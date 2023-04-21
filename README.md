@@ -1,2 +1,3 @@
-# rw-cli-codecollection
-[Public] RunWhen Public CLI Codecollection Repository - Managed by terraform
+# RunWhen CLI CodeCollection
+This repo is a WIP for CLI specialized codebundles.
+
