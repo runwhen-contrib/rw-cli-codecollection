@@ -55,6 +55,10 @@ def from_json(json_str: str):
     return json.loads(json_str, strict=False)
 
 
+def to_json(json_data: any):
+    return json.dumps(json_str)
+
+
 def filter_by_time(
     list_data: list,
     field_name: str,
