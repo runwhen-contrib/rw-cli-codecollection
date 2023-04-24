@@ -62,7 +62,7 @@ def execute_command(
     else:
         return platform.execute_shell_command(
             cmd=cmd,
-            service=target_service,
+            service=service,
             request_secrets=request_secrets,
             env=env,
         )
