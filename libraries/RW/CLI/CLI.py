@@ -13,6 +13,7 @@ from RW.Core import Core
 from .json_parser import *
 from .stdout_parser import *
 from .cli_utils import _string_to_datetime, from_json, verify_rsp
+from .local_process import execute_local_command
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +31,46 @@ def pop_shell_history() -> str:
     return history
 
 
+def execute_command(
+    cmd: str,
+    service: platform.Service = None,
+    request_secrets: list[platform.ShellServiceRequestSecret] = None,
+    env: dict = None,
+    files: dict = None,
+) -> platform.ShellServiceResponse:
+    """Handle split between shellservice command and local process discretely.
+    If the user provides a service, use the traditional shellservice flow.
+    Otherwise we fake a ShellRequest and process it locally with a local subprocess.
+    Somewhat hacky as we're faking ShellResponses. Revisit this.
+
+    Args:
+        cmd (str): _description_
+        service (Service, optional): _description_. Defaults to None.
+        request_secrets (List[ShellServiceRequestSecret], optional): _description_. Defaults to None.
+        env (dict, optional): _description_. Defaults to None.
+        files (dict, optional): _description_. Defaults to None.
+
+    Returns:
+        ShellServiceResponse: _description_
+    """
+    if not service:
+        return execute_local_command(
+            cmd=cmd,
+            request_secrets=request_secrets,
+            env=env,
+        )
+    else:
+        return platform.execute_shell_command(
+            cmd=cmd,
+            service=target_service,
+            request_secrets=request_secrets,
+            env=env,
+        )
+
+
 def _create_kubernetes_remote_exec(
     cmd: str,
-    target_service: platform.Service,
+    target_service: platform.Service = None,
     env: dict = None,
     labels: str = "",
     workload_name: str = "",
@@ -48,9 +86,7 @@ def _create_kubernetes_remote_exec(
             + " -o jsonpath='{.items[0].metadata.name}'"
             + f" -n {namespace} --context={context}"
         )
-        rsp = platform.execute_shell_command(
-            cmd=pod_name_cmd, service=target_service, request_secrets=request_secrets, env=env
-        )
+        rsp = execute_command(cmd=pod_name_cmd, service=target_service, request_secrets=request_secrets, env=env)
         SHELL_HISTORY.append(pod_name_cmd)
         cli_utils.verify_rsp(rsp)
         workload_name = rsp.stdout
@@ -79,7 +115,7 @@ def _create_secrets_from_kwargs(**kwargs) -> list[platform.ShellServiceRequestSe
 
 def run_cli(
     cmd: str,
-    target_service: platform.Service,
+    target_service: platform.Service = None,
     env: dict = None,
     loop_with_items: list = None,
     run_in_workload_with_name: str = "",
@@ -91,6 +127,7 @@ def run_cli(
     global SHELL_HISTORY
     looped_results = []
     rsp = None
+    logger.info(f"Requesting command: {cmd} with service: {target_service} - None indicates run local")
     if run_in_workload_with_labels or run_in_workload_with_name:
         cmd = _create_kubernetes_remote_exec(
             cmd=cmd,
@@ -102,18 +139,13 @@ def run_cli(
             context=optional_context,
             **kwargs,
         )
-    if not target_service:
-        raise ValueError("A runwhen service was not provided for the cli command")
-    logger.info(f"Requesting command: {cmd}")
     request_secrets: [platform.ShellServiceRequestSecret] = [] if len(kwargs.keys()) > 0 else None
     logger.info(f"Received kwargs: {kwargs}")
     request_secrets = _create_secrets_from_kwargs(**kwargs)
     if loop_with_items and len(loop_with_items) > 0:
         for item in loop_with_items:
             cmd = cmd.format(item=item)
-            iter_rsp = platform.execute_shell_command(
-                cmd=cmd, service=target_service, request_secrets=request_secrets, env=env
-            )
+            iter_rsp = execute_command(cmd=cmd, service=target_service, request_secrets=request_secrets, env=env)
             SHELL_HISTORY.append(cmd)
             looped_results.append(iter_rsp.stdout)
             # keep track of last rsp codes we got
@@ -131,7 +163,7 @@ def run_cli(
             errors=rsp.errors,
         )
     else:
-        rsp = platform.execute_shell_command(cmd=cmd, service=target_service, request_secrets=request_secrets, env=env)
+        rsp = execute_command(cmd=cmd, service=target_service, request_secrets=request_secrets, env=env)
         SHELL_HISTORY.append(cmd)
     logger.info(f"shell stdout: {rsp.stdout}")
     logger.info(f"shell stderr: {rsp.stderr}")

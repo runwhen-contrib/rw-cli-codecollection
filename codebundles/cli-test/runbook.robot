@@ -99,3 +99,31 @@ Exec Test
     ...    run_in_workload_with_labels=app=crashi
     ...    optional_namespace=${NAMESPACE}
     ...    optional_context=${CONTEXT}
+
+Local Process Test
+    [Documentation]    Verifies that commands can be run locally directly within the runner
+    [Tags]    Commands    Direct    Process    Local
+    # run local 'ls'
+    ${ls}=    RW.CLI.Run Cli
+    ...    cmd=pwd
+    # run local 'kubectl get pods locally'
+    ${rsp}=    RW.CLI.Run Cli
+    ...    cmd=kubectl get pods --context ${CONTEXT} -n ${NAMESPACE}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    # run kubectl exec locally and df in a remote pod
+    ${rsp}=    RW.CLI.Run Cli
+    ...    cmd=df
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    run_in_workload_with_name=deploy/crashi
+    ...    optional_namespace=${NAMESPACE}
+    ...    optional_context=${CONTEXT}
+    # run kubectl exec locally and df in a remote pod with tags
+    ${rsp}=    RW.CLI.Run Cli
+    ...    cmd=df
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    run_in_workload_with_labels=app=crashi
+    ...    optional_namespace=${NAMESPACE}
+    ...    optional_context=${CONTEXT}
