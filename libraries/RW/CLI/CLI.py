@@ -78,6 +78,7 @@ def _create_kubernetes_remote_exec(
     context: str = "",
     **kwargs,
 ) -> str:
+    # if no specific workload name but labels provided, fetch the first running pod with labels
     if not workload_name and labels:
         request_secrets: [platform.ShellServiceRequestSecret] = [] if len(kwargs.keys()) > 0 else None
         request_secrets = _create_secrets_from_kwargs(**kwargs)

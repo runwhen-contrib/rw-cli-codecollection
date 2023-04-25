@@ -35,7 +35,7 @@ Suite Initialization
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
     IF    "${RUN_LOCAL}" == "YES"
-        ${kubectl}=    Evaluate    None  
+        ${kubectl}=    Evaluate    None
     END
     Set Suite Variable    ${kubectl}    ${kubectl}
 

@@ -53,7 +53,7 @@ Run CLI and Parse Output For Issues
     ...    set_severity_level=1
     ...    set_issue_expected=No crashloops in the output!
     ...    set_issue_actual=We found crashloops in the output line {_line}!
-    ...    set_issue_reproduce_hints=Run 'kubectl get pods --context ${CONTEXT} -n ${NAMESPACE}' and check the output for crashloops
+    ...    set_issue_reproduce_hint=Run 'kubectl get pods --context ${CONTEXT} -n ${NAMESPACE}' and check the output for crashloops
     ...    set_issue_title=The output should contain no crashloopbackoffs
     ...    pod_status__raise_issue_if_eq=CrashLoopBackOff
     ...    pod_name__raise_issue_if_contains=crashi

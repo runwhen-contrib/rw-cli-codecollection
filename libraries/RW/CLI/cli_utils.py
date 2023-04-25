@@ -96,5 +96,5 @@ class IssueCheckResults:
     title: str = ""
     expected: str = ""
     actual: str = ""
-    reproduce_hints: str = ""
+    reproduce_hint: str = ""
     issue_found: bool = False
