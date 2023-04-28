@@ -1,6 +1,6 @@
 *** Settings ***
 Metadata          Author    Shea Stewart
-Documentation     This SLI uses kubectl to score namespace health. Produces a value between 0 (completely failing thet test) and 1 (fully passing the test). Looks for container restarts, events, and pods not ready.
+Documentation     This SLI uses ${BINARY_USED} to score namespace health. Produces a value between 0 (completely failing thet test) and 1 (fully passing the test). Looks for container restarts, events, and pods not ready.
 Force Tags        K8s    Kubernetes    Kube    K8    Namespace    Health
 Metadata          Display Name    Kubernetes Namespace Healthcheck
 Metadata          Supports    Kubernetes,AKS,EKS,GKE,OpenShift
@@ -37,11 +37,18 @@ Suite Initialization
     ...    description=The metadata labels to use when selecting the objects to measure as running.
     ...    pattern=\w*
     ...    example=app=myapp
+    ${BINARY_USED}=    RW.Core.Import User Variable    BINARY_USED
+    ...    type=string
+    ...    description=Which binary to use for Kubernetes CLI commands.
+    ...    enum=[kubectl,oc]
+    ...    example=kubectl
+    ...    default=kubectl
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${kubectl}    ${kubectl}
     Set Suite Variable    ${LABELS}    ${LABELS}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
+    Set Suite Variable    ${BINARY_USED}    ${BINARY_USED}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
 
 *** Tasks ***
@@ -49,7 +56,7 @@ Measure Number of Running Pods with Label
     [Documentation]    Counts the number of running pods with the configured labels.
     [Tags]    Pods    Containers    Running    Status    Count    Health
     ${running_pods}=    RW.CLI.Run Cli
-    ...    cmd=kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} -l ${LABELS} --field-selector=status.phase=Running -ojson
+    ...    cmd=${BINARY_USED} get pods --context=${CONTEXT} -n ${NAMESPACE} -l ${LABELS} --field-selector=status.phase=Running -ojson
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}

@@ -24,7 +24,7 @@ Suite Initialization
     ...    example=kubectl-service.shared
     ${NAMESPACE}=    RW.Core.Import User Variable    NAMESPACE
     ...    type=string
-    ...    description=The name of the Kubernetes namespace to scope actions and searching to. Supports csv list of namespaces, or ALL. 
+    ...    description=The name of the Kubernetes namespace to scope actions and searching to. Supports csv list of namespaces. 
     ...    pattern=\w*
     ...    example=my-namespace
     ${CONTEXT}=    RW.Core.Import User Variable    CONTEXT
@@ -56,6 +56,12 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=2
     ...    default=0
+    ${BINARY_USED}=    RW.Core.Import User Variable    BINARY_USED
+    ...    type=string
+    ...    description=Which binary to use for Kubernetes CLI commands.
+    ...    enum=[kubectl,oc]
+    ...    example=kubectl
+    ...    default=kubectl
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${kubectl}    ${kubectl}
     Set Suite Variable    ${EVENT_AGE}    ${EVENT_AGE}
