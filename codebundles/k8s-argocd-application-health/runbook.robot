@@ -68,11 +68,38 @@ Fetch Application Sync Status
     [Documentation]    Shows the sync status of the ArgoCD application. 
     [Tags]    Application    Sync
     ${app_sync_status}=    RW.CLI.Run Cli
-    ...    cmd=${binary_name} get applications.argoproj.io ${APPLICATION} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='Application Name: {.metadata.name}, Sync Status: {.status.sync.status}'
+    ...    cmd=${binary_name} get applications.argoproj.io ${APPLICATION} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='Application Name: {.metadata.name}, Sync Status: {.status.sync.status}, Health Status: {.status.health.status}'
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of application sync status in namespace: ${NAMESPACE}
-    RW.Core.Add Pre To Report    ${app_sync_status}
+    RW.Core.Add Pre To Report    ${app_sync_status.stdout}
+    RW.Core.Add Pre To Report    Commands Used:\n${history}
+
+Fetch Last Sync Operation Details
+    [Documentation]    Fetches the last argocd sync operation staus. 
+    [Tags]    Application    Sync
+    ${last_sync_status}=    RW.CLI.Run Cli
+    ...    cmd=${binary_name} get applications.argoproj.io ${APPLICATION} -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '"Application Name: " + .metadata.name + "\nApplication Namespace: "+ .metadata.namespace + "\nLast Sync Start Time: " + .status.operationState.finishedAt + "\nLast Sync Finish Time: " + .status.operationState.startedAt + "\nLast Sync Status: " + .status.operationState.phase + "\nLast Sync Message: " + .status.operationState.message'
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    Summary of application sync status in namespace: ${NAMESPACE}
+    RW.Core.Add Pre To Report    ${last_sync_status.stdout}
+    RW.Core.Add Pre To Report    Commands Used:\n${history}
+
+
+Fetch Unhealthy Application Resources
+    [Documentation]    Displays all resources that are not in a healthy state. 
+    [Tags]    Application    Sync
+    ${unhealthy_resources}=    RW.CLI.Run Cli
+    ...    cmd=${binary_name} get applications.argoproj.io ${APPLICATION} -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.status.resources[] | select(.health.status != null) | select(.health.status != "Healthy") | {name,kind,namespace,health}'
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    List of unhealthy resources for application: ${APPLICATION}
+    RW.Core.Add Pre To Report    ${unhealthy_resources.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
