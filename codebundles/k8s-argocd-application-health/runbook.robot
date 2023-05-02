@@ -78,6 +78,7 @@ Fetch Application Sync Status & Health
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of application sync status in namespace: ${APPLICATION_APP_NAMESPACE}
     RW.Core.Add Pre To Report    ${app_sync_status.stdout}
@@ -91,6 +92,7 @@ Fetch Last Sync Operation Details
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of application sync status in namespace: ${APPLICATION_APP_NAMESPACE}
     RW.Core.Add Pre To Report    ${last_sync_status.stdout}
@@ -105,6 +107,7 @@ Fetch Unhealthy Application Resources
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    List of unhealthy resources for application: ${APPLICATION}
     RW.Core.Add Pre To Report    ${unhealthy_resources.stdout}
@@ -118,6 +121,7 @@ Scan For Errors in Pod Logs
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Errors found in pods logs for: ${APPLICATION}
     RW.Core.Add Pre To Report    ${log_errors.stdout}
@@ -131,6 +135,7 @@ Fully Describe Application
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Full description of ArgoCD application: ${APPLICATION}
     RW.Core.Add Pre To Report    ${application_describe.stdout}
