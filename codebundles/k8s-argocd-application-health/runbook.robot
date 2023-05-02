@@ -13,8 +13,6 @@ Library             Collections
 
 Suite Setup         Suite Initialization
 
-Force Tags          k8s    kubernetes    kube    k8    argocd
-
 
 *** Keywords ***
 Suite Initialization
@@ -70,9 +68,9 @@ Suite Initialization
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
 
 *** Tasks ***
-Fetch Application Sync Status & Health
+Fetch ArgoCD Application Sync Status & Health
     [Documentation]    Shows the sync status and health of the ArgoCD application. 
-    [Tags]    Application    Sync    Health
+    [Tags]    Application    Sync    Health    ArgoCD
     ${app_sync_status}=    RW.CLI.Run Cli
     ...    cmd=${binary_name} get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT} -o jsonpath='Application Name: {.metadata.name}, Sync Status: {.status.sync.status}, Health Status: {.status.health.status}, Message: {.status.conditions[].message}'
     ...    target_service=${kubectl}
@@ -84,9 +82,9 @@ Fetch Application Sync Status & Health
     RW.Core.Add Pre To Report    ${app_sync_status.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Fetch Last Sync Operation Details
-    [Documentation]    Fetches the last argocd sync operation staus. 
-    [Tags]    Application    SyncOperation    History
+Fetch ArgoCD Application Last Sync Operation Details
+    [Documentation]    Fetches the last ArgoCD Application sync operation staus. 
+    [Tags]    Application    SyncOperation    History    ArgoCD
     ${last_sync_status}=    RW.CLI.Run Cli
     ...    cmd=${binary_name} get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT} -o json | jq -r '"Application Name: " + .metadata.name + "\nApplication Namespace: "+ .metadata.namespace + "\nLast Sync Start Time: " + .status.operationState.finishedAt + "\nLast Sync Finish Time: " + .status.operationState.startedAt + "\nLast Sync Status: " + .status.operationState.phase + "\nLast Sync Message: " + .status.operationState.message'
     ...    target_service=${kubectl}
@@ -99,9 +97,9 @@ Fetch Last Sync Operation Details
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 
-Fetch Unhealthy Application Resources
-    [Documentation]    Displays all resources that are not in a healthy state. 
-    [Tags]    Resources    Unhealthy    SyncStatus
+Fetch Unhealthy ArgoCD Application Resources
+    [Documentation]    Displays all resources in an ArgoCD Application that are not in a healthy state. 
+    [Tags]    Resources    Unhealthy    SyncStatus    ArgoCD
     ${unhealthy_resources}=    RW.CLI.Run Cli
     ...    cmd=${binary_name} get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT} -o json | jq -r '.status.resources[] | select(.health.status != null) | select(.health.status != "Healthy") | {name,kind,namespace,health}'
     ...    target_service=${kubectl}
@@ -113,9 +111,9 @@ Fetch Unhealthy Application Resources
     RW.Core.Add Pre To Report    ${unhealthy_resources.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Scan For Errors in Pod Logs
+Scan For Errors in Pod Logs Related to ArgoCD Application Deployments
     [Documentation]    Grep for the error pattern across all pods managed by this Applications deployments.  
-    [Tags]    Error    Logs    Deployments
+    [Tags]    Error    Logs    Deployments    ArgoCD    Pods
     ${log_errors}=    RW.CLI.Run Cli
     ...    cmd=for deployment_name in $(kubectl get deployments -l argocd.argoproj.io/instance=${APPLICATION_TARGET_NAMESPACE}_${APPLICATION} -o=custom-columns=NAME:.metadata.name --no-headers -n ${APPLICATION_TARGET_NAMESPACE}); do echo "\nDEPLOYMENT NAME: $deployment_name \n" && kubectl logs deployment/$deployment_name --tail=50 -n ${APPLICATION_TARGET_NAMESPACE} | grep -E '${ERROR_PATTERN}'; done
     ...    target_service=${kubectl}
@@ -127,9 +125,9 @@ Scan For Errors in Pod Logs
     RW.Core.Add Pre To Report    ${log_errors.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Fully Describe Application
-    [Documentation]    Describe all details regarding the application. Useful if reviewing all content.   
-    [Tags]    Application    Describe    
+Fully Describe ArgoCD Application
+    [Documentation]    Describe all details regarding the ArgoCD Application. Useful if reviewing all content.   
+    [Tags]    Application    Describe    ArgoCD
     ${application_describe}=    RW.CLI.Run Cli
     ...    cmd=${binary_name} describe applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT}
     ...    target_service=${kubectl}
