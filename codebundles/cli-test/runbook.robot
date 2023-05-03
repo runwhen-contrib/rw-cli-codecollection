@@ -1,7 +1,6 @@
 *** Settings ***
 Metadata          Author    Jonathan Funk
 Documentation     This taskset smoketests the CLI codebundle setup and run process
-Force Tags        CLI    Troubleshoot    Parse    Stdout
 Suite Setup       Suite Initialization
 Library           BuiltIn
 Library           RW.Core

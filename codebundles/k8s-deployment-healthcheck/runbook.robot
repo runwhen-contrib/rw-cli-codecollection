@@ -1,7 +1,6 @@
 *** Settings ***
 Metadata          Author    Jonathan Funk
 Documentation     Triages issues related to a deployment and its replicas.
-Force Tags        K8s    Kubernetes    Kube    K8    Triage    Troubleshoot    Deployment    Set    Pods    Replicas
 Suite Setup       Suite Initialization
 Library           BuiltIn
 Library           RW.Core

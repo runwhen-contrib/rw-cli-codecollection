@@ -85,6 +85,17 @@ def filter_by_time(
     return results
 
 
+def escape_str_for_exec(string: str, escapes: int = 3) -> str:
+    """Simple helper method to escape specific characters that cause issues in the pod exec passthrough
+    Args:
+        string (str): original string for exec passthrough
+    Returns:
+        str: string with triple escaped quotes for passthrough
+    """
+    string = string.replace('"', "\\" * escapes + '"')
+    return string
+
+
 @dataclass(frozen=True)
 class IssueCheckResults:
     """

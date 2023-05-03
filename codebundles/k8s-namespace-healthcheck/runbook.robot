@@ -13,8 +13,6 @@ Library             Collections
 
 Suite Setup         Suite Initialization
 
-Force Tags          k8s    kubernetes    kube    k8
-
 
 *** Keywords ***
 Suite Initialization
@@ -101,7 +99,7 @@ Trace Namespace Errors
     ${involved_pod_names}=    RW.CLI.From Json    json_str=${involved_pod_names.stdout}
     ${podnames_to_query}=    Combine Lists    ${restarting_pods}    ${involved_pod_names}
     ${pod_logs_errors}=    RW.CLI.Run Cli
-    ...    cmd=kubectl logs --context=${CONTEXT} --namespace=${NAMESPACE} pod/{item} --tail=50 | grep -E -i "${ERROR_PATTERN}"
+    ...    cmd=kubectl logs --context=${CONTEXT} --namespace=${NAMESPACE} pod/{item} --tail=100 | grep -E -i "${ERROR_PATTERN}"
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}

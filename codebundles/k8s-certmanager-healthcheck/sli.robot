@@ -1,7 +1,6 @@
 *** Settings ***
 Metadata          Author    Jonathan Funk
 Documentation     Check the health of pods deployed by cert-manager.
-Force Tags        K8s    Kubernetes    Kube    K8    Cert    CertManager    Health
 Metadata          Display Name    Kubernetes CertManager Healthcheck
 Metadata          Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 Suite Setup       Suite Initialization

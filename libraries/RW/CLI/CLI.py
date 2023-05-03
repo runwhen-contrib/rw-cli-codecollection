@@ -12,7 +12,7 @@ from RW.Core import Core
 # import bare names for robot keyword names
 from .json_parser import *
 from .stdout_parser import *
-from .cli_utils import _string_to_datetime, from_json, verify_rsp
+from .cli_utils import _string_to_datetime, from_json, verify_rsp, escape_str_for_exec
 from .local_process import execute_local_command
 
 logger = logging.getLogger(__name__)
@@ -91,7 +91,10 @@ def _create_kubernetes_remote_exec(
         SHELL_HISTORY.append(pod_name_cmd)
         cli_utils.verify_rsp(rsp)
         workload_name = rsp.stdout
-    cmd_template: str = f"kubectl exec -n {namespace} --context={context} {workload_name} -- /bin/bash -c '{cmd}'"
+    # use eval so that env variables are evaluated in the subprocess
+    cmd_template: str = (
+        f"eval $(echo \"kubectl exec -n {namespace} --context={context} {workload_name} -- /bin/bash -c '{cmd}'\")"
+    )
     cmd = cmd_template
     logger.info(f"Templated remote exec: {cmd}")
     return cmd
