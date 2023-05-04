@@ -66,7 +66,7 @@ Fetch Vault CSI Driver Logs
     [Documentation]    Fetches the last 100 lines of logs for the vault CSI driver.
     [Tags]    Fetch    Log    Pod    Container    Errors    Inspect    Trace    Info    Vault    CSI    Driver
     ${logs}=    RW.CLI.Run Cli
-    ...    cmd=kubectl logs --tail=100 daemonset.apps/vault-csi-provider --context ${CONTEXT} -n ${NAMESPACE}
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs --tail=100 daemonset.apps/vault-csi-provider --context ${CONTEXT} -n ${NAMESPACE}
     ...    env=${env}
     ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -82,7 +82,7 @@ Get Vault CSI Driver Warning Events
     [Documentation]    Fetches warning-type events related to the vault CSI driver. 
     [Tags]    Events    Workloads    Errors    Warnings    Get    Vault    csi    Driver
     ${events}=    RW.CLI.Run Cli
-    ...    cmd=kubectl get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} | grep -i "vault-csi-provider"
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} | grep -i "vault-csi-provider"
     ...    env=${env}
     ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -98,12 +98,12 @@ Check Vault CSI Driver Replicas
     [Documentation]    Performs an inspection on the replicas of the vault CSI driver daemonset.
     [Tags]    Daemonset    csi    Replicas    Desired    Actual    Available    Ready    Unhealthy    Rollout    Stuck    Pods
     ${daemonset_describe}=    RW.CLI.Run Cli
-    ...    cmd=kubectl describe daemonset.apps/vault-csi-provider --context ${CONTEXT} -n ${NAMESPACE}
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} describe daemonset.apps/vault-csi-provider --context ${CONTEXT} -n ${NAMESPACE}
     ...    env=${env}
     ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${daemonset}=    RW.CLI.Run Cli
-    ...    cmd=kubectl get daemonset.apps/vault-csi-provider --context ${CONTEXT} -n ${NAMESPACE} -o json
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get daemonset.apps/vault-csi-provider --context ${CONTEXT} -n ${NAMESPACE} -o json
     ...    env=${env}
     ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -225,7 +225,7 @@ Verify Vault Availability
     ...    extract_path_to_var__sealed=sealed
     ...    extract_path_to_var__standby=standby
     ...    init__raise_issue_if_neq=True
-    ...    sealed__raise_issue_if_neq=False    
+    ...    sealed__raise_issue_if_neq=False
 
 Check Vault StatefulSet Replicas
     [Documentation]    Pulls the replica information for the Vault statefulset and checks if it's highly available
