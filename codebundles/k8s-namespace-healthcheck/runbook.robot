@@ -42,7 +42,7 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=(Error|Exception)
     ...    default=(Error|Exception)
-    ${BINARY_USED}=    RW.Core.Import User Variable    BINARY_USED
+    ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
     ...    enum=[kubectl,oc]
@@ -51,7 +51,7 @@ Suite Initialization
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${kubectl}    ${kubectl}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
-    Set Suite Variable    ${BINARY_USED}    ${BINARY_USED}
+    Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${ERROR_PATTERN}    ${ERROR_PATTERN}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}

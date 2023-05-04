@@ -35,6 +35,7 @@ def parse_cli_json_output(
     set_issue_title: str = "",
     expected_rsp_statuscodes: list[int] = [200],
     expected_rsp_returncodes: list[int] = [0],
+    raise_issue_from_rsp_code: bool = False,
     contains_stderr_ok: bool = True,
     **kwargs,
 ) -> platform.ShellServiceResponse:
@@ -48,7 +49,33 @@ def parse_cli_json_output(
     logger.info(f"kwargs: {kwargs}")
     found_issue: bool = False
     # check we've got an expected rsp
-    cli_utils.verify_rsp(rsp, expected_rsp_statuscodes, expected_rsp_returncodes, contains_stderr_ok)
+    try:
+        cli_utils.verify_rsp(rsp, expected_rsp_statuscodes, expected_rsp_returncodes, contains_stderr_ok)
+    except Exception as e:
+        if raise_issue_from_rsp_code:
+            rsp_code_title = set_issue_title if set_issue_title else "Error/Unexpected Response Code"
+            rsp_code_expected = (
+                set_issue_expected
+                if set_issue_expected
+                else f"The internal response of {rsp.cmd} should be within {expected_rsp_statuscodes} and the process response should be within {expected_rsp_returncodes}"
+            )
+            rsp_code_actual = (
+                set_issue_actual if set_issue_actual else f"Encountered {e} as a result of running: {rsp.cmd}"
+            )
+            rsp_code_reproduce_hint = (
+                set_issue_reproduce_hint
+                if set_issue_reproduce_hint
+                else f"Run command: {rsp.cmd} and check the return code"
+            )
+            _core.add_issue(
+                severity=set_severity_level,
+                title=rsp_code_title,
+                expected=rsp_code_expected,
+                actual=rsp_code_actual,
+                reproduce_hint=rsp_code_reproduce_hint,
+            )
+        else:
+            raise e
     json_data = json.loads(rsp.stdout)
     # create extractions first
     for key in kwargs.keys():
@@ -215,6 +242,9 @@ def _check_for_json_issue(
                 logger.warning(
                     f"Numeric parse query requested but values not castable: {query_value} and {variable_value}"
                 )
+        # If True/False string passed from robot layer, cast it to bool
+        if not numeric_castable and (query_value == "True" or query_value == "False"):
+            query_value = True if query_value == "True" else False
         if query == "raise_issue_if_eq" and (
             query_value == variable_value or (variable_is_list and query_value in variable_value)
         ):
@@ -229,7 +259,7 @@ def _check_for_json_issue(
             issue_found = True
             title = "Unexpected Value in Output"
             expected = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} should be equal to {variable_value}"
-            actual = f"TThe parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} does not contain the expected value of: {prefix}=={variable_value}"
+            actual = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} does not contain the expected value of: {prefix}=={query_value} and is actually {variable_value}"
             reproduce_hint = f"Run {rsp.cmd} and apply the jmespath '{variable_from_path[prefix]}' to the output"
 
         elif query == "raise_issue_if_lt" and numeric_castable and variable_value < query_value:

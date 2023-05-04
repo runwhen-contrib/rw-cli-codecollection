@@ -1,7 +1,6 @@
 *** Settings ***
 Metadata          Author    Jonathan Funk
 Documentation     Triages issues related to a StatefulSet and its replicas.
-Force Tags        K8s    Kubernetes    Kube    K8    Triage    Troubleshoot    StatefulSet    Set    Pods    Replicas
 Suite Setup       Suite Initialization
 Library           BuiltIn
 Library           RW.Core
@@ -41,7 +40,13 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=Could not render example.
     ...    default=
-    ${BINARY_USED}=    RW.Core.Import User Variable    BINARY_USED
+    ${EXPECTED_AVAILABILITY}=    RW.Core.Import User Variable    CONTEXT
+    ...    type=string
+    ...    description=The minimum numbers of replicas allowed considered healthy.
+    ...    pattern=\d+
+    ...    example=3
+    ...    default=3
+    ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for CLI commands
     ...    enum=[kubectl,oc]
@@ -50,9 +55,10 @@ Suite Initialization
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${kubectl}    ${kubectl}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
-    Set Suite Variable    ${BINARY_USED}    ${BINARY_USED}
+    Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${STATEFULSET_NAME}    ${STATEFULSET_NAME}
+    Set Suite Variable    ${EXPECTED_AVAILABILITY}    ${EXPECTED_AVAILABILITY}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
     IF    "${LABELS}" != ""
         ${LABELS}=    Set Variable    -l ${LABELS}        
@@ -65,7 +71,7 @@ Fetch StatefulSet Logs
     [Documentation]    Fetches the last 100 lines of logs for the given statefulset in the namespace.
     [Tags]    Fetch    Log    Pod    Container    Errors    Inspect    Trace    Info    StatefulSet
     ${logs}=    RW.CLI.Run Cli
-    ...    cmd=${BINARY_USED} logs --tail=100 statefulset/${STATEFULSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs --tail=100 statefulset/${STATEFULSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -78,7 +84,7 @@ Get Related StatefulSet Events
     [Documentation]    Fetches events related to the StatefulSet workload in the namespace.
     [Tags]    Events    Workloads    Errors    Warnings    Get    StatefulSet
     ${events}=    RW.CLI.Run Cli
-    ...    cmd=${BINARY_USED} get events --context ${CONTEXT} -n ${NAMESPACE} | grep -i "${STATEFULSET_NAME}"
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} | grep -i "${STATEFULSET_NAME}"
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -91,7 +97,7 @@ Fetch StatefulSet Manifest Details
     [Documentation]    Fetches the current state of the statefulset manifest for inspection.
     [Tags]    StatefulSet    Details    Manifest    Info
     ${statefulset}=    RW.CLI.Run Cli
-    ...    cmd=${BINARY_USED} get statefulset ${LABELS} --context=${CONTEXT} -n ${NAMESPACE} -o yaml
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${LABELS} --context=${CONTEXT} -n ${NAMESPACE} -o yaml
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -105,13 +111,13 @@ Check StatefulSet Replicas
     ...                , if the replica counts are the expected / healthy values, and if not, what they should be.
     [Tags]    StatefulSet    Replicas    Desired    Actual    Available    Ready    Unhealthy    Rollout    Stuck    Pods
     RW.CLI.Run Cli
-    ...    cmd=${BINARY_USED} get statefulset -n ${NAMESPACE} -o json | jq -r '.items[] | select(.status.availableReplicas < .status.replicas) | "---\nStatefulSet Name: " + (.metadata.name|tostring) + "\nDesired Replicas: " + (.status.replicas|tostring) + "\nAvailable Replicas: " + (.status.availableReplicas|tostring)'  
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset -n ${NAMESPACE} -o json | jq -r '.items[] | select(.status.availableReplicas < .status.replicas) | "---\nStatefulSet Name: " + (.metadata.name|tostring) + "\nDesired Replicas: " + (.status.replicas|tostring) + "\nAvailable Replicas: " + (.status.availableReplicas|tostring)'  
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
     ${statefulset}=    RW.CLI.Run Cli
-    ...    cmd=${BINARY_USED} get statefulset ${LABELS} --context=${CONTEXT} -n ${NAMESPACE} -o=jsonpath='{.items[0]}'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${LABELS} --context=${CONTEXT} -n ${NAMESPACE} -o=jsonpath='{.items[0]}'
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -123,7 +129,7 @@ Check StatefulSet Replicas
     RW.CLI.Parse Cli Json Output
     ...    rsp=${available_replicas}
     ...    extract_path_to_var__available_replicas=@
-    ...    available_replicas__raise_issue_if_lt=3
+    ...    available_replicas__raise_issue_if_lt=${EXPECTED_AVAILABILITY}
     ${desired_replicas}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${statefulset}
     ...    extract_path_to_var__desired_replicas=status.replicas || `0`

@@ -55,7 +55,7 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=2
     ...    default=0
-    ${BINARY_USED}=    RW.Core.Import User Variable    BINARY_USED
+    ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
     ...    enum=[kubectl,oc]

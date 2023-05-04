@@ -34,7 +34,13 @@ Suite Initialization
     ...    description=Which Kubernetes context to operate within.
     ...    pattern=\w*
     ...    example=my-main-cluster
-    ${BINARY_USED}=    RW.Core.Import User Variable    BINARY_USED
+    ${EXPECTED_AVAILABILITY}=    RW.Core.Import User Variable    CONTEXT
+    ...    type=string
+    ...    description=The minimum numbers of replicas allowed considered healthy.
+    ...    pattern=\d+
+    ...    example=3
+    ...    default=3
+    ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
     ...    enum=[kubectl,oc]
@@ -42,10 +48,11 @@ Suite Initialization
     ...    default=kubectl
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${kubectl}    ${kubectl}
-    Set Suite Variable    ${BINARY_USED}    ${BINARY_USED}
+    Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${DEPLOYMENT_NAME}    ${DEPLOYMENT_NAME}
+    Set Suite Variable    ${EXPECTED_AVAILABILITY}    ${EXPECTED_AVAILABILITY}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
 
 *** Tasks ***
@@ -53,7 +60,7 @@ Fetch Deployment Logs
     [Documentation]    Fetches the last 100 lines of logs for the given deployment in the namespace.
     [Tags]    Fetch    Log    Pod    Container    Errors    Inspect    Trace    Info    Deployment
     ${logs}=    RW.CLI.Run Cli
-    ...    cmd=${BINARY_USED} logs --tail=100 deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs --tail=100 deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -65,7 +72,7 @@ Get Related Deployment Events
     [Documentation]    Fetches events related to the deployment workload in the namespace.
     [Tags]    Events    Workloads    Errors    Warnings    Get    Deployment
     ${events}=    RW.CLI.Run Cli
-    ...    cmd=${BINARY_USED} get events --context ${CONTEXT} -n ${NAMESPACE} --field-selector type=Warning | grep -i "${DEPLOYMENT_NAME}"
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} --field-selector type=Warning | grep -i "${DEPLOYMENT_NAME}"
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -77,7 +84,7 @@ Fetch Deployment Manifest Details
     [Documentation]    Fetches the current state of the deployment manifest for inspection.
     [Tags]    Deployment    Details    Manifest    Info
     ${deployment}=    RW.CLI.Run Cli
-    ...    cmd=${BINARY_USED} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o yaml
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o yaml
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -90,7 +97,7 @@ Check Deployment Replicas
     ...                , if the replica counts are the expected / healthy values, and if not, what they should be.
     [Tags]    Deployment    Replicas    Desired    Actual    Available    Ready    Unhealthy    Rollout    Stuck    Pods
     ${deployment}=    RW.CLI.Run Cli
-    ...    cmd=${BINARY_USED} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -102,7 +109,7 @@ Check Deployment Replicas
     RW.CLI.Parse Cli Json Output
     ...    rsp=${available_replicas}
     ...    extract_path_to_var__available_replicas=@
-    ...    available_replicas__raise_issue_if_lt=3
+    ...    available_replicas__raise_issue_if_lt=${EXPECTED_AVAILABILITY}
     ${desired_replicas}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${deployment}
     ...    extract_path_to_var__desired_replicas=status.replicas || `0`
