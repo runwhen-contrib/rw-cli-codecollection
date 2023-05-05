@@ -64,10 +64,11 @@ Trace Namespace Errors
     [Tags]    Namespace    Trace    Error    Pods    Events    Logs    Grep
     # get pods involved with error events
     ${error_events}=    RW.CLI.Run Cli
-    ...    cmd=kubectl get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${recent_error_events}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${error_events}
     ...    extract_path_to_var__recent_events=items
@@ -81,7 +82,7 @@ Trace Namespace Errors
     ...    assign_stdout_from_var=involved_pod_names
     # get pods with restarts > 0
     ${pods_in_namespace}=    RW.CLI.Run Cli
-    ...    cmd=kubectl get pods --context ${CONTEXT} -n ${NAMESPACE} -o json
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -o json
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -99,7 +100,7 @@ Trace Namespace Errors
     ${involved_pod_names}=    RW.CLI.From Json    json_str=${involved_pod_names.stdout}
     ${podnames_to_query}=    Combine Lists    ${restarting_pods}    ${involved_pod_names}
     ${pod_logs_errors}=    RW.CLI.Run Cli
-    ...    cmd=kubectl logs --context=${CONTEXT} --namespace=${NAMESPACE} pod/{item} --tail=100 | grep -E -i "${ERROR_PATTERN}"
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs --context=${CONTEXT} --namespace=${NAMESPACE} pod/{item} --tail=100 | grep -E -i "${ERROR_PATTERN}"
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -118,10 +119,11 @@ Fetch Unready Pods
     [Documentation]    Fetches all pods which are not running (unready) in the namespace and raises an issue if any pods are found.
     [Tags]    Namespace    Pods    Status    Unready    Not Starting    Phase    Containers
     ${unreadypods_results}=    RW.CLI.Run Cli
-    ...    cmd=kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --sort-by='status.containerStatuses[0].restartCount' --field-selector=status.phase!=Running
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --sort-by='status.containerStatuses[0].restartCount' --field-selector=status.phase!=Running
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     IF    """${unreadypods_results.stdout}""" == ""
         ${unreadypods_results}=    Set Variable    No unready pods found
@@ -137,10 +139,11 @@ Check Workload Status Conditions
     [Documentation]    Parses all workloads in a namespace and inspects their status conditions for issues. Status conditions with a status value of False are considered an error.
     [Tags]    Namespace    Status    Conditions    Pods    Conditions    Reasons    Workloads
     ${all_resources}=    RW.CLI.Run Cli
-    ...    cmd=kubectl get all --context ${CONTEXT} -n ${NAMESPACE} -o json
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get all --context ${CONTEXT} -n ${NAMESPACE} -o json
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${failing_conditions}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${all_resources}
     ...    extract_path_to_var__workload_conditions=items[].{kind:kind, name:metadata.name, conditions:status.conditions[?status == `False`]}
@@ -162,11 +165,13 @@ Check Workload Status Conditions
 
 Namespace Get All
     [Documentation]    Simple fetch all to provide a snapshot of information about the workloads in the namespace.
+    [Tags]    Get All    Resources    Info    Workloads    Namespace    Manifests
     ${all_results}=    RW.CLI.Run Cli
-    ...    cmd=kubectl get all --context=${CONTEXT} -n ${NAMESPACE}
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY}  get all --context=${CONTEXT} -n ${NAMESPACE}
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Informational Get All for Namespace: ${NAMESPACE}
     RW.Core.Add Pre To Report    ${all_results}

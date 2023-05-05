@@ -1,5 +1,7 @@
 *** Settings ***
 Metadata          Author    Jonathan Funk
+Metadata          Display Name    Kubernetes Daemonset Triage
+Metadata          Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 Documentation     Triages issues related to a Daemonset and its available replicas.
 Suite Setup       Suite Initialization
 Library           BuiltIn
@@ -39,6 +41,13 @@ Suite Initialization
     ...    description=A Kubernetes label selector string used to filter/find relevant resources for troubleshooting.
     ...    pattern=\w*
     ...    example=Could not render example.
+    ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
+    ...    type=string
+    ...    description=Which binary to use for Kubernetes CLI commands.
+    ...    enum=[kubectl,oc]
+    ...    example=kubectl
+    ...    default=kubectl
+    Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${kubectl}    ${kubectl}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
@@ -55,10 +64,11 @@ Fetch Daemonset Logs
     [Documentation]    Fetches the last 100 lines of logs for the given daemonset in the namespace.
     [Tags]    Fetch    Log    Pod    Container    Errors    Inspect    Trace    Info    Daemonset    csi
     ${logs}=    RW.CLI.Run Cli
-    ...    cmd=kubectl logs --tail=100 daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs --tail=100 daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     ...    env=${env}
     ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${logs.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -67,10 +77,11 @@ Get Related Daemonset Events
     [Documentation]    Fetches events related to the daemonset workload in the namespace.
     [Tags]    Events    Workloads    Errors    Warnings    Get    Daemonset    csi
     ${events}=    RW.CLI.Run Cli
-    ...    cmd=kubectl get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} | grep -i "${DAEMONSET_NAME}"
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} | grep -i "${DAEMONSET_NAME}"
     ...    env=${env}
     ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${events.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -80,15 +91,17 @@ Check Daemonset Replicas
     ...                , if the replica counts are the expected / healthy values, and if not, what they should be.
     [Tags]    Daemonset    csi    Replicas    Desired    Actual    Available    Ready    Unhealthy    Rollout    Stuck    Pods
     ${daemonset_describe}=    RW.CLI.Run Cli
-    ...    cmd=kubectl describe daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} describe daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     ...    env=${env}
     ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${daemonset}=    RW.CLI.Run Cli
-    ...    cmd=kubectl get daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json
     ...    env=${env}
     ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     # status fields
     ${current_scheduled}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${daemonset}

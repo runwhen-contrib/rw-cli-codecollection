@@ -70,6 +70,7 @@ Fetch Vault CSI Driver Logs
     ...    env=${env}
     ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${found_logs}=    Set Variable    No Vault CSI driver logs found!
     IF    """${logs.stdout}""" != ""
         ${found_logs}=    Set Variable    ${logs.stdout}        
@@ -86,6 +87,7 @@ Get Vault CSI Driver Warning Events
     ...    env=${env}
     ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${found_events}=    Set Variable    No Vault CSI driver Events found!
     IF    """${events.stdout}""" != ""
         ${found_events}=    Set Variable    ${events.stdout}        
@@ -102,11 +104,13 @@ Check Vault CSI Driver Replicas
     ...    env=${env}
     ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${daemonset}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get daemonset.apps/vault-csi-provider --context ${CONTEXT} -n ${NAMESPACE} -o json
     ...    env=${env}
     ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     # status fields
     ${current_scheduled}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${daemonset}
@@ -166,6 +170,7 @@ Fetch Vault Logs
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${found_logs}=    Set Variable    No Vault logs found!
     IF    """${logs.stdout}""" != ""
         ${found_logs}=    Set Variable    ${logs.stdout}        
@@ -182,6 +187,7 @@ Get Related Vault Events
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${found_events}=    Set Variable    No Vault Events found!
     IF    """${events.stdout}""" != ""
         ${found_events}=    Set Variable    ${events.stdout}        
@@ -198,6 +204,7 @@ Fetch Vault StatefulSet Manifest Details
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${statefulset.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -210,6 +217,7 @@ Fetch Vault DaemonSet Manifest Details
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${statefulset.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -219,6 +227,7 @@ Verify Vault Availability
     [Tags]    HTTP    Curl    Vault    Web    Code    OK    Available
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=curl ${VAULT_URL}
+    ...    render_in_commandlist=true
     RW.CLI.Parse Cli Json Output
     ...    rsp=${rsp}
     ...    extract_path_to_var__init=initialized
@@ -236,6 +245,7 @@ Check Vault StatefulSet Replicas
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${available_replicas}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${statefulset}
     ...    extract_path_to_var__available_replicas=status.availableReplicas || `0`

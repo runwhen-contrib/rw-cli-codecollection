@@ -1,5 +1,7 @@
 *** Settings ***
 Metadata          Author    Jonathan Funk
+Metadata          Display Name    Kubernetes Deployment Triage
+Metadata          Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 Documentation     Triages issues related to a deployment and its replicas.
 Suite Setup       Suite Initialization
 Library           BuiltIn
@@ -64,6 +66,7 @@ Fetch Deployment Logs
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${logs.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -76,6 +79,7 @@ Get Related Deployment Events
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${events.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -88,6 +92,7 @@ Fetch Deployment Manifest Details
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${deployment.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -101,6 +106,7 @@ Check Deployment Replicas
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     ${available_replicas}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${deployment}
     ...    extract_path_to_var__available_replicas=status.availableReplicas || `0`

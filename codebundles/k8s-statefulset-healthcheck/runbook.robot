@@ -1,5 +1,7 @@
 *** Settings ***
 Metadata          Author    Jonathan Funk
+Metadata          Display Name    Kubernetes StatefulSet Triage
+Metadata          Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 Documentation     Triages issues related to a StatefulSet and its replicas.
 Suite Setup       Suite Initialization
 Library           BuiltIn
