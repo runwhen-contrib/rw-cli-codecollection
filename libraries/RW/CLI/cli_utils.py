@@ -85,7 +85,7 @@ def filter_by_time(
     return results
 
 
-def escape_str_for_exec(string: str, escapes: int = 3) -> str:
+def escape_str_for_exec(string: str, escapes: int = 1) -> str:
     """Simple helper method to escape specific characters that cause issues in the pod exec passthrough
     Args:
         string (str): original string for exec passthrough
