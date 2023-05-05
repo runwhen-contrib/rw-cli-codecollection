@@ -1,11 +1,10 @@
 *** Settings ***
 Documentation       Runs multiple Kubernetes and psql commands to report on the health of a postgres cluster. 
 Metadata            Author    Shea Stewart
-
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
-Library    String
+Library             String
 
 Suite Setup         Suite Initialization
 
@@ -13,6 +12,8 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 Get Standard Postgres Resource Information
+    [Documentation]    Runs a simple fetch all for the resources in the given workspace under the configured labels.
+    [Tags]    Postgres    Resources    Workloads    Standard    Information
     ${results}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get all -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
     ...    target_service=${kubectl}
@@ -23,6 +24,9 @@ Get Standard Postgres Resource Information
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Describe Postgres Custom Resources
+    [Documentation]    Runs a ftech all for the CRD types in the cluster and uses the type list after filtering it to fetch
+    ...                a list of live runnig CRD workloads of those types and describe them.
+    [Tags]    Postgres    Resources    Workloads    Customer Resource Definitions    CRD    Information
     ${crd_list}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get crd -n ${NAMESPACE} --context ${CONTEXT} -o=jsonpath='{.items[*].metadata.name}'
     ...    target_service=${kubectl}
@@ -53,6 +57,8 @@ Describe Postgres Custom Resources
     RW.Core.Add Pre To Report    Commands Used:\n${history} 
 
 Get Postgres Pod Logs & Events
+    [Documentation]    Queries Postgres-related pods for their recent logs and checks for any warning-type events.
+    [Tags]    Postgres    Events    Warnings    Labels    Logs    Errors    Pods
     ${labeled_pods}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT} -o=name --field-selector=status.phase=Running
     ...    target_service=${kubectl}
@@ -86,6 +92,8 @@ Get Postgres Pod Logs & Events
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Get Postgres Pod Resource Utilization
+    [Documentation]    Performs and a top command on list of labeled postgres-related workloads to check pod resources.
+    [Tags]    Top    Resources    Utilization    Pods    Workloads    CPU    Memory    Allocation    Postgres
     ${labeled_pods}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT} -o=name --field-selector=status.phase=Running
     ...    target_service=${kubectl}
@@ -107,6 +115,8 @@ Get Postgres Pod Resource Utilization
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Get Running Postgres Configuration
+    [Documentation]    Fetches the postgres instance's configuration information.
+    [Tags]    Config    Postgres    File    Show    Path    Setup    Configuration
     ${config_query}=    Set Variable    SHOW config_file
     ${full_cmd}=    RW.CLI.Escape Str For Exec    echo "${config_query}" > /tmp/rw-tmp-queries.sql && ${PSQL_RUN_PASSTHROUGH}
     ${config_rsp}=    RW.CLI.Run Cli
@@ -135,6 +145,8 @@ Get Running Postgres Configuration
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Get Patroni Output
+    [Documentation]    Attempts to run the patronictl CLI within the workload if it's available to check the current state of a patroni cluster, if applicable.
+    [Tags]    Patroni    patronictl    List    Cluster    Health    Check    state    Postgres
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=patronictl list
     ...    env=${env}
@@ -149,6 +161,8 @@ Get Patroni Output
     RW.Core.Add Pre To Report    ${rsp.stdout}
 
 Run DB Queries
+    [Documentation]    Runs a suite of configurable queries to check for index issues, slow-queries, etc and create a report.
+    [Tags]    Slow Queries    Index    Health    Triage    Postgres    Patroni    Tables
     ${escaped_query}=    RW.CLI.Escape Str For Exec    \\t off \\\\\\\\\\ \\a \\\\\\\\\\ \\timing on \\\\\\\\\\ ${QUERY}
     ${full_cmd}=    RW.CLI.Escape Str For Exec    echo "${escaped_query}" > /tmp/rw-tmp-queries.sql && ${PSQL_RUN_PASSTHROUGH}
     ${rsp}=    RW.CLI.Run Cli
