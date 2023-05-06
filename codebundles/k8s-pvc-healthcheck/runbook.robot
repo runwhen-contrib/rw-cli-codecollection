@@ -60,7 +60,6 @@ Fetch Events for Unhealthy Kubernetes Persistent Volume Claims
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
-    # ${regexp}=    Evaluate    r'(.+)'
     ${regexp}=    Catenate
     ...    (?m)(?P<line>.+)
     RW.CLI.Parse Cli Output By Line
