@@ -5,7 +5,6 @@ Metadata            Display Name    Kubernetes FluxCD HelmRelease TaskSet
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,FluxCD
 Library             RW.Core
 Library             RW.CLI
-Library             RW.Utils
 Library             RW.platform
 
 Suite Setup         Suite Initialization
@@ -41,37 +40,47 @@ Fetch All FluxCD Helmrelease Versions
 Fetch Mismatched FluxCD HelmRelease Version
     [Documentation]    List helmreleases and use jq to display any releases where the last attempted software revision doesn't match the current running revision. Requires jq.  
     [Tags]        FluxCD     Helmrelease    Version    Mismatched    Unhealthy
-    ${stdout}=    RW.CLI.Run Cli
+    ${helmrelease_version_mismatches}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} ${NAMESPACE} -o json --context ${context} | jq -r '.items[] | select(.status.lastAppliedRevision!=.status.lastAttemptedRevision) | "Name: " + .metadata.name + " Last Attempted Version: " + .status.lastAttemptedRevision + " Last Applied Revision: " + .status.lastAppliedRevision'
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true
+    ${regexp}=    Catenate
+    ...    (?m)(?P<line>.+)
     RW.CLI.Parse Cli Output By Line
-    ...    rsp=${stdout}
-    ...    set_issue_title="FluxCD Helmrelease Version Mismatch"
-    ...    lines_like_regexp=".+"
-    ...    mismatched_helmrelease_versions__raise_issue_if_contains="Name:"
+    ...    rsp=${helmrelease_version_mismatches}
+    ...    lines_like_regexp=${regexp}
+    ...    set_severity_level=2
+    ...    set_issue_expected=Flux HelmRelease lastApplied and lastAttempted Revision should match
+    ...    set_issue_actual=Flux HelmRelease lastApplied and lastAttempted Revision do not match
+    ...    set_issue_title=FluxCD Helmrelease Version Mismatch
+    ...    line__raise_issue_if_contains=Name
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Helmreleases version mismatches: \n ${stdout}
+    RW.Core.Add Pre To Report    Helmreleases version mismatches: \n ${helmrelease_version_mismatches.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Fetch FluxCD HelmRelease Error Messages    
     [Documentation]    List helmreleases and display the status conditions message for any helmreleases that are not in a Ready state. 
     [Tags]        FluxCD     Helmrelease    Errors     Unhealthy    Message
-    ${stdout}=    RW.CLI.Run Cli
+    ${helmrelease_errors}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} ${NAMESPACE} -o=jsonpath="{range .items[?(@.status.conditions[].status=='False')]}{'-----\\nName: '}{@.metadata.name}{'\\n'}{@.status.conditions[*].message}{'\\n'}{end}" --context ${context} || true
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true
+   ${regexp}=    Catenate
+    ...    (?m)(?P<line>.+)
     RW.CLI.Parse Cli Output By Line
-    ...    rsp=${stdout}
-    ...    set_issue_title="FluxCD Helmrelease Errors"
-    ...    lines_like_regexp=".+"
-    ...    helm_release_errors__raise_issue_if_contains="Name:"
+    ...    rsp=${helmrelease_errors}
+    ...    lines_like_regexp=${regexp}
+    ...    set_severity_level=2
+    ...    set_issue_expected=Flux HelmRelease Objects should be in a ready state 
+    ...    set_issue_actual=Flux HelmRelease Objects shouldare not in a ready state
+    ...    set_issue_title=FluxCD Helmrelease Errors
+    ...    line__raise_issue_if_contains=Name
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Helmreleases status errors: \n ${stdout}
+    RW.Core.Add Pre To Report    Helmreleases status errors: \n ${helmrelease_errors.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 
