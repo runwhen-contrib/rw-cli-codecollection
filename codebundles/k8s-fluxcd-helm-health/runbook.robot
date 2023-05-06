@@ -76,7 +76,7 @@ Fetch FluxCD HelmRelease Error Messages
     ...    lines_like_regexp=${regexp}
     ...    set_severity_level=2
     ...    set_issue_expected=Flux HelmRelease Objects should be in a ready state 
-    ...    set_issue_actual=Flux HelmRelease Objects shouldare not in a ready state
+    ...    set_issue_actual=Flux HelmRelease Objects are not in a ready state
     ...    set_issue_title=FluxCD Helmrelease Errors
     ...    line__raise_issue_if_contains=Name
     ${history}=    RW.CLI.Pop Shell History
