@@ -75,3 +75,16 @@ Fetch Events for Unhealthy Kubernetes Persistent Volume Claims
     RW.Core.Add Pre To Report    ${unbound_pvc_events.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
+List Pods with Attached Volumes and Related PV Details
+    [Documentation]    For each pod in a namespace, collect details on configured persistent volume claim, persistent volume, and node. 
+    [Tags]    Pod    Storage    PVC    PV    Status    CSI    StorageReport
+    ${pod_storage_report}=    RW.CLI.Run Cli
+    ...    cmd=for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} -o jsonpath='{range .items[*]}{.metadata.name}{"\\n"}{end}'); do for pvc in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods $pod -n ${NAMESPACE} -o jsonpath='{range .spec.volumes[*]}{.persistentVolumeClaim.claimName}{"\\n"}{end}'); do pv=$(${KUBERNETES_DISTRIBUTION_BINARY} get pvc $pvc -n ${NAMESPACE} -o jsonpath='{.spec.volumeName}') && status=$(${KUBERNETES_DISTRIBUTION_BINARY} get pv $pv -o jsonpath='{.status.phase}') && node=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} -o jsonpath='{.spec.nodeName}') && zone=$(${KUBERNETES_DISTRIBUTION_BINARY} get nodes $node -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/zone}') && ingressclass=$(${KUBERNETES_DISTRIBUTION_BINARY} get pvc $pvc -n ${NAMESPACE} -o jsonpath='{.spec.storageClassName}') && accessmode=$(${KUBERNETES_DISTRIBUTION_BINARY} get pvc $pvc -n ${NAMESPACE} -o jsonpath='{.status.accessModes[0]}') && reclaimpolicy=$(${KUBERNETES_DISTRIBUTION_BINARY} get pv $pv -o jsonpath='{.spec.persistentVolumeReclaimPolicy}') && csidriver=$(${KUBERNETES_DISTRIBUTION_BINARY} get pv $pv -o jsonpath='{.spec.csi.driver}')&& echo -e "\\n---\nPod: $pod\nPVC: $pvc\nPV: $pv\nStatus: $status\nNode: $node\nZone: $zone\nIngressClass: $ingressclass\nAccessModes: $accessmode\nReclaimPolicy: $reclaimpolicy\nCSIDriver: $csidriver\n"; done; done
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    Summary of configured persistent volumes in ${NAMESPACE}:
+    RW.Core.Add Pre To Report    ${pod_storage_report.stdout}
+    RW.Core.Add Pre To Report    Commands Used:\n${history}
