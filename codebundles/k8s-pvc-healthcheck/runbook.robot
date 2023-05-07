@@ -112,3 +112,17 @@ List Pods with Attached Volumes and Related PV Details
     RW.Core.Add Pre To Report    Summary of configured persistent volumes in ${NAMESPACE}:
     RW.Core.Add Pre To Report    ${pod_storage_report.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
+
+Fetch the Storage Utilization for PVC Mounts
+    [Documentation]    For each pod in a namespace, the utilization of the pvc mount using the linux df command. Requires kubectl exec permissions. 
+    [Tags]    Pod    Storage    PVC    Storage    Utilization    Capacity
+    ${pod_pvc_utilization}=    RW.CLI.Run Cli
+    ...    cmd=for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} -o jsonpath='{range .items[*]}{.metadata.name}{"\\n"}{end}'); do for pvc in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods $pod -n ${NAMESPACE} -o jsonpath='{range .spec.volumes[*]}{.persistentVolumeClaim.claimName}{"\\n"}{end}'); do volumeName=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} -o json | jq '.spec.volumes[] | select(has("persistentVolumeClaim")) | .name') && mountPath=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} -o json | jq -r '.spec.containers[].volumeMounts[] | select(.name == '$volumeName') | .mountPath') && echo "\\n---\nPod: $pod, PVC: $pvc, volumeName: $volumeName, mounthPath: $mountPath" && kubectl exec $pod -n ${NAMESPACE} -- df -h $mountPath; done; done;
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    Summary of PVC storage mount utilization in ${NAMESPACE}:
+    RW.Core.Add Pre To Report    ${pod_pvc_utilization.stdout}
+    RW.Core.Add Pre To Report    Commands Used:\n${history}
