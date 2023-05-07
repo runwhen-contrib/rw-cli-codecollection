@@ -117,11 +117,22 @@ Fetch the Storage Utilization for PVC Mounts
     [Documentation]    For each pod in a namespace, the utilization of the pvc mount using the linux df command. Requires kubectl exec permissions. 
     [Tags]    Pod    Storage    PVC    Storage    Utilization    Capacity
     ${pod_pvc_utilization}=    RW.CLI.Run Cli
-    ...    cmd=for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} -o jsonpath='{range .items[*]}{.metadata.name}{"\\n"}{end}'); do for pvc in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods $pod -n ${NAMESPACE} -o jsonpath='{range .spec.volumes[*]}{.persistentVolumeClaim.claimName}{"\\n"}{end}'); do volumeName=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} -o json | jq '.spec.volumes[] | select(has("persistentVolumeClaim")) | .name') && mountPath=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} -o json | jq -r '.spec.containers[].volumeMounts[] | select(.name == '$volumeName') | .mountPath') && echo "\\n---\nPod: $pod, PVC: $pvc, volumeName: $volumeName, mounthPath: $mountPath" && kubectl exec $pod -n ${NAMESPACE} -- df -h $mountPath; done; done;
+    ...    cmd=for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} -o jsonpath='{range .items[*]}{.metadata.name}{"\\n"}{end}'); do for pvc in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods $pod -n ${NAMESPACE} -o jsonpath='{range .spec.volumes[*]}{.persistentVolumeClaim.claimName}{"\\n"}{end}'); do volumeName=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} -o json | jq '.spec.volumes[] | select(has("persistentVolumeClaim")) | .name') && mountPath=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} -o json | jq -r '.spec.containers[].volumeMounts[] | select(.name == '$volumeName') | .mountPath') && echo "\n---\nPod: $pod, PVC: $pvc, volumeName: $volumeName, mounthPath: $mountPath" && kubectl exec $pod -n ${NAMESPACE} -- df -h $mountPath; done; done;
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
+    # ${regexp}=    Catenate
+    # ...    (?m)(?P<line>[(\d+)%]) 
+    ${regexp}=     Evaluate   r'(?P<pvc_utilization>\d+(?=%))'
+    RW.CLI.Parse Cli Output By Line
+    ...    rsp=${pod_pvc_utilization}
+    ...    lines_like_regexp=${regexp}
+    ...    set_severity_level=3
+    ...    set_issue_expected=PVC should be less than 80% utilized. 
+    ...    set_issue_actual=PVC is 80% or greater. 
+    ...    set_issue_title=PVC Storage Utilization As Report by Pod
+    ...    pvc_utilization__raise_issue_if_gt=80
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of PVC storage mount utilization in ${NAMESPACE}:
     RW.Core.Add Pre To Report    ${pod_pvc_utilization.stdout}
