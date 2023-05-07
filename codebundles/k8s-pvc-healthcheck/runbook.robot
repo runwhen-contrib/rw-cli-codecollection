@@ -52,8 +52,8 @@ Suite Initialization
 
 *** Tasks ***
 Fetch Events for Unhealthy Kubernetes Persistent Volume Claims
-    [Documentation]    Lists events reltaed to persistent volume claims within the desired namespace that are not bound to a persistent volume.
-    [Tags]    PVC    List    Kubernetes    Storage    PersistentVolumeClaim
+    [Documentation]    Lists events related to persistent volume claims within the desired namespace that are not bound to a persistent volume.
+    [Tags]    PVC    List    Kubernetes    Storage    PersistentVolumeClaim    Events
     ${unbound_pvc_events}=    RW.CLI.Run Cli
     ...    cmd=for pvc in $(${KUBERNETES_DISTRIBUTION_BINARY} get pvc -n ${NAMESPACE} -o json | jq -r '.items[] | select(.status.phase != "Bound") | .metadata.name'); do ${KUBERNETES_DISTRIBUTION_BINARY} get events -n ${NAMESPACE} --field-selector involvedObject.name=$pvc -o json | jq '.items[]| "Last Timestamp: " + .lastTimestamp + " Name: " + .involvedObject.name + " Message: " + .message'; done
     ...    target_service=${kubectl}
@@ -73,6 +73,30 @@ Fetch Events for Unhealthy Kubernetes Persistent Volume Claims
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of events for unbound pvc in ${NAMESPACE}:
     RW.Core.Add Pre To Report    ${unbound_pvc_events.stdout}
+    RW.Core.Add Pre To Report    Commands Used:\n${history}
+
+Fetch Events Persistent Volumes in Terminating State
+    [Documentation]    Lists events related to persistent volumes in Terminating state.
+    [Tags]    PV    List    Kubernetes    Storage    PersistentVolume    Terminating    Events
+    ${dangline_pvcs}=    RW.CLI.Run Cli
+    ...    cmd=for pv in $(${KUBERNETES_DISTRIBUTION_BINARY} get pv -o json | jq -r '.items[] | select(.status.phase == "Terminating") | .metadata.name'); do ${KUBERNETES_DISTRIBUTION_BINARY} get events --all-namespaces --field-selector involvedObject.name=$pv -o json | jq '.items[]| "Last Timestamp: " + .lastTimestamp + " Name: " + .involvedObject.name + " Message: " + .message'; done
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
+    ${regexp}=    Catenate
+    ...    (?m)(?P<line>.+)
+    RW.CLI.Parse Cli Output By Line
+    ...    rsp=${dangline_pvcs}
+    ...    lines_like_regexp=${regexp}
+    ...    set_severity_level=4
+    ...    set_issue_expected=PV should not be stuck terminating. 
+    ...    set_issue_actual=PV is in a terminating state. 
+    ...    set_issue_title=PV Events While Terminating
+    ...    line__raise_issue_if_contains=Name
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    Summary of events for dangling persistent volumes:
+    RW.Core.Add Pre To Report    ${dangline_pvcs.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 List Pods with Attached Volumes and Related PV Details
