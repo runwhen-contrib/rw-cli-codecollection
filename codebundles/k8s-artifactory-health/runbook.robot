@@ -1,8 +1,8 @@
 *** Settings ***
 Metadata          Author    Jonathan Funk
-Metadata          Display Name    Kubernetes StatefulSet Triage
-Metadata          Supports    Kubernetes,AKS,EKS,GKE,OpenShift
-Documentation     Triages issues related to a StatefulSet and its replicas.
+Metadata          Display Name    Kubernetes Artifactory Triage
+Metadata          Supports    Kubernetes,AKS,EKS,GKE,OpenShift,Artifactory
+Documentation     Performs a triage on the Open Source version of Artifactory in a Kubernetes cluster.
 Suite Setup       Suite Initialization
 Library           BuiltIn
 Library           RW.Core
@@ -23,14 +23,16 @@ Suite Initialization
     ...    example=kubectl-service.shared
     ${STATEFULSET_NAME}=    RW.Core.Import User Variable    STATEFULSET_NAME
     ...    type=string
-    ...    description=Used to target the resource for queries and filtering events.
+    ...    description=The name of the Artifactory statefulset.
     ...    pattern=\w*
-    ...    example=my-database
+    ...    example=artifactory-oss
+    ...    default=artifactory-oss
     ${NAMESPACE}=    RW.Core.Import User Variable    NAMESPACE
     ...    type=string
-    ...    description=The name of the Kubernetes namespace to scope actions and searching to.
+    ...    description=The name of the Kubernetes namespace that the Artifactory workloads reside in.
     ...    pattern=\w*
-    ...    example=my-namespace
+    ...    example=artifactory
+    ...    default=artifactory
     ${CONTEXT}=    RW.Core.Import User Variable    CONTEXT
     ...    type=string
     ...    description=Which Kubernetes context to operate within.
@@ -46,8 +48,8 @@ Suite Initialization
     ...    type=string
     ...    description=The minimum numbers of replicas allowed considered healthy.
     ...    pattern=\d+
-    ...    example=3
-    ...    default=3
+    ...    example=2
+    ...    default=2
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for CLI commands
@@ -69,7 +71,7 @@ Suite Initialization
 
 
 *** Tasks ***
-Fetch StatefulSet Logs
+Fetch Artifactory Logs
     [Documentation]    Fetches the last 100 lines of logs for the given statefulset in the namespace.
     [Tags]    Fetch    Log    Pod    Container    Errors    Inspect    Trace    Info    StatefulSet
     ${logs}=    RW.CLI.Run Cli
@@ -82,7 +84,7 @@ Fetch StatefulSet Logs
     RW.Core.Add Pre To Report    ${logs.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Get Related StatefulSet Events
+Get Related Artifactory Events
     [Documentation]    Fetches events related to the StatefulSet workload in the namespace.
     [Tags]    Events    Workloads    Errors    Warnings    Get    StatefulSet
     ${events}=    RW.CLI.Run Cli
@@ -95,7 +97,7 @@ Get Related StatefulSet Events
     RW.Core.Add Pre To Report    ${events.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Fetch StatefulSet Manifest Details
+Fetch Artifactory StatefulSet Manifest Details
     [Documentation]    Fetches the current state of the statefulset manifest for inspection.
     [Tags]    StatefulSet    Details    Manifest    Info
     ${statefulset}=    RW.CLI.Run Cli
@@ -108,7 +110,7 @@ Fetch StatefulSet Manifest Details
     RW.Core.Add Pre To Report    ${statefulset.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Check StatefulSet Replicas
+Check Artifactory StatefulSet Replicas
     [Documentation]    Pulls the replica information for a given StatefulSet and checks if it's highly available
     ...                , if the replica counts are the expected / healthy values, and if not, what they should be.
     [Tags]    StatefulSet    Replicas    Desired    Actual    Available    Ready    Unhealthy    Rollout    Stuck    Pods
@@ -119,7 +121,7 @@ Check StatefulSet Replicas
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
     ${statefulset}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${LABELS} --context=${CONTEXT} -n ${NAMESPACE} -o=jsonpath='{.items[0]}'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset/${STATEFULSET_NAME} ${LABELS} --context=${CONTEXT} -n ${NAMESPACE} -ojson
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -146,3 +148,43 @@ Check StatefulSet Replicas
     RW.Core.Add Pre To Report    StatefulSet State:\n${StatefulSet}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
+
+Check Artifactory Health Endpoints
+    [Documentation]    Runs a set of exec commands internally in the Artifactory workloads to curl the system health endpoints.
+    [Tags]    Pods    Statefulset    Artifactory    Health    System    Curl    API    OK    HTTP
+    # these endpoints dont respect json type headers
+    ${liveness}=    RW.CLI.Run Cli
+    ...    cmd=kubectl exec statefulset/${STATEFULSET_NAME} -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/liveness
+    ...    env=${env}
+    ...    run_in_workload_with_name=
+    ...    secret_file__kubeconfig=${KUBECONFIG}
+    ...    render_in_commandlist=true
+    RW.CLI.Parse Cli Output By Line
+    ...    rsp=${liveness}
+    ...    set_severity_level=2
+    ...    set_issue_title=The liveness endpoint did not respond with OK
+    ...    _line__raise_issue_if_ncontains=OK
+    ${readiness}=    RW.CLI.Run Cli
+    ...    cmd=kubectl exec statefulset/${STATEFULSET_NAME} -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/readiness
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${KUBECONFIG}
+    ...    render_in_commandlist=true
+    RW.CLI.Parse Cli Output By Line
+    ...    rsp=${readiness}
+    ...    set_severity_level=2
+    ...    set_issue_title=The readiness endpoint did not respond with OK
+    ...    _line__raise_issue_if_ncontains=OK
+    # TODO: add task to test download of artifact objects
+    # TODO: figure out how to do implicit auth without passing in secrets
+    # ${topology}=    RW.CLI.Run Cli
+    # ...    cmd=curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/topology/health -H 'Content-Type: application/json'
+    # ...    env=${env}
+    # ...    run_in_workload_with_name=statefulset/${STATEFULSET_NAME} 
+    # ...    optional_namespace=${NAMESPACE}
+    # ...    optional_context=${CONTEXT}
+    # ...    secret_file__kubeconfig=${KUBECONFIG}
+    # ...    render_in_commandlist=true
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    ${liveness.stdout}
+    RW.Core.Add Pre To Report    ${readiness.stdout}
+    # RW.Core.Add Pre To Report    ${topology.stdout}

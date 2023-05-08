@@ -26,7 +26,8 @@ RECOGNIZED_STDOUT_PARSE_QUERIES = [
 
 def parse_cli_output_by_line(
     rsp: platform.ShellServiceResponse,
-    lines_like_regexp,
+    lines_like_regexp: str = "",
+    issue_if_no_capture_groups: bool = False,
     set_severity_level: int = 4,
     set_issue_expected: str = "",
     set_issue_actual: str = "",
@@ -55,20 +56,23 @@ def parse_cli_output_by_line(
         if not line:
             continue
         capture_grps = None
-        regexp_results = re.match(rf"{lines_like_regexp}", line)
-        if regexp_results:
-            regexp_results = regexp_results.groupdict()
-        logger.info(f"regexp results: {regexp_results}")
-        if not regexp_results or len(regexp_results.keys()) == 0:
-            _core.add_issue(
-                set_severity_level,
-                "No Capture Groups Found With Supplied Regex",
-                f"Expected to create capture groups from line: {line} using regexp: {lines_like_regexp}",
-                f"Actual result: {regexp_results}",
-                f"Try apply the regex: {lines_like_regexp} to lines produced by the command: {rsp.parsed_cmd}",
-            )
-            issue_count += 1
-            continue
+        if lines_like_regexp:
+            regexp_results = re.match(rf"{lines_like_regexp}", line)
+            if regexp_results:
+                regexp_results = regexp_results.groupdict()
+            logger.info(f"regexp results: {regexp_results}")
+            if issue_if_no_capture_groups and (not regexp_results or len(regexp_results.keys()) == 0):
+                _core.add_issue(
+                    set_severity_level,
+                    "No Capture Groups Found With Supplied Regex",
+                    f"Expected to create capture groups from line: {line} using regexp: {lines_like_regexp}",
+                    f"Actual result: {regexp_results}",
+                    f"Try apply the regex: {lines_like_regexp} to lines produced by the command: {rsp.parsed_cmd}",
+                )
+                issue_count += 1
+                continue
+        else:
+            regexp_results = {}
         parse_queries = kwargs
         capture_groups = regexp_results
         # Always allow direct parsing of the line as a capture group named _line

@@ -36,7 +36,7 @@ Suite Initialization
     ...    description=Which Kubernetes context to operate within.
     ...    pattern=\w*
     ...    example=my-main-cluster
-    ${EXPECTED_AVAILABILITY}=    RW.Core.Import User Variable    CONTEXT
+    ${EXPECTED_AVAILABILITY}=    RW.Core.Import User Variable    EXPECTED_AVAILABILITY
     ...    type=string
     ...    description=The minimum numbers of replicas allowed considered healthy.
     ...    pattern=\d+
