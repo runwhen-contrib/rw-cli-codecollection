@@ -43,7 +43,7 @@ Suite Initialization
     ...    description=The name of the namespace to search.   
     ...    pattern=\w*
     ...    example=otel-demo
-    ...    default=''
+    ...    default=
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
