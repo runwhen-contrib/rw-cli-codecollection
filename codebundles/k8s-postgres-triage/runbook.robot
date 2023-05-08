@@ -115,6 +115,7 @@ Get Postgres Pod Resource Utilization
         ...    env=${env}
         ...    secret_file__kubeconfig=${KUBECONFIG}
         ...    loop_with_items=${labeled_pods}
+        ${resource_util_info}=    Set Variable    ${temp_top.stdout}
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Pod Resources:\n${resource_util_info}
