@@ -83,23 +83,15 @@ Scan Labeled Pods and Validate Resources
 Get Labeled Container Top Info
     [Documentation]    Performs and a top command on list of labeled workloads to check pod resources.
     [Tags]    Top    Resources    Utilization    Pods    Workloads    CPU    Memory    Allocation    Labeled
-    ${labeled_pods}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods ${LABELS} -n ${NAMESPACE} --context ${CONTEXT} -o=name --field-selector=status.phase=Running
+    ${pods_top}=    RW.CLI.Run Cli
+    ...    cmd=for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods ${LABELS} -n ${NAMESPACE} --context ${CONTEXT} -o custom-columns=":metadata.name" --field-selector=status.phase=Running); do ${KUBERNETES_DISTRIBUTION_BINARY} top pod $pod -n ${NAMESPACE} --context ${CONTEXT} --containers; done
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true
-    ${labeled_pods}=    Split String    ${labeled_pods.stdout}
-    ${labeled_pods}=    Evaluate    [full_name.split("/")[-1] for full_name in ${labeled_pods}]
     ${resource_util_info}=    Set Variable    No resource utilization information could be found!
-    IF    len(${labeled_pods}) > 0
-        ${temp_top}=    RW.CLI.Run Cli
-        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} top pod {item} -n ${NAMESPACE} --context ${CONTEXT} --containers
-        ...    target_service=${kubectl}
-        ...    env=${env}
-        ...    secret_file__kubeconfig=${KUBECONFIG}
-        ...    loop_with_items=${labeled_pods}
-        ${resource_util_info}=    Set Variable    ${temp_top.stdout}
+    IF    """${pods_top.stdout}""" != ""
+        ${resource_util_info}=    Set Variable    ${pods_top.stdout}
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Pod Resources:\n${resource_util_info}
