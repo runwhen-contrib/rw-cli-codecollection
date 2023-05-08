@@ -1,0 +1,106 @@
+*** Settings ***
+Metadata          Author    Jonathan Funk
+Documentation     Inspects the resources provisioned for a given set of pods, selected by their labels and raises issues if no resources were specified.
+Metadata          Display Name    Kubernetes Pod Resources Scan
+Metadata          Supports    Kubernetes,AKS,EKS,GKE,OpenShift
+Suite Setup       Suite Initialization
+Library           BuiltIn
+Library           RW.Core
+Library           RW.CLI
+Library           RW.platform
+Library           String
+Library           OperatingSystem
+
+*** Keywords ***
+Suite Initialization
+    ${kubeconfig}=    RW.Core.Import Secret    kubeconfig
+    ...    type=string
+    ...    description=The kubernetes kubeconfig yaml containing connection configuration used to connect to cluster(s).
+    ...    pattern=\w*
+    ...    example=For examples, start here https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
+    ${kubectl}=    RW.Core.Import Service    kubectl
+    ...    description=The location service used to interpret shell commands.
+    ...    default=kubectl-service.shared
+    ...    example=kubectl-service.shared
+    ${NAMESPACE}=    RW.Core.Import User Variable    NAMESPACE
+    ...    type=string
+    ...    description=The name of the Kubernetes namespace to scope actions and searching to. Supports csv list of namespaces. 
+    ...    pattern=\w*
+    ...    example=my-namespace
+    ${CONTEXT}=    RW.Core.Import User Variable    CONTEXT
+    ...    type=string
+    ...    description=Which Kubernetes context to operate within.
+    ...    pattern=\w*
+    ...    example=my-main-cluster
+    ${LABELS}=    RW.Core.Import User Variable    LABELS
+    ...    type=string
+    ...    description=The metadata labels to use when selecting the objects to measure as running.
+    ...    pattern=\w*
+    ...    example=app=myapp
+    ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
+    ...    type=string
+    ...    description=Which binary to use for Kubernetes CLI commands.
+    ...    enum=[kubectl,oc]
+    ...    example=kubectl
+    ...    default=kubectl
+    Set Suite Variable    ${kubeconfig}    ${kubeconfig}
+    Set Suite Variable    ${kubectl}    ${kubectl}
+    Set Suite Variable    ${CONTEXT}    ${CONTEXT}
+    Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
+    Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
+    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
+    IF    "${LABELS}" != ""
+        ${LABELS}=    Set Variable    -l ${LABELS}        
+    END
+    Set Suite Variable    ${LABELS}    ${LABELS}
+
+*** Tasks ***
+Scan Labeled Pods and Validate Resources
+    [Documentation]    Scans a list of pods in a namespace using labels as a selector and checks if their resources are set.
+    [Tags]    Pods    Resources    Resource    Allocation    CPU    Memory    Startup    Initialization    Prehook    Liveness    Readiness
+    ${pods_without_resources}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running -ojson | jq '[.items[] | select(.spec.containers[].resources == {} or (.spec.containers[].resources|has("requests")|not) or (.spec.containers[].resources|has("limits")|not)) | {namespace:.metadata.namespace,name:.metadata.name}]'
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    target_service=${kubectl}
+    ...    render_in_commandlist=true
+    ${no_resource_count}=    RW.CLI.Parse Cli Json Output
+    ...    rsp=${pods_without_resources}
+    ...    extract_path_to_var__no_resources_count=length(@)
+    ...    set_issue_title=Found pod without resources specified!
+    ...    set_severity_level=4
+    ...    no_resources_count__raise_issue_if_gt=0
+    ...    assign_stdout_from_var=no_resources_count
+    ${history}=    RW.CLI.Pop Shell History
+    ${pod_count}=    Convert To Number    ${no_resource_count.stdout}
+    ${summary}=    Set Variable    No pods with unset resources found!
+    IF    ${pod_count} > 0
+        ${summary}=    Set Variable    ${pod_count} pods found without resources specified:\n${pods_without_resources.stdout}        
+    END
+    RW.Core.Add Pre To Report    ${summary}
+    RW.Core.Add Pre To Report    Commands Used:\n${history}
+
+Get Labeled Container Top Info
+    [Documentation]    Performs and a top command on list of labeled workloads to check pod resources.
+    [Tags]    Top    Resources    Utilization    Pods    Workloads    CPU    Memory    Allocation    Labeled
+    ${labeled_pods}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods ${LABELS} -n ${NAMESPACE} --context ${CONTEXT} -o=name --field-selector=status.phase=Running
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${KUBECONFIG}
+    ...    render_in_commandlist=true
+    ${labeled_pods}=    Split String    ${labeled_pods.stdout}
+    ${labeled_pods}=    Evaluate    [full_name.split("/")[-1] for full_name in ${labeled_pods}]
+    ${resource_util_info}=    Set Variable    No resource utilization information could be found!
+    IF    len(${labeled_pods}) > 0
+        ${temp_top}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} top pod {item} -n ${NAMESPACE} --context ${CONTEXT} --containers
+        ...    target_service=${kubectl}
+        ...    env=${env}
+        ...    secret_file__kubeconfig=${KUBECONFIG}
+        ...    loop_with_items=${labeled_pods}
+        ${resource_util_info}=    Set Variable    ${temp_top.stdout}
+    END
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    Pod Resources:\n${resource_util_info}
+    RW.Core.Add Pre To Report    Commands Used:\n${history}
