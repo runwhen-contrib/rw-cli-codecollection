@@ -72,7 +72,7 @@ Suite Initialization
 
 *** Tasks ***
 Fetch Artifactory Logs
-    [Documentation]    Fetches the last 100 lines of logs for the given statefulset in the namespace.
+    [Documentation]    Fetches the last 100 lines of logs for the Artifactory StatefulSet in the namespace.
     [Tags]    Fetch    Log    Pod    Container    Errors    Inspect    Trace    Info    StatefulSet
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs --tail=100 statefulset/${STATEFULSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
@@ -85,7 +85,7 @@ Fetch Artifactory Logs
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Get Related Artifactory Events
-    [Documentation]    Fetches events related to the StatefulSet workload in the namespace.
+    [Documentation]    Fetches events related to the Artifactory StatefulSet workload in the namespace.
     [Tags]    Events    Workloads    Errors    Warnings    Get    StatefulSet
     ${events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} | grep -i "${STATEFULSET_NAME}"
@@ -98,7 +98,7 @@ Get Related Artifactory Events
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Fetch Artifactory StatefulSet Manifest Details
-    [Documentation]    Fetches the current state of the statefulset manifest for inspection.
+    [Documentation]    Fetches the current state of the Artifactory StatefulSet manifest for inspection.
     [Tags]    StatefulSet    Details    Manifest    Info
     ${statefulset}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${LABELS} --context=${CONTEXT} -n ${NAMESPACE} -o yaml
@@ -111,7 +111,7 @@ Fetch Artifactory StatefulSet Manifest Details
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Check Artifactory StatefulSet Replicas
-    [Documentation]    Pulls the replica information for a given StatefulSet and checks if it's highly available
+    [Documentation]    Pulls the replica information for the Artifactory StatefulSet and checks if it's highly available
     ...                , if the replica counts are the expected / healthy values, and if not, what they should be.
     [Tags]    StatefulSet    Replicas    Desired    Actual    Available    Ready    Unhealthy    Rollout    Stuck    Pods
     RW.CLI.Run Cli
