@@ -78,7 +78,7 @@ Suite Initialization
     ...    description=Run any additional chaos command - verbatim.   
     ...    pattern=\w*
     ...    example=kubectl delete svc --all
-    ...    default=
+    ...    default=kubectl get pods
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
@@ -119,7 +119,7 @@ Execute Additional Chaos Command
     [Documentation]    Run the additional command as input, verbatim. 
     [Tags]    Chaos    Flux    Kubernetes    Resource
     ${run_additional_command}=    RW.CLI.Run Cli
-    ...    cmd=${ADDNL_COMMAND}
+    ...    cmd=${ADDNL_COMMAND} -n ${TARGET_NAMESPACE} --context ${CONTEXT}
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
