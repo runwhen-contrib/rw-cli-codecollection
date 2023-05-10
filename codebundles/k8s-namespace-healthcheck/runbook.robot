@@ -167,7 +167,7 @@ Namespace Get All
     [Documentation]    Simple fetch all to provide a snapshot of information about the workloads in the namespace.
     [Tags]    Get All    Resources    Info    Workloads    Namespace    Manifests
     ${all_results}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY}  get all --context=${CONTEXT} -n ${NAMESPACE}
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get all --context=${CONTEXT} -n ${NAMESPACE}
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
