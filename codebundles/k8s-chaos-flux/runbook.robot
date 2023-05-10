@@ -73,6 +73,12 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=/bin/sh -c "while true; do yes > /dev/null & done"
     ...    default=/bin/sh -c "while true; do yes > /dev/null & done"
+    ${ADDNL_COMMAND}=    RW.Core.Import User Variable    ADDNL_COMMAND
+    ...    type=string
+    ...    description=Run any additional chaos command - verbatim.   
+    ...    pattern=\w*
+    ...    example=kubectl delete svc --all
+    ...    default=
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
@@ -81,6 +87,7 @@ Suite Initialization
     Set Suite Variable    ${FLUX_RESOURCE_NAMESPACE}    ${FLUX_RESOURCE_NAMESPACE}
     Set Suite Variable    ${TARGET_NAMESPACE}    ${TARGET_NAMESPACE}
     Set Suite Variable    ${CHAOS_COMMAND}    ${CHAOS_COMMAND}
+    Set Suite Variable    ${ADDNL_COMMAND}    ${ADDNL_COMMAND}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
 
 *** Tasks ***
@@ -108,10 +115,21 @@ Execute Chaos Command
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
+Execute Additional Chaos Command
+    [Documentation]    Run the additional command as input, verbatim. 
+    [Tags]    Chaos    Flux    Kubernetes    Resource
+    ${run_additional_command}=    RW.CLI.Run Cli
+    ...    cmd=${ADDNL_COMMAND}
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    Commands Used:\n${history}
+
 Resume Flux Resource Reconciliation
     [Documentation]    Resumes Flux reconciliation on desired resource.  
     [Tags]    Chaos    Flux    Kubernetes    Resource    Resume
-    ${run_chaos_command}=    RW.CLI.Run Cli
+    ${resume_flux}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} patch ${FLUX_RESOURCE_TYPE} ${FLUX_RESOURCE_NAME} -n ${FLUX_RESOURCE_NAMESPACE} --type='json' -p='[{"op": "remove", "path": "/spec/suspend", "value":true}]'
     ...    target_service=${kubectl}
     ...    env=${env}
