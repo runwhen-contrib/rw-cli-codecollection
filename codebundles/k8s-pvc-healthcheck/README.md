@@ -1,6 +1,6 @@
-# Kubernetes Storage Troubleshooting Runbook
+# Kubernetes Storage Troubleshooting TaskSet
 
-This runbook provides a set of commands to troubleshoot storage-related issues in a Kubernetes cluster. It leverages the `kubectl` command-line tool to interact with the cluster and retrieve relevant information about persistent volume claims (PVCs), persistent volumes (PVs), and associated events.
+This taskset provides a set of commands to troubleshoot storage-related issues in a Kubernetes cluster. It leverages the `kubectl` command-line tool to interact with the cluster and retrieve relevant information about persistent volume claims (PVCs), persistent volumes (PVs), and associated events.
 
 
 ## Configuration
