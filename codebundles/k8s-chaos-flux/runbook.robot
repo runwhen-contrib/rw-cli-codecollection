@@ -108,7 +108,7 @@ Suspend the Flux Resource Reconciliation
         [Documentation]    Suspends a flux resource so that it can be manipulated for chaos purposes. 
         [Tags]    Chaos    Flux    Kubernetes    Resource    Suspend
         ${suspend_flux_resource}=    RW.CLI.Run Cli
-        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} patch ${FLUX_RESOURCE_TYPE} ${FLUX_RESOURCE_NAME} -n ${FLUX_RESOURCE_NAMESPACE} --type='json' -p='[{"op": "add", "path": "/spec/suspend", "value":true}]'
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} patch ${FLUX_RESOURCE_TYPE} ${FLUX_RESOURCE_NAME} -n ${FLUX_RESOURCE_NAMESPACE} --context ${CONTEXT} --type='json' -p='[{"op": "add", "path": "/spec/suspend", "value":true}]'
         ...    target_service=${kubectl}
         ...    env=${env}
         ...    secret_file__kubeconfig=${kubeconfig}
@@ -120,7 +120,7 @@ Find Random FluxCD Workload as Chaos Target
     [Tags]    Chaos    Flux    Kubernetes    Resource    Random
     IF     "${RANDOMIZE}" == "Yes"
         ${deployments}=    RW.CLI.Run Cli
-        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployments -l kustomize.toolkit.fluxcd.io/name=${FLUX_RESOURCE_NAME} -n ${TARGET_NAMESPACE} -o json
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployments -l kustomize.toolkit.fluxcd.io/name=${FLUX_RESOURCE_NAME} -n ${TARGET_NAMESPACE} --context ${CONTEXT} -o json
         ...    target_service=${kubectl}
         ...    env=${env}
         ...    secret_file__kubeconfig=${kubeconfig}
@@ -145,7 +145,7 @@ Execute Chaos Command
     [Tags]    Chaos    Flux    Kubernetes    Resource    Kill    OOM
     FOR    ${index}    IN RANGE    ${CHAOS_COMMAND_LOOP}
         ${run_chaos_command}=    RW.CLI.Run Cli
-        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec ${TARGET_RESOURCE} -n ${TARGET_NAMESPACE} -- ${CHAOS_COMMAND}
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec ${TARGET_RESOURCE} -n ${TARGET_NAMESPACE} --context ${CONTEXT} -- ${CHAOS_COMMAND}
         ...    target_service=${kubectl}
         ...    env=${env}
         ...    secret_file__kubeconfig=${kubeconfig}
@@ -168,7 +168,7 @@ Resume Flux Resource Reconciliation
     [Documentation]    Resumes Flux reconciliation on desired resource.  
     [Tags]    Chaos    Flux    Kubernetes    Resource    Resume
     ${resume_flux}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} patch ${FLUX_RESOURCE_TYPE} ${FLUX_RESOURCE_NAME} -n ${FLUX_RESOURCE_NAMESPACE} --type='json' -p='[{"op": "remove", "path": "/spec/suspend", "value":true}]'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} patch ${FLUX_RESOURCE_TYPE} ${FLUX_RESOURCE_NAME} -n ${FLUX_RESOURCE_NAMESPACE} --context ${CONTEXT} --type='json' -p='[{"op": "remove", "path": "/spec/suspend", "value":true}]'
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
