@@ -154,7 +154,7 @@ Check Artifactory Health Endpoints
     [Tags]    Pods    Statefulset    Artifactory    Health    System    Curl    API    OK    HTTP
     # these endpoints dont respect json type headers
     ${liveness}=    RW.CLI.Run Cli
-    ...    cmd=kubectl exec statefulset/${STATEFULSET_NAME} -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/liveness
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/liveness
     ...    env=${env}
     ...    run_in_workload_with_name=
     ...    secret_file__kubeconfig=${KUBECONFIG}
@@ -165,7 +165,7 @@ Check Artifactory Health Endpoints
     ...    set_issue_title=The liveness endpoint did not respond with OK
     ...    _line__raise_issue_if_ncontains=OK
     ${readiness}=    RW.CLI.Run Cli
-    ...    cmd=kubectl exec statefulset/${STATEFULSET_NAME} -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/readiness
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/readiness
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true
