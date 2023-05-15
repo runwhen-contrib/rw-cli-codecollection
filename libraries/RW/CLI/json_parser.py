@@ -33,6 +33,7 @@ def parse_cli_json_output(
     set_issue_actual: str = "",
     set_issue_reproduce_hint: str = "",
     set_issue_title: str = "",
+    set_issue_details: str = "",
     expected_rsp_statuscodes: list[int] = [200],
     expected_rsp_returncodes: list[int] = [0],
     raise_issue_from_rsp_code: bool = False,
@@ -73,6 +74,7 @@ def parse_cli_json_output(
                 expected=rsp_code_expected,
                 actual=rsp_code_actual,
                 reproduce_hint=rsp_code_reproduce_hint,
+                details=set_issue_details,
             )
         else:
             raise e
