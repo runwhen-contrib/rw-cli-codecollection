@@ -166,6 +166,7 @@ def parse_cli_json_output(
             expected=issue_results.expected,
             actual=issue_results.actual,
             reproduce_hint=issue_results.reproduce_hint,
+            details=set_issue_details,
         )
     # override rsp stdout for parse chaining
     for key in kwargs.keys():
