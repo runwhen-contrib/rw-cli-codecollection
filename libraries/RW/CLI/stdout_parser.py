@@ -33,6 +33,7 @@ def parse_cli_output_by_line(
     set_issue_actual: str = "",
     set_issue_reproduce_hint: str = "",
     set_issue_title: str = "",
+    set_issue_details: str = "",
     expected_rsp_statuscodes: list[int] = [200],
     expected_rsp_returncodes: list[int] = [0],
     contains_stderr_ok: bool = True,
@@ -68,6 +69,7 @@ def parse_cli_output_by_line(
                     f"Expected to create capture groups from line: {line} using regexp: {lines_like_regexp}",
                     f"Actual result: {regexp_results}",
                     f"Try apply the regex: {lines_like_regexp} to lines produced by the command: {rsp.parsed_cmd}",
+                    details=set_issue_details
                 )
                 issue_count += 1
                 continue
@@ -114,6 +116,7 @@ def parse_cli_output_by_line(
                         reproduce_hint=f"Run {rsp.cmd} and apply the regex {lines_like_regexp} per line"
                         if not set_issue_reproduce_hint
                         else set_issue_reproduce_hint,
+                        set_issue_details
                     )
                     issue_count += 1
                 elif query == "raise_issue_if_neq" and query_value != capture_group_value:
@@ -129,6 +132,7 @@ def parse_cli_output_by_line(
                         reproduce_hint=f"Run {rsp.cmd} and apply the regex {lines_like_regexp} per line"
                         if not set_issue_reproduce_hint
                         else set_issue_reproduce_hint,
+                        set_issue_details
                     )
                     issue_count += 1
                 elif query == "raise_issue_if_lt" and numeric_castable and capture_group_value < query_value:
@@ -144,6 +148,7 @@ def parse_cli_output_by_line(
                         reproduce_hint=f"Run {rsp.cmd} and apply the regex {lines_like_regexp} per line"
                         if not set_issue_reproduce_hint
                         else set_issue_reproduce_hint,
+                        set_issue_details,
                     )
                     issue_count += 1
                 elif query == "raise_issue_if_gt" and numeric_castable and capture_group_value > query_value:
@@ -159,6 +164,7 @@ def parse_cli_output_by_line(
                         reproduce_hint=f"Run {rsp.cmd} and apply the regex {lines_like_regexp} per line"
                         if not set_issue_reproduce_hint
                         else set_issue_reproduce_hint,
+                        set_issue_details
                     )
                     issue_count += 1
                 elif query == "raise_issue_if_contains" and query_value in capture_group_value:
@@ -174,6 +180,7 @@ def parse_cli_output_by_line(
                         reproduce_hint=f"Run {rsp.cmd} and apply the regex {lines_like_regexp} per line"
                         if not set_issue_reproduce_hint
                         else set_issue_reproduce_hint,
+                        set_issue_details
                     )
                     issue_count += 1
                 elif query == "raise_issue_if_ncontains" and query_value not in capture_group_value:
@@ -189,6 +196,7 @@ def parse_cli_output_by_line(
                         reproduce_hint=f"Run {rsp.cmd} and apply the regex {lines_like_regexp} per line"
                         if not set_issue_reproduce_hint
                         else set_issue_reproduce_hint,
+                        set_issue_details
                     )
                     issue_count += 1
             else:
