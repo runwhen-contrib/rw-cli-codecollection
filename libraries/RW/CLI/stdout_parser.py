@@ -104,7 +104,7 @@ def parse_cli_output_by_line(
                 if query == "raise_issue_if_eq" and query_value == capture_group_value:
                     _core.add_issue(
                         severity=set_severity_level,
-                        title="Detected Exact Error Value in Output" if not set_issue_title else set_issue_title,
+                        title = f"Value Of {prefix} ({capture_group_value}) Was {query_value}" if not set_issue_title else set_issue_title,
                         expected=f"The parsed output {line} with regex: {lines_like_regexp} with the capture group: {prefix} should not be equal to {capture_group_value}"
                         if not set_issue_expected
                         else set_issue_expected,
@@ -119,7 +119,7 @@ def parse_cli_output_by_line(
                 elif query == "raise_issue_if_neq" and query_value != capture_group_value:
                     _core.add_issue(
                         severity=set_severity_level,
-                        title="Unexpected Value in Output" if not set_issue_title else set_issue_title,
+                        title = f"Value Of {prefix} ({capture_group_value}) Was Not {query_value}" if not set_issue_title else set_issue_title,
                         expected=f"The parsed output {line} with regex: {lines_like_regexp} with the capture group: {prefix} should be equal to {capture_group_value}"
                         if not set_issue_expected
                         else set_issue_expected,
@@ -134,7 +134,7 @@ def parse_cli_output_by_line(
                 elif query == "raise_issue_if_lt" and numeric_castable and capture_group_value < query_value:
                     _core.add_issue(
                         severity=set_severity_level,
-                        title="Parsed Value Below Allowed Amount" if not set_issue_title else set_issue_title,
+                        title = f"Value of {prefix} ({capture_group_value}) Was Less Than {query_value}" if not set_issue_title else set_issue_title,
                         expected=f"The parsed output {line} with regex: {lines_like_regexp} should have a value >= {query_value}"
                         if not set_issue_expected
                         else set_issue_expected,
@@ -149,7 +149,7 @@ def parse_cli_output_by_line(
                 elif query == "raise_issue_if_gt" and numeric_castable and capture_group_value > query_value:
                     _core.add_issue(
                         severity=set_severity_level,
-                        title="Parsed Value Above Allowed Amount" if not set_issue_title else set_issue_title,
+                        title = f"Value of {prefix} ({capture_group_value}) Was Greater Than {query_value}" if not set_issue_title else set_issue_title,
                         expected=f"The parsed output {line} with regex: {lines_like_regexp} should have a value <= {query_value}"
                         if not set_issue_expected
                         else set_issue_expected,
@@ -164,7 +164,7 @@ def parse_cli_output_by_line(
                 elif query == "raise_issue_if_contains" and query_value in capture_group_value:
                     _core.add_issue(
                         severity=set_severity_level,
-                        title="Parsed Output Contains an Error Value" if not set_issue_title else set_issue_title,
+                        title = f"Value of {prefix} ({variable_value}) Contained {query_value}" if not set_issue_title else set_issue_title,
                         expected=f"The parsed output {line} with regex: {lines_like_regexp} resulted in {capture_group_value} and should not contain {query_value}"
                         if not set_issue_expected
                         else set_issue_expected,
@@ -179,7 +179,7 @@ def parse_cli_output_by_line(
                 elif query == "raise_issue_if_ncontains" and query_value not in capture_group_value:
                     _core.add_issue(
                         severity=set_severity_level,
-                        title="Parsed Output Does Not Contain Expected Value"
+                        title = f"Value of {prefix} ({variable_value}) Did Not Contain {query_value}" if not set_issue_title else set_issue_title,
                         if not set_issue_title
                         else set_issue_title,
                         expected=f"The parsed output {line} with regex: {lines_like_regexp} resulted in {capture_group_value} and should contain {query_value}"
