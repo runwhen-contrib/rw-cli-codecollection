@@ -180,8 +180,6 @@ def parse_cli_output_by_line(
                     _core.add_issue(
                         severity=set_severity_level,
                         title = f"Value of {prefix} ({variable_value}) Did Not Contain {query_value}" if not set_issue_title else set_issue_title,
-                        if not set_issue_title
-                        else set_issue_title,
                         expected=f"The parsed output {line} with regex: {lines_like_regexp} resulted in {capture_group_value} and should contain {query_value}"
                         if not set_issue_expected
                         else set_issue_expected,
