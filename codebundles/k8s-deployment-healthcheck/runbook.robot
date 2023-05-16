@@ -36,7 +36,7 @@ Suite Initialization
     ...    description=Which Kubernetes context to operate within.
     ...    pattern=\w*
     ...    example=my-main-cluster
-    ${EXPECTED_AVAILABILITY}=    RW.Core.Import User Variable    CONTEXT
+    ${EXPECTED_AVAILABILITY}=    RW.Core.Import User Variable    EXPECTED_AVAILABILITY
     ...    type=string
     ...    description=The minimum numbers of replicas allowed considered healthy.
     ...    pattern=\d+
@@ -113,10 +113,12 @@ Check Deployment Replicas
     ...    available_replicas__raise_issue_if_lt=1
     ...    set_issue_details=No available replicas found. Check deployment has not been scaled down, deployment events, persistent volumes, deployment configuration, or applicable fluxcd or argo gitops configurations or status. 
     ...    assign_stdout_from_var=available_replicas
+    ...    set_issue_details=No replicas available - check manifests, kubernetes events, pod logs, resource constraints and persistent volumes
     RW.CLI.Parse Cli Json Output
     ...    rsp=${available_replicas}
     ...    extract_path_to_var__available_replicas=@
     ...    available_replicas__raise_issue_if_lt=${EXPECTED_AVAILABILITY}
+    ...    set_issue_details=Fewer than expected replicas available - check manifests, kubernetes events, pod logs, resource constraints and persistent volumes
     ${desired_replicas}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${deployment}
     ...    extract_path_to_var__desired_replicas=status.replicas || `0`

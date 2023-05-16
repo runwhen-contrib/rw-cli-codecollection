@@ -26,12 +26,14 @@ RECOGNIZED_STDOUT_PARSE_QUERIES = [
 
 def parse_cli_output_by_line(
     rsp: platform.ShellServiceResponse,
-    lines_like_regexp,
+    lines_like_regexp: str = "",
+    issue_if_no_capture_groups: bool = False,
     set_severity_level: int = 4,
     set_issue_expected: str = "",
     set_issue_actual: str = "",
     set_issue_reproduce_hint: str = "",
     set_issue_title: str = "",
+    set_issue_details: str = "",
     expected_rsp_statuscodes: list[int] = [200],
     expected_rsp_returncodes: list[int] = [0],
     contains_stderr_ok: bool = True,
@@ -55,20 +57,24 @@ def parse_cli_output_by_line(
         if not line:
             continue
         capture_grps = None
-        regexp_results = re.match(rf"{lines_like_regexp}", line)
-        if regexp_results:
-            regexp_results = regexp_results.groupdict()
-        logger.info(f"regexp results: {regexp_results}")
-        if not regexp_results or len(regexp_results.keys()) == 0:
-            _core.add_issue(
-                set_severity_level,
-                "No Capture Groups Found With Supplied Regex",
-                f"Expected to create capture groups from line: {line} using regexp: {lines_like_regexp}",
-                f"Actual result: {regexp_results}",
-                f"Try apply the regex: {lines_like_regexp} to lines produced by the command: {rsp.parsed_cmd}",
-            )
-            issue_count += 1
-            continue
+        if lines_like_regexp:
+            regexp_results = re.match(rf"{lines_like_regexp}", line)
+            if regexp_results:
+                regexp_results = regexp_results.groupdict()
+            logger.info(f"regexp results: {regexp_results}")
+            if issue_if_no_capture_groups and (not regexp_results or len(regexp_results.keys()) == 0):
+                _core.add_issue(
+                    set_severity_level,
+                    "No Capture Groups Found With Supplied Regex",
+                    f"Expected to create capture groups from line: {line} using regexp: {lines_like_regexp}",
+                    f"Actual result: {regexp_results}",
+                    f"Try apply the regex: {lines_like_regexp} to lines produced by the command: {rsp.parsed_cmd}",
+                    details=set_issue_details
+                )
+                issue_count += 1
+                continue
+        else:
+            regexp_results = {}
         parse_queries = kwargs
         capture_groups = regexp_results
         # Always allow direct parsing of the line as a capture group named _line
@@ -100,7 +106,7 @@ def parse_cli_output_by_line(
                 if query == "raise_issue_if_eq" and query_value == capture_group_value:
                     _core.add_issue(
                         severity=set_severity_level,
-                        title="Detected Exact Error Value in Output" if not set_issue_title else set_issue_title,
+                        title = f"Value Of {prefix} ({capture_group_value}) Was {query_value}" if not set_issue_title else set_issue_title,
                         expected=f"The parsed output {line} with regex: {lines_like_regexp} with the capture group: {prefix} should not be equal to {capture_group_value}"
                         if not set_issue_expected
                         else set_issue_expected,
@@ -110,12 +116,13 @@ def parse_cli_output_by_line(
                         reproduce_hint=f"Run {rsp.cmd} and apply the regex {lines_like_regexp} per line"
                         if not set_issue_reproduce_hint
                         else set_issue_reproduce_hint,
+                        details=set_issue_details
                     )
                     issue_count += 1
                 elif query == "raise_issue_if_neq" and query_value != capture_group_value:
                     _core.add_issue(
                         severity=set_severity_level,
-                        title="Unexpected Value in Output" if not set_issue_title else set_issue_title,
+                        title = f"Value Of {prefix} ({capture_group_value}) Was Not {query_value}" if not set_issue_title else set_issue_title,
                         expected=f"The parsed output {line} with regex: {lines_like_regexp} with the capture group: {prefix} should be equal to {capture_group_value}"
                         if not set_issue_expected
                         else set_issue_expected,
@@ -125,12 +132,13 @@ def parse_cli_output_by_line(
                         reproduce_hint=f"Run {rsp.cmd} and apply the regex {lines_like_regexp} per line"
                         if not set_issue_reproduce_hint
                         else set_issue_reproduce_hint,
+                        details=set_issue_details
                     )
                     issue_count += 1
                 elif query == "raise_issue_if_lt" and numeric_castable and capture_group_value < query_value:
                     _core.add_issue(
                         severity=set_severity_level,
-                        title="Parsed Value Below Allowed Amount" if not set_issue_title else set_issue_title,
+                        title = f"Value of {prefix} ({capture_group_value}) Was Less Than {query_value}" if not set_issue_title else set_issue_title,
                         expected=f"The parsed output {line} with regex: {lines_like_regexp} should have a value >= {query_value}"
                         if not set_issue_expected
                         else set_issue_expected,
@@ -140,12 +148,13 @@ def parse_cli_output_by_line(
                         reproduce_hint=f"Run {rsp.cmd} and apply the regex {lines_like_regexp} per line"
                         if not set_issue_reproduce_hint
                         else set_issue_reproduce_hint,
+                        details=set_issue_details,
                     )
                     issue_count += 1
                 elif query == "raise_issue_if_gt" and numeric_castable and capture_group_value > query_value:
                     _core.add_issue(
                         severity=set_severity_level,
-                        title="Parsed Value Above Allowed Amount" if not set_issue_title else set_issue_title,
+                        title = f"Value of {prefix} ({capture_group_value}) Was Greater Than {query_value}" if not set_issue_title else set_issue_title,
                         expected=f"The parsed output {line} with regex: {lines_like_regexp} should have a value <= {query_value}"
                         if not set_issue_expected
                         else set_issue_expected,
@@ -155,12 +164,13 @@ def parse_cli_output_by_line(
                         reproduce_hint=f"Run {rsp.cmd} and apply the regex {lines_like_regexp} per line"
                         if not set_issue_reproduce_hint
                         else set_issue_reproduce_hint,
+                        details=set_issue_details
                     )
                     issue_count += 1
                 elif query == "raise_issue_if_contains" and query_value in capture_group_value:
                     _core.add_issue(
                         severity=set_severity_level,
-                        title="Parsed Output Contains an Error Value" if not set_issue_title else set_issue_title,
+                        title = f"Value of {prefix} ({variable_value}) Contained {query_value}" if not set_issue_title else set_issue_title,
                         expected=f"The parsed output {line} with regex: {lines_like_regexp} resulted in {capture_group_value} and should not contain {query_value}"
                         if not set_issue_expected
                         else set_issue_expected,
@@ -170,14 +180,13 @@ def parse_cli_output_by_line(
                         reproduce_hint=f"Run {rsp.cmd} and apply the regex {lines_like_regexp} per line"
                         if not set_issue_reproduce_hint
                         else set_issue_reproduce_hint,
+                        details=set_issue_details
                     )
                     issue_count += 1
                 elif query == "raise_issue_if_ncontains" and query_value not in capture_group_value:
                     _core.add_issue(
                         severity=set_severity_level,
-                        title="Parsed Output Does Not Contain Expected Value"
-                        if not set_issue_title
-                        else set_issue_title,
+                        title = f"Value of {prefix} ({variable_value}) Did Not Contain {query_value}" if not set_issue_title else set_issue_title,
                         expected=f"The parsed output {line} with regex: {lines_like_regexp} resulted in {capture_group_value} and should contain {query_value}"
                         if not set_issue_expected
                         else set_issue_expected,
@@ -187,6 +196,7 @@ def parse_cli_output_by_line(
                         reproduce_hint=f"Run {rsp.cmd} and apply the regex {lines_like_regexp} per line"
                         if not set_issue_reproduce_hint
                         else set_issue_reproduce_hint,
+                        details=set_issue_details
                     )
                     issue_count += 1
             else:

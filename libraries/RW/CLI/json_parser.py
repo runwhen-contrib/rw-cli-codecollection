@@ -33,6 +33,7 @@ def parse_cli_json_output(
     set_issue_actual: str = "",
     set_issue_reproduce_hint: str = "",
     set_issue_title: str = "",
+    set_issue_details: str = "",
     expected_rsp_statuscodes: list[int] = [200],
     expected_rsp_returncodes: list[int] = [0],
     raise_issue_from_rsp_code: bool = False,
@@ -73,6 +74,7 @@ def parse_cli_json_output(
                 expected=rsp_code_expected,
                 actual=rsp_code_actual,
                 reproduce_hint=rsp_code_reproduce_hint,
+                details=set_issue_details,
             )
         else:
             raise e
@@ -164,6 +166,7 @@ def parse_cli_json_output(
             expected=issue_results.expected,
             actual=issue_results.actual,
             reproduce_hint=issue_results.reproduce_hint,
+            details=set_issue_details,
         )
     # override rsp stdout for parse chaining
     for key in kwargs.keys():
@@ -249,7 +252,7 @@ def _check_for_json_issue(
             query_value == variable_value or (variable_is_list and query_value in variable_value)
         ):
             issue_found = True
-            title = "Detected Exact Error Value in Output"
+            title = f"Value Of {prefix} Was {variable_value}"
             expected = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} should not be equal to {query_value}"
             actual = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} is equal to {variable_value}"
             reproduce_hint = f"Run {rsp.cmd} and apply the jmespath '{variable_from_path[prefix]}' to the output"
@@ -257,32 +260,32 @@ def _check_for_json_issue(
             query_value != variable_value or (variable_is_list and query_value not in variable_value)
         ):
             issue_found = True
-            title = "Unexpected Value in Output"
+            title = f"Value of {prefix} ({variable_value}) Was Not {query_value}"
             expected = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} should be equal to {variable_value}"
             actual = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} does not contain the expected value of: {prefix}=={query_value} and is actually {variable_value}"
             reproduce_hint = f"Run {rsp.cmd} and apply the jmespath '{variable_from_path[prefix]}' to the output"
 
         elif query == "raise_issue_if_lt" and numeric_castable and variable_value < query_value:
             issue_found = True
-            title = "Parsed Value Below Allowed Amount"
+            title = f"Value of {prefix} ({variable_value}) Was Less Than {query_value}"
             expected = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} should have a value >= {query_value}"
             actual = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} found value: {variable_value} and it's less than {query_value}"
             reproduce_hint = f"Run {rsp.cmd} and apply the jmespath '{variable_from_path[prefix]}' to the output"
         elif query == "raise_issue_if_gt" and numeric_castable and variable_value > query_value:
             issue_found = True
-            title = "Parsed Value Above Allowed Amount"
+            title = f"Value of {prefix} ({variable_value}) Was Greater Than {query_value}"
             expected = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} should have a value <= {query_value}"
             actual = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} found value: {variable_value} and it's greater than {query_value}"
             reproduce_hint = f"Run {rsp.cmd} and apply the jmespath '{variable_from_path[prefix]}' to the output"
         elif query == "raise_issue_if_contains" and query_value in variable_value:
             issue_found = True
-            title = "Parsed Output Contains an Error Value"
+            title = f"Value of {prefix} ({variable_value}) Contained {query_value}"
             expected = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} resulted in {variable_value} and should not contain {query_value}"
             actual = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} resulted in {variable_value} and it contains {query_value} when it should not"
             reproduce_hint = f"Run {rsp.cmd} and apply the jmespath '{variable_from_path[prefix]}' to the output"
         elif query == "raise_issue_if_ncontains" and query_value not in variable_value:
             issue_found = True
-            title = "Parsed Output Does Not Contain Expected Value"
+            title = f"Value of {prefix} ({variable_value}) Did Not Contain {query_value}"
             expected = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} resulted in {variable_value} and should contain {query_value}"
             actual = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} resulted in {variable_value} and we expected to find {query_value} in the result"
             reproduce_hint = f"Run {rsp.cmd} and apply the jmespath '{variable_from_path[prefix]}' to the output"
