@@ -70,6 +70,7 @@ Scan Labeled Pods and Validate Resources
     ...    set_issue_title=Found pod without resources specified!
     ...    set_severity_level=4
     ...    no_resources_count__raise_issue_if_gt=0
+    ...    set_issue_details=Pods found without resource requests or limits applied. Review each manifest and edit configuration to set appropriate resource limits. 
     ...    assign_stdout_from_var=no_resources_count
     ${history}=    RW.CLI.Pop Shell History
     ${pod_count}=    Convert To Number    ${no_resource_count.stdout}
