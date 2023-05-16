@@ -112,12 +112,12 @@ Check Deployment Replicas
     ...    extract_path_to_var__available_replicas=status.availableReplicas || `0`
     ...    available_replicas__raise_issue_if_lt=1
     ...    assign_stdout_from_var=available_replicas
-    ...    set_issue_details=No replicas available - check configuration, kubernetes events, pod logs, resource constraints and pvcs
+    ...    set_issue_details=No replicas available - check manifests, kubernetes events, pod logs, resource constraints and persistent volumes
     RW.CLI.Parse Cli Json Output
     ...    rsp=${available_replicas}
     ...    extract_path_to_var__available_replicas=@
     ...    available_replicas__raise_issue_if_lt=${EXPECTED_AVAILABILITY}
-    ...    set_issue_details=Fewer than expected replicas available - check configuration, kubernetes events, pod logs, resource constraints and pvcs
+    ...    set_issue_details=Fewer than expected replicas available - check manifests, kubernetes events, pod logs, resource constraints and persistent volumes
     ${desired_replicas}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${deployment}
     ...    extract_path_to_var__desired_replicas=status.replicas || `0`
@@ -127,7 +127,7 @@ Check Deployment Replicas
     ...    rsp=${desired_replicas}
     ...    extract_path_to_var__desired_replicas=@
     ...    desired_replicas__raise_issue_if_neq=${available_replicas.stdout}
-    ...    set_issue_details=Fewer than expected replicas desired - check configuration
+    ...    set_issue_details=Fewer than expected replicas desired - check manifests
     ${desired_replicas}=    Convert To Number    ${desired_replicas.stdout}
     ${available_replicas}=    Convert To Number    ${available_replicas.stdout}
     RW.Core.Add Pre To Report    Deployment State:\n${deployment}
