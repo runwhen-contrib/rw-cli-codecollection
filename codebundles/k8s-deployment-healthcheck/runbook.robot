@@ -111,7 +111,7 @@ Check Deployment Replicas
     ...    rsp=${deployment}
     ...    extract_path_to_var__available_replicas=status.availableReplicas || `0`
     ...    available_replicas__raise_issue_if_lt=1
-    ...    set_issue_details=No available replicas found. Check deployment has not been scaled down, deployment events, deployment configuration, or applicable fluxcd or argo gitops configurations or status. 
+    ...    set_issue_details=No available replicas found. Check deployment has not been scaled down, deployment events, persistent volumes, deployment configuration, or applicable fluxcd or argo gitops configurations or status. 
     ...    assign_stdout_from_var=available_replicas
     RW.CLI.Parse Cli Json Output
     ...    rsp=${available_replicas}
@@ -127,7 +127,7 @@ Check Deployment Replicas
     ...    rsp=${desired_replicas}
     ...    extract_path_to_var__desired_replicas=@
     ...    desired_replicas__raise_issue_if_neq=${available_replicas.stdout}
-    ...    set_issue_details=Desired and ready pods does not match. Check deployment events, deployment configuration, or applicable fluxcd or argo gitops configurations or status. Check node events, or if the cluster is undergoing a scaling event or upgrade. Check cloud provider service availability for any known outages. 
+    ...    set_issue_details=Desired and ready pods does not match. Check deployment events, deployment configuration, persistent volumes, or applicable fluxcd or argo gitops configurations or status. Check node events, or if the cluster is undergoing a scaling event or upgrade. Check cloud provider service availability for any known outages. 
     ${desired_replicas}=    Convert To Number    ${desired_replicas.stdout}
     ${available_replicas}=    Convert To Number    ${available_replicas.stdout}
     RW.Core.Add Pre To Report    Deployment State:\n${deployment}
