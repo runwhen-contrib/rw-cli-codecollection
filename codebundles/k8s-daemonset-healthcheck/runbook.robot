@@ -101,7 +101,6 @@ Check Daemonset Replicas
     ...    env=${env}
     ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
     # status fields
     ${current_scheduled}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${daemonset}

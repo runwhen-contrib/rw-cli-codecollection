@@ -101,11 +101,20 @@ Fetch Unhealthy ArgoCD Application Resources
     [Documentation]    Displays all resources in an ArgoCD Application that are not in a healthy state. 
     [Tags]    Resources    Unhealthy    SyncStatus    ArgoCD
     ${unhealthy_resources}=    RW.CLI.Run Cli
-    ...    cmd=${binary_name} get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT} -o json | jq -r '.status.resources[] | select(.health.status != null) | select(.health.status != "Healthy") | {name,kind,namespace,health}'
+    ...    cmd=${binary_name} get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT} -o json | jq -r '[.status.resources[] | select(.health.status != null) | select(.health.status != "Healthy") | {name,kind,namespace,health}]'
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
+    ${resource_issues}=    RW.CLI.Parse Cli Json Output
+    ...    rsp=${unhealthy_resources}
+    ...    extract_path_to_var__unhealthy_resource_count=length(@)
+    ...    set_severity_level=2
+    ...    unhealthy_resource_count__raise_issue_if_gt=0
+    ...    set_issue_expected=ArgoCD application resources should be in a healthy state 
+    ...    set_issue_actual=ArgoCD application resources are not in a healthy state 
+    ...    set_issue_title=ArgoCD Application Resource Issues
+    ...    set_issue_details=ArgoCD appliation resources are unhealthy. Check argocd application logs and events and configuration, argocd controller events, pod logs, namespace events, resource status, resource limits and quotas. 
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    List of unhealthy resources for application: ${APPLICATION}
     RW.Core.Add Pre To Report    ${unhealthy_resources.stdout}
