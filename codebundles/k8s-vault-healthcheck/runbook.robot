@@ -268,7 +268,7 @@ Check Vault StatefulSet Replicas
     ...    rsp=${desired_replicas}
     ...    extract_path_to_var__desired_replicas=@
     ...    desired_replicas__raise_issue_if_neq=${available_replicas.stdout}
-    ...    set_issue_details=Desired replicas for vault does not match available/ready, namespace and statefulset events, check node events or scaling events. 
+    ...    set_issue_details=Desired replicas for vault does not match available/ready, check namespace and statefulset events, check node events or scaling events. 
     ${desired_replicas}=    Convert To Number    ${desired_replicas.stdout}
     ${available_replicas}=    Convert To Number    ${available_replicas.stdout}
     RW.Core.Add Pre To Report    StatefulSet State:\n${StatefulSet}
