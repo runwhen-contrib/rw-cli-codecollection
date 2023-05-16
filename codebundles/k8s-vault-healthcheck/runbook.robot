@@ -110,17 +110,18 @@ Check Vault CSI Driver Replicas
     ...    env=${env}
     ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
     # status fields
     ${current_scheduled}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${daemonset}
     ...    extract_path_to_var__current_scheduled=status.currentNumberScheduled || `0`
     ...    current_scheduled__raise_issue_if_lt=1
+    ...    set_issue_details=Scheduling issue with csi driver daemonset pods, check node health, events, and namespace events. 
     ...    assign_stdout_from_var=current_scheduled
     ${desired_scheduled}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${daemonset}
     ...    extract_path_to_var__desired_scheduled=status.desiredNumberScheduled || `0`
     ...    desired_scheduled__raise_issue_if_lt=1
+    ...    set_issue_details=No csi driver daemonset pods ready, check the vault csi driver daemonset events, helm or kustomization objects, and configuration.
     ...    assign_stdout_from_var=desired_scheduled
     ${available}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${daemonset}
@@ -131,16 +132,19 @@ Check Vault CSI Driver Replicas
     ...    rsp=${daemonset}
     ...    extract_path_to_var__misscheduled=status.numberMisscheduled || `0`
     ...    misscheduled__raise_issue_if_gt=0
+    ...    set_issue_details=Scheduling issue with csi driver daemonset pods, check node health, events, and namespace events. 
     ...    assign_stdout_from_var=misscheduled
     ${ready}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${daemonset}
     ...    extract_path_to_var__ready=status.numberReady || `0`
     ...    ready__raise_issue_if_lt=1
+    ...    set_issue_details=No csi driver daemonset pods ready, check the vault csi driver daemonset events, helm or kustomization objects, and configuration. 
     ...    assign_stdout_from_var=ready
     ${unavailable}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${daemonset}
     ...    extract_path_to_var__unavailable=status.numberUnavailable || `0`
     ...    unavailable__raise_issue_if_gt=0
+    ...    set_issue_details=Fewer than desired csi driver daemonset pods, check node health, events, and namespace events. 
     ...    assign_stdout_from_var=unavailable
     # spec fields
     ${max_unavailable}=    RW.CLI.Parse Cli Json Output
@@ -154,10 +158,12 @@ Check Vault CSI Driver Replicas
     ...    rsp=${max_unavailable}
     ...    extract_path_to_var__comparison=@
     ...    comparison__raise_issue_if_lt=${unavailable}
+    ...    set_issue_details=More unavailable vault csi driver daemonset pods than configured max_unavailable, check node health, events, and namespace events. Cluster might be undergoing a scaling event or upgrade, but should not cause max_unavailable to be violated. 
     RW.CLI.Parse Cli Json Output
     ...    rsp=${current_scheduled}
     ...    extract_path_to_var__comparison=@
     ...    comparison__raise_issue_if_neq=${available}
+    ...    set_issue_details=Fewer than desired csi driver daemonset pods, check node health, events, and namespace events. Cluster might be undergoing a scaling event or upgrade. 
     RW.Core.Add Pre To Report    Deployment State:\n${daemonset_describe.stdout}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -235,6 +241,7 @@ Verify Vault Availability
     ...    extract_path_to_var__standby=standby
     ...    init__raise_issue_if_neq=True
     ...    sealed__raise_issue_if_neq=False
+    ...    set_issue_details=Check the vault state, it could be sealed or in an init state. Check statefulset pod logs and events. Verify or invoke unseal process. 
 
 Check Vault StatefulSet Replicas
     [Documentation]    Pulls the replica information for the Vault statefulset and checks if it's highly available
@@ -250,20 +257,19 @@ Check Vault StatefulSet Replicas
     ...    rsp=${statefulset}
     ...    extract_path_to_var__available_replicas=status.availableReplicas || `0`
     ...    available_replicas__raise_issue_if_lt=1
+    ...    set_issue_details=No running vault server pods found, check node health, events, namespace events, helm charts or kustomization objects. 
     ...    assign_stdout_from_var=available_replicas
-    RW.CLI.Parse Cli Json Output
-    ...    rsp=${available_replicas}
-    ...    extract_path_to_var__available_replicas=@
-    ...    available_replicas__raise_issue_if_lt=1
     ${desired_replicas}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${statefulset}
     ...    extract_path_to_var__desired_replicas=status.replicas || `0`
     ...    desired_replicas__raise_issue_if_lt=1
     ...    assign_stdout_from_var=desired_replicas
+    ...    set_issue_details=No vault server pods desired, check if the vault instance has been scaled down. 
     RW.CLI.Parse Cli Json Output
     ...    rsp=${desired_replicas}
     ...    extract_path_to_var__desired_replicas=@
     ...    desired_replicas__raise_issue_if_neq=${available_replicas.stdout}
+    ...    set_issue_details=Desired replicas for vault does not match available/ready, check namespace and statefulset events, check node events or scaling events. 
     ${desired_replicas}=    Convert To Number    ${desired_replicas.stdout}
     ${available_replicas}=    Convert To Number    ${available_replicas.stdout}
     RW.Core.Add Pre To Report    StatefulSet State:\n${StatefulSet}

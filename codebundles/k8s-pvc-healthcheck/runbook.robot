@@ -69,6 +69,7 @@ Fetch Events for Unhealthy Kubernetes Persistent Volume Claims
     ...    set_issue_expected=PVCs should be bound
     ...    set_issue_actual=PVCs found pending with the following events
     ...    set_issue_title=PVC Errors & Events
+    ...    set_issue_details=Review list of unbound persistent volume claims - check node events, application configurations, storage classes and CSI drivers. 
     ...    line__raise_issue_if_contains=Name
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of events for unbound pvc in ${NAMESPACE}:
@@ -93,6 +94,7 @@ List Persistent Volumes in Terminating State
     ...    set_issue_expected=PV should not be stuck terminating. 
     ...    set_issue_actual=PV is in a terminating state. 
     ...    set_issue_title=PV Events While Terminating
+    ...    set_issue_details=Check the status of terminating pvcs over the next few minutes, they should disappear. If not, check that deployments or statefulsets attached to the pvc are scaled down and pods attached to the PVC are not running.  
     ...    _line__raise_issue_if_contains=Name
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of events for dangling persistent volumes:
@@ -130,6 +132,7 @@ Fetch the Storage Utilization for PVC Mounts
     ...    set_issue_expected=PVC should be less than 95% utilized. 
     ...    set_issue_actual=PVC is 95% or greater. 
     ...    set_issue_title=PVC Storage Utilization As Report by Pod
+    ...    set_issue_details=Review any storage utilization above 95% as they will be at or nearing capacity. Expand PVCs, remove uneeded storage, or check application configuration such as database logs and backup jobs.  
     ...    pvc_utilization__raise_issue_if_gt=95
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of PVC storage mount utilization in ${NAMESPACE}:
