@@ -107,16 +107,19 @@ Check Daemonset Replicas
     ...    rsp=${daemonset}
     ...    extract_path_to_var__current_scheduled=status.currentNumberScheduled || `0`
     ...    current_scheduled__raise_issue_if_lt=1
+    ...    set_issue_details=Scheduling issue with daemonset pods, check node health, events, and namespace events. 
     ...    assign_stdout_from_var=current_scheduled
     ${desired_scheduled}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${daemonset}
     ...    extract_path_to_var__desired_scheduled=status.desiredNumberScheduled || `0`
     ...    desired_scheduled__raise_issue_if_lt=1
+    ...    set_issue_details=No daemonset pods ready, check the vault csi driver daemonset events, helm or kustomization objects, and configuration.
     ...    assign_stdout_from_var=desired_scheduled
     ${available}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${daemonset}
     ...    extract_path_to_var__available=status.numberAvailable || `0`
     ...    available__raise_issue_if_lt=1
+    ...    set_issue_details=Scheduling issue with daemonset pods, check node health, events, and namespace events. 
     ...    assign_stdout_from_var=available
     ${misscheduled}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${daemonset}
@@ -127,11 +130,13 @@ Check Daemonset Replicas
     ...    rsp=${daemonset}
     ...    extract_path_to_var__ready=status.numberReady || `0`
     ...    ready__raise_issue_if_lt=1
+    ...    set_issue_details=No daemonset pods ready, check the daemonset events, helm or kustomization objects, and configuration. 
     ...    assign_stdout_from_var=ready
     ${unavailable}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${daemonset}
     ...    extract_path_to_var__unavailable=status.numberUnavailable || `0`
     ...    unavailable__raise_issue_if_gt=0
+    ...    set_issue_details=Fewer than desired daemonset pods, check node health, events, and namespace events. 
     ...    assign_stdout_from_var=unavailable
     # spec fields
     ${max_unavailable}=    RW.CLI.Parse Cli Json Output
@@ -145,10 +150,12 @@ Check Daemonset Replicas
     ...    rsp=${max_unavailable}
     ...    extract_path_to_var__comparison=@
     ...    comparison__raise_issue_if_lt=${unavailable}
+    ...    set_issue_details=More unavailable daemonset pods than configured max_unavailable, check node health, events, and namespace events. Cluster might be undergoing a scaling event or upgrade. 
     RW.CLI.Parse Cli Json Output
     ...    rsp=${current_scheduled}
     ...    extract_path_to_var__comparison=@
     ...    comparison__raise_issue_if_neq=${available}
+    ...    set_issue_details=Fewer than desired daemonset pods, check node health, events, and namespace events. Cluster might be undergoing a scaling event or upgrade. 
     RW.Core.Add Pre To Report    Deployment State:\n${daemonset_describe.stdout}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}

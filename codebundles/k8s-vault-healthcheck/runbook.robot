@@ -158,11 +158,12 @@ Check Vault CSI Driver Replicas
     ...    rsp=${max_unavailable}
     ...    extract_path_to_var__comparison=@
     ...    comparison__raise_issue_if_lt=${unavailable}
+    ...    set_issue_details=More unavailable vault csi driver daemonset pods than configured max_unavailable, check node health, events, and namespace events. Cluster might be undergoing a scaling event or upgrade, but should not cause max_unavailable to be violated. 
     RW.CLI.Parse Cli Json Output
     ...    rsp=${current_scheduled}
     ...    extract_path_to_var__comparison=@
     ...    comparison__raise_issue_if_neq=${available}
-    ...    set_issue_details=Fewer than desired csi driver daemonset pods, check node health, events, and namespace events. Cluster might be undergoing a scaleing event or upgrade. 
+    ...    set_issue_details=Fewer than desired csi driver daemonset pods, check node health, events, and namespace events. Cluster might be undergoing a scaling event or upgrade. 
     RW.Core.Add Pre To Report    Deployment State:\n${daemonset_describe.stdout}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
