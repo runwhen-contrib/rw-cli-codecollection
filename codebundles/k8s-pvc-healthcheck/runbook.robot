@@ -51,9 +51,9 @@ Suite Initialization
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
 
 *** Tasks ***
-Fetch Events for Unhealthy Kubernetes Persistent Volume Claims
+Fetch Events for Unhealthy Kubernetes PersistentVolumeClaims
     [Documentation]    Lists events related to persistent volume claims within the desired namespace that are not bound to a persistent volume.
-    [Tags]    PVC    List    Kubernetes    Storage    PersistentVolumeClaim    Events
+    [Tags]    PVC    List    Kubernetes    Storage    PersistentVolumeClaim    PersistentVolumeClaims Events
     ${unbound_pvc_events}=    RW.CLI.Run Cli
     ...    cmd=for pvc in $(${KUBERNETES_DISTRIBUTION_BINARY} get pvc -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.status.phase != "Bound") | .metadata.name'); do ${KUBERNETES_DISTRIBUTION_BINARY} get events -n ${NAMESPACE} --context ${CONTEXT} --field-selector involvedObject.name=$pvc -o json | jq '.items[]| "Last Timestamp: " + .lastTimestamp + " Name: " + .involvedObject.name + " Message: " + .message'; done
     ...    target_service=${kubectl}
