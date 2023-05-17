@@ -74,7 +74,7 @@ def parse_cli_json_output(
                 expected=rsp_code_expected,
                 actual=rsp_code_actual,
                 reproduce_hint=rsp_code_reproduce_hint,
-                details=set_issue_details,
+                details=f"{set_issue_details} ({e})",
             )
         else:
             raise e
@@ -166,7 +166,7 @@ def parse_cli_json_output(
             expected=issue_results.expected,
             actual=issue_results.actual,
             reproduce_hint=issue_results.reproduce_hint,
-            details=set_issue_details,
+            details=f"{set_issue_details} ({variable_from_path}: {variable_results})",
         )
     # override rsp stdout for parse chaining
     for key in kwargs.keys():
