@@ -80,6 +80,17 @@ Get Related Deployment Events
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
+    ${regexp}=    Catenate
+    ...    (?m)(?P<line>.+)
+    RW.CLI.Parse Cli Output By Line
+    ...    rsp=${events}
+    ...    lines_like_regexp=${regexp}
+    ...    set_severity_level=1
+    ...    set_issue_expected=No events of type warning should exist for deployment. 
+    ...    set_issue_actual=Events of type warning found for deployment. 
+    ...    set_issue_title=Deployment Warnings
+    ...    set_issue_details=Warning events found in deployment. Check event output and related nodes, persistent volumes, persistent volume claims, image registry authenticaiton, or fluxcd or argocd logs. 
+    ...    line__raise_issue_if_contains=Warning
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${events.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
