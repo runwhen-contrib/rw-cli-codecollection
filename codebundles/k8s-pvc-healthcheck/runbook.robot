@@ -76,7 +76,7 @@ Fetch Events for Unhealthy Kubernetes PersistentVolumeClaims
     RW.Core.Add Pre To Report    ${unbound_pvc_events.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-List Persistent Volumes in Terminating State
+List PersistentVolumes in Terminating State
     [Documentation]    Lists events related to persistent volumes in Terminating state.
     [Tags]    PV    List    Kubernetes    Storage    PersistentVolume    Terminating    Events
     ${dangline_pvcs}=    RW.CLI.Run Cli
@@ -101,7 +101,7 @@ List Persistent Volumes in Terminating State
     RW.Core.Add Pre To Report    ${dangline_pvcs.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-List Pods with Attached Volumes and Related PV Details
+List Pods with Attached Volumes and Related PersistentVolume Details
     [Documentation]    For each pod in a namespace, collect details on configured persistent volume claim, persistent volume, and node. 
     [Tags]    Pod    Storage    PVC    PV    Status    CSI    StorageReport
     ${pod_storage_report}=    RW.CLI.Run Cli
@@ -117,7 +117,7 @@ List Pods with Attached Volumes and Related PV Details
 
 Fetch the Storage Utilization for PVC Mounts
     [Documentation]    For each pod in a namespace, the utilization of the pvc mount using the linux df command. Requires kubectl exec permissions. 
-    [Tags]    Pod    Storage    PVC    Storage    Utilization    Capacity
+    [Tags]    Pod    Storage    PVC    Storage    Utilization    Capacity    PersistentVolumeClaim
     ${pod_pvc_utilization}=    RW.CLI.Run Cli
     ...    cmd=for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} --field-selector=status.phase=Running --context ${CONTEXT} -o jsonpath='{range .items[*]}{.metadata.name}{"\\n"}{end}'); do for pvc in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods $pod -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{range .spec.volumes[*]}{.persistentVolumeClaim.claimName}{"\\n"}{end}'); do for volumeName in $(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.spec.volumes[] | select(has("persistentVolumeClaim")) | .name'); do mountPath=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r --arg vol "$volumeName" '.spec.containers[].volumeMounts[] | select(.name == $vol) | .mountPath'); containerName=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r --arg vol "$volumeName" '.spec.containers[] | select(.volumeMounts[].name == $vol) | .name'); echo -e "\\n---\\nPod: $pod, PVC: $pvc, volumeName: $volumeName, containerName: $containerName, mountPath: $mountPath"; ${KUBERNETES_DISTRIBUTION_BINARY} exec $pod -n ${NAMESPACE} --context ${CONTEXT} -c $containerName -- df -h $mountPath; done; done; done;
     ...    target_service=${kubectl}
