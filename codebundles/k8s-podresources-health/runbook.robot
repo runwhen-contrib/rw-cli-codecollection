@@ -55,11 +55,11 @@ Suite Initialization
     Set Suite Variable    ${LABELS}    ${LABELS}
 
 *** Tasks ***
-Scan Labeled Pods and Validate Resources
+Scan Labeled Pods and Show All Containers Without Resource Limit or Resource Requests Set
     [Documentation]    Scans a list of pods in a namespace using labels as a selector and checks if their resources are set.
     [Tags]    Pods    Resources    Resource    Allocation    CPU    Memory    Startup    Initialization    Prehook    Liveness    Readiness
     ${pods_without_limits}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running -ojson | jq -r '[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.limits == null) | {pod: $pod.metadata.name, container: .name}]'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running -ojson | jq -r '[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.limits == null) | {pod: $pod.metadata.name, container_without_limits: .name}]'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    target_service=${kubectl}
@@ -73,7 +73,7 @@ Scan Labeled Pods and Validate Resources
     ...    set_issue_details=Pods found without limits applied. Review each manifest and edit configuration to set appropriate resource limits. 
     ...    assign_stdout_from_var=no_limits_count
     ${pods_without_requests}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running -ojson | jq -r '[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.requests == null) | {pod: $pod.metadata.name, container: .name}]'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running -ojson | jq -r '[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.requests == null) | {pod: $pod.metadata.name, container_without_requests: .name}]'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    target_service=${kubectl}
