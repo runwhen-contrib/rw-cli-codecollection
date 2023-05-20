@@ -89,10 +89,10 @@ Scan Labeled Pods and Show All Containers Without Resource Limit or Resource Req
     ${history}=    RW.CLI.Pop Shell History
     ${no_requests_pod_count}=    Convert To Number    ${no_requests_count.stdout}
     ${no_limits_pod_count}=    Convert To Number    ${no_limits_count.stdout}
-    ${pod_count}=    Set Variable    ${no_requests_pod_count} + ${no_limits_pod_count} 
-    ${summary}=    Set Variable    No pods with unset resources found!
-    IF    ${pod_count} > 0
-        ${summary}=    Set Variable    ${pod_count} pods found without resources specified:\n${pods_without_resources.stdout}        
+    ${container_count}=    Set Variable    ${no_requests_pod_count} + ${no_limits_pod_count} 
+    ${summary}=    Set Variable    No containers with unset resources found!
+    IF    ${container_count} > 0
+        ${summary}=    Set Variable    ${container_count} containers found without resources specified:\n${pods_without_limits.stdout}\n ${pods_without_resources.stdout} 
     END
     RW.Core.Add Pre To Report    ${summary}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
