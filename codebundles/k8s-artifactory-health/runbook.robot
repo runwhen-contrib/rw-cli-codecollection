@@ -110,7 +110,7 @@ Fetch Artifactory StatefulSet Manifest Details
     RW.Core.Add Pre To Report    ${statefulset.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Check Artifactory StatefulSet Replicas
+Check IF Artifactory StatefulSet Replicas Are Not Ready
     [Documentation]    Pulls the replica information for the Artifactory StatefulSet and checks if it's highly available
     ...                , if the replica counts are the expected / healthy values, and if not, what they should be.
     [Tags]    StatefulSet    Replicas    Desired    Actual    Available    Ready    Unhealthy    Rollout    Stuck    Pods
@@ -149,7 +149,7 @@ Check Artifactory StatefulSet Replicas
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Check Artifactory Health Endpoints
+Check Artifactory Liveness and Readiness Endpoints
     [Documentation]    Runs a set of exec commands internally in the Artifactory workloads to curl the system health endpoints.
     [Tags]    Pods    Statefulset    Artifactory    Health    System    Curl    API    OK    HTTP
     # these endpoints dont respect json type headers
