@@ -110,7 +110,7 @@ Fetch Artifactory StatefulSet Manifest Details
     RW.Core.Add Pre To Report    ${statefulset.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Check IF Artifactory StatefulSet Replicas Are Not Ready
+Check If Artifactory StatefulSet Replicas Are Not Ready
     [Documentation]    Pulls the replica information for the Artifactory StatefulSet and checks if it's highly available
     ...                , if the replica counts are the expected / healthy values, and if not, what they should be.
     [Tags]    StatefulSet    Replicas    Desired    Actual    Available    Ready    Unhealthy    Rollout    Stuck    Pods
