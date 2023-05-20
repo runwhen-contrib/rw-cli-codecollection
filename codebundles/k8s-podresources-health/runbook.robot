@@ -58,22 +58,38 @@ Suite Initialization
 Scan Labeled Pods and Validate Resources
     [Documentation]    Scans a list of pods in a namespace using labels as a selector and checks if their resources are set.
     [Tags]    Pods    Resources    Resource    Allocation    CPU    Memory    Startup    Initialization    Prehook    Liveness    Readiness
-    ${pods_without_resources}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running -ojson | jq '[.items[] | select(.spec.containers[].resources == {} or (.spec.containers[].resources|has("requests")|not) or (.spec.containers[].resources|has("limits")|not)) | {namespace:.metadata.namespace,name:.metadata.name}]'
+    ${pods_without_limits}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running -ojson | jq '[.items[] | select(.spec.containers[].resources == {} or (.spec.containers[].resources|has("limits")|not)) | {namespace:.metadata.namespace,name:.metadata.name}]'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    target_service=${kubectl}
     ...    render_in_commandlist=true
-    ${no_resource_count}=    RW.CLI.Parse Cli Json Output
-    ...    rsp=${pods_without_resources}
-    ...    extract_path_to_var__no_resources_count=length(@)
-    ...    set_issue_title=Found pod without resources specified!
+    ${no_limits_count}=    RW.CLI.Parse Cli Json Output
+    ...    rsp=${pods_without_limits}
+    ...    extract_path_to_var__no_limits_count=length(@)
+    ...    set_issue_title=Found pod without resource limits specified!
     ...    set_severity_level=4
-    ...    no_resources_count__raise_issue_if_gt=0
-    ...    set_issue_details=Pods found without resource requests or limits applied. Review each manifest and edit configuration to set appropriate resource limits. 
-    ...    assign_stdout_from_var=no_resources_count
+    ...    no_limit_count__raise_issue_if_gt=0
+    ...    set_issue_details=Pods found without limits applied. Review each manifest and edit configuration to set appropriate resource limits. 
+    ...    assign_stdout_from_var=no_limits_count
+    ${pods_without_requests}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running -ojson | jq '[.items[] | select(.spec.containers[].resources == {} or (.spec.containers[].resources|has("requests")|not)) | {namespace:.metadata.namespace,name:.metadata.name}]'
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    target_service=${kubectl}
+    ...    render_in_commandlist=true
+    ${no_requests_count}=    RW.CLI.Parse Cli Json Output
+    ...    rsp=${pods_without_requests}
+    ...    extract_path_to_var__no_requests_count=length(@)
+    ...    set_issue_title=Found pod without resource requests specified!
+    ...    set_severity_level=4
+    ...    no_requests_count__raise_issue_if_gt=0
+    ...    set_issue_details=Pods found without resource requests applied. Review each manifest and edit configuration to set appropriate resource limits. 
+    ...    assign_stdout_from_var=no_requests_count
     ${history}=    RW.CLI.Pop Shell History
-    ${pod_count}=    Convert To Number    ${no_resource_count.stdout}
+    ${no_requests_pod_count}=    Convert To Number    ${no_requests_count.stdout}
+    ${no_limits_pod_count}=    Convert To Number    ${no_limits_count.stdout}
+    ${pod_count}=    Set Variable    ${no_requests_pod_count} + ${no_limits_pod_count} 
     ${summary}=    Set Variable    No pods with unset resources found!
     IF    ${pod_count} > 0
         ${summary}=    Set Variable    ${pod_count} pods found without resources specified:\n${pods_without_resources.stdout}        
