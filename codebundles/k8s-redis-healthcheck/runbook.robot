@@ -47,7 +47,7 @@ Suite Initialization
     ...    type=string
     ...    description=Used to target the redis resource for the health check.
     ...    pattern=\w*
-    ...    example=redis
+    ...    example=o-redis
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${kubectl}    ${kubectl}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
