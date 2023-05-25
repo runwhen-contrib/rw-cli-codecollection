@@ -1,0 +1,55 @@
+*** Settings ***
+Metadata          Author    Shea Stewart
+Documentation     Check if any GCP nodes have an active preempt operation. 
+Metadata          Display Name    GCP Node Prempt List 
+Metadata          Supports    GCP,GKE
+Suite Setup       Suite Initialization
+Library           BuiltIn
+Library           RW.Core
+Library           RW.CLI
+Library           RW.platform
+Library           OperatingSystem
+
+*** Keywords ***
+Suite Initialization
+    ${GCLOUD_SERVICE}=    RW.Core.Import Service    gcloud
+    ...    type=string
+    ...    description=The selected RunWhen Service to use for accessing services within a network.
+    ...    pattern=\w*
+    ...    example=gcloud-service.shared
+    ...    default=gcloud-service.shared
+    ${gcp_credentials_json}=    RW.Core.Import Secret    gcp_credentials_json
+    ...    type=string
+    ...    description=GCP service account json used to authenticate with GCP APIs.
+    ...    pattern=\w*
+    ...    example={"type": "service_account","project_id":"myproject-ID", ... super secret stuff ...}
+    ${PROJECT_ID}=    RW.Core.Import User Variable    PROJECT_ID
+    ...    type=string
+    ...    description=The GCP Project ID to scope the API to.
+    ...    pattern=\w*
+    ...    example=myproject-ID
+    Set Suite Variable    ${GCLOUD_SERVICE}    ${GCLOUD_SERVICE}
+    Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}   
+    Set Suite Variable    ${env}    {"GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}"}
+
+
+*** Tasks ***
+Count the number of nodes in active prempt operation
+    [Documentation]    Fetches all nodes that have an active preempt operation at a global scope in the GCP Project
+    [Tags]    Stdout    gcloud    node    preempt    gcp
+    ${auth}=    RW.CLI.Run Cli
+    ...    cmd=gcloud auth activate-service-account --key-file=./${gcp_credentials_json.key}
+    ...    target_service=${GCLOUD_SERVICE}
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ${preempt_node_list}=    RW.CLI.Run Cli
+    ...    cmd=gcloud compute operations list --filter="operationType:( compute.instances.preempted ) AND NOT status:( DONE )" --format=json --project=${PROJECT_ID}
+    ...    target_service=${GCLOUD_SERVICE}
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ${no_requests_count}=    RW.CLI.Parse Cli Json Output
+    ...    rsp=${preempt_node_list}
+    ...    extract_path_to_var__preempt_node_count=length(@)
+    ...    assign_stdout_from_var=preempt_node_count
+    ${metric}=     Convert To Number    ${no_requests_count.stdout}
+    RW.Core.Push Metric    ${metric}
