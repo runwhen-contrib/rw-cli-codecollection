@@ -2,7 +2,7 @@
 Metadata          Author    Jonathan Funk
 Metadata          Display Name    GCP Gcloud Log Inspection
 Metadata          Supports    GCP,Gcloud,Google Monitoring
-Documentation     Fetches logs from a GCP using a configurable query and raises an issue with details on the most common issue.
+Documentation     Fetches logs from a GCP using a configurable query and raises an issue with details on the most common issues.
 Suite Setup       Suite Initialization
 Library           RW.Core
 Library           RW.CLI
@@ -18,7 +18,7 @@ Suite Initialization
     ...    example=ERROR
     ${ADD_FILTERS}=    RW.Core.Import User Variable    ADD_FILTERS
     ...    type=string
-    ...    description=Extra optional filters to add to the gcloud log read request.  
+    ...    description=Extra optional filters to add to the gcloud log read request. See https://cloud.google.com/logging/docs/view/logging-query-language for syntax.
     ...    pattern=\w*
     ...    default=
     ...    example=resource.labels.cluster_name=mycluster-1
@@ -50,23 +50,47 @@ Suite Initialization
     Set Suite Variable    ${auto_auth_prepend}    gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS &&
 
 *** Tasks ***
-Fetch Error Logs For GCP Project
+Inspect GCP Logs For Common Errors
     [Tags]    Logs    Query    Gcloud    GCP    Errors    Common
-    [Documentation]    Fetches logs from a Google Cloud Project and filters for a count of common messages.
+    [Documentation]    Fetches logs from a Google Cloud Project and filters for a count of common error messages.
     ${cmd}    Set Variable    ${auto_auth_prepend} gcloud logging read "severity>=${SEVERITY}${ADD_FILTERS}" --freshness=120m --limit=50 --format=json
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${cmd}
     ...    target_service=${GCLOUD_SERVICE}
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ${namespace_list}=       RW.CLI.Parse Cli Json Output
+    ...    rsp=${rsp}
+    ...    extract_path_to_var__namespaces=[].resource.labels.namespace_name
+    ...    assign_stdout_from_var=namespaces
+    ${namespace_counts}=    Evaluate    {c: 0 for c in ${namespace_list.stdout}}
+    ${namespace_counts}=    Evaluate    {k: ${namespace_list.stdout}.count(k) for k in ${namespace_counts}.keys()}
+    ${common_namespace}=    Evaluate    max(${namespace_counts}, key=${namespace_counts}.get)
+    ${cluster_list}=       RW.CLI.Parse Cli Json Output
+    ...    rsp=${rsp}
+    ...    extract_path_to_var__clusters=[].resource.labels.cluster_name
+    ...    assign_stdout_from_var=clusters
+    ${cluster_counts}=    Evaluate    {c: 0 for c in ${cluster_list.stdout}}
+    ${cluster_counts}=    Evaluate    {k: ${cluster_list.stdout}.count(k) for k in ${cluster_counts}.keys()}
+    ${common_cluster}=    Evaluate    max(${cluster_counts}, key=${cluster_counts}.get)
     ${entry_count}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${rsp}
     ...    extract_path_to_var__count=length(@)
     ...    count__raise_issue_if_gt=0
+    ...    set_severity_level=4
     ...    set_issue_expected=No filtered log entries returned by the gcloud query: ${cmd} 
     ...    set_issue_title=Found Errors During GCP Log Inspection
     ...    set_issue_actual=Found results from the command: ${cmd}
     ...    set_issue_details=We found: {_stdout}
     ...    assign_stdout_from_var=count
-    #TODO: count up matching results and show most common as issue
+    RW.Core.Add Pre To Report    Log Inspection Results:
+    RW.Core.Add Pre To Report    Entries Count Of Potential Issues: ${entry_count.stdout}
+    RW.Core.Add Pre To Report    Cluster With Most Potential Issues: ${common_cluster}
+    RW.Core.Add Pre To Report    Namespace With Most Potential Issues: ${common_namespace}
+    RW.Core.Add Pre To Report    Cluster Results: ${cluster_counts}
+    RW.Core.Add Pre To Report    Namespace Results: ${namespace_counts}
+    RW.Core.Add Pre To Report    \n\n
+    RW.Core.Add Pre To Report    Full Logs:\n ${rsp.stdout}
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    Commands Used: ${history}
     
