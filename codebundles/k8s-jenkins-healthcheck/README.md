@@ -1,17 +1,8 @@
 # Kubernetes Jenkins Healthcheck
 
-This taskset checks the Kubernetes workloads that jenkins is reliant on in your Kubernetes cluster, and performs some checks against its rest api to determine if there are any stuck jobs, 
-which will result in raised issues if any are detected.
+This taskset performs checks against its rest api to determine if there are any stuck jobs, which will result in raised issues if any are detected.
 
 ## Tasks
-`Fetch Events for Unhealthy Jenkins Kubernetes PersistentVolumeClaims`
-`List PersistentVolumes in Terminating State`
-`List Pods In Jenkins Namespace with Attached Volumes and Related PersistentVolume Details`
-`Fetch the Storage Utilization for PVC Mounts In The Jenkins Namespace`
-`Fetch Jenkins StatefulSet Logs`
-`Get Related Jenkins StatefulSet Events`
-`Fetch Jenkins StatefulSet Manifest Details`
-`Check Jenkins StatefulSet Replicas`
 `Query The Jenkins Kubernetes Workload HTTP Endpoint`
 `Query For Stuck Jenkins Jobs`
 
@@ -25,7 +16,6 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 - `CONTEXT`: The Kubernetes context to operate within.
 - `NAMESPACE`: The name of the namespace to search. Leave it blank to search in all namespaces.
 - `STATEFULSET_NAME`: The name of the statefulset running jenkins
-- `LABELS`: Optional labels for fine-tuning log and event searches
 - `JENKINS_SA_USERNAME`: The jenkins username associated with the API token
 - `JENKINS_SA_TOKEN`: The API token used to perform healthcheck API requests against the endpoint
 
