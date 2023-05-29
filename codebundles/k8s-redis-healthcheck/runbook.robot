@@ -48,14 +48,20 @@ Suite Initialization
     ...    description=Used to target the redis resource for the health check.
     ...    pattern=\w*
     ...    example=o-redis
+    ${REDIS_HEALTHCHECK_KEY}=    RW.Core.Import User Variable    REDIS_HEALTHCHECK_KEY
+    ...    type=string
+    ...    description=The key used to perform read/write operations on to validate storage.
+    ...    pattern=\w*
+    ...    example=runwhen_task_rw_healthcheck
+    ...    default=runwhen_task_rw_healthcheck
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${kubectl}    ${kubectl}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${DEPLOYMENT_NAME}    ${DEPLOYMENT_NAME}
+    Set Suite Variable    ${REDIS_HEALTHCHECK_KEY}    ${REDIS_HEALTHCHECK_KEY}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
-    Set Suite Variable    ${HEALTH_KEY}    runwhen_task_rw_healthcheck
 
 *** Tasks ***
 Ping Redis Workload
@@ -82,17 +88,17 @@ Verify Redis Read Write Operation
     [Documentation]    Attempts to perform a write and read operation on the redis workload, checking that a key can be set, incremented, and read from.
     [Tags]    Redis    CLI    Increment    Health    Check    Read    Write
     ${set_op}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- redis-cli SET ${HEALTH_KEY} 0
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- redis-cli SET ${REDIS_HEALTHCHECK_KEY} 0
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${incr_op}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- redis-cli INCR ${HEALTH_KEY}
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- redis-cli INCR ${REDIS_HEALTHCHECK_KEY}
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${get_op}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- redis-cli GET ${HEALTH_KEY}
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- redis-cli GET ${REDIS_HEALTHCHECK_KEY}
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -102,8 +108,8 @@ Verify Redis Read Write Operation
     ...    set_issue_expected=The redis workload successfully incremented the healthcheck key.
     ...    set_issue_actual=The redis workload failed to increment the key as expected.
     ...    set_issue_title=Redis Read Write Operation Failure
-    ...    set_issue_details=Check the PVC that the redis workload depends on and verify it's healthy. Try use 'redis-cli INCR ${HEALTH_KEY}' yourself on the workload.
+    ...    set_issue_details=Check the PVC that the redis workload depends on and verify it's healthy. Try use 'redis-cli INCR ${REDIS_HEALTHCHECK_KEY}' yourself on the workload.
     ...    _line__raise_issue_if_neq=1
-    RW.Core.Add Pre To Report    Redis Response For Key ${HEALTH_KEY}:${get_op.stdout}
+    RW.Core.Add Pre To Report    Redis Response For Key ${REDIS_HEALTHCHECK_KEY}:${get_op.stdout}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}

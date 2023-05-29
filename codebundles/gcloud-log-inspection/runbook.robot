@@ -47,13 +47,12 @@ Suite Initialization
     END
     Set Suite Variable    ${ADD_FILTERS}    ${ADD_FILTERS}
     Set Suite Variable    ${env}    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}"}
-    Set Suite Variable    ${auto_auth_prepend}    gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS &&
 
 *** Tasks ***
 Inspect GCP Logs For Common Errors
     [Tags]    Logs    Query    Gcloud    GCP    Errors    Common
     [Documentation]    Fetches logs from a Google Cloud Project and filters for a count of common error messages.
-    ${cmd}    Set Variable    ${auto_auth_prepend} gcloud logging read "severity>=${SEVERITY}${ADD_FILTERS}" --freshness=120m --limit=50 --format=json
+    ${cmd}    Set Variable    gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud logging read "severity>=${SEVERITY}${ADD_FILTERS}" --freshness=120m --limit=50 --format=json
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${cmd}
     ...    target_service=${GCLOUD_SERVICE}
