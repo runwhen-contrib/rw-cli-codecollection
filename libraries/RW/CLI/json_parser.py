@@ -7,6 +7,8 @@ from . import cli_utils
 logger = logging.getLogger(__name__)
 ROBOT_LIBRARY_SCOPE = "GLOBAL"
 
+MAX_ISSUE_STRING_LENGTH: int = 255
+
 RECOGNIZED_JSON_PARSE_QUERIES = [
     "raise_issue_if_eq",
     "raise_issue_if_neq",
@@ -49,6 +51,7 @@ def parse_cli_json_output(
     _core: Core = Core()
     logger.info(f"kwargs: {kwargs}")
     found_issue: bool = False
+    variable_results["_stdout"] = rsp.stdout
     # check we've got an expected rsp
     try:
         cli_utils.verify_rsp(rsp, expected_rsp_statuscodes, expected_rsp_returncodes, contains_stderr_ok)
@@ -148,6 +151,7 @@ def parse_cli_json_output(
     # begin searching for issues
     # break at first found issue
     # TODO: revisit how we submit multiple chained issues
+    # TODO: cleanup, reorg this
     issue_results = _check_for_json_issue(
         rsp,
         variable_from_path,
@@ -157,17 +161,24 @@ def parse_cli_json_output(
         set_issue_actual,
         set_issue_reproduce_hint,
         set_issue_title,
+        set_issue_details,
         **kwargs,
     )
     if issue_results.issue_found:
-        _core.add_issue(
-            severity=issue_results.severity,
-            title=issue_results.title,
-            expected=issue_results.expected,
-            actual=issue_results.actual,
-            reproduce_hint=issue_results.reproduce_hint,
-            details=f"{set_issue_details} ({variable_from_path}: {variable_results})",
-        )
+        known_symbols = {**kwargs, **variable_results}
+        issue_data = {
+            "title": f"{issue_results.title}".format_map(known_symbols),
+            "severity": issue_results.severity,
+            "expected": f"{issue_results.expected}".format_map(known_symbols),
+            "actual": f"{issue_results.actual}".format_map(known_symbols),
+            "reproduce_hint": f"{issue_results.reproduce_hint}".format_map(known_symbols),
+            "details": f"{issue_results.details}".format_map(known_symbols),
+        }
+        # truncate long strings
+        for key, value in issue_data.items():
+            if isinstance(value, str) and len(value) > MAX_ISSUE_STRING_LENGTH:
+                issue_data[key] = value[:MAX_ISSUE_STRING_LENGTH] + "..."
+        _core.add_issue(**issue_data)
     # override rsp stdout for parse chaining
     for key in kwargs.keys():
         kwarg_parts = key.split("__")
@@ -199,12 +210,14 @@ def _check_for_json_issue(
     set_issue_actual: str = "",
     set_issue_reproduce_hint: str = "",
     set_issue_title: str = "",
+    set_issue_details: str = "",
     **kwargs,
 ) -> cli_utils.IssueCheckResults:
     severity: int = 4
     title: str = ""
     expected: str = ""
     actual: str = ""
+    details: str = ""
     reproduce_hint: str = ""
     issue_found: bool = False
     parse_queries = kwargs
@@ -249,21 +262,23 @@ def _check_for_json_issue(
         if not numeric_castable and (query_value == "True" or query_value == "False"):
             query_value = True if query_value == "True" else False
         if query == "raise_issue_if_eq" and (
-            query_value == variable_value or (variable_is_list and query_value in variable_value)
+            str(query_value) == str(variable_value) or (variable_is_list and query_value in variable_value)
         ):
             issue_found = True
             title = f"Value Of {prefix} Was {variable_value}"
             expected = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} should not be equal to {query_value}"
             actual = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} is equal to {variable_value}"
             reproduce_hint = f"Run {rsp.cmd} and apply the jmespath '{variable_from_path[prefix]}' to the output"
+            details = f"{set_issue_details} ({variable_value})"
         elif query == "raise_issue_if_neq" and (
-            query_value != variable_value or (variable_is_list and query_value not in variable_value)
+            str(query_value) != str(variable_value) or (variable_is_list and query_value not in variable_value)
         ):
             issue_found = True
             title = f"Value of {prefix} ({variable_value}) Was Not {query_value}"
             expected = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} should be equal to {variable_value}"
             actual = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} does not contain the expected value of: {prefix}=={query_value} and is actually {variable_value}"
             reproduce_hint = f"Run {rsp.cmd} and apply the jmespath '{variable_from_path[prefix]}' to the output"
+            details = f"{set_issue_details} ({variable_value})"
 
         elif query == "raise_issue_if_lt" and numeric_castable and variable_value < query_value:
             issue_found = True
@@ -271,24 +286,28 @@ def _check_for_json_issue(
             expected = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} should have a value >= {query_value}"
             actual = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} found value: {variable_value} and it's less than {query_value}"
             reproduce_hint = f"Run {rsp.cmd} and apply the jmespath '{variable_from_path[prefix]}' to the output"
+            details = f"{set_issue_details} ({variable_value})"
         elif query == "raise_issue_if_gt" and numeric_castable and variable_value > query_value:
             issue_found = True
             title = f"Value of {prefix} ({variable_value}) Was Greater Than {query_value}"
             expected = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} should have a value <= {query_value}"
             actual = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} found value: {variable_value} and it's greater than {query_value}"
             reproduce_hint = f"Run {rsp.cmd} and apply the jmespath '{variable_from_path[prefix]}' to the output"
+            details = f"{set_issue_details} ({variable_value})"
         elif query == "raise_issue_if_contains" and query_value in variable_value:
             issue_found = True
             title = f"Value of {prefix} ({variable_value}) Contained {query_value}"
             expected = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} resulted in {variable_value} and should not contain {query_value}"
             actual = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} resulted in {variable_value} and it contains {query_value} when it should not"
             reproduce_hint = f"Run {rsp.cmd} and apply the jmespath '{variable_from_path[prefix]}' to the output"
+            details = f"{set_issue_details} ({variable_value})"
         elif query == "raise_issue_if_ncontains" and query_value not in variable_value:
             issue_found = True
             title = f"Value of {prefix} ({variable_value}) Did Not Contain {query_value}"
             expected = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} resulted in {variable_value} and should contain {query_value}"
             actual = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} resulted in {variable_value} and we expected to find {query_value} in the result"
             reproduce_hint = f"Run {rsp.cmd} and apply the jmespath '{variable_from_path[prefix]}' to the output"
+            details = f"{set_issue_details} ({variable_value})"
         # Explicit sets
         if set_severity_level:
             severity = set_severity_level
@@ -311,4 +330,5 @@ def _check_for_json_issue(
         actual=actual,
         reproduce_hint=reproduce_hint,
         issue_found=issue_found,
+        details=details,
     )

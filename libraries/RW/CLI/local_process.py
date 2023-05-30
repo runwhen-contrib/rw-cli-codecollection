@@ -64,7 +64,7 @@ def execute_local_command(
             with open(file_path, "w") as tmp:
                 tmp.write(content)
         logger.debug(
-            f"running {parsed_cmd} with env {run_with_env} and files {files.keys()}, secret names {secret_keys}"
+            f"running {parsed_cmd} with env {run_with_env.keys()} and files {files.keys()}, secret names {secret_keys}"
         )
         p = subprocess.run(
             parsed_cmd,
@@ -78,11 +78,11 @@ def execute_local_command(
         err = p.stderr
         rc = p.returncode
         logger.debug(
-            f"ran {parsed_cmd} with env {run_with_env} and files {files.keys()}, secret names {secret_keys}, resulted in returncode {rc}, stdout {out}, stderr {err}"
+            f"ran {parsed_cmd} with env {run_with_env.keys()} and files {files.keys()}, secret names {secret_keys}, resulted in returncode {rc}, stdout {out}, stderr {err}"
         )
     except Exception as e:
         s = traceback.format_exception(*sys.exc_info())
-        msg = f"Exception while running {parsed_cmd} with env {run_with_env} and files {files.keys()}, secret names {secret_keys}: {type(e)}: {e}\n{s}"
+        msg = f"Exception while running {parsed_cmd} with env {run_with_env.keys()} and files {files.keys()}, secret names {secret_keys}: {type(e)}: {e}\n{s}"
         errors.append(msg)
         rc = -1
         logger.error(msg)
