@@ -80,7 +80,7 @@ Inspect GCP Logs For Common Errors
     ...    set_issue_expected=No filtered log entries returned by the gcloud query: ${cmd} 
     ...    set_issue_title=Found Errors During GCP Log Inspection
     ...    set_issue_actual=Found results from the command: ${cmd}
-    ...    set_issue_details=We found: {_stdout}
+    ...    set_issue_details=We found: $_stdout
     ...    assign_stdout_from_var=count
     RW.Core.Add Pre To Report    Log Inspection Results:
     RW.Core.Add Pre To Report    Entries Count Of Potential Issues: ${entry_count.stdout}

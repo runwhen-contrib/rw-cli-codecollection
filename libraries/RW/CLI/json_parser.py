@@ -1,4 +1,5 @@
 import logging, json, jmespath
+from string import Template
 from RW import platform
 from RW.Core import Core
 
@@ -167,12 +168,12 @@ def parse_cli_json_output(
     if issue_results.issue_found:
         known_symbols = {**kwargs, **variable_results}
         issue_data = {
-            "title": f"{issue_results.title}".format_map(known_symbols),
+            "title": Template(issue_results.title).safe_substitute(known_symbols),
             "severity": issue_results.severity,
-            "expected": f"{issue_results.expected}".format_map(known_symbols),
-            "actual": f"{issue_results.actual}".format_map(known_symbols),
-            "reproduce_hint": f"{issue_results.reproduce_hint}".format_map(known_symbols),
-            "details": f"{issue_results.details}".format_map(known_symbols),
+            "expected": Template(issue_results.expected).safe_substitute(known_symbols),
+            "actual": Template(issue_results.actual).safe_substitute(known_symbols),
+            "reproduce_hint": Template(issue_results.reproduce_hint).safe_substitute(known_symbols),
+            "details": Template(issue_results.details).safe_substitute(known_symbols),
         }
         # truncate long strings
         for key, value in issue_data.items():
