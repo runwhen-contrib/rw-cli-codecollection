@@ -56,4 +56,6 @@ Checking HTTP URL Is Available And Timely
     ...    set_issue_details=Check services, pods, load balanacers, and virtual machines for unexpected saturation. 
     ...    assign_stdout_from_var=time_total
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used:\n${history}
+    RW.Core.Add Pre To Report    Commands Used: ${history}
+    RW.Core.Add Pre To Report    URL Latency: ${http_latency.stdout}
+    RW.Core.Add Pre To Report    URL Response Code: ${http_rsp_code.stdout}
