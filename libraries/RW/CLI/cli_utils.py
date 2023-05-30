@@ -96,7 +96,7 @@ def escape_str_for_exec(string: str, escapes: int = 1) -> str:
     return string
 
 
-@dataclass(frozen=True)
+@dataclass
 class IssueCheckResults:
     """
     Used to keep function signatures from getting too busy when passing issue data around.
@@ -109,3 +109,4 @@ class IssueCheckResults:
     actual: str = ""
     reproduce_hint: str = ""
     issue_found: bool = False
+    details: str = ""
