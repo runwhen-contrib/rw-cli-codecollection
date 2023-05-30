@@ -167,7 +167,6 @@ def parse_cli_json_output(
     )
     if issue_results.issue_found:
         known_symbols = {**kwargs, **variable_results}
-        logger.info(f"Known symbols: {known_symbols}")
         issue_data = {
             "title": Template(issue_results.title).safe_substitute(known_symbols),
             "severity": issue_results.severity,
