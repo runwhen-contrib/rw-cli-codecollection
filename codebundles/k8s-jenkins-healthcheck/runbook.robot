@@ -117,7 +117,7 @@ Query For Stuck Jenkins Jobs
     ...    set_issue_expected=The Jenkins pipeline should not have any stuck jobs
     ...    set_issue_actual=The Jenkins pipeline has stuck jobs in the queue
     ...    set_issue_title=Stuck Jobs in Jenkins Pipeline
-    ...    set_issue_details=We found stuck jobs in the stdout: {_stdout} - check the jenkins console for further details on how to unstuck them.
+    ...    set_issue_details=We found stuck jobs in the stdout: $_stdout - check the jenkins console for further details on how to unstuck them.
     ...    _line__raise_issue_if_contains=Stuck
     RW.Core.Add Pre To Report    Queue Information:\n${rsp.stdout}
     ${history}=    RW.CLI.Pop Shell History

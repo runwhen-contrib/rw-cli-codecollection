@@ -4,6 +4,7 @@ CLI Generic keyword library for running and parsing CLI stdout
 Scope: Global
 """
 import re, logging
+from string import Template
 from RW import platform
 from RW.Core import Core
 
@@ -291,12 +292,12 @@ def parse_cli_output_by_line(
                 if title and len(first_issue.keys()) == 0:
                     known_symbols = {**kwargs, **capture_groups}
                     first_issue = {
-                        "title": f"{title}".format_map(known_symbols),
+                        "title": Template(title).safe_substitute(known_symbols),
                         "severity": severity,
-                        "expected": f"{expected}".format_map(known_symbols),
-                        "actual": f"{actual}".format_map(known_symbols),
-                        "reproduce_hint": f"{reproduce_hint}".format_map(known_symbols),
-                        "details": f"{details}".format_map(known_symbols),
+                        "expected": Template(expected).safe_substitute(known_symbols),
+                        "actual": Template(actual).safe_substitute(known_symbols),
+                        "reproduce_hint": Template(reproduce_hint).safe_substitute(known_symbols),
+                        "details": Template(details).safe_substitute(known_symbols),
                     }
             else:
                 logger.info(f"Prefix {prefix} not found in capture groups: {capture_groups.keys()}")
