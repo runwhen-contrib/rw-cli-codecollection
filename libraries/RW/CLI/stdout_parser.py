@@ -291,7 +291,7 @@ def parse_cli_output_by_line(
                     issue_count += 1
                 if title and len(first_issue.keys()) == 0:
                     known_symbols = {**kwargs, **capture_groups}
-                    issue_data = {
+                    first_issue = {
                         "title": Template(title).safe_substitute(known_symbols),
                         "severity": severity,
                         "expected": Template(expected).safe_substitute(known_symbols),
