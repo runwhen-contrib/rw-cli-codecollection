@@ -262,7 +262,7 @@ def _check_for_json_issue(
         if not numeric_castable and (query_value == "True" or query_value == "False"):
             query_value = True if query_value == "True" else False
         if query == "raise_issue_if_eq" and (
-            query_value == variable_value or (variable_is_list and query_value in variable_value)
+            str(query_value) == str(variable_value) or (variable_is_list and query_value in variable_value)
         ):
             issue_found = True
             title = f"Value Of {prefix} Was {variable_value}"
@@ -271,7 +271,7 @@ def _check_for_json_issue(
             reproduce_hint = f"Run {rsp.cmd} and apply the jmespath '{variable_from_path[prefix]}' to the output"
             details = f"{set_issue_details} ({variable_value})"
         elif query == "raise_issue_if_neq" and (
-            query_value != variable_value or (variable_is_list and query_value not in variable_value)
+            str(query_value) != str(variable_value) or (variable_is_list and query_value not in variable_value)
         ):
             issue_found = True
             title = f"Value of {prefix} ({variable_value}) Was Not {query_value}"
