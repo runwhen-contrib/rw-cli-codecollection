@@ -8,7 +8,7 @@ from . import cli_utils
 logger = logging.getLogger(__name__)
 ROBOT_LIBRARY_SCOPE = "GLOBAL"
 
-MAX_ISSUE_STRING_LENGTH: int = 255
+MAX_ISSUE_STRING_LENGTH: int = 512
 
 RECOGNIZED_JSON_PARSE_QUERIES = [
     "raise_issue_if_eq",

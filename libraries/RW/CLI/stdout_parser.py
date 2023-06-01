@@ -15,7 +15,7 @@ ROBOT_LIBRARY_SCOPE = "GLOBAL"
 
 logger = logging.getLogger(__name__)
 
-MAX_ISSUE_STRING_LENGTH: int = 255
+MAX_ISSUE_STRING_LENGTH: int = 512
 
 RECOGNIZED_STDOUT_PARSE_QUERIES = [
     "raise_issue_if_eq",
