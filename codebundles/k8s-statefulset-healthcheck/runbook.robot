@@ -120,19 +120,16 @@ Check StatefulSet Replicas
     ...    rsp=${statefulset}
     ...    extract_path_to_var__available_replicas=status.availableReplicas || `0`
     ...    available_replicas__raise_issue_if_lt=1
-    ...    set_issue_details=No ready/available statefulset pods found, check events, namespace events, helm charts or kustomization objects. 
+    ...    set_issue_title=No Available Replicas for Statefulset In Namespace ${NAMESPACE}
+    ...    set_issue_details=No ready/available statefulset pods found for the statefulset with labels ${LABELS} in namespace ${NAMESPACE}, check events, namespace events, helm charts or kustomization objects. 
     ...    assign_stdout_from_var=available_replicas
     ${desired_replicas}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${statefulset}
     ...    extract_path_to_var__desired_replicas=status.replicas || `0`
     ...    desired_replicas__raise_issue_if_lt=1
-    ...    set_issue_details=No statefulset pods desired, check if the statefulset has been scaled down. 
+    ...    set_issue_title=No Desired Replicas For Statefulset In Namespace ${NAMESPACE}
+    ...    set_issue_details=No desired replicas for statefulset under labels ${LABELS} in namespace ${NAMESPACE}, check if the statefulset has been scaled down. 
     ...    assign_stdout_from_var=desired_replicas
-    RW.CLI.Parse Cli Json Output
-    ...    rsp=${desired_replicas}
-    ...    extract_path_to_var__desired_replicas=@
-    ...    desired_replicas__raise_issue_if_neq=${available_replicas.stdout}
-    ...    set_issue_details=Desired replicas for statefulset does not match available/ready, check namespace and statefulset events, check node events or scaling events. 
     ${desired_replicas}=    Convert To Number    ${desired_replicas.stdout}
     ${available_replicas}=    Convert To Number    ${available_replicas.stdout}
     RW.Core.Add Pre To Report    StatefulSet State:\n${StatefulSet}

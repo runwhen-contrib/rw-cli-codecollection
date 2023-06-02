@@ -28,6 +28,7 @@ Suite Initialization
     ...    description=The GCP Project ID to scope the API to.
     ...    pattern=\w*
     ...    example=myproject-ID
+    Set Suite Variable    ${PROJECT_ID}    ${PROJECT_ID}
     Set Suite Variable    ${GCLOUD_SERVICE}    ${GCLOUD_SERVICE}
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}   
     Set Suite Variable    ${env}    {"CLOUDSDK_CORE_PROJECT":"${PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}"}
@@ -49,7 +50,7 @@ List all nodes in an active prempt operation
     ...    set_issue_title=Found nodes in an active preempt operation!
     ...    set_severity_level=3
     ...    preempt_node_count__raise_issue_if_gt=0
-    ...    set_issue_details=Preempt operations are active on GCP nodes in this project. If services are degraded, modify the node pool or deployment replica configurations, otherwise grab a coffee or take a walk.  
+    ...    set_issue_details=Preempt operations are active on GCP nodes in this project ${PROJECT_ID}. We found $preempt_node_count nodes in preempt. If services are degraded, modify the node pool or deployment replica configurations, otherwise grab a coffee or take a walk.  
     ...    assign_stdout_from_var=preempt_node_count
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Total nodes in a preempt operation: ${no_requests_count.stdout}   

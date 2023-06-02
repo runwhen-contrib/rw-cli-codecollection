@@ -55,7 +55,7 @@ Fetch Mismatched FluxCD HelmRelease Version
     ...    set_issue_expected=Flux HelmRelease lastApplied and lastAttempted Revision should match
     ...    set_issue_actual=Flux HelmRelease lastApplied and lastAttempted Revision do not match
     ...    set_issue_title=FluxCD Helmrelease Version Mismatch
-    ...    set_issue_details=The currently applied helm release does not match the attemped installation version. Check fluxcd helm release version configuration, fluxcd helm release events, or namespace events. 
+    ...    set_issue_details=The currently applied helm release does not match the attemped installation version (found $line). Check fluxcd helm release version configuration, fluxcd helm release events, or namespace events. 
     ...    line__raise_issue_if_contains=Name
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Helmreleases version mismatches: \n ${helmrelease_version_mismatches.stdout}
@@ -79,7 +79,7 @@ Fetch FluxCD HelmRelease Error Messages
     ...    set_issue_expected=Flux HelmRelease Objects should be in a ready state 
     ...    set_issue_actual=Flux HelmRelease Objects are not in a ready state
     ...    set_issue_title=FluxCD Helmrelease Errors
-    ...    set_issue_details=FluxCD helm releases are found to be in an errored state. Check the fluxcd helmrelease status condition messages, helmrelease configuration, fluxcd helm controller, or kustomization objects. Check fluxcd namespace events or helm release namespace events. 
+    ...    set_issue_details=FluxCD helm releases are found to be in an errored state (current state: $line). Check the fluxcd helmrelease status condition messages, helmrelease configuration, fluxcd helm controller, or kustomization objects. Check fluxcd namespace events or helm release namespace events. 
     ...    line__raise_issue_if_contains=Name
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Helmreleases status errors: \n ${helmrelease_errors.stdout}

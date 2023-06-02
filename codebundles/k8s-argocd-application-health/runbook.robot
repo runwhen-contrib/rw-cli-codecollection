@@ -114,7 +114,7 @@ Fetch Unhealthy ArgoCD Application Resources
     ...    set_issue_expected=ArgoCD application resources should be in a healthy state 
     ...    set_issue_actual=ArgoCD application resources are not in a healthy state 
     ...    set_issue_title=ArgoCD Application Resource Issues
-    ...    set_issue_details=ArgoCD appliation resources are unhealthy. Check argocd application logs and events and configuration, argocd controller events, pod logs, namespace events, resource status, resource limits and quotas. 
+    ...    set_issue_details=We found $unhealthy_resource_count unhealthy ArgoCD appliation resources in the namespace: ${APPLICATION_APP_NAMESPACE}. Check argocd application logs and events and configuration, argocd controller events, pod logs, namespace events, resource status, resource limits and quotas. 
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    List of unhealthy resources for application: ${APPLICATION}
     RW.Core.Add Pre To Report    ${unhealthy_resources.stdout}

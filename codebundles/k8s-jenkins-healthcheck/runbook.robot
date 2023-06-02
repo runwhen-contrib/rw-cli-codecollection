@@ -86,7 +86,7 @@ Query The Jenkins Kubernetes Workload HTTP Endpoint
     ...    set_issue_expected=The jenkins login page should be available and return a 200
     ...    set_issue_actual=The jenkins login page returned a non-200 response
     ...    set_issue_title=Jenkins HTTP Check Failed
-    ...    set_issue_details=Check if the statefulset is unhealthy since the non-200 HTTP code was returned from within the pod workload. 
+    ...    set_issue_details=Check if the statefulset is unhealthy as the endpoint returned: $_line from within the pod workload. 
     ...    _line__raise_issue_if_ncontains=200
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- curl -s localhost:8080/api/json?pretty=true --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}

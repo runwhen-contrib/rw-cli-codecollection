@@ -167,7 +167,7 @@ def parse_cli_output_by_line(
                         if not set_issue_reproduce_hint
                         else set_issue_reproduce_hint
                     )
-                    details = f"{set_issue_details} ({line})"
+                    details = f"{set_issue_details}"
                     issue_count += 1
                 elif query == "raise_issue_if_neq" and query_value != capture_group_value:
                     severity = set_severity_level
@@ -191,7 +191,7 @@ def parse_cli_output_by_line(
                         if not set_issue_reproduce_hint
                         else set_issue_reproduce_hint
                     )
-                    details = f"{set_issue_details} ({line})"
+                    details = f"{set_issue_details}"
                     issue_count += 1
                 elif query == "raise_issue_if_lt" and numeric_castable and capture_group_value < query_value:
                     severity = set_severity_level
@@ -215,7 +215,7 @@ def parse_cli_output_by_line(
                         if not set_issue_reproduce_hint
                         else set_issue_reproduce_hint
                     )
-                    details = f"{set_issue_details} ({line})"
+                    details = f"{set_issue_details}"
                     issue_count += 1
                 elif query == "raise_issue_if_gt" and numeric_castable and capture_group_value > query_value:
                     severity = set_severity_level
@@ -239,7 +239,7 @@ def parse_cli_output_by_line(
                         if not set_issue_reproduce_hint
                         else set_issue_reproduce_hint
                     )
-                    details = f"{set_issue_details} ({line})"
+                    details = f"{set_issue_details}"
                     issue_count += 1
                 elif query == "raise_issue_if_contains" and query_value in capture_group_value:
                     severity = set_severity_level
@@ -263,7 +263,7 @@ def parse_cli_output_by_line(
                         if not set_issue_reproduce_hint
                         else set_issue_reproduce_hint
                     )
-                    details = f"{set_issue_details} ({line})"
+                    details = f"{set_issue_details}"
                     issue_count += 1
                 elif query == "raise_issue_if_ncontains" and query_value not in capture_group_value:
                     severity = set_severity_level
@@ -287,7 +287,7 @@ def parse_cli_output_by_line(
                         if not set_issue_reproduce_hint
                         else set_issue_reproduce_hint
                     )
-                    details = f"{set_issue_details} ({line})"
+                    details = f"{set_issue_details}"
                     issue_count += 1
                 if title and len(first_issue.keys()) == 0:
                     known_symbols = {**kwargs, **capture_groups}
