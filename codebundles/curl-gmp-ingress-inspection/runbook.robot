@@ -38,17 +38,17 @@ Suite Initialization
     Set Suite Variable    ${TIME_SLICE}    ${TIME_SLICE}
     ${ERROR_CODES}=    RW.Core.Import User Variable    ERROR_CODES
     ...    type=string
-    ...    description=Which http status codes to look for and classify as errors. Note the single quotes, they are required.
+    ...    description=Which http status codes to look for and classify as errors.
     ...    pattern=\w*
-    ...    example='500'
-    ...    default='500|501|502'
+    ...    example=500
+    ...    default=500|501|502
     Set Suite Variable    ${ERROR_CODES}    ${ERROR_CODES}
     RW.Core.Import User Variable    PROMQL_STATEMENT
     ...    type=string
     ...    description=The PromQL statement used to query metrics from the GCP OpsSuite PromQL API.
     ...    pattern=\w*
     ...    example=up
-    ...    default=rate(nginx_ingress_controller_requests{status=~${ERROR_CODES}}[${TIME_SLICE}]) > 0
+    ...    default=rate(nginx_ingress_controller_requests{status=~'${ERROR_CODES}'}[${TIME_SLICE}]) > 0
     Set Suite Variable    ${GCLOUD_SERVICE}    ${GCLOUD_SERVICE}
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
@@ -73,16 +73,24 @@ Fetch Nginx Ingress Metrics From GMP And Perform Inspection On Results
     ...    target_service=${GCLOUD_SERVICE}
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ${service_name}=    RW.CLI.Parse Cli Json Output
+    ...    rsp=${gmp_json}
+    ...    extract_path_to_var__service_name=data.result[0].metric.service
+    ...    assign_stdout_from_var=service_name
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${gmp_rsp}
     ...    set_severity_level=3
     ...    set_issue_expected=The ingress in $_line should not have any HTTP responses with the following codes: ${ERROR_CODES}
     ...    set_issue_actual=We found the following HTTP error codes: ${ERROR_CODES} associated with the ingress in $_line
     ...    set_issue_title=Detected HTTP Error Codes Across Network
-    ...    set_issue_details=The returned stdout line: $_line indicates there's HTTP error codes associated with this ingress and service!
+    ...    set_issue_details=The returned stdout line: $_line indicates there's HTTP error codes associated with this ingress and service! You need to investigate the application associated with: ${service_name.stdout}
     ...    _line__raise_issue_if_contains=Host
+    ${ingress_info}    Set Variable    ${gmp_rsp.stdout}
+    IF    """${ingress_info}""" == ""
+        ${ingress_info}    Set Variable    No ingress with error codes: ${ERROR_CODES} within the timeframe ${TIME_SLICE}
+    END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
-    RW.Core.Add Pre To Report    Ingress Info:\n${gmp_rsp.stdout}
+    RW.Core.Add Pre To Report    Ingress Info:\n${ingress_info}
     RW.Core.Add Pre To Report    GMP Json Data:\n${gmp_json.stdout}
     
