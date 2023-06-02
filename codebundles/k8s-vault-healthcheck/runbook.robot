@@ -241,7 +241,8 @@ Verify Vault Availability
     ...    extract_path_to_var__standby=standby
     ...    init__raise_issue_if_neq=True
     ...    sealed__raise_issue_if_neq=False
-    ...    set_issue_details=Check the vault state, it could be sealed or in an init state. Check statefulset pod logs and events. Verify or invoke unseal process. 
+    ...    set_issue_title=The Vault API Responded With An Error State
+    ...    set_issue_details=The vault state is init:$init, standby:$standby and sealed:$sealed. Check statefulset pod logs and events. Verify or invoke unseal process. 
 
 Check Vault StatefulSet Replicas
     [Documentation]    Pulls the replica information for the Vault statefulset and checks if it's highly available

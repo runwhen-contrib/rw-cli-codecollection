@@ -50,18 +50,19 @@ Run CLI and Parse Output For Issues
     ...    rsp=${rsp}
     ...    lines_like_regexp=${regexp}
     ...    set_severity_level=1
-    ...    set_issue_expected=No crashloops in the output!
-    ...    set_issue_actual=We found crashloops in the output line {_line}!
+    ...    set_issue_expected=No crashloops or errors in the output $_stdout!
+    ...    set_issue_actual=We found crashloops in the output line $_line!
     ...    set_issue_reproduce_hint=Run 'kubectl get pods --context ${CONTEXT} -n ${NAMESPACE}' and check the output for crashloops
     ...    set_issue_title=The output should contain no crashloopbackoffs
     ...    pod_status__raise_issue_if_eq=CrashLoopBackOff
+    ...    pod_status__raise_issue_if_eq=Error
     ...    pod_name__raise_issue_if_contains=crashi
     ...    pod_name__raise_issue_if_contains=bobbydroptables
     ...    pod_name__raise_issue_if_ncontains=Kyle
     ...    pod_restarts__raise_issue_if_gt=0
     ...    nonsense__raise_issue_if_gt=0
     ...    potatoes=0
-    RW.Core.Add Pre To Report    Found ${rsp} issues after parsing the output of: kubectl get pods --context ${CONTEXT} -n ${NAMESPACE}
+    RW.Core.Add Pre To Report    Found issues after parsing the output of: kubectl get pods --context ${CONTEXT} -n ${NAMESPACE}
 
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=kubectl get pods --context ${CONTEXT} -n ${NAMESPACE} -ojson
@@ -70,14 +71,18 @@ Run CLI and Parse Output For Issues
     ...    secret_file__kubeconfig=${kubeconfig}
     ${rsp}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${rsp}
-    ...    severity_level=1
+    ...    set_severity_level=1
+    ...    set_issue_title=Pod Restarts Detected
+    ...    set_issue_actual=We found $total_container_restarts in the namespace: ${NAMESPACE}
+    ...    set_issue_details=There were a total of $total_container_restarts pod restarts in the stdout of the command we ran.
     ...    extract_path_to_var__pod_names=items[*].metadata.name
     ...    extract_path_to_var__pod_count=length(items)
     ...    extract_path_to_var__total_container_restarts=sum(items[*].status.containerStatuses[*].restartCount[])
     ...    extract_path_to_var__all_data=@
     ...    from_var_with_path__all_data__to__mycount=length(@.items)
     ...    total_container_restarts__raise_issue_if_gt=0
-    RW.Core.Add Pre To Report    Found ${rsp} issues after parsing the output of: kubectl get pods --context ${CONTEXT} -n ${NAMESPACE} -ojson
+    ...    total_container_restarts__raise_issue_if_lt=1
+    RW.Core.Add Pre To Report    Found issues after parsing the output of: kubectl get pods --context ${CONTEXT} -n ${NAMESPACE} -ojson
 
 Exec Test
     [Documentation]    Used to verify that running CLI commands in remote workloads works

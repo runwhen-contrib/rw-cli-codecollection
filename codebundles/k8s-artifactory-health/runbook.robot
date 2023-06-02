@@ -162,7 +162,8 @@ Check Artifactory Liveness and Readiness Endpoints
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${liveness}
     ...    set_severity_level=2
-    ...    set_issue_title=The liveness endpoint did not respond with OK
+    ...    set_issue_title=The liveness endpoint for statefulset/${STATEFULSET_NAME} in ${NAMESPACE} did not respond with OK (responded with ${liveness.stdout})
+    ...    set_issue_details=The Artifactory workload statefulset/${STATEFULSET_NAME} in ${NAMESPACE} liveness endpoint responded with ${liveness.stdout} when it should have returned OK
     ...    _line__raise_issue_if_ncontains=OK
     ${readiness}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/readiness
@@ -172,7 +173,8 @@ Check Artifactory Liveness and Readiness Endpoints
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${readiness}
     ...    set_severity_level=2
-    ...    set_issue_title=The readiness endpoint did not respond with OK
+    ...    set_issue_title=The readiness endpoint for statefulset/${STATEFULSET_NAME} in ${NAMESPACE} did not respond with OK (responded with ${readiness.stdout})
+    ...    set_issue_details=The Artifactory workload statefulset/${STATEFULSET_NAME} in ${NAMESPACE} readiness endpoint responded with ${readiness.stdout} when it should have returned OK
     ...    _line__raise_issue_if_ncontains=OK
     # TODO: add task to test download of artifact objects
     # TODO: figure out how to do implicit auth without passing in secrets

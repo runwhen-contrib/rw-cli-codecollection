@@ -79,7 +79,8 @@ Trace Namespace Errors
     ...    extract_path_to_var__involved_pod_names=items[?involvedObject.kind=='Pod'].involvedObject.name
     ...    from_var_with_path__involved_pod_names__to__pod_count=length(@)
     ...    pod_count__raise_issue_if_gt=0
-    ...    set_issue_details=At least one pod has issues of type Warning in the namespace. Check pod or namespace events. 
+    ...    set_issue_title=Pods Found With Recent Warning Events In Namespace ${NAMESPACE}
+    ...    set_issue_details=We found $pod_count pods with issues of type Warning in the namespace ${NAMESPACE}. Check pod or namespace events. 
     ...    assign_stdout_from_var=involved_pod_names
     # get pods with restarts > 0
     ${pods_in_namespace}=    RW.CLI.Run Cli
@@ -95,7 +96,8 @@ Trace Namespace Errors
     ...    from_var_with_path__pods_with_recent_restarts__to__restart_pod_names=[].name
     ...    from_var_with_path__pods_with_recent_restarts__to__pod_count=length(@)
     ...    pod_count__raise_issue_if_gt=0
-    ...    set_issue_details=At least one pod is frequently restarting. Check pod logs, status, namespace events, or pod resource configuration. 
+    ...    set_issue_title=Frequently Restarting Pods In Namespace ${NAMESPACE}
+    ...    set_issue_details=Found $pod_count pods that are frequently restarting in ${NAMESPACE}. Check pod logs, status, namespace events, or pod resource configuration. 
     ...    assign_stdout_from_var=restart_pod_names
     # fetch logs with pod names
     ${restarting_pods}=    RW.CLI.From Json    json_str=${restarting_pods.stdout}
@@ -153,7 +155,8 @@ Check Workload Status Conditions
     ...    from_var_with_path__failing_workload_conditions__to__aggregate_failures=[].{kind:kind,name:name,conditions:conditions[].{reason:reason, type:type, status:status}}
     ...    from_var_with_path__aggregate_failures__to__pods_with_failures=length(@)
     ...    pods_with_failures__raise_issue_if_gt=0
-    ...    set_issue_details=At least one pod has an unhealthy status condition . Review status conditions, pod logs, pod events, or namespace events. 
+    ...    set_issue_title=Pods With Unhealthy Status In Namespace ${NAMESPACE}
+    ...    set_issue_details=Found $pods_with_failures pods with an unhealthy status condition in the namespace ${NAMESPACE}. Review status conditions, pod logs, pod events, or namespace events. 
     ...    assign_stdout_from_var=aggregate_failures
     ${history}=    RW.CLI.Pop Shell History
     IF    """${failing_conditions.stdout}""" == ""

@@ -67,10 +67,10 @@ Scan Labeled Pods and Show All Containers Without Resource Limit or Resource Req
     ${no_limits_count}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${pods_without_limits}
     ...    extract_path_to_var__no_limits_count=length(@)
-    ...    set_issue_title=Found pod without resource limits specified!
     ...    set_severity_level=4
     ...    no_limit_count__raise_issue_if_gt=0
-    ...    set_issue_details=Pods found without limits applied. Review each manifest and edit configuration to set appropriate resource limits. 
+    ...    set_issue_title=Pods With No Limits In Namespace ${NAMESPACE}
+    ...    set_issue_details=Pods found without limits applied in namespace ${NAMESPACE}. \n $_stdout \n Review each manifest and edit configuration to set appropriate resource limits. 
     ...    assign_stdout_from_var=no_limits_count
     ${pods_without_requests}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running -ojson | jq -r '[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.requests == null) | {pod: $pod.metadata.name, container_without_requests: .name}]'
@@ -81,10 +81,10 @@ Scan Labeled Pods and Show All Containers Without Resource Limit or Resource Req
     ${no_requests_count}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${pods_without_requests}
     ...    extract_path_to_var__no_requests_count=length(@)
-    ...    set_issue_title=Found pod without resource requests specified!
+    ...    set_issue_title=Found pod without resource requests specified in namespace ${NAMESPACE}!
     ...    set_severity_level=4
     ...    no_requests_count__raise_issue_if_gt=0
-    ...    set_issue_details=Pods found without resource requests applied. Review each manifest and edit configuration to set appropriate resource limits. 
+    ...    set_issue_details=Pods found without resource requests applied in namespace ${NAMESPACE}. \n $_stdout \n Review each manifest and edit configuration to set appropriate resource limits. 
     ...    assign_stdout_from_var=no_requests_count
     ${history}=    RW.CLI.Pop Shell History
     ${no_requests_pod_count}=    Convert To Number    ${no_requests_count.stdout}
