@@ -23,14 +23,14 @@ Suite Initialization
     ...    description=GCP service account json used to authenticate with GCP APIs.
     ...    pattern=\w*
     ...    example={"type": "service_account","project_id":"myproject-ID", ... super secret stuff ...}
-    ${PROJECT_ID}=    RW.Core.Import User Variable    PROJECT_ID
+    ${GCP_PROJECT_ID}=    RW.Core.Import User Variable    GCP_PROJECT_ID
     ...    type=string
     ...    description=The GCP Project ID to scope the API to.
     ...    pattern=\w*
     ...    example=myproject-ID
     Set Suite Variable    ${GCLOUD_SERVICE}    ${GCLOUD_SERVICE}
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}   
-    Set Suite Variable    ${env}    {"CLOUDSDK_CORE_PROJECT":"${PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}"}
+    Set Suite Variable    ${env}    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}"}
 
 
 *** Tasks ***
@@ -38,7 +38,7 @@ Count the number of nodes in active prempt operation
     [Documentation]    Fetches all nodes that have an active preempt operation at a global scope in the GCP Project
     [Tags]    Stdout    gcloud    node    preempt    gcp
     ${preempt_node_list}=    RW.CLI.Run Cli
-    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud compute operations list --filter="operationType:( compute.instances.preempted ) AND NOT status:( DONE )" --format=json --project=${PROJECT_ID}
+    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud compute operations list --filter="operationType:( compute.instances.preempted ) AND NOT status:( DONE )" --format=json --project=${GCP_PROJECT_ID}
     ...    target_service=${GCLOUD_SERVICE}
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}

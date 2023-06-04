@@ -9,7 +9,6 @@ Runs a task which performs inspects the HTTP error code metrics related to your 
 
 The TaskSet requires initialization to import necessary secrets, services, and user variables. The following variables should be set:
 
-- `PROMQL_STATEMENT`: The promql statement to run to fetch nginx ingress metrics. Defaults to `rate(nginx_ingress_controller_requests{status=~${ERROR_CODES}}[${TIME_SLICE}]) > 0` which allows it to be injected with other configuration values.
 - `TIME_SLICE`: What duration to calculate the rate over. Defaults to 60 minutes.
 - `ERROR_CODES`: Which HTTP codes to consider as errors. defaults to 500, 501, and 502.
 - `GCLOUD_SERVICE`: The remote gcloud service to use for requests.
