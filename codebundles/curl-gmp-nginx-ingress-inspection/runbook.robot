@@ -1,8 +1,8 @@
 *** Settings ***
-Documentation       Collects Nginx ingress controller metrics from GMP on GCP and inspects the results for ingress with a HTTP error code rate greater than zero
+Documentation       Collects Nginx ingress host controller metrics from GMP on GCP and inspects the results for ingress with a HTTP error code rate greater than zero
 ...                 over a configurable duration and raises issues based on the number of ingress with error codes.
 Metadata            Author    Jonathan Funk
-Metadata            Display Name    GKE Nginx Ingress Controller Triage 
+Metadata            Display Name    GKE Nginx Ingress Host Triage 
 Metadata            Supports    GCP,GMP,Ingress,Nginx,Metrics
 Library             BuiltIn
 Library             RW.Core
@@ -43,26 +43,19 @@ Suite Initialization
     ...    example=500
     ...    default=500|501|502
     Set Suite Variable    ${ERROR_CODES}    ${ERROR_CODES}
-    RW.Core.Import User Variable    PROMQL_STATEMENT
-    ...    type=string
-    ...    description=The PromQL statement used to query metrics from the GCP OpsSuite PromQL API.
-    ...    pattern=\w*
-    ...    example=up
-    ...    default=rate(nginx_ingress_controller_requests{status=~'${ERROR_CODES}'}[${TIME_SLICE}]) > 0
     Set Suite Variable    ${GCLOUD_SERVICE}    ${GCLOUD_SERVICE}
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
-    Set Suite Variable    ${PROMQL_STATEMENT}    ${PROMQL_STATEMENT}
     Set Suite Variable    ${env}    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}"}
 
 
 *** Tasks ***
 Fetch Nginx Ingress Metrics From GMP And Perform Inspection On Results
-    [Documentation]    Fetches metrics for the Nginx ingress controller from GMP and performs an inspection on the results.
+    [Documentation]    Fetches metrics for the Nginx ingress host from GMP and performs an inspection on the results.
     ...     If there are currently any results with more than zero errors, their name will be surfaced for further troubleshooting.
     [Tags]    cURL    HTTP    Ingress    Latency    Errors    Metrics    Controller    Nginx    GMP
     ${gmp_rsp}=    RW.CLI.Run Cli
-    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && curl -d "query=${PROMQL_STATEMENT}" -H "Authorization: Bearer $(gcloud auth print-access-token)" 'https://monitoring.googleapis.com/v1/projects/${GCP_PROJECT_ID}/location/global/prometheus/api/v1/query' | jq -r '.data.result[] | "Host:" + .metric.host + " Ingress:" + .metric.ingress + " Namespace:" + .metric.export_namespace + " Service:" + .metric.service'
+    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && curl -d "query=rate(nginx_ingress_controller_requests{status=~'${ERROR_CODES}'}[${TIME_SLICE}]) > 0" -H "Authorization: Bearer $(gcloud auth print-access-token)" 'https://monitoring.googleapis.com/v1/projects/${GCP_PROJECT_ID}/location/global/prometheus/api/v1/query' | jq -r '.data.result[] | "Host:" + .metric.host + " Ingress:" + .metric.ingress + " Namespace:" + .metric.export_namespace + " Service:" + .metric.service'
     ...    render_in_commandlist=true
     ...    target_service=${GCLOUD_SERVICE}
     ...    env=${env}
