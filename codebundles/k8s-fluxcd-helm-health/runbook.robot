@@ -14,27 +14,27 @@ Suite Setup         Suite Initialization
 List all available FluxCD Helmreleases    
     [Documentation]    List all FluxCD helmreleases that are visible to the kubeconfig.    
     [Tags]        FluxCD     Helmrelease     Available    List
-    ${stdout}=    RW.CLI.Run Cli
+    ${helmreleases}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} ${NAMESPACE} --context ${CONTEXT}
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Helmreleases available: \n ${stdout}
+    RW.Core.Add Pre To Report    Helmreleases available: \n ${helmreleases.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Fetch All FluxCD Helmrelease Versions  
     [Documentation]    List helmreleases and  the last attempted software version and the current running version.  
     [Tags]        FluxCD     Helmrelease    Versions
-    ${stdout}=    RW.CLI.Run Cli
+    ${helmrelease_versions}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} ${NAMESPACE} -o=jsonpath="{range .items[*]}{'\\nName: '}{@.metadata.name}{'\\nlastAppliedRevision:'}{@.status.lastAppliedRevision}{'\\nlastAttemptedRevision:'}{@.status.lastAttemptedRevision}{'\\n---'}{end}" --context ${CONTEXT} || true
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Helmreleases status errors: \n ${stdout}
+    RW.Core.Add Pre To Report    Helmreleases status errors: \n ${helmrelease_versions.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Fetch Mismatched FluxCD HelmRelease Version

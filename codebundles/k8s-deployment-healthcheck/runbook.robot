@@ -143,6 +143,6 @@ Check Deployment Replicas
     ...    set_issue_details=Desired and ready pods for deployment/${DEPLOYMENT_NAME} do not match in namespace ${NAMESPACE}, desired: $desired_replicas vs ready: ${available_replicas.stdout}. We got ready:${available_replicas.stdout} vs desired: $desired_replicas - check deployment events, deployment configuration, persistent volumes, or applicable fluxcd or argo gitops configurations or status. Check node events, or if the cluster is undergoing a scaling event or upgrade. Check cloud provider service availability for any known outages. 
     ${desired_replicas}=    Convert To Number    ${desired_replicas.stdout}
     ${available_replicas}=    Convert To Number    ${available_replicas.stdout}
-    RW.Core.Add Pre To Report    Deployment State:\n${deployment}
+    RW.Core.Add Pre To Report    Deployment State:\n${deployment.stdout}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
