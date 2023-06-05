@@ -134,7 +134,7 @@ Check Deployment Replicas
     ...    desired_replicas__raise_issue_if_lt=1
     ...    assign_stdout_from_var=desired_replicas
     ...    set_issue_title=Less than desired replicas for deployment/${DEPLOYMENT_NAME}
-    ...    set_issue_details=Less than desired replicas for deployment/${DEPLOYMENT_NAME} in ${NAMESPACE}. Check deployment has not been scaled down, deployment events, persistent volumes, deployment configuration, or applicable fluxcd or argo gitops configurations or status.    ...    assign_stdout_from_var=desired_replicas
+    ...    set_issue_details=Less than desired replicas for deployment/${DEPLOYMENT_NAME} in ${NAMESPACE}. Check deployment has not been scaled down, deployment events, persistent volumes, deployment configuration, or applicable fluxcd or argo gitops configurations or status.
     RW.CLI.Parse Cli Json Output
     ...    rsp=${desired_replicas}
     ...    extract_path_to_var__desired_replicas=@
