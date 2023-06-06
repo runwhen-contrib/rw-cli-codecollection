@@ -1,6 +1,6 @@
 *** Settings ***
-Documentation       This taskset collects information about perstistent volumes and persistent volume claims to 
-...    validate health or help troubleshoot potential issues.
+Documentation       This taskset collects information about storage such as PersistentVolumes and PersistentVolumeClaims to 
+...    validate health or help troubleshoot potential storage issues.
 Metadata            Author    Shea Stewart
 Metadata            Display Name    Kubernetes Persistent Volume Healthcheck
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
@@ -52,7 +52,7 @@ Suite Initialization
 
 *** Tasks ***
 Fetch Events for Unhealthy Kubernetes PersistentVolumeClaims
-    [Documentation]    Lists events related to persistent volume claims within the desired namespace that are not bound to a persistent volume.
+    [Documentation]    Lists events related to PersistentVolumeClaims within the namespace that are not bound to PersistentVolumes.
     [Tags]    PVC    List    Kubernetes    Storage    PersistentVolumeClaim    PersistentVolumeClaims Events
     ${unbound_pvc_events}=    RW.CLI.Run Cli
     ...    cmd=for pvc in $(${KUBERNETES_DISTRIBUTION_BINARY} get pvc -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.status.phase != "Bound") | .metadata.name'); do ${KUBERNETES_DISTRIBUTION_BINARY} get events -n ${NAMESPACE} --context ${CONTEXT} --field-selector involvedObject.name=$pvc -o json | jq '.items[]| "Last Timestamp: " + .lastTimestamp + " Name: " + .involvedObject.name + " Message: " + .message'; done
@@ -69,7 +69,7 @@ Fetch Events for Unhealthy Kubernetes PersistentVolumeClaims
     ...    set_issue_expected=PVCs should be bound
     ...    set_issue_actual=PVCs found pending with the following events
     ...    set_issue_title=PVC Errors & Events In Namespace ${NAMESPACE}
-    ...    set_issue_details=We found $line in the namespace ${NAMESPACE}\nReview list of unbound persistent volume claims - check node events, application configurations, storage classes and CSI drivers. 
+    ...    set_issue_details=We found $line in the namespace ${NAMESPACE}\nReview list of unbound PersistentVolumeClaims - check node events, application configurations, StorageClasses and CSI drivers. 
     ...    line__raise_issue_if_contains=Name
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of events for unbound pvc in ${NAMESPACE}:
@@ -78,7 +78,7 @@ Fetch Events for Unhealthy Kubernetes PersistentVolumeClaims
 
 List PersistentVolumes in Terminating State
     [Documentation]    Lists events related to persistent volumes in Terminating state.
-    [Tags]    PV    List    Kubernetes    Storage    PersistentVolume    Terminating    Events
+    [Tags]    PV    List    Kubernetes    Storage    PersistentVolume       PersistentVolume    Terminating    Events
     ${dangline_pvcs}=    RW.CLI.Run Cli
     ...    cmd=for pv in $(${KUBERNETES_DISTRIBUTION_BINARY} get pv --context ${CONTEXT} -o json | jq -r '.items[] | select(.status.phase == "Terminating") | .metadata.name'); do ${KUBERNETES_DISTRIBUTION_BINARY} get events --all-namespaces --field-selector involvedObject.name=$pv --context ${CONTEXT} -o json | jq '.items[]| "Last Timestamp: " + .lastTimestamp + " Name: " + .involvedObject.name + " Message: " + .message'; done
     ...    target_service=${kubectl}
@@ -94,7 +94,7 @@ List PersistentVolumes in Terminating State
     ...    set_issue_expected=PV should not be stuck terminating. 
     ...    set_issue_actual=PV is in a terminating state. 
     ...    set_issue_title=PV Events While Terminating In Namespace ${NAMESPACE}
-    ...    set_issue_details=We found $_line in the namespace ${NAMESPACE}\nCheck the status of terminating pvcs over the next few minutes, they should disappear. If not, check that deployments or statefulsets attached to the pvc are scaled down and pods attached to the PVC are not running.  
+    ...    set_issue_details=We found $_line in the namespace ${NAMESPACE}\nCheck the status of terminating PersistentVolumeClaims over the next few minutes, they should disappear. If not, check that deployments or statefulsets attached to the PersistentVolumeClaims are scaled down and pods attached to the PersistentVolumeClaims are not running.  
     ...    _line__raise_issue_if_contains=Name
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of events for dangling persistent volumes:
@@ -102,7 +102,7 @@ List PersistentVolumes in Terminating State
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 List Pods with Attached Volumes and Related PersistentVolume Details
-    [Documentation]    For each pod in a namespace, collect details on configured persistent volume claim, persistent volume, and node. 
+    [Documentation]    For each pod in a namespace, collect details on configured PersistentVolumeClaim, PersistentVolume, and node. 
     [Tags]    Pod    Storage    PVC    PV    Status    CSI    StorageReport
     ${pod_storage_report}=    RW.CLI.Run Cli
     ...    cmd=for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} --field-selector=status.phase=Running --context ${CONTEXT} -o jsonpath='{range .items[*]}{.metadata.name}{"\\n"}{end}'); do for pvc in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods $pod -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{range .spec.volumes[*]}{.persistentVolumeClaim.claimName}{"\\n"}{end}'); do pv=$(${KUBERNETES_DISTRIBUTION_BINARY} get pvc $pvc -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.volumeName}') && status=$(${KUBERNETES_DISTRIBUTION_BINARY} get pv $pv --context ${CONTEXT} -o jsonpath='{.status.phase}') && node=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.nodeName}') && zone=$(${KUBERNETES_DISTRIBUTION_BINARY} get nodes $node --context ${CONTEXT} -o jsonpath='{.metadata.labels.topology\\.kubernetes\\.io/zone}') && ingressclass=$(${KUBERNETES_DISTRIBUTION_BINARY} get pvc $pvc -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.storageClassName}') && accessmode=$(${KUBERNETES_DISTRIBUTION_BINARY} get pvc $pvc -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.status.accessModes[0]}') && reclaimpolicy=$(${KUBERNETES_DISTRIBUTION_BINARY} get pv $pv --context ${CONTEXT} -o jsonpath='{.spec.persistentVolumeReclaimPolicy}') && csidriver=$(${KUBERNETES_DISTRIBUTION_BINARY} get pv $pv --context ${CONTEXT} -o jsonpath='{.spec.csi.driver}')&& echo -e "\\n---\\nPod: $pod\\nPVC: $pvc\\nPV: $pv\\nStatus: $status\\nNode: $node\\nZone: $zone\\nIngressClass: $ingressclass\\nAccessModes: $accessmode\\nReclaimPolicy: $reclaimpolicy\\nCSIDriver: $csidriver\\n"; done; done
@@ -116,8 +116,8 @@ List Pods with Attached Volumes and Related PersistentVolume Details
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Fetch the Storage Utilization for PVC Mounts
-    [Documentation]    For each pod in a namespace, the utilization of the pvc mount using the linux df command. Requires kubectl exec permissions. 
-    [Tags]    Pod    Storage    PVC    Storage    Utilization    Capacity    PersistentVolumeClaim
+    [Documentation]    For each pod in a namespace, fetch the utilization of any PersistentVolumeClaims mounted using the linux df command. Requires kubectl exec permissions. 
+    [Tags]    Pod    Storage    PVC    Storage    Utilization    Capacity    PersistentVolumeClaims     PersistentVolumeClaim
     ${pod_pvc_utilization}=    RW.CLI.Run Cli
     ...    cmd=for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} --field-selector=status.phase=Running --context ${CONTEXT} -o jsonpath='{range .items[*]}{.metadata.name}{"\\n"}{end}'); do for pvc in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods $pod -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{range .spec.volumes[*]}{.persistentVolumeClaim.claimName}{"\\n"}{end}'); do for volumeName in $(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.spec.volumes[] | select(has("persistentVolumeClaim")) | .name'); do mountPath=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r --arg vol "$volumeName" '.spec.containers[].volumeMounts[] | select(.name == $vol) | .mountPath'); containerName=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r --arg vol "$volumeName" '.spec.containers[] | select(.volumeMounts[].name == $vol) | .name'); echo -e "\\n---\\nPod: $pod, PVC: $pvc, volumeName: $volumeName, containerName: $containerName, mountPath: $mountPath"; ${KUBERNETES_DISTRIBUTION_BINARY} exec $pod -n ${NAMESPACE} --context ${CONTEXT} -c $containerName -- df -h $mountPath; done; done; done;
     ...    target_service=${kubectl}
@@ -132,7 +132,7 @@ Fetch the Storage Utilization for PVC Mounts
     ...    set_issue_expected=PVC should be less than 95% utilized. 
     ...    set_issue_actual=PVC is 95% or greater. 
     ...    set_issue_title=PVC Storage Utilization As Report by Pod
-    ...    set_issue_details=Found PVC Utilization of: $pvc_utilization in namespace ${NAMESPACE}\nReview any storage utilization above 95% as they will be at or nearing capacity. Expand PVCs, remove uneeded storage, or check application configuration such as database logs and backup jobs.  
+    ...    set_issue_details=Found PVC Utilization of: $pvc_utilization in namespace ${NAMESPACE}\nReview PersistentVolumeClaims utilization above 95% as they will be at or nearing capacity. Expand PersistentVolumeClaims, PersistentVolumes, remove uneeded storage, or check application configuration such as database logs and backup jobs.  
     ...    pvc_utilization__raise_issue_if_gt=95
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of PVC storage mount utilization in ${NAMESPACE}:
