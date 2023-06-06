@@ -77,7 +77,7 @@ Get Related Daemonset Events
     [Documentation]    Fetches events related to the daemonset workload in the namespace.
     [Tags]    Events    Workloads    Errors    Warnings    Get    Daemonset    csi
     ${events}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} | grep -i "${DAEMONSET_NAME}"
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} | grep -i "${DAEMONSET_NAME}" || true
     ...    env=${env}
     ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}

@@ -83,7 +83,7 @@ Get Vault CSI Driver Warning Events
     [Documentation]    Fetches warning-type events related to the vault CSI driver. 
     [Tags]    Events    Workloads    Errors    Warnings    Get    Vault    csi    Driver
     ${events}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} | grep -i "vault-csi-provider"
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} | grep -i "vault-csi-provider" || true
     ...    env=${env}
     ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -189,7 +189,7 @@ Get Related Vault Events
     [Documentation]    Fetches all warning-type events related to vault in the vault namespace. 
     [Tags]    Events    Workloads    Errors    Warnings    Get    StatefulSet    Vault
     ${events}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} | grep -i "vault"
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} | grep -i "vault" || true
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
