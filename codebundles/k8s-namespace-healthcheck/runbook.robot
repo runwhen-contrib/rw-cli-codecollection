@@ -56,10 +56,10 @@ Suite Initialization
     ...    default=(node_modules|opentelemetry)
     ${ANOMALY_THRESHOLD}=    RW.Core.Import User Variable    ANOMALY_THRESHOLD
     ...    type=string
-    ...    description=At which count an event is considered an anomaly even when it's just informational according to Kubernetes.
-    ...    pattern=\d+
-    ...    example=100
-    ...    default=100
+    ...    description=The rate of occurence per minute at which an Event becomes classified as an anomaly, even if Kubernetes considers it informational.
+    ...    pattern=\d+(\.\d+)?
+    ...    example=1.0
+    ...    default=1.0
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
@@ -216,7 +216,7 @@ Check For Namespace Event Anomalies
     [Documentation]    Parses all events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
     [Tags]    Namespace    Events    Info    State    Anomolies    Count    Occurences
     ${recent_anomalies}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select((now - (.lastTimestamp | fromdate)) < 1800) | select(.count > ${ANOMALY_THRESHOLD}) | "Count:" + (.count|tostring) + " Object:" + .involvedObject.namespace + "/" + .involvedObject.kind + "/" + .involvedObject.name + " Reason:" + .reason + " Message:" + .message'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select( (.count / (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60)) > ${ANOMALY_THRESHOLD}) | "Event(s) Per Minute:" + ((.count / (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60))|tostring) +" Count:" + (.count|tostring) + " Object:" + .involvedObject.namespace + "/" + .involvedObject.kind + "/" + .involvedObject.name + " Reason:" + .reason + " Message:" + .message'
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
