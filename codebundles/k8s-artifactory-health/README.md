@@ -13,7 +13,7 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 - `KUBERNETES_DISTRIBUTION_BINARY`: Which binary to use for Kubernetes CLI commands. Default value is `kubectl`.
 - `CONTEXT`: The Kubernetes context to operate within.
 - `NAMESPACE`: The name of the namespace to search. Leave it blank to search in all namespaces.
-- `DEPLOYMENT_NAME`: The name of the deployment running Redis
+- `STATEFULSET_NAME`: The name of the Artifactory Statefulset
 - `EXPECTED_AVAILABILITY`: The number of replicas allowed.
 - `LABELS`: Labels used for selecting the workload(s).
 
