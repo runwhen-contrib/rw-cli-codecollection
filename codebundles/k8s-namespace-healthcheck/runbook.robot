@@ -54,7 +54,7 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=(node_modules|opentelemetry)
     ...    default=(node_modules|opentelemetry)
-    ${ANOMALY_THRESHOLD}=    RW.Core.Import User Variable    THRESHOLD
+    ${ANOMALY_THRESHOLD}=    RW.Core.Import User Variable    ANOMALY_THRESHOLD
     ...    type=string
     ...    description=At which count an event is considered an anomaly even when it's just informational according to Kubernetes.
     ...    pattern=\d+
