@@ -65,90 +65,12 @@ Suite Initialization
     Set Suite Variable    ${EXPECTED_AVAILABILITY}    ${EXPECTED_AVAILABILITY}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
     IF    "${LABELS}" != ""
-        ${LABELS}=    Set Variable    -l ${LABELS}        
+        ${LABELS}=    Set Variable    -l ${LABELS}
     END
     Set Suite Variable    ${LABELS}    ${LABELS}
 
 
 *** Tasks ***
-Fetch Artifactory Logs
-    [Documentation]    Fetches the last 100 lines of logs for the Artifactory StatefulSet in the namespace.
-    [Tags]    Fetch    Log    Pod    Container    Errors    Inspect    Trace    Info    StatefulSet
-    ${logs}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs --tail=100 statefulset/${STATEFULSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
-    ...    target_service=${kubectl}
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    ${logs.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
-
-Get Related Artifactory Events
-    [Documentation]    Fetches events related to the Artifactory StatefulSet workload in the namespace.
-    [Tags]    Events    Workloads    Errors    Warnings    Get    StatefulSet
-    ${events}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} | grep -i "${STATEFULSET_NAME}" || true
-    ...    target_service=${kubectl}
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    ${events.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
-
-Fetch Artifactory StatefulSet Manifest Details
-    [Documentation]    Fetches the current state of the Artifactory StatefulSet manifest for inspection.
-    [Tags]    StatefulSet    Details    Manifest    Info
-    ${statefulset}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${LABELS} --context=${CONTEXT} -n ${NAMESPACE} -o yaml
-    ...    target_service=${kubectl}
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    ${statefulset.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
-
-Check If Artifactory StatefulSet Replicas Are Not Ready
-    [Documentation]    Pulls the replica information for the Artifactory StatefulSet and checks if it's highly available
-    ...                , if the replica counts are the expected / healthy values, and if not, what they should be.
-    [Tags]    StatefulSet    Replicas    Desired    Actual    Available    Ready    Unhealthy    Rollout    Stuck    Pods
-    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset -n ${NAMESPACE} -o json | jq -r '.items[] | select(.status.availableReplicas < .status.replicas) | "---\nStatefulSet Name: " + (.metadata.name|tostring) + "\nDesired Replicas: " + (.status.replicas|tostring) + "\nAvailable Replicas: " + (.status.availableReplicas|tostring)'  
-    ...    target_service=${kubectl}
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
-    ${statefulset}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset/${STATEFULSET_NAME} ${LABELS} --context=${CONTEXT} -n ${NAMESPACE} -ojson
-    ...    target_service=${kubectl}
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ${available_replicas}=    RW.CLI.Parse Cli Json Output
-    ...    rsp=${statefulset}
-    ...    extract_path_to_var__available_replicas=status.availableReplicas || `0`
-    ...    available_replicas__raise_issue_if_lt=1
-    ...    assign_stdout_from_var=available_replicas
-    RW.CLI.Parse Cli Json Output
-    ...    rsp=${available_replicas}
-    ...    extract_path_to_var__available_replicas=@
-    ...    available_replicas__raise_issue_if_lt=${EXPECTED_AVAILABILITY}
-    ${desired_replicas}=    RW.CLI.Parse Cli Json Output
-    ...    rsp=${statefulset}
-    ...    extract_path_to_var__desired_replicas=status.replicas || `0`
-    ...    desired_replicas__raise_issue_if_lt=1
-    ...    assign_stdout_from_var=desired_replicas
-    RW.CLI.Parse Cli Json Output
-    ...    rsp=${desired_replicas}
-    ...    extract_path_to_var__desired_replicas=@
-    ...    desired_replicas__raise_issue_if_neq=${available_replicas.stdout}
-    ${desired_replicas}=    Convert To Number    ${desired_replicas.stdout}
-    ${available_replicas}=    Convert To Number    ${available_replicas.stdout}
-    RW.Core.Add Pre To Report    StatefulSet State:\n${StatefulSet}
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
-
 Check Artifactory Liveness and Readiness Endpoints
     [Documentation]    Runs a set of exec commands internally in the Artifactory workloads to curl the system health endpoints.
     [Tags]    Pods    Statefulset    Artifactory    Health    System    Curl    API    OK    HTTP
