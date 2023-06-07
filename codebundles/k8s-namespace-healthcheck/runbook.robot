@@ -42,6 +42,24 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=(Error|Exception)
     ...    default=(Error|Exception)
+    ${SERVICE_ERROR_PATTERN}=    RW.Core.Import User Variable    SERVICE_ERROR_PATTERN
+    ...    type=string
+    ...    description=The error pattern to use when grep-ing logs for services.
+    ...    pattern=\w*
+    ...    example=(Error: 13|Error: 14)
+    ...    default=(Error:)
+    ${SERVICE_EXCLUDE_PATTERN}=    RW.Core.Import User Variable    SERVICE_EXCLUDE_PATTERN
+    ...    type=string
+    ...    description=Pattern used to exclude entries from log results when searching in service logs.
+    ...    pattern=\w*
+    ...    example=(node_modules|opentelemetry)
+    ...    default=(node_modules|opentelemetry)
+    ${ANOMALY_THRESHOLD}=    RW.Core.Import User Variable    THRESHOLD
+    ...    type=string
+    ...    description=At which count an event is considered an anomaly even when it's just informational according to Kubernetes.
+    ...    pattern=\d+
+    ...    example=100
+    ...    default=100
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
@@ -54,10 +72,13 @@ Suite Initialization
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${ERROR_PATTERN}    ${ERROR_PATTERN}
+    Set Suite Variable    ${ANOMALY_THRESHOLD}    ${ANOMALY_THRESHOLD}
+    Set Suite Variable    ${SERVICE_ERROR_PATTERN}    ${SERVICE_ERROR_PATTERN}
+    Set Suite Variable    ${SERVICE_EXCLUDE_PATTERN}    ${SERVICE_EXCLUDE_PATTERN}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
 
 *** Tasks ***
-Trace Namespace Errors
+Trace And Troubleshoot Namespace Warning Events And Errors
     [Documentation]    Queries all error events in a given namespace within the last 30 minutes,
     ...                fetches the list of involved pod names, requests logs from them and parses
     ...                the logs for exceptions.
@@ -80,7 +101,7 @@ Trace Namespace Errors
     ...    from_var_with_path__involved_pod_names__to__pod_count=length(@)
     ...    pod_count__raise_issue_if_gt=0
     ...    set_issue_title=Pods Found With Recent Warning Events In Namespace ${NAMESPACE}
-    ...    set_issue_details=We found $pod_count pods with issues of type Warning in the namespace ${NAMESPACE}. Check pod or namespace events. 
+    ...    set_issue_details=We found $pod_count pods with events of type Warning in the namespace ${NAMESPACE}.\nName of pods with issues:\n$involved_pod_names\nCheck pod or namespace events.
     ...    assign_stdout_from_var=involved_pod_names
     # get pods with restarts > 0
     ${pods_in_namespace}=    RW.CLI.Run Cli
@@ -119,15 +140,23 @@ Trace Namespace Errors
     RW.Core.Add Pre To Report    ${error_trace_results}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Fetch Unready Pods
-    [Documentation]    Fetches all pods which are not running (unready) in the namespace and raises an issue if any pods are found.
+Troubleshoot Unready Pods In Namespace For Report
+    [Documentation]    Fetches all pods which are not running (unready) in the namespace and adds them to a report for future review.
     [Tags]    Namespace    Pods    Status    Unready    Not Starting    Phase    Containers
     ${unreadypods_results}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --sort-by='status.containerStatuses[0].restartCount' --field-selector=status.phase!=Running
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --sort-by='status.containerStatuses[0].restartCount' --field-selector=status.phase!=Running -o=name
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
+    RW.CLI.Parse Cli Output By Line
+    ...    rsp=${unreadypods_results}
+    ...    set_severity_level=3
+    ...    set_issue_expected=No pods should be in an unready state
+    ...    set_issue_actual=We found the following unready pods: $_stdout
+    ...    set_issue_title=Unready Pods Detected In Namespace ${NAMESPACE}
+    ...    set_issue_details=We found the following unready pods: $_stdout in the namespace ${NAMESPACE}
+    ...    _line__raise_issue_if_contains=pod
     ${history}=    RW.CLI.Pop Shell History
     IF    """${unreadypods_results.stdout}""" == ""
         ${unreadypods_results}=    Set Variable    No unready pods found
@@ -139,7 +168,7 @@ Fetch Unready Pods
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 
-Check Workload Status Conditions
+Troubleshoot Workload Status Conditions In Namespace
     [Documentation]    Parses all workloads in a namespace and inspects their status conditions for issues. Status conditions with a status value of False are considered an error.
     [Tags]    Namespace    Status    Conditions    Pods    Conditions    Reasons    Workloads
     ${all_resources}=    RW.CLI.Run Cli
@@ -169,8 +198,8 @@ Check Workload Status Conditions
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 
-Namespace Get All
-    [Documentation]    Simple fetch all to provide a snapshot of information about the workloads in the namespace.
+Get Listing Of Workloads In Namespace
+    [Documentation]    Simple fetch all to provide a snapshot of information about the workloads in the namespace for future review in a report.
     [Tags]    Get All    Resources    Info    Workloads    Namespace    Manifests
     ${all_results}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get all --context=${CONTEXT} -n ${NAMESPACE}
@@ -182,3 +211,48 @@ Namespace Get All
     RW.Core.Add Pre To Report    Informational Get All for Namespace: ${NAMESPACE}
     RW.Core.Add Pre To Report    ${all_results}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
+
+Check For Namespace Event Anomalies
+    [Documentation]    Parses all events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
+    [Tags]    Namespace    Events    Info    State    Anomolies    Count    Occurences
+    ${recent_anomalies}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select((now - (.lastTimestamp | fromdate)) < 1800) | select(.count > ${ANOMALY_THRESHOLD}) | "Count:" + (.count|tostring) + " Object:" + .involvedObject.namespace + "/" + .involvedObject.kind + "/" + .involvedObject.name + " Reason:" + .reason + " Message:" + .message'
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    RW.CLI.Parse Cli Output By Line
+    ...    rsp=${recent_anomalies}
+    ...    set_severity_level=3
+    ...    set_issue_expected=No unusual recent anomaly events with high counts in the namespace ${NAMESPACE}
+    ...    set_issue_actual=We detected events in the namespace ${NAMESPACE} which are considered anomalies
+    ...    set_issue_title=Event Anomalies Detected In Namespace ${NAMESPACE}
+    ...    set_issue_details=Here's a summary of the anomaly events which may indicate an underlying issue that's not surfacing errors:\n$_stdout
+    ...    _line__raise_issue_if_contains=Object
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add To Report    Summary Of Anomalies Detected:\n
+    RW.Core.Add To Report   ${recent_anomalies.stdout}\n
+    RW.Core.Add Pre To Report    Commands Used:\n${history}
+
+
+Troubleshoot Namespace Services And Application Workloads
+    [Documentation]    Iterates through the services within a namespace for a given timeframe and byte length max, checking the resulting logs for distinct entries matching a given pattern in order to determine a root issue.
+    [Tags]    Namespace    Services    Applications    Workloads    Deployments    Apps    Ingress    HTTP    Networking    Endpoints    Logs    Aggregate    Filter
+    ${aggregate_service_logs}=    RW.CLI.Run Cli
+    ...    cmd=services=($(${KUBERNETES_DISTRIBUTION_BINARY} get svc -o=name --context=${CONTEXT} -n ${NAMESPACE})); logs=""; for service in "\${services[@]}"; do logs+=$(${KUBERNETES_DISTRIBUTION_BINARY} logs $service --limit-bytes=256000 --since=2h --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${SERVICE_ERROR_PATTERN}" | grep -Ev "${SERVICE_EXCLUDE_PATTERN}" | sort | uniq -c | awk '{print "Issue Occurences:",$0}'); done; echo "\${logs}"
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${KUBECONFIG}
+    ...    render_in_commandlist=true
+    RW.CLI.Parse Cli Output By Line
+    ...    rsp=${aggregate_service_logs}
+    ...    set_severity_level=2
+    ...    set_issue_expected=Service workload logs in namespace ${NAMESPACE} should not contain any error entries
+    ...    set_issue_actual=Service workload logs in namespace ${NAMESPACE} contain errors entries
+    ...    set_issue_title=Service Workloads In Namespace ${NAMESPACE} Have Error Log Entries
+    ...    set_issue_details=We found the following distinctly counted errors in the service workloads of namespace ${NAMESPACE}:\n\n$_stdout\n\nThese errors may be related to other workloads that need triaging
+    ...    _line__raise_issue_if_contains=Error
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add To Report    Sample Of Aggregate Counted Logs Found:\n
+    RW.Core.Add To Report   ${aggregate_service_logs.stdout}\n
+    RW.Core.Add Pre To Report    Commands Used:\n${history}
+

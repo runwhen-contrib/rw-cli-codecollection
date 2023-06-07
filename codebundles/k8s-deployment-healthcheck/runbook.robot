@@ -58,8 +58,8 @@ Suite Initialization
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
 
 *** Tasks ***
-Fetch Deployment Logs
-    [Documentation]    Fetches the last 100 lines of logs for the given deployment in the namespace.
+Get Deployment Log Details For Report
+    [Documentation]    Fetches the last 100 lines of logs for the given deployment in the namespace and adds the information to the report for future review.
     [Tags]    Fetch    Log    Pod    Container    Errors    Inspect    Trace    Info    Deployment
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs --tail=100 deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
@@ -68,11 +68,11 @@ Fetch Deployment Logs
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    ${logs.stdout}
+    RW.Core.Add Pre To Report    The last 100 lines of logs from deployment/${DEPLOYMENT_NAME} in ${NAMESPACE}:\n\n${logs.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Get Related Deployment Events
-    [Documentation]    Fetches events related to the deployment workload in the namespace.
+Troubleshoot Deployment Warning Events
+    [Documentation]    Fetches warning events related to the deployment workload in the namespace and triages any issues found in the events.
     [Tags]    Events    Workloads    Errors    Warnings    Get    Deployment
     ${events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} --field-selector type=Warning | grep -i "${DEPLOYMENT_NAME}" || true
@@ -92,8 +92,8 @@ Get Related Deployment Events
     RW.Core.Add Pre To Report    ${events.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Fetch Deployment Manifest Details
-    [Documentation]    Fetches the current state of the deployment manifest for inspection.
+Get Deployment Workload Details For Report
+    [Documentation]    Fetches the current state of the deployment for future review in the report.
     [Tags]    Deployment    Details    Manifest    Info
     ${deployment}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o yaml
@@ -102,10 +102,10 @@ Fetch Deployment Manifest Details
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    ${deployment.stdout}
+    RW.Core.Add Pre To Report    Snapshot of deployment state:\n\n${deployment.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Check Deployment Replicas
+Troubleshoot Deployment Replicas
     [Documentation]    Pulls the replica information for a given deployment and checks if it's highly available
     ...                , if the replica counts are the expected / healthy values, and if not, what they should be.
     [Tags]    Deployment    Replicas    Desired    Actual    Available    Ready    Unhealthy    Rollout    Stuck    Pods
