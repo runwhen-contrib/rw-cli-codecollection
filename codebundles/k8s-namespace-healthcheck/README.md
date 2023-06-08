@@ -1,4 +1,4 @@
-# Kubernetes Deployment Triage
+# Kubernetes Namespace Triage
 This codebundle is used for searching in a namespace for possible issues to triage; covering things such as scraping logs, checking for anomalies in events, looking for pod restarts, etc. These tasks can be performed with just native kubernetes objects and do not require additional logging / tracing tools be setup by the user. Problems identified during triage will result in raised issues.
 
 ## Tasks

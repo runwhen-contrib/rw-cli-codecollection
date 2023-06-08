@@ -101,7 +101,7 @@ Trace And Troubleshoot Namespace Warning Events And Errors
     ...    from_var_with_path__involved_pod_names__to__pod_count=length(@)
     ...    pod_count__raise_issue_if_gt=0
     ...    set_issue_title=Pods Found With Recent Warning Events In Namespace ${NAMESPACE}
-    ...    set_issue_details=We found $pod_count pods with events of type Warning in the namespace ${NAMESPACE}.\nName of pods with issues:\n$involved_pod_names\nCheck pod or namespace events.
+    ...    set_issue_details=We found $pod_count pods with events of type Warning in the namespace ${NAMESPACE}.\nName of pods with issues:\n$involved_pod_names\nCheck pod or namespace events:\n${recent_error_events.stdout}
     ...    assign_stdout_from_var=involved_pod_names
     # get pods with restarts > 0
     ${pods_in_namespace}=    RW.CLI.Run Cli
@@ -118,7 +118,7 @@ Trace And Troubleshoot Namespace Warning Events And Errors
     ...    from_var_with_path__pods_with_recent_restarts__to__pod_count=length(@)
     ...    pod_count__raise_issue_if_gt=0
     ...    set_issue_title=Frequently Restarting Pods In Namespace ${NAMESPACE}
-    ...    set_issue_details=Found $pod_count pods that are frequently restarting in ${NAMESPACE}. Check pod logs, status, namespace events, or pod resource configuration. 
+    ...    set_issue_details=Found $pod_count pods that are frequently restarting in ${NAMESPACE}. Check pod logs, status, namespace events, or pod resource configurations of the following pods:\n$pods_with_recent_restarts
     ...    assign_stdout_from_var=restart_pod_names
     # fetch logs with pod names
     ${restarting_pods}=    RW.CLI.From Json    json_str=${restarting_pods.stdout}
@@ -140,11 +140,11 @@ Trace And Troubleshoot Namespace Warning Events And Errors
     RW.Core.Add Pre To Report    ${error_trace_results}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Troubleshoot Unready Pods In Namespace For Report
+Troubleshoot Unready Pods In Namespace
     [Documentation]    Fetches all pods which are not running (unready) in the namespace and adds them to a report for future review.
     [Tags]    Namespace    Pods    Status    Unready    Not Starting    Phase    Containers
     ${unreadypods_results}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --sort-by='status.containerStatuses[0].restartCount' --field-selector=status.phase!=Running -o=name
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --sort-by='status.containerStatuses[0].restartCount' --field-selector=status.phase=Failed --no-headers | grep -v Completed
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -155,8 +155,8 @@ Troubleshoot Unready Pods In Namespace For Report
     ...    set_issue_expected=No pods should be in an unready state
     ...    set_issue_actual=We found the following unready pods: $_stdout
     ...    set_issue_title=Unready Pods Detected In Namespace ${NAMESPACE}
-    ...    set_issue_details=We found the following unready pods: $_stdout in the namespace ${NAMESPACE}
-    ...    _line__raise_issue_if_contains=pod
+    ...    set_issue_details=We found the following unready pods:\n$_stdout in the namespace ${NAMESPACE}
+    ...    _line__raise_issue_if_contains=-
     ${history}=    RW.CLI.Pop Shell History
     IF    """${unreadypods_results.stdout}""" == ""
         ${unreadypods_results}=    Set Variable    No unready pods found
@@ -185,7 +185,7 @@ Troubleshoot Workload Status Conditions In Namespace
     ...    from_var_with_path__aggregate_failures__to__pods_with_failures=length(@)
     ...    pods_with_failures__raise_issue_if_gt=0
     ...    set_issue_title=Pods With Unhealthy Status In Namespace ${NAMESPACE}
-    ...    set_issue_details=Found $pods_with_failures pods with an unhealthy status condition in the namespace ${NAMESPACE}. Review status conditions, pod logs, pod events, or namespace events. 
+    ...    set_issue_details=Found $pods_with_failures pods with an unhealthy status condition in the namespace ${NAMESPACE}. Here's a summary of potential issues we found:\n$aggregate_failures
     ...    assign_stdout_from_var=aggregate_failures
     ${history}=    RW.CLI.Pop Shell History
     IF    """${failing_conditions.stdout}""" == ""
@@ -216,7 +216,7 @@ Check For Namespace Event Anomalies
     [Documentation]    Parses all events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
     [Tags]    Namespace    Events    Info    State    Anomolies    Count    Occurences
     ${recent_anomalies}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select( (.count / (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60)) > ${ANOMALY_THRESHOLD}) | "Event(s) Per Minute:" + ((.count / (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60))|tostring) +" Count:" + (.count|tostring) + " Object:" + .involvedObject.namespace + "/" + .involvedObject.kind + "/" + .involvedObject.name + " Reason:" + .reason + " Message:" + .message'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select( .count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) > ${ANOMALY_THRESHOLD}) | "Event(s) Per Minute:" + (.count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) |tostring) +" Count:" + (.count|tostring) + " Minute(s):" + (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60|tostring)+ " Object:" + .involvedObject.namespace + "/" + .involvedObject.kind + "/" + .involvedObject.name + " Reason:" + .reason + " Message:" + .message'
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
