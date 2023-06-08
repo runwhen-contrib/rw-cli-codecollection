@@ -69,7 +69,7 @@ def organize_results(repo_mapping: dict, codebundle_paths: list[str], parse_resu
     named_results = {}
     branch = "main"
     # TODO: confirm if the collection docs are hosted in gitbook
-    runwhen_docs_url_base = "https://docs.runwhen.com/public/v/cli-codecollection/"
+    runwhen_docs_url_base = "https://docs.runwhen.com/public/v/cli-codecollection"
     for cb_filepath, cb_data in parse_results.items():
         path_parts = cb_filepath.split("/")
         repo_name = path_parts[2]
