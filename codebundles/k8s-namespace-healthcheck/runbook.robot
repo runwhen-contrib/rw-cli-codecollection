@@ -151,7 +151,7 @@ Troubleshoot Unready Pods In Namespace
     ...    render_in_commandlist=true
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${unreadypods_results}
-    ...    set_severity_level=3
+    ...    set_severity_level=1
     ...    set_issue_expected=No pods should be in an unready state
     ...    set_issue_actual=We found the following unready pods: $_stdout
     ...    set_issue_title=Unready Pods Detected In Namespace ${NAMESPACE}
@@ -184,6 +184,7 @@ Troubleshoot Workload Status Conditions In Namespace
     ...    from_var_with_path__failing_workload_conditions__to__aggregate_failures=[].{kind:kind,name:name,conditions:conditions[].{reason:reason, type:type, status:status}}
     ...    from_var_with_path__aggregate_failures__to__pods_with_failures=length(@)
     ...    pods_with_failures__raise_issue_if_gt=0
+    ...    set_severity_level=1
     ...    set_issue_title=Pods With Unhealthy Status In Namespace ${NAMESPACE}
     ...    set_issue_details=Found $pods_with_failures pods with an unhealthy status condition in the namespace ${NAMESPACE}. Here's a summary of potential issues we found:\n$aggregate_failures
     ...    assign_stdout_from_var=aggregate_failures
@@ -198,18 +199,18 @@ Troubleshoot Workload Status Conditions In Namespace
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 
-Get Listing Of Workloads In Namespace
+Get Listing Of Resources In Namespace
     [Documentation]    Simple fetch all to provide a snapshot of information about the workloads in the namespace for future review in a report.
     [Tags]    Get All    Resources    Info    Workloads    Namespace    Manifests
     ${all_results}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get all --context=${CONTEXT} -n ${NAMESPACE}
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} api-resources --verbs=list --namespaced -o name | xargs -n 1 oc get --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Informational Get All for Namespace: ${NAMESPACE}
-    RW.Core.Add Pre To Report    ${all_results}
+    RW.Core.Add Pre To Report    ${all_results.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Check For Namespace Event Anomalies
@@ -222,7 +223,7 @@ Check For Namespace Event Anomalies
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${recent_anomalies}
-    ...    set_severity_level=3
+    ...    set_severity_level=2
     ...    set_issue_expected=No unusual recent anomaly events with high counts in the namespace ${NAMESPACE}
     ...    set_issue_actual=We detected events in the namespace ${NAMESPACE} which are considered anomalies
     ...    set_issue_title=Event Anomalies Detected In Namespace ${NAMESPACE}
@@ -245,7 +246,7 @@ Troubleshoot Namespace Services And Application Workloads
     ...    render_in_commandlist=true
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${aggregate_service_logs}
-    ...    set_severity_level=2
+    ...    set_severity_level=3
     ...    set_issue_expected=Service workload logs in namespace ${NAMESPACE} should not contain any error entries
     ...    set_issue_actual=Service workload logs in namespace ${NAMESPACE} contain errors entries
     ...    set_issue_title=Service Workloads In Namespace ${NAMESPACE} Have Error Log Entries
