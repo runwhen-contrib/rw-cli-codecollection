@@ -1,14 +1,41 @@
 *** Settings ***
-Metadata          Author    Shea Stewart
-Documentation     List all GCP nodes that have an active preempt operation. 
-Metadata          Display Name    GCP Node Prempt List 
-Metadata          Supports    GCP,GKE
-Suite Setup       Suite Initialization
-Library           BuiltIn
-Library           RW.Core
-Library           RW.CLI
-Library           RW.platform
-Library           OperatingSystem
+Documentation       List all GCP nodes that have an active preempt operation.
+Metadata            Author    Shea Stewart
+Metadata            Display Name    GCP Node Prempt List
+Metadata            Supports    GCP,GKE
+
+Library             BuiltIn
+Library             RW.Core
+Library             RW.CLI
+Library             RW.platform
+Library             OperatingSystem
+
+Suite Setup         Suite Initialization
+
+
+*** Tasks ***
+List all nodes in an active prempt operation
+    [Documentation]    Fetches all nodes that have an active preempt operation at a global scope in the GCP Project
+    [Tags]    stdout    gcloud    node    preempt    gcp
+    ${preempt_node_list}=    RW.CLI.Run Cli
+    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud compute operations list --filter="operationType:( compute.instances.preempted ) AND NOT status:( DONE )" --format=json --project=${GCP_PROJECT_ID} | jq '[.[] | {startTime,targetLink, statusMessage, progress, zone, selfLink}]'
+    ...    target_service=${GCLOUD_SERVICE}
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    render_in_commandlist=true
+    ${no_requests_count}=    RW.CLI.Parse Cli Json Output
+    ...    rsp=${preempt_node_list}
+    ...    extract_path_to_var__preempt_node_count=length(@)
+    ...    set_issue_title=Found nodes in an active preempt operation.
+    ...    set_severity_level=3
+    ...    preempt_node_count__raise_issue_if_gt=0
+    ...    set_issue_details=Preempt operations are active on GCP nodes in this project ${GCP_PROJECT_ID}. We found $preempt_node_count nodes in preempt. If services are degraded, modify the node pool or deployment replica configurations, otherwise grab a coffee or take a walk.
+    ...    assign_stdout_from_var=preempt_node_count
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    Total nodes in a preempt operation: ${no_requests_count.stdout}
+    RW.Core.Add Pre To Report    Preempt operation details: \n ${preempt_node_list.stdout}
+    RW.Core.Add Pre To Report    Commands Used:\n${history}
+
 
 *** Keywords ***
 Suite Initialization
@@ -30,29 +57,7 @@ Suite Initialization
     ...    example=myproject-ID
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${GCLOUD_SERVICE}    ${GCLOUD_SERVICE}
-    Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}   
-    Set Suite Variable    ${env}    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}"}
-
-
-*** Tasks ***
-List all nodes in an active prempt operation
-    [Documentation]    Fetches all nodes that have an active preempt operation at a global scope in the GCP Project
-    [Tags]    Stdout    gcloud    node    preempt    gcp
-    ${preempt_node_list}=    RW.CLI.Run Cli
-    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud compute operations list --filter="operationType:( compute.instances.preempted ) AND NOT status:( DONE )" --format=json --project=${GCP_PROJECT_ID} | jq '[.[] | {startTime,targetLink, statusMessage, progress, zone, selfLink}]'
-    ...    target_service=${GCLOUD_SERVICE}
-    ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
-    ...    render_in_commandlist=true
-    ${no_requests_count}=    RW.CLI.Parse Cli Json Output
-    ...    rsp=${preempt_node_list}
-    ...    extract_path_to_var__preempt_node_count=length(@)
-    ...    set_issue_title=Found nodes in an active preempt operation!
-    ...    set_severity_level=3
-    ...    preempt_node_count__raise_issue_if_gt=0
-    ...    set_issue_details=Preempt operations are active on GCP nodes in this project ${GCP_PROJECT_ID}. We found $preempt_node_count nodes in preempt. If services are degraded, modify the node pool or deployment replica configurations, otherwise grab a coffee or take a walk.  
-    ...    assign_stdout_from_var=preempt_node_count
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Total nodes in a preempt operation: ${no_requests_count.stdout}   
-    RW.Core.Add Pre To Report    Preempt operation details: \n ${preempt_node_list.stdout}
-    RW.Core.Add Pre To Report    Commands Used:\n${history}
+    Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
+    Set Suite Variable
+    ...    ${env}
+    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}"}
