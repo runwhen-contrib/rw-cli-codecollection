@@ -44,10 +44,10 @@ def verify_rsp(
         raise ValueError(f"rsp {rsp} has unexpected shell return code {rsp.returncode}")
 
 
-def _string_to_datetime(duration_str: str):
-    now = RobotDateTime.get_current_date(result_format="%Y-%m-%dT%H:%M:%SZ")
+def _string_to_datetime(duration_str: str, date_format_str="%Y-%m-%dT%H:%M:%SZ"):
+    now = RobotDateTime.get_current_date(result_format=date_format_str)
     time = RobotDateTime.convert_time(duration_str)
-    past_date = RobotDateTime.subtract_time_from_date(now, time)
+    past_date = RobotDateTime.subtract_time_from_date(now, time, result_format=date_format_str)
     return past_date
 
 
