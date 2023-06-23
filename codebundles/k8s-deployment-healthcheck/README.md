@@ -3,10 +3,11 @@
 This codebundle provides a suite of tasks aimed at triaging issues related to a deployment and its replicas in Kubernetes clusters.
 
 ## Tasks
-`Get Deployment Log Details For Report`
+`Check Deployment Log For Issues`
 `Troubleshoot Deployment Warning Events`
 `Get Deployment Workload Details For Report`
 `Troubleshoot Deployment Replicas`
+`Check For Deployment Event Anomalies`
 
 ## Configuration
 The TaskSet requires initialization to import necessary secrets, services, and user variables. The following variables should be set:

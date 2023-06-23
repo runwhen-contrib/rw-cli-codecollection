@@ -14,18 +14,26 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Get Deployment Log Details For Report
-    [Documentation]    Fetches the last 100 lines of logs for the given deployment in the namespace and adds the information to the report for future review.
+Check Deployment Log For Issues
+    [Documentation]    Fetches recent logs for the given deployment in the namespace and checks the logs output for issues.
     [Tags]    fetch    log    pod    container    errors    inspect    trace    info    deployment
     ${logs}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs --tail=100 deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} --limit-bytes=256000 --since=3h --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${LOGS_ERROR_PATTERN}" | grep -Eiv "${LOGS_EXCLUDE_PATTERN}" | sort | uniq -c | awk '{print "Occurences:",$0}'
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
+    RW.CLI.Parse Cli Output By Line
+    ...    rsp=${logs}
+    ...    set_severity_level=3
+    ...    set_issue_expected=No logs matching error patterns found in deployment ${DEPLOYMENT_NAME} in namespace: ${NAMESPACE}
+    ...    set_issue_actual=Error logs found in deployment ${DEPLOYMENT_NAME} in namespace: ${NAMESPACE}
+    ...    set_issue_title=Deployment ${DEPLOYMENT_NAME} Has Error Logs
+    ...    set_issue_details=Deployment ${DEPLOYMENT_NAME} has error logs:\n\n$_stdout\n\nThese errors may be related to other workloads that need triaging
+    ...    _line__raise_issue_if_contains=Occurences
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report
-    ...    The last 100 lines of logs from deployment/${DEPLOYMENT_NAME} in ${NAMESPACE}:\n\n${logs.stdout}
+    ...    Recent logs from deployment/${DEPLOYMENT_NAME} in ${NAMESPACE}:\n\n${logs.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Troubleshoot Deployment Warning Events
@@ -114,6 +122,27 @@ Troubleshoot Deployment Replicas
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
+Check For Deployment Event Anomalies
+    [Documentation]    Parses all events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
+    [Tags]    deployment    events    info    state    anomolies    count    occurences
+    ${recent_anomalies}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select( .count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) > ${ANOMALY_THRESHOLD}) | "Event(s) Per Minute:" + (.count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) |tostring) +" Count:" + (.count|tostring) + " Minute(s):" + (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60|tostring)+ " Object:" + .involvedObject.namespace + "/" + .involvedObject.kind + "/" + .involvedObject.name + " Reason:" + .reason + " Message:" + .message'
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    RW.CLI.Parse Cli Output By Line
+    ...    rsp=${recent_anomalies}
+    ...    set_severity_level=2
+    ...    set_issue_expected=No unusual recent anomaly events with high counts in the namespace ${NAMESPACE}
+    ...    set_issue_actual=We detected events in the namespace ${NAMESPACE} which are considered anomalies
+    ...    set_issue_title=Event Anomalies Detected In Namespace ${NAMESPACE}
+    ...    set_issue_details=Anomaly non-warning events in namespace ${NAMESPACE}:\n"$_stdout"
+    ...    _line__raise_issue_if_contains=Object
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add To Report    Summary Of Anomalies Detected:\n
+    RW.Core.Add To Report    ${recent_anomalies.stdout}\n
+    RW.Core.Add Pre To Report    Commands Used:\n${history}
+
 
 *** Keywords ***
 Suite Initialization
@@ -148,6 +177,25 @@ Suite Initialization
     ...    pattern=\d+
     ...    example=3
     ...    default=3
+    ${ANOMALY_THRESHOLD}=    RW.Core.Import User Variable
+    ...    ANOMALY_THRESHOLD
+    ...    type=string
+    ...    description=The rate of occurence per minute at which an Event becomes classified as an anomaly, even if Kubernetes considers it informational.
+    ...    pattern=\d+(\.\d+)?
+    ...    example=1.0
+    ...    default=1.0
+    ${LOGS_ERROR_PATTERN}=    RW.Core.Import User Variable    LOGS_ERROR_PATTERN
+    ...    type=string
+    ...    description=The error pattern to use when grep-ing logs.
+    ...    pattern=\w*
+    ...    example=(Error: 13|Error: 14)
+    ...    default=(ERROR)
+    ${LOGS_EXCLUDE_PATTERN}=    RW.Core.Import User Variable    LOGS_EXCLUDE_PATTERN
+    ...    type=string
+    ...    description=Pattern used to exclude entries from log results when searching in log results.
+    ...    pattern=\w*
+    ...    example=(node_modules|opentelemetry)
+    ...    default=(node_modules|opentelemetry)
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
@@ -161,4 +209,7 @@ Suite Initialization
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${DEPLOYMENT_NAME}    ${DEPLOYMENT_NAME}
     Set Suite Variable    ${EXPECTED_AVAILABILITY}    ${EXPECTED_AVAILABILITY}
+    Set Suite Variable    ${ANOMALY_THRESHOLD}    ${ANOMALY_THRESHOLD}
+    Set Suite Variable    ${LOGS_ERROR_PATTERN}    ${LOGS_ERROR_PATTERN}
+    Set Suite Variable    ${LOGS_EXCLUDE_PATTERN}    ${LOGS_EXCLUDE_PATTERN}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
