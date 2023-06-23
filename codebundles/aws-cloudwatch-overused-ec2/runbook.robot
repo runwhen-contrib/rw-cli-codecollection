@@ -13,7 +13,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check For Overutilized Ec2 Instances
     [Documentation]    Fetches CloudWatch metrics for a list of EC2 instances and raises issues if they're over-utilized based on a configurable threshold.
-    [Tags]    logs    query    gcloud    gcp    errors    common
+    [Tags]    cloudwatch    metrics    ec2    utilization
     ${now}=    RW.CLI.String To Datetime    0h
     ${past_time}=    RW.CLI.String To Datetime    3h
     ${util_metrics}=    RW.CLI.Run Cli
