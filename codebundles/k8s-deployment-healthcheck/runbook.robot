@@ -130,6 +130,7 @@ Check For Deployment Event Anomalies
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${recent_anomalies}
     ...    set_severity_level=2
