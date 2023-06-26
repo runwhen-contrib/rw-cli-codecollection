@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       This taskset collects info on the age of images in a Kubernetes workspace.
-Metadata            Author    Jonathan Funk
+Metadata            Author    jon-funk
 Metadata            Display Name    Kubernetes Image Rollover Check
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,Redis
 Library             BuiltIn

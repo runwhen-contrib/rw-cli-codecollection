@@ -1,5 +1,5 @@
 *** Settings ***
-Metadata          Author    Jonathan Funk
+Metadata          Author    jon-funk
 Documentation     Check the health of pods deployed by cert-manager.
 Metadata          Display Name    Kubernetes CertManager Healthcheck
 Metadata          Supports    Kubernetes,AKS,EKS,GKE,OpenShift

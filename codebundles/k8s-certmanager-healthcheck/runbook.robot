@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       This taskset checks that your cert manager certificates are renewing as expected, raising issues when they are past due in the configured namespace
-Metadata            Author    Jonathan Funk
+Metadata            Author    jon-funk
 Metadata            Display Name    Kubernetes CertManager Healthcheck
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,CertManager
 

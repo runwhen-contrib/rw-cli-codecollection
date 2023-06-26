@@ -1,7 +1,7 @@
 *** Settings ***
 Documentation       Collects Nginx ingress host controller metrics from GMP on GCP and inspects the results for ingress with a HTTP error code rate greater than zero
 ...                 over a configurable duration and raises issues based on the number of ingress with error codes.
-Metadata            Author    Jonathan Funk
+Metadata            Author    jon-funk
 Metadata            Display Name    GKE Nginx Ingress Host Triage
 Metadata            Supports    GCP,GMP,Ingress,Nginx,Metrics
 

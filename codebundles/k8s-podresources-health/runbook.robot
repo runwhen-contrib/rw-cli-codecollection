@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       Inspects the resources provisioned for a given set of pods, selected by their labels and raises issues if no resources were specified.
-Metadata            Author    Jonathan Funk
+Metadata            Author    jon-funk
 Metadata            Display Name    Kubernetes Pod Resources Scan
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 

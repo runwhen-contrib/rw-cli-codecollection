@@ -1,5 +1,5 @@
 *** Settings ***
-Metadata          Author    Jonathan Funk
+Metadata          Author    jon-funk
 Metadata          Display Name    GCP Gcloud Log Inspection
 Metadata          Supports    GCP,Gcloud,Google Monitoring
 Documentation     Fetches logs from a GCP using a configurable query and raises an issue with details on the most common issues.
