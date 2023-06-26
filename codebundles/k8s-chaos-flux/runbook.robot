@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       This taskset is used to suspend a flux resource for the purposes of executing chaos tasks. 
-Metadata            Author    Shea Stewart
+Metadata            Author    stewartshea
 Metadata            Display Name    Kubernetes Flux Choas Testing
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 Library             BuiltIn

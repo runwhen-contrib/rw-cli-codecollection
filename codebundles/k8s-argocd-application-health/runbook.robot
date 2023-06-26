@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       This taskset collects information and runs general troubleshooting checks against argocd application objects within a namespace.
-Metadata            Author    Shea Stewart
+Metadata            Author    stewartshea
 Metadata            Display Name    Kubernetes ArgoCD Application Health & Troubleshoot
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,ArgoCD
 Library             BuiltIn

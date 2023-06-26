@@ -1,5 +1,5 @@
 *** Settings ***
-Metadata          Author    Shea Stewart
+Metadata          Author    stewartshea
 Documentation     Check if any GCP nodes have an active preempt operation. 
 Metadata          Display Name    GCP Node Prempt List 
 Metadata          Supports    GCP,GKE

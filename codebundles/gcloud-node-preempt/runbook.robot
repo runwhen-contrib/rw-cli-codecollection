@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       List all GCP nodes that have an active preempt operation.
-Metadata            Author    Shea Stewart
+Metadata            Author    stewartshea
 Metadata            Display Name    GCP Node Prempt List
 Metadata            Supports    GCP,GKE
 
