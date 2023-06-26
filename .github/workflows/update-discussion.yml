@@ -1,9 +1,15 @@
 name: Check CodeBundle Discussions
 on:
   push:
+    branches:
+      - main
+  push:
+    branches-ignore:
+      - main
 
 jobs:
-  check-discussions:
+  check-discussions-on-main:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Check for CodeBundles
@@ -38,3 +44,26 @@ jobs:
 
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  check-discussions-on-commit:
+    if: github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for CodeBundles
+        id: find_codebundles
+        run: |
+          codebundles=$(find codebundles -type d -depth 1 -exec basename {} \;)
+          echo "::set-output name=codebundles::$codebundles"
+
+      - name: Search Discussions
+        id: search_discussions
+        run: |
+          codebundles=(${{ steps.find_codebundles.outputs.codebundles }})
+
+          for codebundle in "${codebundles[@]}"; do
+            discussion=$(gh api -X GET "/orgs/runwhen-contrib/discussions" --jq "[.[] | select(.title == \"$codebundle\")]")
+            if [[ -z $discussion ]]; then
+              echo "Creating new discussion for $codebundle"
+              gh api -X POST "/repos/runwhen-contrib/.github/discussions" -H "Accept: application/vnd.github.echo-preview+json" -d "{\"title\": \"$codebundle\"}"
+            elif [[ $(jq length <<< "$discussion") -gt 1 ]]; then
+              echo "Multiple discussions found for $codebundle. Skipping note addition."
