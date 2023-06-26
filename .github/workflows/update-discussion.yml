@@ -1,0 +1,47 @@
+name: Check CodeBundle Discussions
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**'
+  push:
+    branches-ignore:
+      - main
+
+jobs:
+  check-discussions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for CodeBundles
+        id: find_codebundles
+        run: |
+          codebundles=$(find codebundles -type d -depth 1 -exec basename {} \;)
+          echo "::set-output name=codebundles::$codebundles"
+
+      - name: Search Discussions
+        id: search_discussions
+        run: |
+          codebundles=(${{ steps.find_codebundles.outputs.codebundles }})
+
+          for codebundle in "${codebundles[@]}"; do
+            discussion=$(gh api -X GET "/orgs/runwhen-contrib/discussions" --jq "[.[] | select(.title == \"$codebundle\")]")
+            if [[ -z $discussion ]]; then
+              echo "Creating new discussion for $codebundle"
+              gh api -X POST "/repos/runwhen-contrib/.github/discussions" -H "Accept: application/vnd.github.echo-preview+json" -d "{\"title\": \"$codebundle\"}"
+            elif [[ $(jq length <<< "$discussion") -gt 1 ]]; then
+              echo "Multiple discussions found for $codebundle. Skipping note addition."
+            else
+              echo "Discussion found for $codebundle"
+              discussion_id=$(jq -r '.[0].id' <<< "$discussion")
+              notes=$(gh api -X GET "/orgs/runwhen-contrib/discussions/$discussion_id/comments" --jq "[.[] | select(.body | contains(\"Possibly outdated or obsolete\"))]")
+
+              if [[ -z $notes ]]; then
+                echo "Adding note to discussion for $codebundle"
+                gh api -X POST "/orgs/runwhen-contrib/discussions/$discussion_id/comments" -H "Accept: application/vnd.github.echo-preview+json" -d "{\"body\": \"Possibly outdated or obsolete. Please review.\"}"
+              fi
+            fi
+          done
+
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
