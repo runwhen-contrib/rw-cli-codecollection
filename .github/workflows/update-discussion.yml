@@ -1,4 +1,8 @@
 name: Check CodeBundle Discussions
+on: 
+  push:
+    branches-ignore:
+      - main
 
 jobs:
   check-discussions-on-main:
