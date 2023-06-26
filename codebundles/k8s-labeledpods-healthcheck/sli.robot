@@ -1,5 +1,5 @@
 *** Settings ***
-Metadata          Author    Shea Stewart
+Metadata          Author    stewartshea
 Documentation     This codebundle fetches the number of running pods with the set of provided labels, letting you measure the number of running pods.
 Metadata          Display Name    Kubernetes Labeled Pod Count
 Metadata          Supports    Kubernetes,AKS,EKS,GKE,OpenShift

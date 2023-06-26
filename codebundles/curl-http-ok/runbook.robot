@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       This taskset uses curl to validate the response code of the endpoint and provides the total time of the request. 
-Metadata            Author    Shea Stewart
+Metadata            Author    stewartshea
 Metadata            Display Name    cURL HTTP OK
 Metadata            Supports    Linux macOS Windows HTTP
 Library             BuiltIn

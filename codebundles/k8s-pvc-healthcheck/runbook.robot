@@ -1,7 +1,7 @@
 *** Settings ***
 Documentation       This taskset collects information about storage such as PersistentVolumes and PersistentVolumeClaims to
 ...                 validate health or help troubleshoot potential storage issues.
-Metadata            Author    Shea Stewart
+Metadata            Author    stewartshea
 Metadata            Display Name    Kubernetes Persistent Volume Healthcheck
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 

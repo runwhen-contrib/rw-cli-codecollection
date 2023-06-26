@@ -1,7 +1,7 @@
 *** Settings ***
 Documentation       Collects Kong ingress host metrics from GMP on GCP and inspects the results for ingress with a HTTP error code rate greater than zero
 ...                 over a configurable duration and raises issues based on the number of ingress with error codes.
-Metadata            Author    Shea Stewart
+Metadata            Author    stewartshea
 Metadata            Display Name    GKE Kong Ingress Host Triage
 Metadata            Supports    GCP,GMP,Ingress,Kong,Metrics
 
