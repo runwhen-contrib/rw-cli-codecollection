@@ -68,12 +68,6 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=us-west-1
     ...    default=us-west-1
-    ${UTILIZATION_THRESHOLD}=    RW.Core.Import User Variable    UTILIZATION_THRESHOLD
-    ...    type=string
-    ...    description=The threshold at which an instance is determined as overutilized.
-    ...    pattern=\w*
-    ...    example=0.8
-    ...    default=0.8
     ${EKS_CLUSTER_NAME}=    RW.Core.Import User Variable    EKS_CLUSTER_NAME
     ...    type=string
     ...    description=The name of the AWS EKS cluster to query.
@@ -90,7 +84,6 @@ Suite Initialization
     Set Suite Variable    ${aws_assume_role_name}    ${aws_assume_role_name}
     Set Suite Variable    ${AWS_DEFAULT_REGION}    ${AWS_DEFAULT_REGION}
     Set Suite Variable    ${AWS_SERVICE}    ${AWS_SERVICE}
-    Set Suite Variable    ${UTILIZATION_THRESHOLD}    ${UTILIZATION_THRESHOLD}
     Set Suite Variable    ${EKS_CLUSTER_NAME}    ${EKS_CLUSTER_NAME}
     Set Suite Variable    ${EKS_NODEGROUP}    ${EKS_NODEGROUP}
     Set Suite Variable
