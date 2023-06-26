@@ -1,13 +1,6 @@
 name: Check CodeBundle Discussions
 on:
   push:
-    branches:
-      - main
-    paths-ignore:
-      - '**'
-  push:
-    branches-ignore:
-      - main
 
 jobs:
   check-discussions:
