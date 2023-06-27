@@ -14,8 +14,9 @@ jobs:
       - name: Check if codebundle discussion exists
         id: find_and_create_codebundle_discussions
         run: |
-          codebundles=$(find codebundles -type d -exec basename {} \; | grep -v "codebundles")          
-
+          codebundles=$(find codebundles -type d -exec basename {} \; | grep -v "codebundles")   
+          # remove this after testing       
+          codebundles=test
           echo "Found codebundles: $codebundles"
           echo "Searching discussions..."
           pwd
@@ -63,7 +64,8 @@ jobs:
             if ! $found; then
               echo "No matching discussion found for $codebundle"
               echo "Creating new discussion for $codebundle"
-              curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" -X POST -d "{\"query\": \"$create_discussion_query\", \"variables\": {\"repo_id\": \"$repo_id\", \"codebundle\": \"$codebundle\"}}" https://api.github.com/graphql 
+              discussion_body=$codebundle
+              curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" -X POST -d "{\"query\": \"$create_discussion_query\", \"variables\": {\"repo_id\": \"org:runwhen-contrib\", \"codebundle\": \"$codebundle\",\"discussion_body\": \"$discussion_body\"}}" https://api.github.com/graphql 
             fi
           done
 
