@@ -23,7 +23,7 @@ jobs:
         id: search_discussions
         run: |
           codebundles=(${{ steps.find_codebundles.outputs.codebundles }})
-
+          echo $codebundles
           for codebundle in "${codebundles[@]}"; do
             discussion=$(gh api -X GET "/orgs/runwhen-contrib/discussions" --jq "[.[] | select(.title == \"$codebundle\")]")
             if [[ -z $discussion ]]; then
