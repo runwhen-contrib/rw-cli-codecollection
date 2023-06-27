@@ -24,13 +24,15 @@ jobs:
           cat .github/queries/searchDiscussions.graphql
           # Read the queries from separate files
           search_discussions_query=$(cat .github/queries/searchDiscussions.graphql | tr -d '\n' | sed 's/"/\\\"/g')
+          echo $search_discussions_query
           create_discussion_query=$(cat .github/queries/createDiscussion.graphql | tr -d '\n' | sed 's/"/\\\"/g')
           add_comment_query=$(cat .github/queries/addDiscussionComment.graphql | tr -d '\n' | sed 's/"/\\\"/g')
           get_comments_query=$(cat .github/queries/getComments.graphql | tr -d '\n' | sed 's/"/\\\"/g')
-
+          echo "done var fetch"
           # Perform the searchDiscussions query
           search_response=$(curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" -X POST -d "{\"query\": \"$search_discussions_query\", \"variables\": $search_discussions_variables}" https://api.github.com/graphql)
           discussion_nodes=$(echo "$search_response" | jq -r '.data.search.edges[].node.discussions.nodes[] | select(.title != null) | { id, title }')
+          echo "done curls"
 
           # Loop through the discussion nodes
           for discussion_node in $discussion_nodes; do
