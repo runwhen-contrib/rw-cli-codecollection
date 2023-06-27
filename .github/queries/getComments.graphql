@@ -1,0 +1,13 @@
+query GetComments($discussion_id: ID!) {
+  node(id: $discussion_id) {
+    ... on Discussion {
+      comments(first: 100) {
+        edges {
+          node {
+            body
+          }
+        }
+      }
+    }
+  }
+}

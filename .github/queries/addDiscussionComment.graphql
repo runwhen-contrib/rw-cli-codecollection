@@ -1,0 +1,7 @@
+mutation AddDiscussionComment($discussion_id: ID!) {
+  addDiscussionComment(input: { discussionId: $discussion_id, body: "Possibly outdated or obsolete. Please review." }) {
+    comment {
+      id
+    }
+  }
+}

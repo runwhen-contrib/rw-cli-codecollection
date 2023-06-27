@@ -1,0 +1,7 @@
+mutation CreateDiscussion($repo_id: ID!, $codebundle: String!) {
+  createDiscussion(input: { repositoryId: $repo_id, title: $codebundle }) {
+    discussion {
+      id
+    }
+  }
+}
