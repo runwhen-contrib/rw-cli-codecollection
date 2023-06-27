@@ -21,6 +21,7 @@ jobs:
           pwd
           ls -lha
           tree .github
+          cat .github/queries/searchDiscussions.graphql
           # Read the queries from separate files
           search_discussions_query=$(cat .github/queries/searchDiscussions.graphql | tr -d '\n' | sed 's/"/\\\"/g')
           create_discussion_query=$(cat .github/queries/createDiscussion.graphql | tr -d '\n' | sed 's/"/\\\"/g')
