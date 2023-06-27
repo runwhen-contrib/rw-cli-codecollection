@@ -1,0 +1,12 @@
+query GetDiscussion($discussion_id: ID!) {
+  discussion:node(id: $discussion_id) {
+    ... on Discussion {
+      repository {
+        id
+      }
+      category {
+        id
+      }
+    }
+  }
+}
