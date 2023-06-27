@@ -17,6 +17,7 @@ jobs:
         run: |
           codebundles=$(find . -type d -name 'codebundles*' -exec basename {} \;)
           echo "::set-output name=codebundles::$codebundles"
+          echo $codebundles
 
       - name: Search Discussions
         id: search_discussions
