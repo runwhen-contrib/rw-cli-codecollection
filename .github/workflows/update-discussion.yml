@@ -1,5 +1,5 @@
 name: Check CodeBundle Discussions
-on: 
+on:
   push:
     branches-ignore:
       - main
@@ -9,10 +9,13 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
       - name: Check for CodeBundles
         id: find_codebundles
         run: |
-          codebundles=$(find codebundles -type d -depth 1 -exec basename {} \;)
+          codebundles=$(find . -type d -name 'codebundles*' -exec basename {} \;)
           echo "::set-output name=codebundles::$codebundles"
 
       - name: Search Discussions
@@ -46,10 +49,13 @@ jobs:
     if: github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
       - name: Check for CodeBundles
         id: find_codebundles
         run: |
-          codebundles=$(find codebundles -type d -depth 1 -exec basename {} \;)
+          codebundles=$(find . -type d -name 'codebundles*' -exec basename {} \;)
           echo "::set-output name=codebundles::$codebundles"
 
       - name: Search Discussions
@@ -62,5 +68,4 @@ jobs:
             if [[ -z $discussion ]]; then
               echo "Creating new discussion for $codebundle"
               gh api -X POST "/repos/runwhen-contrib/.github/discussions" -H "Accept: application/vnd.github.echo-preview+json" -d "{\"title\": \"$codebundle\"}"
-            elif [[ $(jq length <<< "$discussion") -gt 1 ]]; then
-              echo "Multiple discussions found for $codebundle. Skipping note addition."
+            elif [[ $(jq length <<< "$discussion
