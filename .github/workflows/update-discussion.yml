@@ -37,6 +37,7 @@ jobs:
 
           # Loop through the discussion nodes
           for discussion_node in $discussion_nodes; do
+            echo "$discussion_node"
             echo "start loop"
             echo "$discussion_node" | jq -r '.title'
             codebundle=$(echo "$discussion_node" | jq -r '.title')
