@@ -18,6 +18,7 @@ import requests
 import yaml
 import json
 import datetime
+from urllib.parse import urlencode
 from robot.api import TestSuite
 from tempfile import NamedTemporaryFile
 
@@ -80,7 +81,7 @@ def parse_yaml (fpath):
         data = yaml.safe_load(file)
     return data
 
-def search_keywords(parsed_robot, parsed_runbook_config, search_list):
+def search_keywords(parsed_robot, search_list):
     """
     Search through the list of keywords in the robot file,
     looking for interesting patterns that we can extrapolate. 
@@ -88,7 +89,6 @@ def search_keywords(parsed_robot, parsed_runbook_config, search_list):
 
     Args:
         parsed_robot (object): The parsed robot contents. 
-        parsed_runbook_config (object): The parsed runbook config content.
         search_list (list): A list of strings to match desired keywords on. 
 
     Returns:
@@ -109,10 +109,23 @@ def search_keywords(parsed_robot, parsed_runbook_config, search_list):
                         # commands.append(f'{cmd}  \n')
                         command = {
                                 "name": task["name"],
-                                "command": cmd_expansion(keyword.args, parsed_runbook_config)
+                                "command": cmd_expansion(keyword.args)
                                 }
                         commands.append(command)
     return commands
+
+def remove_escape_chars(cmd):
+    cmd = cmd.replace('\\\%', '%')
+    cmd = cmd.replace('\\\n', '')
+    cmd = cmd.replace('\\\\', '\\')
+    cmd = cmd.encode().decode('unicode_escape')
+    ## Handle cases where a wrapped quote has returned
+    if cmd[0] == cmd[-1] == '"':
+        cmd=cmd[1:-1]
+    if cmd[0] == cmd[-1] == "'":
+        cmd=cmd[1:-1]    
+    return cmd
+
 
 def cmd_expansion(keyword_arguments):
     """
@@ -148,17 +161,18 @@ def cmd_expansion(keyword_arguments):
     cmd_str=cmd_components[0]
 
     if "binary_name" in cmd_str: 
-        cmd_str = cmd_str.replace('${binary_name}', parsed_runbook_config["spec"]["servicesProvided"][0]["name"])
+        cmd_str = cmd_str.replace('${binary_name}', 'kubectl')
     if "BINARY_USED" in cmd_str: 
-        cmd_str = cmd_str.replace('${BINARY_USED}', parsed_runbook_config["spec"]["servicesProvided"][0]["name"])
+        cmd_str = cmd_str.replace('${BINARY_USED}', 'kubectl')
     if "KUBERNETES_DISTRIBUTION_BINARY" in cmd_str: 
-        cmd_str = cmd_str.replace('${KUBERNETES_DISTRIBUTION_BINARY}', parsed_runbook_config["spec"]["servicesProvided"][0]["name"])
+        cmd_str = cmd_str.replace('${KUBERNETES_DISTRIBUTION_BINARY}', 'kubectl')
     
     # Set var for public command before configProvided substitutiuon
     # This is used for the Explain function and guarantees no sensitive information
     cmd = remove_escape_chars(cmd_str)
 
     return cmd
+
 
 def generate_metadata(directory_path):
     """
@@ -173,9 +187,47 @@ def generate_metadata(directory_path):
         Object 
     """
     print(f'hello')
+    explainUrl=f'https://backend-services.dev.project-468.com/bow/raw?prompt='
+    search_list = ['render_in_commandlist=true']
     runbook_files = find_files(directory_path, 'runbook.robot')
     for runbook in runbook_files:
         print(runbook)
+        parsed_robot = parse_robot_file(runbook)
+        interesting_commands = search_keywords(parsed_robot, search_list)
+        print(interesting_commands)
+        commands = []
+
+        for item in interesting_commands:
+            name = item['name']
+            command = item['command']
+            # Convert name to lower snake case
+            name_snake_case = re.sub(r'\W+', '_', name.lower())
+            query = f'Please%20explain%20this%20command%20as%20if%20I%20was%20new%20to%20Kubernetes: {command}'
+            explain_query = urlencode({'prompt': query})
+            url = f'{explainUrl}{explain_query}'   
+            response = requests.get(url)
+            # Check if the request was successful (status code 200)
+            if response.status_code == 200:
+                data = response.json()  # Full response content as JSON
+
+                command_meta = {
+                    'name': name_snake_case,
+                    'command': command,
+                    'explanation': data['explanation']
+                }
+                
+                # Add the command meta to the list of commands
+                commands.append(command_meta)
+            else:
+                print("Request failed with status code:", response.status_code)
+        # Create a dictionary with the commands list
+        yaml_data = {'commands': commands}
+
+        # Write out the YAML file
+        dir_path = os.path.dirname(runbook)
+        file_path = os.path.join(dir_path, 'meta.yaml')
+        with open(file_path, 'w') as f:
+            yaml.dump(yaml_data, f)
 
 
 
