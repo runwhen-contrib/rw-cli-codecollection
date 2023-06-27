@@ -24,7 +24,7 @@ jobs:
           get_comments_query=$(cat .github/queries/getComments.graphql | tr -d '\n' | sed 's/"/\\\"/g')
           
           # Temp for cleanup of messes
-          delete=false
+          delete=true
           delete_discusssion_query=$(cat .github/queries/deleteDiscussion.graphql | tr -d '\n' | sed 's/"/\\\"/g')
           codebundles=test
           
@@ -66,7 +66,7 @@ jobs:
                 category_id="DIC_kwDOJo2Id84CXeeV"
                 # The repository_id that we need to use  
                 repo_id="R_kgDOJo2Idw"              
-                discussion_body="🌟Welcome to the community discussion for the troubleshooting commands defined in: [$codebundle](https://github.com/rw-cli-codecollection/tree/main/codebundles/$codebundle) \n\n🌱This discussion is intended to help grow the community\n 🛠️Together, lets enhance the usefulness of the troubleshooting commands\n\n 🙌 Your participation is crucial! Share your valuable comments and questions here, and don't forget to give a thumbs up if you find the commands helpful and utilize them in your work."
+                discussion_body="🌟Welcome to the community discussion for the troubleshooting commands defined in: [$codebundle](https://github.com/runwhen-contrib/rw-cli-codecollection/tree/main/codebundles/$codebundle) \n\n🌱This discussion is intended to help grow the community\n🛠️Together, lets enhance the usefulness of the troubleshooting commands\n\n🙌 Your participation is crucial! Share your valuable comments and questions here, and don't forget to give a thumbs up if you find the commands helpful and utilize them in your work."
                 curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" -X POST -d "{\"query\": \"$create_discussion_query\", \"variables\": {\"repo_id\": \"$repo_id\", \"codebundle\": \"$codebundle\",\"discussion_body\": \"$discussion_body\", \"category_id\": \"$category_id\"}}" https://api.github.com/graphql 
               fi
             fi
