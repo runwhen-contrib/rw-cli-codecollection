@@ -36,7 +36,7 @@ jobs:
           echo $discussion_nodes
 
           # Loop through the discussion nodes
-          echo "$discussion_nodes" | while IFS= read -r discussion_node; do
+          jq -c '.[]' $discussion_nodes | while read discussion_node; do
             echo "$discussion_node"
             codebundle=$(echo "$discussion_node" | jq -r '.title')
             discussion_id=$(echo "$discussion_node" | jq -r '.id')
