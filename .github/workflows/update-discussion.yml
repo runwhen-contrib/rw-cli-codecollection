@@ -42,7 +42,7 @@ jobs:
                 found=true
                 echo "Discussion found for $codebundle with ID: $discussion_id"
                 if [[ "$delete" == "true" ]]; then
-                  url -s -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" -X POST -d "{\"query\": \"$delete_discusssion_query\", \"variables\": {\"discussion_id\": \"$discussion_id\" }}" https://api.github.com/graphql 
+                  curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" -X POST -d "{\"query\": \"$delete_discusssion_query\", \"variables\": {\"discussion_id\": \"$discussion_id\" }}" https://api.github.com/graphql 
                 fi
 
                 # # Fetch comments for the discussion
