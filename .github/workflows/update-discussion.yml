@@ -9,17 +9,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Check for CodeBundles
-        id: find_codebundles
+      - name: Check if codebundle discussion exists
+        id: find_and_create_codebundle_discussions
         run: |
-          codebundles=$(find codebundles -type d -exec basename {} \; | grep -v "codebundles")
-          echo "codebundles=$codebundles" >> $GITHUB_ENV
-          echo $codebundles
+          codebundles=$(find codebundles -type d -exec basename {} \; | grep -v "codebundles")          
 
-      - name: Search Discussions
-        id: search_discussions
-        run: |
-          codebundles=$CODEBUNDLES
           echo "Found codebundles: $codebundles"
           echo "Searching discussions..."
 
@@ -58,4 +52,3 @@ jobs:
 
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CODEBUNDLES: ${{ steps.find_codebundles.outputs.codebundles }}
