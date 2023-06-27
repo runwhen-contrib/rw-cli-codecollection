@@ -35,24 +35,32 @@ jobs:
           discussion_nodes=$(echo "$search_response" | jq -r '[.data.search.edges[].node.discussions.nodes[] | select(.title != null) | { id, title }] | { items: . }')
           echo $discussion_nodes
 
-          # Loop through the discussion nodes
-          jq -c '.items[]' <<< "$discussion_nodes" | while read -r discussion_node; do
-            echo "$discussion_node"
-            codebundle=$(echo "$discussion_node" | jq -r '.title')
-            discussion_id=$(echo "$discussion_node" | jq -r '.id')
+          for codebundle in $codebundles; do
+            found=false
+            echo $codebundle
+            jq -c '.items[]' <<< "$discussion_nodes" | while read -r discussion_node; do
+              echo "$discussion_node"
+              node_codebundle=$(echo "$discussion_node" | jq -r '.title')
+              discussion_id=$(echo "$discussion_node" | jq -r '.id')
 
-            if [[ "$codebundles" =~ (^|[[:space:]])"$codebundle"($|[[:space:]]) ]]; then
-              echo "Discussion found for $codebundle with ID: $discussion_id"
+              if [[ "$codebundle" == "$node_codebundle" ]]; then
+                found=true
+                echo "Discussion found for $codebundle with ID: $discussion_id"
 
-              # # Fetch comments for the discussion
-              # comments_response=$(curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" -X POST -d "{\"query\": \"$get_comments_query\", \"variables\": {\"discussion_id\": \"$discussion_id\"}}" https://api.github.com/graphql)
-              # notes=$(echo "$comments_response" | jq -r '.data.node.comments.edges[].node.body')
+                # # Fetch comments for the discussion
+                # comments_response=$(curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" -X POST -d "{\"query\": \"$get_comments_query\", \"variables\": {\"discussion_id\": \"$discussion_id\"}}" https://api.github.com/graphql)
+                # notes=$(echo "$comments_response" | jq -r '.data.node.comments.edges[].node.body')
 
-              # if [[ -z $notes ]]; then
-              #   echo "Adding note to discussion for $codebundle"
-              #   curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" -X POST -d "{\"query\": \"$add_comment_query\", \"variables\": {\"discussion_id\": \"$discussion_id\"}}" https://api.github.com/graphql > /dev/null
-              # fi
-            else
+                # if [[ -z $notes ]]; then
+                #   echo "Adding note to discussion for $codebundle"
+                #   curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" -X POST -d "{\"query\": \"$add_comment_query\", \"variables\": {\"discussion_id\": \"$discussion_id\"}}" https://api.github.com/graphql > /dev/null
+                # fi
+
+                break
+              fi
+            done
+
+            if ! $found; then
               echo "No matching discussion found for $codebundle"
               echo "Creating new discussion for $codebundle"
               curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" -X POST -d "{\"query\": \"$create_discussion_query\", \"variables\": {\"repo_id\": \"$repo_id\", \"codebundle\": \"$codebundle\"}}" https://api.github.com/graphql > /dev/null
