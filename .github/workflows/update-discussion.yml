@@ -26,7 +26,7 @@ jobs:
           # Temp for cleanup of messes
           delete=true
           delete_discusssion_query=$(cat .github/queries/deleteDiscussion.graphql | tr -d '\n' | sed 's/"/\\\"/g')
-          
+          codebundles=test
           
           # Perform the searchDiscussions query
           search_response=$(curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" -X POST -d "{\"query\": \"$search_discussions_query\", \"variables\": {\"searchQuery\": \"org:runwhen-contrib\"}}" https://api.github.com/graphql)
@@ -61,11 +61,12 @@ jobs:
               if ! $found ; then
                 echo "No matching discussion found for $codebundle"
                 echo "Creating new discussion for $codebundle"
-                discussion_body=$codebundle
+                discussion_title=$codebundle
                 #Troubleshooting Commands Category
                 category_id="DIC_kwDOJo2Id84CXeeV"
                 # The repository_id that we need to use  
                 repo_id="R_kgDOJo2Idw"              
+                discussion_body="🌟Welcome to the community discussion for the troubleshooting commands defined in: $codebundle \n\n-> This discussion is intended to help grow the community\n-> Together, lets enhance the usefulness of the troubleshooting commands\n-> 🙌 Your participation is crucial! Share your valuable comments and questions here, and don't forget to give a thumbs up if you find the commands helpful and utilize them in your work."
                 curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" -X POST -d "{\"query\": \"$create_discussion_query\", \"variables\": {\"repo_id\": \"$repo_id\", \"codebundle\": \"$codebundle\",\"discussion_body\": \"$discussion_body\", \"category_id\": \"$category_id\"}}" https://api.github.com/graphql 
               fi
             fi
