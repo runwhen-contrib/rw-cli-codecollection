@@ -3,7 +3,7 @@ on:
   push:
     branches-ignore:
       - main
-
+  workflow_dispatch:
 jobs:
   check-discussions-on-main:
     if: github.ref == 'refs/heads/main'
