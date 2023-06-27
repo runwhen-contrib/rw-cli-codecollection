@@ -1,6 +1,7 @@
 name: Check CodeBundle Discussions
-on:
+on:  
   workflow_dispatch:
+  push:
 jobs:
   check-discussions-on-main:
     runs-on: ubuntu-latest
