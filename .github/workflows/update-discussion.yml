@@ -36,12 +36,9 @@ jobs:
           echo $discussion_nodes
 
           # Loop through the discussion nodes
-          for discussion_node in $discussion_nodes; do
+          echo "$discussion_nodes" | while IFS= read -r discussion_node; do
             echo "$discussion_node"
-            echo "start loop"
-            echo "$discussion_node" | jq -r '.title'
             codebundle=$(echo "$discussion_node" | jq -r '.title')
-            echo "$discussion_node" | jq -r '.id'
             discussion_id=$(echo "$discussion_node" | jq -r '.id')
 
             if [[ "$codebundles" =~ (^|[[:space:]])"$codebundle"($|[[:space:]]) ]]; then
