@@ -43,7 +43,7 @@ jobs:
           done
 
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT }}
 
   check-discussions-on-commit:
     if: github.ref != 'refs/heads/main'
@@ -83,4 +83,4 @@ jobs:
           done
 
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT }}
