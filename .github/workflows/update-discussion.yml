@@ -8,6 +8,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+        with:
+          ref: ${{ github.ref }}
 
       - name: Check if codebundle discussion exists
         id: find_and_create_codebundle_discussions
