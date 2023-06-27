@@ -53,7 +53,7 @@ jobs:
 
                 # if [[ -z $notes ]]; then
                 #   echo "Adding note to discussion for $codebundle"
-                #   curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" -X POST -d "{\"query\": \"$add_comment_query\", \"variables\": {\"discussion_id\": \"$discussion_id\"}}" https://api.github.com/graphql > /dev/null
+                #   curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" -X POST -d "{\"query\": \"$add_comment_query\", \"variables\": {\"discussion_id\": \"$discussion_id\"}}" https://api.github.com/graphql 
                 # fi
 
                 break
@@ -63,7 +63,7 @@ jobs:
             if ! $found; then
               echo "No matching discussion found for $codebundle"
               echo "Creating new discussion for $codebundle"
-              curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" -X POST -d "{\"query\": \"$create_discussion_query\", \"variables\": {\"repo_id\": \"$repo_id\", \"codebundle\": \"$codebundle\"}}" https://api.github.com/graphql > /dev/null
+              curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" -X POST -d "{\"query\": \"$create_discussion_query\", \"variables\": {\"repo_id\": \"$repo_id\", \"codebundle\": \"$codebundle\"}}" https://api.github.com/graphql 
             fi
           done
 
