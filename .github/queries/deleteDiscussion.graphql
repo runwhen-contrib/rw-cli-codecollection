@@ -1,0 +1,5 @@
+mutation DeleteDiscussion($discussion_id: ID!) {
+  deleteDiscussion(input: { discussionId: $discussion_id }) {
+    clientMutationId
+  }
+}
