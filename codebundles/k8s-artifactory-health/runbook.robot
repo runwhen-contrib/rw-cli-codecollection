@@ -1,5 +1,5 @@
 *** Settings ***
-Metadata          Author    Jonathan Funk
+Metadata          Author    jon-funk
 Metadata          Display Name    Kubernetes Artifactory Triage
 Metadata          Supports    Kubernetes,AKS,EKS,GKE,OpenShift,Artifactory
 Documentation     Performs a triage on the Open Source version of Artifactory in a Kubernetes cluster.

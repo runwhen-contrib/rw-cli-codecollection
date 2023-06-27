@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       Queries AWS CloudWatch for a list of EC2 instances with a high amount of resource utilization, raising issues when overutilized instances are found.
-Metadata            Author    Jonathan Funk
+Metadata            Author    jon-funk
 Metadata            Display Name    AWS CloudWatch Overutlized EC2 Inspection
 Metadata            Supports    AWS,CloudWatch
 

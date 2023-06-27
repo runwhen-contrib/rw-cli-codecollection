@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       Triages issues related to a Daemonset and its available replicas.
-Metadata            Author    Jonathan Funk
+Metadata            Author    jon-funk
 Metadata            Display Name    Kubernetes Daemonset Triage
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 

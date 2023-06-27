@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       This taskset collects information on your redis workload in your Kubernetes cluster and 
-Metadata            Author    Jonathan Funk
+Metadata            Author    jon-funk
 Metadata            Display Name    Kubernetes Redis Healthcheck
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,Redis
 Library             BuiltIn

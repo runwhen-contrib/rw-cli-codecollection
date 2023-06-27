@@ -1,5 +1,5 @@
 *** Settings ***
-Metadata          Author    Jonathan Funk
+Metadata          Author    jon-funk
 Documentation     This taskset smoketests the CLI codebundle setup and run process by running a bare command
 Suite Setup       Suite Initialization
 Library           BuiltIn

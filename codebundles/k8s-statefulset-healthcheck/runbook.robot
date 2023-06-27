@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       Triages issues related to a StatefulSet and its replicas.
-Metadata            Author    Jonathan Funk
+Metadata            Author    jon-funk
 Metadata            Display Name    Kubernetes StatefulSet Triage
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 

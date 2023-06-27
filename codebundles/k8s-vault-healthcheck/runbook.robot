@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       A suite of tasks that can be used to triage potential issues in your vault namespace.
-Metadata            Author    Jonathan Funk
+Metadata            Author    jon-funk
 Metadata            Display Name    Kubernetes Vault Triage
 Metadata            Supports    AKS,EKS,GKE,Kubernetes,Vault
 
