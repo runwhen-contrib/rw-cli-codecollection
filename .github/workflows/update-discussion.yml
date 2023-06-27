@@ -37,7 +37,7 @@ jobs:
 
               if [[ -z $notes ]]; then
                 echo "Adding note to discussion for $codebundle"
-                gh api -X POST "/orgs/runwhen-contrib/discussions/$discussion_id/comments" -H "Accept: application/vnd.github.echo-preview+json" -d "{\"body\": \"Possibly outdated or obsolete. Please review.\"}"
+                gh api -X POST "/orgs/runwhen-contrib/discussions/$discussion_id/comments" -H "Accept: application/vnd.github.echo-preview+json" -H "Content-Type: application/json" -d "{\"body\": \"Possibly outdated or obsolete. Please review.\"}"
               fi
             fi
           done
@@ -67,5 +67,20 @@ jobs:
             discussion=$(gh api -X GET "/orgs/runwhen-contrib/discussions" --jq "[.[] | select(.title == \"$codebundle\")]")
             if [[ -z $discussion ]]; then
               echo "Creating new discussion for $codebundle"
-              gh api -X POST "/repos/runwhen-contrib/.github/discussions" -H "Accept: application/vnd.github.echo-preview+json" -d "{\"title\": \"$codebundle\"}"
-            elif [[ $(jq length <<< "$discussion
+              gh api -X POST "/repos/runwhen-contrib/.github/discussions" -H "Accept: application/vnd.github.echo-preview+json" -H "Content-Type: application/json" -d "{\"title\": \"$codebundle\"}"
+            elif [[ $(jq length <<< "$discussion") -gt 1 ]]; then
+              echo "Multiple discussions found for $codebundle. Skipping note addition."
+            else
+              echo "Discussion found for $codebundle"
+              discussion_id=$(jq -r '.[0].id' <<< "$discussion")
+              notes=$(gh api -X GET "/orgs/runwhen-contrib/discussions/$discussion_id/comments" --jq "[.[] | select(.body | contains(\"Possibly outdated or obsolete\"))]")
+
+              if [[ -z $notes ]]; then
+                echo "Adding note to discussion for $codebundle"
+                gh api -X POST "/orgs/runwhen-contrib/discussions/$discussion_id/comments" -H "Accept: application/vnd.github.echo-preview+json" -H "Content-Type: application/json" -d "{\"body\": \"Possibly outdated or obsolete. Please review.\"}"
+              fi
+            fi
+          done
+
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
