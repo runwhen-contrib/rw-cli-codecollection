@@ -20,9 +20,11 @@ jobs:
           ref: ${{ github.event.pull_request.base.ref }}
       - name: Update readme and commit back to repo
         run: | 
+          DATETIME=$(date '+%Y%m%d-%H%M%S')
+          BRANCH="automatic-index-update-$DATETIME"
           git config --global user.email "${GITHUB_ACTOR}"
           git config --global user.name "${GITHUB_ACTOR}@users.noreply.github.com"
-          git checkout -b "automatic-index-update"
+          git checkout -b $BRANCH
 
           # Run the index update script
           pip install robotframework==6.0.2
@@ -42,7 +44,7 @@ jobs:
           else
               echo "Changes detected. Pushing..."
               git commit -m "Codebundle index update."
-              git push --set-upstream origin automatic-index-update
+              git push --set-upstream origin $BRANCH
           fi
 
           # Open up a PR
