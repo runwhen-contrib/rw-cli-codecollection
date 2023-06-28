@@ -1,0 +1,38 @@
+commands:
+- command: kubectl logs --tail=100 daemonset/${DAEMONSET_NAME} --context ${CONTEXT}
+    -n ${NAMESPACE}
+  explanation: '
+
+
+    This command allows you to view the last 100 log statements of a DaemonSet in
+    Kubernetes. A DaemonSet is a type of controller that ensures a copy of a pod (a
+    basic building block of Kubernetes) is always running on every node in a cluster.
+    The command takes in parameters for the context and namespace of the DaemonSet,
+    so that it can run within that specific environment. You then provide the name
+    of the DaemonSet you want to view logs from, and the command will output the last
+    100 log messages from that DaemonSet.'
+  name: get_daemonset_log_details_for_report
+- command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
+    ${NAMESPACE} | grep -i "${DAEMONSET_NAME}" || true
+  explanation: '
+
+
+    This command allows you to check Kubernetes events for any issues related to a
+    specific resource in a given namespace. Specifically, it will search for warning
+    type events concerning the specified DaemonSet in the context of the provided
+    namespace. It will also return an empty string if no events are found for the
+    specified resources, instead of throwing an error.'
+  name: get_related_daemonset_events
+- command: kubectl describe daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
+  explanation: '
+
+
+    Kubectl describe daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
+    is a command used to view detailed information about a Kubernetes DaemonSet with
+    the specified name, in the context and namespace provided as arguments. A Kubernetes
+    DaemonSet ensures that all nodes run exactly one copy of a service by scheduling
+    pods on nodes automatically. This command enables a user to view different attributes
+    of a Kubernetes DaemonSet such as its configuration, desired number of pod replicas,
+    status of all replicas, information about the node(s) it runs on and other related
+    stats.'
+  name: check_daemonset_replicas

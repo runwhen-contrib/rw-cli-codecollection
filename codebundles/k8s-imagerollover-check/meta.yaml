@@ -1,0 +1,17 @@
+commands:
+- command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Running
+    -o json | jq -r ''[.items[] | "Images: " + (.spec.containers[].image|tostring)
+    + ", Last Started Times:" + (.status.containerStatuses[].state.running.startedAt|tostring)]'''
+  explanation: '
+
+
+    Kubectl get pods is a command used to retrieve all running pod names in a Kubernetes
+    cluster. The --context=${CONTEXT} flag specifies the context for selecting a Kubernetes
+    cluster. The -n ${NAMESPACE} part of the command defines which particular namespace
+    we want to target. The --field-selector=status.phase==Running clause limits the
+    query to only return running pods. The -o json adds the output to a JSON format.
+    Finally, the jq -r ''[.items[] | "Images: " + (.spec.containers[].image|tostring)
+    + ", Last Started Times:" + (.status.containerStatuses[].state.running.startedAt|tostring)]''
+    portion parses the JSON data and returns the list of pod images that were running
+    and the time they started running.'
+  name: check_image_rollover_times_in_namespace

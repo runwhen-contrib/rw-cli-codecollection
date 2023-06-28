@@ -1,0 +1,17 @@
+commands:
+- command: gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+    && gcloud compute operations list --filter="operationType:( compute.instances.preempted
+    ) AND NOT status:( DONE )" --format=json --project=${GCP_PROJECT_ID} | jq '[.[]
+    | {startTime,targetLink, statusMessage, progress, zone, selfLink}]'
+  explanation: '
+
+
+    This command is used to get a list of all preempted Google Compute instances from
+    a specific project. To do this, it uses the Google Cloud Platform authentication
+    service to activate a service account with the key-file specified in the environment
+    variable GOOGLE_APPLICATION_CREDENTIALS. The command then lists operations with
+    operationType compute.instances.preempted and without status DONE, formatting
+    the output as JSON and using the project ID stored in the environment variable
+    GCP_PROJECT_ID. Finally, the JSON is parsed using jq to select certain fields
+    (startTime, targetLink, statusMessage, progress, zone, selfLink).'
+  name: list_all_nodes_in_an_active_prempt_operation

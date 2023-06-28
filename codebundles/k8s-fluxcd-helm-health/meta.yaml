@@ -1,0 +1,57 @@
+commands:
+- command: kubectl get ${RESOURCE_NAME} ${NAMESPACE} --context ${CONTEXT}
+  explanation: '
+
+
+    Kubectl get is a command used to get one or more resources from Kubernetes, such
+    as pods, configmaps, services, and deployments. In this command, you will specify
+    a resource name, a namespace and a context. The resource name is the name of the
+    resource you want to retrieve, for example a pod or a service. The namespace identifies
+    which set of resources you want to work with. The context identifies which cluster
+    of resources you want to work with, if you are connected to multiple clusters
+    at once. This command can be used to get information about your desired resource,
+    like the current state of the resource, or your desired configuration settings.'
+  name: list_all_available_fluxcd_helmreleases
+- command: 'kubectl get ${RESOURCE_NAME} ${NAMESPACE} -o=jsonpath="{range .items[*]}{''\nName:
+    ''}{@.metadata.name}{''\nlastAppliedRevision:''}{@.status.lastAppliedRevision}{''\nlastAttemptedRevision:''}{@.status.lastAttemptedRevision}{''\n---''}{end}"
+    --context ${CONTEXT} || true'
+  explanation: '
+
+
+    This command allows you to get detailed information about a Kubernetes resource
+    given the name and namespace of the resource. It will return the name, last applied
+    revision, and last attempted revision of the resource. The "--context" parameter
+    allows you to specify a specific Kubernetes context which can be used to access
+    multiple clusters from the same kubectl instance. The || true at the end ensures
+    the command returns 0 even if it finds nothing, so an error isn''t thrown.'
+  name: fetch_all_fluxcd_helmrelease_versions
+- command: 'kubectl get ${RESOURCE_NAME} ${NAMESPACE} -o json --context ${CONTEXT}
+    | jq -r ''.items[] | select(.status.lastAppliedRevision!=.status.lastAttemptedRevision)
+    | "Name: " + .metadata.name + " Last Attempted Version: " + .status.lastAttemptedRevision
+    + " Last Applied Revision: " + .status.lastAppliedRevision'''
+  explanation: '
+
+
+    This command is used to get information on a specific Kubernetes resource, such
+    as a pod or a deployment. It uses the kubectl command to retrieve information
+    from the specified context and namespace, and then filters the output of the command
+    in JSON format to show only those resources where the last attempted version differs
+    from the last applied version. The jq command is then used to produce a human-readable
+    output, displaying the name of the resource, its last attempted version, and its
+    last applied version.'
+  name: fetch_mismatched_fluxcd_helmrelease_version
+- command: 'kubectl get ${RESOURCE_NAME} ${NAMESPACE} -o=jsonpath="{range .items[?(@.status.conditions[].status==''False'')]}{''-----\nName:
+    ''}{@.metadata.name}{''\n''}{@.status.conditions[*].message}{''\n''}{end}" --context
+    ${CONTEXT} || true'
+  explanation: '
+
+
+    This command is used to get various resources in Kubernetes. It will fetch the
+    requested resources from the specified namespace, and display information about
+    any resource that has a status condition of ''False''. Specifically, it will output
+    the name of the resource, any associated messages, and details about the condition.
+    This can be used to quickly identify resources with issues and take corrective
+    action. The ''--context'' argument can be used to select a specific Kubernetes
+    cluster. Additionally, the ''-o=jsonpath'' argument allows you to customize the
+    output format.'
+  name: fetch_fluxcd_helmrelease_error_messages
