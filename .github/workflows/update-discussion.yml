@@ -25,7 +25,7 @@ jobs:
           get_comments_query=$(cat .github/queries/getComments.graphql | tr -d '\n' | sed 's/"/\\\"/g')
           
           # Temp for cleanup of messes
-          delete=true
+          delete=false
           delete_discusssion_query=$(cat .github/queries/deleteDiscussion.graphql | tr -d '\n' | sed 's/"/\\\"/g')
           # codebundles=test
           
