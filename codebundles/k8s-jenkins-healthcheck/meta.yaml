@@ -1,0 +1,44 @@
+commands:
+- command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
+    -- curl -s -o /dev/null -w "%{http_code}" localhost:8080/login
+  explanation: '
+
+
+    This command will send a request to the "login" endpoint of a statefulset called
+    "${STATEFULSET_NAME}" in Kubernetes, using the context "${CONTEXT}" and namespace
+    "${NAMESPACE}". The output will be the response code for the request (such as
+    200 or 404). This can help diagnose whether or not the statefulset is functioning
+    properly.'
+  name: query_the_jenkins_kubernetes_workload_http_endpoint
+- command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
+    -- curl -s localhost:8080/api/json?pretty=true --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}
+  explanation: '
+
+
+    This command allows you to access a Kubernetes StatefulSet that has been deployed
+    into a specific namespace with a specific context. It uses the Kubectl command
+    line tool and specifies a particular StatefulSet name, a context, and a namespace.
+    Additionally, it passes the username and token information associated with a Jenkins
+    service account for authentication. Once authenticated, it will do a curl request
+    of the specified URL and return its response, formatted using JSON.'
+  name: query_the_jenkins_kubernetes_workload_http_endpoint
+- command: 'kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
+    -- curl -s localhost:8080/queue/api/json --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}
+    | jq -r ''.items[] | select((.stuck == true) or (.blocked == true)) | "Why: "
+    + .why + "
+
+    Blocked: " + (.blocked|tostring) + "
+
+    Stuck: " + (.stuck|tostring)'''
+  explanation: '
+
+
+    This command is used to view the status of jobs in a Jenkins Queue that are currently
+    blocked or stuck. Specifically, it issues an API call to a stateful set named
+    ${STATEFULSET_NAME} within namespace ${NAMESPACE}, using the specified context
+    (${CONTEXT}), to retrieve information on jobs within the queue. The data returned
+    is then read and filtered to show only those that are either blocked or stuck,
+    and outputted with details as to why they might be in that state. Additionally,
+    the specified user ($${JENKINS_SA_USERNAME.key}) and token ($${JENKINS_SA_TOKEN.key})
+    are used for authentication.'
+  name: query_for_stuck_jenkins_jobs

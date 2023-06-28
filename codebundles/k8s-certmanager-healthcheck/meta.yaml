@@ -1,0 +1,16 @@
+commands:
+- command: kubectl get certificates --context=${CONTEXT} -n ${NAMESPACE} -ojson |
+    jq -r '.items[] | select(now < (.status.renewalTime|fromdate)) | "Namespace:"
+    + .metadata.namespace + " URL:" + .spec.dnsNames[0] + " Renews:" + .status.renewalTime
+    + " Expires:" + .status.notAfter'
+  explanation: '
+
+
+    This command provides information on existing certificates in Kubernetes. The
+    --context flag is used to specify the context you want to run this command in
+    (this can be either the default or a custom cluster), the -n flag specifies the
+    namespace within that context, and the -ojson flag controls the output format
+    as json. The jq command is then used to process the json data and select the certificate
+    items based on their renewal date and output details such as the Namespace, URL,
+    Renewal Time and Expiry Date.'
+  name: get_namespace_certificate_summary

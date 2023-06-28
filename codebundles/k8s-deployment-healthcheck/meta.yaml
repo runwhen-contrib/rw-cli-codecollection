@@ -1,0 +1,73 @@
+commands:
+- command: kubectl logs deployment/${DEPLOYMENT_NAME} --limit-bytes=256000 --since=3h
+    --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${LOGS_ERROR_PATTERN}" | grep
+    -Eiv "${LOGS_EXCLUDE_PATTERN}" | sort | uniq -c | awk '{print "Occurences:",$0}'
+  explanation: '
+
+
+    This command will display the logs for a particular Kubernetes deployment and
+    filter out specific error messages. The limit bytes parameter will set a limit
+    on the size of the log output in bytes (in this case 256000). The since parameter
+    specifies how far back the log will search, in this case three hours. The context
+    parameter specifies the environment from which the commands are being executed
+    (this is usually the cluster name). The namespace parameter gives the namespace
+    associated with the deployment to be targeted by the command. The grep commands
+    are used to filter out any lines containing words matches the ''logs_error_pattern''."The
+    log_exclude_pattern" can be used to exclude lines containing words that match
+    the given pattern. Finally, sort will sort the output and uniq -c will give a
+    frequency count for unique values that have been sorted previously. The awk command
+    is then used to format the output to "Occurences: [number] [value]"'
+  name: check_deployment_log_for_issues
+- command: kubectl get events --context ${CONTEXT} -n ${NAMESPACE} --field-selector
+    type=Warning | grep -i "${DEPLOYMENT_NAME}" || true
+  explanation: '
+
+
+    This command uses kubectl to get Events for a specific context and namespace.
+    It then filters those events by type, looking specifically for Warning level events,
+    and also filters those results again by the deployment name you provide. The "||
+    true" at the end of the command is used to ensure that it always returns as having
+    succeeded (even if there are no results from the initial query).'
+  name: troubleshoot_deployment_warning_events
+- command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
+    -o yaml
+  explanation: '
+
+
+    This kubectl command retrieves the Kubernetes deployment configuration for the
+    specified ${DEPLOYMENT_NAME} in the given ${CONTEXT} and ${NAMESPACE}, and outputs
+    it in YAML format. This is useful if you need to examine or modify a deployment
+    configuration, or if you just want to view the settings that are currently being
+    used by a given deployment.'
+  name: get_deployment_workload_details_for_report
+- command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
+    -o json
+  explanation: '
+
+
+    This command is used when retrieving the configuration settings of a Kubernetes
+    deployment. The "${DEPLOYMENT_NAME}" argument specifies the name of the deployment
+    to be retrieved, the "--context" argument allows you to specify the Kubernetes
+    context in which the deployment resides, and the "-n ${NAMESPACE}" argument allows
+    you to specify the namespace that contains the desired deployment. Finally, the
+    "-o json" argument indicates that you''d like the output information returned
+    in a JSON format.'
+  name: troubleshoot_deployment_replicas
+- command: kubectl get events --field-selector type!=Warning --context ${CONTEXT}
+    -n ${NAMESPACE} -o json | jq -r '.items[] | select( .count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60
+    == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end
+    ) > ${ANOMALY_THRESHOLD}) | "Event(s) Per Minute:" + (.count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60
+    == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end
+    ) |tostring) +" Count:" + (.count|tostring) + " Minute(s):" + (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60|tostring)+
+    " Object:" + .involvedObject.namespace + "/" + .involvedObject.kind + "/" + .involvedObject.name
+    + " Reason:" + .reason + " Message:" + .message'
+  explanation: "\n\nThis command is used to identify events that occurred in a Kubernetes\
+    \ cluster. The command will filter out all warning events and only return events\
+    \ with a frequency higher than the \"ANOMALY_THRESHOLD\". The command takes two\
+    \ arguments: CONTEXT and NAMESPACE. \n\nThe CONTEXT argument specifies which context\
+    \ to run the command in and the NAMESPACE argument specifies which namespace the\
+    \ events should be retrieved from. The output of the command provides information\
+    \ about each event such as the number of events per minute, the count, number\
+    \ of minutes, involved object (like namespace or resource kind) name, reason and\
+    \ message."
+  name: check_for_deployment_event_anomalies

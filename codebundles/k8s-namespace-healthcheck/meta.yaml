@@ -1,0 +1,67 @@
+commands:
+- command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
+    ${NAMESPACE} -o json
+  explanation: '
+
+
+    This command allows you to retrieve a list of Kubernetes events related to any
+    potential warnings that may have been generated. It specifically filters the events
+    for type "Warning" and can be used with the context and namespace parameters provided
+    in the command to obtain more specific results. The output format is json which
+    provides an easy to read and parse output.'
+  name: trace_and_troubleshoot_namespace_warning_events_and_errors
+- command: kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --sort-by='status.containerStatuses[0].restartCount'
+    --field-selector=status.phase=Failed --no-headers | grep -v Completed || true
+  explanation: '
+
+
+    Kubectl get pods is a command-line tool used to retrieve all of the pods in a
+    Kubernetes cluster. The --context flag specifies which context you want to query
+    from. The -n flag specifies the namespace for the desired pods. By passing in
+    the --sort-by option, we can sort the pods by the restart count of the first container
+    in the pod. Finally, with the --field-selector, we can restrict our query to only
+    pods that are in the Failed phase. The --no-headers parameter eliminates all of
+    the column headers from the output. Lastly, the grep and true statement allow
+    us to filter out any successfully completed pods from the output.'
+  name: troubleshoot_unready_pods_in_namespace
+- command: kubectl get all --context ${CONTEXT} -n ${NAMESPACE} -o json
+  explanation: '
+
+
+    Kubectl get all --context ${CONTEXT} -n ${NAMESPACE} -o json is a command that
+    allows you to access Kubernetes resources in a specific context and namespace
+    with an output of json. The ${CONTEXT} and ${NAMESPACE} arguments allow you to
+    be more specific when searching for resources. This command can be useful if you
+    want to take a deeper look into the Kubernetes resources you have available in
+    a particular context and namespace.'
+  name: troubleshoot_workload_status_conditions_in_namespace
+- command: kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT}
+    | xargs -n 1 kubectl get --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}
+  explanation: "\n\nThis command retrieves the list of resources available in the\
+    \ Kubernetes cluster that you are currently connected to. This is useful for knowing\
+    \ what type of objects are available with the Kubernetes API. First, it searches\
+    \ for all resources available on the cluster and only returns a list of the names.\
+    \ It then applies flags to determine which verb (in this case \"list\") should\
+    \ be used, allowing you to access more information about each resource. The \u2013\
+    namespaced flag limits results to those resources that require a namespace to\
+    \ be specified, while the \u2013context flag specifies the connection context\
+    \ of the current cluster. Finally, the xargs command is used to get additional\
+    \ details about the resources, such as their type (-show-kind) and if they have\
+    \ been found (-ignore-not-found). It will also ensure any retrieved resources\
+    \ belong to the specified namespace (-n ${NAMESPACE})."
+  name: get_listing_of_resources_in_namespace
+- command: services=($(kubectl get svc -o=name --context=${CONTEXT} -n ${NAMESPACE}));
+    logs=""; for service in "\${services[@]}"; do logs+=$(kubectl logs $service --limit-bytes=256000
+    --since=2h --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${SERVICE_ERROR_PATTERN}"
+    | grep -Ev "${SERVICE_EXCLUDE_PATTERN}" | sort | uniq -c | awk '{print "Issue
+    Occurences:",$0}'); done; echo "\${logs}"
+  explanation: '
+
+
+    This command is used to get logs from Kubernetes services in a given context and
+    namespace. It retrieves all service names using the kubectl get svc command and
+    stores them in an array named "services". Then it loops through each service,
+    retrieving the logs with kubectl logs and storing them in the "logs" variable.
+    Lastly, the output is filtered based on patterns provided by the user and printed
+    out.'
+  name: troubleshoot_namespace_services_and_application_workloads

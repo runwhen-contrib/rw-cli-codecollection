@@ -1,0 +1,48 @@
+commands:
+- command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
+    -- redis-cli PING
+  explanation: '
+
+
+    This command executes a Redis CLI command on a deployment within a Kubernetes
+    cluster. The Kubernetes command line tool (kubectl) is used to run the command.
+    The parameters provided are ''deployment/${DEPLOYMENT_NAME}'', ''--context=${CONTEXT}'',
+    ''-n ${NAMESPACE}'' and ''-- redis-cli PING''. The first parameter determines
+    which deployment in the cluster you want to target. The next two parameters determine
+    what context and namespace within that cluster will be used to execute the command.
+    The final parameter is the Redis CLI command - ''PING''. This command will send
+    a message to the Redis server and it should respond with "PONG".'
+  name: ping_redis_workload
+- command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
+    -- redis-cli SET ${REDIS_HEALTHCHECK_KEY} 0
+  explanation: "\n\nThis command is used to perform a healthcheck for a Redis deployment\
+    \ on Kubernetes. The command setting a specific key to 0 in the Redis instance\
+    \ through an execution of \"redis-cli\". \n\nThe kubectl exec command is used\
+    \ to execute arbitrary commands on a Kubernetes Deployment in a given context\
+    \ within a namespace. The values of the parameters DEPLOYMENT_NAME, CONTEXT and\
+    \ NAMESPACE specify which deployment, context and namespace will be applied when\
+    \ performing the command. The REDIS_HEALTHCHECK_KEY specifies the key that will\
+    \ be used for the healthcheck."
+  name: verify_redis_read_write_operation
+- command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
+    -- redis-cli INCR ${REDIS_HEALTHCHECK_KEY}
+  explanation: '
+
+
+    This command will increase a specified Redis key on a Kubernetes deployment named
+    DEPLOYMENT_NAME. The command should be executed within the context CONTEXT and
+    namespace NAMESPACE. Specifically, it will run ''redis-cli INCR REDIS_HEALTHCHECK_KEY''
+    command, which increases the key value by one, using Kubernetes''s kubectl exec
+    command.'
+  name: verify_redis_read_write_operation
+- command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
+    -- redis-cli GET ${REDIS_HEALTHCHECK_KEY}
+  explanation: '
+
+
+    This command uses ''kubectl'' to execute a ''redis-cli'' command inside the container
+    of a Kubernetes Deployment with name ${DEPLOYMENT_NAME} in the context (cluster)
+    of ${CONTEXT} and namespace ${NAMESPACE}, and is specifically retrieving a value
+    for key ${REDIS_HEALTHCHECK_KEY} from a Redis server. The command will perform
+    its actions within a running pod or container created as part of the deployment.'
+  name: verify_redis_read_write_operation
