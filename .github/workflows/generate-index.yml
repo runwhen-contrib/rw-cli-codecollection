@@ -11,15 +11,13 @@ on:
       - ".github/scripts/index.py"
       - ".github/scripts/meta.py"
       - ".github/workflows/generate-index.yml"
-  pull_request:
 jobs:
   update-readme:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with: 
-          # ref: ${{ github.event.pull_request.base.ref }}
-          ref: ${{ github.ref }}
+          ref: ${{ github.event.pull_request.base.ref }}
       - name: Update readme and commit back to repo
         run: | 
           git config --global user.email "${GITHUB_ACTOR}"
