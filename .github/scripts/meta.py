@@ -12,15 +12,10 @@ import sys
 import os
 import fnmatch
 import re
-import shutil
-import jinja2
 import requests
 import yaml
-import json
-import datetime
 from urllib.parse import urlencode
 from robot.api import TestSuite
-from tempfile import NamedTemporaryFile
 
 
 def parse_robot_file(fpath):
@@ -186,15 +181,12 @@ def generate_metadata(directory_path):
     Returns:
         Object 
     """
-    print(f'hello')
     explainUrl=f'https://backend-services.dev.project-468.com/bow/raw?prompt='
     search_list = ['render_in_commandlist=true']
     runbook_files = find_files(directory_path, 'runbook.robot')
     for runbook in runbook_files:
-        print(runbook)
         parsed_robot = parse_robot_file(runbook)
         interesting_commands = search_keywords(parsed_robot, search_list)
-        print(interesting_commands)
         commands = []
 
         for item in interesting_commands:
