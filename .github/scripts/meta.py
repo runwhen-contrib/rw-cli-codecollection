@@ -185,6 +185,7 @@ def generate_metadata(directory_path):
     search_list = ['render_in_commandlist=true']
     runbook_files = find_files(directory_path, 'runbook.robot')
     for runbook in runbook_files:
+        print(f'generating meta for {runbook}')
         parsed_robot = parse_robot_file(runbook)
         interesting_commands = search_keywords(parsed_robot, search_list)
         commands = []
@@ -195,6 +196,7 @@ def generate_metadata(directory_path):
             # Convert name to lower snake case
             name_snake_case = re.sub(r'\W+', '_', name.lower())
             query = f'Please%20explain%20this%20command%20as%20if%20I%20was%20new%20to%20Kubernetes: {command}'
+            print(f'generating explanation for {name_snake_case}')
             explain_query = urlencode({'prompt': query})
             url = f'{explainUrl}{explain_query}'   
             response = requests.get(url)
@@ -220,6 +222,7 @@ def generate_metadata(directory_path):
         file_path = os.path.join(dir_path, 'meta.yaml')
         with open(file_path, 'w') as f:
             yaml.dump(yaml_data, f)
+        print(f'writing meta.yml for {runbook}')
 
 
 
