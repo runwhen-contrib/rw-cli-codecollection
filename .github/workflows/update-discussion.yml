@@ -1,8 +1,8 @@
 name: Check CodeBundle Discussions
 on: 
   push:
-    # branches:
-    #   - main
+    branches:
+      - main
 jobs:
   check-discussions-on-main:
     runs-on: ubuntu-latest
