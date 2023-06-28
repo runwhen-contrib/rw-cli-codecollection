@@ -1,0 +1,29 @@
+commands:
+- command: 'gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+    && curl -d "query=rate(nginx_ingress_controller_requests{status=~''${ERROR_CODES}''}[${TIME_SLICE}])
+    > 0" -H "Authorization: Bearer $(gcloud auth print-access-token)" ''https://monitoring.googleapis.com/v1/projects/${GCP_PROJECT_ID}/location/global/prometheus/api/v1/query''
+    | jq -r ''.data.result[] | "Host:" + .metric.host + " Ingress:" + .metric.ingress
+    + " Namespace:" + .metric.export_namespace + " Service:" + .metric.service'''
+  explanation: "\n\nThis command is used to gather information from the Google Kubernetes\
+    \ Engine (GKE) cluster about errors in nginx that are encountered on ingress controller\
+    \ requests. The command requires a few variables such as the GOOGLE_APPLICATION_CREDENTIALS\
+    \ which uses authorization details to access resources on GCP. \n\nThe TIME_SLICE\
+    \ value is set to gather metrics over a specific time range. ERROR_CODES will\
+    \ tell the command what type of errors to look for, such as 404 or 500 errors.\
+    \  Finally, GCP_PROJECT_ID is the unique identifier for your project in GCP.\n\
+    \nOnce this command runs, it will use the curl command to query the GKE monitoring\
+    \ API and then use jq to read the response and output relevant information about\
+    \ any detected issues in the form of host, ingress, namespace, and service."
+  name: fetch_nginx_ingress_metrics_from_gmp_and_perform_inspection_on_results
+- command: 'gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+    && curl -d "query=rate(nginx_ingress_controller_requests{status=~''${ERROR_CODES}''}[${TIME_SLICE}])
+    > 0" -H "Authorization: Bearer $(gcloud auth print-access-token)" ''https://monitoring.googleapis.com/v1/projects/${GCP_PROJECT_ID}/location/global/prometheus/api/v1/query'''
+  explanation: '
+
+
+    This command authenticates your Google Cloud Platform account and then sends a
+    query to the Prometheus API. The query measures the number of requests for nginx
+    ingress controller that result in an error, over given time slices. This information
+    is used by Kubernetes to manage and monitor applications running on its clusters.
+    Knowing how many requests are resulting in errors helps identify potential problems.'
+  name: fetch_nginx_ingress_metrics_from_gmp_and_perform_inspection_on_results

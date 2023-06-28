@@ -1,0 +1,25 @@
+commands:
+- command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
+    -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/liveness
+  explanation: '
+
+
+    Kubectl exec is a command that allows you to run a command inside a running container
+    in kubernetes. In the above command, it will execute a curl command inside a container
+    part of a statefulset with name ${STATEFULSET_NAME} which exists within a kubernetes
+    cluster with context ${CONTEXT} and namespace ${NAMESPACE}. The curl command will
+    perform a request on localhost (inside the container) on port 8091 and send a
+    liveness check request with a max timeout of 10 seconds.'
+  name: check_artifactory_liveness_and_readiness_endpoints
+- command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
+    -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/readiness
+  explanation: '
+
+
+    This command checks the readiness status of a StatefulSet in Kubernetes. The "kubectl
+    exec" command is used to execute commands on a Kubernetes Pod. In this case, you
+    are executing the ''curl'' command to check the status of the Artifactory service
+    running in the StatefulSet, named ${STATEFULSET_NAME}, which is running in the
+    ${CONTEXT} Kubernetes context and in the ${NAMESPACE} namespace. This command
+    runs with a timeout of 10 seconds, after which it will error out.'
+  name: check_artifactory_liveness_and_readiness_endpoints

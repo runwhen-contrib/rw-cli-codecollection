@@ -1,0 +1,71 @@
+commands:
+- command: kubectl get all -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
+  explanation: '
+
+
+    The command "kubectl get all -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}"
+    can be used to obtain information about resources in a Kubernetes cluster. This
+    command uses a tool called kubectl, which is the command-line interface for managing
+    clusters of Kubernetes containers. The "-l" flag stands for labels and allows
+    you to filter resources based on their labels. The value for "${RESOURCE_LABELS}"
+    should be a comma separated list of label/value pairs. The "-n" flag stands for
+    namespace and lets you specify the namespace that the invocation will take place
+    in. The value for "${NAMESPACE}" should be the name of an existing namespace.
+    The "--context" flag allows you to choose the Kubernetes context that the operation
+    will take place in. The value for "${CONTEXT}" should be one of the defined contexts
+    of the user. Finally, the "get all" command retrieves information about all the
+    workloads running in the specified namespace.'
+  name: get_standard_postgres_resource_information
+- command: kubectl get crd -n ${NAMESPACE} --context ${CONTEXT} -o=jsonpath='{.items[*].metadata.name}'
+  explanation: '
+
+
+    This command is used to get a list of Custom Resource Definitions (CRDs) in a
+    Kubernetes namespace. Using the kubectl command, you can specify the namespace,
+    context, and output format that will provide details for each CRD. The namespace
+    is specified using the -n flag followed by the name of the namespace in question.
+    The context is the Kubernetes cluster in which the command should run and is specified
+    with the --context flag. Finally, the output option is defined using the -o flag
+    followed by jsonpath which can help parse the JSON output to get specific fields/data.
+    In this example, it is specifying to output the metadata names for each CRD items
+    returned.'
+  name: describe_postgres_custom_resources
+- command: kubectl get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
+    -o=name --field-selector=status.phase=Running
+  explanation: '
+
+
+    This command with kubectl will list all the running pods in the specified Kubernetes
+    namespace. Labels are used to uniquely identify resources within the namespace
+    and context is used to select clusters when working in a multi-cluster environment.
+    The -l flag allows us to narrow down our search to a specific set of labels, -n
+    flag specifies the namespace, --context specifies the cluster, -o flag instructs
+    kubectl to output the pod names instead of the full description and --field-selector
+    flag allows us to filter for status.phase = Running pods only.'
+  name: get_postgres_pod_logs_events
+- command: kubectl get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
+    -o=name --field-selector=status.phase=Running
+  explanation: '
+
+
+    This command with kubectl will list all the running pods in the specified Kubernetes
+    namespace. Labels are used to uniquely identify resources within the namespace
+    and context is used to select clusters when working in a multi-cluster environment.
+    The -l flag allows us to narrow down our search to a specific set of labels, -n
+    flag specifies the namespace, --context specifies the cluster, -o flag instructs
+    kubectl to output the pod names instead of the full description and --field-selector
+    flag allows us to filter for status.phase = Running pods only.'
+  name: get_postgres_pod_resource_utilization
+- command: patronictl list
+  explanation: '
+
+
+    This command is used to list the status of all Patroni clusters currently running
+    on a Kubernetes cluster. Patroni is an open source tool that helpsusers to manage
+    and create high availability PostgreSQL clusters in Kubernetes. This command will
+    output the current configuration of each Patroni cluster including the name, nodes,
+    subclusters, and whether the cluster is running or not. Additionally, it can output
+    additional detail such as the replication state and lag time of individual nodes.
+    This information is helpful when determining what action needs to be taken in
+    order to maintain high availability of the PostgreSQL cluster.'
+  name: get_patroni_output
