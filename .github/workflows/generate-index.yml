@@ -48,7 +48,7 @@ jobs:
           fi
 
           # Open up a PR
-          PR_OUTPUT=$(curl -X POST -H "Authorization: Token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" -d '{"title":"automatic-index-update","head":"$BRANCH","base":"main","body":"automatic-index-update" }' https://api.github.com/repos/${{ github.event.repository.owner.login }}/${{ github.event.repository.name }}/pulls)
+          PR_OUTPUT=$(curl -X POST -H "Authorization: Token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" -d '{"title":"automatic-index-update","head":\"$BRANCH\","base":"main","body":"automatic-index-update" }' https://api.github.com/repos/${{ github.event.repository.owner.login }}/${{ github.event.repository.name }}/pulls)
           PR_LINK=$(echo $PR_OUTPUT| jq '._links.html.href' )
           PR_LINK=$(echo $PR_LINK | tr -d '"')
           # attempt auto merge but accept fail
