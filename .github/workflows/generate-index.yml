@@ -18,7 +18,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with: 
-          ref: ${{ github.event.pull_request.base.ref }}
+          # ref: ${{ github.event.pull_request.base.ref }}
+          ref: ${{ github.ref }}
       - name: Update readme and commit back to repo
         run: | 
           git config --global user.email "${GITHUB_ACTOR}"
