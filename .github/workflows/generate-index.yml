@@ -9,15 +9,17 @@ on:
       - "codebundles/**.robot"
       - "readme_header.md"
       - ".github/scripts/index.py"
+      - ".github/scripts/meta.py"
       - ".github/workflows/generate-index.yml"
-
+  pull_request:
 jobs:
   update-readme:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with: 
-          ref: ${{ github.event.pull_request.base.ref }}
+          # ref: ${{ github.event.pull_request.base.ref }}
+          ref: ${{ github.ref }}
       - name: Update readme and commit back to repo
         run: | 
           git config --global user.email "${GITHUB_ACTOR}"
@@ -25,9 +27,13 @@ jobs:
           git checkout -b "automatic-index-update"
 
           # Run the index update script
-          pip install robotframework
+          pip install robotframework==6.0.2
           python3 .github/scripts/index.py .github/scripts/index-config.yaml
           git add README.md
+
+          # Run the index update script
+          python3 .github/scripts/meta.py codebundles/
+          git add codebundles/**/meta.yaml
 
 
           # Test if any git changes are made. If not, bail out and send instruction. 
