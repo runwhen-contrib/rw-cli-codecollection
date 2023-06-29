@@ -12,12 +12,22 @@ SESSION_TAGS = ["testing"]
 POLL_DURATION = 60
 
 
-def get_codebundles_in_last_commit() -> set[str]:
-    command = "git show --name-only | grep codebundles | grep .robot || true"
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
-    output, _ = process.communicate()
-    stdout_string = output.decode("utf-8").strip()
-    codebundles: set[str] = set([line.split("/")[1] for line in stdout_string.split("\n")])
+def get_codebundles_in_last_commit(runall: bool = False) -> set[str]:
+    codebundles: set[str] = []
+    if runall:
+        command = "ls ../../codebundles"
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
+        output, _ = process.communicate()
+        stdout_string = output.decode("utf-8").strip()
+        if len(stdout_string) > 0:
+            codebundles: set[str] = set([line for line in stdout_string.split("\n")])
+    else:
+        command = "git show --name-only | grep codebundles | grep .robot || true"
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
+        output, _ = process.communicate()
+        stdout_string = output.decode("utf-8").strip()
+        if len(stdout_string) > 0:
+            codebundles: set[str] = set([line.split("/")[1] for line in stdout_string.split("\n")])
     return codebundles
 
 
@@ -213,16 +223,26 @@ if __name__ == "__main__":
     parser.add_argument(
         "--session_name", default="ci-session", help="The name of the runsession to organize results under."
     )
-    args = parser.parse_args(["-h"])
+    parser.add_argument(
+        "--runall",
+        dest="runall",
+        default=False,
+        action="store_true",
+        help="Flag used to run all codebundles in this codecollection if they're found in the workspace, regardless of recent changes",
+    )
+    args = parser.parse_args()
     print(f"Current Arguments: {args}")
     # TODO: runall config
     # TODO: trace python deps and run dependent codebundles
     create_session(USER, TOKEN, args.papi_url)
     changed_codebundles: list[str] = []
-    changed_codebundles = get_codebundles_in_last_commit()
+    changed_codebundles = get_codebundles_in_last_commit(args.runall)
     print("Found the following codebundles to test:")
     print("\n".join(changed_codebundles))
     print("...")
+    if len(changed_codebundles) == 0:
+        print(f"No codebundles found in last set of changes - found ({changed_codebundles}) , exiting...")
+        exit(0)
     codebundles_in_ws: list[str] = []
     codebundles_in_ws = get_workspace_codebundles(args.papi_url, args.e2e_workspace)
     print(f"Found the following taskset codebundles in the {args.e2e_workspace} workspace:")
