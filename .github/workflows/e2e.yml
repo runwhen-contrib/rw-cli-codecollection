@@ -34,8 +34,8 @@ jobs:
           WORKSPACE: ob-1-small
         run: |
           if [ "${{ github.event.inputs.runall }}" = "yes" ]; then
-            python e2e.py --e2e_workspace=$WORKSPACE --papi_url=$API_URL --runall
+            cd .github/scripts/ && python e2e.py --e2e_workspace=$WORKSPACE --papi_url=$API_URL --runall
           else
-            python e2e.py --e2e_workspace=$WORKSPACE --papi_url=$API_URL
+            cd .github/scripts/ && python e2e.py --e2e_workspace=$WORKSPACE --papi_url=$API_URL
           fi
           
