@@ -10,19 +10,40 @@ commands:
     in the command to obtain more specific results. The output format is json which
     provides an easy to read and parse output.'
   name: trace_and_troubleshoot_namespace_warning_events_and_errors
-- command: kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --sort-by='status.containerStatuses[0].restartCount'
-    --field-selector=status.phase=Failed --no-headers | grep -v Completed || true
-  explanation: '
+- command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --sort-by=''status.containerStatuses[0].restartCount''
+    --field-selector=status.phase=Failed --no-headers -o json | jq -r --argjson exit_code_explanations
+    ''{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated
+    by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL
+    - Possible OOM", "143":"Graceful Termination SIGTERM"}'' ''.items[] | "---
 
+    pod_name: \(.metadata.name)
 
-    Kubectl get pods is a command-line tool used to retrieve all of the pods in a
-    Kubernetes cluster. The --context flag specifies which context you want to query
-    from. The -n flag specifies the namespace for the desired pods. By passing in
-    the --sort-by option, we can sort the pods by the restart count of the first container
-    in the pod. Finally, with the --field-selector, we can restrict our query to only
-    pods that are in the Failed phase. The --no-headers parameter eliminates all of
-    the column headers from the output. Lastly, the grep and true statement allow
-    us to filter out any successfully completed pods from the output.'
+    restart_count: \(.status.containerStatuses[0].restartCount // "N/A")
+
+    message: \(.status.message // "N/A")
+
+    terminated_finishedAt: \(.status.containerStatuses[0].state.terminated.finishedAt
+    // "N/A")
+
+    exit_code: \(.status.containerStatuses[0].state.terminated.exitCode // "N/A")
+
+    exit_code_explanation: \($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode
+    | tostring] // "Unknown exit code")
+
+    ---
+
+    "'''
+  explanation: "\n\nThis command uses the Kubectl CLI to access the Kubernetes cluster\
+    \ and list failed pods on a given namespace using the parameters --context, -n,\
+    \ --sort-by, --field-selector, --no-headers and -o json. You can provide a JSON\
+    \ array parameter exit_code_explanations which contains key-value pairs to explain\
+    \ the exit codes of the pods. The command itself follow Kubernete\u2019s API standards\
+    \ and is used to return more detailed information about the pod failed resources\
+    \ in the specified namespace by formatting its output as raw strings with names\
+    \ and other values as defined in the command. Finally, it prints out the details\
+    \ of these failed pods in a human readable format, displaying their name, restart\
+    \ count, message, terminated/finished time, exit code and explanation for the\
+    \ exit code."
   name: troubleshoot_unready_pods_in_namespace
 - command: kubectl get all --context ${CONTEXT} -n ${NAMESPACE} -o json
   explanation: '
