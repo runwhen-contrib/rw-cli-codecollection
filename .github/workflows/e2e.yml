@@ -21,8 +21,6 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v3
-        with: 
-          ref: ${{ github.event.pull_request.base.ref }}
       - name: install deps
         run: |
           pip install requests
