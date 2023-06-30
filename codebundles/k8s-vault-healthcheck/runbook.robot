@@ -33,7 +33,7 @@ Fetch Vault CSI Driver Logs
 
 Get Vault CSI Driver Warning Events
     [Documentation]    Fetches warning-type events related to the vault CSI driver.
-    [Tags]    events    workloads    errors    warnings    get    vault    csi    driver
+    [Tags]    events    errors    warnings    get    vault    csi    driver
     ${events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} | grep -i "vault-csi-provider" || true
     ...    env=${env}
