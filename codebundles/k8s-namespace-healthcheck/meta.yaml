@@ -14,36 +14,32 @@ commands:
     --field-selector=status.phase=Failed --no-headers -o json | jq -r --argjson exit_code_explanations
     ''{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated
     by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL
-    - Possible OOM", "143":"Graceful Termination SIGTERM"}'' ''.items[] | "---
-
-    pod_name: \(.metadata.name)
-
-    restart_count: \(.status.containerStatuses[0].restartCount // "N/A")
-
-    message: \(.status.message // "N/A")
+    - Possible OOM", "143":"Graceful Termination SIGTERM"}'' ''.items[] | "---\npod_name:
+    \(.metadata.name)\nrestart_count: \(.status.containerStatuses[0].restartCount
+    // "N/A")\nmessage: \(.status.message // "N/A")
 
     terminated_finishedAt: \(.status.containerStatuses[0].state.terminated.finishedAt
-    // "N/A")
-
-    exit_code: \(.status.containerStatuses[0].state.terminated.exitCode // "N/A")
-
-    exit_code_explanation: \($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode
-    | tostring] // "Unknown exit code")
-
-    ---
-
-    "'''
-  explanation: "\n\nThis command uses the Kubectl CLI to access the Kubernetes cluster\
-    \ and list failed pods on a given namespace using the parameters --context, -n,\
-    \ --sort-by, --field-selector, --no-headers and -o json. You can provide a JSON\
-    \ array parameter exit_code_explanations which contains key-value pairs to explain\
-    \ the exit codes of the pods. The command itself follow Kubernete\u2019s API standards\
-    \ and is used to return more detailed information about the pod failed resources\
-    \ in the specified namespace by formatting its output as raw strings with names\
-    \ and other values as defined in the command. Finally, it prints out the details\
-    \ of these failed pods in a human readable format, displaying their name, restart\
-    \ count, message, terminated/finished time, exit code and explanation for the\
-    \ exit code."
+    // "N/A")\nexit_code: \(.status.containerStatuses[0].state.terminated.exitCode
+    // "N/A")\nexit_code_explanation: \($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode
+    | tostring] // "Unknown exit code")\n---\n"'''
+  explanation: "\n\nThis command is used to retrieve a listing of all pods that are\
+    \ currently in a failed state in the Kubernetes cluster. It will print out the\
+    \ name, restart count, status message, finishedAt timestamp, and exit code(along\
+    \ with an explanation) of each failed pod. The output will be in JSON format.\
+    \ \n\nThe command also takes several flags that control its behaviour: \n--context=${CONTEXT}:\
+    \ This flag allows you to specify which Kubernetes context you want to query.\
+    \ \n-n ${NAMESPACE}: This flag allows you to restrict the list of pods to the\
+    \ specified namespace. \n--sort-by='status.containerStatuses[0].restartCount':\
+    \ This flag allows you to sort the output by the restart count inside the container\
+    \ statuses array. \n--field-selector=status.phase=Failed: This flag restricts\
+    \ the output to only show those pods whose status phase equals to Failed.\n--no-headers:\
+    \ This flag causes the output to not include headers at the top. \n-o json | jq\
+    \ -r: This option changes the output to be in a JSON string format, parsed using\
+    \ the JQ command line utility. \n--argjson exit_code_explanations: This flag defines\
+    \ a list of possible exit codes and explanations for them associated with them.\
+    \ \n\nTherefore, running this command should produce a list of all failed pods\
+    \ in the Kubernetes cluster with information about each pod's restart count, message,\
+    \ finishedAt timestamp, and exit code along with possible explanation."
   name: troubleshoot_unready_pods_in_namespace
 - command: kubectl get all --context ${CONTEXT} -n ${NAMESPACE} -o json
   explanation: '
