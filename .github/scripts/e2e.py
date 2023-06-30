@@ -10,6 +10,7 @@ api_token = None
 session = None
 SESSION_TAGS = ["testing"]
 POLL_DURATION = 60
+MAX_POLLS = 10
 
 
 def get_codebundles_in_last_commit(runall: bool = False) -> set[str]:
@@ -232,7 +233,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     print(f"Current Arguments: {args}")
-    # TODO: runall config
     # TODO: trace python deps and run dependent codebundles
     create_session(USER, TOKEN, args.papi_url)
     changed_codebundles: list[str] = []
@@ -249,15 +249,21 @@ if __name__ == "__main__":
     print("\n".join(codebundles_in_ws))
     print("...")
     codebundles_to_run: set[str] = set([cb for cb in changed_codebundles if cb in codebundles_in_ws])
-    # codebundles_to_run = set(["k8s-redis-healthcheck"])
     print("Queueing following codebundles for testing:")
     print("\n".join(codebundles_to_run))
     print("...")
     task_data = run_codebundles_in_workspace(args.papi_url, args.e2e_workspace, args.session_name, codebundles_to_run)
     print("Beginning polling for results")
+    poll_amount = 0
     while not poll_runsessions_complete(task_data, args.papi_url, args.e2e_workspace):
         print("...")
         time.sleep(POLL_DURATION)
+        poll_amount += 1
+        if poll_amount >= MAX_POLLS:
+            print(
+                "CI exceeded max polls waiting for a runrequest to finish. Check the logs and investigate the runrequest."
+            )
+            exit(1)
     print("CI Runsession finished - collecting results...")
     print("...")
     ci_results = get_runsession_ci_results(task_data, args.papi_url, args.e2e_workspace)
