@@ -199,7 +199,7 @@ def process_results(workspace_name, results) -> None:
         cb_name = test_results["codebundle"]
         has_fails = fails > 0
         if has_fails:
-            exit_failure
+            exit_failure = has_fails
         print(
             f'{f"{cb_name} results in SLX {slx}":<128} ...    Passed: {passes}, Failed: {fails} {SYMBOL_FAIL if has_fails else SYMBOL_PASS}'
         )
