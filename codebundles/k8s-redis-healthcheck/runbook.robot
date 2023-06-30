@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       This taskset collects information on your redis workload in your Kubernetes cluster and raises issues when health checks fail.
+Documentation       This taskset collects information on your redis workload in your Kubernetes cluster and raises issues if any health checks fail.
 Metadata            Author    jon-funk
 Metadata            Display Name    Kubernetes Redis Healthcheck
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,Redis
