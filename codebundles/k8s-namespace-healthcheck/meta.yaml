@@ -15,26 +15,26 @@ commands:
     "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137":
     "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}''
     ''.items[] | select(.status.containerStatuses != null) | select(.status.containerStatuses[].restartCount
-    > 0) | "---\npod_name: \(.metadata.name)
-
-    containers: \(.status.containerStatuses | map(.name) | join(", "))\nrestart_count:
-    \(.status.containerStatuses[].restartCount)
-
-    message: \(.status.message // "N/A")\n\(.status.containerStatuses[] | select(.state.running
+    > 0) | "---\npod_name: \(.metadata.name)\ncontainers: \(.status.containerStatuses
+    | map(.name) | join(", "))\nrestart_count: \(.status.containerStatuses[].restartCount)\nmessage:
+    \(.status.message // "N/A")\n\(.status.containerStatuses[] | select(.state.running
     != null) | .lastState.terminated | "terminated_reason: \(.reason // "N/A")
 
     terminated_finishedAt: \(.finishedAt // "N/A")\nterminated_exitCode: \(.exitCode
     // "N/A")\nexit_code_explanation: \($exit_code_explanations[.exitCode | tostring]
     // "Unknown exit code")")\n---\n"'''
-  explanation: '
-
-
-    This command is used to get information on running pods within a particular context
-    and namespace. The command will return detailed information such as the name of
-    the pod, names of any associated containers, the restart count, and any related
-    messages. Additionally, if there is an abnormally terminated container within
-    the pod, it will show the related termination reason, finished time, exit code
-    and a corresponding explanation.'
+  explanation: "\n\nThis command is used to retrieve information about Pod(s) from\
+    \ a Kubernetes cluster. It has the following arguments: \n--context: Specifies\
+    \ the context you'd like to use to access the Kubernetes cluster\n-n: Specifies\
+    \ the namespace within the cluster to search for pods\n-o: Specifies the output\
+    \ format\njson: Instructs the command to output the information in the JSON format\
+    \ \njq: Instructs the command to parse the results using jq, which is a command\
+    \ line utility for querying and manipulating arrays\n--argson: Defines an array\
+    \ of exit codes and associated meanings\n\nThe command will output details about\
+    \ any found pods that have had restart attempts, such as the pod name, names of\
+    \ the containers concerned, restart count, an optional error message, and also\
+    \ terminated information for each container. The list of terminated information\
+    \ includes the reason, finishedAt time, exitCode, and associated explanation."
   name: troubleshoot_container_restarts_in_namespace
 - command: kubectl get all --context ${CONTEXT} -n ${NAMESPACE} -o json
   explanation: '
