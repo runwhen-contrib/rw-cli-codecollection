@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       This taskset runs general troubleshooting checks against all applicable objects in a namespace, checks error events, and searches pod logs for error entries.
-Metadata            Author    jon-funk
+Metadata            Author    jon-funk stewartshea
 Metadata            Display Name    Kubernetes Namespace Troubleshoot
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 
@@ -88,21 +88,62 @@ Troubleshoot Container Restarts In Namespace
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
+    RW.CLI.Parse Cli Output By Line
+    ...    rsp=${container_restart_details}
+    ...    set_severity_level=2
+    ...    set_issue_expected=Containers should not be restarting. 
+    ...    set_issue_actual=We found the following containers with restarts: $_stdout
+    ...    set_issue_title=Container Restarts Detected In Namespace ${NAMESPACE}
+    ...    set_issue_details=Pods with Container Restarts:\n"$_stdout" in the namespace ${NAMESPACE}
+    ...    _line__raise_issue_if_contains=-
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Summary of container restarts in namespace: ${NAMESPACE}
-    RW.Core.Add Pre To Report    ${container_restart_details.stdout}
+    IF    """${container_restart_details.stdout}""" == ""
+        ${container_restart_details}=    Set Variable    No container restarts found
+    ELSE
+        ${container_restart_details}=    Set Variable    ${container_restart_details.stdout}
+    END
+    RW.Core.Add Pre To Report    Summary of unready pod restarts in namespace: ${NAMESPACE}
+    RW.Core.Add Pre To Report    ${container_restart_details}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Troubleshoot Unready Pods In Namespace
-    [Documentation]    Fetches all pods which are not running (unready) in the namespace and adds them to a report for future review.
-    [Tags]    namespace    pods    status    unready    not starting    phase    
-    ${unreadypods_results}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --sort-by='status.containerStatuses[0].restartCount' --field-selector=status.phase=Failed --no-headers | grep -v Completed || true
+Troubleshoot Pending Pods In Namespace
+    [Documentation]    Fetches pods that are pending and provides details. 
+    [Tags]    namespace    pods    status    pending
+    ${pending_pods}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending --no-headers -o json | jq -r '.items[] | "---\\npod_name: \\(.metadata.name)\\nstatus: \\(.status.phase // "N/A")\\nmessage: \\(.status.conditions[0].message // "N/A")\\nreason: \\(.status.conditions[0].reason // "N/A")\\n---\\n"'
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     RW.CLI.Parse Cli Output By Line
-    ...    rsp=${unreadypods_results}
+    ...    rsp=${pending_pods}
+    ...    set_severity_level=1
+    ...    set_issue_expected=Pods should not be stuck pending.  
+    ...    set_issue_actual=We found the following pods in a pending state: $_stdout
+    ...    set_issue_title=Pending Pods Found In Namespace ${NAMESPACE}
+    ...    set_issue_details=Pods pending with reasons:\n"$_stdout" in the namespace ${NAMESPACE}
+    ...    _line__raise_issue_if_contains=-
+    ${history}=    RW.CLI.Pop Shell History
+    IF    """${pending_pods.stdout}""" == ""
+        ${pending_pods}=    Set Variable    No container restarts found
+    ELSE
+        ${pending_pods}=    Set Variable    ${pending_pods.stdout}
+    END
+    RW.Core.Add Pre To Report    Summary of unready pod restarts in namespace: ${NAMESPACE}
+    RW.Core.Add Pre To Report    ${pending_pods}
+    RW.Core.Add Pre To Report    Commands Used:\n${history}
+
+Troubleshoot Failed Pods In Namespace
+    [Documentation]    Fetches all pods which are not running (unready) in the namespace and adds them to a report for future review.
+    [Tags]    namespace    pods    status    unready    not starting    phase    
+    ${unreadypods_details}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed --no-headers -o json | jq -r --argjson exit_code_explanations '{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}' '.items[] | "---\\npod_name: \\(.metadata.name)\\nrestart_count: \\(.status.containerStatuses[0].restartCount // "N/A")\\nmessage: \\(.status.message // "N/A")\\nterminated_finishedAt: \\(.status.containerStatuses[0].state.terminated.finishedAt // "N/A")\\nexit_code: \\(.status.containerStatuses[0].state.terminated.exitCode // "N/A")\\nexit_code_explanation: \\($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode | tostring] // "Unknown exit code")\\n---\\n"'
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
+    RW.CLI.Parse Cli Output By Line
+    ...    rsp=${unreadypods_details}
     ...    set_severity_level=1
     ...    set_issue_expected=No pods should be in an unready state
     ...    set_issue_actual=We found the following unready pods: $_stdout
@@ -111,12 +152,12 @@ Troubleshoot Unready Pods In Namespace
     ...    _line__raise_issue_if_contains=-
     ${history}=    RW.CLI.Pop Shell History
     IF    """${unreadypods_results.stdout}""" == ""
-        ${unreadypods_results}=    Set Variable    No unready pods found
+        ${unreadypods_details}=    Set Variable    No unready pods found
     ELSE
-        ${unreadypods_results}=    Set Variable    ${unreadypods_results.stdout}
+        ${unreadypods_details}=    Set Variable    ${unreadypods_details.stdout}
     END
     RW.Core.Add Pre To Report    Summary of unready pod restarts in namespace: ${NAMESPACE}
-    RW.Core.Add Pre To Report    ${unreadypods_results}
+    RW.Core.Add Pre To Report    ${unreadypods_details}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Troubleshoot Workload Status Conditions In Namespace
