@@ -15,26 +15,36 @@ commands:
     "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137":
     "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}''
     ''.items[] | select(.status.containerStatuses != null) | select(.status.containerStatuses[].restartCount
-    > 0) | "---\npod_name: \(.metadata.name)
-
-    containers: \(.status.containerStatuses | map(.name) | join(", "))\nrestart_count:
-    \(.status.containerStatuses[].restartCount)
-
-    message: \(.status.message // "N/A")\n\(.status.containerStatuses[] | select(.state.running
-    != null) | .lastState.terminated | "terminated_reason: \(.reason // "N/A")
-
-    terminated_finishedAt: \(.finishedAt // "N/A")\nterminated_exitCode: \(.exitCode
-    // "N/A")\nexit_code_explanation: \($exit_code_explanations[.exitCode | tostring]
-    // "Unknown exit code")")\n---\n"'''
+    > 0) | "---\npod_name: \(.metadata.name)\ncontainers: \(.status.containerStatuses
+    | map(.name) | join(", "))\nrestart_count: \(.status.containerStatuses[].restartCount)\nmessage:
+    \(.status.message // "N/A")\n\(.status.containerStatuses[] | select(.state.running
+    != null) | .lastState.terminated | "terminated_reason: \(.reason // "N/A")\nterminated_finishedAt:
+    \(.finishedAt // "N/A")\nterminated_exitCode: \(.exitCode // "N/A")\nexit_code_explanation:
+    \($exit_code_explanations[.exitCode | tostring] // "Unknown exit code")")\n---\n"'''
   explanation: '
 
 
-    This command is used to get information on running pods within a particular context
-    and namespace. The command will return detailed information such as the name of
-    the pod, names of any associated containers, the restart count, and any related
-    messages. Additionally, if there is an abnormally terminated container within
-    the pod, it will show the related termination reason, finished time, exit code
-    and a corresponding explanation.'
+    This command will get information about all containers from the pods in the specified
+    Kubernetes context and namespace. It will then filter the results to only display
+    pods with restarted containers. For each pod, the following pieces of information
+    will be displayed:
+
+
+    - The pod name
+
+    - The names of all containers in the pod
+
+    - The number of times each container has been restarted
+
+    - Any error messages related to the restart
+
+    - The reason that a container was terminated
+
+    - The time at which a container was last terminated
+
+    - The exit code associated with a container''s termination
+
+    - An explanation of the exit code'
   name: troubleshoot_container_restarts_in_namespace
 - command: kubectl get all --context ${CONTEXT} -n ${NAMESPACE} -o json
   explanation: '
