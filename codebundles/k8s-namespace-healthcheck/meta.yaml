@@ -15,10 +15,8 @@ commands:
     "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137":
     "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}''
     ''.items[] | select(.status.containerStatuses != null) | select(.status.containerStatuses[].restartCount
-    > 0) | "---\npod_name: \(.metadata.name)
-
-    containers: \(.status.containerStatuses | map(.name) | join(", "))\nrestart_count:
-    \(.status.containerStatuses[].restartCount)
+    > 0) | "---\npod_name: \(.metadata.name)\ncontainers: \(.status.containerStatuses
+    | map(.name) | join(", "))\nrestart_count: \(.status.containerStatuses[].restartCount)
 
     message: \(.status.message // "N/A")\n\(.status.containerStatuses[] | select(.state.running
     != null) | .lastState.terminated | "terminated_reason: \(.reason // "N/A")
@@ -29,12 +27,12 @@ commands:
   explanation: '
 
 
-    This command is used to get information on running pods within a particular context
-    and namespace. The command will return detailed information such as the name of
-    the pod, names of any associated containers, the restart count, and any related
-    messages. Additionally, if there is an abnormally terminated container within
-    the pod, it will show the related termination reason, finished time, exit code
-    and a corresponding explanation.'
+    This command is used to get a list of the Kubernetes pods running on the cluster
+    with context ${CONTEXT} located in namespace ${NAMESPACE}, and output a list in
+    JSON format. From this list, we can get information about every pod including
+    its name, container names, restart count, status message, as well as the reason
+    why the pods terminated and the exit code received. Furthermore, for each exit
+    code, there is an explanation that tries to explain why the code was received.'
   name: troubleshoot_container_restarts_in_namespace
 - command: kubectl get all --context ${CONTEXT} -n ${NAMESPACE} -o json
   explanation: '
