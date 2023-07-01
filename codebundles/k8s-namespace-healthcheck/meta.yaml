@@ -15,27 +15,74 @@ commands:
     "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137":
     "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}''
     ''.items[] | select(.status.containerStatuses != null) | select(.status.containerStatuses[].restartCount
-    > 0) | "---\npod_name: \(.metadata.name)
-
-    containers: \(.status.containerStatuses | map(.name) | join(", "))\nrestart_count:
-    \(.status.containerStatuses[].restartCount)
-
-    message: \(.status.message // "N/A")\n\(.status.containerStatuses[] | select(.state.running
-    != null) | .lastState.terminated | "terminated_reason: \(.reason // "N/A")
-
-    terminated_finishedAt: \(.finishedAt // "N/A")\nterminated_exitCode: \(.exitCode
-    // "N/A")\nexit_code_explanation: \($exit_code_explanations[.exitCode | tostring]
-    // "Unknown exit code")")\n---\n"'''
+    > 0) | "---\npod_name: \(.metadata.name)\ncontainers: \(.status.containerStatuses
+    | map(.name) | join(", "))\nrestart_count: \(.status.containerStatuses[].restartCount)\nmessage:
+    \(.status.message // "N/A")\n\(.status.containerStatuses[] | select(.state.running
+    != null) | .lastState.terminated | "terminated_reason: \(.reason // "N/A")\nterminated_finishedAt:
+    \(.finishedAt // "N/A")\nterminated_exitCode: \(.exitCode // "N/A")\nexit_code_explanation:
+    \($exit_code_explanations[.exitCode | tostring] // "Unknown exit code")")\n---\n"'''
   explanation: '
 
 
-    This command is used to get information on running pods within a particular context
-    and namespace. The command will return detailed information such as the name of
-    the pod, names of any associated containers, the restart count, and any related
-    messages. Additionally, if there is an abnormally terminated container within
-    the pod, it will show the related termination reason, finished time, exit code
-    and a corresponding explanation.'
+    This command will get information about all containers from the pods in the specified
+    Kubernetes context and namespace. It will then filter the results to only display
+    pods with restarted containers. For each pod, the following pieces of information
+    will be displayed:
+
+
+    - The pod name
+
+    - The names of all containers in the pod
+
+    - The number of times each container has been restarted
+
+    - Any error messages related to the restart
+
+    - The reason that a container was terminated
+
+    - The time at which a container was last terminated
+
+    - The exit code associated with a container''s termination
+
+    - An explanation of the exit code'
   name: troubleshoot_container_restarts_in_namespace
+- command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending
+    --no-headers -o json | jq -r ''.items[] | "---\npod_name: \(.metadata.name)\nstatus:
+    \(.status.phase // "N/A")\nmessage: \(.status.conditions[0].message // "N/A")\nreason:
+    \(.status.conditions[0].reason // "N/A")\n---\n"'''
+  explanation: '
+
+
+    Kubectl get pods is a command that can be used to access information about running
+    pods in Kubernetes. The --context flag allows you to specify a cluster context,
+    the -n flag allows you to specify a namespace and the --field-selector flag allows
+    you to filter for pods with a given status. In this example, the status of Pending
+    is being filtered for. The --no-headers flag instructs the command not to include
+    heading labels in its output while the -o json flag instructs it to output data
+    in JSON format. Lastly, jq inputs JavaScript Object Notation (JSON) data and is
+    used to transform it into human-readable form. In the example given, jq is used
+    to display pod name, status, message, and reason.'
+  name: troubleshoot_pending_pods_in_namespace
+- command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed
+    --no-headers -o json | jq -r --argjson exit_code_explanations ''{"0": "Success",
+    "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134":
+    "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM",
+    "143":"Graceful Termination SIGTERM"}'' ''.items[] | "---\npod_name: \(.metadata.name)\nrestart_count:
+    \(.status.containerStatuses[0].restartCount // "N/A")\nmessage: \(.status.message
+    // "N/A")\nterminated_finishedAt: \(.status.containerStatuses[0].state.terminated.finishedAt
+    // "N/A")\nexit_code: \(.status.containerStatuses[0].state.terminated.exitCode
+    // "N/A")\nexit_code_explanation: \($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode
+    | tostring] // "Unknown exit code")\n---\n"'''
+  explanation: "\n\nThis command displays information about all of the failed pods\
+    \ in a specific namespace and context. \n\nBy using the ```kubectl get pods```\
+    \ command with some additional arguments, you can specify parameters such as context\
+    \ (--context=${CONTEXT}), namespace (-n ${NAMESPACE}), and field selector (--field-selector=status.phase=Failed)\
+    \ to list only failed pods. The --no-headers argument limits the output displayed.\
+    \ \n\nThe pipe character (| ) connects this command with the jq command to parse\
+    \ the JSON data and extract information about the failed pod. This includes the\
+    \ pod name, restart count, message, finishedAt, exit code, and an explanation\
+    \ of the exit code."
+  name: troubleshoot_failed_pods_in_namespace
 - command: kubectl get all --context ${CONTEXT} -n ${NAMESPACE} -o json
   explanation: '
 
