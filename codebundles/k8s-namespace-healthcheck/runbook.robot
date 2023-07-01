@@ -151,7 +151,7 @@ Troubleshoot Failed Pods In Namespace
     ...    set_issue_details=Unready pods:\n"$_stdout" in the namespace ${NAMESPACE}
     ...    _line__raise_issue_if_contains=-
     ${history}=    RW.CLI.Pop Shell History
-    IF    """${unreadypods_results.stdout}""" == ""
+    IF    """${unreadypods_details.stdout}""" == ""
         ${unreadypods_details}=    Set Variable    No unready pods found
     ELSE
         ${unreadypods_details}=    Set Variable    ${unreadypods_details.stdout}
