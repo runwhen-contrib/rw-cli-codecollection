@@ -35,7 +35,7 @@ Get details for unready Kustomizations
     ...    render_in_commandlist=true
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${kustomizations_not_ready}
-    ...    set_severity_level=1
+    ...    set_severity_level=2
     ...    set_issue_expected=Kustomizations should be synced and ready.   
     ...    set_issue_actual=We found the following kustomization objects in a pending state: $_stdout
     ...    set_issue_title=Unready Kustomizations Found In Namespace ${NAMESPACE}
