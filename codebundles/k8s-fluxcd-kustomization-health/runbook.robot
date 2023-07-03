@@ -33,6 +33,23 @@ Get details for unready Kustomizations
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true
+    RW.CLI.Parse Cli Output By Line
+    ...    rsp=${kustomizations_not_ready}
+    ...    set_severity_level=1
+    ...    set_issue_expected=Kustomizations should be synced and ready.   
+    ...    set_issue_actual=We found the following kustomization objects in a pending state: $_stdout
+    ...    set_issue_title=Unready Kustomizations Found In Namespace ${NAMESPACE}
+    ...    set_issue_details=Kustomizations pending with reasons:\n"$_stdout" in the namespace ${NAMESPACE}
+    ...    _line__raise_issue_if_contains=-
+    ${history}=    RW.CLI.Pop Shell History
+    IF    """${kustomizations_not_ready.stdout}""" == ""
+        ${kustomizations_not_ready}=    Set Variable    No Kustomizations Pending Found
+    ELSE
+        ${kustomizations_not_ready}=    Set Variable    ${kustomizations_not_ready.stdout}
+    END
+    RW.Core.Add Pre To Report    Summary of unready pod restarts in namespace: ${NAMESPACE}
+    RW.Core.Add Pre To Report    ${pending_pods}
+    RW.Core.Add Pre To Report    Commands Used:\n${history}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Kustomizations with: \n ${kustomizations_not_ready.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}

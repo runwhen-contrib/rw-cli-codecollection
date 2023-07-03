@@ -102,7 +102,7 @@ Troubleshoot Container Restarts In Namespace
     ELSE
         ${container_restart_details}=    Set Variable    ${container_restart_details.stdout}
     END
-    RW.Core.Add Pre To Report    Summary of unready pod restarts in namespace: ${NAMESPACE}
+    RW.Core.Add Pre To Report    Summary of unready container restarts in namespace: ${NAMESPACE}
     RW.Core.Add Pre To Report    ${container_restart_details}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
@@ -125,17 +125,17 @@ Troubleshoot Pending Pods In Namespace
     ...    _line__raise_issue_if_contains=-
     ${history}=    RW.CLI.Pop Shell History
     IF    """${pending_pods.stdout}""" == ""
-        ${pending_pods}=    Set Variable    No container restarts found
+        ${pending_pods}=    Set Variable    No pending pods found
     ELSE
         ${pending_pods}=    Set Variable    ${pending_pods.stdout}
     END
-    RW.Core.Add Pre To Report    Summary of unready pod restarts in namespace: ${NAMESPACE}
+    RW.Core.Add Pre To Report    Summary of pendind pods in namespace: ${NAMESPACE}
     RW.Core.Add Pre To Report    ${pending_pods}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Troubleshoot Failed Pods In Namespace
     [Documentation]    Fetches all pods which are not running (unready) in the namespace and adds them to a report for future review.
-    [Tags]    namespace    pods    status    unready    not starting    phase    
+    [Tags]    namespace    pods    status    unready    not starting    phase    failed    
     ${unreadypods_details}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed --no-headers -o json | jq -r --argjson exit_code_explanations '{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}' '.items[] | "---\\npod_name: \\(.metadata.name)\\nrestart_count: \\(.status.containerStatuses[0].restartCount // "N/A")\\nmessage: \\(.status.message // "N/A")\\nterminated_finishedAt: \\(.status.containerStatuses[0].state.terminated.finishedAt // "N/A")\\nexit_code: \\(.status.containerStatuses[0].state.terminated.exitCode // "N/A")\\nexit_code_explanation: \\($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode | tostring] // "Unknown exit code")\\n---\\n"'
     ...    target_service=${kubectl}
@@ -156,7 +156,7 @@ Troubleshoot Failed Pods In Namespace
     ELSE
         ${unreadypods_details}=    Set Variable    ${unreadypods_details.stdout}
     END
-    RW.Core.Add Pre To Report    Summary of unready pod restarts in namespace: ${NAMESPACE}
+    RW.Core.Add Pre To Report    Summary of unready pods in namespace: ${NAMESPACE}
     RW.Core.Add Pre To Report    ${unreadypods_details}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
