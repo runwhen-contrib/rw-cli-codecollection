@@ -1,16 +1,38 @@
 commands:
-- command: kubectl get certificates --context=${CONTEXT} -n ${NAMESPACE} -ojson |
-    jq -r '.items[] | select(now < (.status.renewalTime|fromdate)) | "Namespace:"
-    + .metadata.namespace + " URL:" + .spec.dnsNames[0] + " Renews:" + .status.renewalTime
-    + " Expires:" + .status.notAfter'
+- command: kubectl get certificates.cert-manager.io --context=${CONTEXT} -n ${NAMESPACE}
+    -ojson | jq -r '.items[] | select(.status.conditions[] | select(.type == "Ready"
+    and .status == "True")) | select(.status.renewalTime) | "Namespace:" + .metadata.namespace
+    + " URL:" + .spec.dnsNames[0] + " Renews:" + .status.renewalTime + " Expires:"
+    + .status.notAfter'
   explanation: '
 
 
-    This command provides information on existing certificates in Kubernetes. The
-    --context flag is used to specify the context you want to run this command in
-    (this can be either the default or a custom cluster), the -n flag specifies the
-    namespace within that context, and the -ojson flag controls the output format
-    as json. The jq command is then used to process the json data and select the certificate
-    items based on their renewal date and output details such as the Namespace, URL,
-    Renewal Time and Expiry Date.'
+    This command retrieves certificates from Kubernetes using Cert-Manager. It will
+    use the context and namespace specified to query all certificate resources. It
+    will filter out any that are not in a Ready status, and output information such
+    as the namespace, URL, renewal time, and expiration.'
   name: get_namespace_certificate_summary
+- command: 'kubectl get certificaterequests.cert-manager.io --context=${CONTEXT} -n
+    ${NAMESPACE} -o json | jq -r ''.items[] | select(.status.conditions[] | select(.type
+    == "Ready" and .status != "True")) | {certRequest: .metadata.name, certificate:
+    (.metadata.ownerReferences[].name), issuer: .spec.issuerRef.name, readyStatus:
+    (.status.conditions[] | select(.type == "Ready")).status, readyMessage: (.status.conditions[]
+    | select(.type == "Ready")).message, approvedStatus: (.status.conditions[] | select(.type
+    == "Approved")).status, approvedMessage: (.status.conditions[] | select(.type
+    == "Approved")).message} | "---\nCertificateRequest: \(.certRequest)", "Certificate:
+    \(.certificate)", "Issuer: \(.issuer)", "Ready Status: \(.readyStatus)", "Ready
+    Message: \(.readyMessage)", "Approved Status: \(.approvedStatus)", "Approved Message:
+    \(.approvedMessage)"'''
+  explanation: '
+
+
+    This command is used to obtain a list of certificaterequests, along with their
+    associated certificates, issuers, and status information. The command uses kubectl,
+    which is the command line tool for controlling Kubernetes clusters, to get detailed
+    information about certificaterequests, including the name, owner References, issuer
+    reference, ready status, ready message, approved status, and approved message.
+    The command also includes parameters such as context, namespace, and output format
+    (in this case JSON) to specify what data should be retrieved. The command includes
+    an additional filter to select only items with a specified status. After retrieving
+    the data, the jq command is used to parse it into a readable format.'
+  name: find_failed_certificate_requests_and_identify_issues
