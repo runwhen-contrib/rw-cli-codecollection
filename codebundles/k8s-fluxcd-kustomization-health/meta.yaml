@@ -10,27 +10,20 @@ commands:
     \ the specified resource from the given namespace located on the Kubernetes cluster\
     \ pointed to by the connection context."
   name: list_all_available_kustomization_objects
-- command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} -o json | jq -r ''.items[]
-    | select (.status.conditions[] | select(.type == "Ready" and .status == "False"))
-    | "---\nKustomization Name: \(.metadata.name)\n\nReady Status: \(.status.conditions[]
-    | select(.type == "Ready") | "\n ready: \(.status)\n message: \(.message)\n reason:
-    \(.reason)\n last_transition_time: \(.lastTransitionTime)")\n\nReconcile Status:\(.status.conditions[]
-    | select(.type == "Reconciling") |"\n reconciling: \(.status)\n message: \(.message)")\n---\n"'''
-  explanation: "\n\nThis command is used to display the Ready and Reconciling status\
-    \ information of a particular resource in a Kubernetes namespace. \n\nThe command\
-    \ can be broken down into 3 parts:\n1. kubectl get \\${RESOURCE_NAME} -n \\${NAMESPACE}\
-    \ -o json: Retrieves the specified resource name (\\${RESOURCE_NAME}) from the\
-    \ given namespace (\\${NAMESPACE}) in json format.\n2. jq -r '.items[] | select\
-    \ (.status.conditions[] | select(.type == \"Ready\" and .status == \"False\"))':\
-    \ Uses JQ to query the json output and filter out all items for which the condition\
-    \ type must be Ready and status must be False.\n3. | \"---\\nKustomization Name:\
-    \ \\(.metadata.name)\\n\\nReady Status: \\(.status.conditions[] | select(.type\
-    \ == \"Ready\") | \"\\n ready: \\(.status)\\n message: \\(.message)\\n reason:\
-    \ \\(.reason)\\n last_transition_time: \\(.lastTransitionTime)\")\\n\\nReconcile\
-    \ Status:\\(.status.conditions[] | select(.type == \"Reconciling\") |\"\\n reconciling:\
-    \ \\(.status)\\n message: \\(.message)\")\\n---\\n\": Format the output of the\
-    \ command to include Kustomization Name, Ready status and Reconcile status information\
-    \ of the retrieved resource. \n\nIn summary, this command retrieves the Ready\
-    \ and Reconciling status information for a specified resource in a Kubernetes\
-    \ namespace."
+- command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json
+    | jq -r ''.items[] | select (.status.conditions[] | select(.type == "Ready" and
+    .status == "False")) | "---\nKustomization Name: \(.metadata.name)\n\nReady Status:
+    \(.status.conditions[] | select(.type == "Ready") | "\n ready: \(.status)\n message:
+    \(.message)\n reason: \(.reason)\n last_transition_time: \(.lastTransitionTime)")\n\nReconcile
+    Status:\(.status.conditions[] | select(.type == "Reconciling") |"\n reconciling:
+    \(.status)\n message: \(.message)")\n---\n"'''
+  explanation: "\n\nThis command will print out a JSON array from the Kubernetes resource\
+    \ specified (in this case, RESOURCE_NAME) within the given namespace (NAMESPACE)\
+    \ and context (CONTEXT). It then uses the jq program to filter out objects in\
+    \ the array with a status type of \"Ready\" and a status value of \"False\". For\
+    \ these objects, it will print out the Kustomization Name, Ready Status, and Reconcile\
+    \ Status.  The output will be in the following format: \n\n---\nKustomization\
+    \ Name: NameOfResource\n\nReady Status: \nready: False\nmessage: Message here\n\
+    reason: Reason here\nlast_transition_time: <Timestamp>\n\nReconcile Status:\n\
+    reconciling: False\nmessage: Message here\n\n---"
   name: get_details_for_unready_kustomizations
