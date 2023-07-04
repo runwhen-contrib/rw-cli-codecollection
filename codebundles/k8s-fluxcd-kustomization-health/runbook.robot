@@ -28,7 +28,7 @@ Get details for unready Kustomizations
     [Documentation]    List all Kustomizations that are not found in a ready state in namespace ${NAMESPACE}  
     [Tags]        FluxCD     Kustomization    Versions
     ${kustomizations_not_ready}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} -o json | jq -r '.items[] | select (.status.conditions[] | select(.type == "Ready" and .status == "False")) | "---\\nKustomization Name: \\(.metadata.name)\\n\\nReady Status: \\(.status.conditions[] | select(.type == "Ready") | "\\n ready: \\(.status)\\n message: \\(.message)\\n reason: \\(.reason)\\n last_transition_time: \\(.lastTransitionTime)")\\n\\nReconcile Status:\\(.status.conditions[] | select(.type == "Reconciling") |"\\n reconciling: \\(.status)\\n message: \\(.message)")\\n---\\n"'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select (.status.conditions[] | select(.type == "Ready" and .status == "False")) | "---\\nKustomization Name: \\(.metadata.name)\\n\\nReady Status: \\(.status.conditions[] | select(.type == "Ready") | "\\n ready: \\(.status)\\n message: \\(.message)\\n reason: \\(.reason)\\n last_transition_time: \\(.lastTransitionTime)")\\n\\nReconcile Status:\\(.status.conditions[] | select(.type == "Reconciling") |"\\n reconciling: \\(.status)\\n message: \\(.message)")\\n---\\n"'
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
