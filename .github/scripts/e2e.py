@@ -249,6 +249,9 @@ if __name__ == "__main__":
     print("\n".join(codebundles_in_ws))
     print("...")
     codebundles_to_run: set[str] = set([cb for cb in changed_codebundles if cb in codebundles_in_ws])
+    if len(codebundles_to_run) == 0:
+        print("Found no codebundles to run, exiting...")
+        exit(0)
     print("Queueing following codebundles for testing:")
     print("\n".join(codebundles_to_run))
     print("...")
