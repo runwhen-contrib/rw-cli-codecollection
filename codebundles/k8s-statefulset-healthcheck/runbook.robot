@@ -53,7 +53,7 @@ Fetch StatefulSet Manifest Details
     RW.Core.Add Pre To Report    ${statefulset.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Check StatefulSet Replicas
+List StatefulSets with Unhealthy Replica Counts
     [Documentation]    Pulls the replica information for a given StatefulSet and checks if it's highly available
     ...    , if the replica counts are the expected / healthy values, and if not, what they should be.
     [Tags]
