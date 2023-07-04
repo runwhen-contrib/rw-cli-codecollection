@@ -1,9 +1,10 @@
 # Kubernetes CertManager Triage
 
-This taskset checks that certmanager is renewing certificates as expected within a namespace and raises issues when certificates are not renewing as expected.
+This taskset looks into issues related to CertManager Certificates.
 
 ## Tasks
-`Get Namespace Certificate Summary`
+- `Get Namespace Certificate Summary`: This task retrieves a list of certmanager certificates and summarizes their information for review.
+- `Find Failed Certificate Requests and Identify Issues`: This task retrieves a list of failed certmanager certificates and summarizes their issues.
 
 ## Configuration
 The TaskSet requires initialization to import necessary secrets, services, and user variables. The following variables should be set:
@@ -19,4 +20,3 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 
 ## TODO
 - [ ] Add additional documentation.
-
