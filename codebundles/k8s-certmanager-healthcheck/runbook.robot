@@ -20,7 +20,7 @@ Get Namespace Certificate Summary
     [Documentation]    Gets a list of certmanager certificates and summarize their information for review.
     [Tags]    tls    certificates    kubernetes    objects    expiration    summary    certmanager
     ${cert_info}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get certificates --context=${CONTEXT} -n ${NAMESPACE} -ojson | jq -r '.items[] | select(now < (.status.renewalTime|fromdate)) | "Namespace:" + .metadata.namespace + " URL:" + .spec.dnsNames[0] + " Renews:" + .status.renewalTime + " Expires:" + .status.notAfter'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get certificates.cert-manager.io --context=${CONTEXT} -n ${NAMESPACE} -ojson | jq -r '.items[] | select(.status.conditions[] | select(.type == "Ready" and .status == "True")) | select(.status.renewalTime) | "Namespace:" + .metadata.namespace + " URL:" + .spec.dnsNames[0] + " Renews:" + .status.renewalTime + " Expires:" + .status.notAfter'
     ...    render_in_commandlist=true
     ...    target_service=${kubectl}
     ...    env=${env}
@@ -34,6 +34,27 @@ Get Namespace Certificate Summary
     ...    set_issue_details=CertManager certificates not renewing: "$_stdout" - investigate CertManager.
     ...    _line__raise_issue_if_contains=Namespace
     RW.Core.Add Pre To Report    Certificate Information:\n${cert_info.stdout}
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    Commands Used: ${history}
+
+Find Failed Certificate Requests and Identify Issues
+    [Documentation]    Gets a list of failed certmanager certificates and summarize their issues.
+    [Tags]    tls    certificates    kubernetes    objects    failed    certificaterequest    certmanager
+    ${failed_certificaterequests}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get certificaterequests.cert-manager.io --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select(.status.conditions[] | select(.type == "Ready" and .status != "True")) | {certRequest: .metadata.name, certificate: (.metadata.ownerReferences[].name), issuer: .spec.issuerRef.name, readyStatus: (.status.conditions[] | select(.type == "Ready")).status, readyMessage: (.status.conditions[] | select(.type == "Ready")).message, approvedStatus: (.status.conditions[] | select(.type == "Approved")).status, approvedMessage: (.status.conditions[] | select(.type == "Approved")).message} | "---\\nCertificateRequest: \\(.certRequest)", "Certificate: \\(.certificate)", "Issuer: \\(.issuer)", "Ready Status: \\(.readyStatus)", "Ready Message: \\(.readyMessage)", "Approved Status: \\(.approvedStatus)", "Approved Message: \\(.approvedMessage)"'
+    ...    render_in_commandlist=true
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    RW.CLI.Parse Cli Output By Line
+    ...    rsp=${failed_certificaterequests}
+    ...    set_severity_level=2
+    ...    set_issue_expected=All certifiactes to be ready in ${NAMESPACE}
+    ...    set_issue_actual=Certificates are not ready in ${NAMESPACE}
+    ...    set_issue_title=Found failed certificates in namespace ${NAMESPACE}
+    ...    set_issue_details=CertManager certificates failed: "$_stdout" - investigate Issuers or ClusterIssuers.
+    ...    _line__raise_issue_if_contains=-
+    RW.Core.Add Pre To Report    Certificate Information:\n${failed_certificaterequests.stdout}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
