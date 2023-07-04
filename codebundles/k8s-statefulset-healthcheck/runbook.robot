@@ -68,7 +68,7 @@ Check StatefulSet Replicas
     ...    stuck
     ...    pods
     RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset -n ${NAMESPACE} -o json --context ${CONTEXT} | jq -r '.items[] | select(.status.availableReplicas < .status.replicas) | "---\nStatefulSet Name: " + (.metadata.name|tostring) + "\nDesired Replicas: " + (.status.replicas|tostring) + "\nAvailable Replicas: " + (.status.availableReplicas|tostring)'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset -n ${NAMESPACE} -o json --context ${CONTEXT} | jq -r '.items[] | select(.status.availableReplicas < .status.replicas) | "---\\nStatefulSet Name: " + (.metadata.name|tostring) + "\\nDesired Replicas: " + (.status.replicas|tostring) + "\\nAvailable Replicas: " + (.status.availableReplicas|tostring)'
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
