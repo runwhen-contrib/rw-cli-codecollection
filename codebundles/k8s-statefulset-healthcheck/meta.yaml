@@ -37,23 +37,16 @@ commands:
     the output be returned as YAML instead of table format.'
   name: fetch_statefulset_manifest_details
 - command: 'kubectl get statefulset -n ${NAMESPACE} -o json --context ${CONTEXT} |
-    jq -r ''.items[] | select(.status.availableReplicas < .status.replicas) | "---
-
-    StatefulSet Name: " + (.metadata.name|tostring) + "
-
-    Desired Replicas: " + (.status.replicas|tostring) + "
-
-    Available Replicas: " + (.status.availableReplicas|tostring)'''
+    jq -r ''.items[] | select(.status.availableReplicas < .status.replicas) | "---\nStatefulSet
+    Name: " + (.metadata.name|tostring) + "\nDesired Replicas: " + (.status.replicas|tostring)
+    + "\nAvailable Replicas: " + (.status.availableReplicas|tostring)'''
   explanation: '
 
 
-    Kubectl get statefulset is a command used to retrieve information from your Kubernetes
-    cluster about statefulsets. It takes two arguments: -n (NAMEPSACE) and --context
-    (CONTEXT). The -n argument specifies the namespace in which to search for the
-    statefulset, while the --context argument defines the specific cluster on which
-    to execute the command. The command will print out the retrieved statefulset information
-    as a JSON object. The second part of this command, jq, helps to filter through
-    the returned data for relevant information and prints it out in a neatly formatted
-    manner with its break down of desired replicas versus available replicas to give
-    you an overview of the health of the statefulset.'
+    This command runs a query using the kubectl tool to access the Kubernetes API
+    and retrieve information about running StatefulSets within a certain namespace.
+    It then processes that data with jq, a command-line json processor, to filter
+    out those StatefulSets with fewer than the desired number of replicas. The output
+    of the query is formatted in a readable way that includes the name of the StatefulSet,
+    the desired number of replicas, and the number of available replicas.'
   name: check_statefulset_replicas
