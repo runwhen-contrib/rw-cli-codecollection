@@ -1,0 +1,35 @@
+commands:
+- command: 'namespace="${NAMESPACE}"; context="${CONTEXT}"; for ingress in $(kubectl
+    get ingress -n "$namespace" --context "$context" -ojsonpath=''{range .items[*]}{.metadata.name}{"\n"}{end}'');
+    do echo "Ingress: $ingress"; health_status="NA"; services=(); backend_services=$(kubectl
+    get ingress "$ingress" -n "$namespace" --context "$context" -ojsonpath=''{range
+    .spec.rules[*].http.paths[*]}{.backend.service.name}{"|"}{.backend.service.port.number}{"\n"}{end}'');
+    while IFS=''|'' read -r service port; do if [ -n "$service" ] && [ -n "$port"
+    ]; then echo "Backend Service: $service, Port: $port"; service_exists=$(kubectl
+    get service "$service" -n "$namespace" --context "$context" -ojsonpath=''{.metadata.name}'');
+    if [ -z "$service_exists" ]; then health_status="Unhealthy"; echo "Validation:
+    Service $service does not exist"; else endpoint_pods=$(kubectl get endpoints "$service"
+    -n "$namespace" --context "$context" -ojsonpath=''{range .subsets[*].addresses[*]}-
+    Pod Name: {.targetRef.name}\n Pod IP: {.ip}\n{end}''); if [ -z "$endpoint_pods"
+    ]; then health_status="Unhealthy"; echo "Validation: Endpoint for service $service
+    does not have any pods"; else echo "Endpoint Pod:"; echo "$endpoint_pods"; health_status="Healthy";
+    fi; fi; services+=("$service"); fi; done <<< "$backend_services"; for service
+    in "\${services[@]}"; do service_exists=$(kubectl get service "$service" -n "$namespace"
+    --context "$context" -ojsonpath=''{.metadata.name}''); if [ -z "$service_exists"
+    ]; then health_status="Unhealthy"; echo "Validation: Service $service does not
+    exist"; else endpoint_exists=$(kubectl get endpoints "$service" -n "$namespace"
+    --context "$context" -ojsonpath=''{.metadata.name}''); if [ -z "$endpoint_exists"
+    ]; then health_status="Unhealthy"; echo "Validation: Endpoint for service $service
+    does not exist"; fi; fi; done; if [ "$health_status" = "Unhealthy" ]; then echo
+    "Health Status: $health_status"; echo "====================="; elif [ "$health_status"
+    = "Healthy" ]; then echo "Health Status: $health_status"; fi; echo "------------";
+    done'
+  explanation: "\n\nThis command is checking the health status of all Ingress resources\
+    \ in a Kubernetes cluster. It first sets the namespace and the context variables,\
+    \ then it iterates through each Ingress resource found in the provided namespace\
+    \ using the \"kubectl get ingress\" command. For each Ingress resource, it prints\
+    \ out its name and then checks if the related services and Endpoints exist. If\
+    \ they do, the status will be set to \u201CHealthy\u201D; otherwise, it will be\
+    \ set to \u201CUnhealthy\u201D. Finally, the command will print out either the\
+    \ unhealthy or healthy status for each Ingress."
+  name: fetch_ingress_object_health_in_namespace
