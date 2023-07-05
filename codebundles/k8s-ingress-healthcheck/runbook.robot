@@ -26,10 +26,10 @@ Fetch Ingress Object Health in Namespace
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${ingress_object_summary}
     ...    set_severity_level=3
-    ...    set_issue_expected=No logs matching error patterns found in deployment ${DEPLOYMENT_NAME} in namespace: ${NAMESPACE}
-    ...    set_issue_actual=Error logs found in deployment ${DEPLOYMENT_NAME} in namespace: ${NAMESPACE}
-    ...    set_issue_title=Deployment ${DEPLOYMENT_NAME} Has Error Logs
-    ...    set_issue_details=Deployment ${DEPLOYMENT_NAME} has error logs:\n\n$_stdout\n\nThese errors may be related to other workloads that need triaging
+    ...    set_issue_expected=All ingress objects should have services and active endpoints in namespace: ${NAMESPACE}
+    ...    set_issue_actual=Ingress objects missing services or endpoints found in namespace: ${NAMESPACE}
+    ...    set_issue_title=Unhealthy ingress objects found in ${NAMESPACE}
+    ...    set_issue_details=Ingress object health is:\n\n$_stdout\n\n
     ...    _line__raise_issue_if_contains=Unhealthy
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Ingress object summary for ${NAMESPACE}:\n\n${ingress_object_summary.stdout}
@@ -48,11 +48,6 @@ Suite Initialization
     ...    description=The location service used to interpret shell commands.
     ...    default=kubectl-service.shared
     ...    example=kubectl-service.shared
-    ${DEPLOYMENT_NAME}=    RW.Core.Import User Variable    DEPLOYMENT_NAME
-    ...    type=string
-    ...    description=Used to target the resource for queries and filtering events.
-    ...    pattern=\w*
-    ...    example=artifactory
     ${NAMESPACE}=    RW.Core.Import User Variable    NAMESPACE
     ...    type=string
     ...    description=The name of the Kubernetes namespace to scope actions and searching to.
