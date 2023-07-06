@@ -1,8 +1,11 @@
-# Kubernetes Image Rollover Check
+# Kubernetes Image Check
 
-Simple informational triage report that fetches the list of images in a namespace and shows the last time the container was started and therefore the age of the image pull.
+Simple informational report that provides information about images in a namespace. 
+
 ## Tasks
-`Check Image Rollover Times In Namespace`
+- `Check Image Rollover Times In Namespace` - Fetches the list of images in a namespace and shows the last time the container was started and therefore the age of the image pull
+- `List Images and Tags for Every Container in Running Pods` - Display the status, image name, image tag, and container name for running pods in the namespace.
+- `List Images and Tags for Every Container in Failed Pods` - Display the status, image name, image tag, and container name for failed pods in the namespace.
 
 ## Configuration
 
@@ -13,10 +16,6 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 - `KUBERNETES_DISTRIBUTION_BINARY`: Which binary to use for Kubernetes CLI commands. Default value is `kubectl`.
 - `CONTEXT`: The Kubernetes context to operate within.
 - `NAMESPACE`: The name of the namespace to search.
-
-## Notes
-
-Please note that the script requires permissions to execute commands within the Kubernetes cluster, and it may require additional permissions depending on the tasks it performs (for example, fetching storage utilization for PVC mounts requires kubectl exec permissions). Make sure to review the tasks and the required permissions before running the script.
 
 ## TODO
 - [ ] Add documentation

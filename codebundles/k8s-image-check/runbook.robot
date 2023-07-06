@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       This taskset collects info on the age of images in a Kubernetes workspace.
+Documentation       This taskset provides detailed information about the images used in a Kubernetes namespace.
 Metadata            Author    jon-funk
 Metadata            Display Name    Kubernetes Image Rollover Check
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,Redis
@@ -61,5 +61,30 @@ Check Image Rollover Times In Namespace
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    Image Info:\n${rsp.stdout}
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    Commands Used: ${history}
+List Images and Tags for Every Container in Running Pods
+    [Documentation]    Display the status, image name, image tag, and container name for running pods in the namespace. 
+    [Tags]    Pods    Containers    Image    Images    Tag
+    ${image_details}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Running -o=json | jq -r '.items[] | "---", "pod_name: " + .metadata.name, "Status: " + .status.phase, "containers:", (.spec.containers[] | "- container_name: " + .name, " \ image_path: " + (.image | split(":")[0]), " \ image_tag: " + (.image | split(":")[1])), "---"'
+    ...    render_in_commandlist=true
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    RW.Core.Add Pre To Report    Image details for pods in ${NAMESPACE}:\n${image_details.stdout}
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    Commands Used: ${history}
+
+List Images and Tags for Every Container in Failed Pods
+    [Documentation]    Display the status, image name, image tag, and container name for failed pods in the namespace. 
+    [Tags]    Pods    Containers    Image    Images    Tag
+    ${image_details}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Failed -o=json | jq -r '.items[] | "---", "pod_name: " + .metadata.name, "Status: " + .status.phase, "containers:", (.spec.containers[] | "- container_name: " + .name, " \ image_path: " + \(.image | split(":")[0]), " \ image_tag: " + (.image | split(":")[1])), "---"'
+    ...    render_in_commandlist=true
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    RW.Core.Add Pre To Report    Image details for pods in ${NAMESPACE}:\n${image_details.stdout}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
