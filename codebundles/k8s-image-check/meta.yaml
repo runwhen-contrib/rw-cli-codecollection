@@ -15,3 +15,40 @@ commands:
     portion parses the JSON data and returns the list of pod images that were running
     and the time they started running.'
   name: check_image_rollover_times_in_namespace
+- command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Running
+    -o=json | jq -r ''.items[] | "---", "pod_name: " + .metadata.name, "Status: "
+    + .status.phase, "containers:", (.spec.containers[] | "- container_name: " + .name,
+    " \ image_path: " + (.image | split(":")[0]), " \ image_tag: " + (.image | split(":")[1])),
+    "---"'''
+  explanation: "\n\nThis command will get a list of pods in JSON format from the given\
+    \ Kubernetes context and namespace and filter them for running pods only. The\
+    \ output returns data in human readable form with each pod listed by name, status,\
+    \ and container names with image paths and tags. \n\nThe command consists of:\n\
+    - kubectl get pods - this is the command to get a list of pods in Kubernetes clusters.\n\
+    - --context=${CONTEXT} - here you provide the context of the Kubernetes cluster\
+    \ from where the pods should be retrieved.\n- -n ${NAMESPACE} - this argument\
+    \ specifies the namespace where the pods should be retrieved from.\n- --field-selector=status.phase==Running\
+    \ - this argument eliminates any non-running pods from the list.\n- -o=json -\
+    \ this provides the output in JSON format which is easier to parse using another\
+    \ command.\n- | jq -r '.items[] | \"---\", \"pod_name: \" + .metadata.name, \"\
+    Status: \" + .status.phase, \"containers:\", (.spec.containers[] | \"- container_name:\
+    \ \" + .name, \" \\ image_path: \" + (.image | split(\":\")[0]), \" \\ image_tag:\
+    \ \" + (.image | split(\":\")[1])), \"---\"' - this formats the output as human\
+    \ readable data and filters only the needed information."
+  name: list_images_and_tags_for_every_container_in_running_pods
+- command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Failed
+    -o=json | jq -r ''.items[] | "---", "pod_name: " + .metadata.name, "Status: "
+    + .status.phase, "containers:", (.spec.containers[] | "- container_name: " + .name,
+    " \ image_path: " + \(.image | split(":")[0]), " \ image_tag: " + (.image | split(":")[1])),
+    "---"'''
+  explanation: '
+
+
+    This command is used for getting the details of failed Kubernetes pods. The --context
+    option is used to specify a cluster context. The -n option is used to filter for
+    a specific namespace. The --field-selector option is used to select only Failed
+    pods. The output is formatted with the -o=json option, and then the output is
+    passed on to jq utility which provides formatting options. The jq command returns
+    a list of failed pod names, their status, and name and image of all containers
+    inside them.'
+  name: list_images_and_tags_for_every_container_in_failed_pods
