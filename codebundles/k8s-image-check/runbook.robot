@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       This taskset provides detailed information about the images used in a namespace.
+Documentation       This taskset provides detailed information about the images used in a Kubernetes namespace.
 Metadata            Author    jon-funk
 Metadata            Display Name    Kubernetes Image Rollover Check
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,Redis
