@@ -19,7 +19,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Fetch Events for Unhealthy Kubernetes PersistentVolumeClaims
     [Documentation]    Lists events related to PersistentVolumeClaims within the namespace that are not bound to PersistentVolumes.
-    [Tags]    pvc    list    kubernetes    storage    persistentvolumeclaim    persistentvolumeclaims events
+    [Tags]    pvc    list    kubernetes    storage    persistentvolumeclaim    persistentvolumeclaims events    check event output and related nodes, PersistentVolumes, PersistentVolumeClaims, image registry authenticaiton, or fluxcd or argocd logs.
     ${unbound_pvc_events}=    RW.CLI.Run Cli
     ...    cmd=for pvc in $(${KUBERNETES_DISTRIBUTION_BINARY} get pvc -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.status.phase != "Bound") | .metadata.name'); do ${KUBERNETES_DISTRIBUTION_BINARY} get events -n ${NAMESPACE} --context ${CONTEXT} --field-selector involvedObject.name=$pvc -o json | jq '.items[]| "Last Timestamp: " + .lastTimestamp + " Name: " + .involvedObject.name + " Message: " + .message'; done
     ...    target_service=${kubectl}

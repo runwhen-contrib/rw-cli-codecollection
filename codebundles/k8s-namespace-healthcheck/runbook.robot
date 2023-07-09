@@ -20,7 +20,7 @@ Trace And Troubleshoot Namespace Warning Events And Errors
     [Documentation]    Queries all error events in a given namespace within the last 30 minutes,
     ...    fetches the list of involved pod names, requests logs from them and parses
     ...    the logs for exceptions.
-    [Tags]    namespace    trace    error    pods    events    logs    grep
+    [Tags]    namespace    trace    error    pods    events    logs    grep    indicates there's HTTP error codes associated with this ingress and service. You need to investigate the application
     # get pods involved with error events
     ${error_events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json
@@ -206,7 +206,7 @@ Get Listing Of Resources In Namespace
 
 Check For Namespace Event Anomalies
     [Documentation]    Parses all events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
-    [Tags]    namespace    events    info    state    anomolies    count    occurences
+    [Tags]    namespace    events    info    state    anomolies    count    occurences    indicates there's HTTP error codes associated with this ingress and service. You need to investigate the application
     ${recent_anomalies}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select( .count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) > ${ANOMALY_THRESHOLD}) | "Event(s) Per Minute:" + (.count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) |tostring) +" Count:" + (.count|tostring) + " Minute(s):" + (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60|tostring)+ " Object:" + .involvedObject.namespace + "/" + .involvedObject.kind + "/" + .involvedObject.name + " Reason:" + .reason + " Message:" + .message'
     ...    target_service=${kubectl}
@@ -241,6 +241,7 @@ Troubleshoot Namespace Services And Application Workloads
     ...    logs
     ...    aggregate
     ...    filter
+    ...    indicates there's HTTP error codes associated with this ingress and service. You need to investigate the application
     ${aggregate_service_logs}=    RW.CLI.Run Cli
     ...    cmd=services=($(${KUBERNETES_DISTRIBUTION_BINARY} get svc -o=name --context=${CONTEXT} -n ${NAMESPACE})); logs=""; for service in "\${services[@]}"; do logs+=$(${KUBERNETES_DISTRIBUTION_BINARY} logs $service --limit-bytes=256000 --since=2h --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${SERVICE_ERROR_PATTERN}" | grep -Ev "${SERVICE_EXCLUDE_PATTERN}" | sort | uniq -c | awk '{print "Issue Occurences:",$0}'); done; echo "\${logs}"
     ...    target_service=${kubectl}
