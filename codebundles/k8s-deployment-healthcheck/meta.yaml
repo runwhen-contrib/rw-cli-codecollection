@@ -54,20 +54,23 @@ commands:
     in a JSON format.'
   name: troubleshoot_deployment_replicas
 - command: kubectl get events --field-selector type!=Warning --context ${CONTEXT}
-    -n ${NAMESPACE} -o json | jq -r '.items[] | select( .count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60
+    -n ${NAMESPACE} -o json | jq -r '.items[] | select(.involvedObject.name|contains("${DEPLOYMENT_NAME}"))
+    | select( .count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60
     == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end
     ) > ${ANOMALY_THRESHOLD}) | "Event(s) Per Minute:" + (.count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60
     == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end
     ) |tostring) +" Count:" + (.count|tostring) + " Minute(s):" + (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60|tostring)+
     " Object:" + .involvedObject.namespace + "/" + .involvedObject.kind + "/" + .involvedObject.name
     + " Reason:" + .reason + " Message:" + .message'
-  explanation: "\n\nThis command is used to identify events that occurred in a Kubernetes\
-    \ cluster. The command will filter out all warning events and only return events\
-    \ with a frequency higher than the \"ANOMALY_THRESHOLD\". The command takes two\
-    \ arguments: CONTEXT and NAMESPACE. \n\nThe CONTEXT argument specifies which context\
-    \ to run the command in and the NAMESPACE argument specifies which namespace the\
-    \ events should be retrieved from. The output of the command provides information\
-    \ about each event such as the number of events per minute, the count, number\
-    \ of minutes, involved object (like namespace or resource kind) name, reason and\
-    \ message."
+  explanation: "\n\nThis command is used to monitor Kubernetes clusters for any abnormal\
+    \ behavior, specifically events with a type not equal to Warning. \n\nIt takes\
+    \ several parameters such as the context, namespace, deployment name, and anomaly\
+    \ threshold. \n\nIt then uses those parameters in conjunction with Kubectl's 'get\
+    \ events' command to retrieve events from the specified context and namespace.\
+    \ Those events are combined with jq filters to parse out only messages related\
+    \ to the given deployment name, and limit them further by their frequency of occurrence.\
+    \ If an event occurs more times per minute than the given anomaly threshold, it\
+    \ will be printed in the output. Additionally, each record contains data such\
+    \ as the count, duration, involved object, reason, and message associated with\
+    \ the event."
   name: check_for_deployment_event_anomalies
