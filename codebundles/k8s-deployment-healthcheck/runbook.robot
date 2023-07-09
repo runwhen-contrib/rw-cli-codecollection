@@ -84,6 +84,9 @@ Troubleshoot Deployment Replicas
     ...    rollout
     ...    stuck
     ...    pods
+    ...    We found the following distinctly counted errors in the service workloads of namespace
+    ...    connection error
+    ${recent_anomalies}=    RW.CLI.Run Cli
     ${deployment}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json
     ...    target_service=${kubectl}
@@ -124,7 +127,7 @@ Troubleshoot Deployment Replicas
 
 Check For Deployment Event Anomalies
     [Documentation]    Parses all events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
-    [Tags]    deployment    events    info    state    anomolies    count    occurences
+    [Tags]    deployment    events    info    state    anomolies    count    occurences    We found the following distinctly counted errors in the service workloads of namespace    connection error
     ${recent_anomalies}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select(.involvedObject.name|contains("${DEPLOYMENT_NAME}")) | select( .count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) > ${ANOMALY_THRESHOLD}) | "Event(s) Per Minute:" + (.count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) |tostring) +" Count:" + (.count|tostring) + " Minute(s):" + (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60|tostring)+ " Object:" + .involvedObject.namespace + "/" + .involvedObject.kind + "/" + .involvedObject.name + " Reason:" + .reason + " Message:" + .message'
     ...    target_service=${kubectl}
