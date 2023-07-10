@@ -86,7 +86,6 @@ Troubleshoot Deployment Replicas
     ...    pods
     ...    We found the following distinctly counted errors in the service workloads of namespace
     ...    connection error
-    ${recent_anomalies}=    RW.CLI.Run Cli
     ${deployment}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json
     ...    target_service=${kubectl}

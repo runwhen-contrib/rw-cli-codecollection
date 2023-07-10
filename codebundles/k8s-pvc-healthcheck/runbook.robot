@@ -105,6 +105,28 @@ Fetch the Storage Utilization for PVC Mounts
     RW.Core.Add Pre To Report    ${pod_pvc_utilization.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
+Check for RWO Persistent Volume Node Attachment Issues
+    [Documentation]    For each pod in a namespace, check if it has an RWO persistent volume claim and if so, validate that the pod and the pv are on the same node. 
+    [Tags]    pod    storage    pvc    readwriteonce    node    persistentvolumeclaims    persistentvolumeclaim    scheduled   attachment 
+    ${pod_rwo_node_and_pod_attachment}=    RW.CLI.Run Cli
+    ...    cmd=NAMESPACE="${NAMESPACE}"; CONTEXT="${CONTEXT}"; PODS=$(kubectl get pods -n $NAMESPACE --context=$CONTEXT -o json); for pod in $(echo "$PODS" | jq -r '.items[] | @base64'); do _jq() { echo \${pod} | base64 --decode | jq -r \${1}; }; POD_NAME=$(_jq '.metadata.name'); POD_NODE_NAME=$(kubectl get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o custom-columns=:.spec.nodeName --no-headers); PVC_NAMES=$(kubectl get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o jsonpath='{.spec.volumes[*].persistentVolumeClaim.claimName}'); for pvc_name in $PVC_NAMES; do PVC=$(kubectl get pvc $pvc_name -n $NAMESPACE --context=$CONTEXT -o json); ACCESS_MODE=$(echo "$PVC" | jq -r '.spec.accessModes[0]'); if [[ "$ACCESS_MODE" == "ReadWriteOnce" ]]; then PV_NAME=$(echo "$PVC" | jq -r '.spec.volumeName'); STORAGE_NODE_NAME=$(kubectl get nodes --context=$CONTEXT -o json | jq -r --arg pv "$PV_NAME" '.items[] | select(.status.volumesAttached != null) | select(.status.volumesInUse[] | contains($pv)) | .metadata.name'); echo "-----"; if [[ "$POD_NODE_NAME" == "$STORAGE_NODE_NAME" ]]; then echo "OK: Pod and Storage Node Matched"; else echo "Error: Pod and Storage Node Mismatched - If the issue persists, the node requires attention."; fi; echo "Pod: $POD_NAME"; echo "PVC: $pvc_name"; echo "PV: $PV_NAME"; echo "Node with Pod: $POD_NODE_NAME"; echo "Node with Storage: $STORAGE_NODE_NAME"; echo; fi; done; done
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
+    RW.CLI.Parse Cli Output By Line
+    ...    rsp=${pod_rwo_node_and_pod_attachment}
+    ...    set_severity_level=2
+    ...    set_issue_expected=All pods with RWO storage must be scheduled on the same node in which the persistent volume is attached: ${NAMESPACE}
+    ...    set_issue_actual=Pods with RWO found on a different node than their RWO storage: ${NAMESPACE}
+    ...    set_issue_title=Pods with RWO storage might not have storage scheduling issues for namespace: ${NAMESPACE}
+    ...    set_issue_details=All Pods and RWO their storage details are:\n\n$_stdout\n\n
+    ...    _line__raise_issue_if_contains=Error
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    Summary of Pods with RWO storage and the nodes their scheduling details for namespace: ${NAMESPACE}:
+    RW.Core.Add Pre To Report    ${pod_rwo_node_and_pod_attachment.stdout}
+    RW.Core.Add Pre To Report    Commands Used:\n${history}
+
 
 *** Keywords ***
 Suite Initialization
