@@ -1,8 +1,8 @@
 *** Settings ***
 Documentation       This taskset provides detailed information about the images used in a Kubernetes namespace.
 Metadata            Author    jon-funk
-Metadata            Display Name    Kubernetes Image Rollover Check
-Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,Redis
+Metadata            Display Name    Kubernetes Image Check
+Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
