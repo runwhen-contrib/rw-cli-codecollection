@@ -86,32 +86,32 @@ commands:
     \ on the mount paths to display the disk usage of the associated PVCS."
   name: fetch_the_storage_utilization_for_pvc_mounts
 - command: 'NAMESPACE="${NAMESPACE}"; CONTEXT="${CONTEXT}"; PODS=$(kubectl get pods
-    -n $NAMESPACE --context=$CONTEXT -o json); for pod in $(echo "$PODS" | jq -r ''.items[]
-    | @base64''); do _jq() { echo \${pod} | base64 --decode | jq -r \${1}; }; POD_NAME=$(_jq
-    ''.metadata.name''); POD_NODE_NAME=$(kubectl get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT
-    -o custom-columns=:.spec.nodeName --no-headers); PVC_NAMES=$(kubectl get pod $POD_NAME
-    -n $NAMESPACE --context=$CONTEXT -o jsonpath=''{.spec.volumes[*].persistentVolumeClaim.claimName}'');
+    -n $NAMESPACE --context=$CONTEXT -o json); for pod in $(jq -r ''.items[] | @base64''
+    <<< "$PODS"); do _jq() { jq -r \${1} <<< "$(base64 --decode <<< \${pod})"; };
+    POD_NAME=$(_jq ''.metadata.name''); POD_NODE_NAME=$(kubectl get pod $POD_NAME
+    -n $NAMESPACE --context=$CONTEXT -o custom-columns=:.spec.nodeName --no-headers);
+    PVC_NAMES=$(kubectl get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o jsonpath=''{.spec.volumes[*].persistentVolumeClaim.claimName}'');
     for pvc_name in $PVC_NAMES; do PVC=$(kubectl get pvc $pvc_name -n $NAMESPACE --context=$CONTEXT
-    -o json); ACCESS_MODE=$(echo "$PVC" | jq -r ''.spec.accessModes[0]''); if [[ "$ACCESS_MODE"
-    == "ReadWriteOnce" ]]; then PV_NAME=$(echo "$PVC" | jq -r ''.spec.volumeName'');
-    STORAGE_NODE_NAME=$(kubectl get nodes --context=$CONTEXT -o json | jq -r --arg
-    pv "$PV_NAME" ''.items[] | select(.status.volumesAttached != null) | select(.status.volumesInUse[]
-    | contains($pv)) | .metadata.name''); echo "-----"; if [[ "$POD_NODE_NAME" ==
-    "$STORAGE_NODE_NAME" ]]; then echo "OK: Pod and Storage Node Matched"; else echo
-    "Error: Pod and Storage Node Mismatched - If the issue persists, the node requires
-    attention."; fi; echo "Pod: $POD_NAME"; echo "PVC: $pvc_name"; echo "PV: $PV_NAME";
-    echo "Node with Pod: $POD_NODE_NAME"; echo "Node with Storage: $STORAGE_NODE_NAME";
+    -o json); ACCESS_MODE=$(jq -r ''.spec.accessModes[0]'' <<< "$PVC"); if [[ "$ACCESS_MODE"
+    == "ReadWriteOnce" ]]; then PV_NAME=$(jq -r ''.spec.volumeName'' <<< "$PVC");
+    STORAGE_NODE_NAME=$(jq -r --arg pv "$PV_NAME" ''.items[] | select(.status.volumesAttached
+    != null) | select(.status.volumesInUse[] | contains($pv)) | .metadata.name'' <<<
+    "$(kubectl get nodes --context=$CONTEXT -o json)"); echo "-----"; if [[ "$POD_NODE_NAME"
+    == "$STORAGE_NODE_NAME" ]]; then echo "OK: Pod and Storage Node Matched"; else
+    echo "Error: Pod and Storage Node Mismatched - If the issue persists, the node
+    requires attention."; fi; echo "Pod: $POD_NAME"; echo "PVC: $pvc_name"; echo "PV:
+    $PV_NAME"; echo "Node with Pod: $POD_NODE_NAME"; echo "Node with Storage: $STORAGE_NODE_NAME";
     echo; fi; done; done'
   explanation: '
 
 
-    This is a bash command that checks whether the node where the pod exists is the
-    same as the node where the storage for the pod is located. The command sets environment
-    variables for the namespace and context, used in subsequent commands. It then
-    runs "kubectl" to get information about the pods running in the specified namespace.
-    This information is parsed with jq to find the pod name, storage PVC name, and
-    PV name. Finally, kubectl is used again to identify which node is associated with
-    the pod and PVC. It compares this information to ensure that the pod and its associated
-    storage are both running on the same node. If they are not matched, the script
-    prints an error message to alert the user that the node may require attention.'
+    This command checks if the pod and its associated storage node are running on
+    the same node. It starts by setting two variables: NAMESPACE and CONTEXT. Then,
+    it gets a list of pods from the Kubernetes cluster in the specified namespace
+    using the Kubectl command. The loop iterates over each pod, getting its name and
+    the nodes it is running on. The command then checks for PVC''s (persistent volume
+    claims) and their access modes going through only those with ReadWriteOnce mode.
+    For each found PVC, it gets the associated PV (persistent volume), and the nodes
+    that processing these volumes; compares the nodes running the Pod and the ones
+    hosting the storage and prints the appropriate message.'
   name: check_for_rwo_persistent_volume_node_attachment_issues
