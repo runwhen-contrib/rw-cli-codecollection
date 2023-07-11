@@ -1,0 +1,22 @@
+commands:
+- command: 'apiserver=https://kubernetes.default.svc; namespace=${NAMESPACE}; context=${CONTEXT};
+    resource=""; serviceaccount=${SERVICE_ACCOUNT}; kubectl run curl-pod --image=curlimages/curl:latest
+    --restart=Never --overrides="{ \"spec\": { \"serviceAccountName\": \"$serviceaccount\"
+    } }" -n $namespace --context=$context --command -- sleep infinity && echo "Waiting
+    for the curl-pod to be running..." && kubectl wait --for=condition=Ready pod/curl-pod
+    --timeout=20s -n $namespace --context=$context && TOKEN=$(kubectl exec curl-pod
+    -n $namespace --context=$context -- cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+    && echo "Performing a curl request to the Kubernetes API..." && kubectl exec curl-pod
+    -n $namespace --context=$context -- curl -s -k -H "Authorization: Bearer $TOKEN"
+    $apiserver$resource && echo "Cleaning up..." && kubectl delete pod curl-pod -n
+    $namespace --context=$context && echo "Done!"'
+  explanation: '
+
+
+    This command will use kubectl to run a curl-pod in a Kubernetes cluster. The pod
+    is set to never restart, has an overriding service account name (if configurable)
+    and runs the ''sleep infinity'' command until Kubernetes API is ready. Once the
+    Pod is ready, it fetches an access token associated with serviceaccount from the
+    Kubernetes API and performs a  curl request using that token for authentication
+    against the Kubernetes API. Finally, the pod is deleted.'
+  name: test_service_account_access_to_kubernetes_api_server
