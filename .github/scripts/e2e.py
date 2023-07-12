@@ -65,7 +65,7 @@ def get_workspace_codebundles(base_url, workspace_name) -> set[str]:
     workspace_entities: list[dict] = []
     cb_stats_rsp = session.get(f"{base_url}/workspaces/{workspace_name}/codebundle-stats")
     if not cb_stats_rsp.status_code == 200:
-        raise AssertionError(f"Received non-200 response: {cb_stats_rsp}")
+        raise AssertionError(f"Received non-200 response: {cb_stats_rsp.json()}")
     cb_stats = cb_stats_rsp.json()
     workspace_entities = cb_stats["taskSets"]  # + cb_stats["slis"]
     codebundle_names = set([wse["codeBundleName"] for wse in workspace_entities])
@@ -279,6 +279,7 @@ if __name__ == "__main__":
                 "CI exceeded max polls waiting for codecollection to reconcile with latest changes before CI - check modelsync/corestate"
             )
             exit(1)
+    print(f"CodeCollection reconciled to {current_hash}")
     changed_codebundles: list[str] = []
     changed_codebundles = get_codebundles_in_last_commit(args.runall)
     print("Found the following codebundles to test:")
