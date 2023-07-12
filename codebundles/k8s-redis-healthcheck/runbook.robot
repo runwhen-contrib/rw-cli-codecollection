@@ -14,7 +14,6 @@ Library             Collections
 
 Suite Setup         Suite Initialization
 
-
 *** Tasks ***
 Ping Redis Workload
     [Documentation]    Verifies that a PING can be peformed against the redis workload.
