@@ -15,10 +15,14 @@ on:
       - "codebundles/**.robot"
 # TODO: add traced python dependency support
 
+concurrency:
+  group: CI
+  cancel-in-progress: true
+
 jobs:
   run-e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v3
         with:
@@ -31,10 +35,11 @@ jobs:
           API_USER: ${{ secrets.API_USER }}
           API_TOKEN: ${{ secrets.API_TOKEN }}
           API_URL: https://backend-services.dev.project-468.com/api/v3
+          GIT_URL: https://github.com/runwhen-contrib/rw-cli-codecollection.git
           WORKSPACE: ob-1-small
         run: |
           if [ "${{ github.event.inputs.runall }}" = "yes" ] || [ "${{ github.event.inputs.runall }}" = "true" ]; then
-            cd .github/scripts/ && python e2e.py --e2e_workspace=$WORKSPACE --papi_url=$API_URL --runall
+            cd .github/scripts/ && python e2e.py $WORKSPACE $API_URL $GIT_URL --runall
           else
-            cd .github/scripts/ && python e2e.py --e2e_workspace=$WORKSPACE --papi_url=$API_URL
+            cd .github/scripts/ && python e2e.py $WORKSPACE $API_URL $GIT_URL
           fi
