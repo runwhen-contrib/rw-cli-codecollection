@@ -13,6 +13,34 @@ POLL_DURATION = 60
 MAX_POLLS = 10
 
 
+def get_current_git_hash() -> str:
+    command = "git rev-parse HEAD"
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
+    output, _ = process.communicate()
+    stdout_string = output.decode("utf-8").strip()
+    return stdout_string
+
+
+def hash_matches_codecollection(cc_name: str, base_url: str, current_hash: str, branch: str = "main") -> bool:
+    cc_hash = None
+    codecollections = session.get(f"{base_url}/codecollections")
+    if codecollections.status_code != 200:
+        raise AssertionError(
+            f"Received non-200 response during codecollection get: {codecollections.status_code} {codecollections.json()}"
+        )
+    codecollections = codecollections.json()
+    results = codecollections["results"]
+    for res in results:
+        if not ("spec" in res and "repoURL" in res["spec"]):
+            continue
+        if cc_name == res["spec"]["repoURL"]:
+            cc_hash = res["status"]["versions"][branch]
+            break
+    if cc_hash == current_hash:
+        return True
+    return False
+
+
 def get_codebundles_in_last_commit(runall: bool = False) -> set[str]:
     codebundles: set[str] = []
     if runall:
@@ -214,13 +242,17 @@ if __name__ == "__main__":
     if not USER or not TOKEN:
         print("API User not provided - please set API_USER and API_TOKEN environment variables")
     parser = argparse.ArgumentParser(
-        description="The workspace used for E2E testing. A session will be created and used to run recently changed codebundles."
+        description="A script that can be used to run end to end tests with codebundles in a given workspace."
     )
     required_named = parser.add_argument_group("required named arguments")
     required_named.add_argument(
-        "--e2e_workspace", help="The workspace used to create a testing session and search for runnable codebundles."
+        "e2e_workspace", help="The workspace used to create a testing session and search for runnable codebundles."
     )
-    required_named.add_argument("--papi_url", help="The url of the public API used to make requests against.")
+    required_named.add_argument("papi_url", help="The url of the public API used to make requests against.")
+    required_named.add_argument(
+        "codecollection_git",
+        help="The git url of the codecollection.",
+    )
     parser.add_argument(
         "--session_name", default="ci-session", help="The name of the runsession to organize results under."
     )
@@ -235,6 +267,18 @@ if __name__ == "__main__":
     print(f"Current Arguments: {args}")
     # TODO: trace python deps and run dependent codebundles
     create_session(USER, TOKEN, args.papi_url)
+    current_hash = get_current_git_hash()
+    print("Waiting for CodeCollection changes to reconcile...")
+    poll_amount = 0
+    while not hash_matches_codecollection(args.codecollection_git, args.papi_url, current_hash):
+        print("...")
+        time.sleep(POLL_DURATION)
+        poll_amount += 1
+        if poll_amount >= MAX_POLLS:
+            print(
+                "CI exceeded max polls waiting for codecollection to reconcile with latest changes before CI - check modelsync/corestate"
+            )
+            exit(1)
     changed_codebundles: list[str] = []
     changed_codebundles = get_codebundles_in_last_commit(args.runall)
     print("Found the following codebundles to test:")
