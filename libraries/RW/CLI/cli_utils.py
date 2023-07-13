@@ -110,3 +110,4 @@ class IssueCheckResults:
     reproduce_hint: str = ""
     issue_found: bool = False
     details: str = ""
+    next_steps: str = ""
