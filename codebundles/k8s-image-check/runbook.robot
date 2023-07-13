@@ -89,7 +89,7 @@ List Images and Tags for Every Container in Failed Pods
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-List Image Pull Back-Off Events and Test Path and Tags
+List ImagePullBackOff Events and Test Path and Tags
     [Documentation]    Search events in the last 5 minutes for BackOff events related to image pull issues. Run Skopeo to test if the image path exists and what tags are available.  
     [Tags]    Containers    Image    Images    Tag    ImagePullBackoff    Skopeo    BackOff
     ${image_path_and_tag_details}=    RW.CLI.Run Cli
