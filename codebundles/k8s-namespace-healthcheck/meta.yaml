@@ -124,3 +124,43 @@ commands:
     Lastly, the output is filtered based on patterns provided by the user and printed
     out.'
   name: troubleshoot_namespace_services_and_application_workloads
+- command: 'context="${CONTEXT}"; namespace="${NAMESPACE}"; check_health() { local
+    type=$1; local name=$2; local replicas=$3; local selector=$4; local pdbs=$(kubectl
+    --context "$context" --namespace "$namespace" get pdb -o json | jq -c --arg selector
+    "$selector" ''.items[] | select(.spec.selector.matchLabels | to_entries[] | .key
+    + "=" + .value == $selector)''); if [[ $replicas -gt 1 && -z "$pdbs" ]]; then
+    printf "%-30s %-30s %-10s
+
+    " "$type/$name" "" "Missing"; else echo "$pdbs" | jq -c . | while IFS= read -r
+    pdb; do local pdbName=$(echo "$pdb" | jq -r ''.metadata.name''); local minAvailable=$(echo
+    "$pdb" | jq -r ''.spec.minAvailable // ""''); local maxUnavailable=$(echo "$pdb"
+    | jq -r ''.spec.maxUnavailable // ""''); if [[ "$minAvailable" == "100%" || "$maxUnavailable"
+    == "0" || "$maxUnavailable" == "0%" ]]; then printf "%-30s %-30s %-10s
+
+    " "$type/$name" "$pdbName" "Risky"; elif [[ $replicas -gt 1 && ("$minAvailable"
+    != "100%" || "$maxUnavailable" != "0" || "$maxUnavailable" != "0%") ]]; then printf
+    "%-30s %-30s %-10s
+
+    " "$type/$name" "$pdbName" "OK"; fi; done; fi; }; echo "Deployments:"; echo "-----------";
+    printf "%-30s %-30s %-10s
+
+    " "NAME" "PDB" "STATUS"; kubectl --context "$context" --namespace "$namespace"
+    get deployments -o json | jq -c ''.items[] | "\(.metadata.name) \(.spec.replicas)
+    \(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value)"'' | while
+    read -r line; do check_health "Deployment" $(echo $line | tr -d ''"''); done;
+    echo ""; echo "Statefulsets:"; echo "-------------"; printf "%-30s %-30s %-10s
+
+    " "NAME" "PDB" "STATUS"; kubectl --context "$context" --namespace "$namespace"
+    get statefulsets -o json | jq -c ''.items[] | "\(.metadata.name) \(.spec.replicas)
+    \(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value)"'' | while
+    read -r line; do check_health "StatefulSet" $(echo $line | tr -d ''"''); done'
+  explanation: ';
+
+
+    This command is used to check the health of deployments and statefulsets in Kubernetes.
+    Kubernetes provides a way to ensure availability by using Pod Disruption Budgets
+    (PDBs). This command iterates through all the deployments and statefulsets in
+    a given namespace and context, and checks if each one of them has a corresponding
+    PDB set up to ensure availability. It will then print out the NAME, the associated
+    PDB, and the STATUS for each deployment or statefulset.'
+  name: check_missing_or_risky_poddisruptionbudget_policies
