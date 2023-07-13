@@ -261,6 +261,35 @@ Troubleshoot Namespace Services And Application Workloads
     RW.Core.Add To Report    ${aggregate_service_logs.stdout}\n
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
+Check Missing or Risky PodDisruptionBudget Policies
+    [Documentation]    Searches through deployemnts and statefulsets to determine if they are missing PodDistruptionBudgets or have them configured in a risky way that prohibits cluster or node upgrades. 
+    [Tags]    poddisruptionbudget    availability    unavailable    risky   missing    policy
+    ${pdb_check}=    RW.CLI.Run Cli
+    ...    cmd=context="${CONTEXT}"; namespace="${NAMESPACE}"; check_health() { local type=$1; local name=$2; local replicas=$3; local selector=$4; local pdbs=$(${KUBERNETES_DISTRIBUTION_BINARY} --context "$context" --namespace "$namespace" get pdb -o json | jq -c --arg selector "$selector" '.items[] | select(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value == $selector)'); if [[ $replicas -gt 1 && -z "$pdbs" ]]; then printf "%-30s %-30s %-10s\n" "$type/$name" "" "Missing"; else echo "$pdbs" | jq -c . | while IFS= read -r pdb; do local pdbName=$(echo "$pdb" | jq -r '.metadata.name'); local minAvailable=$(echo "$pdb" | jq -r '.spec.minAvailable // ""'); local maxUnavailable=$(echo "$pdb" | jq -r '.spec.maxUnavailable // ""'); if [[ "$minAvailable" == "100%" || "$maxUnavailable" == "0" || "$maxUnavailable" == "0%" ]]; then printf "%-30s %-30s %-10s\n" "$type/$name" "$pdbName" "Risky"; elif [[ $replicas -gt 1 && ("$minAvailable" != "100%" || "$maxUnavailable" != "0" || "$maxUnavailable" != "0%") ]]; then printf "%-30s %-30s %-10s\n" "$type/$name" "$pdbName" "OK"; fi; done; fi; }; echo "Deployments:"; echo "-----------"; printf "%-30s %-30s %-10s\n" "NAME" "PDB" "STATUS"; ${KUBERNETES_DISTRIBUTION_BINARY} --context "$context" --namespace "$namespace" get deployments -o json | jq -c '.items[] | "\\(.metadata.name) \\(.spec.replicas) \\(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value)"' | while read -r line; do check_health "Deployment" $(echo $line | tr -d '"'); done; echo ""; echo "Statefulsets:"; echo "-------------"; printf "%-30s %-30s %-10s\n" "NAME" "PDB" "STATUS"; ${KUBERNETES_DISTRIBUTION_BINARY} --context "$context" --namespace "$namespace" get statefulsets -o json | jq -c '.items[] | "\\(.metadata.name) \\(.spec.replicas) \\(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value)"' | while read -r line; do check_health "StatefulSet" $(echo $line | tr -d '"'); done
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${KUBECONFIG}
+    ...    render_in_commandlist=true
+    RW.CLI.Parse Cli Output By Line
+    ...    rsp=${pdb_check}
+    ...    set_severity_level=2
+    ...    set_issue_expected=PodDisruptionBudgets in ${NAMESPACE} do not block regular maintenance
+    ...    set_issue_actual=We detected PodDisruptionBudgets in namespace ${NAMESPACE} which are considered Risky to maintenance operations
+    ...    set_issue_title=Risky PodDisruptionBudgets Found in namespace ${NAMESPACE}
+    ...    set_issue_details=Review the PodDisruptionBudget check for ${NAMESPACE}:\n"$_stdout"
+    ...    _line__raise_issue_if_contains=Risky
+    RW.CLI.Parse Cli Output By Line
+    ...    rsp=${pdb_check}
+    ...    set_severity_level=4
+    ...    set_issue_expected=PodDisruptionBudgets in ${NAMESPACE} should exist for applications
+    ...    set_issue_actual=We detected Deployments or StatefulSets in namespace ${NAMESPACE} which are missing PodDisruptionBudgets
+    ...    set_issue_title=Deployments or StatefulSets in namespace ${NAMESPACE} are missing PodDisruptionBudgets
+    ...    set_issue_details=Review the Deployments and StatefulSets missing PodDisruptionBudget in ${NAMESPACE}:\n"$_stdout"
+    ...    _line__raise_issue_if_contains=Missing
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add To Report    ${pdb_check.stdout}\n
+    RW.Core.Add Pre To Report    Commands Used:\n${history}
+
 
 *** Keywords ***
 Suite Initialization
