@@ -139,28 +139,24 @@ commands:
 
     " "$type/$name" "$pdbName" "Risky"; elif [[ $replicas -gt 1 && ("$minAvailable"
     != "100%" || "$maxUnavailable" != "0" || "$maxUnavailable" != "0%") ]]; then printf
-    "%-30s %-30s %-10s
-
-    " "$type/$name" "$pdbName" "OK"; fi; done; fi; }; echo "Deployments:"; echo "-----------";
-    printf "%-30s %-30s %-10s
-
-    " "NAME" "PDB" "STATUS"; kubectl --context "$context" --namespace "$namespace"
-    get deployments -o json | jq -c ''.items[] | "\(.metadata.name) \(.spec.replicas)
-    \(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value)"'' | while
-    read -r line; do check_health "Deployment" $(echo $line | tr -d ''"''); done;
-    echo ""; echo "Statefulsets:"; echo "-------------"; printf "%-30s %-30s %-10s
-
-    " "NAME" "PDB" "STATUS"; kubectl --context "$context" --namespace "$namespace"
-    get statefulsets -o json | jq -c ''.items[] | "\(.metadata.name) \(.spec.replicas)
-    \(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value)"'' | while
-    read -r line; do check_health "StatefulSet" $(echo $line | tr -d ''"''); done'
-  explanation: ';
-
-
-    This command is used to check the health of deployments and statefulsets in Kubernetes.
-    Kubernetes provides a way to ensure availability by using Pod Disruption Budgets
-    (PDBs). This command iterates through all the deployments and statefulsets in
-    a given namespace and context, and checks if each one of them has a corresponding
-    PDB set up to ensure availability. It will then print out the NAME, the associated
-    PDB, and the STATUS for each deployment or statefulset.'
+    "%-30s %-30s %-10s\n" "$type/$name" "$pdbName" "OK"; fi; done; fi; }; echo "Deployments:";
+    echo "-----------"; printf "%-30s %-30s %-10s\n" "NAME" "PDB" "STATUS"; kubectl
+    --context "$context" --namespace "$namespace" get deployments -o json | jq -c
+    ''.items[] | "\(.metadata.name) \(.spec.replicas) \(.spec.selector.matchLabels
+    | to_entries[] | .key + "=" + .value)"'' | while read -r line; do check_health
+    "Deployment" $(echo $line | tr -d ''"''); done; echo ""; echo "Statefulsets:";
+    echo "-------------"; printf "%-30s %-30s %-10s\n" "NAME" "PDB" "STATUS"; kubectl
+    --context "$context" --namespace "$namespace" get statefulsets -o json | jq -c
+    ''.items[] | "\(.metadata.name) \(.spec.replicas) \(.spec.selector.matchLabels
+    | to_entries[] | .key + "=" + .value)"'' | while read -r line; do check_health
+    "StatefulSet" $(echo $line | tr -d ''"''); done'
+  explanation: "\n\nThis command checks the health of deployments and statefulsets\
+    \ in a Kubernetes cluster. It uses kubectl, which is a command line utility for\
+    \ managing clusters, and jq, which is a lightweight and flexible command-line\
+    \ JSON processor. The command is executed against a particular Kubernetes context\
+    \ (a set of API objects associated with the cluster) and namespace. For each deployment\
+    \ and statefulset it retrieves, the command checks if there are any Pod Disruption\
+    \ Budgets (PDBs) that has been configured to keep at least some of the pods available\
+    \ during maintenance operations or other disruptions, and displays their status\
+    \ accordingly (\u201COK,\u201D \u201CRisky,\u201D or \u201CMissing\u201D)."
   name: check_missing_or_risky_poddisruptionbudget_policies
