@@ -6,6 +6,7 @@ Simple informational report that provides information about images in a namespac
 - `Check Image Rollover Times In Namespace` - Fetches the list of images in a namespace and shows the last time the container was started and therefore the age of the image pull
 - `List Images and Tags for Every Container in Running Pods` - Display the status, image name, image tag, and container name for running pods in the namespace.
 - `List Images and Tags for Every Container in Failed Pods` - Display the status, image name, image tag, and container name for failed pods in the namespace.
+- `List Image Pull Back-Off Events and Test Path and Tags` - Search events in the last 5 minutes for BackOff events related to image pull issues. Run Skopeo to test if the image path exists and what tags are available.
 
 ## Configuration
 
