@@ -89,4 +89,4 @@ commands:
     \ checks if they can be reached with skopeo using a pod with the given name. It\
     \ also prints out a list of available tags for the particular container image\
     \ path associated with the event. Finally the pod is deleted when done."
-  name: list_image_pull_back_off_events_and_test_path_and_tags
+  name: list_imagepullbackoff_events_and_test_path_and_tags
