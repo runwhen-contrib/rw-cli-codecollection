@@ -88,3 +88,16 @@ List Images and Tags for Every Container in Failed Pods
     RW.Core.Add Pre To Report    Image details for pods in ${NAMESPACE}:\n${image_details.stdout}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
+
+List ImagePullBackOff Events and Test Path and Tags
+    [Documentation]    Search events in the last 5 minutes for BackOff events related to image pull issues. Run Skopeo to test if the image path exists and what tags are available.  
+    [Tags]    Containers    Image    Images    Tag    ImagePullBackoff    Skopeo    BackOff
+    ${image_path_and_tag_details}=    RW.CLI.Run Cli
+    ...    cmd=NAMESPACE=${NAMESPACE}; POD_NAME="skopeo-pod"; CONTEXT="${CONTEXT}"; events=$(${KUBERNETES_DISTRIBUTION_BINARY} get events -n $NAMESPACE --context=$CONTEXT -o json | jq --arg timestamp "$(date -u -v -5M +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d "-5 minutes" +"%Y-%m-%dT%H:%M:%SZ")" '.items[] | select(.lastTimestamp > $timestamp)'); if [[ ! -z "\${events-unset}" ]]; then image_pull_backoff_events=$(echo "$events" | jq -s '[.[] | select(.reason == "BackOff") | .message] | .[]'); else echo "No events found in the last 5 minutes"; exit; fi; if [[ $image_pull_backoff_events =~ "Back-off pulling image" ]]; then echo "Running Skopeo Pod"; ${KUBERNETES_DISTRIBUTION_BINARY} run $POD_NAME --restart=Never -n $NAMESPACE --context=$CONTEXT --image=quay.io/containers/skopeo:latest --command -- sleep infinity && echo "Waiting for the $POD_NAME to be running..." && ${KUBERNETES_DISTRIBUTION_BINARY} wait --for=condition=Ready pod/$POD_NAME -n $NAMESPACE --context=$CONTEXT; else echo "No image pull backoff events found"; exit; fi; while IFS= read -r event; do echo "Found BackOff with message: $event"; echo "Checking if we can reach the image with skopeo and what tags exist"; container_image_path_tag=$(echo "$event" | cut -d' ' -f4 | tr -d '"' | tr -d '\\'); container_image_path="\${container_image_path_tag%:*}"; container_image_tag="\${container_image_path_tag#*:}"; if [ -z "$container_image_path" ] || [ -z "$container_image_tag" ]; then continue; fi; skopeo_output=$(${KUBERNETES_DISTRIBUTION_BINARY} exec $POD_NAME -n $NAMESPACE --context=$CONTEXT -- skopeo inspect docker://$container_image_path:$container_image_tag); skopeo_exit_code=$?; if [ $skopeo_exit_code -eq 0 ]; then echo "Container image '$container_image_path:$container_image_tag' exists."; else echo "Container image '$container_image_path:$container_image_tag' does not exist."; echo "Available tags for '$container_image_path':"; available_tags=$(${KUBERNETES_DISTRIBUTION_BINARY} exec $POD_NAME -n $NAMESPACE --context=$CONTEXT -- skopeo list-tags docker://$container_image_path ); echo "$available_tags"; fi; done <<<"$image_pull_backoff_events" && echo "Deleting Skopeo pod" && ${KUBERNETES_DISTRIBUTION_BINARY} delete pod $POD_NAME -n $NAMESPACE --context=$CONTEXT && echo "Done"
+    ...    render_in_commandlist=true
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    RW.Core.Add Pre To Report    Image details for pods in ${NAMESPACE}:\n${image_path_and_tag_details.stdout}
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    Commands Used: ${history}
