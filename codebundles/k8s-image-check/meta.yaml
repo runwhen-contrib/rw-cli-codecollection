@@ -62,11 +62,11 @@ commands:
     echo "Running Skopeo Pod"; kubectl run $POD_NAME --restart=Never -n $NAMESPACE
     --context=$CONTEXT --image=quay.io/containers/skopeo:latest --command -- sleep
     infinity && echo "Waiting for the $POD_NAME to be running..." && kubectl wait
-    --for=condition=Ready pod/$POD_NAME -n $NAMESPACE; else echo "No image pull backoff
-    events found"; exit; fi; while IFS= read -r event; do echo "Found BackOff with
-    message: $event"; echo "Checking if we can reach the image with skopeo and what
-    tags exist"; container_image_path_tag=$(echo "$event" | cut -d'' '' -f4 | tr -d
-    ''"'' | tr -d ''\''); container_image_path="\${container_image_path_tag%:*}";
+    --for=condition=Ready pod/$POD_NAME -n $NAMESPACE --context=$CONTEXT; else echo
+    "No image pull backoff events found"; exit; fi; while IFS= read -r event; do echo
+    "Found BackOff with message: $event"; echo "Checking if we can reach the image
+    with skopeo and what tags exist"; container_image_path_tag=$(echo "$event" | cut
+    -d'' '' -f4 | tr -d ''"'' | tr -d ''\''); container_image_path="\${container_image_path_tag%:*}";
     container_image_tag="\${container_image_path_tag#*:}"; if [ -z "$container_image_path"
     ] || [ -z "$container_image_tag" ]; then continue; fi; skopeo_output=$(kubectl
     exec $POD_NAME -n $NAMESPACE --context=$CONTEXT -- skopeo inspect docker://$container_image_path:$container_image_tag);
@@ -78,15 +78,13 @@ commands:
     ); echo "$available_tags"; fi; done <<<"$image_pull_backoff_events" && echo "Deleting
     Skopeo pod" && kubectl delete pod $POD_NAME -n $NAMESPACE --context=$CONTEXT &&
     echo "Done"'
-  explanation: "\n\nThis command is used to check if a Kubernetes image pull backoff\
-    \ event can be fixed by skopeo. It first sets the value of variables NAMESPACE,\
-    \ POD_NAME, and CONTEXT. Then it uses kubectl to get events related to the given\
-    \ namespace in the last 5 minutes (using jq to filter which ones have a timestamp\
-    \ greater than that) and store them in the variable events. If no events are found,\
-    \ it exits. \n\nOtherwise, it looks for any image pull backoff events within the\
-    \ list and stores them in the variable image_pull_backoff_events. If none are\
-    \ found, it exits. Otherwise, it reads through each of these backoff events and\
-    \ checks if they can be reached with skopeo using a pod with the given name. It\
-    \ also prints out a list of available tags for the particular container image\
-    \ path associated with the event. Finally the pod is deleted when done."
-  name: list_image_pull_back_off_events_and_test_path_and_tags
+  explanation: '
+
+
+    This command is used for troubleshooting an issue with Kubernetes container images.
+    It sets up several environment variables, runs a kubectl command to check for
+    events within the last 5 minutes, and then checks for any ''BackOff'' events.
+    If any are found, it will then run a Skopeo pod in order to inspect the image
+    that is mentioned in the event. It will also list the available tags if the tagged
+    image does not exist. Finally, it deletes the Skopeo pod when done.'
+  name: list_imagepullbackoff_events_and_test_path_and_tags
