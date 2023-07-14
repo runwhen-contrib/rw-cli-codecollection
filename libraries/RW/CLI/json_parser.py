@@ -37,6 +37,7 @@ def parse_cli_json_output(
     set_issue_reproduce_hint: str = "",
     set_issue_title: str = "",
     set_issue_details: str = "",
+    set_issue_next_steps: str = "",
     expected_rsp_statuscodes: list[int] = [200],
     expected_rsp_returncodes: list[int] = [0],
     raise_issue_from_rsp_code: bool = False,
@@ -59,6 +60,7 @@ def parse_cli_json_output(
     except Exception as e:
         if raise_issue_from_rsp_code:
             rsp_code_title = set_issue_title if set_issue_title else "Error/Unexpected Response Code"
+            rsp_next_steps = set_issue_next_steps if set_issue_next_steps else "View the logs of the shellservice"
             rsp_code_expected = (
                 set_issue_expected
                 if set_issue_expected
@@ -79,6 +81,7 @@ def parse_cli_json_output(
                 actual=rsp_code_actual,
                 reproduce_hint=rsp_code_reproduce_hint,
                 details=f"{set_issue_details} ({e})",
+                next_steps=rsp_next_steps,
             )
         else:
             raise e
@@ -163,6 +166,7 @@ def parse_cli_json_output(
         set_issue_reproduce_hint,
         set_issue_title,
         set_issue_details,
+        set_issue_next_steps,
         **kwargs,
     )
     if issue_results.issue_found:
@@ -174,6 +178,7 @@ def parse_cli_json_output(
             "actual": Template(issue_results.actual).safe_substitute(known_symbols),
             "reproduce_hint": Template(issue_results.reproduce_hint).safe_substitute(known_symbols),
             "details": Template(issue_results.details).safe_substitute(known_symbols),
+            "next_steps": Template(issue_results.next_steps).safe_substitute(known_symbols),
         }
         # truncate long strings
         for key, value in issue_data.items():
@@ -212,6 +217,7 @@ def _check_for_json_issue(
     set_issue_reproduce_hint: str = "",
     set_issue_title: str = "",
     set_issue_details: str = "",
+    set_issue_next_steps: str = "",
     **kwargs,
 ) -> cli_utils.IssueCheckResults:
     severity: int = 4
@@ -219,6 +225,7 @@ def _check_for_json_issue(
     expected: str = ""
     actual: str = ""
     details: str = ""
+    next_steps: str = ""
     reproduce_hint: str = ""
     issue_found: bool = False
     parse_queries = kwargs
@@ -271,6 +278,7 @@ def _check_for_json_issue(
             actual = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} is equal to {variable_value}"
             reproduce_hint = f"Run {rsp.cmd} and apply the jmespath '{variable_from_path[prefix]}' to the output"
             details = f"{set_issue_details}"
+            next_steps = f"{set_issue_next_steps}"
         elif query == "raise_issue_if_neq" and (
             str(query_value) != str(variable_value) or (variable_is_list and query_value not in variable_value)
         ):
@@ -280,6 +288,7 @@ def _check_for_json_issue(
             actual = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} does not contain the expected value of: {prefix}=={query_value} and is actually {variable_value}"
             reproduce_hint = f"Run {rsp.cmd} and apply the jmespath '{variable_from_path[prefix]}' to the output"
             details = f"{set_issue_details}"
+            next_steps = f"{set_issue_next_steps}"
 
         elif query == "raise_issue_if_lt" and numeric_castable and variable_value < query_value:
             issue_found = True
@@ -288,6 +297,8 @@ def _check_for_json_issue(
             actual = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} found value: {variable_value} and it's less than {query_value}"
             reproduce_hint = f"Run {rsp.cmd} and apply the jmespath '{variable_from_path[prefix]}' to the output"
             details = f"{set_issue_details}"
+            next_steps = f"{set_issue_next_steps}"
+
         elif query == "raise_issue_if_gt" and numeric_castable and variable_value > query_value:
             issue_found = True
             title = f"Value of {prefix} Was Greater Than {query_value}"
@@ -295,6 +306,8 @@ def _check_for_json_issue(
             actual = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} found value: {variable_value} and it's greater than {query_value}"
             reproduce_hint = f"Run {rsp.cmd} and apply the jmespath '{variable_from_path[prefix]}' to the output"
             details = f"{set_issue_details}"
+            next_steps = f"{set_issue_next_steps}"
+
         elif query == "raise_issue_if_contains" and query_value in variable_value:
             issue_found = True
             title = f"Value of {prefix} Contained {query_value}"
@@ -302,6 +315,8 @@ def _check_for_json_issue(
             actual = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} resulted in {variable_value} and it contains {query_value} when it should not"
             reproduce_hint = f"Run {rsp.cmd} and apply the jmespath '{variable_from_path[prefix]}' to the output"
             details = f"{set_issue_details}"
+            next_steps = f"{set_issue_next_steps}"
+
         elif query == "raise_issue_if_ncontains" and query_value not in variable_value:
             issue_found = True
             title = f"Value of {prefix} Did Not Contain {query_value}"
@@ -309,6 +324,8 @@ def _check_for_json_issue(
             actual = f"The parsed output {variable_value} stored in {prefix} using the path: {variable_from_path[prefix]} resulted in {variable_value} and we expected to find {query_value} in the result"
             reproduce_hint = f"Run {rsp.cmd} and apply the jmespath '{variable_from_path[prefix]}' to the output"
             details = f"{set_issue_details}"
+            next_steps = f"{set_issue_next_steps}"
+
         # Explicit sets
         if set_severity_level:
             severity = set_severity_level
@@ -320,6 +337,8 @@ def _check_for_json_issue(
             actual = set_issue_actual
         if set_issue_reproduce_hint:
             reproduce_hint = set_issue_reproduce_hint
+        if set_issue_next_steps:
+            next_steps = set_issue_next_steps
         if issue_found:
             break
     # return struct like results
@@ -332,4 +351,5 @@ def _check_for_json_issue(
         reproduce_hint=reproduce_hint,
         issue_found=issue_found,
         details=details,
+        next_steps=next_steps,
     )

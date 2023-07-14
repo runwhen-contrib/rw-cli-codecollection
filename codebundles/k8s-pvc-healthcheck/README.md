@@ -18,9 +18,10 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 The TaskSet provides the following tasks:
 
 - `Fetch Events for Unhealthy Kubernetes Persistent Volume Claims`: This task lists events related to persistent volume claims within the desired namespace that are not bound to a persistent volume. It retrieves the events and displays information like the last timestamp, name, and message associated with the PVC.
-- `List Persistent Volumes in Terminating State`: This tasl lists events related to persistent volumes in a Terminating state. It retrieves the events and displays information like the last timestamp, name, and message associated with the PV.
+- `List Persistent Volumes in Terminating State`: This task lists events related to persistent volumes in a Terminating state. It retrieves the events and displays information like the last timestamp, name, and message associated with the PV.
 - `List Pods with Attached Volumes and Related PV Details`: This task collects details on the configured persistent volume claim, persistent volume, and node for each pod in the specified namespace. It displays information such as the pod name, PVC name, PV name, status, node, zone, ingress class, access modes, and reclaim policy.
-- `Fetch the Storage Utilization for PVC Mounts`: This keyword retrieves the storage utilization for PVC mounts in each pod within the specified namespace. It executes the `df -h` command inside each pod and displays information about the pod, PVC, volume name, container name, and mount path. It also checks if the PVC utilization exceeds 95% and raises an issue if it does.
+- `Fetch the Storage Utilization for PVC Mounts`: This task retrieves the storage utilization for PVC mounts in each pod within the specified namespace. It executes the `df -h` command inside each pod and displays information about the pod, PVC, volume name, container name, and mount path. It also checks if the PVC utilization exceeds 95% and raises an issue if it does.
+- `Check for RWO Persistent Volume Node Attachment Issues`: This task finds pods with RWO type storage and prints a report of which node the pod is scheduled and where the storage is attached with an "OK" if they are the same and "Error" if they are mismatched. 
 
 ## Pre-requisites
 

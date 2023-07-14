@@ -9,6 +9,7 @@ This codebundle is used for searching in a namespace for possible issues to tria
 `Get Listing Of Workloads In Namespace`
 `Check For Namespace Event Anomalies`
 `Troubleshoot Namespace Services And Application Workloads`
+`Check Missing or Risky PodDisruptionBudget Policies`
 
 
 ## Configuration
