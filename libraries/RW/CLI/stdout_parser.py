@@ -37,6 +37,7 @@ def parse_cli_output_by_line(
     set_issue_reproduce_hint: str = "",
     set_issue_title: str = "",
     set_issue_details: str = "",
+    set_issue_next_steps: str = "",
     expected_rsp_statuscodes: list[int] = [200],
     expected_rsp_returncodes: list[int] = [0],
     contains_stderr_ok: bool = True,
@@ -80,6 +81,7 @@ def parse_cli_output_by_line(
                 actual=rsp_code_actual,
                 reproduce_hint=rsp_code_reproduce_hint,
                 details=f"{set_issue_details} ({e})",
+                next_steps=set_issue_next_steps,
             )
             issue_count += 1
         else:
@@ -104,6 +106,7 @@ def parse_cli_output_by_line(
                     actual=f"Actual result: {regexp_results}",
                     reproduce_hints=f"Try apply the regex: {lines_like_regexp} to lines produced by the command: {rsp.parsed_cmd}",
                     details=f"{set_issue_details}",
+                    next_steps=f"{set_issue_next_steps}",
                 )
                 issue_count += 1
                 continue
@@ -119,6 +122,7 @@ def parse_cli_output_by_line(
             actual: str = ""
             reproduce_hint: str = ""
             details: str = ""
+            next_steps: str = ""
             query_parts = parse_query.split("__")
             if len(query_parts) != 2:
                 if not squelch_further_warnings:
@@ -168,6 +172,7 @@ def parse_cli_output_by_line(
                         else set_issue_reproduce_hint
                     )
                     details = f"{set_issue_details}"
+                    next_steps = f"{set_issue_next_steps}"
                     issue_count += 1
                 elif query == "raise_issue_if_neq" and query_value != capture_group_value:
                     severity = set_severity_level
@@ -192,6 +197,7 @@ def parse_cli_output_by_line(
                         else set_issue_reproduce_hint
                     )
                     details = f"{set_issue_details}"
+                    next_steps = f"{set_issue_next_steps}"
                     issue_count += 1
                 elif query == "raise_issue_if_lt" and numeric_castable and capture_group_value < query_value:
                     severity = set_severity_level
@@ -216,6 +222,7 @@ def parse_cli_output_by_line(
                         else set_issue_reproduce_hint
                     )
                     details = f"{set_issue_details}"
+                    next_steps = f"{set_issue_next_steps}"
                     issue_count += 1
                 elif query == "raise_issue_if_gt" and numeric_castable and capture_group_value > query_value:
                     severity = set_severity_level
@@ -240,6 +247,7 @@ def parse_cli_output_by_line(
                         else set_issue_reproduce_hint
                     )
                     details = f"{set_issue_details}"
+                    next_steps = f"{set_issue_next_steps}"
                     issue_count += 1
                 elif query == "raise_issue_if_contains" and query_value in capture_group_value:
                     severity = set_severity_level
@@ -264,6 +272,7 @@ def parse_cli_output_by_line(
                         else set_issue_reproduce_hint
                     )
                     details = f"{set_issue_details}"
+                    next_steps = f"{set_issue_next_steps}"
                     issue_count += 1
                 elif query == "raise_issue_if_ncontains" and query_value not in capture_group_value:
                     severity = set_severity_level
@@ -288,6 +297,7 @@ def parse_cli_output_by_line(
                         else set_issue_reproduce_hint
                     )
                     details = f"{set_issue_details}"
+                    next_steps = f"{set_issue_next_steps}"
                     issue_count += 1
                 if title and len(first_issue.keys()) == 0:
                     known_symbols = {**kwargs, **capture_groups}
@@ -298,6 +308,7 @@ def parse_cli_output_by_line(
                         "actual": Template(actual).safe_substitute(known_symbols),
                         "reproduce_hint": Template(reproduce_hint).safe_substitute(known_symbols),
                         "details": Template(details).safe_substitute(known_symbols),
+                        "next_steps": Template(next_steps).safe_substitute(known_symbols),
                     }
             else:
                 logger.info(f"Prefix {prefix} not found in capture groups: {capture_groups.keys()}")
