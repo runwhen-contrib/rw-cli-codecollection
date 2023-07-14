@@ -30,6 +30,7 @@ Fetch Ingress Object Health in Namespace
     ...    set_issue_actual=Ingress objects missing services or endpoints found in namespace: ${NAMESPACE}
     ...    set_issue_title=Unhealthy ingress objects found in ${NAMESPACE}
     ...    set_issue_details=Ingress object health is:\n\n$_stdout\n\n
+    ...    set_issue_next_steps=check namespace
     ...    _line__raise_issue_if_contains=Unhealthy
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Ingress object summary for ${NAMESPACE}:\n\n${ingress_object_summary.stdout}

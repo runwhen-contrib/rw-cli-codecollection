@@ -44,6 +44,7 @@ Fetch Nginx Ingress Metrics From GMP And Perform Inspection On Results
     ...    set_issue_title=Detected HTTP Error Codes Across Network
     ...    set_issue_details=HTTP error codes in ingress and service "$_line". Troubleshoot the application associated with: ${svc_name.stdout}
     ...    set_issue_next_steps=Check For Namespace Event Anomalies ${svc_namespace}
+    ...    set_issue_next_steps=check namespace
     ...    _line__raise_issue_if_contains=Host
     ${ingress_info}=    Set Variable    ${gmp_rsp.stdout}
     IF    """${ingress_info}""" == "" or """${ingress_info}""".isspace()

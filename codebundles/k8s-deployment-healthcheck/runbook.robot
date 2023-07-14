@@ -52,6 +52,7 @@ Troubleshoot Deployment Warning Events
     ...    set_issue_actual=Events of type warning found for deployment.
     ...    set_issue_title=The deployment ${DEPLOYMENT_NAME} has warning events.
     ...    set_issue_details=Warning events found for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE} eg: $_line \n - check event output and related nodes, PersistentVolumes, PersistentVolumeClaims, image registry authenticaiton, or fluxcd or argocd logs.
+    ...    set_issue_next_steps=check pvc
     ...    _line__raise_issue_if_contains=Warning
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${events.stdout}
@@ -99,12 +100,14 @@ Troubleshoot Deployment Replicas
     ...    assign_stdout_from_var=available_replicas
     ...    set_issue_title=No replicas available for deployment/${DEPLOYMENT_NAME}
     ...    set_issue_details=No replicas available for deployment/${DEPLOYMENT_NAME} in namespace ${NAMESPACE}, we found 0. Check deployment has not been scaled down, deployment events, PersistentVolumes, deployment configuration, or applicable fluxcd or argo gitops configurations or status.
+    ...    set_issue_next_steps=check pvc
     RW.CLI.Parse Cli Json Output
     ...    rsp=${available_replicas}
     ...    extract_path_to_var__available_replicas=@
     ...    available_replicas__raise_issue_if_lt=${EXPECTED_AVAILABILITY}
     ...    set_issue_title=Fewer Than Expected Available Replicas For Deployment ${DEPLOYMENT_NAME}
     ...    set_issue_details=Fewer than expected replicas available (we found $available_replicas) for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE} - check manifests, kubernetes events, pod logs, resource constraints and PersistentVolumes
+    ...    set_issue_next_steps=check pvc
     ${desired_replicas}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${deployment}
     ...    extract_path_to_var__desired_replicas=status.replicas || `0`
@@ -112,12 +115,14 @@ Troubleshoot Deployment Replicas
     ...    assign_stdout_from_var=desired_replicas
     ...    set_issue_title=Less than desired replicas for deployment/${DEPLOYMENT_NAME}
     ...    set_issue_details=Less than desired replicas for deployment/${DEPLOYMENT_NAME} in ${NAMESPACE}. Check deployment has not been scaled down, deployment events, PersistentVolumes, deployment configuration, or applicable fluxcd or argo gitops configurations or status.
+    ...    set_issue_next_steps=check pvc
     RW.CLI.Parse Cli Json Output
     ...    rsp=${desired_replicas}
     ...    extract_path_to_var__desired_replicas=@
     ...    desired_replicas__raise_issue_if_neq=${available_replicas.stdout}
     ...    set_issue_title=Desired and ready pods for deployment/${DEPLOYMENT_NAME} do not match as expected.
     ...    set_issue_details=Desired and ready pods for deployment/${DEPLOYMENT_NAME} do not match in namespace ${NAMESPACE}, desired: $desired_replicas vs ready: ${available_replicas.stdout}. We got ready:${available_replicas.stdout} vs desired: $desired_replicas - check deployment events, deployment configuration, PersistentVolumes, or applicable fluxcd or argo gitops configurations or status. Check node events, or if the cluster is undergoing a scaling event or upgrade. Check cloud provider service availability for any known outages.
+    ...    set_issue_next_steps=check pvc
     ${desired_replicas}=    Convert To Number    ${desired_replicas.stdout}
     ${available_replicas}=    Convert To Number    ${available_replicas.stdout}
     RW.Core.Add Pre To Report    Deployment State:\n${deployment.stdout}
@@ -140,6 +145,7 @@ Check For Deployment Event Anomalies
     ...    set_issue_actual=We detected events in the namespace ${NAMESPACE} which are considered anomalies
     ...    set_issue_title=Event Anomalies Detected In Namespace ${NAMESPACE}
     ...    set_issue_details=Anomaly non-warning events in namespace ${NAMESPACE}:\n"$_stdout"
+    ...    set_issue_next_steps=check pvc
     ...    _line__raise_issue_if_contains=Object
     ${history}=    RW.CLI.Pop Shell History
     ${recent_anomalies}=    Set Variable    ${recent_anomalies.stdout}
