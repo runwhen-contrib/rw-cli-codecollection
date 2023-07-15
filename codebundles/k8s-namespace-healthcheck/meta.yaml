@@ -48,20 +48,34 @@ commands:
   name: troubleshoot_container_restarts_in_namespace
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending
     --no-headers -o json | jq -r ''.items[] | "---\npod_name: \(.metadata.name)\nstatus:
-    \(.status.phase // "N/A")\nmessage: \(.status.conditions[0].message // "N/A")\nreason:
-    \(.status.conditions[0].reason // "N/A")\n---\n"'''
-  explanation: '
-
-
-    Kubectl get pods is a command that can be used to access information about running
-    pods in Kubernetes. The --context flag allows you to specify a cluster context,
-    the -n flag allows you to specify a namespace and the --field-selector flag allows
-    you to filter for pods with a given status. In this example, the status of Pending
-    is being filtered for. The --no-headers flag instructs the command not to include
-    heading labels in its output while the -o json flag instructs it to output data
-    in JSON format. Lastly, jq inputs JavaScript Object Notation (JSON) data and is
-    used to transform it into human-readable form. In the example given, jq is used
-    to display pod name, status, message, and reason.'
+    \(.status.phase // "N/A")\nmessage: \(.status.conditions[].message // "N/A")\nreason:
+    \(.status.conditions[].reason // "N/A")\ncontainerStatus: \((.status.containerStatuses
+    // [{}])[].state // "N/A")\ncontainerMessage: \((.status.containerStatuses //
+    [{}])[].state?.waiting?.message // "N/A")\ncontainerReason: \((.status.containerStatuses
+    // [{}])[].state?.waiting?.reason // "N/A")\n---\n"'''
+  explanation: "\n\nThis command can be used to get a list of pending pods in a specific\
+    \ Kubernetes namespace and context. The command begins with the command 'kubectl',\
+    \ which is the command line tool for interacting with a Kubernetes cluster. Following\
+    \ that are the flags 'get pods', which is an instruction to kubectl to retrieve\
+    \ a list of pods from the cluster. \n\nThe flag '--context=' followed by (${CONTEXT})\
+    \ gives additional information about which context you want to view the pods from.\
+    \ Contexts provide different views of the same cluster, allowing multiple users\
+    \ to access the same cluster with different sets of restrictions. \n\nThe flag\
+    \ '-n' followed by (${NAMESPACE}) tells kubectl to only show pods from this particular\
+    \ namespace on the cluster. Namespaces are used to identify and group resources\
+    \ such as pods; think of them as a way to organize your system into logical units.\
+    \ \n\nThe flag '--field-selector=status.phase=Pending' will tell Kubectl to only\
+    \ list pods with status phase 'Pending'. The '--no-headers' flag tells Kubectl\
+    \ to not list any headers or labels when displaying the output. \n\nFinally, the\
+    \ last two components of the command, -o json and jq -r '.items[] | \"---\\npod_name:\
+    \ \\(.metadata.name)\\nstatus: \\(.status.phase // \"N/A\")\\nmessage:\\n \\(.status.conditions[].message\
+    \ // \"N/A\")\\nreason: \\(.status.conditions[].reason // \"N/A\")\\ncontainerStatus:\
+    \ \\((.status.containerStatuses // [{}])[].state // \"N/A\")\\nmessage: \\((.status.containerStatuses\
+    \ // [{}])[].state?.waiting?.message // \"N/A\")\\ncontainerReason: \\((.status.containerStatuses\
+    \ // [{}])[].state?.waiting?.reason // \"N/A\")\\n---\\n\"' \nThese two commands\
+    \ instruct kubectl to format the output as JSON for easier parsing by other programs\
+    \ such as jq. jq is a command line json processor which in this case is filtering\
+    \ the data and printing out specific fields about the pending pods."
   name: troubleshoot_pending_pods_in_namespace
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed
     --no-headers -o json | jq -r --argjson exit_code_explanations ''{"0": "Success",
