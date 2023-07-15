@@ -17,19 +17,6 @@ commands:
     the provided error codes. Finally, it checks if there are any results, and displays
     relevant details such as host, namespace, service, etc.'
   name: fetch_nginx_ingress_metrics_from_gmp_and_perform_inspection_on_results
-- command: 'gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
-    && curl -d "query=rate(nginx_ingress_controller_requests{host=''${INGRESS_HOST}'',
-    service=''${INGRESS_SERVICE}'', status=~''${ERROR_CODES}''}[${TIME_SLICE}]) >
-    0" -H "Authorization: Bearer $(gcloud auth print-access-token)" ''https://monitoring.googleapis.com/v1/projects/${GCP_PROJECT_ID}/location/global/prometheus/api/v1/query'''
-  explanation: '
-
-
-    This command is used to authenticate and query requests from the Kubernetes Nginx
-    Ingress Controller. It verifies if any error codes have occurred over a set period
-    of time for an assigned host/service combination. The variables with ${} signs
-    are environment variables that provide information on what error codes, host,
-    service, and time interval to monitor.'
-  name: fetch_nginx_ingress_metrics_from_gmp_and_perform_inspection_on_results
 - command: 'namespace="${NAMESPACE}"; context="${CONTEXT}"; ingress="${INGRESS_OBJECT_NAME}";
     echo "Ingress: $ingress"; health_status="NA"; services=(); backend_services=$(kubectl
     get ingress "$ingress" -n "$namespace" --context "$context" -ojsonpath=''{range
@@ -79,4 +66,4 @@ commands:
     associated with the service. It also prints out additional information such as
     the name and kind of the owner of each pod. Finally, it prints out a Health Status
     based on whether or not each service and endpoint exist in the cluster.'
-  name: fetch_nginx_ingress_metrics_from_gmp_and_perform_inspection_on_results
+  name: find_ingress_owner_and_service_health
