@@ -26,7 +26,6 @@ Fetch Nginx Ingress Metrics From GMP And Perform Inspection On Results
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ${gmp_json}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && curl -d "query=rate(nginx_ingress_controller_requests{host='${INGRESS_HOST}', service='${INGRESS_SERVICE}', status=~'${ERROR_CODES}'}[${TIME_SLICE}]) > 0" -H "Authorization: Bearer $(gcloud auth print-access-token)" 'https://monitoring.googleapis.com/v1/projects/${GCP_PROJECT_ID}/location/global/prometheus/api/v1/query'
-    ...    render_in_commandlist=true
     ...    target_service=${GCLOUD_SERVICE}
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
