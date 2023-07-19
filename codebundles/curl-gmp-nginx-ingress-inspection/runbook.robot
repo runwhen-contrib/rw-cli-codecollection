@@ -44,7 +44,7 @@ Fetch Nginx Ingress Metrics From GMP And Perform Inspection On Results
     ...    set_issue_actual=We found the following HTTP error codes: ${ERROR_CODES} associated with the ingress in $_line
     ...    set_issue_title=Detected HTTP Error Codes Across Network
     ...    set_issue_details=HTTP error codes in ingress and service "$_line". Troubleshoot the application associated with: ${INGRESS_SERVICE}
-    ...    set_issue_next_steps=Check Deployment Log For Issues ${ingress_owner.stdout}
+    ...    set_issue_next_steps=${ingress_owner.stdout} check deployment anomalies
     ...    _line__raise_issue_if_contains=Host
     ${ingress_info}=    Set Variable    ${gmp_rsp.stdout}
     IF    """${ingress_info}""" == "" or """${ingress_info}""".isspace()
