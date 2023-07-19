@@ -176,8 +176,8 @@ Troubleshoot Workload Status Conditions In Namespace
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
-    ${svc_name}=    RW.CLI.Run Cli
-    ...    cmd=echo "${all_resources.stdout}" | grep -oP "(?<={'kind': 'Deployment', 'name': ')[^ ]*" | grep -oP "[^.]*(?=',)"
+    ${dply_name}=    RW.CLI.Run Cli
+    ...    cmd=echo "${all_resources.stdout}" | grep -oP "(?<={'kind': 'Deployment', 'name': ')[^ ]*" | grep -oP "[^.]*(?=',)" | head -n 1
     ${failing_conditions}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${all_resources}
     ...    extract_path_to_var__workload_conditions=items[].{kind:kind, name:metadata.name, conditions:status.conditions[?status == `False`]}
@@ -188,7 +188,7 @@ Troubleshoot Workload Status Conditions In Namespace
     ...    set_severity_level=1
     ...    set_issue_title=$pods_with_failures Pods With Unhealthy Status In Namespace ${NAMESPACE}
     ...    set_issue_details=Pods with unhealthy status condition in the namespace ${NAMESPACE}. Here's a summary of potential issues we found:\n"$aggregate_failures"
-    ...    set_issue_next_steps=${svc_name.stdout} check deployments
+    ...    set_issue_next_steps=${dply_name.stdout} get deployment issue logs
     ...    assign_stdout_from_var=aggregate_failures
     ${history}=    RW.CLI.Pop Shell History
     IF    """${failing_conditions.stdout}""" == ""
@@ -222,8 +222,8 @@ Check For Namespace Event Anomalies
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ${svc_name}=    RW.CLI.Run Cli
-    ...    cmd=echo "${recent_anomalies.stdout}" | grep -oP '(?<=Pod/)[^ ]*' | grep -oP '[^.]*(?=-[a-z0-9]+-[a-z0-9]+)'
+    ${pod_name}=    RW.CLI.Run Cli
+    ...    cmd=echo "${recent_anomalies.stdout}" | grep -oP '(?<=Pod/)[^ ]*' | grep -oP '[^.]*(?=-[a-z0-9]+-[a-z0-9]+)' | head -n 1
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${recent_anomalies}
     ...    set_severity_level=2
@@ -231,7 +231,7 @@ Check For Namespace Event Anomalies
     ...    set_issue_actual=We detected events in the namespace ${NAMESPACE} which are considered anomalies
     ...    set_issue_title=Event Anomalies Detected In Namespace ${NAMESPACE}
     ...    set_issue_details=Anomaly non-warning events in namespace ${NAMESPACE}:\n"$_stdout"
-    ...    set_issue_next_steps=${svc_name.stdout} check deployments
+    ...    set_issue_next_steps=${pod_name.stdout} get deployment issue logs
     ...    _line__raise_issue_if_contains=Object
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add To Report    Summary Of Anomalies Detected:\n
