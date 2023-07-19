@@ -223,7 +223,7 @@ Check For Namespace Event Anomalies
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${svc_name}=    RW.CLI.Run Cli
-    ...    cmd=echo "${all_resources.stdout}" | grep -oP '(?<=Pod/)[^ ]*' | grep -oP '[^.]*(?=-[a-z0-9]+-[a-z0-9]+)'
+    ...    cmd=echo "${recent_anomalies.stdout}" | grep -oP '(?<=Pod/)[^ ]*' | grep -oP '[^.]*(?=-[a-z0-9]+-[a-z0-9]+)'
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${recent_anomalies}
     ...    set_severity_level=2
@@ -286,9 +286,9 @@ Check Missing or Risky PodDisruptionBudget Policies
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true
     ${dply_name}=    RW.CLI.Run Cli
-    ...    cmd=echo "${all_resources.stdout}" | grep -oP '(?<=Deployment/)[^ ]*' | grep -oP '[^.]*(?=-[a-z0-9]+-[a-z0-9]+)'
+    ...    cmd=echo "${pdb_check.stdout}" | grep -oP '(?<=Deployment/)[^ ]*' | grep -oP '[^.]*(?=-[a-z0-9]+-[a-z0-9]+)'
     ${svc_name}=    RW.CLI.Run Cli
-    ...    cmd=echo "${all_resources.stdout}" | grep -oP "(?<='name': ')[^ ]*" | grep -oP "[^.]*(?=-[a-z0-9]+-[a-z0-9]+)"
+    ...    cmd=echo "${pdb_check.stdout}" | grep -oP "(?<='name': ')[^ ]*" | grep -oP "[^.]*(?=-[a-z0-9]+-[a-z0-9]+)"
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${pdb_check}
     ...    set_severity_level=2
