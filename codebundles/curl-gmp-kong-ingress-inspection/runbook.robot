@@ -33,7 +33,7 @@ Check If Kong Ingress HTTP Error Rate Violates HTTP Error Threshold
     ...    set_issue_actual=We found the following HTTP error codes ${HTTP_ERROR_CODES} associated with the ingress in $_line
     ...    set_issue_title=Detected HTTP Error Codes Across Network
     ...    set_issue_details=The returned stdout line: $_line indicates there's HTTP error codes associated with this ingress and service. You need to investigate the application associated with: ${INGRESS_SERVICE}
-    ...    set_issue_next_steps=${svc_name.stdout} check deployment anomalies,get namespace anomalies,troubleshoot namespace resources
+    ...    set_issue_next_steps=${svc_name.stdout} check deployment logs,get namespace anomalies,troubleshoot namespace resources
     ...    _line__raise_issue_if_contains=Route
     ${gmp_json}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && curl -s -d "query=rate(kong_http_requests_total{service='${INGRESS_SERVICE}',code=~'${HTTP_ERROR_CODES}'}[${TIME_SLICE}])" -H "Authorization: Bearer $(gcloud auth print-access-token)" 'https://monitoring.googleapis.com/v1/projects/runwhen-nonprod-sandbox/location/global/prometheus/api/v1/query' | jq .
@@ -64,7 +64,7 @@ Check If Kong Ingress HTTP Request Latency Violates Threshold
     ...    set_issue_actual=We found HTTP request latencies greater than ${REQUEST_LATENCY_THRESHOLD} associated with the ingress in $_line
     ...    set_issue_title=Detected HTTP Request Latencies in network
     ...    set_issue_details=The returned stdout line: $_line indicates there's high HTTP request latencies. You need to investigate the application associated with: ${INGRESS_SERVICE} or the Kong ingress controller.
-    ...    set_issue_next_steps=${svc_name.stdout} check deployment anomalies,get namespace anomalies,troubleshoot namespace resources
+    ...    set_issue_next_steps=${svc_name.stdout} check deployment logs,get namespace anomalies,troubleshoot namespace resources
     ...    _line__raise_issue_if_contains=Route
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
