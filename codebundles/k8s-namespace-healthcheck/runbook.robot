@@ -92,7 +92,6 @@ Troubleshoot Container Restarts In Namespace
     ...    render_in_commandlist=true
     ${svc_name}=    RW.CLI.Run Cli
     ...    cmd=echo "${container_restart_details.stdout}" | grep -oP '(?<=pod_name:)[^ ]*' | grep -oP '[^.]*(?=-[a-z0-9]+-[a-z0-9]+)'
-    ...    target_service=${GCLOUD_SERVICE}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${container_restart_details}
     ...    set_severity_level=2
@@ -179,7 +178,6 @@ Troubleshoot Workload Status Conditions In Namespace
     ...    render_in_commandlist=true
     ${svc_name}=    RW.CLI.Run Cli
     ...    cmd=echo "${all_resources.stdout}" | grep -oP "(?<={'kind': 'Deployment', 'name': ')[^ ]*" | grep -oP "[^.]*(?=',)"
-    ...    target_service=${GCLOUD_SERVICE}
     ${failing_conditions}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${all_resources}
     ...    extract_path_to_var__workload_conditions=items[].{kind:kind, name:metadata.name, conditions:status.conditions[?status == `False`]}
@@ -226,7 +224,6 @@ Check For Namespace Event Anomalies
     ...    secret_file__kubeconfig=${kubeconfig}
     ${svc_name}=    RW.CLI.Run Cli
     ...    cmd=echo "${all_resources.stdout}" | grep -oP '(?<=Pod/)[^ ]*' | grep -oP '[^.]*(?=-[a-z0-9]+-[a-z0-9]+)'
-    ...    target_service=${GCLOUD_SERVICE}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${recent_anomalies}
     ...    set_severity_level=2
@@ -290,10 +287,8 @@ Check Missing or Risky PodDisruptionBudget Policies
     ...    render_in_commandlist=true
     ${dply_name}=    RW.CLI.Run Cli
     ...    cmd=echo "${all_resources.stdout}" | grep -oP '(?<=Deployment/)[^ ]*' | grep -oP '[^.]*(?=-[a-z0-9]+-[a-z0-9]+)'
-    ...    target_service=${GCLOUD_SERVICE}
     ${svc_name}=    RW.CLI.Run Cli
     ...    cmd=echo "${all_resources.stdout}" | grep -oP "(?<='name': ')[^ ]*" | grep -oP "[^.]*(?=-[a-z0-9]+-[a-z0-9]+)"
-    ...    target_service=${GCLOUD_SERVICE}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${pdb_check}
     ...    set_severity_level=2
