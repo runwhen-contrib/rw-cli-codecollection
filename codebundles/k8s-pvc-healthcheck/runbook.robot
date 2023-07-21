@@ -46,7 +46,7 @@ List PersistentVolumeClaims in Terminating State
     [Documentation]    Lists persistentvolumeclaims in a Terminating state.
     [Tags]    pvc    list    kubernetes    storage    persistentvolumeclaim    terminating        check PersistentVolumes
     ${terminating_pvcs}=    RW.CLI.Run Cli
-    ...    cmd=NAMESPACE=${NAMESPACE}; kubectl get pvc -n ${KUBERNETES_DISTRIBUTION_BINARY} -o json | jq -r '.items[] | select(.metadata.deletionTimestamp != null) | .metadata.name as $name | .metadata.deletionTimestamp as $deletion_time | .metadata.finalizers as $finalizers | "\\($name) is in Terminating state (Deletion started at: \\($deletion_time)). Finalizers: \\($finalizers)"'
+    ...    cmd=namespace=${NAMESPACE}; context=${CONTEXT}; ${KUBERNETES_DISTRIBUTION_BINARY} get pvc -n $namespace --context=$context -o json | jq -r '.items[] | select(.metadata.deletionTimestamp != null) | .metadata.name as $name | .metadata.deletionTimestamp as $deletion_time | .metadata.finalizers as $finalizers | "\\($name) is in Terminating state (Deletion started at: \\($deletion_time)). Finalizers: \\($finalizers)"'
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
