@@ -42,6 +42,21 @@ Fetch Events for Unhealthy Kubernetes PersistentVolumeClaims
     RW.Core.Add Pre To Report    ${unbound_pvc_events.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
+List PersistentVolumeClaims in Terminating State
+    [Documentation]    Lists persistentvolumeclaims in a Terminating state.
+    [Tags]    pvc    list    kubernetes    storage    persistentvolumeclaim    terminating        check PersistentVolumes
+    ${terminating_pvcs}=    RW.CLI.Run Cli
+    ...    cmd=NAMESPACE=${NAMESPACE}; kubectl get pvc -n ${KUBERNETES_DISTRIBUTION_BINARY} -o json | jq -r '.items[] | select(.metadata.deletionTimestamp != null) | .metadata.name as $name | .metadata.deletionTimestamp as $deletion_time | .metadata.finalizers as $finalizers | "\\($name) is in Terminating state (Deletion started at: \\($deletion_time)). Finalizers: \\($finalizers)"'
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    Summary of events for dangling persistent volumes:
+    RW.Core.Add Pre To Report    ${terminating_pvcs.stdout}
+    RW.Core.Add Pre To Report    Commands Used:\n${history}
+
+
 List PersistentVolumes in Terminating State
     [Documentation]    Lists events related to persistent volumes in Terminating state.
     [Tags]    pv    list    kubernetes    storage    persistentvolume    terminating    events    check event output and related nodes, PersistentVolumes, PersistentVolumeClaims, image registry authenticaiton, or fluxcd or argocd logs.
