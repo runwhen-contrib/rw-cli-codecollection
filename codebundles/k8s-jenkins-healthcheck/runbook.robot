@@ -104,7 +104,7 @@ Query For Stuck Jenkins Jobs
     [Documentation]    Performs a curl within the jenkins statefulset kubernetes workload to check for stuck jobs in the jenkins piepline queue.
     [Tags]    HTTP    Curl    Web    Code    OK    Available    Queue    Stuck    Jobs    Jenkins
     ${rsp}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- curl -s localhost:8080/queue/api/json --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key} | jq -r '.items[] | select((.stuck == true) or (.blocked == true)) | "Why: " + .why + "\nBlocked: " + (.blocked|tostring) + "\nStuck: " + (.stuck|tostring)'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- curl -s localhost:8080/queue/api/json --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key} | jq -r '.items[] | select((.stuck == true) or (.blocked == true)) | "Why: " + .why + "\\nBlocked: " + (.blocked|tostring) + "\\nStuck: " + (.stuck|tostring)'
     ...    secret__jenkins_sa_username=${JENKINS_SA_USERNAME}
     ...    secret__jenkins_sa_token=${JENKINS_SA_TOKEN}
     ...    env=${env}
