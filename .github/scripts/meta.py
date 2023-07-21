@@ -216,7 +216,7 @@ def generate_metadata(directory_path):
                 command_meta = {
                     'name': name_snake_case,
                     'command': command,
-                    'explanation': explain['explanation']
+                    'explanation': explain['explanation'],
                     'multi_line_details': multi_line['explanation']
                 }
                 # Add the command meta to the list of commands
