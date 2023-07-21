@@ -181,7 +181,7 @@ def generate_metadata(directory_path):
     Returns:
         Object 
     """
-    explainUrl=f'https://backend-services.dev.project-468.com/bow/raw?prompt='
+    explainUrl=f'https://papi.test.runwhen.com/bow/raw?prompt='
     search_list = ['render_in_commandlist=true']
     runbook_files = find_files(directory_path, 'runbook.robot')
     for runbook in runbook_files:

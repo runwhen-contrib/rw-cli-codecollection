@@ -19,4 +19,20 @@ commands:
     and wait until it is ready before getting the token for authentication and then
     performing a curl request on the given API server resource. After the request
     is complete, the Pod will be deleted to clean up the environment.'
+  multi_line_details: "\n\n#Define the variables to use throughout the script\nAPISERVER=\"\
+    https://kubernetes.default.svc\"\nNAMESPACE=\"${NAMESPACE}\"\nCONTEXT=\"${CONTEXT}\"\
+    \nRESOURCE=\"\"\nSERVICE_ACCOUNT=\"${SERVICE_ACCOUNT}\"\n\n#Run a curl-pod that\
+    \ never restarts\necho \"Running curl-pod...\"\nkubectl run curl-pod --image=curlimages/curl:latest\
+    \ --restart=Never --overrides=\"{ \\\"spec\\\": { \\\"serviceAccountName\\\":\
+    \ \\\"$serviceaccount\\\" } }\" -n $namespace --context=$context\n\n#Wait for\
+    \ curl-pod to become ready\necho \"Waiting for the curl-pod to be running...\"\
+    \nkubectl wait --for=condition=Ready pod/curl-pod --timeout=20s -n $namespace\
+    \ --context=$context\n\n#Get token of service account for authorization\necho\
+    \ \"Retrieving token...\"\nTOKEN=$(kubectl exec curl-pod -n $namespace --context=$context\
+    \ -- cat /var/run/secrets/kubernetes.io/serviceaccount/token)\n\n#Perform a curl\
+    \ request to the Kubernetes API\necho \"Performing a curl request to the Kubernetes\
+    \ API...\"\nkubectl exec curl-pod -n $namespace --context=$context -- curl -s\
+    \ -k -H \"Authorization: Bearer $TOKEN\" $apiserver$resource \n\n#Clean up the\
+    \ curl-pod\necho \"Cleaning up...\"\nkubectl delete pod curl-pod -n $namespace\
+    \ --context=$context\n\necho \"Done\""
   name: test_service_account_access_to_kubernetes_api_server

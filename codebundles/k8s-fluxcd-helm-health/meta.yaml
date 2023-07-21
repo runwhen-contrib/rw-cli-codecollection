@@ -11,6 +11,26 @@ commands:
     of resources you want to work with, if you are connected to multiple clusters
     at once. This command can be used to get information about your desired resource,
     like the current state of the resource, or your desired configuration settings.'
+  multi_line_details: '
+
+
+    # This is a script to get resources in a specific Kubernetes context.
+
+    # You need to provide three values as input - resource name, namespace and context.
+
+
+    # Declaring Variables for Resource Name, Namespace and Context
+
+    RESOURCE_NAME="[YOUR_RESOURCE_NAME]"
+
+    NAMESPACE="[YOUR_NAMESPACE]"
+
+    CONTEXT="[YOUR_CONTEXT]"
+
+
+    # Running command to get the resources with the given parameters
+
+    kubectl get ${RESOURCE_NAME} ${NAMESPACE} --context ${CONTEXT}'
   name: list_all_available_fluxcd_helmreleases
 - command: 'kubectl get ${RESOURCE_NAME} ${NAMESPACE} -o=jsonpath="{range .items[*]}{''\nName:
     ''}{@.metadata.name}{''\nlastAppliedRevision:''}{@.status.lastAppliedRevision}{''\nlastAttemptedRevision:''}{@.status.lastAttemptedRevision}{''\n---''}{end}"
@@ -24,6 +44,15 @@ commands:
     allows you to specify a specific Kubernetes context which can be used to access
     multiple clusters from the same kubectl instance. The || true at the end ensures
     the command returns 0 even if it finds nothing, so an error isn''t thrown.'
+  multi_line_details: "\n\n## Get the resource name, namespace and context for your\
+    \ environment\nRESOURCE_NAME=\"deployments\"\nNAMESPACE=\"default\"\nCONTEXT=\"\
+    my-cluster\"\n\n## Get resources and associated information in JSON format\ngetResourcesJSON=$(kubectl\
+    \ get ${RESOURCE_NAME} ${NAMESPACE} -o=jsonpath=\"{range .items[*]}{'\\nName:\
+    \ '}{@.metadata.name}{'\\nlastAppliedRevision:'}{@.status.lastAppliedRevision}{'\\\
+    nlastAttemptedRevision:'}{@.status.lastAttemptedRevision}{'\\n---'}{end}\")\n\n\
+    ## Print out the resources with associated information \necho -e $getResourcesJSON\n\
+    \n## Exit if an error is encountered while running this command\n[ $? -eq 0 ]\
+    \ || exit"
   name: fetch_all_fluxcd_helmrelease_versions
 - command: 'kubectl get ${RESOURCE_NAME} ${NAMESPACE} -o json --context ${CONTEXT}
     | jq -r ''.items[] | select(.status.lastAppliedRevision!=.status.lastAttemptedRevision)
@@ -39,6 +68,14 @@ commands:
     from the last applied version. The jq command is then used to produce a human-readable
     output, displaying the name of the resource, its last attempted version, and its
     last applied version.'
+  multi_line_details: "\n\n# Below script converts the command given above into a\
+    \ multi-line script format with comments. \n# This will help new kubernetes users\
+    \ to understand the syntax more easily.\n\n# Get resource data in JSON format\n\
+    DATA=$(kubectl get ${RESOURCE_NAME} ${NAMESPACE} -o json --context ${CONTEXT})\n\
+    echo $DATA\n\n# Parse the output using jq and print the desired output\nPARSED_DATA=$(echo\
+    \ $DATA | jq -r '.items[] | select(.status.lastAppliedRevision!=.status.lastAttemptedRevision)\
+    \ | \"Name: \" + .metadata.name + \" Last Attempted Version: \" + .status.lastAttemptedRevision\
+    \ + \" Last Applied Revision: \" + .status.lastAppliedRevision')\necho $PARSED_DATA"
   name: fetch_mismatched_fluxcd_helmrelease_version
 - command: 'kubectl get ${RESOURCE_NAME} ${NAMESPACE} -o=jsonpath="{range .items[?(@.status.conditions[].status==''False'')]}{''-----\nName:
     ''}{@.metadata.name}{''\n''}{@.status.conditions[*].message}{''\n''}{end}" --context
@@ -54,4 +91,13 @@ commands:
     action. The ''--context'' argument can be used to select a specific Kubernetes
     cluster. Additionally, the ''-o=jsonpath'' argument allows you to customize the
     output format.'
+  multi_line_details: "\n\n#This is a script to query resources in Kubernetes and\
+    \ output error messages. \n#This script needs the following four parameters: resource\
+    \ name, namespace, context and the jsonpath expression for parsing data.\n\nRESOURCE_NAME=<fill\
+    \ in desired resource name>\nNAMESPACE=<fill in desired namespace>\nCONTEXT=<fill\
+    \ in desired context>\n\n#Below is the command that will query the given resource\
+    \ under the specified namespace using the chosen context and parse it using the\
+    \ given jsonpath expression.\nkubectl get ${RESOURCE_NAME} ${NAMESPACE} -o=jsonpath=\"\
+    {range .items[?(@.status.conditions[].status=='False')]}{'-----\\nName: '}{@.metadata.name}{'\\\
+    n'}{@.status.conditions[*].message}{'\\n'}{end}\" --context ${CONTEXT} || true"
   name: fetch_fluxcd_helmrelease_error_messages

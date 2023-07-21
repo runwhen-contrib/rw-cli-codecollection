@@ -9,6 +9,11 @@ commands:
     \ to the last 100 records, making it easier for troubleshooting. Finally, the\
     \ --context and -n options ensure that the command is executed in the correct\
     \ context (cluster) and namespace."
+  multi_line_details: "\n\n# This script will show the last 100 entries of a specified\
+    \ Kubernetes StatefulSet on a given namespace/context. \n\n#Specify context, namespace\
+    \ and statefulset name:\nCONTEXT='myContext'\nNAMESPACE='myNamespace'\nSTATEFULSET_NAME='myStatefulSetName'\n\
+    \n# Command to get logs for the specified StatefulSet:\nkubectl logs --tail=100\
+    \ statefulset/${STATEFULSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}"
   name: fetch_statefulset_logs
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "${STATEFULSET_NAME}" || true
@@ -24,6 +29,14 @@ commands:
     Finally, the command also uses grep -i to search for the StatefulSet specified
     by the variable ${STATEFULSET_NAME}. The || true at the end ensures that the command
     will always return true, even if no matching events are found.'
+  multi_line_details: "\n\n# Description: Get events from a particular Kubernetes\
+    \ context and namespace, and look for those belonging to a specific statefulset.\
+    \ \n\n# Store important command parameters in variables\nCONTEXT=\"my-context\"\
+    \nNAMESPACE=\"my-namespace\"\nSTATEFULSET_NAME=\"MyStatefulSet\"\n\n# Run the\
+    \ kubectl command to get events from that context/namespace that match the statefulset\
+    \ name\nkubectl get events \\\n    --field-selector type=Warning \\\n    --context\
+    \ ${CONTEXT} \\\n    -n ${NAMESPACE} | \\\n    grep -i \"${STATEFULSET_NAME}\"\
+    \ || true"
   name: get_related_statefulset_events
 - command: kubectl get statefulset ${LABELS} --context=${CONTEXT} -n ${NAMESPACE}
     -o yaml
@@ -35,6 +48,14 @@ commands:
     labels. ${CONTEXT} determines which kubernetes cluster you are querying from.
     ${NAMESPACE} is the namespace you want to query in. Finally, -o yaml requests
     the output be returned as YAML instead of table format.'
+  multi_line_details: "\n\n#Create a namespace if one does not already exist with\
+    \ the 'kubectl create namespace' command\nkubectl create namespace ${NAMESPACE}\n\
+    \n#Set environment variables so values are consistently used in the script \n\
+    LABELS=webserver \nCONTEXT=my-cluster\n\n#Retrieve full StatefulSet info from\
+    \ Kubernetes cluster \n#'--context' parameter is required to ensure it's running\
+    \ against the right cluster & '-o yaml' provided output in yaml format\nkubectl\
+    \ get statefulset \\\n    ${LABELS} \\\n    --context=${CONTEXT} \\\n    -n ${NAMESPACE}\
+    \ \\\n    -o yaml"
   name: fetch_statefulset_manifest_details
 - command: 'kubectl get statefulset -n ${NAMESPACE} -o json --context ${CONTEXT} |
     jq -r ''.items[] | select(.status.availableReplicas < .status.replicas) | "---\nStatefulSet
@@ -49,4 +70,14 @@ commands:
     out those StatefulSets with fewer than the desired number of replicas. The output
     of the query is formatted in a readable way that includes the name of the StatefulSet,
     the desired number of replicas, and the number of available replicas.'
+  multi_line_details: "\n\n# This script is used to get statefulsets in a kubernetes\
+    \ cluster, filtering the ones that have available replicas less than desired replicas.\
+    \ \n# The variables ${NAMESPACE} and ${CONTEXT} should be correctly sets before\
+    \ running this script.\n# The output will print the produced information as result\
+    \ of the executed command.\n\n# Get statefulsets from Kubernetes cluster\nkubectl\
+    \ get statefulset \\\n    -n ${NAMESPACE} \\ \n\t-o json \\\n    --context ${CONTEXT}\
+    \ \\\n| jq \\\n    -r '.items[] \\ \n        | select(.status.availableReplicas\
+    \ < .status.replicas) \\\n        | \"---\\nStatefulSet Name: \" + (.metadata.name|tostring)\
+    \ + \"\\nDesired Replicas: \" + (.status.replicas|tostring) + \"\\nAvailable Replicas:\
+    \ \" + (.status.availableReplicas|tostring)'"
   name: list_statefulsets_with_unhealthy_replica_counts

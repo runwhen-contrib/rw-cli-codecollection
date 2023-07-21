@@ -9,6 +9,15 @@ commands:
     "${NAMESPACE}". The output will be the response code for the request (such as
     200 or 404). This can help diagnose whether or not the statefulset is functioning
     properly.'
+  multi_line_details: "\n\n# This script helps Kubernetes users configure a simple\
+    \ cURL command to test the status of a \n# statefulset in the Kubernetes cluster.\
+    \ It assumes the user has already set the below \n# variables.\n\nSTATEFULSET_NAME=\"\
+    [INSERT STATEFULSET NAME]\"\nCONTEXT=\"[INSERT CONTEXT]\"\nNAMESPACE=\"[INSERT\
+    \ NAMESPACE]\"\n\n# This is the command that the user will execute. The command\
+    \ executes a cURL command to a \n# statefulset within a specific context and namespace,\
+    \ checking for a 200 OK code.\nkubectl exec \\\n\tstatefulset/${STATEFULSET_NAME}\
+    \ \\\n\t--context=${CONTEXT} \\\n\t-n ${NAMESPACE} \\\n\t-- curl -s -o /dev/null\
+    \ -w \"%{http_code}\" localhost:8080/login"
   name: query_the_jenkins_kubernetes_workload_http_endpoint
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -s localhost:8080/api/json?pretty=true --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}
@@ -21,6 +30,12 @@ commands:
     Additionally, it passes the username and token information associated with a Jenkins
     service account for authentication. Once authenticated, it will do a curl request
     of the specified URL and return its response, formatted using JSON.'
+  multi_line_details: "\n\n# Connect the kubectl client to the cluster with the context.\
+    \ Also provide the namespace target.\nkubectl exec statefulset/${STATEFULSET_NAME}\
+    \ \\\n    --context=${CONTEXT} \\\n    -n ${NAMESPACE} \\\n    -- \n# Perform\
+    \ a curl request against the endpoint localhost:8080/api/json?pretty=true with\
+    \ the provided username and token\ncurl -s localhost:8080/api/json?pretty=true\
+    \ \\\n    --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}"
   name: query_the_jenkins_kubernetes_workload_http_endpoint
 - command: 'kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -s localhost:8080/queue/api/json --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}
@@ -41,4 +56,14 @@ commands:
     and outputted with details as to why they might be in that state. Additionally,
     the specified user ($${JENKINS_SA_USERNAME.key}) and token ($${JENKINS_SA_TOKEN.key})
     are used for authentication.'
+  multi_line_details: "\n\n# Execute a command in a container and parse the response\
+    \ using jq in order to indentify stuck or blocked jobs\n# Define variables\nSTATEFULSET_NAME=\"\
+    statefulset\"\nCONTEXT=\"cluster-context\"\nNAMESPACE=\"production\"\nJENKINS_SA_USERNAME.key=\"\
+    admin\"\nJENKINS_SA_TOKEN.key=\"12edads6h4jhs\"\n\n# Execute the command to find\
+    \ stuck or blocked jobs\nkubectl exec statefulset/${STATEFULSET_NAME} \\\n   \
+    \ --context=${CONTEXT} \\ \n    -n ${NAMESPACE} \\ \n    -- curl -s localhost:8080/queue/api/json\
+    \ \\\n    --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key} | \\ \n\
+    \    # Parse the response using jq\n    jq -r '.items[] | select((.stuck == true)\
+    \ or (.blocked == true)) | \"Why: \" + .why + \"\n    Blocked: \" + (.blocked|tostring)\
+    \ + \"\n    Stuck: \" + (.stuck|tostring)'"
   name: query_for_stuck_jenkins_jobs

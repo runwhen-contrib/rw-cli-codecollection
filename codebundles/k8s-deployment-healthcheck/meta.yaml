@@ -17,6 +17,17 @@ commands:
     the given pattern. Finally, sort will sort the output and uniq -c will give a
     frequency count for unique values that have been sorted previously. The awk command
     is then used to format the output to "Occurences: [number] [value]"'
+  multi_line_details: "\n\n# Get log messages from the given deployment with limited\
+    \ bytes, for the last 3 hours. Then filter out error messages that are not related\
+    \ to the given pattern and finally produce the occurrence count of each log message\n\
+    kubectl logs deployment/${DEPLOYMENT_NAME} \\ \n    --limit-bytes=256000 \\  \
+    \ # Limiting the logs size \n    --since=3h \\             # Get logs for the\
+    \ past 3 hours  \n    --context=${CONTEXT} \\   # Context name\n    -n ${NAMESPACE}\
+    \ |        # Namespace for getting deployments\n    grep -Ei \"${LOGS_ERROR_PATTERN}\"\
+    \ | # Filter out Error Messages\n    grep -Eiv \"${LOGS_EXCLUDE_PATTERN}\" | #\
+    \ Exclude certain messages \n    sort |                    # Sort to group similar\
+    \ messages together \n    uniq -c |                 # Count Occurences of Each\
+    \ Message \n    awk '{print \"Occurences:\",$0}'      # Print the occurrence count"
   name: check_deployment_log_for_issues
 - command: kubectl get events --context ${CONTEXT} -n ${NAMESPACE} --field-selector
     type=Warning | grep -i "${DEPLOYMENT_NAME}" || true
@@ -28,6 +39,15 @@ commands:
     and also filters those results again by the deployment name you provide. The "||
     true" at the end of the command is used to ensure that it always returns as having
     succeeded (even if there are no results from the initial query).'
+  multi_line_details: "\n\n# This script will allow users to get relevant Kubernetes\
+    \ events for the chosen namespace and deployment. \n# This will help diagnose\
+    \ issues with deployments.\n\n# Set your specific context, namespace, and deployment\
+    \ name\nCONTEXT=\"your_context\"\nNAMESPACE=\"your_namespace\"\nDEPLOYMENT_NAME=\"\
+    your_deployment\"\n\n# This command will query get events which match with field\
+    \ type is Warning\n# Pipe the output to grep to filter based on specified deployment\
+    \ name \n# End with || true to make sure script does not fail if no results are\
+    \ found\nkubectl get events --context ${CONTEXT} -n ${NAMESPACE} --field-selector\
+    \ type=Warning | \\\n    grep -i \"${DEPLOYMENT_NAME}\" || true"
   name: troubleshoot_deployment_warning_events
 - command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o yaml
@@ -39,6 +59,11 @@ commands:
     it in YAML format. This is useful if you need to examine or modify a deployment
     configuration, or if you just want to view the settings that are currently being
     used by a given deployment.'
+  multi_line_details: "\n\n# This command retrieves the YAML you need to read/modify/delete\
+    \ a specific deployment\n\nDEPLOYMENT_NAME=\"deployment-name\"\nCONTEXT=\"context-name\"\
+    \nNAMESPACE=\"namespace-name\"\n\n# Get deployment YAML in specified context and\
+    \ namespace \nkubectl get \\\n  deployment/${DEPLOYMENT_NAME} \\\n  --context\
+    \ ${CONTEXT} \\\n  -n ${NAMESPACE} \\\n  -o yaml"
   name: get_deployment_workload_details_for_report
 - command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o json
@@ -52,6 +77,14 @@ commands:
     you to specify the namespace that contains the desired deployment. Finally, the
     "-o json" argument indicates that you''d like the output information returned
     in a JSON format.'
+  multi_line_details: "\n\n# This is a script to get an existing Kubernetes deployment\
+    \ using the kubectl utility. \n# Make sure that you replace DEPLOYMENT_NAME, CONTEXT\
+    \ and NAMESPACE with appropriate values for your system before running this script\n\
+    \n# Making sure command line arguments are provided\nif [[ $# -ne 3 ]]; then\n\
+    \    echo \"Error: DEPLOYMENT_NAME, CONTEXT, and NAMESPACE must be provided as\
+    \ arguments.\"\n    exit 1\nfi\n\n# Assign variables with the arguments provided\n\
+    DEPLOYMENT_NAME=$1\nCONTEXT=$2\nNAMESPACE=$3\n\n# Run the required command\nkubectl\
+    \ get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json"
   name: troubleshoot_deployment_replicas
 - command: kubectl get events --field-selector type!=Warning --context ${CONTEXT}
     -n ${NAMESPACE} -o json | jq -r '.items[] | select(.involvedObject.name|contains("${DEPLOYMENT_NAME}"))
@@ -73,4 +106,18 @@ commands:
     \ will be printed in the output. Additionally, each record contains data such\
     \ as the count, duration, involved object, reason, and message associated with\
     \ the event."
+  multi_line_details: "\n\n# Create variables for Context, Namespace, Deployment Name,\
+    \ and Anomaly Threshold\nCONTEXT=\"Cluster-Name\"\nNAMESPACE=\"Namespace name\"\
+    \nDEPLOYMENT_NAME=\"Deployment name\"\nANOMALY_THRESHOLD=10\n\n# Get all events\
+    \ (excluding warnings) from the given context in given namespace, and output as\
+    \ JSON\nkubectl get events --field-selector type!=Warning --context ${CONTEXT}\
+    \ -n ${NAMESPACE} -o json \n\n# Using jq sedlect out all the events related to\
+    \ a specific deployment\njq -r '.items[] | select(.involvedObject.name|contains(\"\
+    ${DEPLOYMENT_NAME}\")) | select( .count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60\
+    \ == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end\
+    \ ) > ${ANOMALY_THRESHOLD}) | \"Event(s) Per Minute:\" + (.count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60\
+    \ == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end\
+    \ ) |tostring) +\" Count:\" + (.count|tostring) + \" Minute(s):\" + (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60|tostring)+\
+    \ \" Object:\" + .involvedObject.namespace + \"/\" + .involvedObject.kind + \"\
+    /\" + .involvedObject.name + \" Reason:\" + .reason + \" Message:\" + .message'"
   name: check_for_deployment_event_anomalies

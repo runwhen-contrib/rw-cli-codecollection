@@ -10,6 +10,14 @@ commands:
     cluster with context ${CONTEXT} and namespace ${NAMESPACE}. The curl command will
     perform a request on localhost (inside the container) on port 8091 and send a
     liveness check request with a max timeout of 10 seconds.'
+  multi_line_details: "\n\n# This is a script for Kubernetes users to learn how to\
+    \ check the liveness of an artifactory running in a StatefulSet.\n\n# Set variables\
+    \ \nSTATEFULSET_NAME=\"mystatefulset\" # Replace with the name of your StatefulSet\
+    \ \nCONTEXT=\"dev-cluster\" # Replace with the context where the StatefulSet is\
+    \ configured  \nNAMESPACE=\"mynamespace\" # Replace with the namespace where the\
+    \ StatefulSet is configured \n\n# Run Kubernetes command to check the liveness\
+    \ of the artifactory\nkubectl exec statefulset/${STATEFULSET_NAME} \\\n    --context=${CONTEXT}\
+    \ \\\n    -n ${NAMESPACE} \\\n    -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/liveness"
   name: check_artifactory_liveness_and_readiness_endpoints
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/readiness
@@ -22,4 +30,10 @@ commands:
     running in the StatefulSet, named ${STATEFULSET_NAME}, which is running in the
     ${CONTEXT} Kubernetes context and in the ${NAMESPACE} namespace. This command
     runs with a timeout of 10 seconds, after which it will error out.'
+  multi_line_details: "\n\n#this command checks the readiness of Artifactory. \n#it\
+    \ requires to connect to a node in the Kubernetes cluster where the statefulSet\
+    \ pods are running\n\n#Below is the multi-line version of the command:\n\nSTATEFULSET_NAME=name_of_the_statefulset\n\
+    CONTEXT=name_of_the_context\nNAMESPACE=name_of_the_namespace\n\nkubectl exec \\\
+    \n    statefulset/${STATEFULSET_NAME} \\\n    --context=${CONTEXT} \\\n    -n\
+    \ ${NAMESPACE} \\\n    -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/readiness"
   name: check_artifactory_liveness_and_readiness_endpoints
