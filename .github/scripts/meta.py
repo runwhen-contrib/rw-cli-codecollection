@@ -195,21 +195,30 @@ def generate_metadata(directory_path):
             command = item['command']
             # Convert name to lower snake case
             name_snake_case = re.sub(r'\W+', '_', name.lower())
-            query = f'Please%20explain%20this%20command%20as%20if%20I%20was%20new%20to%20Kubernetes: {command}'
-            print(f'generating explanation for {name_snake_case}')
-            explain_query = urlencode({'prompt': query})
-            url = f'{explainUrl}{explain_query}'   
-            response = requests.get(url)
-            # Check if the request was successful (status code 200)
-            if response.status_code == 200:
-                data = response.json()  # Full response content as JSON
 
+            # Generate what it does
+            query_what_it_does_what_it_does = f'Please%20explain%20this%20command%20as%20if%20I%20was%20new%20to%20Kubernetes: {command}'
+            print(f'generating explanation for {name_snake_case}')
+            explain_query_what_it_does = urlencode({'prompt': query_what_it_does})
+            url_what_it_does = f'{explainUrl}{explain_query_what_it_does}'   
+            response_what_it_does = requests.get(url_what_it_does)
+
+            #Generate multi-line explanation 
+            query_multi_line_with_comments = f'Please%20convert%20this%20command%20into%20a%20multi-line%20script%20format%20with%20comments%20to%20educate%20new%20Kubernetes%20users%20who%20are%20learning%20syntax: {command}'
+            print(f'generating multi-line code with comments for {name_snake_case}')
+            explain_query_multi_line_with_comments = urlencode({'prompt': query_multi_line_with_comments})
+            url_multi_line_with_comments = f'{explainUrl}{explain_query_multi_line_with_comments}'   
+            response_multi_line_with_comments = requests.get(url_multi_line_with_comments)
+            # Check if the request was successful (status code 200)
+            if ((response_what_it_does.status_code == 200) and (response_multi_line_with_comments.status_code == 200)):
+                explain = response_what_it_does.json()
+                multi_line = response_multi_line_with_comments.json()
                 command_meta = {
                     'name': name_snake_case,
                     'command': command,
-                    'explanation': data['explanation']
+                    'explanation': explain['explanation']
+                    'multi_line_details': multi_line['explanation']
                 }
-                
                 # Add the command meta to the list of commands
                 commands.append(command_meta)
             else:
