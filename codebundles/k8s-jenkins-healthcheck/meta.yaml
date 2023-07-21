@@ -40,30 +40,21 @@ commands:
 - command: 'kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -s localhost:8080/queue/api/json --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}
     | jq -r ''.items[] | select((.stuck == true) or (.blocked == true)) | "Why: "
-    + .why + "
-
-    Blocked: " + (.blocked|tostring) + "
-
-    Stuck: " + (.stuck|tostring)'''
-  explanation: '
-
-
-    This command is used to view the status of jobs in a Jenkins Queue that are currently
-    blocked or stuck. Specifically, it issues an API call to a stateful set named
-    ${STATEFULSET_NAME} within namespace ${NAMESPACE}, using the specified context
-    (${CONTEXT}), to retrieve information on jobs within the queue. The data returned
-    is then read and filtered to show only those that are either blocked or stuck,
-    and outputted with details as to why they might be in that state. Additionally,
-    the specified user ($${JENKINS_SA_USERNAME.key}) and token ($${JENKINS_SA_TOKEN.key})
-    are used for authentication.'
-  multi_line_details: "\n\n# Execute a command in a container and parse the response\
-    \ using jq in order to indentify stuck or blocked jobs\n# Define variables\nSTATEFULSET_NAME=\"\
-    statefulset\"\nCONTEXT=\"cluster-context\"\nNAMESPACE=\"production\"\nJENKINS_SA_USERNAME.key=\"\
-    admin\"\nJENKINS_SA_TOKEN.key=\"12edads6h4jhs\"\n\n# Execute the command to find\
-    \ stuck or blocked jobs\nkubectl exec statefulset/${STATEFULSET_NAME} \\\n   \
-    \ --context=${CONTEXT} \\ \n    -n ${NAMESPACE} \\ \n    -- curl -s localhost:8080/queue/api/json\
-    \ \\\n    --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key} | \\ \n\
-    \    # Parse the response using jq\n    jq -r '.items[] | select((.stuck == true)\
-    \ or (.blocked == true)) | \"Why: \" + .why + \"\n    Blocked: \" + (.blocked|tostring)\
-    \ + \"\n    Stuck: \" + (.stuck|tostring)'"
+    + .why + "\nBlocked: " + (.blocked|tostring) + "\nStuck: " + (.stuck|tostring)'''
+  explanation: "\n\nThis command is used to check the state of Jenkins jobs running\
+    \ in a Kubernetes cluster. It will output information about any jobs that are\
+    \ either stuck or blocked. \n\nThe command utilizes the Kubernetes command-line\
+    \ tool (Kubectl) to execute a curl call against the namespace and context specified,\
+    \ which specifies a JSON representation of the queue status from an external source.\
+    \ It then runs a jq query against the data which looks for items with 'stuck'\
+    \ or 'blocked' values, and provides additional information about why they are\
+    \ stuck or blocked."
+  multi_line_details: "\n\n#Command to retrieve stuck jobs from Jenkins\n\n#Create\
+    \ environment variables for context, namespace, SA username and token \nCONTEXT=${CONTEXT}\n\
+    NAMESPACE=${NAMESPACE}\nJENKINS_SA_USERNAME=$${JENKINS_SA_USERNAME.key}\nJENKINS_SA_TOKEN=$${JENKINS_SA_TOKEN.key}\n\
+    \n#Execute command inside pod of stateful set\nkubectl exec statefulset/${STATEFULSET_NAME}\
+    \ \\\n--context=${CONTEXT} \\\n-n ${NAMESPACE} \\\n-- curl -s localhost:8080/queue/api/json\
+    \ \\\n--user ${JENKINS_SA_USERNAME}:${JENKINS_SA_TOKEN} | \\\njq -r '.items[]\
+    \ \\\n| select((.stuck == true) or (.blocked == true)) \\\n| \"Why: \" + .why\
+    \ + \"\\nBlocked: \" + (.blocked|tostring) + \"\\nStuck: \" + (.stuck|tostring)'"
   name: query_for_stuck_jenkins_jobs

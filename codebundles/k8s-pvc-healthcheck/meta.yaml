@@ -25,6 +25,32 @@ commands:
     \ \"Last Timestamp: \" + .lastTimestamp + \" Name: \" + .involvedObject.name +\
     \ \" Message: \" + .message'; \n  \ndone"
   name: fetch_events_for_unhealthy_kubernetes_persistentvolumeclaims
+- command: 'namespace=${NAMESPACE}; context=${CONTEXT}; kubectl get pvc -n $namespace
+    --context=$context -o json | jq -r ''.items[] | select(.metadata.deletionTimestamp
+    != null) | .metadata.name as $name | .metadata.deletionTimestamp as $deletion_time
+    | .metadata.finalizers as $finalizers | "\($name) is in Terminating state (Deletion
+    started at: \($deletion_time)). Finalizers: \($finalizers)"'''
+  explanation: '
+
+
+    This command is used to list persistent volume claims (PVCs) that are in the process
+    of being terminated in a Kubernetes cluster. It sets two variables containing
+    the name of the namespace and the context that should be used, then fetches all
+    PVCs in that namespace from the cluster using the kubectl get pvc command. The
+    information obtained is passed through jq, a processing tool for JSON documents,
+    which filters the items based on their associated metadata and outputs formatted
+    strings with the claim''s name, deletion time, and finalizers. The result of this
+    command would be a list of terminated PVCs and their associated information.'
+  multi_line_details: "\n\n#This script would be used to get the name, deletion time\
+    \ and finalizers associated with Persistent Volume Claims in a Kubernetes cluster\n\
+    \n#Defining the variables required for the command\nNAMESPACE=\"<namespace_name_here>\"\
+    \ \nCONTEXT=\"<cluster_context_here>\"\n\n#Building the command\ncommand=\"kubectl\
+    \ get pvc -n $NAMESPACE --context=$CONTEXT -o json | jq -r '.items[] | select(.metadata.deletionTimestamp\
+    \ != null) | .metadata.name as $name | .metadata.deletionTimestamp as $deletion_time\
+    \ | .metadata.finalizers as $finalizers | \\\"\\(\\$name\\) is in Terminating\
+    \ state (Deletion started at: \\(\\$deletion_time)). Finalizers: \\(\\$finalizers)\\\
+    \"'\"\n\n#Executing the command\neval $command"
+  name: list_persistentvolumeclaims_in_terminating_state
 - command: 'for pv in $(kubectl get pv --context ${CONTEXT} -o json | jq -r ''.items[]
     | select(.status.phase == "Terminating") | .metadata.name''); do kubectl get events
     --all-namespaces --field-selector involvedObject.name=$pv --context ${CONTEXT}
