@@ -32,4 +32,45 @@ commands:
     \ they do, the status will be set to \u201CHealthy\u201D; otherwise, it will be\
     \ set to \u201CUnhealthy\u201D. Finally, the command will print out either the\
     \ unhealthy or healthy status for each Ingress."
+  multi_line_details: "\n\n# Set the values of NAMESPACE and CONTEXT as variables\
+    \ based on the kubeconfig settings\nnamespace=\"${NAMESPACE}\"\ncontext=\"${CONTEXT}\"\
+    \n\n# Iterate over a list of Ingress objects\nfor ingress in $(kubectl get ingress\
+    \ -n \"$namespace\" --context \"$context\" \\\n    -ojsonpath='{range .items[*]}{.metadata.name}{\"\
+    \\n\"}{end}'); do\n\n    # Set Validations\n    health_status=\"NA\"\n    services=()\n\
+    \n    # Get Backend Services and Ports from ingress object\n    backend_services=$(kubectl\
+    \ get ingress \"$ingress\" -n \"$namespace\" \\\n        --context \"$context\"\
+    \ -ojsonpath='{range .spec.rules[*].http.paths[*]} \\\n        {.backend.service.name}{\"\
+    |\"}{.backend.service.port.number}{\"\\n\"}{end}')\n\n    # Read each service\
+    \ and port and validate if it exists\n    while IFS='|' read -r service port;\
+    \ do\n        if [ -n \"$service\" ] && [ -n \"$port\" ]; then\n            echo\
+    \ \"Backend Service: $service, Port: $port\"\n\n            # Check if service\
+    \ exists\n            service_exists=$(kubectl get service \"$service\" -n \"\
+    $namespace\" \\\n                --context \"$context\" -ojsonpath='{.metadata.name}')\n\
+    \            if [ -z \"$service_exists\" ]; then\n                health_status=\"\
+    Unhealthy\"\n                echo \"Validation: Service $service does not exist\"\
+    \n            else\n                # Check if Endpoint has any active pods\n\
+    \                endpoint_pods=$(kubectl get endpoints \"$service\" -n \"$namespace\"\
+    \ \\\n                    --context \"$context\" -ojsonpath='{range .subsets[*].addresses[*]}\
+    \ \\\n                    - Pod Name: {.targetRef.name}\\n Pod IP: {.ip}\\n{end}')\n\
+    \                if [ -z \"$endpoint_pods\" ]; then\n                    health_status=\"\
+    Unhealthy\"\n                    echo \"Validation: Endpoint for service $service\
+    \ does not have any pods\"\n                else\n                    echo \"\
+    Endpoint Pod:\"\n                    echo \"$endpoint_pods\"\n               \
+    \     health_status=\"Healthy\"\n                fi\n            fi\n        \
+    \    services+=(\"$service\")\n        fi\n    done <<< \"$backend_services\"\n\
+    \n    # Validate other services even though not exposed by Ingress\n    for service\
+    \ in \"\\${services[@]}\"; do\n        service_exists=$(kubectl get service \"\
+    $service\" -n \"$namespace\" \\\n            --context \"$context\" -ojsonpath='{.metadata.name}')\n\
+    \        if [ -z \"$service_exists\" ]; then\n            health_status=\"Unhealthy\"\
+    \n            echo \"Validation: Service $service does not exist\"\n        else\n\
+    \            endpoint_exists=$(kubectl get endpoints \"$service\" -n \"$namespace\"\
+    \ \\\n                --context \"$context\" -ojsonpath='{.metadata.name}')\n\
+    \            if [ -z \"$endpoint_exists\" ]; then\n                health_status=\"\
+    Unhealthy\"\n                echo \"Validation: Endpoint for service $service\
+    \ does not exist\"\n            fi\n        fi\n    done\n\n    # Show Ingress\
+    \ Health Status\n    if [ \"$health_status\" = \"Unhealthy\" ]; then\n       \
+    \ echo \"Ingress: $ingress; Health Status: $health_status\"\n        echo \"=====================\"\
+    \n    elif [ \"$health_status\" = \"Healthy\" ]; then\n        echo \"Ingress:\
+    \ $ingress; Health Status: $health_status\"\n    fi\n    echo \"------------\"\
+    \ndone"
   name: fetch_ingress_object_health_in_namespace

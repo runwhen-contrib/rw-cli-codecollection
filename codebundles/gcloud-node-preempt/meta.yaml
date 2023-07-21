@@ -14,4 +14,13 @@ commands:
     the output as JSON and using the project ID stored in the environment variable
     GCP_PROJECT_ID. Finally, the JSON is parsed using jq to select certain fields
     (startTime, targetLink, statusMessage, progress, zone, selfLink).'
+  multi_line_details: "\n\n# The command below can be used to check instances that\
+    \ have been preempted in a GCP project.\n\n# First, authenticate with the service\
+    \ account\ngcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS\n\
+    \n# Next, use the 'gcloud compute operations list' command to filter and format\
+    \ the output data\ngcloud compute operations list \\\n    --filter=\"operationType:(\
+    \ compute.instances.preempted ) AND NOT status:( DONE )\" \\\n    --format=json\
+    \ \\\n    --project=${GCP_PROJECT_ID}\n\n# Finally, pipe the output through jq\
+    \ to format it as an array of objects containing certain properties\njq '[.[]\
+    \ | {startTime,targetLink, statusMessage, progress, zone, selfLink}]'"
   name: list_all_nodes_in_an_active_prempt_operation

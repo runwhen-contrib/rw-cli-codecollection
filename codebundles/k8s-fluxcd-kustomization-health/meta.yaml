@@ -9,6 +9,11 @@ commands:
     \ is the cluster connection context in use.\n\nIn this way, the command will retrieve\
     \ the specified resource from the given namespace located on the Kubernetes cluster\
     \ pointed to by the connection context."
+  multi_line_details: "\n\n# Command to get a resource, such as a pod or deployment\
+    \ in Kubernetes\nkubectl get \\\n  ${RESOURCE_NAME} \\ # Name of the resource,\
+    \ e.g. my-deployment\n  -n ${NAMESPACE} \\ # Namespace the resource is in, e.g.\
+    \ production\n  --context ${CONTEXT} # Context to use for running Kubernetes commands,\
+    \ e.g. my-cluster"
   name: list_all_available_kustomization_objects
 - command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json
     | jq -r ''.items[] | select (.status.conditions[] | select(.type == "Ready" and
@@ -26,4 +31,17 @@ commands:
     \ Name: NameOfResource\n\nReady Status: \nready: False\nmessage: Message here\n\
     reason: Reason here\nlast_transition_time: <Timestamp>\n\nReconcile Status:\n\
     reconciling: False\nmessage: Message here\n\n---"
+  multi_line_details: "\n\n# The above command can be broken down into a multi-line\
+    \ script for improved readability/maintainability as shown below: \n\n# Get the\
+    \ specified resource name in the indicated namespace, using the given context\
+    \ information. Output will be in JSON format \nGET_CMD=\"kubectl get ${RESOURCE_NAME}\
+    \ -n ${NAMESPACE} --context ${CONTEXT} -o json\"\n\n# Process the JSON string\
+    \ to extract relevant information and output in a standardized format\nJQ_CMD=\"\
+    jq -r '.items[] | select (.status.conditions[] | select(.type == \"Ready\" and\
+    \ .status == \"False\")) | \\\"---\\nKustomization Name: \\$(.metadata.name)\\\
+    n\\nReady Status: \\$(.status.conditions[] | select(.type == \"Ready\") | \\\"\
+    \\n ready: \\$(.status)\\n message: \\$(.message)\\n reason: \\$(.reason)\\n last_transition_time:\
+    \ \\$(.lastTransitionTime)\")\\n\\nReconcile Status:\\$(.status.conditions[] |\
+    \ select(.type == \"Reconciling\") |\"\\n reconciling: \\$(.status)\\n message:\
+    \ \\$(.message)\"\\\"' '\"\n\n# Call both commands together\n${GET_CMD} | ${JQ_CMD}"
   name: get_details_for_unready_kustomizations
