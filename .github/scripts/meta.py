@@ -197,7 +197,7 @@ def generate_metadata(directory_path):
             name_snake_case = re.sub(r'\W+', '_', name.lower())
 
             # Generate what it does
-            query_what_it_does_what_it_does = f'Please%20explain%20this%20command%20as%20if%20I%20was%20new%20to%20Kubernetes: {command}'
+            query_what_it_does = f'Please%20explain%20this%20command%20as%20if%20I%20was%20new%20to%20Kubernetes: {command}'
             print(f'generating explanation for {name_snake_case}')
             explain_query_what_it_does = urlencode({'prompt': query_what_it_does})
             url_what_it_does = f'{explainUrl}{explain_query_what_it_does}'   
