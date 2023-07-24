@@ -40,7 +40,7 @@ Trace And Troubleshoot Namespace Warning Events And Errors
     ...    pod_count__raise_issue_if_gt=0
     ...    set_issue_title=$pod_count Pods Found With Recent Warning Events In Namespace ${NAMESPACE}
     ...    set_issue_details=Warning events in the namespace ${NAMESPACE}.\nName of pods with issues:\n"$involved_pod_names"\nTroubleshoot pod or namespace events:\n"${recent_error_events.stdout}"
-    ...    set_issue_next_steps=check deployments anomolies
+    ...    set_issue_next_steps=Check For Deployment Event Anomalies
     ...    assign_stdout_from_var=involved_pod_names
     # get pods with restarts > 0
     ${pods_in_namespace}=    RW.CLI.Run Cli
@@ -58,7 +58,7 @@ Trace And Troubleshoot Namespace Warning Events And Errors
     ...    pod_count__raise_issue_if_gt=0
     ...    set_issue_title=Frequently Restarting Pods In Namespace ${NAMESPACE}
     ...    set_issue_details=Found $pod_count pods that are frequently restarting in ${NAMESPACE}. Troubleshoot these pods:\n"$pods_with_recent_restarts"
-    ...    set_issue_next_steps=check deployments anomalies
+    ...    set_issue_next_steps=Check For Deployment Event Anomalies
     ...    assign_stdout_from_var=restart_pod_names
     # fetch logs with pod names
     ${restarting_pods}=    RW.CLI.From Json    json_str=${restarting_pods.stdout}
@@ -99,7 +99,7 @@ Troubleshoot Container Restarts In Namespace
     ...    set_issue_actual=We found the following containers with restarts: $_stdout
     ...    set_issue_title=Container Restarts Detected In Namespace ${NAMESPACE}
     ...    set_issue_details=Pods with Container Restarts:\n"$_stdout" in the namespace ${NAMESPACE}
-    ...    set_issue_next_steps=${svc_name.stdout} check deployments anomolies
+    ...    set_issue_next_steps=${svc_name.stdout} Check For Deployment Event Anomalies
     ...    _line__raise_issue_if_contains=-
     ${history}=    RW.CLI.Pop Shell History
     IF    """${container_restart_details.stdout}""" == ""
@@ -127,7 +127,7 @@ Troubleshoot Pending Pods In Namespace
     ...    set_issue_actual=We found the following pods in a pending state: $_stdout
     ...    set_issue_title=Pending Pods Found In Namespace ${NAMESPACE}
     ...    set_issue_details=Pods pending with reasons:\n"$_stdout" in the namespace ${NAMESPACE}
-    ...    set_issue_next_steps=check deployments anomalies
+    ...    set_issue_next_steps=Check For Deployment Event Anomalies
     ...    _line__raise_issue_if_contains=-
     ${history}=    RW.CLI.Pop Shell History
     IF    """${pending_pods.stdout}""" == ""
@@ -155,7 +155,7 @@ Troubleshoot Failed Pods In Namespace
     ...    set_issue_actual=We found the following unready pods: $_stdout
     ...    set_issue_title=Unready Pods Detected In Namespace ${NAMESPACE}
     ...    set_issue_details=Unready pods:\n"$_stdout" in the namespace ${NAMESPACE}
-    ...    set_issue_next_steps=check deployments anomalies
+    ...    set_issue_next_steps=Check For Deployment Event Anomalies
     ...    _line__raise_issue_if_contains=-
     ${history}=    RW.CLI.Pop Shell History
     IF    """${unreadypods_details.stdout}""" == ""
@@ -188,7 +188,7 @@ Troubleshoot Workload Status Conditions In Namespace
     ...    set_severity_level=1
     ...    set_issue_title=$pods_with_failures Pods With Unhealthy Status In Namespace ${NAMESPACE}
     ...    set_issue_details=Pods with unhealthy status condition in the namespace ${NAMESPACE}. Here's a summary of potential issues we found:\n"$aggregate_failures"
-    ...    set_issue_next_steps=${dply_name.stdout} get deployment issue logs
+    ...    set_issue_next_steps=${dply_name.stdout} Check For Deployment Event Anomalies
     ...    assign_stdout_from_var=aggregate_failures
     ${history}=    RW.CLI.Pop Shell History
     IF    """${failing_conditions.stdout}""" == ""
@@ -231,7 +231,7 @@ Check For Namespace Event Anomalies
     ...    set_issue_actual=We detected events in the namespace ${NAMESPACE} which are considered anomalies
     ...    set_issue_title=Event Anomalies Detected In Namespace ${NAMESPACE}
     ...    set_issue_details=Anomaly non-warning events in namespace ${NAMESPACE}:\n"$_stdout"
-    ...    set_issue_next_steps=${pod_name.stdout} get deployment issue logs
+    ...    set_issue_next_steps=${pod_name.stdout} Check For Deployment Event Anomalies
     ...    _line__raise_issue_if_contains=Object
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add To Report    Summary Of Anomalies Detected:\n
@@ -269,7 +269,7 @@ Troubleshoot Namespace Services And Application Workloads
     ...    set_issue_actual=Service workload logs in namespace ${NAMESPACE} contain errors entries
     ...    set_issue_title=Service Workloads In Namespace ${NAMESPACE} Have Error Log Entries
     ...    set_issue_details=We found the following distinctly counted errors in the service workloads of namespace ${NAMESPACE}:\n\n$_stdout\n\nThese errors may be related to other workloads that need triaging
-    ...    set_issue_next_steps=check deployments anomalies
+    ...    set_issue_next_steps=Check For Deployment Event Anomalies
     ...    _line__raise_issue_if_contains=Error
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add To Report    Sample Of Aggregate Counted Logs Found:\n
