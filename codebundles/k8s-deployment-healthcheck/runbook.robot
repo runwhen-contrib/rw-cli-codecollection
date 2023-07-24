@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check Deployment Log For Issues
     [Documentation]    Fetches recent logs for the given deployment in the namespace and checks the logs output for issues.
-    [Tags]    fetch    log    pod    container    errors    inspect    trace    info    deployment    <service_name> get deployment issue logs
+    [Tags]    fetch    log    pod    container    errors    inspect    trace    info    deployment    <service_name>
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} --limit-bytes=256000 --since=3h --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${LOGS_ERROR_PATTERN}" | grep -Eiv "${LOGS_EXCLUDE_PATTERN}" | sort | uniq -c | awk '{print "Occurences:",$0}'
     ...    target_service=${kubectl}
@@ -39,7 +39,7 @@ Check Deployment Log For Issues
 
 Troubleshoot Deployment Warning Events
     [Documentation]    Fetches warning events related to the deployment workload in the namespace and triages any issues found in the events.
-    [Tags]    events    workloads    errors    warnings    get    deployment    <service_name> troubleshoot warning events
+    [Tags]    events    workloads    errors    warnings    get    deployment    <service_name>
     ${events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} --field-selector type=Warning | grep -i "${DEPLOYMENT_NAME}" || true
     ...    target_service=${kubectl}
@@ -61,7 +61,7 @@ Troubleshoot Deployment Warning Events
 
 Get Deployment Workload Details For Report
     [Documentation]    Fetches the current state of the deployment for future review in the report.
-    [Tags]    deployment    details    manifest    info    <service_name> get deployment report
+    [Tags]    deployment    details    manifest    info    <service_name>
     ${deployment}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o yaml
     ...    target_service=${kubectl}
@@ -86,7 +86,7 @@ Troubleshoot Deployment Replicas
     ...    rollout
     ...    stuck
     ...    pods
-    ...    <service_name> get deployment replicas
+    ...    <service_name>
     ...    We found the following distinctly counted errors in the service workloads of namespace
     ...    connection error
     ${deployment}=    RW.CLI.Run Cli
@@ -133,7 +133,7 @@ Troubleshoot Deployment Replicas
 
 Check For Deployment Event Anomalies
     [Documentation]    Parses all events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
-    [Tags]    deployment    events    info    state    anomolies    count    occurences    <service_name> get deployment anomalies    We found the following distinctly counted errors in the service workloads of namespace    connection error
+    [Tags]    deployment    events    info    state    anomolies    count    occurences    <service_name>    We found the following distinctly counted errors in the service workloads of namespace    connection error
     ${recent_anomalies}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select(.involvedObject.name|contains("${DEPLOYMENT_NAME}")) | select( .count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) > ${ANOMALY_THRESHOLD}) | "Event(s) Per Minute:" + (.count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) |tostring) +" Count:" + (.count|tostring) + " Minute(s):" + (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60|tostring)+ " Object:" + .involvedObject.namespace + "/" + .involvedObject.kind + "/" + .involvedObject.name + " Reason:" + .reason + " Message:" + .message'
     ...    target_service=${kubectl}

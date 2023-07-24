@@ -216,7 +216,7 @@ Get Listing Of Resources In Namespace
 
 Check For Namespace Event Anomalies
     [Documentation]    Parses all events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
-    [Tags]    namespace    events    info    state    anomolies    count    occurences    <service_name> get namespace anomalies    indicates there's HTTP error codes associated with this ingress and service. You need to investigate the application
+    [Tags]    namespace    events    info    state    anomolies    count    occurences    <service_name>    indicates there's HTTP error codes associated with this ingress and service. You need to investigate the application
     ${recent_anomalies}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select( .count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) > ${ANOMALY_THRESHOLD}) | "Event(s) Per Minute:" + (.count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) |tostring) +" Count:" + (.count|tostring) + " Minute(s):" + (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60|tostring)+ " Object:" + .involvedObject.namespace + "/" + .involvedObject.kind + "/" + .involvedObject.name + " Reason:" + .reason + " Message:" + .message'
     ...    target_service=${kubectl}
@@ -254,7 +254,7 @@ Troubleshoot Namespace Services And Application Workloads
     ...    logs
     ...    aggregate
     ...    filter
-    ...    <service_name> troubleshoot namespace resources
+    ...    <service_name>
     ...    indicates there's HTTP error codes associated with this ingress and service. You need to investigate the application
     ${aggregate_service_logs}=    RW.CLI.Run Cli
     ...    cmd=services=($(${KUBERNETES_DISTRIBUTION_BINARY} get svc -o=name --context=${CONTEXT} -n ${NAMESPACE})); logs=""; for service in "\${services[@]}"; do logs+=$(${KUBERNETES_DISTRIBUTION_BINARY} logs $service --limit-bytes=256000 --since=2h --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${SERVICE_ERROR_PATTERN}" | grep -Ev "${SERVICE_EXCLUDE_PATTERN}" | sort | uniq -c | awk '{print "Issue Occurences:",$0}'); done; echo "\${logs}"
@@ -278,7 +278,7 @@ Troubleshoot Namespace Services And Application Workloads
 
 Check Missing or Risky PodDisruptionBudget Policies
     [Documentation]    Searches through deployemnts and statefulsets to determine if they are missing PodDistruptionBudgets or have them configured in a risky way that prohibits cluster or node upgrades. 
-    [Tags]    poddisruptionbudget    availability    unavailable    risky   missing    policy    <service_name> troubleshoot policies
+    [Tags]    poddisruptionbudget    availability    unavailable    risky   missing    policy    <service_name>
     ${pdb_check}=    RW.CLI.Run Cli
     ...    cmd=context="${CONTEXT}"; namespace="${NAMESPACE}"; check_health() { local type=$1; local name=$2; local replicas=$3; local selector=$4; local pdbs=$(${KUBERNETES_DISTRIBUTION_BINARY} --context "$context" --namespace "$namespace" get pdb -o json | jq -c --arg selector "$selector" '.items[] | select(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value == $selector)'); if [[ $replicas -gt 1 && -z "$pdbs" ]]; then printf "%-30s %-30s %-10s\\n" "$type/$name" "" "Missing"; else echo "$pdbs" | jq -c . | while IFS= read -r pdb; do local pdbName=$(echo "$pdb" | jq -r '.metadata.name'); local minAvailable=$(echo "$pdb" | jq -r '.spec.minAvailable // ""'); local maxUnavailable=$(echo "$pdb" | jq -r '.spec.maxUnavailable // ""'); if [[ "$minAvailable" == "100%" || "$maxUnavailable" == "0" || "$maxUnavailable" == "0%" ]]; then printf "%-30s %-30s %-10s\\n" "$type/$name" "$pdbName" "Risky"; elif [[ $replicas -gt 1 && ("$minAvailable" != "100%" || "$maxUnavailable" != "0" || "$maxUnavailable" != "0%") ]]; then printf "%-30s %-30s %-10s\\n" "$type/$name" "$pdbName" "OK"; fi; done; fi; }; echo "Deployments:"; echo "-----------"; printf "%-30s %-30s %-10s\\n" "NAME" "PDB" "STATUS"; ${KUBERNETES_DISTRIBUTION_BINARY} --context "$context" --namespace "$namespace" get deployments -o json | jq -c '.items[] | "\\(.metadata.name) \\(.spec.replicas) \\(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value)"' | while read -r line; do check_health "Deployment" $(echo $line | tr -d '"'); done; echo ""; echo "Statefulsets:"; echo "-------------"; printf "%-30s %-30s %-10s\\n" "NAME" "PDB" "STATUS"; ${KUBERNETES_DISTRIBUTION_BINARY} --context "$context" --namespace "$namespace" get statefulsets -o json | jq -c '.items[] | "\\(.metadata.name) \\(.spec.replicas) \\(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value)"' | while read -r line; do check_health "StatefulSet" $(echo $line | tr -d '"'); done
     ...    target_service=${kubectl}
