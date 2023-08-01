@@ -33,7 +33,7 @@ Check If Kong Ingress HTTP Error Rate Violates HTTP Error Threshold
     ...    set_issue_actual=We found the following HTTP error codes ${HTTP_ERROR_CODES} associated with the ingress in $_line
     ...    set_issue_title=Detected HTTP Error Codes Across Network
     ...    set_issue_details=The returned stdout line: $_line indicates there's HTTP error codes associated with this ingress and service. You need to investigate the application associated with: ${INGRESS_SERVICE}
-    ...    set_issue_next_steps=${svc_name.stdout} Check Deployment
+    ...    set_issue_next_steps=${svc_name.stdout} Check Deployment Log For Issues,Check For Namespace Event Anomalies,Troubleshoot Namespace Services And Application Workloads
     ...    _line__raise_issue_if_contains=Route
     ${gmp_json}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && curl -s -d "query=rate(kong_http_requests_total{service='${INGRESS_SERVICE}',code=~'${HTTP_ERROR_CODES}'}[${TIME_SLICE}])" -H "Authorization: Bearer $(gcloud auth print-access-token)" 'https://monitoring.googleapis.com/v1/projects/runwhen-nonprod-sandbox/location/global/prometheus/api/v1/query' | jq .
@@ -54,6 +54,9 @@ Check If Kong Ingress HTTP Request Latency Violates Threshold
     ...    target_service=${GCLOUD_SERVICE}
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ${svc_name}=    RW.CLI.Run Cli
+    ...    cmd=echo "${gmp_rsp.stdout}" | grep -oP '(?<=Service:)[^ ]*' | grep -oP '[^.]*(?=.80)'
+    ...    target_service=${GCLOUD_SERVICE}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${gmp_rsp}
     ...    set_severity_level=3
@@ -61,6 +64,7 @@ Check If Kong Ingress HTTP Request Latency Violates Threshold
     ...    set_issue_actual=We found HTTP request latencies greater than ${REQUEST_LATENCY_THRESHOLD} associated with the ingress in $_line
     ...    set_issue_title=Detected HTTP Request Latencies in network
     ...    set_issue_details=The returned stdout line: $_line indicates there's high HTTP request latencies. You need to investigate the application associated with: ${INGRESS_SERVICE} or the Kong ingress controller.
+    ...    set_issue_next_steps=${svc_name.stdout} Check For Deployment Event Anomalies,Check For Namespace Event Anomalies,Troubleshoot Namespace Services And Application Workloads
     ...    _line__raise_issue_if_contains=Route
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -82,6 +86,7 @@ Check If Kong Ingress Controller Reports Upstream Errors
     ...    set_issue_actual=We found Kong healthchecks disabled in $_line
     ...    set_issue_title=Detected Kong Ingress Upstream healthchecks disabled
     ...    set_issue_details=The returned stdout line: $_line indicates Kong ingress upstream healthchecks are disabled for ${INGRESS_UPSTREAM}.
+    ...    set_issue_next_steps=Check For Namespace Event Anomalies,Troubleshoot Namespace Services And Application Workloads
     ...    _line__raise_issue_if_contains=Disabled
     ${gmp_healthchecks_rsp}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && response=$(curl -s -d "query=kong_upstream_target_health{upstream='${INGRESS_UPSTREAM}',state=~'dns_error|unhealthy'} > 0" -H "Authorization: Bearer $(gcloud auth print-access-token)" 'https://monitoring.googleapis.com/v1/projects/runwhen-nonprod-sandbox/location/global/prometheus/api/v1/query') && echo "$response" | jq -e '.data.result | length > 0' && echo "$response" | jq -r '.data.result[] | "Issue detected with Service: ${INGRESS_UPSTREAM}" + " Healthcheck subsystem-state: " + .metric.subsystem + "-" + .metric.state + " Target: " + .metric.target' || echo "${INGRESS_UPSTREAM} is reported as healthy from the Kong ingress controller."
@@ -96,6 +101,7 @@ Check If Kong Ingress Controller Reports Upstream Errors
     ...    set_issue_actual=We found Kong healthcheck errors in $_line
     ...    set_issue_title=Detected Kong Ingress Upstream healthcheck errors
     ...    set_issue_details=The returned stdout line: $_line indicates Kong ingress upstream healthchecks are reported unhealthy ${INGRESS_UPSTREAM}.
+    ...    set_issue_next_steps=Check For Namespace Event Anomalies,Troubleshoot Namespace Services And Application Workloads
     ...    _line__raise_issue_if_contains=detected
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
