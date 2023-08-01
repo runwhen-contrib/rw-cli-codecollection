@@ -4,49 +4,14 @@ on:
   push:
     branches:    
       - main
-  workflow_dispatch: 
-
-permissions:
-  contents: "read"
-  id-token: "write"
-  packages: "write"	
+  workflow_dispatch:
 
 env:
-  IMAGE: rw-cli-codecollection
-  DEFAULT_BRANCH: "origin/${{ github.event.repository.default_branch }}"
-  SHARED_ARTIFACT_REPOSITORY_PATH: "us-docker.pkg.dev/runwhen-nonprod-shared/public-images"
+  TEST_CODEBUNDLE_PATH: /app/codecollection/codebundles/curl-http-ok/sli.robot
+  CURL_URL: http://localhost:3000/curl-http-ok/sli-log.html
+#TODO add feature branch builds
 
 jobs:
-  build-and-push-gar:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2 
-      - id: 'auth-runwhen'
-        name: 'Authenticate to Google Cloud'
-        uses: 'google-github-actions/auth@v0.4.0'
-        with:
-          workload_identity_provider: ${{ secrets.RUNWHEN_NONPROD_SHARED_WI_PROVIDER }}
-          service_account: ${{ secrets.RUNWHEN_NONPROD_SHARED_WI_SA }}
-      - name: Set tag to branch name
-        run: |-
-          echo "TAG=$(echo $GITHUB_REF_NAME | sed 's/[^a-zA-Z0-9]/-/g')-${GITHUB_SHA::8}" >> $GITHUB_ENV
-      - name: Build
-        run: |-
-          docker build \
-            -t "${{env.SHARED_ARTIFACT_REPOSITORY_PATH }}/$IMAGE:$TAG" \
-            -t "${{env.SHARED_ARTIFACT_REPOSITORY_PATH }}/$IMAGE:latest" \
-            --build-arg GITHUB_SHA="$GITHUB_SHA" \
-            --build-arg GITHUB_REF="$GITHUB_REF" \
-            -f Dockerfile . 
-
-      - name: Configure docker for GCP
-        run: gcloud --quiet auth configure-docker us-docker.pkg.dev
-
-      - name: Publish NonProd Shared Artifact Repo
-        id: publish-nonprod-shared-artifact-repo
-        run: |-
-          docker push "${{env.SHARED_ARTIFACT_REPOSITORY_PATH }}/$IMAGE" --all-tags
-
   build-and-push-ghcr:
     runs-on: ubuntu-latest
     steps:
@@ -56,8 +21,14 @@ jobs:
         run: |-
           docker build \
             -t "ghcr.io/${{ github.repository }}:latest" \
-            -f Dockerfile . 
+            -t "ghcr.io/${{ github.repository }}:main" \
+            -f Dockerfile .
+      - name: Smoke Test Build
+        run: |
+          docker run -d -p 3000:3000 --name mycodecollection ghcr.io/${{ github.repository }}:latest 
+          docker exec mycodecollection bash -c "ro ${{ env.TEST_CODEBUNDLE_PATH }} && ls -R /robot_logs"
+          curl --fail-with-body ${{ env.CURL_URL }}
       - name: Push
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login --username ${{ github.actor }} --password-stdin ghcr.io
-          docker push ghcr.io/${{ github.repository }}:latest
+          docker push ghcr.io/${{ github.repository }} --all-tags
