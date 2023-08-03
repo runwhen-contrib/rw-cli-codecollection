@@ -1,19 +1,39 @@
 commands:
 - command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}
-  explanation: "\n\nThis command allows you to view a specific resource on a Kubernetes\
-    \ cluster using the kubectl command-line utility. The kubectl command is used\
-    \ to interact with a running Kubernetes cluster.\n\nThe command structure is as\
-    \ follows: \nkubectl get RESOURCE_NAME -n NAMESPACE --context CONTEXT\n\nwhere\
-    \ \nRESOURCE_NAME is the name of the specific type of resource that should be\
-    \ retrieved,\nNAMESPACE is the namespace where the resource resides, and \nCONTEXT\
-    \ is the cluster connection context in use.\n\nIn this way, the command will retrieve\
-    \ the specified resource from the given namespace located on the Kubernetes cluster\
-    \ pointed to by the connection context."
-  multi_line_details: "\n\n# Command to get a resource, such as a pod or deployment\
-    \ in Kubernetes\nkubectl get \\\n  ${RESOURCE_NAME} \\ # Name of the resource,\
-    \ e.g. my-deployment\n  -n ${NAMESPACE} \\ # Namespace the resource is in, e.g.\
-    \ production\n  --context ${CONTEXT} # Context to use for running Kubernetes commands,\
-    \ e.g. my-cluster"
+  explanation: '
+
+
+    This command allows you to view the details of a particular resource in a Kubernetes
+    cluster. The ${RESOURCE_NAME} is the name of the resource you wish to view, and
+    must be one of the supported resources as listed on the official Kubernetes documentation
+    (https://kubernetes.io/docs/reference/kubectl/overview/). The ${NAMESPACE} is
+    the namespace within the cluster where the resource is located, while the ${CONTEXT}
+    is the name that you use to switch between clusters. This command will return
+    the details of the specified resource, or an error if the resource does not exist.'
+  multi_line_details: '
+
+
+    #This command gets a specified resource from the desired Kubernetes context/namespace.
+
+
+    #Get a reference to the desired resource
+
+    RESOURCE_NAME="<enter_resource_name>"
+
+
+    #Set the namespace identifier
+
+    NAMESPACE="<enter_namespace>"
+
+
+    #Identify desired Kubernetes context
+
+    CONTEXT="<enter_context>"
+
+
+    #Invoke kubectl command to obtain the resource from cluster
+
+    kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}'
   name: list_all_available_kustomization_objects
 - command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json
     | jq -r ''.items[] | select (.status.conditions[] | select(.type == "Ready" and
@@ -22,26 +42,40 @@ commands:
     \(.message)\n reason: \(.reason)\n last_transition_time: \(.lastTransitionTime)")\n\nReconcile
     Status:\(.status.conditions[] | select(.type == "Reconciling") |"\n reconciling:
     \(.status)\n message: \(.message)")\n---\n"'''
-  explanation: "\n\nThis command will print out a JSON array from the Kubernetes resource\
-    \ specified (in this case, RESOURCE_NAME) within the given namespace (NAMESPACE)\
-    \ and context (CONTEXT). It then uses the jq program to filter out objects in\
-    \ the array with a status type of \"Ready\" and a status value of \"False\". For\
-    \ these objects, it will print out the Kustomization Name, Ready Status, and Reconcile\
-    \ Status.  The output will be in the following format: \n\n---\nKustomization\
-    \ Name: NameOfResource\n\nReady Status: \nready: False\nmessage: Message here\n\
-    reason: Reason here\nlast_transition_time: <Timestamp>\n\nReconcile Status:\n\
-    reconciling: False\nmessage: Message here\n\n---"
-  multi_line_details: "\n\n# The above command can be broken down into a multi-line\
-    \ script for improved readability/maintainability as shown below: \n\n# Get the\
-    \ specified resource name in the indicated namespace, using the given context\
-    \ information. Output will be in JSON format \nGET_CMD=\"kubectl get ${RESOURCE_NAME}\
-    \ -n ${NAMESPACE} --context ${CONTEXT} -o json\"\n\n# Process the JSON string\
-    \ to extract relevant information and output in a standardized format\nJQ_CMD=\"\
-    jq -r '.items[] | select (.status.conditions[] | select(.type == \"Ready\" and\
-    \ .status == \"False\")) | \\\"---\\nKustomization Name: \\$(.metadata.name)\\\
-    n\\nReady Status: \\$(.status.conditions[] | select(.type == \"Ready\") | \\\"\
-    \\n ready: \\$(.status)\\n message: \\$(.message)\\n reason: \\$(.reason)\\n last_transition_time:\
-    \ \\$(.lastTransitionTime)\")\\n\\nReconcile Status:\\$(.status.conditions[] |\
-    \ select(.type == \"Reconciling\") |\"\\n reconciling: \\$(.status)\\n message:\
-    \ \\$(.message)\"\\\"' '\"\n\n# Call both commands together\n${GET_CMD} | ${JQ_CMD}"
+  explanation: '
+
+
+    This command will get an individual Kubernetes resource by name for the specified
+    namespace and context, convert it to JSON format, and then use a command-line
+    data transformation tool called ''jq'' to extract parts of the data into a readable
+    output. In particular, it prints out the Kustomization name, readiness status
+    (including the condition, message, reason and last transition time) and reconcile
+    status (including the condition and message). It can be helpful in troubleshooting
+    Kubernetes resources that aren''t properly functioning or haven''t settled into
+    their desired states yet.'
+  multi_line_details: "\n# This command retrieves resource information in JSON format\
+    \ from Kubernetes. It uses the Kustomization name, namespace, and context, provided\
+    \ as variables in the command, to get detailed information about ready and reconciliations\
+    \ statuses for resources. \n\n# We convert the output into a multi-line command\
+    \ here with added verbose comments: \nkubectl \\\n    # The kubectl command is\
+    \ used to communicate with the Kubernetes API to configure clusters, deploy apps,\
+    \ etc.\n    get ${RESOURCE_NAME} \\\n    # This is the resource type you want\
+    \ to retrieve information on, provided as a variable in the command.\n    -n ${NAMESPACE}\
+    \ \\\n    # This is the particular namespace within the cluster that contains\
+    \ the desired resources.\n    --context ${CONTEXT} \\\n    # Every request to\
+    \ the Kubernetes API needs to specify a context. This usually includes the cluster\
+    \ name and other requested data such as user and authentication info.\n    -o\
+    \ json \\\n    # This flag indicates that the output from this command should\
+    \ be outputted in JSON format.\n    | jq -r '.items[] | select (.status.conditions[]\
+    \ | select(.type == \"Ready\" and .status == \"False\")) | \"---\\nKustomization\
+    \ Name: \\(.metadata.name)\\n\\nReady Status: \\(.status.conditions[] | select(.type\
+    \ == \"Ready\") | \"\\n ready: \\(.status)\\n message: \\(.message)\\n reason:\
+    \ \\(.reason)\\n last_transition_time: \\(.lastTransitionTime)\")\\n\\nReconcile\
+    \ Status:\\(.status.conditions[] | select(.type == \"Reconciling\") |\"\\n reconciling:\
+    \ \\(.status)\\n message: \\(.message)\")\\n---\\n\"'\n    # This is a pipe operator\
+    \ used to take the output of the previous command (the kubectl get command) and\
+    \ pass it to the \u2018jq\u2019 utility. Jq is a command line tool used to search,\
+    \ manipulate, and analyze a JSON object using a specific syntax. This command\
+    \ will retrieve the Kustomization name, the ready status, and the reconciliation\
+    \ status, all formatted to be readily readable."
   name: get_details_for_unready_kustomizations

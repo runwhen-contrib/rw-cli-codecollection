@@ -5,86 +5,91 @@ commands:
   explanation: '
 
 
-    This command will display the logs for a particular Kubernetes deployment and
-    filter out specific error messages. The limit bytes parameter will set a limit
-    on the size of the log output in bytes (in this case 256000). The since parameter
-    specifies how far back the log will search, in this case three hours. The context
-    parameter specifies the environment from which the commands are being executed
-    (this is usually the cluster name). The namespace parameter gives the namespace
-    associated with the deployment to be targeted by the command. The grep commands
-    are used to filter out any lines containing words matches the ''logs_error_pattern''."The
-    log_exclude_pattern" can be used to exclude lines containing words that match
-    the given pattern. Finally, sort will sort the output and uniq -c will give a
-    frequency count for unique values that have been sorted previously. The awk command
-    is then used to format the output to "Occurences: [number] [value]"'
-  multi_line_details: "\n\n# Get log messages from the given deployment with limited\
-    \ bytes, for the last 3 hours. Then filter out error messages that are not related\
-    \ to the given pattern and finally produce the occurrence count of each log message\n\
-    kubectl logs deployment/${DEPLOYMENT_NAME} \\ \n    --limit-bytes=256000 \\  \
-    \ # Limiting the logs size \n    --since=3h \\             # Get logs for the\
-    \ past 3 hours  \n    --context=${CONTEXT} \\   # Context name\n    -n ${NAMESPACE}\
-    \ |        # Namespace for getting deployments\n    grep -Ei \"${LOGS_ERROR_PATTERN}\"\
-    \ | # Filter out Error Messages\n    grep -Eiv \"${LOGS_EXCLUDE_PATTERN}\" | #\
-    \ Exclude certain messages \n    sort |                    # Sort to group similar\
-    \ messages together \n    uniq -c |                 # Count Occurences of Each\
-    \ Message \n    awk '{print \"Occurences:\",$0}'      # Print the occurrence count"
+    This command uses the kubectl tool to get logs from a deployment with a name specified
+    by ${DEPLOYMENT_NAME}. It retrieves a maximum of 256000 bytes per log that have
+    been logged in the past 3 hours, using the context set in the ${CONTEXT} variable
+    from within the namespace set in the ${NAMESPACE} variable. It then filters the
+    output to only show lines that contains a pattern specified by ${LOGS_ERROR_PATTERN},
+    while excluding any lines containing a pattern specified by ${LOGS_EXCLUDE_PATTERN}.
+    The output is sorted and duplicates are removed. Finally the occurences of each
+    line is printed.'
+  multi_line_details: "\n\n# Get all the logs from a specific deployment in Kubernetes,\
+    \ limiting the amout of logs to 256 bytes. \n# The logs should only contain lines\
+    \ matching an error pattern and exclude the ones matching an exclusion pattern.\n\
+    # Lastly, we want to print an output counting the occurances of these errorlines.\
+    \ \nkubectl logs deployment/${DEPLOYMENT_NAME} \\ #Execute the 'logs' command\
+    \ on the Kubernetes Deployment with the provided name \n    --limit-bytes=256000\
+    \ \\                #limit the amount of logs to 256 thousand bytes\n    --since=3h\
+    \ \\                         #only show logs which have been generated in the\
+    \ last 3 hours\n    --context=${CONTEXT} \\               #specify the context\
+    \ \n    -n ${NAMESPACE} \\                    #specify the namespace\n    | grep\
+    \ -Ei \"${LOGS_ERROR_PATTERN}\" \\  #Filter each logline based on an error pattern\
+    \ \n    | grep -Eiv \"${LOGS_EXCLUDE_PATTERN}\" #Exclude each logline based on\
+    \ an exception pattern\n    | sort \\                             #Sort the output\n\
+    \    | uniq -c \\                         #Count the amount of occurrences for\
+    \ each unique line\n    | awk '{print \"Occurences:\",$0}'    #Print output as\
+    \ \"Occurences: x\""
   name: check_deployment_log_for_issues
 - command: kubectl get events --context ${CONTEXT} -n ${NAMESPACE} --field-selector
     type=Warning | grep -i "${DEPLOYMENT_NAME}" || true
   explanation: '
 
 
-    This command uses kubectl to get Events for a specific context and namespace.
-    It then filters those events by type, looking specifically for Warning level events,
-    and also filters those results again by the deployment name you provide. The "||
-    true" at the end of the command is used to ensure that it always returns as having
-    succeeded (even if there are no results from the initial query).'
-  multi_line_details: "\n\n# This script will allow users to get relevant Kubernetes\
-    \ events for the chosen namespace and deployment. \n# This will help diagnose\
-    \ issues with deployments.\n\n# Set your specific context, namespace, and deployment\
-    \ name\nCONTEXT=\"your_context\"\nNAMESPACE=\"your_namespace\"\nDEPLOYMENT_NAME=\"\
-    your_deployment\"\n\n# This command will query get events which match with field\
-    \ type is Warning\n# Pipe the output to grep to filter based on specified deployment\
-    \ name \n# End with || true to make sure script does not fail if no results are\
-    \ found\nkubectl get events --context ${CONTEXT} -n ${NAMESPACE} --field-selector\
-    \ type=Warning | \\\n    grep -i \"${DEPLOYMENT_NAME}\" || true"
+    This command is using the kubectl command line tool to get events related to your
+    deployment in a specific namespace, with the context and name of the deployment
+    that you specify. It filters out all but Warning events (meaning that only Warnings
+    will be shown) and then uses grep to search the output for your deployment''s
+    name. The || true at the end ensures that even if the grep command returns no
+    results, the overall command will still succeed.'
+  multi_line_details: "\n\n# This command is designed to get events from the Kubernetes\
+    \ context, namesapce and deployment name that are of type Warning\n# The optional\
+    \ `|| true` ensures that the command will always return `0` even if it fails.\n\
+    \n# Split into multi-line command:\nkubectl \\\n    get events \\  # Get events\n\
+    \    --context ${CONTEXT} \\  # Specify what context by declaring variable\n \
+    \   -n ${NAMESPACE} \\  # Specify the namespace by declaring variable \n    --field-selector\
+    \ type=Warning \\  # Filter only events of type warning\n    | grep -i \"${DEPLOYMENT_NAME}\"\
+    \ \\  # Search for the deployment name using case insensitive search\n    || true\
+    \ \\  # Make sure command returns a 0 even if it fails"
   name: troubleshoot_deployment_warning_events
 - command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o yaml
   explanation: '
 
 
-    This kubectl command retrieves the Kubernetes deployment configuration for the
-    specified ${DEPLOYMENT_NAME} in the given ${CONTEXT} and ${NAMESPACE}, and outputs
-    it in YAML format. This is useful if you need to examine or modify a deployment
-    configuration, or if you just want to view the settings that are currently being
-    used by a given deployment.'
-  multi_line_details: "\n\n# This command retrieves the YAML you need to read/modify/delete\
-    \ a specific deployment\n\nDEPLOYMENT_NAME=\"deployment-name\"\nCONTEXT=\"context-name\"\
-    \nNAMESPACE=\"namespace-name\"\n\n# Get deployment YAML in specified context and\
-    \ namespace \nkubectl get \\\n  deployment/${DEPLOYMENT_NAME} \\\n  --context\
-    \ ${CONTEXT} \\\n  -n ${NAMESPACE} \\\n  -o yaml"
+    This command tells Kubernetes to get information about a particular deployment
+    that has been specified by the name (${DEPLOYMENT_NAME}). The context (${CONTEXT})
+    and namespace (${NAMESPACE}) provide Kubernetes with more information as to where
+    exactly this deployment lives. Finally, you are asking Kubernetes to output the
+    results in the yaml format.'
+  multi_line_details: "\n\n#This line of code will retrieve the deployment configuration\
+    \ info from Kubernetes corresponding to a given deployment name, context, and\
+    \ namespace in a yaml format\n\nkubectl \\\n    #This is the kubernetes command\
+    \ line interface command\n    get \\\n    #Use the 'get' subcommand to retrieve\
+    \ information/objects\n    deployment/${DEPLOYMENT_NAME} \\\n    #In this case,\
+    \ we're specifically looking for Deployments with the given deployment name\n\
+    \    --context ${CONTEXT} \\\n    #Optionally specify a 'context' - an isolated\
+    \ cluster role for the operation. We set this variable separately, as it's value\
+    \ may differ between users/environments.\n    -n ${NAMESPACE} \\\n    #Specify\
+    \ a 'namespace' - the environment where all objects of type K8s live. This variable\
+    \ should be set separately, as it's value can change between users/environments.\n\
+    \    -o yaml\\\n    #The output format will be in yaml, as specified by the '-o\
+    \ yaml' option."
   name: get_deployment_workload_details_for_report
 - command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o json
   explanation: '
 
 
-    This command is used when retrieving the configuration settings of a Kubernetes
-    deployment. The "${DEPLOYMENT_NAME}" argument specifies the name of the deployment
-    to be retrieved, the "--context" argument allows you to specify the Kubernetes
-    context in which the deployment resides, and the "-n ${NAMESPACE}" argument allows
-    you to specify the namespace that contains the desired deployment. Finally, the
-    "-o json" argument indicates that you''d like the output information returned
-    in a JSON format.'
-  multi_line_details: "\n\n# This is a script to get an existing Kubernetes deployment\
-    \ using the kubectl utility. \n# Make sure that you replace DEPLOYMENT_NAME, CONTEXT\
-    \ and NAMESPACE with appropriate values for your system before running this script\n\
-    \n# Making sure command line arguments are provided\nif [[ $# -ne 3 ]]; then\n\
-    \    echo \"Error: DEPLOYMENT_NAME, CONTEXT, and NAMESPACE must be provided as\
-    \ arguments.\"\n    exit 1\nfi\n\n# Assign variables with the arguments provided\n\
-    DEPLOYMENT_NAME=$1\nCONTEXT=$2\nNAMESPACE=$3\n\n# Run the required command\nkubectl\
-    \ get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json"
+    This command allows you to retrieve information about a specific deployment in
+    Kubernetes. The ${DEPLOYMENT_NAME} argument is used to specify which deployment
+    you want to get info from. The ${CONTEXT} argument is used to specify the cluster
+    or context against which the request is made and the ${NAMESPACE} argument specifies
+    the namespace within the given cluster in which the deployment exists. Finally,
+    the -o json flag specifies that the resulting output should be in JSON format.'
+  multi_line_details: "path='{.spec.replicas}'\n\n# Get the current Deployment object\
+    \ based on a name, context, and namespace\nkubectl get deployment/${DEPLOYMENT_NAME}\
+    \ \\\n    --context ${CONTEXT} \\\n    -n ${NAMESPACE} \\\n# Output the number\
+    \ of replicas as defined in the Deployment Spec \n   -o jsonpath='{.spec.replicas}'"
   name: troubleshoot_deployment_replicas
 - command: kubectl get events --field-selector type!=Warning --context ${CONTEXT}
     -n ${NAMESPACE} -o json | jq -r '.items[] | select(.involvedObject.name|contains("${DEPLOYMENT_NAME}"))
@@ -95,29 +100,50 @@ commands:
     ) |tostring) +" Count:" + (.count|tostring) + " Minute(s):" + (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60|tostring)+
     " Object:" + .involvedObject.namespace + "/" + .involvedObject.kind + "/" + .involvedObject.name
     + " Reason:" + .reason + " Message:" + .message'
-  explanation: "\n\nThis command is used to monitor Kubernetes clusters for any abnormal\
-    \ behavior, specifically events with a type not equal to Warning. \n\nIt takes\
-    \ several parameters such as the context, namespace, deployment name, and anomaly\
-    \ threshold. \n\nIt then uses those parameters in conjunction with Kubectl's 'get\
-    \ events' command to retrieve events from the specified context and namespace.\
-    \ Those events are combined with jq filters to parse out only messages related\
-    \ to the given deployment name, and limit them further by their frequency of occurrence.\
-    \ If an event occurs more times per minute than the given anomaly threshold, it\
-    \ will be printed in the output. Additionally, each record contains data such\
-    \ as the count, duration, involved object, reason, and message associated with\
-    \ the event."
-  multi_line_details: "\n\n# Create variables for Context, Namespace, Deployment Name,\
-    \ and Anomaly Threshold\nCONTEXT=\"Cluster-Name\"\nNAMESPACE=\"Namespace name\"\
-    \nDEPLOYMENT_NAME=\"Deployment name\"\nANOMALY_THRESHOLD=10\n\n# Get all events\
-    \ (excluding warnings) from the given context in given namespace, and output as\
-    \ JSON\nkubectl get events --field-selector type!=Warning --context ${CONTEXT}\
-    \ -n ${NAMESPACE} -o json \n\n# Using jq sedlect out all the events related to\
-    \ a specific deployment\njq -r '.items[] | select(.involvedObject.name|contains(\"\
-    ${DEPLOYMENT_NAME}\")) | select( .count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60\
+  explanation: '
+
+
+    This command is used to get events from Kubernetes running in the specified context
+    and namespace. The command will filter out all Warning type events, and look for
+    events related to the deployment name that are occurring at a rate greater than
+    ANOMALY_THRESHOLD, as determined by dividing the number of events by the time
+    between the first occurrence and last occurrence. If it finds any such events,
+    it prints out information about them, including the event''s message, reason,
+    and object type.'
+  multi_line_details: "\n\n# This command calculates the number of events per minute\
+    \ created by a given deployment in Kubernetes. \n# It filters out events that\
+    \ aren't related to the deployment, and prints out useful information about any\
+    \ anomalies.\n\n# Break down the one-liner into multiple lines:\nkubectl get events\
+    \ \\\n    --field-selector type!=Warning \\\n    --context ${CONTEXT} \\\n   \
+    \ -n ${NAMESPACE}\\\n    -o json |\n    jq -r '.items[] | \\\n        select(.involvedObject.name|contains(\"\
+    ${DEPLOYMENT_NAME}\")) | \\\n        select( .count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60\
     \ == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end\
-    \ ) > ${ANOMALY_THRESHOLD}) | \"Event(s) Per Minute:\" + (.count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60\
+    \ ) > ${ANOMALY_THRESHOLD}) | \n        \"Event(s) Per Minute:\" + (.count / (\
+    \ if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else\
+    \ ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) |tostring) +\"\
+    \ Count:\" + (.count|tostring) + \" Minute(s):\" + (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60|tostring)+\
+    \ \" Object:\" + .involvedObject.namespace + \"/\" + .involvedObject.kind + \"\
+    /\" + .involvedObject.name + \" Reason:\" + .reason + \" Message:\" + .message'\n\
+    \n# Explanation:\n# kubectl get events \n#     Fetches the events in the cluster\
+    \ based on the following options.\n# \n# --field-selector type!=Warning\n#   \
+    \  Option to exclude events with Warning type from the output\n# \n# --context\
+    \ ${CONTEXT}\n#     Name of the context for which the events have to be fetched\n\
+    # \n# -n ${NAMESPACE}\n#     Namespace where the events are located\n# \n# -o\
+    \ json \n#     Output option to print events in JSON format\n# \n# jq -r\n#  \
+    \   Command to use the JSON parser jq to find specific items in the response\n\
+    # \n# '.items[] |\n#      Iterates over each event object stored as item\n# \n\
+    # select(.involvedObject.name|contains(\"${DEPLOYMENT_NAME}\"))\n#     Filters\
+    \ items according to the specified Deployment name defined by the variable\n#\
+    \ \n# select( .count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60\
+    \ == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end\
+    \ ) > ${ANOMALY_THRESHOLD})\n#     Calculates the number of events per minute\
+    \ using the first and last time stamps of the events, checks whether the value\
+    \ is greater then the anomaly threshold and selects only such items\n# \n# \"\
+    Event(s) Per Minute:\" + (.count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60\
     \ == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end\
     \ ) |tostring) +\" Count:\" + (.count|tostring) + \" Minute(s):\" + (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60|tostring)+\
     \ \" Object:\" + .involvedObject.namespace + \"/\" + .involvedObject.kind + \"\
-    /\" + .involvedObject.name + \" Reason:\" + .reason + \" Message:\" + .message'"
+    /\" + .involvedObject.name + \" Reason:\" + .reason + \" Message:\" + .message'\n\
+    #     Prints helpful details regarding the selected events, like the object's\
+    \ name, the reason behind the events, etc."
   name: check_for_deployment_event_anomalies

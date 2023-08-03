@@ -4,36 +4,35 @@ commands:
   explanation: '
 
 
-    Kubectl exec is a command that allows you to run a command inside a running container
-    in kubernetes. In the above command, it will execute a curl command inside a container
-    part of a statefulset with name ${STATEFULSET_NAME} which exists within a kubernetes
-    cluster with context ${CONTEXT} and namespace ${NAMESPACE}. The curl command will
-    perform a request on localhost (inside the container) on port 8091 and send a
-    liveness check request with a max timeout of 10 seconds.'
-  multi_line_details: "\n\n# This is a script for Kubernetes users to learn how to\
-    \ check the liveness of an artifactory running in a StatefulSet.\n\n# Set variables\
-    \ \nSTATEFULSET_NAME=\"mystatefulset\" # Replace with the name of your StatefulSet\
-    \ \nCONTEXT=\"dev-cluster\" # Replace with the context where the StatefulSet is\
-    \ configured  \nNAMESPACE=\"mynamespace\" # Replace with the namespace where the\
-    \ StatefulSet is configured \n\n# Run Kubernetes command to check the liveness\
-    \ of the artifactory\nkubectl exec statefulset/${STATEFULSET_NAME} \\\n    --context=${CONTEXT}\
-    \ \\\n    -n ${NAMESPACE} \\\n    -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/liveness"
+    This command uses the kubectl command line utility to execute a curl command on
+    a StatefulSet with the given name, in the given context and namespace. The curl
+    command makes a request to the localhost at port 8091 of the StatefulSet and obtains
+    the liveness information from the Artifactory API v1. This command is used to
+    regularly check whether the StatefulSet is running and if so, how many instances
+    are running.'
+  multi_line_details: "\n\n# Connect to a pod from the statefulset in order to make\
+    \ a cURL request \n# to Artifactory's liveness API endpoint. \nkubectl exec \\\
+    \n    # A name or unique identifier of the StatefulSet.\n    statefulset/${STATEFULSET_NAME}\
+    \ \\\n    # The configured context to connect to when using kubectl.\n    --context=${CONTEXT}\
+    \ \\\n    # An objects namespace.\n    -n ${NAMESPACE} \\\n    # Execute the curl\
+    \ command \n    -- curl -k \\ \n    # Maximum time allowed for the entire operation.\n\
+    \    --max-time 10 \\\n    # Request URL.\n    http://localhost:8091/artifactory/api/v1/system/liveness"
   name: check_artifactory_liveness_and_readiness_endpoints
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/readiness
   explanation: '
 
 
-    This command checks the readiness status of a StatefulSet in Kubernetes. The "kubectl
-    exec" command is used to execute commands on a Kubernetes Pod. In this case, you
-    are executing the ''curl'' command to check the status of the Artifactory service
-    running in the StatefulSet, named ${STATEFULSET_NAME}, which is running in the
-    ${CONTEXT} Kubernetes context and in the ${NAMESPACE} namespace. This command
-    runs with a timeout of 10 seconds, after which it will error out.'
-  multi_line_details: "\n\n#this command checks the readiness of Artifactory. \n#it\
-    \ requires to connect to a node in the Kubernetes cluster where the statefulSet\
-    \ pods are running\n\n#Below is the multi-line version of the command:\n\nSTATEFULSET_NAME=name_of_the_statefulset\n\
-    CONTEXT=name_of_the_context\nNAMESPACE=name_of_the_namespace\n\nkubectl exec \\\
-    \n    statefulset/${STATEFULSET_NAME} \\\n    --context=${CONTEXT} \\\n    -n\
-    \ ${NAMESPACE} \\\n    -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/readiness"
+    This command uses the kubectl command line tool to check the readiness of a service
+    called "statefulset" in a particular context and namespace. It does this by sending
+    an http request to a specific port (8091) on the localhost. This allows you to
+    determine whether the service is ready to accept requests or not. This command
+    can also be used to periodically check if the service is still running properly.'
+  multi_line_details: "\n\n# Kubernetes commands allow a user to view, manage, and\
+    \ add resources.\n# The kubectl command allows a user to run CLI commands directly\
+    \ on Kubernetes clusters\n# In this example, kubectl is used to execute a curl-based\
+    \ command for a statefulset using the context, namespace, and values indicated.\n\
+    \nkubectl exec \\\n  --context=${CONTEXT} \\\n  --namespace=${NAMESPACE} \\\n\
+    \  statefulset/${STATEFULSET_NAME} \\\n  -- curl \\\n  -k \\\n  --max-time 10\
+    \ \\\n  http://localhost:8091/artifactory/api/v1/system/readiness"
   name: check_artifactory_liveness_and_readiness_endpoints

@@ -197,16 +197,18 @@ def generate_metadata(directory_path):
             name_snake_case = re.sub(r'\W+', '_', name.lower())
 
             # Generate what it does
-            query_what_it_does = f'Please%20explain%20this%20command%20as%20if%20I%20was%20new%20to%20Kubernetes: {command}'
+            query_what_it_does_prompt =f"Please explain this command as if I was new to Kubernetes, but am learning to use it daily as an engineer"
+            query_what_it_does_with_command = f'{query_what_it_does_prompt} \n{command}'
             print(f'generating explanation for {name_snake_case}')
-            explain_query_what_it_does = urlencode({'prompt': query_what_it_does})
+            explain_query_what_it_does = urlencode({'prompt': query_what_it_does_with_command})
             url_what_it_does = f'{explainUrl}{explain_query_what_it_does}'   
             response_what_it_does = requests.get(url_what_it_does)
 
             #Generate multi-line explanation 
-            query_multi_line_with_comments = f'Please%20convert%20this%20command%20into%20a%20multi-line%20script%20format%20with%20comments%20to%20educate%20new%20Kubernetes%20users%20who%20are%20learning%20syntax: {command}'
+            query_multi_line_with_comments_prompt = f"Convert this one-line command into a multi-line command, adding verbose comments to educate new users of Kubernetes and related cli commands"
+            query_multi_line_with_command = f'{query_multi_line_with_comments_prompt}\n{command}'
             print(f'generating multi-line code with comments for {name_snake_case}')
-            explain_query_multi_line_with_comments = urlencode({'prompt': query_multi_line_with_comments})
+            explain_query_multi_line_with_comments = urlencode({'prompt': query_multi_line_with_command})
             url_multi_line_with_comments = f'{explainUrl}{explain_query_multi_line_with_comments}'   
             response_multi_line_with_comments = requests.get(url_multi_line_with_comments)
             # Check if the request was successful (status code 200)
