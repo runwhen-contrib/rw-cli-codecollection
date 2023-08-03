@@ -1,3 +1,6 @@
+Troubleshooting Tasks in Codecollection: **98**
+Codebundles in Codecollection: **34**
+
 ![](docs/GitHub_Banner.jpg)
 
 <p align="center">

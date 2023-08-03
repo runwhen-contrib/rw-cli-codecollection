@@ -4,26 +4,19 @@ commands:
     and .status == "True")) | select(.status.renewalTime) | "Namespace:" + .metadata.namespace
     + " URL:" + .spec.dnsNames[0] + " Renews:" + .status.renewalTime + " Expires:"
     + .status.notAfter'
-  explanation: '
-
-
-    This command retrieves certificates from Kubernetes using Cert-Manager. It will
-    use the context and namespace specified to query all certificate resources. It
-    will filter out any that are not in a Ready status, and output information such
-    as the namespace, URL, renewal time, and expiration.'
-  multi_line_details: "\n\n# This multi-line script with comments can be used by new\
-    \ Kubernetes users to learn syntax\nkubectl get # invocation of the kubectl command\
-    \ \ncertificates.cert-manager.io # use the Get verb to refer to certificates resources\
-    \ \n--context=${CONTEXT} #use an environment variable to provide a context value\
-    \ \n-n ${NAMESPACE} # query the specific namespace \n-ojson # get the output as\
-    \ json format    \n| jq -r '.items[] | # run a jq filter to select certain values\
-    \ from the output  \nselect(.status.conditions[] | select(.type == \"Ready\" and\
-    \ .status == \"True\")) \n| select(.status.renewalTime) # filter items that have\
-    \ renewale time \n| \"Namespace:\" + .metadata.namespace + # combine fields from\
-    \ jq with strings \n\" URL:\" + .spec.dnsNames[0] + # refer to first element in\
-    \ dns Names array \n\" Renews:\" + .status.renewalTime + # return renewal time\
-    \ from status object \n\" Expires:\" + .status.notAfter' # return expiration time\
-    \ from status object"
+  explanation: " \n\nThis command will query a Certificate Manager in a Kubernetes\
+    \ environment, looking for certificates that are ready and active, and then output\
+    \ information about them. It will output the namespace, the domain name it's associated\
+    \ with, when it needs to be renewed, and when it expires. This is useful information\
+    \ when deploying applications on the Kubernetes cluster that require secure TLS/SSL\
+    \ certificates."
+  multi_line_details: "\n# Get the certificate from cert-manager.io in the specified\
+    \ context and namespace:\nkubectl get certificates.cert-manager.io \\ \n    --context=${CONTEXT}\
+    \ \\\n    -n ${NAMESPACE} \\\n    -ojson \n\n# Filter for Ready certificate that\
+    \ have a time to renewal set (renewalTime)\njq -r '.items[] | select(.status.conditions[]\
+    \ | select(.type == \"Ready\" and .status == \"True\")) | select(.status.renewalTime)\
+    \ | \"Namespace:\" + .metadata.namespace + \" URL:\" + .spec.dnsNames[0] + \"\
+    \ Renews:\" + .status.renewalTime + \" Expires:\" + .status.notAfter'"
   name: get_namespace_certificate_summary
 - command: 'kubectl get certificaterequests.cert-manager.io --context=${CONTEXT} -n
     ${NAMESPACE} -o json | jq -r ''.items[] | select(.status.conditions[] | select(.type
@@ -39,30 +32,29 @@ commands:
   explanation: '
 
 
-    This command is used to obtain a list of certificaterequests, along with their
-    associated certificates, issuers, and status information. The command uses kubectl,
-    which is the command line tool for controlling Kubernetes clusters, to get detailed
-    information about certificaterequests, including the name, owner References, issuer
-    reference, ready status, ready message, approved status, and approved message.
-    The command also includes parameters such as context, namespace, and output format
-    (in this case JSON) to specify what data should be retrieved. The command includes
-    an additional filter to select only items with a specified status. After retrieving
-    the data, the jq command is used to parse it into a readable format.'
-  multi_line_details: "\n\n#This script will get the status and other information\
-    \ about certificates configured in a particular Kubernetes namespace\n\n# Get\
-    \ 2 variables for use in subsequent commands:\nCONTEXT=<Desired-Kube-Context>\n\
-    NAMESPACE=<Desired-Namespace> \n\n# Get CertificateRequest info (json format)\
-    \ from the desired Kubernetes context and namespace\nkubectl get certificaterequests.cert-manager.io\
-    \ \\\n--context=${CONTEXT} \\\n-n ${NAMESPACE} \\\n-o json\n\n# Parse the output\
-    \ of the previous command, using jq\njq -r '.items[] | select(.status.conditions[]\
-    \ | select(.type == \"Ready\" and .status != \"True\")) | {certRequest: .metadata.name,\
-    \ certificate: (.metadata.ownerReferences[].name), issuer: .spec.issuerRef.name,\
-    \ readyStatus: (.status.conditions[] | select(.type == \"Ready\")).status, readyMessage:\
-    \ (.status.conditions[] | select(.type == \"Ready\")).message, approvedStatus:\
-    \ (.status.conditions[] | select(.type == \"Approved\")).status, approvedMessage:\
-    \ (.status.conditions[] | select(.type == \"Approved\")).message} \n| \"---\\\
-    nCertificateRequest: \\(.certRequest)\", \"Certificate: \\(.certificate)\", \"\
-    Issuer: \\(.issuer)\", \"Ready Status: \\(.readyStatus)\", \"Ready Message: \\\
-    (.readyMessage)\", \"Approved Status: \\(.approvedStatus)\", \"Approved Message:\
-    \ \\(.approvedMessage)\"'"
+    This command uses the `kubectl` tool to get information from a CertificateRequest
+    object in Kubernetes. This information is filtered based on the specified parameters
+    such as the context and namespace - in this case `${CONTEXT}` and `${NAMESPACE}`.
+    The output from `kubectl` is then piped to the `jq` command which selects items
+    from the response based on whether the ''Ready'' or ''Approved'' conditions have
+    a status of ''True''. Finally, the command prints out each item''s name, certificate,
+    issuer, ready status, ready message, approved status, and approved message.'
+  multi_line_details: "\n\n# Convert one-line command into a multi-line command adding\
+    \ verbose comments to educate new users of Kubernetes and related cli commands.\n\
+    # This command is used to get certificate requests from the Cert-manager system\
+    \ \n\n# First, we need to specify the context and namespace to use with the kubectl\
+    \ command \nCONTEXT=${CONTEXT}\nNAMESPACE=${NAMESPACE}\n\n# Now we can execute\
+    \ our kubectl command \nkubectl get certificaterequests.cert-manager.io \\\n \
+    \   --context=${CONTEXT} \\\n    -n ${NAMESPACE} \\\n    -o json\n\n# Pipe this\
+    \ output to `jq` in order to filter the JSON output for relevant data\njq -r '.items[]\
+    \ | select(.status.conditions[] | select(.type == \"Ready\" and .status != \"\
+    True\")) | {certRequest: .metadata.name, certificate: (.metadata.ownerReferences[].name),\
+    \ issuer: .spec.issuerRef.name, readyStatus: (.status.conditions[] | select(.type\
+    \ == \"Ready\")).status, readyMessage: (.status.conditions[] | select(.type ==\
+    \ \"Ready\")).message, approvedStatus: (.status.conditions[] | select(.type ==\
+    \ \"Approved\")).status, approvedMessage: (.status.conditions[] | select(.type\
+    \ == \"Approved\")).message} | \"---\\nCertificateRequest: \\(.certRequest)\"\
+    , \"Certificate: \\(.certificate)\", \"Issuer: \\(.issuer)\", \"Ready Status:\
+    \ \\(.readyStatus)\", \"Ready Message: \\(.readyMessage)\", \"Approved Status:\
+    \ \\(.approvedStatus)\", \"Approved Message: \\(.approvedMessage)\"'"
   name: find_failed_certificate_requests_and_identify_issues

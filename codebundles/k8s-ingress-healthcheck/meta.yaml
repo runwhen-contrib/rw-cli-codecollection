@@ -20,45 +20,54 @@ commands:
   explanation: '
 
 
-    This command checks the status of an Ingress in Kubernetes. An Ingress is a resource
-    in Kubernetes that controls external access to services in a cluster, typically
-    HTTP. The command gets a list of all the ingresses in the cluster in the specified
-    namespace for the specified context, then it loops through and validates the health
-    of the each Ingress. For each Ingress, it validates each of its backend services
-    and checks if the endpoint for those services is healthy.  At the end, it outputs
-    the health status for the Ingress.'
-  multi_line_details: "\n\n# Create variables for Namespace and Context\nNAMESPACE=\"\
-    ${NAMESPACE}\"; \nCONTEXT=\"${CONTEXT}\"; \n\n# Get a list of Ingress objects\n\
-    ingress_list=$(kubectl get ingress -n \"$namespace\" --context \"$context\" -ojsonpath='{range\
-    \ .items[*]}{.metadata.name}{\"\\n\"}{end}');\n\n# Iterate through Ingress list\n\
-    for ingress in $ingress_list; do \n\n    # Print the Ingress name\n    echo \"\
-    Ingress: $ingress\"\n\n    # Initialize health_status to NA\n    health_status=\"\
-    NA\"\n\n    # Get list of backend services i.e services integrated with the Ingress\
-    \ object\n    backend_services=$(kubectl get ingress \"$ingress\" -n \"$namespace\"\
-    \ --context \"$context\" -ojsonpath='{range .spec.rules[*].http.paths[*]}{.backend.service.name}{\"\
-    |\"}{.backend.service.port.number}{\"\\n\"}{end}');    \n\n    # Read each service\
-    \ name and service port found in the backend services variable\n    while IFS='|'\
-    \ read -r service port; do \n\n        # Check if service and port names are not\
-    \ empty\n        if [ -n \"$service\" ] && [ -n \"$port\" ]; then\n          \
-    \  \n            # Print backend service name and port \n            echo \"Backend\
-    \ Service: $service, Port: $port\"; \n\n            # Get name of service\n  \
-    \          service_exists=$(kubectl get service \"$service\" -n \"$namespace\"\
-    \ --context \"$context\" -ojsonpath='{.metadata.name}'); \n\n            #Check\
-    \ if the service is found\n            if [ -z \"$service_exists\" ]; then\n \
-    \               health_status=\"Unhealthy\";\n                echo \"Validation:\
-    \ Service $service does not exist\"; \n            else\n                endpoint_pods=$(kubectl\
-    \ get endpoints \"$service\" -n \"$namespace\" --context \"$context\" -ojsonpath='{range\
-    \ .subsets[*].addresses[*]}- Pod Name: {.targetRef.name}\\n Pod IP: {.ip}\\n{end}');\n\
-    \n                # Check if pods are present in the endpoint \n             \
-    \   if [ -z \"$endpoint_pods\" ]; then\n                    health_status=\"Unhealthy\"\
-    ;\n                    echo \"Validation: Endpoint for service $service does not\
-    \ have any pods\";\n                else\n                    echo \"Endpoint\
-    \ Pod:\";\n                    echo \"$endpoint_pods\"; \n                   \
-    \ health_status=\"Healthy\";\n                fi;\n            fi;\n         \
-    \   services+=(\"$service\"); \n        fi;\n    done <<< \"$backend_services\"\
-    ;\n\n    # Print the overall health status of the Ingress\n    if [ \"$health_status\"\
-    \ = \"Unhealthy\" ]; then\n        echo \"Health Status: $health_status\";\n \
-    \       echo \"=====================\";\n    elif [ \"$health_status\" = \"Healthy\"\
-    \ ]; then\n        echo \"Health Status: $health_status\";\n    fi;\n    echo\
-    \ \"------------\";\ndone"
+    This command is used to validate the health of an ingress in a Kubernetes cluster.
+    It retrieves all the ingresses from a specified namespace and context, and then
+    for each ingress it will get its backend services and ports, determine if those
+    services exist, and check if each service has at least one pod behind the endpoint.
+    At the end of the process it prints out the validation results such as Healthy
+    or Unhealthy with more detailed logs.'
+  multi_line_details: "\n\n# Convert the one-line command into a multi-line command,\
+    \ along with verbose comments to educate new users of Kubernetes and related cli\
+    \ commands\n# namespaces and context are pulled form environment variables\nnamespace=\"\
+    ${NAMESPACE}\"; \ncontext=\"${CONTEXT}\";\n\n# Get the name of each ingress in\
+    \ the given namespace\nfor ingress in $(kubectl get ingress -n \"$namespace\"\
+    \ --context \"$context\" -ojsonpath='{range .items[*]}{.metadata.name}{\"\\n\"\
+    }{end}'); do\n    \n    # Print information about the current ingress\n    echo\
+    \ \"Ingress: $ingress\";\n\n    # Determine the initial health status as Not Available\n\
+    \    health_status=\"NA\";\n\n    # Initialize an array to hold the list of services\
+    \ associated with this ingress\n    services=();\n    \n    # Get the names of\
+    \ the backend services associated with each ingress rule in this ingress \n  \
+    \  # and their port numbers\n    backend_services=$(kubectl get ingress \"$ingress\"\
+    \ -n \"$namespace\" --context \"$context\" \\\n                       -ojsonpath='{range\
+    \ .spec.rules[*].http.paths[*]}{.backend.service.name}{\"|\"}{.backend.service.port.number}{\"\
+    \\n\"}{end}');\n\n    # Iterate through the output of each service and port to\
+    \ determine the health status of the ingress\n    while IFS='|' read -r service\
+    \ port; do\n        # If the service and port exist, print information about them\n\
+    \        if [ -n \"$service\" ] && [ -n \"$port\" ]; then\n            echo \"\
+    Backend Service: $service, Port: $port\";\n\n            # Check whether the service\
+    \ exists\n            service_exists=$(kubectl get service \"$service\" -n \"\
+    $namespace\" --context \"$context\" \\\n                             -ojsonpath='{.metadata.name}');\n\
+    \n            # If the service does not exist, set the health status to Unhealthy\n\
+    \            if [ -z \"$service_exists\" ]; then\n                health_status=\"\
+    Unhealthy\";\n                echo \"Validation: Service $service does not exist\"\
+    ;\n\n            # If the service does exist, check whether it has any endpoints\
+    \ (pods) associated with it\n            else\n                endpoint_pods=$(kubectl\
+    \ get endpoints \"$service\" -n \"$namespace\" --context \"$context\" \\\n   \
+    \                             -ojsonpath='{range .subsets[*].addresses[*]}- Pod\
+    \ Name: {.targetRef.name}\\n Pod IP: {.ip}\\n{end}');\n\n                # If\
+    \ the service does not have any pods associated with it, set the health status\
+    \ to Unhealthy\n                if [ -z \"$endpoint_pods\" ]; then\n         \
+    \           health_status=\"Unhealthy\";\n                    echo \"Validation:\
+    \ Endpoint for service $service does not have any pods\";\n                # If\
+    \ the service does have pods associated with it, set the health status to Healthy\n\
+    \                else\n                    echo \"Endpoint Pod:\";\n         \
+    \           echo \"$endpoint_pods\";\n                    health_status=\"Healthy\"\
+    ;\n                fi;\n            fi;\n\n            # Update the array of services\
+    \ for this ingress\n            services+=(\"$service\");\n        fi;\n    done\
+    \ <<< \"$backend_services\";\n\n    # Print the health status for this ingress\n\
+    \    if [ \"$health_status\" = \"Unhealthy\" ]; then \n        echo \"Health Status:\
+    \ $health_status\"; \n        echo \"=====================\";\n    elif [ \"$health_status\"\
+    \ = \"Healthy\" ]; then\n        echo \"Health Status: $health_status\";\n   \
+    \ fi;\n\n    # Print a line between iterations\n    echo \"------------\"; \n\
+    done"
   name: fetch_ingress_object_health_in_namespace
