@@ -1,6 +1,22 @@
 commands:
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -s -o /dev/null -w "%{http_code}" localhost:8080/login
+  doc_links: '
+
+
+    1. Kubernetes Overview: https://kubernetes.io/docs/home/
+
+    2. Kubectl Documentation: https://kubernetes.io/docs/reference/kubectl/overview/
+
+    3. Pod Documentation: https://kubernetes.io/docs/tasks/run-application/run-stateful-application-deployment/
+
+    4. StatefulSet Documentation: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
+
+    5. Context Documentation: https://kubernetes.io/docs/user-guide/contexts/
+
+    6. Namespaces Documentation: https://kubernetes.io/docs/tasks/administer-cluster/namespaces-walkthrough/
+
+    7. Curl Documentation: https://curl.haxx.se/docs/manpage.html'
   explanation: '
 
 
@@ -20,6 +36,11 @@ commands:
   name: query_the_jenkins_kubernetes_workload_http_endpoint
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -s localhost:8080/api/json?pretty=true --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}
+  doc_links: "\n\n#Documentation Links: \n1. Kubectl Documentation: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands\n\
+    2. Statefulset Overview -https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/\n\
+    3. Contexts Overview - https://kubernetes.io/docs/tasks/access-cluster-info/contexts-clusters-users/#managing-contexts\n\
+    4. Creating Namespaces - https:// kubernetes.io/docs/tasks/administer-cluster/namespaces-walkthrough/\n\
+    5. Configure Container Commands - https://kubernetes.io/docs/tasks/inject-data-application/configure-pod-container/"
   explanation: '
 
 
@@ -44,6 +65,11 @@ commands:
     -- curl -s localhost:8080/queue/api/json --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}
     | jq -r ''.items[] | select((.stuck == true) or (.blocked == true)) | "Why: "
     + .why + "\nBlocked: " + (.blocked|tostring) + "\nStuck: " + (.stuck|tostring)'''
+  doc_links: "\n\n# Documentation Links \n1.Kubernetes documentation on statefulsets:\
+    \ https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/\n\
+    2.Jenkins Security ACL setup guide: https://wiki.jenkins.io/display/JENKINS/Managing+Security+Realm#ManagingSecurityRealm-ConfigureACLsandPermissions\n\
+    3.Curl CommandLine reference: https://curl.haxx.se/docs/manpage.html\n4.jq documentation:\
+    \ https://stedolan.github.io/jq/"
   explanation: "\n\nThis command is used to identify the cause of stuck or blocked\
     \ jobs in a Jenkins instance. The command calls the Jenkins API and filters out\
     \ stuck and/or blocked jobs, displaying the related \"why\" value as well as their\

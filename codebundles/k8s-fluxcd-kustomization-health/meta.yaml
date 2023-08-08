@@ -1,5 +1,15 @@
 commands:
 - command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}
+  doc_links: '
+
+
+
+
+    1. Kubectl Documentation: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands
+
+    2. Contexts in Kubernetes Concept Reference:  https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
+
+    3. Overview of Kubernetes Namespaces:  https://kubernetes.io/docs/tasks/administer-cluster/namespaces-walkthrough/'
   explanation: '
 
 
@@ -42,6 +52,10 @@ commands:
     \(.message)\n reason: \(.reason)\n last_transition_time: \(.lastTransitionTime)")\n\nReconcile
     Status:\(.status.conditions[] | select(.type == "Reconciling") |"\n reconciling:
     \(.status)\n message: \(.message)")\n---\n"'''
+  doc_links: "\n\nHelpful Documentation Links: \n- Kubectl Documentation: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands\
+    \ \n- Understanding Kubernetes Contexts: https://www.antbutler.com/2016/11/understanding-kubernetes-contexts/\n\
+    - JQ Utility Examples: https://stedolan.github.io/jq/examples/ \n- JSON Data Types:\
+    \ https://devhints.io/json \n- Kustomization Documentation: https://github.com/kubernetes-sigs/kustomize/blob/master/docs/glossary.md#kindkustomization"
   explanation: '
 
 

@@ -1,7 +1,7 @@
 """
 Utility file to generate metadata file for each 
 runbook. Initial purpose is to hold static 
-command explainations for use with runwhen-local 
+command explanations for use with runwhen-local 
 documentation. 
 
 parse_robot_file written by Kyle Forster
@@ -125,7 +125,7 @@ def remove_escape_chars(cmd):
 def cmd_expansion(keyword_arguments):
     """
     Cleans up the command details as sent in from robot parsing.
-    Substitutes major binaries in for better command explaination,  
+    Substitutes major binaries in for better command explanation,  
     and escapes special characters. 
 
 
@@ -203,6 +203,11 @@ def generate_metadata(directory_path):
             explain_query_what_it_does = urlencode({'prompt': query_what_it_does_with_command})
             url_what_it_does = f'{explainUrl}{explain_query_what_it_does}'   
             response_what_it_does = requests.get(url_what_it_does)
+            if ((response_what_it_does.status_code == 200)):
+                explanation = response_what_it_does.json()
+                explanation_content = explanation['explanation']
+            else: 
+                explanation_content = "Explanation not available"
 
             #Generate multi-line explanation 
             query_multi_line_with_comments_prompt = f"Convert this one-line command into a multi-line command, adding verbose comments to educate new users of Kubernetes and related cli commands"
@@ -211,20 +216,37 @@ def generate_metadata(directory_path):
             explain_query_multi_line_with_comments = urlencode({'prompt': query_multi_line_with_command})
             url_multi_line_with_comments = f'{explainUrl}{explain_query_multi_line_with_comments}'   
             response_multi_line_with_comments = requests.get(url_multi_line_with_comments)
-            # Check if the request was successful (status code 200)
-            if ((response_what_it_does.status_code == 200) and (response_multi_line_with_comments.status_code == 200)):
-                explain = response_what_it_does.json()
+            if ((response_multi_line_with_comments.status_code == 200)):
                 multi_line = response_multi_line_with_comments.json()
-                command_meta = {
-                    'name': name_snake_case,
-                    'command': command,
-                    'explanation': explain['explanation'],
-                    'multi_line_details': multi_line['explanation']
-                }
-                # Add the command meta to the list of commands
-                commands.append(command_meta)
-            else:
-                print("Request failed with status code:", response.status_code)
+                multi_line_content = multi_line['explanation']
+
+                #Generate external doc links 
+                query_doc_links_prompt = f"Given the following script and comments, can you generate a list of helpful documentation links for a reader who want's to learn more about the topics used in the script?"
+                query_doc_links_with_command = f'{query_doc_links_prompt}\n{multi_line_content}'
+                print(f'generating doc-links for {name_snake_case}')
+                explain_query_doc_links = urlencode({'prompt': query_doc_links_with_command})
+                url_doc_links = f'{explainUrl}{explain_query_doc_links}'   
+                response_doc_links = requests.get(url_doc_links)
+                if ((response_doc_links.status_code == 200)):
+                    doc_links = response_doc_links.json()
+                    doc_links_content = doc_links['explanation']
+                else: 
+                    doc_links_content = "Documentation links not available"
+            else: 
+                multi_line_content = "Multi-line script not available"
+                doc_links_content = "Documentation links not available"
+            
+
+            command_meta = {
+                'name': name_snake_case,
+                'command': command,
+                'explanation': explanation_content,
+                'multi_line_details': multi_line_content,
+                'doc_links': doc_links_content
+            }
+            # Add the command meta to the list of commands
+            commands.append(command_meta)
+
         # Create a dictionary with the commands list
         yaml_data = {'commands': commands}
 

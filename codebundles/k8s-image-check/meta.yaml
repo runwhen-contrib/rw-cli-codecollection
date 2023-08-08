@@ -2,6 +2,18 @@ commands:
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Running
     -o json | jq -r ''[.items[] | "Images: " + (.spec.containers[].image|tostring)
     + ", Last Started Times:" + (.status.containerStatuses[].state.running.startedAt|tostring)]'''
+  doc_links: '
+
+
+    Documentation Links:
+
+    1. Kubernetes Documentation for kubectl:  https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands
+
+    2. Kubernetes Documentation for Fields Selector: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get
+
+    3. Kubernetes Documentation for Output Formatting: https://kubernetes.io/docs/tasks/access-application-cluster/list-all-running-container-images/#output
+
+    4. jq Manual: https://stedolan.github.io/jq/manual/'
   explanation: '
 
 
@@ -30,6 +42,25 @@ commands:
     + .status.phase, "containers:", (.spec.containers[] | "- container_name: " + .name,
     " \ image_path: " + (.image | split(":")[0]), " \ image_tag: " + (.image | split(":")[1])),
     "---"'''
+  doc_links: '
+
+
+
+    # Documentation Links:
+
+    1. Kubernetes Overview: https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/
+
+    2. Kubernetes Cheat Sheet - Kubectl: https://kubernetes.io/docs/reference/kubectl/cheatsheet/
+
+    3. Managing Resources with kubectl: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get
+
+    4. Field Selectors: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/#field-selector
+
+    5. Kubernetes Namespaces: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+
+    6. JSONPath Guide: https://goessner.net/articles/JsonPath/
+
+    7. jq Manual: https://stedolan.github.io/jq/manual/'
   explanation: '
 
 
@@ -61,6 +92,10 @@ commands:
     + .status.phase, "containers:", (.spec.containers[] | "- container_name: " + .name,
     " \ image_path: " + \(.image | split(":")[0]), " \ image_tag: " + (.image | split(":")[1])),
     "---"'''
+  doc_links: "\n\nAnswer: \n1. Kubernetes Documentation \"kubectl get pods\": https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-pods-psp\n\
+    2. jq Documentation \"jq -r .items[]\": https://stedolan.github.io/jq/manual/#Basicfilters\n\
+    3. Kubernetes Fields Selectors Documentation: https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/\
+    \ \n4. Kubernetes Output Formats Documentation: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#getting-the-list-of-resources"
   explanation: '
 
 
@@ -110,6 +145,9 @@ commands:
     ); echo "$available_tags"; fi; done <<<"$image_pull_backoff_events" && echo "Deleting
     Skopeo pod" && kubectl delete pod $POD_NAME -n $NAMESPACE --context=$CONTEXT &&
     echo "Done"'
+  doc_links: "\n\nAnswer: \n- Documentation for KubeCTL command:  https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands\n\
+    - Documentation for JQ command: https://stedolan.github.io/jq/\n- Documentation\
+    \ for Skopeo: https://skopeo.github.io/docs/user-guides/overview/"
   explanation: '
 
 

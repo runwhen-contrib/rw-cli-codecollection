@@ -4,6 +4,8 @@ commands:
     and .status == "True")) | select(.status.renewalTime) | "Namespace:" + .metadata.namespace
     + " URL:" + .spec.dnsNames[0] + " Renews:" + .status.renewalTime + " Expires:"
     + .status.notAfter'
+  doc_links: "\n\n\nLinks: \n- Kubernetes Documentation on kubectl: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get\
+    \ \n- Cert-Manager Documentation: https://cert-manager.io/docs\n- JQ Manual: https://stedolan.github.io/jq/manual/"
   explanation: " \n\nThis command will query a Certificate Manager in a Kubernetes\
     \ environment, looking for certificates that are ready and active, and then output\
     \ information about them. It will output the namespace, the domain name it's associated\
@@ -29,6 +31,10 @@ commands:
     \(.certificate)", "Issuer: \(.issuer)", "Ready Status: \(.readyStatus)", "Ready
     Message: \(.readyMessage)", "Approved Status: \(.approvedStatus)", "Approved Message:
     \(.approvedMessage)"'''
+  doc_links: "\n\n# Helpful documentation links: \n\n1. Overview of Kubernetes CLI\
+    \ (kubectl): https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands\n\
+    2. Overview of jq, a Command-line JSON processor: https://stedolan.github.io/jq/\n\
+    3. Tutorial for using kubectl to manage objects in Kubernetes clusters: https://kubernetes.io/docs/tasks/basic-update/update-api-object-kubectl-patch/"
   explanation: '
 
 

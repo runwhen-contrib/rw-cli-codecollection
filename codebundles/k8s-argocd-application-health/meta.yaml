@@ -2,6 +2,17 @@ commands:
 - command: 'kubectl get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
     --context ${CONTEXT} -o jsonpath=''Application Name: {.metadata.name}, Sync Status:
     {.status.sync.status}, Health Status: {.status.health.status}, Message: {.status.conditions[].message}'''
+  doc_links: '
+
+
+
+    1. Kubernetes Documentation for kubectl: https://kubernetes.io/docs/reference/generated/kubectl/
+
+    2. ArgoProject Documentation to learn about Applications: https://argoproj.github.io/argo-cd/concepts/app_resources/
+
+    3. Helm Documentation to learn about Chart Templates: https://helm.sh/docs/topics/chart_template_guide/
+
+    4. JSONPath Syntax Documentation: https://goessner.net/articles/JsonPath/'
   explanation: '
 
 
@@ -42,6 +53,12 @@ commands:
     Last Sync Status: " + .status.operationState.phase + "
 
     Last Sync Message: " + .status.operationState.message'''
+  doc_links: "\n\nDocumentation Links: \n- Kubernetes Documentation on Applications:\
+    \ https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/custom-resource-definitions/\n\
+    - ArgoProj Documentation on Application Resources: https://argoproj.github.io/argo-cd/getting_started/application_model/\
+    \   \n- Kubernetes Documentation on Contexts: https://kubernetes.io/docs/tasks/access-cluster-resources/#use-contexts-to-switch-between-clusters\n\
+    - Kubernetes Documentation on kubectl: https://kubernetes.io/docs/reference/kubectl/overview/\
+    \  \n- jq Documentation: https://shapeshed.com/jq-json/"
   explanation: "\n\nThis command is using the Kubernetes command line tool \"kubectl\"\
     \ to get information on an application created with Argoproj. In your command,\
     \ you specified that this application exists within a specified namespace (APPLICATION_APP_NAMESPACE)\
@@ -67,6 +84,18 @@ commands:
 - command: kubectl get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
     --context ${CONTEXT} -o json | jq -r '[.status.resources[] | select(.health.status
     != null) | select(.health.status != "Healthy") | {name,kind,namespace,health}]'
+  doc_links: '
+
+
+    # Documentation Links:
+
+    1. Kubectl Command Reference: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands
+
+    2. Argo Project website: https://argoproj.github.io/
+
+    3. About JSON: https://www.geeksforgeeks.org/json-javascript-object-notation/
+
+    4. Introduction to jq: https://stedolan.github.io/jq/tutorial/'
   explanation: '
 
 
@@ -91,6 +120,16 @@ commands:
     \ -o=custom-columns=NAME:.metadata.name --no-headers -n ${APPLICATION_TARGET_NAMESPACE});\
     \ do echo \"\nDEPLOYMENT NAME: $deployment_name \n\" && kubectl logs deployment/$deployment_name\
     \ --tail=50 -n ${APPLICATION_TARGET_NAMESPACE} | grep -E '${ERROR_PATTERN}'; done"
+  doc_links: '
+
+
+    1. kubectl Get Command: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get
+
+    2. Custom Output Formatting: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#custom-columns
+
+    3. Retrieve Logs with Kubectl: https://kubernetes.io/docs/tasks/debug-application-cluster/get-shell-running-container/#use-kubectl-to-retrieve-logs-for-a-deployment
+
+    4. Grep Command: https://www.digitalocean.com/community/tutorials/using-grep-regular-expressions-to-search-for-text-patterns-in-linux'
   explanation: '
 
 
@@ -117,6 +156,12 @@ commands:
   name: scan_for_errors_in_pod_logs_related_to_argocd_application_deployments
 - command: kubectl describe applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
     --context ${CONTEXT}
+  doc_links: "\n\n\nDocumentation Links: \n1. Kubernetes Documentation on Kubectl:\
+    \ https://kubernetes.io/docs/reference/kubectl/overview/\n2. Argo Docs on Argo\
+    \ Applications: https://argoproj.github.io/docs/argo/readme.html# ar go-applications\n\
+    3. Kubernetes Docs on Contexts and Config Files: https://kubernetes.io/docs/reference/access-authn-authz/contexts/\n\
+    4. Argo Docs on Namespaces: https://argoproj.github.io/docs/argo/manage-users-and-teams#\
+    \ organizations-tasks-and-namespaces"
   explanation: '
 
 
