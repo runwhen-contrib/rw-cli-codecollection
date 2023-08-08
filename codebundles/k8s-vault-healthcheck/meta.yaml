@@ -1,6 +1,13 @@
 commands:
 - command: kubectl logs --tail=100 daemonset.apps/vault-csi-provider --context ${CONTEXT}
     -n ${NAMESPACE}
+  doc_links: "\n\nAnswers: \n\u2022 https://kubernetes.io/docs/reference/kubectl/overview/\
+    \ - Overview of DigitalOcean Managed Kubernetes and Kubectl command line tool\n\
+    \u2022 https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/ -\
+    \ Overview of DaemonSets in Kubernetes\n\u2022 https://kubernetes.io/docs/tasks/debug-application-cluster/logging-elasticsearch-kibana/\
+    \ - Logging with Elasticsearch and Kibana\n\u2022 https://kubernetes.io/docs/reference/commands/kubectl/kubectl_logs/\
+    \ - Kubectl \u2018logs\u2019 command reference  \n\u2022 https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#daemonset-v1-apps\
+    \ - DaemonSet API object reference"
   explanation: '
 
 
@@ -22,6 +29,12 @@ commands:
   name: fetch_vault_csi_driver_logs
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "vault-csi-provider" || true
+  doc_links: "\n\n\n# Documentation Links \n1. Kubernetes documentation on the `get`\
+    \ command: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get\
+    \ \n2. Kubernetes documentation on the `--context` flag: https://kubernetes.io/docs/tasks/access-cluster-information/configure-access-multiple-clusters/#specifying-cluster-info-using-flags\
+    \ \n3. Kubernetes documentation on the `-n` flag: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#apply\
+    \ \n4. Grep man pages: https://linux.die.net/man/1/grep \n5. Introduction to Environment\
+    \ Variables in bash: http://www.tldp.org/LDP/abs/html/internalvariables.html"
   explanation: '
 
 
@@ -40,6 +53,11 @@ commands:
   name: get_vault_csi_driver_warning_events
 - command: kubectl describe daemonset.apps/vault-csi-provider --context ${CONTEXT}
     -n ${NAMESPACE}
+  doc_links: "\n\n\n\nHelpful documentation links: \n1. Kubectl Overview - https://kubernetes.io/docs/reference/kubectl/overview/\n\
+    2. Describe Object - https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#describe\n\
+    3. DaemonSet Resource - https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/\n\
+    4. Context Configuration - https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#set-the-kubeconfig-context\n\
+    5. Namespace - https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
   explanation: " \n\nThis command is used to get information about a particular DaemonSet\
     \ of the Vault Kubernetes CSI provider that is running in your Kubernetes cluster.\
     \ It shows the details for the DaemonSet such as what nodes it is running on,\
@@ -57,6 +75,18 @@ commands:
   name: check_vault_csi_driver_replicas
 - command: kubectl logs --tail=100 statefulset.apps/vault --context ${CONTEXT} -n
     ${NAMESPACE}
+  doc_links: '
+
+
+    # Helpful documentation links
+
+    1. Kubernetes Context: https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
+
+    2. Kubernetes Namespace: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+
+    3. StatefulSet: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
+
+    4. Kubectl Logs: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs'
   explanation: '
 
 
@@ -76,6 +106,12 @@ commands:
   name: fetch_vault_logs
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "vault" || true
+  doc_links: "\n\nAnswer: \n- Kubernetes Documentation on kubectl get: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get\n\
+    - Working With Events: https://kubernetes.io/docs/tasks/debug-application-cluster/core-concepts/working-with-events/\n\
+    - Troubleshooting Kubernetes Applications: https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/\n\
+    - Environment Variables in Bash Scripts: https://www.cyberciti.biz/faq/set-environment-variable-in-bash/\n\
+    - Using grep Command: https://thegeekstuff.com/2009/03/15-practical-unix-grep-command-examples/\n\
+    - Understanding Logging and System Events with Kubernetes: https://kubernetes.io/docs/tasks/debug-application-cluster/determine-reason-pod-failure/"
   explanation: "\n\nThis command will print out all \"Warning\" type events from a\
     \ Kubernetes cluster, specifically from the context and namespace you specify.\
     \ It filters for specific words such as \"vault\". The \u2018|| true\u2019 at\
@@ -91,6 +127,18 @@ commands:
   name: get_related_vault_events
 - command: kubectl get statefulset.apps/vault --context=${CONTEXT} -n ${NAMESPACE}
     -o yaml
+  doc_links: '
+
+
+    Useful documentation links:
+
+    - Kubernetes - Getting started with kubectl: https://kubernetes.io/docs/tasks/tools/install-kubectl/#getting-started-with-kubectl
+
+    - Configure Access to Multiple Clusters: https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/
+
+    - Kubectl Cheat Sheet (includes more flags and switches): https://kubernetes.io/docs/reference/kubectl/cheatsheet/
+
+    - StatefulSet concepts: https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/'
   explanation: '
 
 
@@ -112,6 +160,13 @@ commands:
   name: fetch_vault_statefulset_manifest_details
 - command: kubectl get daemonset.apps/vault-csi-provider --context=${CONTEXT} -n ${NAMESPACE}
     -o yaml
+  doc_links: "\n\n\nDocumentation Links:\n1. Introduction to Kubernetes Contexts:\
+    \ https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/\n\
+    2. Overview of the Kubectl command:https://kubernetes.io/docs/reference/kubectl/overview/\
+    \ \n3. Operations with Kubectl: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands\n\
+    4. DaemonSet Reference: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/\
+    \ \n5. Accessing Application Cluster: https://kubernetes.io/docs/tasks/access-application-cluster/\
+    \ \n6. YAML Syntax Guide: https://learnxinyminutes.com/docs/yaml/"
   explanation: '
 
 
@@ -131,6 +186,15 @@ commands:
     \ \\\n    -o yaml"
   name: fetch_vault_daemonset_manifest_details
 - command: curl ${VAULT_URL}
+  doc_links: "\n\n#Step 3: Show the results as a json object\necho ${VAULT_URL} |\
+    \ jq -r\n\n# Step 4: Extract the data from the json and store it in an environment\
+    \ variable\nSECRET=$(curl \\\n    --request POST \\ \n    --data '{\"key\":\"\
+    value\"}' \\\n    ${VAULT_URL}/secret/mySecret \\\n    # This command allows the\
+    \ user to extract secret data stored in Vault's backend using the vault URL)\n\
+    \n\n1. Overview of Curl: https://www.taniarascia.com/how-to-use-curl-with-examples/\n\
+    2. JSON Object Syntax Reference: https://www.w3schools.com/js/js_json_syntax.asp\n\
+    3. Guide on Using Environments variables: https://www.twilio.com/blog/environment-variables-bash-profile\n\
+    4. Documentation on Vault Secrets Engine: https://www.vaultproject.io/docs/secrets/"
   explanation: '/v1/sys/health
 
 
@@ -146,6 +210,10 @@ commands:
   name: verify_vault_availability
 - command: kubectl get statefulset.apps/vault --context=${CONTEXT} -n ${NAMESPACE}
     -o json
+  doc_links: "\n\nAnswer: \n\u2022 Kubernetes Documentation - https://kubernetes.io/docs/\n\
+    \u2022 Stateful Sets Documentation - https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/\n\
+    \u2022 Kubectl Command Documentation - https://kubernetes.io/docs/reference/kubectl/overview/\n\
+    \u2022 JsonPath Syntax Documentation - https://kubernetes.io/docs/reference/kubectl/jsonpath/"
   explanation: "\n\nThis command is used to retrieve information about a StatefulSet\
     \ called \u201Cvault\u201D in Kubernetes. The \u201Ckubectl get\u201D command\
     \ retrieves objects of different types from the Kubernetes cluster. The \u201C\

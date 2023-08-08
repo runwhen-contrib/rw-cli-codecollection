@@ -1,6 +1,10 @@
 commands:
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli PING
+  doc_links: "\n\n\n1. Kubernetes: https://kubernetes.io/docs/home/ \n2. Context and\
+    \ Namespace Configuration: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#config-set-context\
+    \ \n3. redis-cli: https://redis.io/topics/rediscli \n4. Deployment Concepts: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/\
+    \ \n5. kubectl syntax for exec command: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec"
   explanation: '
 
 
@@ -18,6 +22,11 @@ commands:
   name: ping_redis_workload
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli SET ${REDIS_HEALTHCHECK_KEY} 0
+  doc_links: "\n\nDocumentation Links: \n1. Kubernetes - https://kubernetes.io/docs/\n\
+    2. kubectl command - https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec\n\
+    3. Context - https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#configuring-the-default-context\n\
+    4. Namespace - https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/\n\
+    5. Redis - https://redis.io/documentation"
   explanation: '
 
 
@@ -64,6 +73,11 @@ commands:
   name: verify_redis_read_write_operation
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli INCR ${REDIS_HEALTHCHECK_KEY}
+  doc_links: "\n\n\n\nHelpful Documentation Links: \n1. Kubernetes Environment Variables:\
+    \ https://kubernetes.io/docs/concepts/configuration/environment-variables/\n2.\
+    \ Kubectl Commands Reference: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands\n\
+    3. Redis CLI Documentation: https://redis.io/commands/INCR\n4. Kubernetes Namespaces\
+    \ Reference: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
   explanation: "\n\nThis command is used to increase an internal counter stored in\
     \ a Redis database. It enables you to track the health of your application deployment\
     \ on Kubernetes. \nThe command begins with the kubectl command, which allows you\
@@ -86,6 +100,11 @@ commands:
   name: verify_redis_read_write_operation
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli GET ${REDIS_HEALTHCHECK_KEY}
+  doc_links: "\n\n1. Kubernetes Documentation: https://kubernetes.io/docs/home/\n\
+    2. Kubectl Documentation: https://christiewilson.github.io/how-to-use-kubectl/\
+    \ \n3. Redis Documentation: https://redis.io/documentation \n4. Kubernetes Exec\
+    \ Documentation: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec\
+    \ \n5. Kubernetes Contexts Documentation: https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#understanding-contexts"
   explanation: '
 
 

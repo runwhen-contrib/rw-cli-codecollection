@@ -6,6 +6,10 @@ commands:
     | jq -r ''if .data.result[0] then "Host:" + .data.result[0].metric.host + " Ingress:"
     + .data.result[0].metric.ingress + " Namespace:" + .data.result[0].metric.exported_namespace
     + " Service:" + .data.result[0].metric.service else "" end'''
+  doc_links: "\n\nAnswer: \n- GCP Authentication Using Service Accounts: https://cloud.google.com/docs/authentication/production\n\
+    - Kubernetes User Guide - Accessing Clusters with the Command Line Tool:  https://kubernetes.io/docs/tasks/tools/install-kubectl/\n\
+    - Google Cloud Monitoring API Quickstart: https://cloud.google.com/monitoring/api/quickstart\n\
+    - jq Manual (Command-line JSON processor): https://stedolan.github.io/jq/manual/"
   explanation: '
 
 
@@ -66,6 +70,17 @@ commands:
     = "Unhealthy" ]; then echo "Health Status: $health_status"; echo "=====================";
     elif [ "$health_status" = "Healthy" ]; then echo "Health Status: $health_status";
     fi; echo "------------"'
+  doc_links: " has an endpoint\n        if [ -z \"$ENDPOINT_EXISTS\" ]; then \n  \
+    \          HEALTH_STATUS=\"Unhealthy\"\n            echo \"Validation: Service\
+    \ $SERVICE does not have an endpoint\"\n        fi\n    fi\ndone\n\necho \"Health\
+    \ Status: $HEALTH_STATUS\"\n\n# Helpful Documentation Links:\n1. Variables in\
+    \ Bash - https://www.gnu.org/software/bash/manual/html_node/Shell-Parameters.html\n\
+    2. Array Declaration and Iteration in Bash - https://www.tldp.org/LDP/abs/html/arrays.html\n\
+    3. kubectl get command - https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get\
+    \ \n4. kubectl jsonpath guide - https://kubernetes.io/docs/reference/kubectl/jsonpath/\
+    \ \n5. IFS in Bash - https://unix.stackexchange.com/questions/86900/how-to-use-ifs-in-bash\n\
+    6. cut command - https://linuxize.com/post/cut-command-in-linux/\n7. kubectl owner\
+    \ references guide - https://kubernetes.io/docs/reference/kubectl/cheatsheet/"
   explanation: "\n\nThis command checks the health status of an Ingress in a Kubernetes\
     \ cluster. It takes three parameters \u2013 NAMESPACE, CONTEXT and INGRESS_OBJECT_NAME.\
     \ The command first retrieves all the backend services and ports associated with\

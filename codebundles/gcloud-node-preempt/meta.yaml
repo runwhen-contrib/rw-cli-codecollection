@@ -3,6 +3,12 @@ commands:
     && gcloud compute operations list --filter="operationType:( compute.instances.preempted
     ) AND NOT status:( DONE )" --format=json --project=${GCP_PROJECT_ID} | jq '[.[]
     | {startTime,targetLink, statusMessage, progress, zone, selfLink}]'
+  doc_links: "\n\n1. GCP authentication overview: https://cloud.google.com/docs/authentication/getting-started\n\
+    2. Service Account basics: https://cloud.google.com/iam/docs/service-accounts\n\
+    3. Compute operations list overview: https://cloud.google.com/sdk/gcloud/reference/compute/operations/list\n\
+    4. JQ overview: https://stedolan.github.io/jq/manual/ \n5. GCP project concepts:\
+    \ https://cloud.google.com/resource-manager/docs/cloud-platform-resource-hierarchy#projects\n\
+    6. Overview of Google Compute Instances: https://cloud.google.com/compute/docs/instances/"
   explanation: '
 
 

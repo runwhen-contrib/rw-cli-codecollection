@@ -10,6 +10,12 @@ commands:
     -n $namespace --context=$context -- curl -s -k -H "Authorization: Bearer $TOKEN"
     $apiserver$resource && echo "Cleaning up..." && kubectl delete pod curl-pod -n
     $namespace --context=$context && echo "Done"'
+  doc_links: "\n\nHelpful Documentation Links \n\n1. Introduction to Kubernetes- https://kubernetes.io/docs/concepts/\n\
+    2. Working with pods- https://kubernetes.io/docs/concepts/workloads/pods/\n3.\
+    \ Using kubectl commands- https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands\n\
+    4. Creating Service Accounts- https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/\n\
+    5. Managing API requests in Kubernetes- https://kubernetes.io/docs/reference/access-authn-authz/controlling-access/#authentication\
+    \ \n6. Understanding the Kubernetes API Server Architecture- https://github.com/kubernetes/community/blob/master/contributors/design-proposals/api-server/api-server-architecture.md"
   explanation: '
 
 

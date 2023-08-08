@@ -2,6 +2,15 @@ commands:
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running
     -ojson | jq -r ''[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.limits
     == null) | {pod: $pod.metadata.name, container_without_limits: .name}]'''
+  doc_links: "\n\n\n1. Kubernetes Documentation: https://kubernetes.io/docs/home/\
+    \ \n2. kubectl Command Reference: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands\
+    \ \n3. Using Contexts in Kubernetes: https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/\
+    \ \n4. Working with Kubernetes namespaces: https://kubernetes.io/docs/tasks/administer-cluster/namespaces-walkthrough/\
+    \ \n5. Labels and Selectors in Kubernetes: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/\
+    \ \n6. Kubernetes Pod Status: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#podstatus-v1-core\
+    \ \n7. Filtering Resources using the fieldSelector Parameter: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#fieldselector-v1-meta\
+    \ \n8. JSON Output Formatting in kubectl Command: https://kubernetes.io/docs/tasks/extend-kubectl/custom-columns-in-cli-output/#formatting-output\
+    \ \n9. Introduction to jq for JSON Processing: https://stedolan.github.io/jq/"
   explanation: '
 
 
@@ -45,6 +54,19 @@ commands:
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running
     -ojson | jq -r ''[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.requests
     == null) | {pod: $pod.metadata.name, container_without_requests: .name}]'''
+  doc_links: '
+
+
+
+    1.  Kubectl Overview: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands
+
+    2. Kubernetes context overview: https://kubernetes.io/docs/tasks/access-cluster-information/retrieve-cluster-contexts
+
+    3. Kubernetes Namespaces documentation: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces
+
+    4. Kubernetes Labels overview: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels
+
+    5. jq manual and tutorials: https://stedolan.github.io/jq/manual/'
   explanation: '
 
 
@@ -72,6 +94,10 @@ commands:
 - command: for pod in $(kubectl get pods ${LABELS} -n ${NAMESPACE} --context ${CONTEXT}
     -o custom-columns=":metadata.name" --field-selector=status.phase=Running); do
     kubectl top pod $pod -n ${NAMESPACE} --context ${CONTEXT} --containers; done
+  doc_links: "\n\n\n\u2022 Kubernetes Documentation: https://kubernetes.io/docs/\n\
+    \u2022 Kubectl Reference Guide: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get\n\
+    \u2022 Custom Columns Format Guide: https://kubernetes.io/docs/reference/using-api/custom-resources/custom-resource-definitions/#columns\n\
+    \u2022 Top Command Guide: https://kubernetes.io/docs/tasks/debug-application-cluster/get-shell-running-container/#running-the-top-command-for-containers"
   explanation: '
 
 

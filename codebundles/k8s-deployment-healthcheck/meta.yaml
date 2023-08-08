@@ -2,6 +2,15 @@ commands:
 - command: kubectl logs deployment/${DEPLOYMENT_NAME} --limit-bytes=256000 --since=3h
     --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${LOGS_ERROR_PATTERN}" | grep
     -Eiv "${LOGS_EXCLUDE_PATTERN}" | sort | uniq -c | awk '{print "Occurences:",$0}'
+  doc_links: "\n\n\n\nHelpful Documentation Links: \n1.  Overview of Kubernetes Logs:\
+    \ https://kubernetes.io/docs/concepts/cluster-administration/logging/\n2. Logs\
+    \ Commands: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/#logs\n\
+    3. Limit Flags for Logs: https://kubernetes.io/docs/tasks/debug-application-cluster/get-shell-running-container/#limiting-log-output\n\
+    4. Grep for Uniq Rows in Logs: https://www.geeksforgeeks.org/grep-linux-version-unix-version/\n\
+    5. Filter and Exclude Rows with Grep: https://web.archive.org/web/20160502225335/http://mywiki.wooledge.org/UsingFind\n\
+    6. Sorting in Shell Scripts: https://www.tecmint.com/sort-files-and-directories-by-date-in-linux/\n\
+    7. Uniq Command for Counting Occurrences: https://linuxize.com/post/linux-uniq-command/\n\
+    8. Awk command to format Output: https://www.edureka.co/blog/awk-command-in-linux-with-examples"
   explanation: '
 
 
@@ -32,6 +41,10 @@ commands:
   name: check_deployment_log_for_issues
 - command: kubectl get events --context ${CONTEXT} -n ${NAMESPACE} --field-selector
     type=Warning | grep -i "${DEPLOYMENT_NAME}" || true
+  doc_links: "\n    \n# Documentation Links\n1. Kubectl get events: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events\
+    \ \n2. Kubernetes Contexts: https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/\
+    \ \n3. Kubernetes Namespaces: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/\
+    \ \n4. The `||` operator: https://en.wikipedia.org/wiki/Boolean_operators_in_C_and_C%2B%2B"
   explanation: '
 
 
@@ -53,6 +66,11 @@ commands:
   name: troubleshoot_deployment_warning_events
 - command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o yaml
+  doc_links: "\n\n#Suggested documents: \n1. Kubernetes get command documentation:\
+    \  https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get\n\
+    2. Kubectl Configure Context documentation: https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#configuring-the-kubectl-context\n\
+    3. Kubernetes Namespaces documentation:  https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/\n\
+    4. Kubernetes Deployment object documentation: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
   explanation: '
 
 
@@ -77,6 +95,9 @@ commands:
   name: get_deployment_workload_details_for_report
 - command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o json
+  doc_links: "\n\n# Documentation Links \n1. Kubernetes Deployments: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/\n\
+    2. Kubectl get command: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get\n\
+    3. JSONPath syntax:https://github.com/json-path/JsonPath#path-examples"
   explanation: '
 
 
@@ -100,6 +121,11 @@ commands:
     ) |tostring) +" Count:" + (.count|tostring) + " Minute(s):" + (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60|tostring)+
     " Object:" + .involvedObject.namespace + "/" + .involvedObject.kind + "/" + .involvedObject.name
     + " Reason:" + .reason + " Message:" + .message'
+  doc_links: " \n\n\n\nDocumentation Links: \n1. Kubernetes Documentation on 'kubectl\
+    \ get events': https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events\n\
+    2. jq Manual : https://stedolan.github.io/jq/manual/\n3. Kubernetes Contexts Explained\
+    \ : https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/\n\
+    4. kubectl Options Cheat Sheet : https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#options"
   explanation: '
 
 
