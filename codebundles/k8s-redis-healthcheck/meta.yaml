@@ -1,10 +1,17 @@
 commands:
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli PING
-  doc_links: "\n\n\n1. Kubernetes: https://kubernetes.io/docs/home/ \n2. Context and\
-    \ Namespace Configuration: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#config-set-context\
-    \ \n3. redis-cli: https://redis.io/topics/rediscli \n4. Deployment Concepts: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/\
-    \ \n5. kubectl syntax for exec command: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec"
+  doc_links: '
+
+
+    ## Helpful Documentation Links
+
+
+    1. [Exporting Variables in Bash](https://www.cyberciti.biz/faq/export-command-examples/)
+
+    2. [How to run Command in Kubernetes Cluster](http://thediscoblog.com/blog/2018/05/22/how-to-run-commands-in-a-k8s-cluster/)
+
+    3. [Redis CLI Commands](https://redis.io/commands)'
   explanation: '
 
 
@@ -22,11 +29,19 @@ commands:
   name: ping_redis_workload
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli SET ${REDIS_HEALTHCHECK_KEY} 0
-  doc_links: "\n\nDocumentation Links: \n1. Kubernetes - https://kubernetes.io/docs/\n\
-    2. kubectl command - https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec\n\
-    3. Context - https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#configuring-the-default-context\n\
-    4. Namespace - https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/\n\
-    5. Redis - https://redis.io/documentation"
+  doc_links: '
+
+
+    **Documentation Links**
+
+
+    * [Kubectl Exec](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec)
+
+    * [Contexts in Kubernetes](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/)
+
+    * [Namespaces in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
+
+    * [Redis Documentation](https://redis.io/documentation)'
   explanation: '
 
 
@@ -73,11 +88,18 @@ commands:
   name: verify_redis_read_write_operation
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli INCR ${REDIS_HEALTHCHECK_KEY}
-  doc_links: "\n\n\n\nHelpful Documentation Links: \n1. Kubernetes Environment Variables:\
-    \ https://kubernetes.io/docs/concepts/configuration/environment-variables/\n2.\
-    \ Kubectl Commands Reference: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands\n\
-    3. Redis CLI Documentation: https://redis.io/commands/INCR\n4. Kubernetes Namespaces\
-    \ Reference: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
+  doc_links: '
+
+
+    **Helpful Documentation Links:**
+
+    1. [Kubernetes: Environment Variables](https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/)
+
+    2. [Kubectl: Exec](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec)
+
+    3. [Redis: INCR command](https://redis.io/commands/incr)
+
+    4. [Redis: Health Checks](https://redis.io/topics/health-check)'
   explanation: "\n\nThis command is used to increase an internal counter stored in\
     \ a Redis database. It enables you to track the health of your application deployment\
     \ on Kubernetes. \nThe command begins with the kubectl command, which allows you\
@@ -100,11 +122,11 @@ commands:
   name: verify_redis_read_write_operation
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli GET ${REDIS_HEALTHCHECK_KEY}
-  doc_links: "\n\n1. Kubernetes Documentation: https://kubernetes.io/docs/home/\n\
-    2. Kubectl Documentation: https://christiewilson.github.io/how-to-use-kubectl/\
-    \ \n3. Redis Documentation: https://redis.io/documentation \n4. Kubernetes Exec\
-    \ Documentation: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec\
-    \ \n5. Kubernetes Contexts Documentation: https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#understanding-contexts"
+  doc_links: "\n\n**Markdown Format List of Helpful Documentations:**\n\n- [Kubectl\
+    \ Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\
+    \ - Documentaton on kubectl commands \n- [Kubernetes Contexts and Namespaces](https://kubernetes.io/docs/tasks/administer-cluster/multi-tenancy/namespaces/)\
+    \  - Documentation on Kubernetes contexts and namespaces \n- [Redis Documentation](https://redis.io/documentation)\
+    \ - Redis documentation for learning about the `redis-cli` command"
   explanation: '
 
 

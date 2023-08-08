@@ -1,9 +1,10 @@
 commands:
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} -o json
-  doc_links: "\n\n# Helpful Documentation Links: \n1. Working with Contexts: https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/\n\
-    2. Querying Events: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get\n\
-    3. Event Types: https://kubernetes.io/docs/concepts/workloads/controllers/job/#pod-lifecycle-events"
+  doc_links: "\n\n\n* [Kubernetes Documentation on Events](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#event-v1-core)\
+    \ \n* [Kubernetes Documentation on Kubernetes Contexts](https://kubernetes.io/docs/reference/kubectl/cheatsheet/#kubectl-context-and-configuration)\n\
+    * [Kubernetes API Reference - fieldSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#field-selector-v1-meta)\n\
+    * [Kubernetes Documentation on Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)"
   explanation: '
 
 
@@ -33,12 +34,11 @@ commands:
     != null) | .lastState.terminated | "terminated_reason: \(.reason // "N/A")\nterminated_finishedAt:
     \(.finishedAt // "N/A")\nterminated_exitCode: \(.exitCode // "N/A")\nexit_code_explanation:
     \($exit_code_explanations[.exitCode | tostring] // "Unknown exit code")")\n---\n"'''
-  doc_links: "\n\n# Helpful Documentation Links:\n-Kubernetes Getting Started Guide:\
-    \ https://kubernetes.io/docs/setup/\n-Kubectl Overview: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands\n\
-    -A Guide for using Kubectl:  https://medium.com/@colemanword/a-guide-for-using-kubectl-b1fe029eb526\
-    \ \n-Getting Started with JQ:  https://stedolan.github.io/jq/tutorial/ \n-Using\
-    \ Termination Signals in Kubernetes: https://kubernetes.io/docs/tasks/debug-application-cluster/determine-reason-pod-failure/#understanding-termination-signals\
-    \ \n"
+  doc_links: "\n\n# Helpful Documentation Links\n- [Kubernetes Documentation](https://kubernetes.io/docs/)\n\
+    - [kubectl Overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\
+    \ \n- [JQ expressions](https://stedolan.github.io/jq/manual/) \n- [kubectl describe\
+    \ Pods command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#describe)\
+    \ \n- [Kubernetes Container Termination Reasons](https://kubernetes.io/docs/tasks/debug-application-cluster/determine-reason-pod-failure/)"
   explanation: '
 
 
@@ -77,16 +77,13 @@ commands:
     // [{}])[].state // "N/A")\ncontainerMessage: \((.status.containerStatuses //
     [{}])[].state?.waiting?.message // "N/A")\ncontainerReason: \((.status.containerStatuses
     // [{}])[].state?.waiting?.reason // "N/A")\n---\n"'''
-  doc_links: '
-
-
-    Helpful documentation links:
-
-    1. Kubernetes Documentation: kubernetes.io/docs/reference/kubectl/cheatsheet/
-
-    2. jq - How to use Command Line JSON Processor: tutorialspoint.com/jq/index.htm
-
-    3. Kubernetes Contexts Explained: blog.heptio.com/introduction-to-kubernetes-contexts-81184665e034'
+  doc_links: "\n\nDocumentation Links: \n* [Kubectl Get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)\n\
+    * [Context Argument](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#--context)\n\
+    * [Namespace Argument](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#-n-namespace-string)\n\
+    * [Field Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/)\n\
+    * [No Headers Argument](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#--no-headers)\n\
+    * [Output Format Argument](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#-o-output-format-string))\n\
+    * [Jq JSON Processor](https://stedolan.github.io/jq/)"
   explanation: ' | grep "${pod_name}"
 
 
@@ -125,13 +122,12 @@ commands:
     // "N/A")\nexit_code: \(.status.containerStatuses[0].state.terminated.exitCode
     // "N/A")\nexit_code_explanation: \($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode
     | tostring] // "Unknown exit code")\n---\n"'''
-  doc_links: "\n\n\n\nSuggested documentation links: \n- Kubernetes Documentation:\
-    \ https://kubernetes.io/docs/home/ \n- Kubectl command reference: https://kubernetes.io/docs/reference/kubectl/overview/\
-    \ \n- jq Manual: https://shapeshed.com/jq-json/ \n- Using Field Selectors with\
-    \ kubectl: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#field-selectors\
-    \ \n- Formatting Output with kubectl: https://kubernetes.io/docs/tasks/administer-cluster/formating-with-kubectl/#default-outputs\
-    \ \n- JSON Explained: https://www.json.org/json-en.html\n- Linux Signal Reference\
-    \ Guide: http://man7.org/linux/man-pages/man7/signal.7.html"
+  doc_links: "\n\n\n**Helpful Documentation Links:**\n\n- [Kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/)\
+    \ \n- [Kubernetes Documentation Overview](https://kubernetes.io/docs/home/?path=overview)\n\
+    - [The kubectl Command Line Tool Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get_pods)\n\
+    - [JSON Path Expressions Syntax](https://github.com/stedolan/jq/wiki/JQ-Manual#jq-language-syntax)\n\
+    - [Managing Resources with Field Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/)\n\
+    - [JQ Manual](https://stedolan.github.io/jq/manual/)"
   explanation: '
 
 
@@ -161,11 +157,10 @@ commands:
     \ | tostring] // \"Unknown exit code\")\\n---\\n\"'"
   name: troubleshoot_failed_pods_in_namespace
 - command: kubectl get all --context ${CONTEXT} -n ${NAMESPACE} -o json
-  doc_links: "\n\n1. Getting Started with kubectl: https://kubernetes.io/docs/tasks/tools/install-kubectl/\
-    \ \n2. kubectl Overview: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#overview\n\
-    3. Commands for Kubernetes objects: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands\n\
-    4. Export environment variables with Bash: https://www.cyberciti.biz/faq/linux-unix-export-command/\n\
-    5. jsonpath Cheat Sheet: https://kubernetes.io/docs/reference/kubectl/cheatsheet/#jsonpath-expressions"
+  doc_links: '
+
+
+    '
   explanation: '
 
 
@@ -184,12 +179,22 @@ commands:
   name: troubleshoot_workload_status_conditions_in_namespace
 - command: kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT}
     | xargs -n 1 kubectl get --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}
-  doc_links: "\n\n\nDocumentation Links: \n1. Understand Kubernetes API Resources:\
-    \ https://kubernetes.io/docs/concepts/overview/kubernetes-api/#resources\n2. What\
-    \ is kubectl?: https://kubernetes.io/docs/reference/kubectl/overview/\n3. How\
-    \ to use Kubernetes Contexts: https://kubernetes.io/docs/tasks/access-cluster/contexts/\n\
-    4. Understand the 'list' verb in kubectl: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get\n\
-    5. Utilizing xargs with kubectl: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#xargs"
+  doc_links: '
+
+
+
+    **List of Helpful Documentation Links**
+
+
+    - [Kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/)
+
+    - [Kubectl Commands Reference](https://kubernetes.io/docs/reference/kubectl/cheatsheet/)
+
+    - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
+
+    - [Kubectl API Resources](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#api-resources)
+
+    - [Kubectl Get Command Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)'
   explanation: ' -o yaml
 
 
@@ -219,15 +224,14 @@ commands:
     --since=2h --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${SERVICE_ERROR_PATTERN}"
     | grep -Ev "${SERVICE_EXCLUDE_PATTERN}" | sort | uniq -c | awk '{print "Issue
     Occurences:",$0}'); done; echo "\${logs}"
-  doc_links: "\n\n\nDocumentation Links: \n\u2022 Kubernetes Service Documentation:\
-    \ https://kubernetes.io/docs/concepts/services-networking/service/ \n\u2022 kubectl\
-    \ Command Reference: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands\
-    \ \n\u2022 kubectl get Documentation: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-get\
-    \ \n\u2022 kubectl logs Documentation: https://kubernetes.io/docs/tasks/debug-application-cluster/get-shell-running-container/#examine-a-pods-logs\
-    \ \n\u2022 grep Reference Guide: http://www.grymoire.com/Unix/Grep.html \n\u2022\
-    \ awk Reference Guide: http://www.grymoire.com/Unix/Awk.html \n\u2022 sort Documentation:\
-    \ https://www.computerhope.com/unix/sort.htm \n\u2022 uniq Command Reference:\
-    \ https://ss64.com/bash/uniq.html"
+  doc_links: "\n\n## List of Documentation Links: \n* [Getting Started with Kubernetes](https://kubernetes.io/docs/tutorials/kubernetes-basics/)\n\
+    * [Cluster Administration, Installation, Backup & Recovery for Kubernetes](https://kubernetes.io/docs/setup/)\n\
+    * [Overview and Authentication/Authorization](https://kubernetes.io/docs/reference/access-authn-authz/overview/)\n\
+    * [Creating and Managing Services](https://kubernetes.io/docs/concepts/services-networking/service/)\n\
+    * [Kubectl Reference Guide](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\n\
+    * [Using Contexts & Clusters](https://kubernetes.io/docs/reference/command-line-tools-reference/context-cluster-operations/)\n\
+    * [kubectl Logging Overview](https://kubernetes.io/docs/concepts/cluster-administration/logging/)\n\
+    * [When Regular Expressions are Required in kubectl](https://kubernetes.io/docs/reference/kubectl/regular-expressions/)"
   explanation: '
 
 
@@ -272,10 +276,11 @@ commands:
     | "\(.metadata.name) \(.spec.replicas) \(.spec.selector.matchLabels | to_entries[]
     | .key + "=" + .value)"' | while read -r line; do check_health "StatefulSet" $(echo
     $line | tr -d '"'); done
-  doc_links: ";\n\nHelpful Documentation Links:\n\nKubernetes Pod Disruption Budgets\
-    \ (PDB): \nhttps://kubernetes.io/docs/tasks/run-application/configure-pdb/\n\n\
-    Using KubeCTL:\nhttps://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands\n\
-    \nJQ Command Line JSON Processor: \nhttps://stedolan.github.io/jq/manual/"
+  doc_links: ";\n\nAnswer: \n1. [Kubernetes Pod Disruption Budget](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/#pod-disruption-budget)\n\
+    2. [Kubernetes Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)\n\
+    3. [Kubernetes Stateful Sets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/)\n\
+    4. [kubectl Command Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\n\
+    5. [jq Command Reference](https://stedolan.github.io/jq/manual/)"
   explanation: "\n\nThis Kubernetes command checks the health of the deployments and\
     \ statefulsets in a given context and namespace. It displays the status of each\
     \ deployment/statefulset and the Pod Disruption Budgets (PDBs) associated with\

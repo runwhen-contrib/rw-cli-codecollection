@@ -17,14 +17,20 @@ commands:
     = "Unhealthy" ]; then echo "Health Status: $health_status"; echo "=====================";
     elif [ "$health_status" = "Healthy" ]; then echo "Health Status: $health_status";
     fi; echo "------------"; done'
-  doc_links: "\n\nHelpful documentation links:\n\u2022 Kubernetes: https://kubernetes.io/docs/\n\
-    \u2022 kubectl CLI commands: https://kubernetes.io/docs/reference/kubectl/cheatsheet/\
-    \ \n\u2022 Kubernetes objects: https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects/\
-    \ \n\u2022 Namespaces: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/\
-    \ \n\u2022 Contexts: https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/\
-    \ \n\u2022 Ingress objects: https://kubernetes.io/docs/concepts/services-networking/ingress/\
-    \ \n\u2022 Services: https://kubernetes.io/docs/concepts/services-networking/service/\
-    \ \n\u2022 Endpoints: https://kubernetes.io/docs/concepts/services-networking/endpoints/"
+  doc_links: ';
+
+
+    **Useful Documentation Links**
+
+    - Kubernetes Command Line Interface (CLI): https://kubernetes.io/docs/reference/kubectl/overview/
+
+    - Kubernetes Namespaces: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+
+    - Ingress Resources: https://kubernetes.io/docs/concepts/services-networking/ingress/
+
+    - kubectl get Pods: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-po
+
+    - kubectl get Services: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-svc'
   explanation: '
 
 

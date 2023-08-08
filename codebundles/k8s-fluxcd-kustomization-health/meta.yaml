@@ -1,15 +1,10 @@
 commands:
 - command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}
-  doc_links: '
-
-
-
-
-    1. Kubectl Documentation: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands
-
-    2. Contexts in Kubernetes Concept Reference:  https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
-
-    3. Overview of Kubernetes Namespaces:  https://kubernetes.io/docs/tasks/administer-cluster/namespaces-walkthrough/'
+  doc_links: " \n\n\n## Helpful Documentation Links\n\n1. [What is Kubernetes?](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/)\n\
+    2. [Understanding Contexts in Kubernetes](https://kubernetes.io/docs/reference/kubectl/cheatsheet/#understanding-contexts)\n\
+    3. [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)\n\
+    4. [Kubectl Command Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\n\
+    5. [Common kubectl Commands](https://kubernetes.io/docs/reference/kubectl/cheatsheet/)"
   explanation: '
 
 
@@ -52,10 +47,11 @@ commands:
     \(.message)\n reason: \(.reason)\n last_transition_time: \(.lastTransitionTime)")\n\nReconcile
     Status:\(.status.conditions[] | select(.type == "Reconciling") |"\n reconciling:
     \(.status)\n message: \(.message)")\n---\n"'''
-  doc_links: "\n\nHelpful Documentation Links: \n- Kubectl Documentation: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands\
-    \ \n- Understanding Kubernetes Contexts: https://www.antbutler.com/2016/11/understanding-kubernetes-contexts/\n\
-    - JQ Utility Examples: https://stedolan.github.io/jq/examples/ \n- JSON Data Types:\
-    \ https://devhints.io/json \n- Kustomization Documentation: https://github.com/kubernetes-sigs/kustomize/blob/master/docs/glossary.md#kindkustomization"
+  doc_links: " \n\nHere is a list of helpful documentation links related to the topics\
+    \ used in the script: \n\n- [Kubectl Command](https://kubernetes.io/docs/reference/kubectl/overview/)\n\
+    - [Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)\n\
+    - [Kubernetes Contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#manage-your-contexts)\n\
+    - [JSON Format](https://www.json.org/)\n- [Jq Utility](https://stedolan.github.io/jq/manual/)"
   explanation: '
 
 

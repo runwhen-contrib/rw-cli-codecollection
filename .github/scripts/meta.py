@@ -221,7 +221,7 @@ def generate_metadata(directory_path):
                 multi_line_content = multi_line['explanation']
 
                 #Generate external doc links 
-                query_doc_links_prompt = f"Given the following script and comments, can you generate a list of helpful documentation links for a reader who want's to learn more about the topics used in the script?"
+                query_doc_links_prompt = f"Given the following script and comments, can you generate a list of helpful documentation links for a reader who want's to learn more about the topics used in the script and present the results in markdown format?"
                 query_doc_links_with_command = f'{query_doc_links_prompt}\n{multi_line_content}'
                 print(f'generating doc-links for {name_snake_case}')
                 explain_query_doc_links = urlencode({'prompt': query_doc_links_with_command})

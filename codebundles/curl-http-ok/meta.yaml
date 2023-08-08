@@ -1,10 +1,16 @@
 commands:
 - command: 'curl -o /dev/null -w ''{"http_code": %{http_code}, "time_total": %{time_total}}''
     -s ${URL}'
-  doc_links: "\n\n\nDocumentation links: \n1. What is cURL? https://ec.haxx.se/usingcurl-intro.html\n\
-    2. What is a Status Code?: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status\n\
-    3. What are Environment Variables?: https://www.digitalocean.com/community/tutorials/an-introduction-to-environment-variables-and-how-to-use-them\n\
-    4. What is the /dev/null File?: https://stackoverflow.com/questions/5137497/what-is-dev-null-21"
+  doc_links: '
+
+
+    1. [What is cURL?](https://ec.haxx.se/what-is-curl.html)
+
+    2. [Using cURL to get the HTTP status code of a URL](https://mformatio.com/blog/using-curl-to-get-the-http-status-code-of-a-url)
+
+    3. [Using cURL -w Argument for Debugging](https://stackoverflow.com/questions/17284996/using-curl-w-argument-for-debugging)
+
+    4. [How to set and use variables in Bash](https://linuxize.com/post/bash-set-and-use-environment-variables/)'
   explanation: '
 
 
