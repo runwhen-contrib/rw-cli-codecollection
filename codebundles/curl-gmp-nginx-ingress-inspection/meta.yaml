@@ -6,12 +6,18 @@ commands:
     | jq -r ''if .data.result[0] then "Host:" + .data.result[0].metric.host + " Ingress:"
     + .data.result[0].metric.ingress + " Namespace:" + .data.result[0].metric.exported_namespace
     + " Service:" + .data.result[0].metric.service else "" end'''
-  doc_links: "\n\n**Helpful Documentation Links:**\n\n- [Google Cloud Platform Authentication](https://cloud.google.com/docs/authentication/)\n\
-    - [Bearer Token Definition](https://en.wikipedia.org/wiki/JSON_Web_Token)\n- [Constructing\
-    \ Queries](https://developers.google.com/protocol-buffers/docs/proto3#query_language)\
-    \ \n- [cURL Documenation](https://curl.haxx.se/docs/)  \n- [jq Man Pages](https://stedolan.github.io/jq/manual/)\n\
-    - [Google Cloud Platform Monitoring API](https://cloud.google.com/monitoring/api/ref_v3/rest/)\
-    \ \n- [GCP Protobuf](https://developers.google.com/protocol-buffers/)"
+  doc_links: '
+
+
+    - [gcloud auth](https://cloud.google.com/sdk/gcloud/reference/auth)
+
+    - [curl](https://curl.haxx.se/)
+
+    - [JSON Query (jq)](https://stedolan.github.io/jq/)
+
+    - [Google Cloud Monitoring API](https://cloud.google.com/monitoring/api/ref_v3/rest/)
+
+    - [Google Application Credentials](https://cloud.google.com/docs/authentication/production)'
   explanation: '
 
 
@@ -72,20 +78,18 @@ commands:
     = "Unhealthy" ]; then echo "Health Status: $health_status"; echo "=====================";
     elif [ "$health_status" = "Healthy" ]; then echo "Health Status: $health_status";
     fi; echo "------------"'
-  doc_links: "'s endpoint still exists\n        if [ -z \"$ENDPOINT_EXISTS\" ]; then\n\
-    \            HEALTH_STATUS=\"Unhealthy\"\n            echo \"Validation: Endpoint\
-    \ for service $SERVICE does not exist\"\n        fi \n    fi\ndone\n\necho \"\
-    Overall health status: $HEALTH_STATUS\"\n\n\n**Useful Documentation Links:**\n\
-    - Variables [Kubernetes - kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/)\n\
-    - `kubectl get` command [Kubernetes Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)\n\
-    - Get information about the Ingress path and available back-end services [In Kubernetes\
-    \ Docs](https://kubernetes.io/docs/concepts/services-networking/ingress/#ingress-yaml)\n\
-    - Set IFS (Internal Field Separator) [GNU Bash Manual](https://www.gnu.org/software/bash/manual/html_node/The-Set-Builtin.html#The-Set-Builtin)\n\
-    - Cut command to extract out only the Service name and Port number [Unix \u2013\
-    \ Cut Command \u2013 Syntax and Examples](https://www.geeksforgeeks.org/cut-command-linux-examples/)\n\
-    - Extract information for the pods associated with the Service's endpoint [Kubernetes\
-    \ API Reference Documentation](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/)\n\
-    - Obtain the kind of owner associated to the pod [Kubernetes API Reference Documentation](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/)"
+  doc_links: "\n\n* [kubectl Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\n\
+    * [NAMESPACE reference](https://kubernetes.io/docs/tasks/administer-cluster/namespaces/)\
+    \ \n* [CONTEXT Reference](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#switch-between-clusters-in-kubeconfig)\n\
+    * [INGRESS_OBJECT_NAME reference](https://kubernetes.io/docs/concepts/services-networking/ingress/)\n\
+    * [JSONPATH reference](https://jsonpath.herokuapp.com/)\n* [CUT command reference](https://www.computerhope.com/unix/ucut.htm)\n\
+    * [IFS Reference](https://www.gnu.org/software/bash/manual/html_node/The-Shopt-Builtin.html#The-Shopt-Builtin)\n\
+    * [Kubernetes Endpoints reference](https://kubernetes.io/docs/concepts/services-networking/endpoints/)\n\
+    * [Kubernetes Services reference](https://kubernetes.io/docs/concepts/services-networking/service/)\n\
+    * [Kubernetes Pods reference](https://kubernetes.io/docs/concepts/workloads/pods/)\n\
+    * [Kubernetes Deployments/ReplicaSet reference](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)\n\
+    * [Kubernetes DaemonSet reference](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/)\n\
+    * [Kubernetes StatefulSet reference](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/)"
   explanation: "\n\nThis command checks the health status of an Ingress in a Kubernetes\
     \ cluster. It takes three parameters \u2013 NAMESPACE, CONTEXT and INGRESS_OBJECT_NAME.\
     \ The command first retrieves all the backend services and ports associated with\

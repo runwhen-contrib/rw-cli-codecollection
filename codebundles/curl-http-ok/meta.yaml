@@ -1,16 +1,10 @@
 commands:
 - command: 'curl -o /dev/null -w ''{"http_code": %{http_code}, "time_total": %{time_total}}''
     -s ${URL}'
-  doc_links: '
-
-
-    1. [What is cURL?](https://ec.haxx.se/what-is-curl.html)
-
-    2. [Using cURL to get the HTTP status code of a URL](https://mformatio.com/blog/using-curl-to-get-the-http-status-code-of-a-url)
-
-    3. [Using cURL -w Argument for Debugging](https://stackoverflow.com/questions/17284996/using-curl-w-argument-for-debugging)
-
-    4. [How to set and use variables in Bash](https://linuxize.com/post/bash-set-and-use-environment-variables/)'
+  doc_links: "\n\n- [cURL CLI Manual](https://ec.haxx.se/cmdline-opts.html) \n- [HTTP\
+    \ Response Codes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status) \n\
+    - [HTTP Headers for Dummies](https://www.keycdn.com/support/what-are-http-headers)\
+    \ \n- [cURL Performance Tuning](https://dzone.com/articles/10-tips-for-optimizing-curl-performance)"
   explanation: '
 
 

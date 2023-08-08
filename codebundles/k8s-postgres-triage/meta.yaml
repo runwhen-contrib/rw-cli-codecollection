@@ -1,11 +1,17 @@
 commands:
 - command: kubectl get all -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
-  doc_links: "\n\n## Documentation Links\n\n- [Kubernetes Documentation](https://kubernetes.io/docs/)\n\
-    - [Getting Started with Kubernetes](https://kubernetes.io/docs/tutorials/kubernetes-basics/)\n\
-    - [kubectl Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\n\
-    - [Resource Labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)\
-    \ \n- [Namespaces](https://kubernetes.io/docs/tasks/administer-cluster/namespaces-walkthrough/)\
-    \ \n- [Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/context/)"
+  doc_links: '
+
+
+    * [`kubectl` Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)
+
+    * [`get` Command for `kubectl`](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)
+
+    * [Resource Labels Documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)
+
+    * [Namespace Overview Documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
+
+    * [Context Documentation](https://kubernetes.io/docs/tasks/access-kubernetes-api/configure-access-multiple-clusters/#use-contexts-to-switch-between-clusters)'
   explanation: "\n \nThis command is used to view all of the Kubernetes resources\
     \ in a specific namespace within a specific context. It will \"get\" all of the\
     \ resources that have labels matching the value for \"$RESOURCE_LABELS\" in this\
@@ -21,20 +27,18 @@ commands:
 - command: kubectl get crd -n ${NAMESPACE} --context ${CONTEXT} -o=jsonpath='{.items[*].metadata.name}'
   doc_links: '
 
-    #End multi-line command
 
+    - [Kubernetes Documentation: kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)
 
-    Answer:
+    - [Kubernetes Documentation: Command Line Tool Reference](https://kubernetes.io/docs/reference/kubectl/overview/)
 
-    1. [Kubernetes Documentation - Custom Resources](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/)
+    - [Kubernetes Documentation: CustomResourceDefinitions (CRDs)](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/)
 
-    2. [Kubernetes Documentation - Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context)
+    - [Kubernetes Documentation: Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
 
-    3. [Instructions for Kubectl Command Line Tool](https://kubernetes.io/docs/reference/kubectl/cheatsheet/)
+    - [Kubernetes Documentation: Contexts](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#context)
 
-    4. [Configuring Access with Kubeconfig](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/)
-
-    5. [Kubernetes API Objects and JSON Path](https://kubernetes.io/docs/reference/kubectl/jsonpath/)'
+    - [Kubernetes Documentation: Using JSONPath with kubectl](https://kubernetes.io/docs/reference/kubectl/jsonpath/)'
   explanation: '
 
 
@@ -57,10 +61,12 @@ commands:
   name: describe_postgres_custom_resources
 - command: kubectl get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
     -o=name --field-selector=status.phase=Running
-  doc_links: '
-
-
-    '
+  doc_links: "\n\n- [Kubernetes Documentation on \"Getting Started with Kubernetes\"\
+    ](https://kubernetes.io/docs/tutorials/kubernetes-basics/) \n- [Official Documentation\
+    \ on Kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\n\
+    - [Kubernetes Documentation on \"Label Selectors\"](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)\
+    \ \n- [Kubernetes Documentation on the \"Namespace Concept\"](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)\
+    \ \n- [Kubernetes Documentation on the \"Field Selector Concept\"](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/)"
   explanation: '
 
 
@@ -87,10 +93,12 @@ commands:
   name: get_postgres_pod_logs_events
 - command: kubectl get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
     -o=name --field-selector=status.phase=Running
-  doc_links: '
-
-
-    '
+  doc_links: "\n\n- [Kubernetes Documentation on \"Getting Started with Kubernetes\"\
+    ](https://kubernetes.io/docs/tutorials/kubernetes-basics/) \n- [Official Documentation\
+    \ on Kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\n\
+    - [Kubernetes Documentation on \"Label Selectors\"](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)\
+    \ \n- [Kubernetes Documentation on the \"Namespace Concept\"](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)\
+    \ \n- [Kubernetes Documentation on the \"Field Selector Concept\"](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/)"
   explanation: '
 
 
@@ -116,11 +124,11 @@ commands:
     \ selector only allows running pods"
   name: get_postgres_pod_resource_utilization
 - command: patronictl list
-  doc_links: "\n\n1. [What is Kubernetes?](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/)\
-    \ \n2. [Kubernetes Persistence Documentation](https://kubernetes.io/docs/tasks/configure-pod-container/configure-persistent-volume-storage/)\
-    \ \n3. [Patroni Documentation](https://github.com/zalando/patroni) \n4. [Patronictl\
-    \ Documentation](https://github.com/zalando/patroni/blob/master/patronictl.rst)\
-    \ \n5. [Distributed Configurations on Kubernetes with Patroni](https://www.gocardless.com/engineering/distributed-configurations-on-kubernetes-with-patroni/)"
+  doc_links: " all\n\n- [patronictl Documentation](https://patroni.readthedocs.io/en/latest/patronictl.html)\n\
+    - [How to Install and Configure PostgreSQL with Patroni High Availability System](https://systembelts.com/database/how-to-install-and-configure-postgresql-with-patroni-high-availability-system/)\
+    \ \n- [How to Deploy Patroni in Kubernetes Environment - AKS](https://www.symmetricalit.com/deploy-patroni-in-kubernetes-environment-aks/)\
+    \ \n- [Patroni Cluster Maintenance and Performance Tuning](https://severalnines.com/blog/patroni-cluster-maintenance-performance-tuning)\
+    \  \n- [Overview of Patroni - Automated failover and distributed configuration](https://www.slideshare.net/chzbrgr71/overview-of-patroni-automated-failover-and-distributed-configuration)"
   explanation: '
 
 

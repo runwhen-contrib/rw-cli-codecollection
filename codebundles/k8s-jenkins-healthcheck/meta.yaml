@@ -1,20 +1,18 @@
 commands:
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -s -o /dev/null -w "%{http_code}" localhost:8080/login
-  doc_links: " \n\nHelpful Documentation Links:\n\n- [Kubernetes Docs: kubectl exec](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec):\
-    \ This page explains how to use the `kubectl exec` command which is used in this\
-    \ script\n- [Kubernetes Docs: Context and Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/#contexts):\
-    \ This page explains the concept of contexts and namespaces in Kubernetes, which\
-    \ are both specified as arguments in this script.\n- [jq Manual](https://stedolan.github.io/jq/manual/):\
-    \ Since jq is not mentioned in the script, this manual provides the necessary\
-    \ details to understand how it works and how it can be incorporated in the script.\
-    \  \n- [Curl: Understanding HTTP Responses](https://ec.haxx.se/usingcurl-http-responses.html):\
-    \ This page digs deep into the concepts of understanding http responses, which\
-    \ is done in this script with the `-w \"%{http_code}` argument. \n- [Introduction\
-    \ to Services - NodePort](https://kubernetes.io/docs/tutorials/services/expose-intro/):\
-    \ The target endpoint specified in the script is `localhost:8080/login`, so this\
-    \ tutorial is a perfect fit to learn more about services and how they work within\
-    \ Kubernetes clusters."
+  doc_links: '
+
+
+    - [Kubernetes Documentation: Executing Commands](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec)
+
+    - [Kubernetes Documentation: Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/)
+
+    - [Kubernetes Documentation: Nodes](https://kubernetes.io/docs/concepts/architecture/nodes/)
+
+    - [cURL Guide to Common Usage](https://ec.haxx.se/usingcurl-common.html)
+
+    - [HTTP Status Codes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status)'
   explanation: '
 
 
@@ -34,11 +32,16 @@ commands:
   name: query_the_jenkins_kubernetes_workload_http_endpoint
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -s localhost:8080/api/json?pretty=true --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}
-  doc_links: " \n\n\n**Documentation Links:**\n- [Kubectl Cheat Sheet](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands):\
-    \ A reference sheet of commands available for kubectl.\n- [StatefulSets Documentation](https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/#prerequisites):\
-    \ Learn more about statefulsets. \n- [Curl Command Tutorial](https://curl.haxx.se/docs/manual.html):\
-    \ Detailed guide on the usage of curl. \n- [Kubernetes Contexts & Namespaces](https://kubernetes.io/docs/tasks/administer-cluster/namespaces-walkthrough-demo/):\
-    \ A demonstration of how contexts and namespaces work in Kubernetes."
+  doc_links: '
+
+
+    - [Kubernetes Documentation - kubectl exec](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec)
+
+    - [Kubernetes Documentation - Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#contexts)
+
+    - [curl Documentation - pretty formatting](https://ec.haxx.se/usingcurl/usingcurl-verbose/)
+
+    - [Jenkins Documentation - Using Credentials Binding](https://plugins.jenkins.io/credentials-binding/usage)'
   explanation: '
 
 
@@ -63,16 +66,9 @@ commands:
     -- curl -s localhost:8080/queue/api/json --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}
     | jq -r ''.items[] | select((.stuck == true) or (.blocked == true)) | "Why: "
     + .why + "\nBlocked: " + (.blocked|tostring) + "\nStuck: " + (.stuck|tostring)'''
-  doc_links: '
-
-
-    1. [Kubernetes Documentation for kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)
-
-    2. [Jenkins Documentation for Secrets](https://jenkins.io/doc/book/using/using-secrets/)
-
-    3. [cURL Documentation](https://curl.haxx.se/docs/)
-
-    4. [jq Manual](https://stedolan.github.io/jq/manual/)'
+  doc_links: "\n\n- [Kubernetes Documentation for kubectl exec](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec)\
+    \ \n- [Curl Documentation](https://ec.haxx.se/) \n- [JQ Manual](https://stedolan.github.io/jq/manual/)\
+    \ \n- [Jenkins Documentation for Secret Credentials](https://www.jenkins.io/doc/book/using/working-with-credentials/#using-secret-text-credentials-in-builds)"
   explanation: "\n\nThis command is used to identify the cause of stuck or blocked\
     \ jobs in a Jenkins instance. The command calls the Jenkins API and filters out\
     \ stuck and/or blocked jobs, displaying the related \"why\" value as well as their\

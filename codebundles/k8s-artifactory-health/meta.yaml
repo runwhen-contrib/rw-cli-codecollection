@@ -1,13 +1,20 @@
 commands:
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/liveness
-  doc_links: "\n\n**1. Connecting to a pod using kubectl:** \n- [Kubernetes Documentation:\
-    \ Creating and Connecting to a Cluster](https://kubernetes.io/docs/tasks/access-application-cluster/connecting-frontend-backend/)\
-    \ \n- [Kubernetes Documentation: Accessing apps through services](https://kubernetes.io/docs/concepts/services-networking/connect-applications-service/)\n\
-    \n**2. Kubectl exec command:** \n- [Kubernetes Documentation: kubectl exec](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec)\n\
-    \n**3. Understanding StatefulSets:**\n- [Kubernetes Documentation: Overview of\
-    \ Statefulsets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#overview)\n\
-    \n**4. Curl Command:**\n- [MDN Web Docs: Using cURL](https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/GET#Using_cURL)"
+  doc_links: '
+
+
+    - [Kubernetes Documentation: Exec](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec)
+
+    - [Kubernetes Documentation: Contexts](https://kubernetes.io/docs/tasks/access-cluster-resources/#list-contexts)
+
+    - [Kubernetes Documentation: Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
+
+    - [StatefulSets Documentation](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/)
+
+    - [cURL Documentation](https://curl.haxx.se/docs/)
+
+    - [Artifactory Liveness Check API Documentation](https://www.jfrog.com/confluence/display/RTF/Artifactory+REST+API#ArtifactoryRESTAPI-SystemLivenessCheck)'
   explanation: '
 
 
@@ -27,11 +34,11 @@ commands:
   name: check_artifactory_liveness_and_readiness_endpoints
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/readiness
-  doc_links: "\n\n**Documentation Links:** \n- [Kubernetes Documentation](https://kubernetes.io/docs/)\n\
-    - [Kubectl CLI Tool Reference Guide](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\n\
-    - [Kubectl User Guide](https://kubernetes.io/docs/reference/kubectl/overview/)\n\
-    - [StatefulSet Tutorial](https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/)\n\
-    - [Curl Command Line Options](https://curl.haxx.se/docs/manpage.html)"
+  doc_links: "\n\n1. [Kubernetes Documentation - kubectl exec](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec)\
+    \ \n2. [Kubernetes Documentation - Context switching](https://kubernetes.io/docs/tasks/access-kubernetes-api/configure-access-multiple-clusters/#switch-between-clusters-contexts)\n\
+    3. [Kubernetes Documentation - Working with namespaces](https://kubernetes.io/docs/tasks/administer-cluster/namespaces-walkthrough/#understand-the-role-of-namespaces-in-organizing-cluster-resources)\n\
+    4. [Kubernetes Documentation - StatefulSets](https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/)\n\
+    5. [cURL Documentation](https://curl.haxx.se/docs/)\n6. [cURL Command-Line Options](https://ec.haxx.se/cmdline-opts.html)"
   explanation: '
 
 

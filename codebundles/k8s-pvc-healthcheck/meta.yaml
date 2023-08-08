@@ -4,18 +4,10 @@ commands:
     kubectl get events -n ${NAMESPACE} --context ${CONTEXT} --field-selector involvedObject.name=$pvc
     -o json | jq ''.items[]| "Last Timestamp: " + .lastTimestamp + " Name: " + .involvedObject.name
     + " Message: " + .message''; done'
-  doc_links: '
-
-
-    1. [Introduction to Persistent Volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)
-
-    2. [Kubectl get pvc command reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-pvc)
-
-    3. [jq Manual Reference](https://stedolan.github.io/jq/manual/)
-
-    4. [Kubernetes Field Selector using Kubectl](https://kubernetes.io/docs/tasks/inject-data-application/field-selectors/)
-
-    5. [Kubectl get events Command Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events)'
+  doc_links: "\n\n- [Kubernetes - Kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/)\
+    \ \n- [Using the kubectl Command Line Interface](https://kubernetes.io/docs/tasks/tools/install-kubectl/#using-the-kubectl-command-line-interface)\
+    \ \n- [jq Manual (v1.6)](https://stedolan.github.io/jq/manual/)\n- [Field Selectors\
+    \ Kubernetes Documentation](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#field-selectors)"
   explanation: '
 
 
@@ -43,13 +35,15 @@ commands:
   doc_links: '
 
 
-    ## Helpful Documentation Links
+    - [Kubernetes Documentation: kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)
 
-    - [Kubernetes Reference - kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)
+    - [JSONPath Basics](http://goessner.net/articles/JsonPath/)
 
-    - [JSON Command Line Tools jq](https://stedolan.github.io/jq/)
+    - [Python json.load() and jq](https://www.programcreek.com/python/example/104578/json.load)
 
-    - [Example on filtering data using JSON, JQ and bash](https://medium.com/@colin_brown/json-bash-and-jq-equals-awesome-16fbe1b1159a)'
+    - [jq Manual](https://stedolan.github.io/jq/manual/)
+
+    - [jq FAQ](https://stedolan.github.io/jq/faq/)'
   explanation: '
 
 
@@ -95,10 +89,16 @@ commands:
     --all-namespaces --field-selector involvedObject.name=$pv --context ${CONTEXT}
     -o json | jq ''.items[]| "Last Timestamp: " + .lastTimestamp + " Name: " + .involvedObject.name
     + " Message: " + .message''; done'
-  doc_links: "\n\nDocumentation Links: \n- [Kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)\n\
-    - [Kubectl get events](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events)\n\
-    - [jq command line processor](https://stedolan.github.io/jq/)\n- [Understanding\
-    \ Kubernetes Volumes](https://kubernetes.io/docs/concepts/storage/volumes/)"
+  doc_links: '
+
+
+    - [Kubernetes Documentation - Persistent Volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)
+
+    - [Kubernetes Documentation - Events Object](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#events-v1-core)
+
+    - [Kubernetes Documentation - kubectl Overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)
+
+    - [jq Documentation](https://stedolan.github.io/jq/)'
   explanation: '
 
 
@@ -141,44 +141,15 @@ commands:
     echo -e "\n---\nPod: $pod\nPVC: $pvc\nPV: $pv\nStatus: $status\nNode: $node\nZone:
     $zone\nIngressClass: $ingressclass\nAccessModes: $accessmode\nReclaimPolicy: $reclaimpolicy\nCSIDriver:
     $csidriver\n"; done; done'
-  doc_links: ';
-
-
-    ## Helpful Documentation Links
-
-
-    - [kubectl get](https://kubernetes.io/docs/tasks/extend-kubectl/custom-resources/custom-resource-definitions/#get):
-    Documentation for the `kubectl get` command used to retrieve objects that match
-    certain criteria.
-
-    - [field selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/):
-    Documentation on field selector which we used to specify criteria for selecting
-    objects.
-
-    - [jsonPath Queries](https://kubernetes.io/docs/reference/kubectl/jsonpath/):
-    Documentation for the `jsonPath` query language used for extracting fields from
-    API objects.
-
-    - [Kubernets Objects](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.16/#):
-    Documentation of Kubernetes objects.
-
-    - [Persistent Volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/):
-    Documentation about Persistent Volumes in Kubernetes.
-
-    - [Persistent Volume Claims](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims):
-    Documentation about Persistent Volume Claims in Kubernetes.
-
-    - [Storage Classes](https://kubernetes.io/docs/concepts/storage/storage-classes/):
-    Documentation about Storage Classes in Kubernetes.
-
-    - [Nodes](https://kubernetes.io/docs/concepts/architecture/nodes/): Documentation
-    about Nodes in Kubernetes.
-
-    - [Zonal Cluster Topology](https://cloud.google.com/kubernetes-engine/docs/how-to/zonal-cluster-topology):
-    Documentation about zonal cluster topology and how to manage it in GKE.
-
-    - [CSI Drivers](https://kubernetes-csi.github.io/docs/home.html): Documentation
-    for Kubernetes Container Storage Interface (CSI) drivers.'
+  doc_links: "\n\n- kubectl Documentation: https://kubernetes.io/docs/reference/generated/kubectl/\n\
+    - Kubernetes Tasks with kubectl: https://kubernetes.io/docs/tasks/tools/install-kubectl/#common-kubectl-commands\n\
+    - Volumes in Kubernetes: https://kubernetes.io/docs/concepts/storage/volumes/\n\
+    - PersistentVolumes Specification: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#specifications\
+    \ \n- Access Modes for PersistentVolumes: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes\n\
+    - Reclaim Policies for PersistentVolumes: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reclaim-policies\n\
+    - Topology Aware Volume Provisioning: https://kubernetes.io/docs/concepts/storage/storage-classes/#topology-aware-volume-provisioning\n\
+    - Configure Default StorageClass: https://kubernetes.io/docs/tasks/administer-cluster/configure-default-storage-class/\n\
+    - CSI Drivers: https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/csi-drivers/"
   explanation: '
 
 
@@ -234,21 +205,12 @@ commands:
     PVC: $pvc, volumeName: $volumeName, containerName: $containerName, mountPath:
     $mountPath"; kubectl exec $pod -n ${NAMESPACE} --context ${CONTEXT} -c $containerName
     -- df -h $mountPath; done; done; done;'
-  doc_links: '
-
-
-    **Helpful documentation links:**
-
-
-    - [Kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)
-
-    - [JsonPath](https://kubernetes.io/docs/reference/kubectl/jsonpath/)
-
-    - [jq](https://stedolan.github.io/jq/manual/)
-
-    - [Kubectl exec](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec)
-
-    - [df](https://linux.die.net/man/1/df)'
+  doc_links: "\n\n* [kubectl get pods](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get_pods)\
+    \ \n* [kubectl get pods with field selector](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get_all_pods)\n\
+    * [JSONPath syntax reference](https://goessner.net/articles/JsonPath/)\n* [jq\
+    \ Language Guide (CLI JSON Processor)](https://stedolan.github.io/jq/manual/)\n\
+    * [kubectl exec](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec)\
+    \ \n* [df (Unix/Linux command)](https://pubs.vmware.com/vsphere-50/index.jsp?topic=%2Fcom.vmware.vcli.ref.doc_50%2Fvcli-right-df.html)"
   explanation: '
 
 
@@ -302,12 +264,12 @@ commands:
     requires attention."; fi; echo "Pod: $POD_NAME"; echo "PVC: $pvc_name"; echo "PV:
     $PV_NAME"; echo "Node with Pod: $POD_NODE_NAME"; echo "Node with Storage: $STORAGE_NODE_NAME";
     echo; fi; done; done'
-  doc_links: "\n\n## Documentation Links: \n- [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)\
-    \ \n- [Working with Kubernetes Objects using kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)\
-    \ \n- [JQ Commands Reference](https://stedolan.github.io/jq/manual/#Basicfilters)\
-    \ \n- [Pods](https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/)\
-    \ \n- [Persistent Volumes and PVCs](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)\
-    \ \n- [kubectl Get Nodes Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get_nodes)"
+  doc_links: ";\n\n* [kubectl](https://kubernetes.io/docs/reference/generated/kubectl/)\n\
+    * [NAMESPACE](https://kubernetes.io/docs/tasks/administer-cluster/namespaces/)\
+    \ \n* [CONTEXT](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#set-the-current-context)\n\
+    * [jq](https://stedolan.github.io/jq/manual/)\n* [base64](https://developer.mozilla.org/en-US/docs/Web/API/WindowBase64/Base64_encoding_and_decoding)\n\
+    * [PersistentVolumeClaims](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims)\n\
+    * [Kubernetes nodes](https://kubernetes.io/docs/concepts/architecture/nodes/)"
   explanation: "\n\nThis command checks that all pods in a Kubernetes Namespace are\
     \ using Persistent Volumes from the same node. Specifically, it performs the following\
     \ steps: \n1. It sets the NAMESPACE and CONTEXT variables so that Kubernetes knows\

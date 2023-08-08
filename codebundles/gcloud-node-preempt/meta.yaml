@@ -6,7 +6,11 @@ commands:
   doc_links: '
 
 
-    '
+    - [gcloud auth](https://cloud.google.com/sdk/gcloud/reference/auth/)
+
+    - [gcloud compute operations list](https://cloud.google.com/sdk/gcloud/reference/compute/operations/list)
+
+    - [jq](https://stedolan.github.io/jq/)'
   explanation: '
 
 

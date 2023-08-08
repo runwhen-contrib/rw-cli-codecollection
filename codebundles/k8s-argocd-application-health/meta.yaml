@@ -2,11 +2,16 @@ commands:
 - command: 'kubectl get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
     --context ${CONTEXT} -o jsonpath=''Application Name: {.metadata.name}, Sync Status:
     {.status.sync.status}, Health Status: {.status.health.status}, Message: {.status.conditions[].message}'''
-  doc_links: "\n\n\n## Helpful Documentation Links:\n1. [The Kubernetes documentation\
-    \ on Kubectl](https://kubernetes.io/docs/reference/kubectl/overview/) \n2. [Argo\
-    \ tutorial with detailed Argo CLI instructions and usage examples](https://argoproj.github.io/argo/getting-started/)\
-    \ \n3. [The official JSONPath syntax guide](https://goessner.net/articles/JsonPath/)\
-    \ \n4. [Kubernetes resource types overview](https://www.callicoder.com/kubernetes-resource-types-overview/)"
+  doc_links: '
+
+
+    - [Kubectl Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)
+
+    - [Argo: Application objects](https://argoproj.github.io/argo/user-guide/application/)
+
+    - [Kubernetes Contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#manage-contexts)
+
+    - [JSONPath Syntax](https://goessner.net/articles/JsonPath/)'
   explanation: '
 
 
@@ -47,12 +52,16 @@ commands:
     Last Sync Status: " + .status.operationState.phase + "
 
     Last Sync Message: " + .status.operationState.message'''
-  doc_links: "\n\nBelow are helpful documentation links for learning more about the\
-    \ topics used in the script and presented in Markdown format: \n\n- [Kubernetes\
-    \ Basic Concepts | Kubernetes](https://kubernetes.io/docs/concepts/) \n- [Kubectl\
-    \ Overview | Kubernetes](https://kubernetes.io/docs/reference/kubectl/overview/)\n\
-    - [Contexts | Kubernetes](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#contexts)\
-    \ \n- [Argo | GitHub](https://github.com/argoproj/argo) \n- [JQ Tutorial](https://stedolan.github.io/jq/tutorial/)"
+  doc_links: '
+
+
+    * [Kubernetes Documentation: kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)
+
+    * [Argo Projects](https://argoproj.github.io/)
+
+    * [JSON Overview](http://www.json.org/)
+
+    * [jq command line processor](https://stedolan.github.io/jq/)'
   explanation: "\n\nThis command is using the Kubernetes command line tool \"kubectl\"\
     \ to get information on an application created with Argoproj. In your command,\
     \ you specified that this application exists within a specified namespace (APPLICATION_APP_NAMESPACE)\
@@ -81,17 +90,15 @@ commands:
   doc_links: '
 
 
+    - [Kubectl Command Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)
 
-    1. [Kubernetes Documentation - Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#contexts)
+    - [jq Manual - Syntax Guide](https://stedolan.github.io/jq/manual/)
 
-    2. [jq Manual](https://stedolan.github.io/jq/manual/)
+    - [Argo Applications Documentation](https://argoproj.github.io/argo-cd/operator-manual/applications/)
 
-    3. [Argo Documentation](https://argoproj.github.io/argo/)
+    - [Resource and Object Specifications](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/)
 
-    4. [Kubernetes Documentation - Get Resources](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)
-
-    5. [Kubernetes Documentation - Printing API Objects in YAML, JSON, or Go Template
-    Format](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#output-format)'
+    - [The jq Playground](https://jqplay.org/)'
   explanation: '
 
 
@@ -116,9 +123,18 @@ commands:
     \ -o=custom-columns=NAME:.metadata.name --no-headers -n ${APPLICATION_TARGET_NAMESPACE});\
     \ do echo \"\nDEPLOYMENT NAME: $deployment_name \n\" && kubectl logs deployment/$deployment_name\
     \ --tail=50 -n ${APPLICATION_TARGET_NAMESPACE} | grep -E '${ERROR_PATTERN}'; done"
-  doc_links: " \n\n1. [Kubectl Get Deployments Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get_deployment)\n\
-    2. [Kubectl Logs Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs)\n\
-    3. [Grep Tutorial](https://ryanstutorials.net/linuxtutorial/grep.php)"
+  doc_links: ';
+
+
+    - [Kubectl Get Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)
+
+    - [Custom resources columns in kubectl](https://kubernetes.io/docs/reference/using-api/client-concepts/#custom-resources)
+
+    - [Echo Command Reference](http://man7.org/linux/man-pages/man1/echo.1.html)
+
+    - [Log Command Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs)
+
+    - [Grep Command Reference](https://www.gnu.org/software/grep/manual/grep.html)'
   explanation: '
 
 
@@ -145,18 +161,10 @@ commands:
   name: scan_for_errors_in_pod_logs_related_to_argocd_application_deployments
 - command: kubectl describe applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
     --context ${CONTEXT}
-  doc_links: '
-
-
-    - [Kubernetes Documentation: Configure Access to clusters](https://kubernetes.io/docs/reference/access-authn-authz/configuring-access/)
-
-    - [Argo Documentation: Get Started with Argo Applications](https://argoproj.github.io/argo#installing-applications)
-
-    - [Argo Documentation: Kuberbetes API Reference](https://argoproj.github.io/argo/master/reference/api/v1/argoproj_v1alpha1/#applications)
-
-    - [Kubernetes Documentation: CLI cmd Overview kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)
-
-    - [Kubernetes Documentation: Namespaces Concepts](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)'
+  doc_links: "\n\n- [Kubectl Overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-overview/)\
+    \ \n- [Understanding kubectl output](https://kubernetes.io/docs/tasks/debug-application-cluster/understand-kubectl-output/)\
+    \ \n- [Describe Applications Argoproj.io Reference](https://argoproj.github.io/argo-cd/user-guide/kubectl/#describe-applications-argoproj-io)\
+    \ \n- [Kubernetes Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/)"
   explanation: '
 
 

@@ -7,10 +7,11 @@ commands:
     | jq -r ''.data.result[] | "Route:" + .metric.route + " Service:" + .metric.service
     + " Kong Instance:" + .metric.instance + " HTTP Error Count:" + .value[1]'' ||
     echo "No HTTP Error threshold violations found for ${INGRESS_SERVICE}."'
-  doc_links: " \n\n\n**Documentation Links:**\n\n- [Google Cloud Service Account](https://cloud.google.com/iam/docs/service-accounts)\n\
-    - [curl Command Line Reference](https://ec.haxx.se/usingcurl/usingcurl-optsref.html)\n\
-    - [jq Documentation](https://stedolan.github.io/jq/manual/)\n- [Google Monitoring\
-    \ API Query Guide](https://cloud.google.com/monitoring/api/query-language#grammar)"
+  doc_links: "\n\n- [Google Cloud gcloud auth documentation](https://cloud.google.com/sdk/gcloud/reference/auth/)\
+    \ \n- [Curl HTTP request examples](https://curl.haxx.se/docs/httpscripting.html)\n\
+    - [Monitoring API Reference](https://cloud.google.com/monitoring/api/ref_v3/rest/v3/projects.metricDescriptors/list)\n\
+    - [Prometheus Query Language reference](https://prometheus.io/docs/prometheus/latest/querying/basics/#querying-ranges)\n\
+    - [JQ utility usage guide](https://stedolan.github.io/jq/)"
   explanation: '
 
 
@@ -46,11 +47,20 @@ commands:
     | jq -r ''.data.result[] | "Service: ${INGRESS_SERVICE}" + " HTTP Request Latency(ms):"
     + .value[1]'' || echo "No HTTP request latency threshold violations found for
     ${INGRESS_SERVICE}."'
-  doc_links: "\n\n**List of Helpful Documentation Links:** \n\n- [GCP authentication\
-    \ using gcloud command](https://cloud.google.com/sdk/gcloud/reference/auth) \n\
-    - [Stackdriver Monitoring API](https://cloud.google.com/monitoring/api/v3/) \n\
-    - [Prometheus Query Language (PromQL)](https://prometheus.io/docs/prometheus/latest/querying/basics/)\n\
-    - [jq Library Documentation](https://stedolan.github.io/jq/manual/)"
+  doc_links: '
+
+
+    - [gcloud - Cloud SDK documentation](https://cloud.google.com/sdk/gcloud)
+
+    - [cURL - Manual](https://curl.haxx.se/docs/manual.html)
+
+    - [jq Manual (Official)](https://stedolan.github.io/jq/manual/)
+
+    - [Kong - Measure Latency with Prometheus](https://docs.konghq.com/0.x/prometheus/#measuring-latency-with-prometheus)
+
+    - [Prometheus Query Language - PromQL](https://prometheus.io/docs/prometheus/latest/querying/basics/)
+
+    - [Google Cloud Monitoring Query Language](https://cloud.google.com/monitoring/api/v3/query-language)'
   explanation: '
 
 
@@ -85,10 +95,20 @@ commands:
     && echo "$response" | jq -e ''.data.result | length > 0'' && echo "$response"
     | jq -r ''.data.result[] | "Service: ${INGRESS_UPSTREAM}" + " Healthchecks Disabled!''
     || echo "${INGRESS_UPSTREAM} has healthchecks enabled."'
-  doc_links: " \n\n1. [Google Cloud Platform Authentication](https://cloud.google.com/iam/docs/reference/rest/v1/projects.serviceAccounts/generateAccessToken)\n\
-    2. [Curl Requests and Authorization Headers](https://ec.haxx.se/http-auth.html)\n\
-    3. [Google Cloud Platform Monitoring API V1](https://cloud.google.com/monitoring/api/v1/)\n\
-    4. [JQ Manual](https://stedolan.github.io/jq/manual/)"
+  doc_links: '
+
+
+    - [GCloud Auth Overview](https://cloud.google.com/sdk/gcloud/reference/auth/)
+
+    - [Activate Service Account](https://cloud.google.com/sdk/gcloud/reference/auth/activate-service-account)
+
+    - [Env Variables](https://en.wikipedia.org/wiki/Environment_variable)
+
+    - [Curl Docs](https://curl.haxx.se/docs/)
+
+    - [Prometheus Monitoring](https://prometheus.io/docs/introduction/overview/)
+
+    - [JQ JSON Parser](https://stedolan.github.io/jq/manual/)'
   explanation: '
 
 
@@ -126,19 +146,11 @@ commands:
     + " Healthcheck subsystem-state: " + .metric.subsystem + "-" + .metric.state +
     " Target: " + .metric.target'' || echo "${INGRESS_UPSTREAM} is reported as healthy
     from the Kong ingress controller."'
-  doc_links: '
-
-
-    **Helpful Documentation Links:**
-
-
-    - [Authentication with GCP Service Account](https://cloud.google.com/docs/authentication/getting-started)
-
-    - [Monitoring API Request Syntax](https://cloud.google.com/monitoring/api/ref_v3/rest/v1/projects.timeSeries/query)
-
-    - [Using Curl for API Requests](https://curl.haxx.se/docs/manual.html)
-
-    - [jq for Formatting JSON](https://stedolan.github.io/jq/manual/)'
+  doc_links: "\n\n- [Google Cloud Documentation: gcloud auth activate-service-account](https://cloud.google.com/sdk/gcloud/reference/auth/activate-service-account)\
+    \  \n- [cURL Documentation](https://curl.haxx.se/docs/) \n- [Monitoring Documentation\
+    \ \u2014 API Client Library for Python | Monitoring | Google Cloud](https://cloud.google.com/monitoring/api/ref_v3/rest/v1/projects.locations.prometheus/query)\
+    \ \n- [JavaScript Object Notation (JSON) - Developer Guide | Google Cloud](https://cloud.google.com/storage/docs/json_api/v1/json)\n\
+    - [jq Manual](https://stedolan.github.io/jq/manual/#Basicfiltersandselectors)"
   explanation: '
 
 

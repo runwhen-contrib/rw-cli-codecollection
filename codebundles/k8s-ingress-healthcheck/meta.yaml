@@ -20,17 +20,17 @@ commands:
   doc_links: ';
 
 
-    **Useful Documentation Links**
+    - [Kubernetes Documentation: Working with kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
 
-    - Kubernetes Command Line Interface (CLI): https://kubernetes.io/docs/reference/kubectl/overview/
+    - [Kubernetes Documentation: Understanding kubectl Output](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/#get)
 
-    - Kubernetes Namespaces: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+    - [Kubernetes Documentation: Ingress Resource](https://kubernetes.io/docs/concepts/services-networking/ingress/)
 
-    - Ingress Resources: https://kubernetes.io/docs/concepts/services-networking/ingress/
+    - [Kubernetes Documentation: Working with Contexts in kubectl Commands](https://kubernetes.io/docs/tasks/access-kubernetes-cluster/configure-access-multiple-clusters/)
 
-    - kubectl get Pods: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-po
+    - [Kubernetes Documentation: Service Resource](https://kubernetes.io/docs/concepts/services-networking/service/)
 
-    - kubectl get Services: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-svc'
+    - [Kubernetes Documentation: Endpoints Resource](https://kubernetes.io/docs/concepts/services-networking/endpoints/)'
   explanation: '
 
 

@@ -1,10 +1,16 @@
 commands:
 - command: kubectl logs --tail=100 statefulset/${STATEFULSET_NAME} --context ${CONTEXT}
     -n ${NAMESPACE}
-  doc_links: "\n\n**Answer:** \n- [Kubernetes Documentation - kubectl logs](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs)\n\
-    - [Kubernetes Documentation - StatefulSets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#what-is-a-statefulset)\n\
-    - [Kubernetes Documentation - Setting Kubernetes context](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/)\n\
-    - [Kubernetes Documentation - Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)"
+  doc_links: '
+
+
+    - [`kubectl logs`](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs)
+
+    - [Contexts in Kubernetes](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/)
+
+    - [Namespaces in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
+
+    - [StatefulSets in Kubernetes](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/)'
   explanation: '
 
 
@@ -26,14 +32,24 @@ commands:
   name: fetch_statefulset_logs
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "${STATEFULSET_NAME}" || true
-  doc_links: ").\n\n**Below are helpful documentation links for those looking to learn\
-    \ more about the topics used in the script:**  \n- [Kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\
-    \  \n- [Get command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)\
-    \  \n- [Events Resource](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/#event-v1-core)\
-    \  \n- [--field-selector option](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)\
-    \  \n- [Piping Commands](https://www.geeksforgeeks.org/understanding-pipes-in-unix/)\
-    \ \n- [Grep Command](https://www.geeksforgeeks.org/grep-command-in-unixlinux/)\n\
-    - [Exit Code](https://www.geeksforgeeks.org/shell-exit-status-builtin-command/)"
+  doc_links: '
+
+
+    - [Kubectl Overview](https://kubernetes.io/docs/reference/generated/kubectl/overview/)
+
+    - [Getting Started - Accessing Cluster with Kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/#access-clusters-using-kubectl)
+
+    - [kubectl get Events Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events)
+
+    - [--field-selector Flag Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-field-selectors)
+
+    - [Contexts and Namespaces in Kubernetes](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/)
+
+    - [StatefulSet Object Reference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#statefulset-v1-apps)
+
+    - [grep Command Reference](https://www.computerhope.com/unix/ugrep.htm)
+
+    - [true Command Reference](https://linuxize.com/post/bash-true-command/)'
   explanation: '
 
 
@@ -62,18 +78,12 @@ commands:
   name: get_related_statefulset_events
 - command: kubectl get statefulset ${LABELS} --context=${CONTEXT} -n ${NAMESPACE}
     -o yaml
-  doc_links: '
-
-
-    1. [Kubernetes Documentation - kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)
-
-    2. [Kubernetes Documentation - Labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)
-
-    3. [Kubernetes Documentation - Contexts](https://kubernetes.io/docs/concepts/architecture/nodes/#contexts)
-
-    4. [Kubernetes Documentation - Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
-
-    5. [YAML Syntax Reference](http://yaml.org/spec/1.2/spec.html)'
+  doc_links: "  \n\n- [Kubernetes Documentation: kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)\n\
+    - [Kubernetes Documentation: Kubernetes Resources and Objects](https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects/)\n\
+    - [Kubernetes Documentation: Labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)\n\
+    - [Kubernetes Documentation: StatefulSet](https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/)\n\
+    - [Kubernetes Documentation: Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context)\n\
+    - [Kubernetes Documentation: Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)"
   explanation: '
 
 
@@ -98,9 +108,9 @@ commands:
     jq -r ''.items[] | select(.status.availableReplicas < .status.replicas) | "---\nStatefulSet
     Name: " + (.metadata.name|tostring) + "\nDesired Replicas: " + (.status.replicas|tostring)
     + "\nAvailable Replicas: " + (.status.availableReplicas|tostring)'''
-  doc_links: "\n\n# Helpful Documentation Links: \n1. [Kubernetes StatefulSet Documentation](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/)\n\
-    2. [Kubernetes CLI `kubectl` Reference Guide](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\n\
-    3. [jq Manual](https://stedolan.github.io/jq/manual/)"
+  doc_links: "\n\n- [Kubernetes Documentation: kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\
+    \ \n- [JSON Data Interchange Syntax](http://www.json.org/) \n- [jq Tutorial](https://stedolan.github.io/jq/tutorial/)\
+    \ \n- [StatefulSets from Kubernetes Documentation](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/)"
   explanation: "\n\nThis command will retrieve the information about a StatefulSet\
     \ in the Kubernetes cluster, which is a way of managing resources as a unit for\
     \ persistent applications. \nIt looks at the context and namespace associated\

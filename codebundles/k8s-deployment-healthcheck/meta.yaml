@@ -2,11 +2,15 @@ commands:
 - command: kubectl logs deployment/${DEPLOYMENT_NAME} --limit-bytes=256000 --since=3h
     --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${LOGS_ERROR_PATTERN}" | grep
     -Eiv "${LOGS_EXCLUDE_PATTERN}" | sort | uniq -c | awk '{print "Occurences:",$0}'
-  doc_links: "\n\n\n\n - [Kubernetes Documentation: Overview of kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\n\
-    \ - [Kubernetes Documentation: Get Logs From a Container in a Pod](https://kubernetes.io/docs/tasks/debug-application-cluster/get-container-logs/)\n\
-    \ - [Grep Manual Page](https://www.gnu.org/software/grep/manual/grep.html) \n\
-    \ - [Unix Sort Manual Page](https://www.unix.com/man-page/all/1/sort/)\n - [AWK\
-    \ Language Manual](https://www.gnu.org/software/gawk/manual/gawk.html)"
+  doc_links: "\n\n- [Kubectl Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\
+    \ \n- [Kubctl Logs Command Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs)\
+    \ \n- [Deployment Documentation](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)\
+    \ \n- [Context Documentation](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context)\
+    \ \n- [Namespace Documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)\
+    \ \n- [Grep Utility Documentation](https://linux.die.net/man/1/grep) \n- [Sort\
+    \ Utility Documentation](http://man7.org/linux/man-pages/man1/sort.1.html)\n-\
+    \ [Uniq Utility Documentation](http://man7.org/linux/man-pages/man1/uniq.1.html)\n\
+    - [AWK Utility Command Documentation](https://www.gnu.org/software/gawk/manual/html_node/index.html)"
   explanation: '
 
 
@@ -37,12 +41,20 @@ commands:
   name: check_deployment_log_for_issues
 - command: kubectl get events --context ${CONTEXT} -n ${NAMESPACE} --field-selector
     type=Warning | grep -i "${DEPLOYMENT_NAME}" || true
-  doc_links: "\n\n**Documentation Links:** \n\n- [Kubectl get events](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events)\n\
-    - [Kubectl Contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#configure-the-kubectl-context)\n\
-    - [Variables in Bash Scripts](https://www.tldp.org/LDP/Bash-Beginners-Guide/html/sect_03_02.html)\n\
-    - [Grep Command](https://linuxize.com/post/grep-command-in-linux-with-examples/)\n\
-    - [Pipes in Linux](https://www.computerhope.com/unix/upipe.htm)\n- [True Operator\
-    \ (||)](https://linux.die.net/man/1/true)"
+  doc_links: '
+
+
+    * [kubectl Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)
+
+    * [Contexts Documentation](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/)
+
+    * [Namespaces Documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
+
+    * [Events Documentation](https://kubernetes.io/docs/tasks/debug-application-cluster/debug-cluster-events/)
+
+    * [Field Selectors Documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/)
+
+    * [Grep Documentation](https://linux.die.net/man/1/grep)'
   explanation: '
 
 
@@ -64,10 +76,11 @@ commands:
   name: troubleshoot_deployment_warning_events
 - command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o yaml
-  doc_links: "\n\n**Kubernetes Documentation Links**\n- [Kubectl Command Line Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\n\
-    - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)\n\
-    - [Kubernetes Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)\
-    \ \n- [YAML Overview](https://yaml.org/spec/1.2/spec.html)"
+  doc_links: "\n\n- [Kubernetes Documentation: Kubectl Overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\
+    \ \n- [Kubernetes Documentation: Contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#set-the-current-context)\n\
+    - [Kubernetes Documentation: Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)\n\
+    - [Kubernetes Documentation: Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)\n\
+    - [Kubernetes Documentation: Managing Resources Using YAML Files](https://kubernetes.io/docs/concepts/configuration/overview/#managing-resources-using-yaml-files)"
   explanation: '
 
 
@@ -92,12 +105,11 @@ commands:
   name: get_deployment_workload_details_for_report
 - command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o json
-  doc_links: "\n   \n**1. Kubernetes** \n- [Kubernetes Overview](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/)\
-    \ \n- [Kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/)\n\
-    \n**2. Kubectl get command for retrieving objects** \n- [Kubectl get Command Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)\n\
-    - [Retrieve an Object in Kubernetes](https://kubernetes.io/docs/tasks/access-kubernetes-api/http-proxy-access-api/#retrieve-an-object)\n\
-    \n**3. jsonpath**\n- [jsonpath Syntax](https://kubernetes.io/docs/reference/kubectl/jsonpath/)\n\
-    - [Using jsonpath to Extract Data](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#extracting-kubernetes-objects-as-json-documents)"
+  doc_links: "\n\n- [Kubernetes Documentation on Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)\n\
+    - [Kubernetes Documentation on Kubectl Command Line](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\
+    \ \n- [Kubernetes Documentation on Contexts](https://kubernetes.io/docs/reference/kubectl/cheatsheet/kubectl-cheatsheet/#contexts-and-configuration)\n\
+    - [Kubernetes Documentation on Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)\n\
+    - [Kubernetes Documentation on JSON Path](https://kubernetes.io/docs/reference/kubectl/jsonpath/)"
   explanation: '
 
 
@@ -121,10 +133,18 @@ commands:
     ) |tostring) +" Count:" + (.count|tostring) + " Minute(s):" + (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60|tostring)+
     " Object:" + .involvedObject.namespace + "/" + .involvedObject.kind + "/" + .involvedObject.name
     + " Reason:" + .reason + " Message:" + .message'
-  doc_links: "\n\nList of Documentation Links: \n* [Kubernetes - Get Events](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events)\n\
-    * [jq - Command-line JSON processor](https://stedolan.github.io/jq/)\n* [JSON\
-    \ Parsing with jq](https://kubernetes.io/blog/2017/01/json-parsing-with-jq/)\n\
-    * [Select based on Property](https://kubernetes.io/docs/tasks/debug-application-cluster/debug-pod-replica-set/#select-based-on-property)"
+  doc_links: '
+
+
+    * [kubectl reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)
+
+    * [jq manual](https://stedolan.github.io/jq/manual/)
+
+    * [Kubernetes Events Documentation](https://kubernetes.io/docs/concepts/cluster-administration/monitoring/#accessing-events)
+
+    * [Kubernetes Context Reference](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#specify-which-context-to-use-by-default)
+
+    * [Kubernetes Namespaces Documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)'
   explanation: '
 
 

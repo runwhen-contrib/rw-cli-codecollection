@@ -10,29 +10,13 @@ commands:
     -n $namespace --context=$context -- curl -s -k -H "Authorization: Bearer $TOKEN"
     $apiserver$resource && echo "Cleaning up..." && kubectl delete pod curl-pod -n
     $namespace --context=$context && echo "Done"'
-  doc_links: '
-
-
-    **Helpful Documentation Links**
-
-
-    * [Kubectl Run](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#run):
-    Create and run a particular image, possibly replicated.
-
-    * [Kubernetes Service Accounts](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/):
-    Configure Service Account for pods.
-
-    * [Kubectl Wait](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#wait):
-    Wait for a specific condition on one or many resources.
-
-    * [Getting Secrets From a Pod](https://kubernetes.io/docs/concepts/configuration/secret/#getting-secrets-inside-pods):
-    Obtain a service account token to get access to the API server.
-
-    * [Using Curl in Kubernetes](https://kubernetes.io/docs/tasks/administer-cluster/access-cluster-api/):
-    Use curl commands to interact with Kubernetes API server.
-
-    * [Kubectl Delete](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#delete):
-    Delete resources from the cluster.'
+  doc_links: "\n\n* [Kubernetes API](https://kubernetes.io/docs/reference/generated/kubernetes-api/)\
+    \ \n* [Creating Pods Automatically with kubectl run](https://kubernetes.io/docs/tasks/manage-pod/create-pod-automatically/)\n\
+    * [Pods](https://kubernetes.io/docs/concepts/workloads/pods/pod/)\n* [Managing\
+    \ Service Accounts](https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/)\n\
+    * [kubectl exec](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec)\
+    \ \n* [kubectl wait](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#wait)\n\
+    * [cURL](https://curl.haxx.se/docs/)"
   explanation: '
 
 

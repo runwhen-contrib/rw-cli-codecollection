@@ -4,9 +4,9 @@ commands:
     and .status == "True")) | select(.status.renewalTime) | "Namespace:" + .metadata.namespace
     + " URL:" + .spec.dnsNames[0] + " Renews:" + .status.renewalTime + " Expires:"
     + .status.notAfter'
-  doc_links: "\n\n\n**Helpful Documentation Links** \n* [kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\
-    \ \n* [cert-manager.io Overview](https://cert-manager.io/docs/overview/) \n* [jq\
-    \ Filters](https://stedolan.github.io/jq/manual/#Basicfilters)"
+  doc_links: "\n\n- [Kubectl Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\
+    \ \n- [Cert Manager Documentation](https://cert-manager.io/docs) \n- [JSONPath\
+    \ Documentation](https://jsonpath.com/) \n- [jq Documentation](https://stedolan.github.io/jq/)"
   explanation: " \n\nThis command will query a Certificate Manager in a Kubernetes\
     \ environment, looking for certificates that are ready and active, and then output\
     \ information about them. It will output the namespace, the domain name it's associated\
@@ -32,10 +32,25 @@ commands:
     \(.certificate)", "Issuer: \(.issuer)", "Ready Status: \(.readyStatus)", "Ready
     Message: \(.readyMessage)", "Approved Status: \(.approvedStatus)", "Approved Message:
     \(.approvedMessage)"'''
-  doc_links: "\n\nBelow are some helpful documentation links for learning more about\
-    \ the topics used in the script:  \n\n- [Kubernetes Documentation](https://kubernetes.io/docs/home/)\
-    \ \n- [kubectl Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\
-    \ \n- [Cert-Manager Documentation](https://cert-manager.io/docs/) \n- [jq Documentation](https://stedolan.github.io/jq/)"
+  doc_links: '
+
+
+    - [Kubernetes documentation - kubectl][1]
+
+    - [JSONPath specification][2]
+
+    - [jq Documentation & Tutorials][3]
+
+    - [Introduction to using jq for Command Line JSON Parsing][4]
+
+
+    [1]: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands
+
+    [2]: https://goessner.net/articles/JsonPath/
+
+    [3]: https://stedolan.github.io/jq/tutorial/
+
+    [4]: https://www.alexkras.com/introduction-to-using-jq-for-command-line-json-parsing/'
   explanation: '
 
 

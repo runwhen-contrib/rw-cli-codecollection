@@ -2,10 +2,10 @@ commands:
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Running
     -o json | jq -r ''[.items[] | "Images: " + (.spec.containers[].image|tostring)
     + ", Last Started Times:" + (.status.containerStatuses[].state.running.startedAt|tostring)]'''
-  doc_links: '
-
-
-    '
+  doc_links: "\n\n- [Kubernetes Documentation - kubectl Overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\n\
+    - [Understanding the Kubernetes Context Concept](https://www.mirantis.com/blog/understanding-kubernetes-contexts-and-configurations/)\n\
+    - [About Namespaces in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)\
+    \ \n- [jq Manual](https://stedolan.github.io/jq/manual/)\n- [jq Tutorial by Examples](https://devhints.io/jq)"
   explanation: '
 
 
@@ -34,20 +34,10 @@ commands:
     + .status.phase, "containers:", (.spec.containers[] | "- container_name: " + .name,
     " \ image_path: " + (.image | split(":")[0]), " \ image_tag: " + (.image | split(":")[1])),
     "---"'''
-  doc_links: '
-
-
-    1. [Kubernetes Documentation: Overview of kubectl](https://kubernetes.io/docs/reference/kubectl/overview/)
-
-    2. [Kubernetes Documentation: Context and Configuration](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/)
-
-    3. [Kubernetes Documentation: Namspaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
-
-    4. [Kubernetes Documentation: Field Selectors](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#field-selectors)
-
-    5. [Kubernetes Documentation: Kubernetes Objects](https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects/)
-
-    6. [jq Documentation](https://stedolan.github.io/jq/)'
+  doc_links: "\n\n- [Kubernetes - kubectl command reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\n\
+    - [kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/)\n\
+    - [jq manual](https://stedolan.github.io/jq/manual/) \n- [Field Selectors](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/#field-selectors)\n\
+    - [JSONPath Reference](https://kubernetes.io/docs/reference/kubectl/jsonpath/)"
   explanation: '
 
 
@@ -82,8 +72,17 @@ commands:
   doc_links: '
 
 
+    - [Kubernetes Documentation - kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/)
 
-    '
+    - [Kubernetes Concepts - Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/)
+
+    - [Kubernetes Documentation - Controlling resource visibility](https://kubernetes.io/docs/tasks/administer-cluster/namespaces-walkthrough/)
+
+    - [Kubernetes Concepts - API Object Field Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/)
+
+    - [jq Manual - Basics](https://stedolan.github.io/jq/manual/#Basicfilters)
+
+    - [jq Manual - Array Input and Output](https://stedolan.github.io/jq/manual/#Arrayinputandoutput)'
   explanation: '
 
 
@@ -133,11 +132,14 @@ commands:
     ); echo "$available_tags"; fi; done <<<"$image_pull_backoff_events" && echo "Deleting
     Skopeo pod" && kubectl delete pod $POD_NAME -n $NAMESPACE --context=$CONTEXT &&
     echo "Done"'
-  doc_links: "\n\n\n\n**Helpful Documentation Links:**   \n[Kubectl Get Events](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events)\
-    \  \n[JQ Filter](https://stedolan.github.io/jq/manual/#Filterfunctionsandoperators)\
-    \  \n[Skopeo Overview](https://github.com/containers/skopeo/blob/master/README.md#overview)\
-    \  \n[Skopeo Inspect](https://github.com/containers/skopeo#skopeo-inspect)  \n\
-    [Skopeo List Tags](https://github.com/containers/skopeo#skopeo-list-tags)"
+  doc_links: "\n\n* [NAMESPACE Environment Variable](https://kubernetes.io/docs/tasks/administer-cluster/namespaces-walkthrough/)\n\
+    * [Kubectl Get Events Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events)\n\
+    * [JQ - Command Line JSON Processing Tool](https://stedolan.github.io/jq/)\n*\
+    \ [Date Command and Flags](https://linuxize.com/post/linux-date-command/)\n* [Kubectl\
+    \ Run Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#run)\n\
+    * [Quay Container Registry Repository](https://www.quay.io/how-it-works)\n* [Skopeo\
+    \ Inspect Command](https://www.mankier.com/1/skopeo-inspect) \n* [Skopeo List\
+    \ Tags Command](https://www.mankier.com/1/skopeo-list-tags)\n* [Kubectl Wait Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/#wait)"
   explanation: '
 
 

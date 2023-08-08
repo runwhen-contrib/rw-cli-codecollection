@@ -1,10 +1,13 @@
 commands:
 - command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}
-  doc_links: " \n\n\n## Helpful Documentation Links\n\n1. [What is Kubernetes?](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/)\n\
-    2. [Understanding Contexts in Kubernetes](https://kubernetes.io/docs/reference/kubectl/cheatsheet/#understanding-contexts)\n\
-    3. [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)\n\
-    4. [Kubectl Command Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\n\
-    5. [Common kubectl Commands](https://kubernetes.io/docs/reference/kubectl/cheatsheet/)"
+  doc_links: ' --selector ${SELECTOR}
+
+
+    - [kubectl Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)
+
+    - [Contexts and Namespaces](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/)
+
+    - [Selector Options](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#field-selectors)'
   explanation: '
 
 
@@ -47,11 +50,9 @@ commands:
     \(.message)\n reason: \(.reason)\n last_transition_time: \(.lastTransitionTime)")\n\nReconcile
     Status:\(.status.conditions[] | select(.type == "Reconciling") |"\n reconciling:
     \(.status)\n message: \(.message)")\n---\n"'''
-  doc_links: " \n\nHere is a list of helpful documentation links related to the topics\
-    \ used in the script: \n\n- [Kubectl Command](https://kubernetes.io/docs/reference/kubectl/overview/)\n\
-    - [Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)\n\
-    - [Kubernetes Contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#manage-your-contexts)\n\
-    - [JSON Format](https://www.json.org/)\n- [Jq Utility](https://stedolan.github.io/jq/manual/)"
+  doc_links: "\n\n- [Kubectl Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\n\
+    - [JSONPath Documentation](https://goessner.net/articles/JsonPath/)\n- [JQ Documentation](https://stedolan.github.io/jq/)\
+    \ \n- [Kubectl Contexts Documentation](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/)"
   explanation: '
 
 
