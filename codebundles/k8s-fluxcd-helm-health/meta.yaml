@@ -1,15 +1,13 @@
 commands:
 - command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}
-  doc_links: '
+  doc_links: ' --selector ${SELECTOR}
 
 
+    - [kubectl Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)
 
+    - [Contexts and Namespaces](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/)
 
-    1. Kubectl Documentation: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands
-
-    2. Contexts in Kubernetes Concept Reference:  https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
-
-    3. Overview of Kubernetes Namespaces:  https://kubernetes.io/docs/tasks/administer-cluster/namespaces-walkthrough/'
+    - [Selector Options](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#field-selectors)'
   explanation: '
 
 
@@ -48,11 +46,16 @@ commands:
 - command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} -o=jsonpath="{range .items[*]}{''\nName:
     ''}{@.metadata.name}{''\nlastAppliedRevision:''}{@.status.lastAppliedRevision}{''\nlastAttemptedRevision:''}{@.status.lastAttemptedRevision}{''\n---''}{end}"
     --context ${CONTEXT} || true'
-  doc_links: "\n\n- How to Control Pods, ReplicaSets, and DaemonSets Using the kubectl\
-    \ CLI:  https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get\
-    \ \n- What is a k8s Namespace?:  https://kubernetes.io/docs/tasks/administer-cluster/namespaces-walkthrough/\
-    \ \n- Introducing Contexts in kubectl: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#config-view\
-    \ \n- JSONPath expressions: https://kubernetes.io/docs/reference/kubectl/jsonpath/"
+  doc_links: '
+
+
+    * [Kubernetes Documentation - kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/)
+
+    * [Kubernetes Documentation - Concepts: Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
+
+    * [Kubernetes Documentation - Config Files](https://kubernetes.io/docs/tasks/administer-cluster/x/config-file/)
+
+    * [Kubernetes Documentation - JSONPath reference](https://kubernetes.io/docs/reference/kubectl/jsonpath/)'
   explanation: '
 
 
@@ -72,14 +75,16 @@ commands:
     | jq -r ''.items[] | select(.status.lastAppliedRevision!=.status.lastAttemptedRevision)
     | "Name: " + .metadata.name + " Last Attempted Version: " + .status.lastAttemptedRevision
     + " Last Applied Revision: " + .status.lastAppliedRevision'''
-  doc_links: "\n\n\n  Documentation Links:\n  1. Intro to Kubernetes command-line\
-    \ interface (CLI): https://kubernetes.io/docs/reference/kubectl/overview/\n  2.\
-    \ Using kubectl get resources: https://kubernetes.io/docs/tasks/access-kubernetes-api/list-all-resources/\n\
-    \  3. Details about the syntax of kubectl commands and uses for various options:\
-    \ https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands\n  4.\
-    \ Working with namespaces: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/\n\
-    \  5. Docs on context object for managing cluster connections: https://kubernetes.io/docs/reference/using-api/contexts/\n\
-    \  6. Tutorial introducing jq for working with JSON data: https://stedolan.github.io/jq/tutorial/"
+  doc_links: '
+
+
+    * [kubectl Overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)
+
+    * [Syntax for kubectl get command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)
+
+    * [kubectl Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/)
+
+    * [jq Manual](https://stedolan.github.io/jq/manual/)'
   explanation: '
 
 
@@ -111,10 +116,18 @@ commands:
 - command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} -o=jsonpath="{range .items[?(@.status.conditions[].status==''False'')]}{''-----\nName:
     ''}{@.metadata.name}{''\n''}{@.status.conditions[*].message}{''\n''}{end}" --context
     ${CONTEXT} || true'
-  doc_links: "\n\n# Helpful Documentation Links:\n1. KUBECTL COMMANDS: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands\n\
-    2. KUBERNETES NAMESPACES: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/\n\
-    3. JSONPATH EXPRESSION SYNTAX: https://kubernetes.io/docs/reference/kubectl/jsonpath/\
-    \ \n4. KUBECTL CONTEXT: https://kubernetes.io/docs/tasks/access-cluster-services/configure-access-multiple-clusters/"
+  doc_links: '
+
+
+    - Documentation for the kubectl command line tool: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands
+
+    - JSONPath syntax: http://goessner.net/articles/JsonPath/
+
+    - JSONPath examples: https://goessner.net/articles/JsonPath/examples.html
+
+    - Kubernetes API guide: https://kubernetes.io/docs/reference/using-api/api-concepts/
+
+    - Handling False status conditions effectively with Kubernetes resources: https://medium.com/@p4nd3r86/handling-false-status-conditions-effectively-with-kubernetes-resources-a3d8f7e83272'
   explanation: '
 
 
@@ -162,14 +175,13 @@ commands:
     version_update_available="False"; fi; echo "Release: $release | Chart: $chart_namespace/$chart_name
     | Installed Version: $chart_version | Available Update: $version_update_available
     | Available Version: $available_version"; done'
-  doc_links: "\n\nDocumentation Links: \n- Overview of Kubernetes: https://kubernetes.io/docs/home/\
-    \  \n- Deploy Helm Charts with kubectl:  https://kubernetes.io/docs/tasks/tools/install-kubectl/\
-    \  \n- Get helm releases from a namespace: https://github.com/helm/helm/blob/master/docs/commands/get.md#how-to-lookup-resources\
-    \  \n- Chart version specification: https://github.com/helm/helm/blob/master/docs/topics/version_sorting.md\
-    \  \n- JQ JSON Path Filtering Speech: https://stedolan.github.io/jq/manual/v1/\
-    \   \n- Helm Repository ConfigMaps: https://fluxcd.io/docs/references/helm-operator/#repository-configmap-object\
-    \    \n- Add and remove helm chart repositories: https://helm.sh/docs/helm/helm_repo/\
-    \    \n- Helm Search Repo Command Reference: https://helm.sh/docs/helm/helm_search/"
+  doc_links: "\n\n- [Kubernetes Documentation: Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)\n\
+    - [Kubernetes Documentation: Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context)\
+    \ \n- [Kubernetes Documentation: Kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)\
+    \ \n- [Helm Chart Repositories Documentation](https://helm.sh/docs/topics/chart_repository/)\n\
+    - [Flux Helm Operator Documentation](https://toolkit.fluxcd.io/guides/helm-operator/)\n\
+    - [Helm Search Documentation](https://helm.sh/docs/helm/helm_search/)\n- [JQ:\
+    \ A Command-Line JSON Processor Documentation](https://stedolan.github.io/jq/)"
   explanation: "\n\nThis command retrieves Helm releases from a Kubernetes namespace\
     \ and compares their installed versions to the available versions in their corresponding\
     \ repository, in order to determine if an update is available. \n\nIt takes five\

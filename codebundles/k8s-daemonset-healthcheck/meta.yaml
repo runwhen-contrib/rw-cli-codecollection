@@ -1,10 +1,10 @@
 commands:
 - command: kubectl logs --tail=100 daemonset/${DAEMONSET_NAME} --context ${CONTEXT}
     -n ${NAMESPACE}
-  doc_links: "\n\n\n1. Kubectl: https://kubernetes.io/docs/reference/kubectl/overview/\
-    \ \n2. Contexts: https://kubernetes.io/docs/tasks/access-cluster-resources/configure-access-multiple-clusters/\
-    \ \n3. DaemonSets: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/\
-    \ \n4. Logging in Kubernetes: https://kubernetes.io/docs/tasks/debug-application-cluster/logging-kubernetes-objects/"
+  doc_links: "\n\n- [Kubernetes Documentation: kubectl Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs)\n\
+    - [Kubernetes Documentation: DaemonSets](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/)\n\
+    - [Kubernetes Documentation: Contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#specifying-the-current-context)\
+    \ \n- [Kubernetes Documentation: Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)"
   explanation: '
 
 
@@ -25,13 +25,18 @@ commands:
   name: get_daemonset_log_details_for_report
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "${DAEMONSET_NAME}" || true
-  doc_links: "\n\n\n1) Kubernetes documentation on how to set variables: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/\
-    \ \n2) Kubernetes documentation on how to use the kubectl command: https://kubernetes.io/docs/reference/kubectl/overview/\n\
-    3) Kubernetes documentation on selecting fields in a list output with kubectl:\
-    \ https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get\
-    \ \n4) Kubernetes documentation on filtering resource output by labels and fields:\
-    \ https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/\n\
-    5) Kubernetes documentation on events: https://kubernetes.io/docs/reference/kubectl/cheatsheet/#viewing-perfoming-kubernetes-events"
+  doc_links: '
+
+
+    - [Kubectl Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)
+
+    - [Contexts and Kubernetes Clusters](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/)
+
+    - [Field Selectors in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/)
+
+    - [Grep Command Tutorial](https://www.computerhope.com/unix/ugrep.htm)
+
+    - [DaemonSet Overview](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/)'
   explanation: '
 
 
@@ -51,11 +56,9 @@ commands:
     | grep -i \"${DAEMONSET_NAME}\" || true"
   name: get_related_daemonset_events
 - command: kubectl describe daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
-  doc_links: "\n\n\nSuggested Documentation Links: \n1. Introduction to the Kubernetes\
-    \ Command Line Tool kubectl: https://kubernetes.io/docs/reference/kubectl/overview/\
-    \ \n2. Overview of Contexts in Kubernetes: https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/\
-    \ \n3. Namespaces in Kubernetes: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/\
-    \ \n4. DaemonSet Overview in the Kubernetes Documentation: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/"
+  doc_links: "\n\n- [Kubernetes Documentation - Describe Daemon Sets](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#describe-daemonset)\
+    \ \n- [Kubernetes Documentation - Contexts](https://kubernetes.io/docs/tasks/access-cluster-information/manage-contexts/)\
+    \ \n- [Kubernetes Documentation - Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)"
   explanation: "\n\nThe command kubectl describe daemonset/${DAEMONSET_NAME} --context\
     \ ${CONTEXT} -n ${NAMESPACE} is used to view detailed information about the specified\
     \ daemonset. A daemonset is a Kubernetes object that ensures that all nodes in\

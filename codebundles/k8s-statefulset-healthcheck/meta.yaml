@@ -1,10 +1,16 @@
 commands:
 - command: kubectl logs --tail=100 statefulset/${STATEFULSET_NAME} --context ${CONTEXT}
     -n ${NAMESPACE}
-  doc_links: "\n\n# Documentation Links: \n- Kubernetes CLI Command \u2018logs\u2019\
-    \ Documentation: https://kubernetes.io/docs/reference/kubectl/cheatsheet/#kubectl-logs\n\
-    - Kubernetes StatefulSet Documentation: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/\n\
-    - Kubernetes Context Management Documentation:https://kubernetes.io/docs/tasks/administer-cluster/context-admin/"
+  doc_links: '
+
+
+    - [`kubectl logs`](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs)
+
+    - [Contexts in Kubernetes](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/)
+
+    - [Namespaces in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
+
+    - [StatefulSets in Kubernetes](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/)'
   explanation: '
 
 
@@ -26,11 +32,24 @@ commands:
   name: fetch_statefulset_logs
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "${STATEFULSET_NAME}" || true
-  doc_links: ")\n\n \nHelpful documentation links for topics in the script:\n- Kubectl\
-    \ Get Events Documentation: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events\n\
-    - Field Selectors in Kubectl Documentation: https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/\n\
-    - Working with Contexts and Namespaces in Kubectl Documentation: https://kubernetes.io/docs/tasks/administer-cluster/connect-cluster-\
-    \ harmoniously/\n- Pipe usage in Linux Documentation:https://linuxize.com/post/understanding-the-linux-pipe-concept/"
+  doc_links: '
+
+
+    - [Kubectl Overview](https://kubernetes.io/docs/reference/generated/kubectl/overview/)
+
+    - [Getting Started - Accessing Cluster with Kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/#access-clusters-using-kubectl)
+
+    - [kubectl get Events Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events)
+
+    - [--field-selector Flag Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-field-selectors)
+
+    - [Contexts and Namespaces in Kubernetes](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/)
+
+    - [StatefulSet Object Reference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#statefulset-v1-apps)
+
+    - [grep Command Reference](https://www.computerhope.com/unix/ugrep.htm)
+
+    - [true Command Reference](https://linuxize.com/post/bash-true-command/)'
   explanation: '
 
 
@@ -59,12 +78,12 @@ commands:
   name: get_related_statefulset_events
 - command: kubectl get statefulset ${LABELS} --context=${CONTEXT} -n ${NAMESPACE}
     -o yaml
-  doc_links: "\n\n1. Introduction to Kubernetes resources: https://kubernetes.io/docs/concepts/overview/working-with-objects/\
-    \ \n2. Overview of StatefulSets on Kubernetes: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/\n\
-    3. Documentation on kubectl: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands\
-    \ \n4. Set and delete a context in kubectl command: https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#configuring-access-to-multiple-clusters\
-    \ \n5. Specify namespace with the kubectl command: https://kubernetes.io/docs/tasks/administer-cluster/namespaces-walkthrough/#using-the-kubectl-get-command\
-    \ \n6. Represent resources information as YAML format using kubectl command: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get"
+  doc_links: "  \n\n- [Kubernetes Documentation: kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)\n\
+    - [Kubernetes Documentation: Kubernetes Resources and Objects](https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects/)\n\
+    - [Kubernetes Documentation: Labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)\n\
+    - [Kubernetes Documentation: StatefulSet](https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/)\n\
+    - [Kubernetes Documentation: Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context)\n\
+    - [Kubernetes Documentation: Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)"
   explanation: '
 
 
@@ -89,11 +108,9 @@ commands:
     jq -r ''.items[] | select(.status.availableReplicas < .status.replicas) | "---\nStatefulSet
     Name: " + (.metadata.name|tostring) + "\nDesired Replicas: " + (.status.replicas|tostring)
     + "\nAvailable Replicas: " + (.status.availableReplicas|tostring)'''
-  doc_links: "\n\n# Helpful Documentation Links:\n1. Kubernetes StatefulSets Overview:\
-    \ https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/\n2. jq\
-    \ Documentation for Filtering and Manipulating JSON Data: https://stedolan.github.io/jq/\n\
-    3. Kubectl Overview: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands\
-    \ \n4. Setting Kubernetes Contexts with kubectl: https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#set-the-kubernetes-context"
+  doc_links: "\n\n- [Kubernetes Documentation: kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\
+    \ \n- [JSON Data Interchange Syntax](http://www.json.org/) \n- [jq Tutorial](https://stedolan.github.io/jq/tutorial/)\
+    \ \n- [StatefulSets from Kubernetes Documentation](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/)"
   explanation: "\n\nThis command will retrieve the information about a StatefulSet\
     \ in the Kubernetes cluster, which is a way of managing resources as a unit for\
     \ persistent applications. \nIt looks at the context and namespace associated\

@@ -5,14 +5,13 @@ commands:
   doc_links: '
 
 
+    - [Kubectl Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)
 
-    1. Kubernetes Documentation for kubectl: https://kubernetes.io/docs/reference/generated/kubectl/
+    - [Argo: Application objects](https://argoproj.github.io/argo/user-guide/application/)
 
-    2. ArgoProject Documentation to learn about Applications: https://argoproj.github.io/argo-cd/concepts/app_resources/
+    - [Kubernetes Contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#manage-contexts)
 
-    3. Helm Documentation to learn about Chart Templates: https://helm.sh/docs/topics/chart_template_guide/
-
-    4. JSONPath Syntax Documentation: https://goessner.net/articles/JsonPath/'
+    - [JSONPath Syntax](https://goessner.net/articles/JsonPath/)'
   explanation: '
 
 
@@ -53,12 +52,16 @@ commands:
     Last Sync Status: " + .status.operationState.phase + "
 
     Last Sync Message: " + .status.operationState.message'''
-  doc_links: "\n\nDocumentation Links: \n- Kubernetes Documentation on Applications:\
-    \ https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/custom-resource-definitions/\n\
-    - ArgoProj Documentation on Application Resources: https://argoproj.github.io/argo-cd/getting_started/application_model/\
-    \   \n- Kubernetes Documentation on Contexts: https://kubernetes.io/docs/tasks/access-cluster-resources/#use-contexts-to-switch-between-clusters\n\
-    - Kubernetes Documentation on kubectl: https://kubernetes.io/docs/reference/kubectl/overview/\
-    \  \n- jq Documentation: https://shapeshed.com/jq-json/"
+  doc_links: '
+
+
+    * [Kubernetes Documentation: kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)
+
+    * [Argo Projects](https://argoproj.github.io/)
+
+    * [JSON Overview](http://www.json.org/)
+
+    * [jq command line processor](https://stedolan.github.io/jq/)'
   explanation: "\n\nThis command is using the Kubernetes command line tool \"kubectl\"\
     \ to get information on an application created with Argoproj. In your command,\
     \ you specified that this application exists within a specified namespace (APPLICATION_APP_NAMESPACE)\
@@ -87,15 +90,15 @@ commands:
   doc_links: '
 
 
-    # Documentation Links:
+    - [Kubectl Command Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)
 
-    1. Kubectl Command Reference: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands
+    - [jq Manual - Syntax Guide](https://stedolan.github.io/jq/manual/)
 
-    2. Argo Project website: https://argoproj.github.io/
+    - [Argo Applications Documentation](https://argoproj.github.io/argo-cd/operator-manual/applications/)
 
-    3. About JSON: https://www.geeksforgeeks.org/json-javascript-object-notation/
+    - [Resource and Object Specifications](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/)
 
-    4. Introduction to jq: https://stedolan.github.io/jq/tutorial/'
+    - [The jq Playground](https://jqplay.org/)'
   explanation: '
 
 
@@ -120,16 +123,18 @@ commands:
     \ -o=custom-columns=NAME:.metadata.name --no-headers -n ${APPLICATION_TARGET_NAMESPACE});\
     \ do echo \"\nDEPLOYMENT NAME: $deployment_name \n\" && kubectl logs deployment/$deployment_name\
     \ --tail=50 -n ${APPLICATION_TARGET_NAMESPACE} | grep -E '${ERROR_PATTERN}'; done"
-  doc_links: '
+  doc_links: ';
 
 
-    1. kubectl Get Command: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get
+    - [Kubectl Get Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)
 
-    2. Custom Output Formatting: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#custom-columns
+    - [Custom resources columns in kubectl](https://kubernetes.io/docs/reference/using-api/client-concepts/#custom-resources)
 
-    3. Retrieve Logs with Kubectl: https://kubernetes.io/docs/tasks/debug-application-cluster/get-shell-running-container/#use-kubectl-to-retrieve-logs-for-a-deployment
+    - [Echo Command Reference](http://man7.org/linux/man-pages/man1/echo.1.html)
 
-    4. Grep Command: https://www.digitalocean.com/community/tutorials/using-grep-regular-expressions-to-search-for-text-patterns-in-linux'
+    - [Log Command Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs)
+
+    - [Grep Command Reference](https://www.gnu.org/software/grep/manual/grep.html)'
   explanation: '
 
 
@@ -156,12 +161,10 @@ commands:
   name: scan_for_errors_in_pod_logs_related_to_argocd_application_deployments
 - command: kubectl describe applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
     --context ${CONTEXT}
-  doc_links: "\n\n\nDocumentation Links: \n1. Kubernetes Documentation on Kubectl:\
-    \ https://kubernetes.io/docs/reference/kubectl/overview/\n2. Argo Docs on Argo\
-    \ Applications: https://argoproj.github.io/docs/argo/readme.html# ar go-applications\n\
-    3. Kubernetes Docs on Contexts and Config Files: https://kubernetes.io/docs/reference/access-authn-authz/contexts/\n\
-    4. Argo Docs on Namespaces: https://argoproj.github.io/docs/argo/manage-users-and-teams#\
-    \ organizations-tasks-and-namespaces"
+  doc_links: "\n\n- [Kubectl Overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-overview/)\
+    \ \n- [Understanding kubectl output](https://kubernetes.io/docs/tasks/debug-application-cluster/understand-kubectl-output/)\
+    \ \n- [Describe Applications Argoproj.io Reference](https://argoproj.github.io/argo-cd/user-guide/kubectl/#describe-applications-argoproj-io)\
+    \ \n- [Kubernetes Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/)"
   explanation: '
 
 

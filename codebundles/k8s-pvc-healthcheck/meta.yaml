@@ -4,10 +4,10 @@ commands:
     kubectl get events -n ${NAMESPACE} --context ${CONTEXT} --field-selector involvedObject.name=$pvc
     -o json | jq ''.items[]| "Last Timestamp: " + .lastTimestamp + " Name: " + .involvedObject.name
     + " Message: " + .message''; done'
-  doc_links: "\n\n1. Kubernetes Persistent Volumes Documentation: https://kubernetes.io/docs/concepts/storage/persistent-volumes/\
-    \ \n2. kubectl Command Reference Documentation: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands\
-    \ \n3. PVC Troubleshooting Documentation: https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshoot-pods/#persistent-volume-claims\
-    \ \n4. jq Documentation: https://stedolan.github.io/jq/manual/"
+  doc_links: "\n\n- [Kubernetes - Kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/)\
+    \ \n- [Using the kubectl Command Line Interface](https://kubernetes.io/docs/tasks/tools/install-kubectl/#using-the-kubectl-command-line-interface)\
+    \ \n- [jq Manual (v1.6)](https://stedolan.github.io/jq/manual/)\n- [Field Selectors\
+    \ Kubernetes Documentation](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#field-selectors)"
   explanation: '
 
 
@@ -32,8 +32,18 @@ commands:
     != null) | .metadata.name as $name | .metadata.deletionTimestamp as $deletion_time
     | .metadata.finalizers as $finalizers | "\($name) is in Terminating state (Deletion
     started at: \($deletion_time)). Finalizers: \($finalizers)"'''
-  doc_links: " \n\n\nHelpful documentation links: \n- Kubectl: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands\n\
-    - JQ command: https://stedolan.github.io/jq/manual/"
+  doc_links: '
+
+
+    - [Kubernetes Documentation: kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)
+
+    - [JSONPath Basics](http://goessner.net/articles/JsonPath/)
+
+    - [Python json.load() and jq](https://www.programcreek.com/python/example/104578/json.load)
+
+    - [jq Manual](https://stedolan.github.io/jq/manual/)
+
+    - [jq FAQ](https://stedolan.github.io/jq/faq/)'
   explanation: '
 
 
@@ -82,15 +92,13 @@ commands:
   doc_links: '
 
 
-    Documentation Links:
+    - [Kubernetes Documentation - Persistent Volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)
 
-    - Kubernetes Persistent Volume Documentation: https://kubernetes.io/docs/concepts/storage/persistent-volumes/
+    - [Kubernetes Documentation - Events Object](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#events-v1-core)
 
-    - Kubectl command reference: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands
+    - [Kubernetes Documentation - kubectl Overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)
 
-    - Kube control context documentation: https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/
-
-    - jq language documentation: https://stedolan.github.io/jq/manual/'
+    - [jq Documentation](https://stedolan.github.io/jq/)'
   explanation: '
 
 
@@ -133,31 +141,15 @@ commands:
     echo -e "\n---\nPod: $pod\nPVC: $pvc\nPV: $pv\nStatus: $status\nNode: $node\nZone:
     $zone\nIngressClass: $ingressclass\nAccessModes: $accessmode\nReclaimPolicy: $reclaimpolicy\nCSIDriver:
     $csidriver\n"; done; done'
-  doc_links: ';
-
-
-    Helpful Documentation Links:
-
-
-    1. Pods: https://kubernetes.io/docs/concepts/workloads/pods/
-
-    2. PersistentVolumeClaims: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims
-
-    3. PersistentVolumes: https://kubernetes.io/docs/concepts/storage/persistent-volumes/
-
-    4. kubectl get: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get
-
-    5. Nodes: https://kubernetes.io/docs/concepts/architecture/nodes/
-
-    6. Topology: https://kubernetes.io/docs/concepts/architecture/nodes/#topology
-
-    7. StorageClassName: https://kubernetes.io/docs/concepts/storage/storage-classes/
-
-    8. AccessModes: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes
-
-    9. PersistentVolumeReclaimPolicy: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reclaim-policy
-
-    10. CSIDriver: https://kubernetes.io/docs/concepts/storage/volume-plugins/'
+  doc_links: "\n\n- kubectl Documentation: https://kubernetes.io/docs/reference/generated/kubectl/\n\
+    - Kubernetes Tasks with kubectl: https://kubernetes.io/docs/tasks/tools/install-kubectl/#common-kubectl-commands\n\
+    - Volumes in Kubernetes: https://kubernetes.io/docs/concepts/storage/volumes/\n\
+    - PersistentVolumes Specification: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#specifications\
+    \ \n- Access Modes for PersistentVolumes: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes\n\
+    - Reclaim Policies for PersistentVolumes: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reclaim-policies\n\
+    - Topology Aware Volume Provisioning: https://kubernetes.io/docs/concepts/storage/storage-classes/#topology-aware-volume-provisioning\n\
+    - Configure Default StorageClass: https://kubernetes.io/docs/tasks/administer-cluster/configure-default-storage-class/\n\
+    - CSI Drivers: https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/csi-drivers/"
   explanation: '
 
 
@@ -213,14 +205,12 @@ commands:
     PVC: $pvc, volumeName: $volumeName, containerName: $containerName, mountPath:
     $mountPath"; kubectl exec $pod -n ${NAMESPACE} --context ${CONTEXT} -c $containerName
     -- df -h $mountPath; done; done; done;'
-  doc_links: "\n\nHelpful Documentation Links:\n1. How to Use the kubectl get Command:\
-    \ https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get\
-    \ \n2. What is JSONPath?: https://goessner.net/articles/JsonPath/ \n3. Kubernetes\
-    \ VolumeMounts in Pod Specifications: https://kubernetes.io/docs/concepts/storage/volumes/#using-a-volumemount-to-expose-a-persistentvolumeclaim-as-a-volume\
-    \ \n4. Bash Script Syntax: https://www.tutorialspoint.com/unix/shell_scripting.htm\
-    \ \n5. How to Use jq to Process JSON Input: https://stedolan.github.io/jq/manual/\
-    \ \n6. How to Execute Commands in Pods: https://kubernetes.io/docs/reference/command-line-tools-reference/kubectl/kubectl-commands#exec\
-    \ \n7. The df Command for Filesystem Disk Space Usage: https://www.computerhope.com/unix/udf.htm"
+  doc_links: "\n\n* [kubectl get pods](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get_pods)\
+    \ \n* [kubectl get pods with field selector](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get_all_pods)\n\
+    * [JSONPath syntax reference](https://goessner.net/articles/JsonPath/)\n* [jq\
+    \ Language Guide (CLI JSON Processor)](https://stedolan.github.io/jq/manual/)\n\
+    * [kubectl exec](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec)\
+    \ \n* [df (Unix/Linux command)](https://pubs.vmware.com/vsphere-50/index.jsp?topic=%2Fcom.vmware.vcli.ref.doc_50%2Fvcli-right-df.html)"
   explanation: '
 
 
@@ -274,13 +264,12 @@ commands:
     requires attention."; fi; echo "Pod: $POD_NAME"; echo "PVC: $pvc_name"; echo "PV:
     $PV_NAME"; echo "Node with Pod: $POD_NODE_NAME"; echo "Node with Storage: $STORAGE_NODE_NAME";
     echo; fi; done; done'
-  doc_links: ";\n\n1. Kubernetes Namespaces: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/\
-    \ \n2. Kubectl Command: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands\
-    \ \n3. Context Switching: https://kubernetes.io/docs/tasks/access-kubernetes-api/configure-access-multiple-clusters/\
-    \ \n4. The jq Tool: https://stedolan.github.io/jq/ \n5. Pods in Kubernetes:https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/\
-    \ \n6. Persistent Volume Claims (PVC): https://kubernetes.io/docs/concepts/storage/persistent-volumes/\
-    \ \n7. Access Mode for Persistent Volumes: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes\
-    \ \n8. Nodes in Kubernetes: https://kubernetes.io/docs/concepts/architecture/nodes/"
+  doc_links: ";\n\n* [kubectl](https://kubernetes.io/docs/reference/generated/kubectl/)\n\
+    * [NAMESPACE](https://kubernetes.io/docs/tasks/administer-cluster/namespaces/)\
+    \ \n* [CONTEXT](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#set-the-current-context)\n\
+    * [jq](https://stedolan.github.io/jq/manual/)\n* [base64](https://developer.mozilla.org/en-US/docs/Web/API/WindowBase64/Base64_encoding_and_decoding)\n\
+    * [PersistentVolumeClaims](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims)\n\
+    * [Kubernetes nodes](https://kubernetes.io/docs/concepts/architecture/nodes/)"
   explanation: "\n\nThis command checks that all pods in a Kubernetes Namespace are\
     \ using Persistent Volumes from the same node. Specifically, it performs the following\
     \ steps: \n1. It sets the NAMESPACE and CONTEXT variables so that Kubernetes knows\
