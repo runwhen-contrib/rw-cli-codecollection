@@ -1,10 +1,9 @@
 commands:
 - command: 'curl -o /dev/null -w ''{"http_code": %{http_code}, "time_total": %{time_total}}''
     -s ${URL}'
-  doc_links: "\n\n- [cURL CLI Manual](https://ec.haxx.se/cmdline-opts.html) \n- [HTTP\
-    \ Response Codes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status) \n\
-    - [HTTP Headers for Dummies](https://www.keycdn.com/support/what-are-http-headers)\
-    \ \n- [cURL Performance Tuning](https://dzone.com/articles/10-tips-for-optimizing-curl-performance)"
+  doc_links: '- [Curl Command Documentation](https://ec.haxx.se/usingcurl-verboseoutput.html){:target="_blank"}
+
+    - [HTTP Status Codes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status){:target="_blank"}'
   explanation: '
 
 

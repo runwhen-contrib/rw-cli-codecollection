@@ -1,10 +1,11 @@
 commands:
 - command: kubectl logs --tail=100 daemonset/${DAEMONSET_NAME} --context ${CONTEXT}
     -n ${NAMESPACE}
-  doc_links: "\n\n- [Kubernetes Documentation: kubectl Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs)\n\
-    - [Kubernetes Documentation: DaemonSets](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/)\n\
-    - [Kubernetes Documentation: Contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#specifying-the-current-context)\
-    \ \n- [Kubernetes Documentation: Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)"
+  doc_links: '- [Kubernetes Documentation for Kubectl Logs command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs){:target="_blank"}
+
+    - [Kubernetes Documentation for Daemonsets](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/){:target="_blank"}
+
+    - [Kubernetes Documentation for Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}'
   explanation: '
 
 
@@ -25,18 +26,9 @@ commands:
   name: get_daemonset_log_details_for_report
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "${DAEMONSET_NAME}" || true
-  doc_links: '
+  doc_links: '- [Kubernetes Documentation for kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 
-
-    - [Kubectl Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)
-
-    - [Contexts and Kubernetes Clusters](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/)
-
-    - [Field Selectors in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/)
-
-    - [Grep Command Tutorial](https://www.computerhope.com/unix/ugrep.htm)
-
-    - [DaemonSet Overview](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/)'
+    - [Kubernetes Documentation for field selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/){:target="_blank"}'
   explanation: '
 
 
@@ -56,9 +48,8 @@ commands:
     | grep -i \"${DAEMONSET_NAME}\" || true"
   name: get_related_daemonset_events
 - command: kubectl describe daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
-  doc_links: "\n\n- [Kubernetes Documentation - Describe Daemon Sets](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#describe-daemonset)\
-    \ \n- [Kubernetes Documentation - Contexts](https://kubernetes.io/docs/tasks/access-cluster-information/manage-contexts/)\
-    \ \n- [Kubernetes Documentation - Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)"
+  doc_links: '- [GitHub kubernetes/community - Kubernetes documentation and website
+    repo](https://github.com/kubernetes/website){:target="_blank"}'
   explanation: "\n\nThe command kubectl describe daemonset/${DAEMONSET_NAME} --context\
     \ ${CONTEXT} -n ${NAMESPACE} is used to view detailed information about the specified\
     \ daemonset. A daemonset is a Kubernetes object that ensures that all nodes in\

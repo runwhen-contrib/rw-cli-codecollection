@@ -4,9 +4,11 @@ commands:
     and .status == "True")) | select(.status.renewalTime) | "Namespace:" + .metadata.namespace
     + " URL:" + .spec.dnsNames[0] + " Renews:" + .status.renewalTime + " Expires:"
     + .status.notAfter'
-  doc_links: "\n\n- [Kubectl Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\
-    \ \n- [Cert Manager Documentation](https://cert-manager.io/docs) \n- [JSONPath\
-    \ Documentation](https://jsonpath.com/) \n- [jq Documentation](https://stedolan.github.io/jq/)"
+  doc_links: '- [Kubernetes Documentation - Kubectl Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/){:target="_blank"}
+
+    - [Kubernetes Documentation - Certificate Manager Configuration and Installation](https://cert-manager.io/docs/configuration/){:target="_blank"}
+
+    - [JSONPath Syntax Documentation](https://goessner.net/articles/JsonPath/){:target="_blank"}'
   explanation: " \n\nThis command will query a Certificate Manager in a Kubernetes\
     \ environment, looking for certificates that are ready and active, and then output\
     \ information about them. It will output the namespace, the domain name it's associated\
@@ -32,25 +34,15 @@ commands:
     \(.certificate)", "Issuer: \(.issuer)", "Ready Status: \(.readyStatus)", "Ready
     Message: \(.readyMessage)", "Approved Status: \(.approvedStatus)", "Approved Message:
     \(.approvedMessage)"'''
-  doc_links: '
+  doc_links: '- [Kubernetes getting started guide](https://kubernetes.io/docs/tutorials/kubernetes-basics/){:target="_blank"}
 
+    - [Kubectl command reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 
-    - [Kubernetes documentation - kubectl][1]
+    - [Kubernetes Contexts reference](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#use-contexts-in-a-kubeconfig-file){:target="_blank"}
 
-    - [JSONPath specification][2]
+    - [Cert Manager Installation guide](https://docs.cert-manager.io/en/latest/getting-started/install/k8s.html){:target="_blank"}
 
-    - [jq Documentation & Tutorials][3]
-
-    - [Introduction to using jq for Command Line JSON Parsing][4]
-
-
-    [1]: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands
-
-    [2]: https://goessner.net/articles/JsonPath/
-
-    [3]: https://stedolan.github.io/jq/tutorial/
-
-    [4]: https://www.alexkras.com/introduction-to-using-jq-for-command-line-json-parsing/'
+    - [JQ utility documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
   explanation: '
 
 

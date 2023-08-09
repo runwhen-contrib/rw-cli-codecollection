@@ -2,10 +2,13 @@ commands:
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Running
     -o json | jq -r ''[.items[] | "Images: " + (.spec.containers[].image|tostring)
     + ", Last Started Times:" + (.status.containerStatuses[].state.running.startedAt|tostring)]'''
-  doc_links: "\n\n- [Kubernetes Documentation - kubectl Overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\n\
-    - [Understanding the Kubernetes Context Concept](https://www.mirantis.com/blog/understanding-kubernetes-contexts-and-configurations/)\n\
-    - [About Namespaces in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)\
-    \ \n- [jq Manual](https://stedolan.github.io/jq/manual/)\n- [jq Tutorial by Examples](https://devhints.io/jq)"
+  doc_links: '- [Kubernetes Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
+
+    - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+
+    - [AWS EKS Documentation for using field selectors](https://docs.aws.amazon.com/eks/latest/userguide/filter-expressions.html){:target="_blank"}
+
+    - [jq Manual Explanation of Filtering Arrays](https://stedolan.github.io/jq/manual/#Arrayfilters){:target="_blank"}'
   explanation: '
 
 
@@ -34,10 +37,11 @@ commands:
     + .status.phase, "containers:", (.spec.containers[] | "- container_name: " + .name,
     " \ image_path: " + (.image | split(":")[0]), " \ image_tag: " + (.image | split(":")[1])),
     "---"'''
-  doc_links: "\n\n- [Kubernetes - kubectl command reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\n\
-    - [kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/)\n\
-    - [jq manual](https://stedolan.github.io/jq/manual/) \n- [Field Selectors](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/#field-selectors)\n\
-    - [JSONPath Reference](https://kubernetes.io/docs/reference/kubectl/jsonpath/)"
+  doc_links: '- [Kubernetes Documentation - kubectl overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+
+    - [Kubernetes Documentation - Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors){:target="_blank"}
+
+    - [Kubernetes Documentation - jq overview](https://kubernetes.io/docs/reference/kubectl/cheatsheet/#advanced-jsonpath-expressions-with-jq){:target="_blank"}'
   explanation: '
 
 
@@ -69,20 +73,15 @@ commands:
     + .status.phase, "containers:", (.spec.containers[] | "- container_name: " + .name,
     " \ image_path: " + \(.image | split(":")[0]), " \ image_tag: " + (.image | split(":")[1])),
     "---"'''
-  doc_links: '
+  doc_links: '- [Kubernetes Documentation: Pods](https://kubernetes.io/docs/concepts/workloads/pods/){:target="_blank"}
 
+    - [Kubernetes Documentation: Contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#use-different-contexts-to-switch-between-clusters){:target="_blank"}
 
-    - [Kubernetes Documentation - kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/)
+    - [Kubernetes Documentation: Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [Kubernetes Concepts - Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/)
+    - [Kubernetes Documentation: FieldSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#fieldselector-v1-meta){:target="_blank"}
 
-    - [Kubernetes Documentation - Controlling resource visibility](https://kubernetes.io/docs/tasks/administer-cluster/namespaces-walkthrough/)
-
-    - [Kubernetes Concepts - API Object Field Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/)
-
-    - [jq Manual - Basics](https://stedolan.github.io/jq/manual/#Basicfilters)
-
-    - [jq Manual - Array Input and Output](https://stedolan.github.io/jq/manual/#Arrayinputandoutput)'
+    - [Kubernetes Documentation: JSONPath](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}'
   explanation: '
 
 
@@ -132,14 +131,25 @@ commands:
     ); echo "$available_tags"; fi; done <<<"$image_pull_backoff_events" && echo "Deleting
     Skopeo pod" && kubectl delete pod $POD_NAME -n $NAMESPACE --context=$CONTEXT &&
     echo "Done"'
-  doc_links: "\n\n* [NAMESPACE Environment Variable](https://kubernetes.io/docs/tasks/administer-cluster/namespaces-walkthrough/)\n\
-    * [Kubectl Get Events Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events)\n\
-    * [JQ - Command Line JSON Processing Tool](https://stedolan.github.io/jq/)\n*\
-    \ [Date Command and Flags](https://linuxize.com/post/linux-date-command/)\n* [Kubectl\
-    \ Run Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#run)\n\
-    * [Quay Container Registry Repository](https://www.quay.io/how-it-works)\n* [Skopeo\
-    \ Inspect Command](https://www.mankier.com/1/skopeo-inspect) \n* [Skopeo List\
-    \ Tags Command](https://www.mankier.com/1/skopeo-list-tags)\n* [Kubectl Wait Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/#wait)"
+  doc_links: '- [Kubernetes Events](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#event-v1-core){:target="_blank"}
+
+    - [jq command line processor](https://stedolan.github.io/jq/){:target="_blank"}
+
+    - [Date command](http://www.freebsd.org/cgi/man.cgi?query=date&sektion=1){:target="_blank"}
+
+    - [Cut command](http://www.freebsd.org/cgi/man.cgi?query=cut&sektion=1){:target="_blank"}
+
+    - [Tr command](http://www.freebsd.org/cgi/man.cgi?query=tr&sektion=1){:target="_blank"}
+
+    - [IFS environment variable](http://wiki.bash-hackers.org/syntax/shellvars#ifs){:target="_blank"}
+
+    - [kubectl run command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#run){:target="_blank"}
+
+    - [kubectl wait command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#wait){:target="_blank"}
+
+    - [kubectl exec command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
+
+    - [Skopeo image utility](https://github.com/containers/skopeo){:target="_blank"}'
   explanation: '
 
 

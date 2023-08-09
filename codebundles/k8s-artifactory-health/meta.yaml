@@ -1,20 +1,13 @@
 commands:
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/liveness
-  doc_links: '
+  doc_links: '- [Kubernetes Exec](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
 
+    - [Stateful Sets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
 
-    - [Kubernetes Documentation: Exec](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec)
+    - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [Kubernetes Documentation: Contexts](https://kubernetes.io/docs/tasks/access-cluster-resources/#list-contexts)
-
-    - [Kubernetes Documentation: Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
-
-    - [StatefulSets Documentation](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/)
-
-    - [cURL Documentation](https://curl.haxx.se/docs/)
-
-    - [Artifactory Liveness Check API Documentation](https://www.jfrog.com/confluence/display/RTF/Artifactory+REST+API#ArtifactoryRESTAPI-SystemLivenessCheck)'
+    - [cURL Commandline Options](https://ec.haxx.se/usingcurl-verbose.html){:target="_blank"}'
   explanation: '
 
 
@@ -34,11 +27,17 @@ commands:
   name: check_artifactory_liveness_and_readiness_endpoints
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/readiness
-  doc_links: "\n\n1. [Kubernetes Documentation - kubectl exec](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec)\
-    \ \n2. [Kubernetes Documentation - Context switching](https://kubernetes.io/docs/tasks/access-kubernetes-api/configure-access-multiple-clusters/#switch-between-clusters-contexts)\n\
-    3. [Kubernetes Documentation - Working with namespaces](https://kubernetes.io/docs/tasks/administer-cluster/namespaces-walkthrough/#understand-the-role-of-namespaces-in-organizing-cluster-resources)\n\
-    4. [Kubernetes Documentation - StatefulSets](https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/)\n\
-    5. [cURL Documentation](https://curl.haxx.se/docs/)\n6. [cURL Command-Line Options](https://ec.haxx.se/cmdline-opts.html)"
+  doc_links: '- [kubectl documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+
+    - [kubectl exec command reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
+
+    - [statefulsets in Kubernetes concepts](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
+
+    - [Kubernetes context concept](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
+
+    - [Kubernetes namespace concept](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+
+    - [curl page on max-time switch](http://man7.org/linux/man-pages/man1/curl.1.html){:target="_blank"}'
   explanation: '
 
 

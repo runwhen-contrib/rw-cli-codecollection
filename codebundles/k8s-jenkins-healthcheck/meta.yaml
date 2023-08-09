@@ -1,18 +1,13 @@
 commands:
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -s -o /dev/null -w "%{http_code}" localhost:8080/login
-  doc_links: '
+  doc_links: '- [kubectl Reference - Executing a Command in a Container](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
 
+    - [StatefulSet Concepts - Kubernetes](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#definition-of-a-statefulset){:target="_blank"}
 
-    - [Kubernetes Documentation: Executing Commands](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec)
+    - [Using Contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/){:target="_blank"}
 
-    - [Kubernetes Documentation: Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/)
-
-    - [Kubernetes Documentation: Nodes](https://kubernetes.io/docs/concepts/architecture/nodes/)
-
-    - [cURL Guide to Common Usage](https://ec.haxx.se/usingcurl-common.html)
-
-    - [HTTP Status Codes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status)'
+    - [Fundamentals of HTTP Status Codes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status){:target="_blank"}'
   explanation: '
 
 
@@ -32,16 +27,13 @@ commands:
   name: query_the_jenkins_kubernetes_workload_http_endpoint
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -s localhost:8080/api/json?pretty=true --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}
-  doc_links: '
+  doc_links: '- [Kubernetes: Kubectl Overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
 
+    - [Kubectl Cheat Sheet]( https://kubernetes.io/docs/reference/kubectl/cheatsheet/#execing-into-running-pods){:target="_blank"}
 
-    - [Kubernetes Documentation - kubectl exec](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec)
+    - [Context, Namespace and Secrets in Kubernetes](https://medium.com/teknomuslim/context-namespace-and-secrets-in-kubernetes-e27b984fe299){:target="_blank"}
 
-    - [Kubernetes Documentation - Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#contexts)
-
-    - [curl Documentation - pretty formatting](https://ec.haxx.se/usingcurl/usingcurl-verbose/)
-
-    - [Jenkins Documentation - Using Credentials Binding](https://plugins.jenkins.io/credentials-binding/usage)'
+    - [StatefulSets in Kubernetes](https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/){:target="_blank"}'
   explanation: '
 
 
@@ -66,9 +58,15 @@ commands:
     -- curl -s localhost:8080/queue/api/json --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}
     | jq -r ''.items[] | select((.stuck == true) or (.blocked == true)) | "Why: "
     + .why + "\nBlocked: " + (.blocked|tostring) + "\nStuck: " + (.stuck|tostring)'''
-  doc_links: "\n\n- [Kubernetes Documentation for kubectl exec](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec)\
-    \ \n- [Curl Documentation](https://ec.haxx.se/) \n- [JQ Manual](https://stedolan.github.io/jq/manual/)\
-    \ \n- [Jenkins Documentation for Secret Credentials](https://www.jenkins.io/doc/book/using/working-with-credentials/#using-secret-text-credentials-in-builds)"
+  doc_links: '- [Learn how to use the kubectl exec command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
+
+    - [Understand more about statefulsets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
+
+    - [Gain an understanding of contexts in Kubernetes](https://kubernetes.io/docs/tasks/access-application-cluster/authenticate-across-clusters-kubeconfig/){:target="_blank"}
+
+    - [Check out the curl documentation](https://curl.haxx.se/docs/){:target="_blank"}
+
+    - [Get friendly with jq](https://stedolan.github.io/jq/manual/){:target="_blank"}'
   explanation: "\n\nThis command is used to identify the cause of stuck or blocked\
     \ jobs in a Jenkins instance. The command calls the Jenkins API and filters out\
     \ stuck and/or blocked jobs, displaying the related \"why\" value as well as their\

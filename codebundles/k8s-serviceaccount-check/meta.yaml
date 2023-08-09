@@ -10,13 +10,19 @@ commands:
     -n $namespace --context=$context -- curl -s -k -H "Authorization: Bearer $TOKEN"
     $apiserver$resource && echo "Cleaning up..." && kubectl delete pod curl-pod -n
     $namespace --context=$context && echo "Done"'
-  doc_links: "\n\n* [Kubernetes API](https://kubernetes.io/docs/reference/generated/kubernetes-api/)\
-    \ \n* [Creating Pods Automatically with kubectl run](https://kubernetes.io/docs/tasks/manage-pod/create-pod-automatically/)\n\
-    * [Pods](https://kubernetes.io/docs/concepts/workloads/pods/pod/)\n* [Managing\
-    \ Service Accounts](https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/)\n\
-    * [kubectl exec](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec)\
-    \ \n* [kubectl wait](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#wait)\n\
-    * [cURL](https://curl.haxx.se/docs/)"
+  doc_links: '- [Kubernetes Official Documentation Online: Concepts](https://kubernetes.io/docs/concepts/){:target="_blank"}
+
+    - [Kubernetes Official Documentation Online: api-resources](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.15/){:target="_blank"}
+
+    - [Kubernetes Official Documentation Online: Service Accounts](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/){:target="_blank"}
+
+    - [Kubernetes Official Documentation Online: kubectl run](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#run){:target="_blank"}
+
+    - [Kubernetes Official Documentation Online: kubectl wait](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#wait){:target="_blank"}
+
+    - [Kubernetes Official Documentation Online: kubectl exec](https://kubernetes.io/docs/tasks/debug-application-cluster/get-shell-running-container/){:target="_blank"}
+
+    - [Kubernetes Official Documentation Online: kubectl delete pod](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#delete_pod){:target="_blank"}'
   explanation: '
 
 
