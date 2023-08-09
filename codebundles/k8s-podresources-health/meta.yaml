@@ -2,13 +2,19 @@ commands:
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running
     -ojson | jq -r ''[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.limits
     == null) | {pod: $pod.metadata.name, container_without_limits: .name}]'''
-  doc_links: "\n\n- [Kubectl Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\
-    \ \n- [Using Contexts in kubectl](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/)\n\
-    - [Namespaces Overview](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)\n\
-    - [Label Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors)\n\
-    - [Field Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/)\n\
-    - [JSONPath Usage](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-cli/jsonpath.md)\n\
-    - [jq - Command-line json processor](https://stedolan.github.io/jq/)"
+  doc_links: '- [`kubectl get pods` - get information about Pod objects](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-pods){:target="_blank"}
+
+    - [`--context` parameter for kubectl](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#set-the-current-context){:target="_blank"}
+
+    - [`-n/${NAMESPACE}` parameter for kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/#namespace-1){:target="_blank"}
+
+    - [`${LABELS}` parameter for kubectl](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
+
+    - [`--field-selector` parameter for kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/#--field-selector=){:target="_blank"}
+
+    - [`-o json` parameter for kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/#output-short-options){:target="_blank"}
+
+    - [jq - Command-line JSON processor](https://stedolan.github.io/jq/manual/){:target="_blank"}'
   explanation: '
 
 
@@ -52,10 +58,11 @@ commands:
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running
     -ojson | jq -r ''[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.requests
     == null) | {pod: $pod.metadata.name, container_without_requests: .name}]'''
-  doc_links: "\n\n- [Kubectl Overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\n\
-    - [Kubectl Get Pods](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)\n\
-    - [jq Manual](https://stedolan.github.io/jq/manual/)\n- [Kubernetes Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors)\
-    \ \n- [Kubernetes Resources Requests and Limits](https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource-limit-pod/)"
+  doc_links: '- [Kubernetes Documentation - kubectl get command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+
+    - [Kubernetes Documentation - Kubernetes labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
+
+    - [Kubernetes Documentation - Field Selector Syntax](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#field-selectors){:target="_blank"}'
   explanation: '
 
 
@@ -83,16 +90,9 @@ commands:
 - command: for pod in $(kubectl get pods ${LABELS} -n ${NAMESPACE} --context ${CONTEXT}
     -o custom-columns=":metadata.name" --field-selector=status.phase=Running); do
     kubectl top pod $pod -n ${NAMESPACE} --context ${CONTEXT} --containers; done
-  doc_links: '
+  doc_links: '- [Kubernetes official documentation page for kubectl get pods](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get_pods){:target="_blank"}
 
-
-    - [Kubernetes Documentation: kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)
-
-    - [Kubernetes Documentation: kubectl top](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#top)
-
-    - [Kubernetes Documentation: field selector](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/)
-
-    - [Kubernetes Documentation: custom columns](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-columns-merging-patching/#use-custom-columns)'
+    - [Kubernetes official documentation page for kubectl top pod](https://kubernetes.io/docs/tasks/debug-application-cluster/resource-usage-monitoring/#determine-the-cpu-and-memory-usage-of-individual-containers){:target="_blank"}'
   explanation: '
 
 

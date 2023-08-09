@@ -1,17 +1,10 @@
 commands:
 - command: kubectl get all -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
-  doc_links: '
+  doc_links: '- [Documentation on kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
+    - [Instructions for using labels with kubectl](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
 
-    * [`kubectl` Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)
-
-    * [`get` Command for `kubectl`](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)
-
-    * [Resource Labels Documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)
-
-    * [Namespace Overview Documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
-
-    * [Context Documentation](https://kubernetes.io/docs/tasks/access-kubernetes-api/configure-access-multiple-clusters/#use-contexts-to-switch-between-clusters)'
+    - [Information on namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}'
   explanation: "\n \nThis command is used to view all of the Kubernetes resources\
     \ in a specific namespace within a specific context. It will \"get\" all of the\
     \ resources that have labels matching the value for \"$RESOURCE_LABELS\" in this\
@@ -25,20 +18,11 @@ commands:
     \ \\\n    --context ${CONTEXT}"
   name: get_standard_postgres_resource_information
 - command: kubectl get crd -n ${NAMESPACE} --context ${CONTEXT} -o=jsonpath='{.items[*].metadata.name}'
-  doc_links: '
+  doc_links: '- [Kubernetes Documentation on CLI Reference for kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 
+    - [Kubernetes Documentation on Custom Resource Definition Objects (CRD)](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/){:target="_blank"}
 
-    - [Kubernetes Documentation: kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)
-
-    - [Kubernetes Documentation: Command Line Tool Reference](https://kubernetes.io/docs/reference/kubectl/overview/)
-
-    - [Kubernetes Documentation: CustomResourceDefinitions (CRDs)](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/)
-
-    - [Kubernetes Documentation: Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
-
-    - [Kubernetes Documentation: Contexts](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#context)
-
-    - [Kubernetes Documentation: Using JSONPath with kubectl](https://kubernetes.io/docs/reference/kubectl/jsonpath/)'
+    - [Kubernetes Documentation on JSONPath](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}'
   explanation: '
 
 
@@ -61,12 +45,15 @@ commands:
   name: describe_postgres_custom_resources
 - command: kubectl get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
     -o=name --field-selector=status.phase=Running
-  doc_links: "\n\n- [Kubernetes Documentation on \"Getting Started with Kubernetes\"\
-    ](https://kubernetes.io/docs/tutorials/kubernetes-basics/) \n- [Official Documentation\
-    \ on Kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\n\
-    - [Kubernetes Documentation on \"Label Selectors\"](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)\
-    \ \n- [Kubernetes Documentation on the \"Namespace Concept\"](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)\
-    \ \n- [Kubernetes Documentation on the \"Field Selector Concept\"](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/)"
+  doc_links: '- [Kubernetes Documentation - kubectl command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/#get){:target="_blank"}
+
+    - [Kubernetes Documentation - Labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels){:target="_blank"}
+
+    - [Kubernetes Documentation - Namespaces](https://kubernetes.io/docs/tasks/administer-cluster/namespaces){:target="_blank"}
+
+    - [Kubernetes Documentation - Contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters){:target="_blank"}
+
+    - [Kubernetes Documentation - Field Selectors](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#field-selectors){:target="_blank"}'
   explanation: '
 
 
@@ -93,12 +80,15 @@ commands:
   name: get_postgres_pod_logs_events
 - command: kubectl get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
     -o=name --field-selector=status.phase=Running
-  doc_links: "\n\n- [Kubernetes Documentation on \"Getting Started with Kubernetes\"\
-    ](https://kubernetes.io/docs/tutorials/kubernetes-basics/) \n- [Official Documentation\
-    \ on Kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\n\
-    - [Kubernetes Documentation on \"Label Selectors\"](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)\
-    \ \n- [Kubernetes Documentation on the \"Namespace Concept\"](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)\
-    \ \n- [Kubernetes Documentation on the \"Field Selector Concept\"](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/)"
+  doc_links: '- [Kubernetes Documentation - kubectl command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/#get){:target="_blank"}
+
+    - [Kubernetes Documentation - Labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels){:target="_blank"}
+
+    - [Kubernetes Documentation - Namespaces](https://kubernetes.io/docs/tasks/administer-cluster/namespaces){:target="_blank"}
+
+    - [Kubernetes Documentation - Contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters){:target="_blank"}
+
+    - [Kubernetes Documentation - Field Selectors](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#field-selectors){:target="_blank"}'
   explanation: '
 
 
@@ -124,11 +114,9 @@ commands:
     \ selector only allows running pods"
   name: get_postgres_pod_resource_utilization
 - command: patronictl list
-  doc_links: " all\n\n- [patronictl Documentation](https://patroni.readthedocs.io/en/latest/patronictl.html)\n\
-    - [How to Install and Configure PostgreSQL with Patroni High Availability System](https://systembelts.com/database/how-to-install-and-configure-postgresql-with-patroni-high-availability-system/)\
-    \ \n- [How to Deploy Patroni in Kubernetes Environment - AKS](https://www.symmetricalit.com/deploy-patroni-in-kubernetes-environment-aks/)\
-    \ \n- [Patroni Cluster Maintenance and Performance Tuning](https://severalnines.com/blog/patroni-cluster-maintenance-performance-tuning)\
-    \  \n- [Overview of Patroni - Automated failover and distributed configuration](https://www.slideshare.net/chzbrgr71/overview-of-patroni-automated-failover-and-distributed-configuration)"
+  doc_links: '- [Patroni official GitHub repository](https://github.com/zalando/patroni/){:target="_blank"}
+
+    - [Patroni Documentation](https://patroni.readthedocs.io/en/latest/index.html){:target="_blank"}'
   explanation: '
 
 

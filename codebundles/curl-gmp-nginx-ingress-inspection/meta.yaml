@@ -6,18 +6,17 @@ commands:
     | jq -r ''if .data.result[0] then "Host:" + .data.result[0].metric.host + " Ingress:"
     + .data.result[0].metric.ingress + " Namespace:" + .data.result[0].metric.exported_namespace
     + " Service:" + .data.result[0].metric.service else "" end'''
-  doc_links: '
+  doc_links: '- [Overview of gcloud auth](https://cloud.google.com/sdk/gcloud/reference/auth/){:target="_blank"}
 
+    - [activate-service-account information for gcloud](https://cloud.google.com/sdk/gcloud/reference/auth/activate-service-account){:target="_blank"}
 
-    - [gcloud auth](https://cloud.google.com/sdk/gcloud/reference/auth)
+    - [Information on curl''s data option](https://curl.haxx.se/docs/manpage.html#-d){:target="_blank"}
 
-    - [curl](https://curl.haxx.se/)
+    - [Information on HTTP Header Authorization](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Authorization){:target="_blank"}
 
-    - [JSON Query (jq)](https://stedolan.github.io/jq/)
+    - [Information on gcloud auth command](https://cloud.google.com/sdk/gcloud/reference/auth/){:target="_blank"}
 
-    - [Google Cloud Monitoring API](https://cloud.google.com/monitoring/api/ref_v3/rest/)
-
-    - [Google Application Credentials](https://cloud.google.com/docs/authentication/production)'
+    - [Information on jq command](https://stedolan.github.io/jq/){:target="_blank"}'
   explanation: '
 
 
@@ -78,18 +77,19 @@ commands:
     = "Unhealthy" ]; then echo "Health Status: $health_status"; echo "=====================";
     elif [ "$health_status" = "Healthy" ]; then echo "Health Status: $health_status";
     fi; echo "------------"'
-  doc_links: "\n\n* [kubectl Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\n\
-    * [NAMESPACE reference](https://kubernetes.io/docs/tasks/administer-cluster/namespaces/)\
-    \ \n* [CONTEXT Reference](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#switch-between-clusters-in-kubeconfig)\n\
-    * [INGRESS_OBJECT_NAME reference](https://kubernetes.io/docs/concepts/services-networking/ingress/)\n\
-    * [JSONPATH reference](https://jsonpath.herokuapp.com/)\n* [CUT command reference](https://www.computerhope.com/unix/ucut.htm)\n\
-    * [IFS Reference](https://www.gnu.org/software/bash/manual/html_node/The-Shopt-Builtin.html#The-Shopt-Builtin)\n\
-    * [Kubernetes Endpoints reference](https://kubernetes.io/docs/concepts/services-networking/endpoints/)\n\
-    * [Kubernetes Services reference](https://kubernetes.io/docs/concepts/services-networking/service/)\n\
-    * [Kubernetes Pods reference](https://kubernetes.io/docs/concepts/workloads/pods/)\n\
-    * [Kubernetes Deployments/ReplicaSet reference](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)\n\
-    * [Kubernetes DaemonSet reference](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/)\n\
-    * [Kubernetes StatefulSet reference](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/)"
+  doc_links: '- [Kubernetes Overview](https://kubernetes.io/docs/concepts/){:target="_blank"}
+
+    - [Kubectl Overview](https://kubernetes.io/docs/tasks/tools/install-kubectl/){:target="_blank"}
+
+    - [Ingress Documentation](https://kubernetes.io/docs/concepts/services-networking/ingress/){:target="_blank"}
+
+    - [Service Documentation](https://kubernetes.io/docs/concepts/services-networking/service/){:target="_blank"}
+
+    - [StatefulSets Documentation](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
+
+    - [DaemonSets Documentation](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/){:target="_blank"}
+
+    - [ReplicaSets Documentation](https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/){:target="_blank"}'
   explanation: "\n\nThis command checks the health status of an Ingress in a Kubernetes\
     \ cluster. It takes three parameters \u2013 NAMESPACE, CONTEXT and INGRESS_OBJECT_NAME.\
     \ The command first retrieves all the backend services and ports associated with\

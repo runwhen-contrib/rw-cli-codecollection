@@ -1,13 +1,12 @@
 commands:
 - command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}
-  doc_links: ' --selector ${SELECTOR}
+  doc_links: '- [Kubernetes Documentation: kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
+    - [Kubernetes Docs Overview: The Basics of Kubernetes Objects](https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects/){:target="_blank"}
 
-    - [kubectl Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get)
+    - [Kubernetes Documentation: namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [Contexts and Namespaces](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/)
-
-    - [Selector Options](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#field-selectors)'
+    - [Kubernetes Docs: Context and Configuration](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/){:target="_blank"}'
   explanation: '
 
 
@@ -50,9 +49,19 @@ commands:
     \(.message)\n reason: \(.reason)\n last_transition_time: \(.lastTransitionTime)")\n\nReconcile
     Status:\(.status.conditions[] | select(.type == "Reconciling") |"\n reconciling:
     \(.status)\n message: \(.message)")\n---\n"'''
-  doc_links: "\n\n- [Kubectl Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands)\n\
-    - [JSONPath Documentation](https://goessner.net/articles/JsonPath/)\n- [JQ Documentation](https://stedolan.github.io/jq/)\
-    \ \n- [Kubectl Contexts Documentation](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/)"
+  doc_links: '- [Kubernetes Documentation about kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+
+    - [Kubernetes Documentation about Resource Names](https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/#resourcenames){:target="_blank"}
+
+    - [Kubernetes Documentation about Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+
+    - [Kubernetes Documentation about kubectl contexts](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#config-set-context){:target="_blank"}
+
+    - [YAML Tutorial](https://learnxinyminutes.com/docs/yaml/){:target="_blank"}
+
+    - [JSON Tutorial](https://www.w3schools.com/js/js_json_syntax.asp){:target="_blank"}
+
+    - [jq Command Examples](https://stedolan.github.io/jq/tutorial/){:target="_blank"}'
   explanation: '
 
 

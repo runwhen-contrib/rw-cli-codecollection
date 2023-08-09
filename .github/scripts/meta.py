@@ -17,7 +17,6 @@ import yaml
 from urllib.parse import urlencode
 from robot.api import TestSuite
 
-
 def parse_robot_file(fpath):
     """
     Parses a robot file in to a python object that is
@@ -168,6 +167,12 @@ def cmd_expansion(keyword_arguments):
 
     return cmd
 
+def check_url(url):
+    try:
+        response = requests.head(url)
+        return response.status_code != 404
+    except requests.RequestException:
+        return False
 
 def generate_metadata(directory_path):
     """
@@ -221,7 +226,7 @@ def generate_metadata(directory_path):
                 multi_line_content = multi_line['explanation']
 
                 #Generate external doc links 
-                query_doc_links_prompt = f"Given the following command, generate a list of helpful documentation links for a reader who want's to learn more about the topics used in the script. Present the content as a simple unordered list, without any pretext, that can be rendered in mkdocs. The command is:  "
+                query_doc_links_prompt = r"Given the following command, generate some links that provide helpful documentation for a reader who want's to learn more about the topics used in the command. Format the output in a single YAML list with the keys of `description` and `url` for each link with the values in double quotes. Ensure each description and url are on separate lines, ensure an empty blank line separates each item. Ensure there are no other keys or text or extra characters other than the items. The command is:  "
                 # query_doc_links_with_command = f'{query_doc_links_prompt}\n{multi_line_content}'
                 query_doc_links_with_command = f'{query_doc_links_prompt}\n{command}'
                 print(f'generating doc-links for {name_snake_case}')
@@ -231,7 +236,38 @@ def generate_metadata(directory_path):
                 if ((response_doc_links.status_code == 200)):
                     doc_links = response_doc_links.json() 
                     doc_links_content = doc_links['explanation']
+                    # Try to clean up poor openAI formatting
+                    corrected_input = re.sub(r'url:(?=[^\s])', r'url: ', doc_links_content)
+
+                    # Try to be flexible about spaces and indentation 
+                    pattern = r'^\s*-.*\bdescription:.*\n\s+(?:url\s*:|url)\s*:.*'
+                    # Find all matches using the pattern
+                    matches = re.findall(pattern, corrected_input, re.MULTILINE)
+                    # Join the matched lines to create the final output
+                    output_string = "\n".join(matches)
+                    non_404_urls = []
+                    # Siltently Discard any poor yaml - some content from openAI is still inconsistent
+                    # Otherwise build a list of URLS that still exist (as openAI generates some links that are 404s)
+                    try:
+                        yaml_data = yaml.safe_load(output_string)
+                        for item in yaml_data: 
+                            if isinstance(item, dict) and isinstance(item.get('description'), str) and isinstance(item.get('url'), str):
+                                if check_url(item['url']):
+                                    non_404_urls.append(item)
+                    except yaml.YAMLError:
+                        pass
+                    markdown_links = []
+                    for link in non_404_urls: 
+                        if 'description' in link and 'url' in link:
+                            description = link['description']
+                            url = link['url']
+                            markdown_links.append(f"[{description}]({url}){{:target=\"_blank\"}}")
+                    # Format markdown lines
+                    formatted_markdown_lines = "\n".join([f"- {item}" for item in markdown_links])
+                    doc_links_content = formatted_markdown_lines
                     print(doc_links_content)
+
+
                 else: 
                     doc_links_content = "Documentation links not available"
             else: 
