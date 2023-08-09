@@ -265,7 +265,7 @@ def generate_metadata(directory_path):
                     # Format markdown lines
                     formatted_markdown_lines = "\n".join([f"- {item}" for item in markdown_links])
                     doc_links_content = formatted_markdown_lines
-                    print(doc_links_content)
+
 
 
                 else: 
