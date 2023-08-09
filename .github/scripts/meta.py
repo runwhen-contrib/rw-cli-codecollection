@@ -280,7 +280,7 @@ def generate_metadata(directory_path):
                 'command': command,
                 'explanation': explanation_content,
                 'multi_line_details': multi_line_content,
-                'doc_links': doc_links_content
+                'doc_links':  f'\n{doc_links_content}'
             }
             # Add the command meta to the list of commands
             commands.append(command_meta)

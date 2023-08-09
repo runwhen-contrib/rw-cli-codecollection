@@ -1,7 +1,7 @@
 commands:
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} -o json
-  doc_links: "- [Kubernetes Documentation - namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target=\"\
+  doc_links: "\n- [Kubernetes Documentation - namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target=\"\
     _blank\"}\n- [Kubernetes Documentation - Events](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.16/#event-v1-core){:target=\"\
     _blank\"}\n- [Kubernetes Documentation - kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target=\"\
     _blank\"}\n- [Kubectl Documentation \u2013 Get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target=\"\
@@ -36,7 +36,7 @@ commands:
     != null) | .lastState.terminated | "terminated_reason: \(.reason // "N/A")\nterminated_finishedAt:
     \(.finishedAt // "N/A")\nterminated_exitCode: \(.exitCode // "N/A")\nexit_code_explanation:
     \($exit_code_explanations[.exitCode | tostring] // "Unknown exit code")")\n---\n"'''
-  doc_links: "- [Kubernetes Documentation \u2014\_kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target=\"\
+  doc_links: "\n- [Kubernetes Documentation \u2014\_kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target=\"\
     _blank\"}\n- [Kubernetes Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target=\"\
     _blank\"}\n- [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target=\"\
     _blank\"}\n- [jq Manual](https://stedolan.github.io/jq/){:target=\"_blank\"}"
@@ -78,7 +78,9 @@ commands:
     // [{}])[].state // "N/A")\ncontainerMessage: \((.status.containerStatuses //
     [{}])[].state?.waiting?.message // "N/A")\ncontainerReason: \((.status.containerStatuses
     // [{}])[].state?.waiting?.reason // "N/A")\n---\n"'''
-  doc_links: '- [Kubernetes documentation about kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes documentation about kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 
     - [Kubernetes documentation about the get pods command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-pods){:target="_blank"}
 
@@ -125,7 +127,9 @@ commands:
     // "N/A")\nexit_code: \(.status.containerStatuses[0].state.terminated.exitCode
     // "N/A")\nexit_code_explanation: \($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode
     | tostring] // "Unknown exit code")\n---\n"'''
-  doc_links: '- [Kubernetes Docs - kubectl get command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Docs - kubectl get command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
     - [Kubernetes Docs - Controlling the Kubernetes Configuration with Environment
     Variables](https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/#define-environment-variables-for-a-container){:target="_blank"}
@@ -160,7 +164,9 @@ commands:
     \ | tostring] // \"Unknown exit code\")\\n---\\n\"'"
   name: troubleshoot_failed_pods_in_namespace
 - command: kubectl get all --context ${CONTEXT} -n ${NAMESPACE} -o json
-  doc_links: '- [Kubernetes documentation on `kubectl get`](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes documentation on `kubectl get`](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
     - [Kubernetes documentation on the `-n` flag](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
@@ -183,7 +189,9 @@ commands:
   name: troubleshoot_workload_status_conditions_in_namespace
 - command: kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT}
     | xargs -n 1 kubectl get --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}
-  doc_links: '- [kubectl overview and examples](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+  doc_links: '
+
+    - [kubectl overview and examples](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
     - [Listing and Describing Resources](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
@@ -217,7 +225,9 @@ commands:
     --since=2h --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${SERVICE_ERROR_PATTERN}"
     | grep -Ev "${SERVICE_EXCLUDE_PATTERN}" | sort | uniq -c | awk '{print "Issue
     Occurences:",$0}'); done; echo "\${logs}"
-  doc_links: '- [Kubectl Reference Documents](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+  doc_links: '
+
+    - [Kubectl Reference Documents](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 
     - [Kubectl Get Documentation](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#get-32){:target="_blank"}
 
@@ -272,7 +282,9 @@ commands:
     | "\(.metadata.name) \(.spec.replicas) \(.spec.selector.matchLabels | to_entries[]
     | .key + "=" + .value)"' | while read -r line; do check_health "StatefulSet" $(echo
     $line | tr -d '"'); done
-  doc_links: '- [Kubernetes Pod Disruption Budget](https://kubernetes.io/docs/tasks/run-application/configure-pdb/){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Pod Disruption Budget](https://kubernetes.io/docs/tasks/run-application/configure-pdb/){:target="_blank"}
 
     - [JQ Manual](https://stedolan.github.io/jq/manual/){:target="_blank"}
 

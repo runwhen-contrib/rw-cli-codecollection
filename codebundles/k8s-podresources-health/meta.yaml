@@ -2,7 +2,9 @@ commands:
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running
     -ojson | jq -r ''[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.limits
     == null) | {pod: $pod.metadata.name, container_without_limits: .name}]'''
-  doc_links: '- [`kubectl get pods` - get information about Pod objects](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-pods){:target="_blank"}
+  doc_links: '
+
+    - [`kubectl get pods` - get information about Pod objects](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-pods){:target="_blank"}
 
     - [`--context` parameter for kubectl](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#set-the-current-context){:target="_blank"}
 
@@ -58,7 +60,9 @@ commands:
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running
     -ojson | jq -r ''[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.requests
     == null) | {pod: $pod.metadata.name, container_without_requests: .name}]'''
-  doc_links: '- [Kubernetes Documentation - kubectl get command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Documentation - kubectl get command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
     - [Kubernetes Documentation - Kubernetes labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
 
@@ -90,7 +94,9 @@ commands:
 - command: for pod in $(kubectl get pods ${LABELS} -n ${NAMESPACE} --context ${CONTEXT}
     -o custom-columns=":metadata.name" --field-selector=status.phase=Running); do
     kubectl top pod $pod -n ${NAMESPACE} --context ${CONTEXT} --containers; done
-  doc_links: '- [Kubernetes official documentation page for kubectl get pods](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get_pods){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes official documentation page for kubectl get pods](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get_pods){:target="_blank"}
 
     - [Kubernetes official documentation page for kubectl top pod](https://kubernetes.io/docs/tasks/debug-application-cluster/resource-usage-monitoring/#determine-the-cpu-and-memory-usage-of-individual-containers){:target="_blank"}'
   explanation: '

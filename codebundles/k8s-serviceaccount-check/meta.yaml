@@ -10,7 +10,9 @@ commands:
     -n $namespace --context=$context -- curl -s -k -H "Authorization: Bearer $TOKEN"
     $apiserver$resource && echo "Cleaning up..." && kubectl delete pod curl-pod -n
     $namespace --context=$context && echo "Done"'
-  doc_links: '- [Kubernetes Official Documentation Online: Concepts](https://kubernetes.io/docs/concepts/){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Official Documentation Online: Concepts](https://kubernetes.io/docs/concepts/){:target="_blank"}
 
     - [Kubernetes Official Documentation Online: api-resources](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.15/){:target="_blank"}
 

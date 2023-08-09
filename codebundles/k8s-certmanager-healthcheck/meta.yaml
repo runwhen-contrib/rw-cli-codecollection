@@ -4,7 +4,9 @@ commands:
     and .status == "True")) | select(.status.renewalTime) | "Namespace:" + .metadata.namespace
     + " URL:" + .spec.dnsNames[0] + " Renews:" + .status.renewalTime + " Expires:"
     + .status.notAfter'
-  doc_links: '- [Kubernetes Documentation - Kubectl Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Documentation - Kubectl Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/){:target="_blank"}
 
     - [Kubernetes Documentation - Certificate Manager Configuration and Installation](https://cert-manager.io/docs/configuration/){:target="_blank"}
 
@@ -34,7 +36,9 @@ commands:
     \(.certificate)", "Issuer: \(.issuer)", "Ready Status: \(.readyStatus)", "Ready
     Message: \(.readyMessage)", "Approved Status: \(.approvedStatus)", "Approved Message:
     \(.approvedMessage)"'''
-  doc_links: '- [Kubernetes getting started guide](https://kubernetes.io/docs/tutorials/kubernetes-basics/){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes getting started guide](https://kubernetes.io/docs/tutorials/kubernetes-basics/){:target="_blank"}
 
     - [Kubectl command reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 

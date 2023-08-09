@@ -1,6 +1,8 @@
 commands:
 - command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}
-  doc_links: '- [Kubernetes Documentation: kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Documentation: kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
     - [Kubernetes Docs Overview: The Basics of Kubernetes Objects](https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects/){:target="_blank"}
 
@@ -45,7 +47,9 @@ commands:
 - command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} -o=jsonpath="{range .items[*]}{''\nName:
     ''}{@.metadata.name}{''\nlastAppliedRevision:''}{@.status.lastAppliedRevision}{''\nlastAttemptedRevision:''}{@.status.lastAttemptedRevision}{''\n---''}{end}"
     --context ${CONTEXT} || true'
-  doc_links: '- [Kubernetes Overview](https://kubernetes.io/docs/concepts/){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Overview](https://kubernetes.io/docs/concepts/){:target="_blank"}
 
     - [Core Concept in Kubernetes](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
@@ -71,7 +75,9 @@ commands:
     | jq -r ''.items[] | select(.status.lastAppliedRevision!=.status.lastAttemptedRevision)
     | "Name: " + .metadata.name + " Last Attempted Version: " + .status.lastAttemptedRevision
     + " Last Applied Revision: " + .status.lastAppliedRevision'''
-  doc_links: '- [Kubernetes Documentation - kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Documentation - kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
     - [jq Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}
 
@@ -107,7 +113,9 @@ commands:
 - command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} -o=jsonpath="{range .items[?(@.status.conditions[].status==''False'')]}{''-----\nName:
     ''}{@.metadata.name}{''\n''}{@.status.conditions[*].message}{''\n''}{end}" --context
     ${CONTEXT} || true'
-  doc_links: '- [Kubernetes Documentation of kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Documentation of kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 
     - [Kubernetes Documentation about Resource Names](https://kubernetes.io/docs/concepts/overview/working-with-objects/names/){:target="_blank"}
 
@@ -163,7 +171,9 @@ commands:
     version_update_available="False"; fi; echo "Release: $release | Chart: $chart_namespace/$chart_name
     | Installed Version: $chart_version | Available Update: $version_update_available
     | Available Version: $available_version"; done'
-  doc_links: '- [Kubernetes Documentation - Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Documentation - Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
     - [Kubernetes Documentation - Contexts and Configuration](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
 

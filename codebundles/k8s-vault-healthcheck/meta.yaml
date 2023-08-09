@@ -1,7 +1,9 @@
 commands:
 - command: kubectl logs --tail=100 daemonset.apps/vault-csi-provider --context ${CONTEXT}
     -n ${NAMESPACE}
-  doc_links: ''
+  doc_links: '
+
+    '
   explanation: '
 
 
@@ -23,7 +25,9 @@ commands:
   name: fetch_vault_csi_driver_logs
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "vault-csi-provider" || true
-  doc_links: '- [Kubectl overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+  doc_links: '
+
+    - [Kubectl overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 
     - [Events API object reference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#events-v1-core){:target="_blank"}'
   explanation: '
@@ -44,7 +48,7 @@ commands:
   name: get_vault_csi_driver_warning_events
 - command: kubectl describe daemonset.apps/vault-csi-provider --context ${CONTEXT}
     -n ${NAMESPACE}
-  doc_links: "- [Kubectl Describe documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#describe){:target=\"\
+  doc_links: "\n- [Kubectl Describe documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#describe){:target=\"\
     _blank\"}\n- [Kubernetes Concepts - DaemonSet](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/){:target=\"\
     _blank\"}\n- [Kubernetes Task \u2013 manage context](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#manage-contexts){:target=\"\
     _blank\"}\n- [Kubernetes Concepts \u2013 namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target=\"\
@@ -66,7 +70,9 @@ commands:
   name: check_vault_csi_driver_replicas
 - command: kubectl logs --tail=100 statefulset.apps/vault --context ${CONTEXT} -n
     ${NAMESPACE}
-  doc_links: '- [Kubectl Logs command documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs){:target="_blank"}
+  doc_links: '
+
+    - [Kubectl Logs command documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs){:target="_blank"}
 
     - [Context command examples, syntax, and reference for kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#context){:target="_blank"}
 
@@ -92,7 +98,9 @@ commands:
   name: fetch_vault_logs
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "vault" || true
-  doc_links: '- [Kubernetes Documentation - kubectl overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Documentation - kubectl overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 
     - [Kubernetes Documentation - kubectl cheatsheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
 
@@ -112,7 +120,9 @@ commands:
   name: get_related_vault_events
 - command: kubectl get statefulset.apps/vault --context=${CONTEXT} -n ${NAMESPACE}
     -o yaml
-  doc_links: '- [Kubernetes documentation about statefulsets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes documentation about statefulsets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
 
     - [How to use the `kubectl get` command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}'
   explanation: '
@@ -136,7 +146,9 @@ commands:
   name: fetch_vault_statefulset_manifest_details
 - command: kubectl get daemonset.apps/vault-csi-provider --context=${CONTEXT} -n ${NAMESPACE}
     -o yaml
-  doc_links: '- [Official Kubernetes get imperative command reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+  doc_links: '
+
+    - [Official Kubernetes get imperative command reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
     - [Daemon Set overview](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/){:target="_blank"}
 
@@ -164,7 +176,9 @@ commands:
     \ \\\n    -o yaml"
   name: fetch_vault_daemonset_manifest_details
 - command: curl ${VAULT_URL}
-  doc_links: '- [Vault Documentation on Initializing a new Vault](https://www.vaultproject.io/docs/commands/operator/init.html){:target="_blank"}
+  doc_links: '
+
+    - [Vault Documentation on Initializing a new Vault](https://www.vaultproject.io/docs/commands/operator/init.html){:target="_blank"}
 
     - [HashiCorp Vault Command Line Tool Reference Guide](https://www.vaultproject.io/docs/commands/index.html){:target="_blank"}
 
@@ -184,7 +198,9 @@ commands:
   name: verify_vault_availability
 - command: kubectl get statefulset.apps/vault --context=${CONTEXT} -n ${NAMESPACE}
     -o json
-  doc_links: '- [Kubernetes Docs - kubectl reference guide](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Docs - kubectl reference guide](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
     - [Kubernetes Docs - Configure Access to Multiple Clusters](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 

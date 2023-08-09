@@ -2,7 +2,9 @@ commands:
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Running
     -o json | jq -r ''[.items[] | "Images: " + (.spec.containers[].image|tostring)
     + ", Last Started Times:" + (.status.containerStatuses[].state.running.startedAt|tostring)]'''
-  doc_links: '- [Kubernetes Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
 
     - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
@@ -37,7 +39,9 @@ commands:
     + .status.phase, "containers:", (.spec.containers[] | "- container_name: " + .name,
     " \ image_path: " + (.image | split(":")[0]), " \ image_tag: " + (.image | split(":")[1])),
     "---"'''
-  doc_links: '- [Kubernetes Documentation - kubectl overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Documentation - kubectl overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 
     - [Kubernetes Documentation - Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors){:target="_blank"}
 
@@ -73,7 +77,9 @@ commands:
     + .status.phase, "containers:", (.spec.containers[] | "- container_name: " + .name,
     " \ image_path: " + \(.image | split(":")[0]), " \ image_tag: " + (.image | split(":")[1])),
     "---"'''
-  doc_links: '- [Kubernetes Documentation: Pods](https://kubernetes.io/docs/concepts/workloads/pods/){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Documentation: Pods](https://kubernetes.io/docs/concepts/workloads/pods/){:target="_blank"}
 
     - [Kubernetes Documentation: Contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#use-different-contexts-to-switch-between-clusters){:target="_blank"}
 
@@ -131,7 +137,9 @@ commands:
     ); echo "$available_tags"; fi; done <<<"$image_pull_backoff_events" && echo "Deleting
     Skopeo pod" && kubectl delete pod $POD_NAME -n $NAMESPACE --context=$CONTEXT &&
     echo "Done"'
-  doc_links: '- [Kubernetes Events](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#event-v1-core){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Events](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#event-v1-core){:target="_blank"}
 
     - [jq command line processor](https://stedolan.github.io/jq/){:target="_blank"}
 

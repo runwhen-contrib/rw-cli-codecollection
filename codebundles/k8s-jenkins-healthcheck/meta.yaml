@@ -1,7 +1,9 @@
 commands:
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -s -o /dev/null -w "%{http_code}" localhost:8080/login
-  doc_links: '- [kubectl Reference - Executing a Command in a Container](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
+  doc_links: '
+
+    - [kubectl Reference - Executing a Command in a Container](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
 
     - [StatefulSet Concepts - Kubernetes](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#definition-of-a-statefulset){:target="_blank"}
 
@@ -27,7 +29,9 @@ commands:
   name: query_the_jenkins_kubernetes_workload_http_endpoint
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -s localhost:8080/api/json?pretty=true --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}
-  doc_links: '- [Kubernetes: Kubectl Overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes: Kubectl Overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
 
     - [Kubectl Cheat Sheet]( https://kubernetes.io/docs/reference/kubectl/cheatsheet/#execing-into-running-pods){:target="_blank"}
 
@@ -58,7 +62,9 @@ commands:
     -- curl -s localhost:8080/queue/api/json --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}
     | jq -r ''.items[] | select((.stuck == true) or (.blocked == true)) | "Why: "
     + .why + "\nBlocked: " + (.blocked|tostring) + "\nStuck: " + (.stuck|tostring)'''
-  doc_links: '- [Learn how to use the kubectl exec command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
+  doc_links: '
+
+    - [Learn how to use the kubectl exec command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
 
     - [Understand more about statefulsets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
 
