@@ -4,7 +4,9 @@ commands:
     kubectl get events -n ${NAMESPACE} --context ${CONTEXT} --field-selector involvedObject.name=$pvc
     -o json | jq ''.items[]| "Last Timestamp: " + .lastTimestamp + " Name: " + .involvedObject.name
     + " Message: " + .message''; done'
-  doc_links: '- [Kubernetes Documentation - PVCs](https://kubernetes.io/docs/concepts/storage/persistent-volumes/){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Documentation - PVCs](https://kubernetes.io/docs/concepts/storage/persistent-volumes/){:target="_blank"}
 
     - [Kubernetes Documentation - Get Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
@@ -35,7 +37,9 @@ commands:
     != null) | .metadata.name as $name | .metadata.deletionTimestamp as $deletion_time
     | .metadata.finalizers as $finalizers | "\($name) is in Terminating state (Deletion
     started at: \($deletion_time)). Finalizers: \($finalizers)"'''
-  doc_links: '- [Kubernetes context and namespace reference guide](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#namespace-v1-core){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes context and namespace reference guide](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#namespace-v1-core){:target="_blank"}
 
     - [Kubectl objects documentation](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#persistentvolumeclaim-v1-core){:target="_blank"}
 
@@ -87,7 +91,9 @@ commands:
     --all-namespaces --field-selector involvedObject.name=$pv --context ${CONTEXT}
     -o json | jq ''.items[]| "Last Timestamp: " + .lastTimestamp + " Name: " + .involvedObject.name
     + " Message: " + .message''; done'
-  doc_links: '- [Kubernetes Docs - PersistentVolumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Docs - PersistentVolumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/){:target="_blank"}
 
     - [Kubernetes Docs - kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
@@ -136,7 +142,9 @@ commands:
     echo -e "\n---\nPod: $pod\nPVC: $pvc\nPV: $pv\nStatus: $status\nNode: $node\nZone:
     $zone\nIngressClass: $ingressclass\nAccessModes: $accessmode\nReclaimPolicy: $reclaimpolicy\nCSIDriver:
     $csidriver\n"; done; done'
-  doc_links: '- [Kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
+  doc_links: '
+
+    - [Kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
 
     - [Kubernetes Concepts and Architecture](https://kubernetes.io/docs/concepts/){:target="_blank"}
 
@@ -202,7 +210,9 @@ commands:
     PVC: $pvc, volumeName: $volumeName, containerName: $containerName, mountPath:
     $mountPath"; kubectl exec $pod -n ${NAMESPACE} --context ${CONTEXT} -c $containerName
     -- df -h $mountPath; done; done; done;'
-  doc_links: '- [Kubernetes Documentation - kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Documentation - kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
     - [Kubernetes Documentation - Specifying Output Format (jsonpath)](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#getting-started-with-jsonpath){:target="_blank"}
 
@@ -262,7 +272,9 @@ commands:
     requires attention."; fi; echo "Pod: $POD_NAME"; echo "PVC: $pvc_name"; echo "PV:
     $PV_NAME"; echo "Node with Pod: $POD_NODE_NAME"; echo "Node with Storage: $STORAGE_NODE_NAME";
     echo; fi; done; done'
-  doc_links: '- [Kubernetes Documentation for ''kubectl get pods'' Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-pod){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Documentation for ''kubectl get pods'' Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-pod){:target="_blank"}
 
     - [Kubernetes Documentation for ''jq'' Command](https://stedolan.github.io/jq/){:target="_blank"}
 

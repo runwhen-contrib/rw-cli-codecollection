@@ -17,7 +17,9 @@ commands:
     = "Unhealthy" ]; then echo "Health Status: $health_status"; echo "=====================";
     elif [ "$health_status" = "Healthy" ]; then echo "Health Status: $health_status";
     fi; echo "------------"; done'
-  doc_links: '- [Kubernetes Documentation on Kubectl](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Documentation on Kubectl](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
     - [Kubernetes Documentation on Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/){:target="_blank"}
 

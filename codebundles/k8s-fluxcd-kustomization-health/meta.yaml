@@ -1,6 +1,8 @@
 commands:
 - command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}
-  doc_links: '- [Kubernetes Documentation: kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Documentation: kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
     - [Kubernetes Docs Overview: The Basics of Kubernetes Objects](https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects/){:target="_blank"}
 
@@ -49,7 +51,9 @@ commands:
     \(.message)\n reason: \(.reason)\n last_transition_time: \(.lastTransitionTime)")\n\nReconcile
     Status:\(.status.conditions[] | select(.type == "Reconciling") |"\n reconciling:
     \(.status)\n message: \(.message)")\n---\n"'''
-  doc_links: '- [Kubernetes Documentation about kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Documentation about kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
     - [Kubernetes Documentation about Resource Names](https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/#resourcenames){:target="_blank"}
 

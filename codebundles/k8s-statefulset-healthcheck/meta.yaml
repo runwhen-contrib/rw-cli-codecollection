@@ -1,7 +1,9 @@
 commands:
 - command: kubectl logs --tail=100 statefulset/${STATEFULSET_NAME} --context ${CONTEXT}
     -n ${NAMESPACE}
-  doc_links: '- [Kubernetes Documentation for kubectl logs](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Documentation for kubectl logs](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs){:target="_blank"}
 
     - [Kubernetes Documentation for StatefulSets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
 
@@ -29,7 +31,9 @@ commands:
   name: fetch_statefulset_logs
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "${STATEFULSET_NAME}" || true
-  doc_links: '- [Kubectl Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+  doc_links: '
+
+    - [Kubectl Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 
     - [Get Events Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events){:target="_blank"}
 
@@ -66,7 +70,9 @@ commands:
   name: get_related_statefulset_events
 - command: kubectl get statefulset ${LABELS} --context=${CONTEXT} -n ${NAMESPACE}
     -o yaml
-  doc_links: '- [Kubernetes docs - how to use kubectl in the command line](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes docs - how to use kubectl in the command line](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 
     - [Kubernetes docs - StatefulSets concepts and usage](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#why-use-a-statefulset){:target="_blank"}'
   explanation: '
@@ -93,7 +99,9 @@ commands:
     jq -r ''.items[] | select(.status.availableReplicas < .status.replicas) | "---\nStatefulSet
     Name: " + (.metadata.name|tostring) + "\nDesired Replicas: " + (.status.replicas|tostring)
     + "\nAvailable Replicas: " + (.status.availableReplicas|tostring)'''
-  doc_links: '- [What is a StatefulSet?](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
+  doc_links: '
+
+    - [What is a StatefulSet?](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
 
     - [Managing Resources Using the JSONPath Expression Syntax](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}
 

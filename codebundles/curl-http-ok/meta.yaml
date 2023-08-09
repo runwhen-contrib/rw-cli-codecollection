@@ -1,7 +1,9 @@
 commands:
 - command: 'curl -o /dev/null -w ''{"http_code": %{http_code}, "time_total": %{time_total}}''
     -s ${URL}'
-  doc_links: '- [Curl Command Documentation](https://ec.haxx.se/usingcurl-verboseoutput.html){:target="_blank"}
+  doc_links: '
+
+    - [Curl Command Documentation](https://ec.haxx.se/usingcurl-verboseoutput.html){:target="_blank"}
 
     - [HTTP Status Codes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status){:target="_blank"}'
   explanation: '

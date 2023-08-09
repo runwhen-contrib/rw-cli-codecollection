@@ -6,7 +6,9 @@ commands:
     | jq -r ''if .data.result[0] then "Host:" + .data.result[0].metric.host + " Ingress:"
     + .data.result[0].metric.ingress + " Namespace:" + .data.result[0].metric.exported_namespace
     + " Service:" + .data.result[0].metric.service else "" end'''
-  doc_links: '- [Overview of gcloud auth](https://cloud.google.com/sdk/gcloud/reference/auth/){:target="_blank"}
+  doc_links: '
+
+    - [Overview of gcloud auth](https://cloud.google.com/sdk/gcloud/reference/auth/){:target="_blank"}
 
     - [activate-service-account information for gcloud](https://cloud.google.com/sdk/gcloud/reference/auth/activate-service-account){:target="_blank"}
 
@@ -77,7 +79,9 @@ commands:
     = "Unhealthy" ]; then echo "Health Status: $health_status"; echo "=====================";
     elif [ "$health_status" = "Healthy" ]; then echo "Health Status: $health_status";
     fi; echo "------------"'
-  doc_links: '- [Kubernetes Overview](https://kubernetes.io/docs/concepts/){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Overview](https://kubernetes.io/docs/concepts/){:target="_blank"}
 
     - [Kubectl Overview](https://kubernetes.io/docs/tasks/tools/install-kubectl/){:target="_blank"}
 

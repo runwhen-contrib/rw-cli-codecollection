@@ -1,7 +1,9 @@
 commands:
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli PING
-  doc_links: '- [Kubectl Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/){:target="_blank"}
+  doc_links: '
+
+    - [Kubectl Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/){:target="_blank"}
 
     - [Kubectl Exec Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/#exec){:target="_blank"}
 
@@ -23,7 +25,9 @@ commands:
   name: ping_redis_workload
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli SET ${REDIS_HEALTHCHECK_KEY} 0
-  doc_links: '- [Kubernetes Documentation for the exec command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Documentation for the exec command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
 
     - [Kubernetes Documentation for contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
 
@@ -76,7 +80,9 @@ commands:
   name: verify_redis_read_write_operation
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli INCR ${REDIS_HEALTHCHECK_KEY}
-  doc_links: '- [Kubernetes documentation for ''kubectl exec'' command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes documentation for ''kubectl exec'' command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
 
     - [Kubernetes documentation for ''contexts'' including information about when
     to use them and how to select them](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#contexts){:target="_blank"}
@@ -108,7 +114,9 @@ commands:
   name: verify_redis_read_write_operation
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli GET ${REDIS_HEALTHCHECK_KEY}
-  doc_links: '- [Kubernetes Exec Command Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Exec Command Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
 
     - [Kubernetes Basic Concepts of Namespaces Documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 

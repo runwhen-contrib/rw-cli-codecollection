@@ -3,7 +3,7 @@ commands:
     && gcloud compute operations list --filter="operationType:( compute.instances.preempted
     ) AND NOT status:( DONE )" --format=json --project=${GCP_PROJECT_ID} | jq '[.[]
     | {startTime,targetLink, statusMessage, progress, zone, selfLink}]'
-  doc_links: "- [Cloud SDK Documentation \u2013 gcloud auth activate-service-account](https://cloud.google.com/sdk/gcloud/reference/auth/activate-service-account){:target=\"\
+  doc_links: "\n- [Cloud SDK Documentation \u2013 gcloud auth activate-service-account](https://cloud.google.com/sdk/gcloud/reference/auth/activate-service-account){:target=\"\
     _blank\"}\n- [Cloud SDK Documentation \u2013 gcloud compute operations list](https://cloud.google.com/sdk/gcloud/reference/compute/operations/list){:target=\"\
     _blank\"}\n- [Filter Syntax - Compute Engine | Google Cloud](https://cloud.google.com/sdk/gcloud/reference/topic/filters#supported_format_args){:target=\"\
     _blank\"}\n- [JSONPath - XPath for JSON - GossPara Software](http://goessner.net/articles/JsonPath/){:target=\"\

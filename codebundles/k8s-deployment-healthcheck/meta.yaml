@@ -2,7 +2,9 @@ commands:
 - command: kubectl logs deployment/${DEPLOYMENT_NAME} --limit-bytes=256000 --since=3h
     --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${LOGS_ERROR_PATTERN}" | grep
     -Eiv "${LOGS_EXCLUDE_PATTERN}" | sort | uniq -c | awk '{print "Occurences:",$0}'
-  doc_links: '- [Kubernetes - kubectl Overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes - kubectl Overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 
     - [Kubernetes - kubectl Logging Pods](https://kubernetes.io/docs/concepts/cluster-administration/logging/){:target="_blank"}'
   explanation: '
@@ -35,7 +37,9 @@ commands:
   name: check_deployment_log_for_issues
 - command: kubectl get events --context ${CONTEXT} -n ${NAMESPACE} --field-selector
     type=Warning | grep -i "${DEPLOYMENT_NAME}" || true
-  doc_links: '- [Kubernetes Documentation for kubectl command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Documentation for kubectl command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 
     - [Kubernetes Documentation on contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#specify-a-context){:target="_blank"}
 
@@ -63,7 +67,9 @@ commands:
   name: troubleshoot_deployment_warning_events
 - command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o yaml
-  doc_links: '- [Kubernetes documentation on kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes documentation on kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 
     - [Official Kubernetes kubectl get deployment documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-deployment){:target="_blank"}
 
@@ -94,7 +100,9 @@ commands:
   name: get_deployment_workload_details_for_report
 - command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o json
-  doc_links: '- [Kubernetes - kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes - kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
     - [Kubernetes - Deployment Concepts](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
 
@@ -126,7 +134,9 @@ commands:
     ) |tostring) +" Count:" + (.count|tostring) + " Minute(s):" + (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60|tostring)+
     " Object:" + .involvedObject.namespace + "/" + .involvedObject.kind + "/" + .involvedObject.name
     + " Reason:" + .reason + " Message:" + .message'
-  doc_links: '- [Kubernetes Documentation: kubectl get events](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events){:target="_blank"}
+  doc_links: '
+
+    - [Kubernetes Documentation: kubectl get events](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events){:target="_blank"}
 
     - [jq Manual for .items[]](https://stedolan.github.io/jq/manual/#Itemsarraysstringsequencesandobjects){:target="_blank"}
 

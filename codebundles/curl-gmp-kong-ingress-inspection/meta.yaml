@@ -7,7 +7,9 @@ commands:
     | jq -r ''.data.result[] | "Route:" + .metric.route + " Service:" + .metric.service
     + " Kong Instance:" + .metric.instance + " HTTP Error Count:" + .value[1]'' ||
     echo "No HTTP Error threshold violations found for ${INGRESS_SERVICE}."'
-  doc_links: '- [gcloud auth activate-service-account command documentation](https://cloud.google.com/sdk/gcloud/reference/auth/activate-service-account){:target="_blank"}
+  doc_links: '
+
+    - [gcloud auth activate-service-account command documentation](https://cloud.google.com/sdk/gcloud/reference/auth/activate-service-account){:target="_blank"}
 
     - [curl command documentation](https://curl.haxx.se/docs/){:target="_blank"}
 
@@ -47,7 +49,9 @@ commands:
     | jq -r ''.data.result[] | "Service: ${INGRESS_SERVICE}" + " HTTP Request Latency(ms):"
     + .value[1]'' || echo "No HTTP request latency threshold violations found for
     ${INGRESS_SERVICE}."'
-  doc_links: '- [gcloud Auth Documentation](https://cloud.google.com/sdk/gcloud/reference/auth/){:target="_blank"}
+  doc_links: '
+
+    - [gcloud Auth Documentation](https://cloud.google.com/sdk/gcloud/reference/auth/){:target="_blank"}
 
     - [Activate Service Account Documentation](https://cloud.google.com/iam/docs/creating-managing-service-account-keys#iam-service-account-keys-create){:target="_blank"}
 
@@ -88,7 +92,9 @@ commands:
     && echo "$response" | jq -e ''.data.result | length > 0'' && echo "$response"
     | jq -r ''.data.result[] | "Service: ${INGRESS_UPSTREAM}" + " Healthchecks Disabled!''
     || echo "${INGRESS_UPSTREAM} has healthchecks enabled."'
-  doc_links: '- [GCloud Authentication documentation](https://cloud.google.com/sdk/gcloud/reference/auth/activate-service-account){:target="_blank"}
+  doc_links: '
+
+    - [GCloud Authentication documentation](https://cloud.google.com/sdk/gcloud/reference/auth/activate-service-account){:target="_blank"}
 
     - [Curl Documentation](https://curl.haxx.se/docs/){:target="_blank"}
 
@@ -130,7 +136,9 @@ commands:
     + " Healthcheck subsystem-state: " + .metric.subsystem + "-" + .metric.state +
     " Target: " + .metric.target'' || echo "${INGRESS_UPSTREAM} is reported as healthy
     from the Kong ingress controller."'
-  doc_links: '- [GCP Cloud Shell Documentation](https://cloud.google.com/shell/docs/){:target="_blank"}
+  doc_links: '
+
+    - [GCP Cloud Shell Documentation](https://cloud.google.com/shell/docs/){:target="_blank"}
 
     - [gCloud Auth Documentation](https://cloud.google.com/sdk/gcloud/reference/auth/activate-service-account){:target="_blank"}
 
