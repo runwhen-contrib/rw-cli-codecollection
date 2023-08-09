@@ -86,7 +86,7 @@ Fetch ArgoCD Application Last Sync Operation Details
     [Documentation]    Fetches the last ArgoCD Application sync operation staus. 
     [Tags]    Application    SyncOperation    History    ArgoCD
     ${last_sync_status}=    RW.CLI.Run Cli
-    ...    cmd=${binary_name} get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT} -o json | jq -r '"Application Name: " + .metadata.name + "\nApplication Namespace: "+ .metadata.namespace + "\nLast Sync Start Time: " + .status.operationState.finishedAt + "\nLast Sync Finish Time: " + .status.operationState.startedAt + "\nLast Sync Status: " + .status.operationState.phase + "\nLast Sync Message: " + .status.operationState.message'
+    ...    cmd=${binary_name} get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT} -o json | jq -r '"Application Name: " + .metadata.name + "\\nApplication Namespace: "+ .metadata.namespace + "\\nLast Sync Start Time: " + .status.operationState.finishedAt + "\\nLast Sync Finish Time: " + .status.operationState.startedAt + "\\nLast Sync Status: " + .status.operationState.phase + "\\nLast Sync Message: " + .status.operationState.message'
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -124,7 +124,7 @@ Scan For Errors in Pod Logs Related to ArgoCD Application Deployments
     [Documentation]    Grep for the error pattern across all pods managed by this Applications deployments.  
     [Tags]    Error    Logs    Deployments    ArgoCD    Pods
     ${log_errors}=    RW.CLI.Run Cli
-    ...    cmd=for deployment_name in $(kubectl get deployments -l argocd.argoproj.io/instance=${APPLICATION_TARGET_NAMESPACE}_${APPLICATION} -o=custom-columns=NAME:.metadata.name --no-headers -n ${APPLICATION_TARGET_NAMESPACE}); do echo "\nDEPLOYMENT NAME: $deployment_name \n" && kubectl logs deployment/$deployment_name --tail=50 -n ${APPLICATION_TARGET_NAMESPACE} | grep -E '${ERROR_PATTERN}'; done
+    ...    cmd=for deployment_name in $(${binary_name} get deployments -l argocd.argoproj.io/instance=${APPLICATION_TARGET_NAMESPACE}_${APPLICATION} -o=custom-columns=NAME:.metadata.name --no-headers -n ${APPLICATION_TARGET_NAMESPACE}); do echo "\\nDEPLOYMENT NAME: $deployment_name \\n" && kubectl logs deployment/$deployment_name --tail=50 -n ${APPLICATION_TARGET_NAMESPACE} | grep -E '${ERROR_PATTERN}'; done
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
