@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       Check whether the Terraform Cloud Workspace is in a locked state.
-Metadata            Author    Nitin Madhok (nmadhok@icloud.com)
+Metadata            Author    nmadhok
 Metadata            Display Name    Terraform Cloud Workspace Lock Check
 Metadata            Supports    Terraform Cloud
 
