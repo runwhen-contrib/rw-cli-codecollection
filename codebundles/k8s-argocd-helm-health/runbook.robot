@@ -12,30 +12,30 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-List all available ArgoCD Helm releases
+Fetch all available ArgoCD Helm releases
     [Documentation]    List all ArgoCD helm releases that are visible to the kubeconfig.
-    [Tags]    argocd    helmrelease    available    list
+    [Tags]    argocd    helmrelease    available    list    health
     ${helmreleases}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json | jq -r '.items[] | select(.spec.source.helm != null) | "\\nName:\\t\\t\\t" + .metadata.name + "\\nSync Status:\\t\\t" + .status.sync.status + "\\nHealth Status:\\t\\t" + .status.health.status'
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    \n\nArgoCD Helm releases available: \n\n ${helmreleases.stdout}
+    RW.Core.Add Pre To Report    \n\nArgoCD Helm releases available: \n${helmreleases.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Check ArgoCD Helm releases Status
-    [Documentation]    Check ArgoCD helm release Status.
-    [Tags]    argocd    helmrelease    status    health
+Fetch Installed ArgoCD Helm release versions
+    [Documentation]    Fetch Installed ArgoCD Helm release Versions.
+    [Tags]    argocd    helmrelease    version    state
     ${argocd_helm_status}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json | jq -r '.items[] | "Name:\\t\\t\\t" + .metadata.name + "\\nHealth Status:\\t\\t" + .status.health.status + "\\nSync Status:\\t\\t" + .status.sync.status + "\\nOperational State:\\t" + .status.operationState.message'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json | jq -r '.items[] | select(.spec.source.helm != null) | "\\nName:\\t\\t\\t" + .metadata.name + "\\nTarget Revision:\\t" + .spec.source.targetRevision + "\\nAttempted Revision:\\t" + .status.sync.revision + "\\nSync Status:\\t\\t" + .status.sync.status + "\\nOperational State:\\t" + .status.operationState.message'
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    \n\nArgoCD Helm release Status: \n\n ${argocd_helm_status.stdout}
+    RW.Core.Add Pre To Report    \n\nArgoCD Helm release Status: \n${argocd_helm_status.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 
@@ -73,16 +73,14 @@ Suite Initialization
     ...    type=string
     ...    description=The name of the Kubernetes namespace to scope actions and searching to. Accepts a single namespace in the format `-n namespace-name` or `--all-namespaces`.
     ...    pattern=\w*
-    ...    example=-n my-namespace
-    ...    default=--all-namespaces
 
     ${RESOURCE_NAME}=    RW.Core.Import User Variable
     ...    RESOURCE_NAME
     ...    type=string
     ...    description=The short or long name of the Kubernetes helmrelease resource to search for. These might vary by helm controller implementation, and are best to use full crd name.
     ...    pattern=\w*
-    ...    example=helmreleases.helm.toolkit.fluxcd.io
-    ...    default=helmreleases
+    ...    example=applications.argoproj.io
+    ...    default=applications.argoproj.io
 
     ${CONTEXT}=    RW.Core.Import User Variable    CONTEXT
     ...    type=string
