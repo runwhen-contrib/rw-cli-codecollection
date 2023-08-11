@@ -1,28 +1,22 @@
 commands:
 - command: 'curl -o /dev/null -w ''{"http_code": %{http_code}, "time_total": %{time_total}}''
     -s ${URL}'
+  doc_links: '
+
+    - [Curl Command Documentation](https://ec.haxx.se/usingcurl-verboseoutput.html){:target="_blank"}
+
+    - [HTTP Status Codes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status){:target="_blank"}'
   explanation: '
 
 
-    This command is using the cURL tool to access a given URL. It reports the HTTP
-    code and the total time taken in milliseconds with a response in a JSON format
-    and writing it to /dev/null (the null device which discards all data sent to it).
-    This is useful for checking if a web page or application is available, testing
-    the response times and confirming that the desired status codes are being returned.
-    This can be used in Kubernetes to check the availability of APIs, services, pod
-    deployments and more.'
-  multi_line_details: "\n\n#This command uses curl to connect to a URL, and get its\
-    \ response. Additionally, it stores the http_code for that response, as well as\
-    \ what time it took to request the response in JSON format. \n\n#Requirement:\
-    \ using the same command, convert it into a multi-line script format with comments\n\
-    \n#!/bin/bash           #Let's define what this script will use for execution\n\
-    URL=\"${1}\"            #We are going to accept a URL as an argument\n \necho\
-    \ \"Retrieving data from $URL...\" #Giving the user some feedback that the script\
-    \ is running\n\n#Now let's execute the curl command, capturing statistics about\
-    \ the response\nRESULT=$(curl \\\n    -o /dev/null \\  #Outputting the response\
-    \ to just null since we're not interested in what the response data was\n    -w\
-    \ '{\"http_code\": %{http_code}, \"time_total\": %{time_total}}' \\ #Defining\
-    \ the exact output format for how the http_stat and time should be returned\n\
-    \    -s ${URL}       #The actual URL we will connect to\n)\n\n#Finally, let's\
-    \ echo the result of our curl command back to the user\necho \"$RESULT\""
+    This command uses the Curl program to make an HTTP request to the URL provided,
+    and collects the HTTP response code and the total request time in terms of seconds.
+    This information can be useful for monitoring API endpoint health and performance.'
+  multi_line_details: "\n\n# This command will retrieve a website response code and\
+    \ timing information \n# for the provided ${URL} address using cURL.\n\n# Here\
+    \ is the same command broken into multiple lines:\n\n# Define our URL variable\n\
+    URL=\"http://example.com\"\n\n# Retrieve the status code of the URL address, as\
+    \ well as timing information,\n# with cURL and store the results in a file called\
+    \ 'null'\ncurl -o /dev/null \\\n     -w '{\"http_code\": %{http_code}, \"time_total\"\
+    : %{time_total}}' \\\n     -s ${URL}"
   name: checking_http_url_is_available_and_timely

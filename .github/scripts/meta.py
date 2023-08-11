@@ -1,7 +1,7 @@
 """
 Utility file to generate metadata file for each 
 runbook. Initial purpose is to hold static 
-command explainations for use with runwhen-local 
+command explanations for use with runwhen-local 
 documentation. 
 
 parse_robot_file written by Kyle Forster
@@ -16,7 +16,6 @@ import requests
 import yaml
 from urllib.parse import urlencode
 from robot.api import TestSuite
-
 
 def parse_robot_file(fpath):
     """
@@ -125,7 +124,7 @@ def remove_escape_chars(cmd):
 def cmd_expansion(keyword_arguments):
     """
     Cleans up the command details as sent in from robot parsing.
-    Substitutes major binaries in for better command explaination,  
+    Substitutes major binaries in for better command explanation,  
     and escapes special characters. 
 
 
@@ -168,6 +167,12 @@ def cmd_expansion(keyword_arguments):
 
     return cmd
 
+def check_url(url):
+    try:
+        response = requests.head(url)
+        return response.status_code != 404
+    except requests.RequestException:
+        return False
 
 def generate_metadata(directory_path):
     """
@@ -197,32 +202,89 @@ def generate_metadata(directory_path):
             name_snake_case = re.sub(r'\W+', '_', name.lower())
 
             # Generate what it does
-            query_what_it_does = f'Please%20explain%20this%20command%20as%20if%20I%20was%20new%20to%20Kubernetes: {command}'
+            query_what_it_does_prompt =f"Please explain this command as if I was new to Kubernetes, but am learning to use it daily as an engineer"
+            query_what_it_does_with_command = f'{query_what_it_does_prompt} \n{command}'
             print(f'generating explanation for {name_snake_case}')
-            explain_query_what_it_does = urlencode({'prompt': query_what_it_does})
+            explain_query_what_it_does = urlencode({'prompt': query_what_it_does_with_command})
             url_what_it_does = f'{explainUrl}{explain_query_what_it_does}'   
             response_what_it_does = requests.get(url_what_it_does)
+            if ((response_what_it_does.status_code == 200)):
+                explanation = response_what_it_does.json()
+                explanation_content = explanation['explanation']
+            else: 
+                explanation_content = "Explanation not available"
 
             #Generate multi-line explanation 
-            query_multi_line_with_comments = f'Please%20convert%20this%20command%20into%20a%20multi-line%20script%20format%20with%20comments%20to%20educate%20new%20Kubernetes%20users%20who%20are%20learning%20syntax: {command}'
+            query_multi_line_with_comments_prompt = f"Convert this one-line command into a multi-line command, adding verbose comments to educate new users of Kubernetes and related cli commands"
+            query_multi_line_with_command = f'{query_multi_line_with_comments_prompt}\n{command}'
             print(f'generating multi-line code with comments for {name_snake_case}')
-            explain_query_multi_line_with_comments = urlencode({'prompt': query_multi_line_with_comments})
+            explain_query_multi_line_with_comments = urlencode({'prompt': query_multi_line_with_command})
             url_multi_line_with_comments = f'{explainUrl}{explain_query_multi_line_with_comments}'   
             response_multi_line_with_comments = requests.get(url_multi_line_with_comments)
-            # Check if the request was successful (status code 200)
-            if ((response_what_it_does.status_code == 200) and (response_multi_line_with_comments.status_code == 200)):
-                explain = response_what_it_does.json()
+            if ((response_multi_line_with_comments.status_code == 200)):
                 multi_line = response_multi_line_with_comments.json()
-                command_meta = {
-                    'name': name_snake_case,
-                    'command': command,
-                    'explanation': explain['explanation'],
-                    'multi_line_details': multi_line['explanation']
-                }
-                # Add the command meta to the list of commands
-                commands.append(command_meta)
-            else:
-                print("Request failed with status code:", response.status_code)
+                multi_line_content = multi_line['explanation']
+
+                #Generate external doc links 
+                query_doc_links_prompt = r"Given the following command, generate some links that provide helpful documentation for a reader who want's to learn more about the topics used in the command. Format the output in a single YAML list with the keys of `description` and `url` for each link with the values in double quotes. Ensure each description and url are on separate lines, ensure an empty blank line separates each item. Ensure there are no other keys or text or extra characters other than the items. The command is:  "
+                # query_doc_links_with_command = f'{query_doc_links_prompt}\n{multi_line_content}'
+                query_doc_links_with_command = f'{query_doc_links_prompt}\n{command}'
+                print(f'generating doc-links for {name_snake_case}')
+                explain_query_doc_links = urlencode({'prompt': query_doc_links_with_command})
+                url_doc_links = f'{explainUrl}{explain_query_doc_links}'   
+                response_doc_links = requests.get(url_doc_links)
+                if ((response_doc_links.status_code == 200)):
+                    doc_links = response_doc_links.json() 
+                    doc_links_content = doc_links['explanation']
+                    # Try to clean up poor openAI formatting
+                    corrected_input = re.sub(r'url:(?=[^\s])', r'url: ', doc_links_content)
+
+                    # Try to be flexible about spaces and indentation 
+                    pattern = r'^\s*-.*\bdescription:.*\n\s+(?:url\s*:|url)\s*:.*'
+                    # Find all matches using the pattern
+                    matches = re.findall(pattern, corrected_input, re.MULTILINE)
+                    # Join the matched lines to create the final output
+                    output_string = "\n".join(matches)
+                    non_404_urls = []
+                    # Siltently Discard any poor yaml - some content from openAI is still inconsistent
+                    # Otherwise build a list of URLS that still exist (as openAI generates some links that are 404s)
+                    try:
+                        yaml_data = yaml.safe_load(output_string)
+                        for item in yaml_data: 
+                            if isinstance(item, dict) and isinstance(item.get('description'), str) and isinstance(item.get('url'), str):
+                                if check_url(item['url']):
+                                    non_404_urls.append(item)
+                    except yaml.YAMLError:
+                        pass
+                    markdown_links = []
+                    for link in non_404_urls: 
+                        if 'description' in link and 'url' in link:
+                            description = link['description']
+                            url = link['url']
+                            markdown_links.append(f"[{description}]({url}){{:target=\"_blank\"}}")
+                    # Format markdown lines
+                    formatted_markdown_lines = "\n".join([f"- {item}" for item in markdown_links])
+                    doc_links_content = formatted_markdown_lines
+
+
+
+                else: 
+                    doc_links_content = "Documentation links not available"
+            else: 
+                multi_line_content = "Multi-line script not available"
+                doc_links_content = "Documentation links not available"
+            
+
+            command_meta = {
+                'name': name_snake_case,
+                'command': command,
+                'explanation': explanation_content,
+                'multi_line_details': multi_line_content,
+                'doc_links':  f'\n{doc_links_content}'
+            }
+            # Add the command meta to the list of commands
+            commands.append(command_meta)
+
         # Create a dictionary with the commands list
         yaml_data = {'commands': commands}
 

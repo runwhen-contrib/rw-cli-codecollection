@@ -111,6 +111,14 @@ def create_codebundle_table(codebundle_data: list) -> str:
 """
     return table
 
+def sum_tasks(data):
+    total_length = 0
+
+    for tasks, info in data.items():
+        if "tasks" in info:
+                total_length += len(info["tasks"])
+
+    return total_length
 
 if __name__ == "__main__":
     # Create the parser
@@ -148,7 +156,9 @@ if __name__ == "__main__":
     # print(f"Found codebundles: {codebundle_path_list}")
     parse_results: dict = parse_codebundles(codebundle_path_list)
     # print(f"Parse results: {parse_results}")
-
+    codebundle_count=len(parse_results)
+    total_task_count = sum_tasks(parse_results)
+    codebundle_summary_statistics = f"Troubleshooting Tasks in Codecollection: **{total_task_count}**\nCodebundles in Codecollection: **{codebundle_count}**"
     readme_header_content: str = ""
     with open(args.readme_header, "r") as header_file:
         readme_header_content = header_file.read()
@@ -157,6 +167,6 @@ if __name__ == "__main__":
 
     table_content: str = create_codebundle_table(organized_results)
 
-    readme_content: str = f"{readme_header_content}\n{table_content}"
+    readme_content: str = f"{codebundle_summary_statistics}\n\n{readme_header_content}\n{table_content}"
     with open(args.readme, "w") as readme_file:
         readme_file.write(readme_content)

@@ -4,81 +4,127 @@ commands:
     kubectl get events -n ${NAMESPACE} --context ${CONTEXT} --field-selector involvedObject.name=$pvc
     -o json | jq ''.items[]| "Last Timestamp: " + .lastTimestamp + " Name: " + .involvedObject.name
     + " Message: " + .message''; done'
-  explanation: "\n\nThis command is used to get a list of Persistent Volume Claims\
-    \ (PVCs) in the Kubernetes cluster, filter for those that are not yet 'Bound',\
-    \ and then retrieve events related to each of those PVCs. The output of the command\
-    \ displays time stamps and messages associated with each unbound PVC. \n\nThe\
-    \ command begins by retrieving all PVCs in a given namespace via the `kubectl\
-    \ get pvc` command. We then use the `jq` command to filter the result to only\
-    \ include PVCs that are not yet 'Bound'. We then loop through the filtered list\
-    \ of PVCs and use the `kubectl get events` to retrieve events related to each\
-    \ PVC. Finally, we use `jq` again to format the output and display relevant information."
-  multi_line_details: "\n\n#This script takes in a list of PVC's that are not yet\
-    \ bound and gets corresponding events for each. It will print out the last timestamp,\
-    \ name, and message for each.\n\nNAMESPACE=\"<your-namespace>\"\nCONTEXT=\"<your-context>\"\
-    \n\n#Loop through all PVC's in your namespace under your context that aren't bound\
-    \ yet\nfor pvc in $(kubectl get pvc -n ${NAMESPACE} --context ${CONTEXT} -o json\
-    \ | jq -r '.items[] | select(.status.phase != \"Bound\") | .metadata.name'); do\n\
-    \n  # Get events for the current PVC and parse the data to print out the last\
-    \ timestamp, name, and message\n  kubectl get events -n ${NAMESPACE} --context\
-    \ ${CONTEXT} --field-selector involvedObject.name=$pvc -o json | jq '.items[]|\
-    \ \"Last Timestamp: \" + .lastTimestamp + \" Name: \" + .involvedObject.name +\
-    \ \" Message: \" + .message'; \n  \ndone"
+  doc_links: '
+
+    - [Kubernetes Documentation - PVCs](https://kubernetes.io/docs/concepts/storage/persistent-volumes/){:target="_blank"}
+
+    - [Kubernetes Documentation - Get Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+
+    - [jq Documentation - Introduction](https://stedolan.github.io/jq/manual/#Introduction){:target="_blank"}
+
+    - [jq Documentation - Built-in Operators and Functions](https://stedolan.github.io/jq/manual/#Built-inoperatorsandfunctions){:target="_blank"}'
+  explanation: '
+
+
+    This command is used to get information about any pending Persistent Volume Claims
+    (PVCs) in a Kubernetes namespace. It begins by getting all PVCs in the provided
+    ${NAMESPACE} using the "$kubectl get" command, but excluding those that have already
+    been bound. Then, for each of these PVCs, a new command is run to get events associated
+    with them and will output the last timestamp, name and message of each event.'
+  multi_line_details: "\n\n# Get all Persistent Volume Claims in the given namespace\
+    \ and context, and store them in a variable.\npvcs=$(kubectl get pvc -n ${NAMESPACE}\
+    \ --context ${CONTEXT} -o json)\n \n# Use 'jq' to filter out PVCS that aren't\
+    \ in the 'Bound' phase\nfor pvc in $(echo $pvcs | jq -r '.items[] | select(.status.phase\
+    \ != \"Bound\") | .metadata.name'); do\n \n    # Get events for the current PVC\n\
+    \    events=$(kubectl get events -n ${NAMESPACE} --context ${CONTEXT} --field-selector\
+    \ involvedObject.name=$pvc -o json)\n \n    # Print the last timestamp, event\
+    \ name and message for each event\n    echo $events | jq '.items[]| \"Last Timestamp:\
+    \ \" + .lastTimestamp + \" Name: \" + .involvedObject.name + \" Message: \" +\
+    \ .message'\n done"
   name: fetch_events_for_unhealthy_kubernetes_persistentvolumeclaims
 - command: 'namespace=${NAMESPACE}; context=${CONTEXT}; kubectl get pvc -n $namespace
     --context=$context -o json | jq -r ''.items[] | select(.metadata.deletionTimestamp
     != null) | .metadata.name as $name | .metadata.deletionTimestamp as $deletion_time
     | .metadata.finalizers as $finalizers | "\($name) is in Terminating state (Deletion
     started at: \($deletion_time)). Finalizers: \($finalizers)"'''
+  doc_links: '
+
+    - [Kubernetes context and namespace reference guide](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#namespace-v1-core){:target="_blank"}
+
+    - [Kubectl objects documentation](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#persistentvolumeclaim-v1-core){:target="_blank"}
+
+    - [JSONPath reference guide](https://goessner.net/articles/JsonPath/){:target="_blank"}
+
+    - [jq manual for filtering JSON documents](https://stedolan.github.io/jq/manual/){:target="_blank"}'
   explanation: '
 
 
-    This command is used to list persistent volume claims (PVCs) that are in the process
-    of being terminated in a Kubernetes cluster. It sets two variables containing
-    the name of the namespace and the context that should be used, then fetches all
-    PVCs in that namespace from the cluster using the kubectl get pvc command. The
-    information obtained is passed through jq, a processing tool for JSON documents,
-    which filters the items based on their associated metadata and outputs formatted
-    strings with the claim''s name, deletion time, and finalizers. The result of this
-    command would be a list of terminated PVCs and their associated information.'
-  multi_line_details: "\n\n#This script would be used to get the name, deletion time\
-    \ and finalizers associated with Persistent Volume Claims in a Kubernetes cluster\n\
-    \n#Defining the variables required for the command\nNAMESPACE=\"<namespace_name_here>\"\
-    \ \nCONTEXT=\"<cluster_context_here>\"\n\n#Building the command\ncommand=\"kubectl\
-    \ get pvc -n $NAMESPACE --context=$CONTEXT -o json | jq -r '.items[] | select(.metadata.deletionTimestamp\
-    \ != null) | .metadata.name as $name | .metadata.deletionTimestamp as $deletion_time\
-    \ | .metadata.finalizers as $finalizers | \\\"\\(\\$name\\) is in Terminating\
-    \ state (Deletion started at: \\(\\$deletion_time)). Finalizers: \\(\\$finalizers)\\\
-    \"'\"\n\n#Executing the command\neval $command"
+    This command is used to get information about Persistent Volume Claims (PVC) in
+    the specified Kubernetes namespace, through the specified context. This command
+    will output a list of PVCs that are currently in a Terminating state (i.e. they
+    have had their deletion process started). The output of the command includes information
+    such as the PVC name, the time its deletion process began, and the list of finalizers
+    associated with it.'
+  multi_line_details: '
+
+
+    # Store the intended namespace and context variables in easy to use variables.
+
+    NAMESPACE=my-namespace
+
+    CONTEXT=my-context
+
+
+    # kubectl get pvc
+
+    # Get a list of all Persistent Volume Claims (pvc) from the namespace ''my-namespace'',
+    using the context ''my-context''
+
+    kubectl get pvc -n $NAMESPACE --context=$CONTEXT -o json
+
+
+    # jq command
+
+    # Parse the returned JSON file using the ''jq'' command and filter out any PVCs
+    that don''t have a deletion timestamp
+
+    # Also select the name, deletion timestamp and finalizers properties for each
+    item
+
+    jq -r ''.items[] | select(.metadata.deletionTimestamp != null) | .metadata.name
+    as $name | .metadata.deletionTimestamp as $deletion_time | .metadata.finalizers
+    as $finalizers | "\($name) is in Terminating state (Deletion started at: \($deletion_time)).
+    Finalizers: \($finalizers)"'''
   name: list_persistentvolumeclaims_in_terminating_state
 - command: 'for pv in $(kubectl get pv --context ${CONTEXT} -o json | jq -r ''.items[]
     | select(.status.phase == "Terminating") | .metadata.name''); do kubectl get events
     --all-namespaces --field-selector involvedObject.name=$pv --context ${CONTEXT}
     -o json | jq ''.items[]| "Last Timestamp: " + .lastTimestamp + " Name: " + .involvedObject.name
     + " Message: " + .message''; done'
+  doc_links: '
+
+    - [Kubernetes Docs - PersistentVolumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/){:target="_blank"}
+
+    - [Kubernetes Docs - kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+
+    - [Kubernetes Docs - events](https://kubernetes.io/docs/concepts/cluster-administration/logging/){:target="_blank"}
+
+    - [jq Tutorial - Parsing JSON](https://stedolan.github.io/jq/tutorial/){:target="_blank"}'
   explanation: '
 
 
-    This command is used to retrieve information about Kubernetes persistent volumes
-    (PV) that are in the process of being terminated. Specifically, it retrieves the
-    timestamp, name, and message of each PV as well as any events associated with
-    them. The command uses the kubectl utility to get a list of all currently terminating
-    volumes, and then uses the jq utility to parse the resulting JSON output in order
-    to retrieve the specific data points for each volume. The output is printed to
-    the console.'
-  multi_line_details: "\n\n#This script is written to help new Kubernetes users learn\
-    \ syntax. It will get a list of Persistent Volumes (PV) in a specified context\
-    \ in Terminating state, and it will print the lastTimestamp, name, and message\
-    \ of each PV's associated Events.\n\nCONTEXT=\"<INSERT CONTEXT OF CHOICE>\"\n\n\
-    #Get all PVs in specified context and output them as JSON \nPVS=$(kubectl get\
-    \ pv --context ${CONTEXT} -o json)\n\n#Turn the JSON data for the PVs into an\
-    \ array\npv_array=($(echo $PVS | jq -r '.items[] | select(.status.phase == \"\
-    Terminating\") | .metadata.name'))\n\n#Loop through the array of PVs\nfor pv in\
-    \ ${pv_array[*]}; do\n    # Get the Events for the PV and output them as JSON\n\
-    \    EVENTS=$(kubectl get events --all-namespaces --field-selector involvedObject.name=$pv\
-    \ --context ${CONTEXT} -o json)\n\n    #Parse the JSON data to retrieve desired\
-    \ fields \n    echo $EVENTS | jq '.items[]| \"Last Timestamp: \" + .lastTimestamp\
-    \ + \" Name: \" + .involvedObject.name + \" Message: \" + .message'\ndone"
+    This command is used to fetch information about Persistent Volumes (PVs) that
+    are being terminated in a Kubernetes cluster. It uses the kubectl get pv command,
+    which can be used to list all of the available PVs and their statuses in the cluster.
+    After that, it then uses jq, which is a command-line JSON processor, to filter
+    out and identify only those PVs that have a status of ''Terminating''. Once those
+    PVs have been identified, the command then uses the kubectl get events command
+    to fetch and display the relevant events related to those PVs, such as the timestamp
+    when they were last updated and the message associated with them. The result of
+    this command is a display of the PVs that are being terminated in your Kubernetes
+    cluster along with useful details about them.'
+  multi_line_details: " \n\n# Get a list of Persistent Volumes in the current context\n\
+    PV_LIST=$(kubectl get pv --context ${CONTEXT} -o json | jq -r '.items[]') \n\n\
+    # Iterate over each PV and check for \"Terminating\" status\nfor pv in $PV_LIST;\
+    \ do\n    PV_STATUS=$(echo $pv | jq -r .status.phase)\n    # If status is \"Terminating\"\
+    , get events for respective PV\n    if [ \"$PV_STATUS\" = \"Terminating\" ]; then\n\
+    \        PV_NAME=$(echo $pv | jq -r .metadata.name)\n        # Get Events related\
+    \ to the PV\n        PV_EVENTS=$(kubectl get events --all-namespaces --field-selector\
+    \ involvedObject.name=$PV_NAME --context ${CONTEXT} -o json | jq)\n        # Loop\
+    \ over each event and output lastTimestamp, name and message\n        for event\
+    \ in $\u0420V_EVENTS; do \n            echo $(echo $event | jq '\"Last Timestamp:\
+    \ \" + .lastTimestamp + \" Name: \" + .involvedObject.name + \" Message: \" +\
+    \ .message')\n        done\n    fi\ndone"
   name: list_persistentvolumes_in_terminating_state
 - command: 'for pod in $(kubectl get pods -n ${NAMESPACE} --field-selector=status.phase=Running
     --context ${CONTEXT} -o jsonpath=''{range .items[*]}{.metadata.name}{"\n"}{end}'');
@@ -96,45 +142,59 @@ commands:
     echo -e "\n---\nPod: $pod\nPVC: $pvc\nPV: $pv\nStatus: $status\nNode: $node\nZone:
     $zone\nIngressClass: $ingressclass\nAccessModes: $accessmode\nReclaimPolicy: $reclaimpolicy\nCSIDriver:
     $csidriver\n"; done; done'
+  doc_links: '
+
+    - [Kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
+
+    - [Kubernetes Concepts and Architecture](https://kubernetes.io/docs/concepts/){:target="_blank"}
+
+    - [Search for Kubectl Commands in the Kubernetes Documentation](https://kubernetes.io/docs/reference/kubectl/overview/#search-for-kubectl-commands-in-the-kubernetes-documentation){:target="_blank"}
+
+    - [JSONPath Syntax Documentation](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}
+
+    - [Storage Classes and Persistent Volume Claims Documentation](https://kubernetes.io/docs/tasks/administer-cluster/change-pv-reclaim-policy/){:target="_blank"}
+
+    - [CSI Drivers Docuemtnations](https://kubernetes.io/docs/concepts/storage/volumes/#csi){:target="_blank"}'
   explanation: '
 
 
-    This command is used to print out details about the Persistent Volumes attached
-    to each pod in a specific Kubernetes namespace. The command will first use "kubectl
-    get pods" to retrieve all running pods in a given namespace. It will then for
-    each of those pods, query "kubectl get pods" again to get the Persistent Volume
-    Claim associated with that pod and store it in the variable "$pvc". Then it uses
-    "kubectl get pvc" to retrieve information about the PVC such as its volume name
-    and storage class name. Similarly, it calls "kubectl get pv" to retrieve information
-    about the actual Persistent Volume associated with the PVC including status, reclaim
-    policy, and CSI driver. Lastly, it uses "kubectl get nodes" to get the node name
-    on which the pod is scheduled and the zone it belongs to. It will store all this
-    information into variables and output it in an easily readable format.'
-  multi_line_details: "\n\n# Conversion of a one-line command to a multi-line script\
-    \ format with comments\n# This script is purposed to be used by Kubernetes users\
-    \ who are learning the syntax\n\n# Set some variables for ensuing commands\nNAMESPACE=\"\
-    \ \"\nCONTEXT=\" \"\n\n# Get all running pods in the target $NAMESAPCE using kubectl\
-    \ and JSONPath\nfor pod in $(kubectl get pods -n ${NAMESPACE} --field-selector=status.phase=Running\
+    This command is used to display several important metrics about each running pod
+    and related persistent volumes in a Kubernetes cluster. It collects information
+    such as the name of the pod, associated persistent volume claim (PVC), persistent
+    volume (PV) name, PV status, node name, node availability zone, storage class
+    name, access mode, reclaim policy, and CSI driver of the PVC. To do this, it utilizes
+    several kubectl commands including get pods, get nodes, and get pv and pvc. The
+    command also applies the selected context, namespace, and field-selector values
+    to ensure just running pods are returned. Once looped through all running pods,
+    the output will show a summary of the collected information for each one. '
+  multi_line_details: "\n\n# This command gets running pods, persistent volume claims\
+    \ and persistent volumes associated with those pods in a given namespace and context.\n\
+    # It loops through the list of pods and prints information about each pod, its\
+    \ associated PVC and PV.\n\n# Get all the pods in the namespace and context\n\
+    for pod in $(kubectl get pods -n ${NAMESPACE} --field-selector=status.phase=Running\
     \ --context ${CONTEXT} -o jsonpath='{range .items[*]}{.metadata.name}{\"\\n\"\
-    }{end}');\ndo\n\n  # Using the current $pod, extract all Persistent Volume Claims\
-    \ (pvc)\n  for pvc in $(kubectl get pods $pod -n ${NAMESPACE} --context ${CONTEXT}\
-    \ -o jsonpath='{range .spec.volumes[*]}{.persistentVolumeClaim.claimName}{\"\\\
-    n\"}{end}');\n  do\n\n    # Extract details of the PVC including persistent volume\
-    \ name, phase, node, zone, \n    # ingress class, access monde, reclaim policy\
-    \ and csi driver\n    pv=$(kubectl get pvc $pvc -n ${NAMESPACE} --context ${CONTEXT}\
-    \ -o jsonpath='{.spec.volumeName}')\n    status=$(kubectl get pv $pv --context\
-    \ ${CONTEXT} -o jsonpath='{.status.phase}')\n    node=$(kubectl get pod $pod -n\
-    \ ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.nodeName}')\n    zone=$(kubectl\
-    \ get nodes $node --context ${CONTEXT} -o jsonpath='{.metadata.labels.topology\\\
-    .kubernetes\\.io/zone}')\n    ingressclass=$(kubectl get pvc $pvc -n ${NAMESPACE}\
-    \ --context ${CONTEXT} -o jsonpath='{.spec.storageClassName}')\n    accessmode=$(kubectl\
-    \ get pvc $pvc -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.status.accessModes[0]}')\n\
-    \    reclaimpolicy=$(kubectl get pv $pv --context ${CONTEXT} -o jsonpath='{.spec.persistentVolumeReclaimPolicy}')\n\
-    \    csidriver=$(kubectl get pv $pv --context ${CONTEXT} -o jsonpath='{.spec.csi.driver}')\n\
-    \    \n    # Echo the collected information\n    echo -e \"\\n---\\nPod: $pod\\\
-    nPVC: $pvc\\nPV: $pv\\nStatus: $status\\nNode: $node\\nZone: $zone\\nIngressClass:\
-    \ $ingressclass\\nAccessModes: $accessmode\\nReclaimPolicy: $reclaimpolicy\\nCSIDriver:\
-    \ $csidriver\\n\";\n  done;\ndone"
+    }{end}'); do \n    # Loop through the pod and get the PVC\n    for pvc in $(kubectl\
+    \ get pods $pod -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{range .spec.volumes[*]}{.persistentVolumeClaim.claimName}{\"\
+    \\n\"}{end}'); do \n        # Get persistent volume associated with the PVC \n\
+    \        pv=$(kubectl get pvc $pvc -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.volumeName}')\
+    \ \n        \n        # Get status of the persistent volume \n        status=$(kubectl\
+    \ get pv $pv --context ${CONTEXT} -o jsonpath='{.status.phase}') \n\n        #\
+    \ Get node associated with the pod\n        node=$(kubectl get pod $pod -n ${NAMESPACE}\
+    \ --context ${CONTEXT} -o jsonpath='{.spec.nodeName}') \n        \n        # Get\
+    \ zone associated with the node\n        zone=$(kubectl get nodes $node --context\
+    \ ${CONTEXT} -o jsonpath='{.metadata.labels.topology\\.kubernetes\\.io/zone}')\
+    \ \n        \n        # Get ingressclass associated with the PVC\n        ingressclass=$(kubectl\
+    \ get pvc $pvc -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.storageClassName}')\
+    \ \n        \n        # Get accessmode associated with the PVC\n        accessmode=$(kubectl\
+    \ get pvc $pvc -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.status.accessModes[0]}')\
+    \ \n        \n        # Get reclaimpolicy associated with the PV\n        reclaimpolicy=$(kubectl\
+    \ get pv $pv --context ${CONTEXT} -o jsonpath='{.spec.persistentVolumeReclaimPolicy}')\
+    \ \n        \n        # Get csidriver associated with the PV\n        csidriver=$(kubectl\
+    \ get pv $pv --context ${CONTEXT} -o jsonpath='{.spec.csi.driver}')\n      \n\
+    \        # Print information about the pod, VC and PV\n        echo -e \"\\n---\\\
+    nPod: $pod\\nPVC: $pvc\\nPV: $pv\\nStatus: $status\\nNode: $node\\nZone: $zone\\\
+    nIngressClass: $ingressclass\\nAccessModes: $accessmode\\nReclaimPolicy: $reclaimpolicy\\\
+    nCSIDriver: $csidriver\\n\"; \n    done;  \ndone"
   name: list_pods_with_attached_volumes_and_related_persistentvolume_details
 - command: 'for pod in $(kubectl get pods -n ${NAMESPACE} --field-selector=status.phase=Running
     --context ${CONTEXT} -o jsonpath=''{range .items[*]}{.metadata.name}{"\n"}{end}'');
@@ -150,38 +210,50 @@ commands:
     PVC: $pvc, volumeName: $volumeName, containerName: $containerName, mountPath:
     $mountPath"; kubectl exec $pod -n ${NAMESPACE} --context ${CONTEXT} -c $containerName
     -- df -h $mountPath; done; done; done;'
-  explanation: "\n\nThis command is used to display the capacity of the storage space\
-    \ associated with a running Kubernetes pod. It first lists all running pods in\
-    \ a given namespace using kubectl get pods -n ${NAMESPACE}. Secondly, it uses\
-    \ the list of running pods to find their corresponding persistent volume claims\
-    \ (PVCs) using  kubectl get pods $pod -n ${NAMESPACE} command. The result of each\
-    \ persistent volume claim command is then used to determine the name of the associated\
-    \ volume, its mount path, and the container name. Finally, kubectl exec $pod -n\
-    \ ${NAMESPACE} -c $containerName command is used to execute the df \u2013h command\
-    \ on the mount paths to display the disk usage of the associated PVCS."
-  multi_line_details: "\n\n# This script is designed to get information about which\
-    \ filesystems that the Docker container in a Kubernetes Pod is running. \n# Run\
-    \ this script with appropriate parameters - NAMESPACE, CONTEXT - to make sure\
-    \ you are getting information only from the Kuberenetes cluster and namespace\
-    \ you care about.\n\n# Get the list of Pods in the given NAMESPACE and CONTEXT\n\
-    for pod in $(kubectl get pods -n ${NAMESPACE} --field-selector=status.phase=Running\
-    \ --context ${CONTEXT} -o jsonpath='{range .items[*]}{.metadata.name}{\"\\n\"\
-    }{end}');\ndo\n  # For each pod get the list of PVC it is using\n  for pvc in\
-    \ $(kubectl get pods $pod -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{range\
-    \ .spec.volumes[*]}{.persistentVolumeClaim.claimName}{\"\\n\"}{end}');\n  do\n\
-    \    # For each PVC get the volume name\n    for volumeName in $(kubectl get pod\
-    \ $pod -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.spec.volumes[] |\
-    \ select(has(\"persistentVolumeClaim\")) | .name');\n    do\n      # Get Mount\
-    \ path of the Volume\n      mountPath=$(kubectl get pod $pod -n ${NAMESPACE} --context\
-    \ ${CONTEXT} -o json | jq -r --arg vol \"$volumeName\" '.spec.containers[].volumeMounts[]\
-    \ | select(.name == $vol) | .mountPath');\n      # Get Container Name\n      containerName=$(kubectl\
+  doc_links: '
+
+    - [Kubernetes Documentation - kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+
+    - [Kubernetes Documentation - Specifying Output Format (jsonpath)](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#getting-started-with-jsonpath){:target="_blank"}
+
+    - [Kubernetes Documentation - VolumeMounts](https://kubernetes.io/docs/concepts/storage/volumes/#volume-mounts){:target="_blank"}
+
+    - [Linux Documentation - df command](http://man7.org/linux/man-pages/man1/df.1.html){:target="_blank"}'
+  explanation: '
+
+
+    This command looks for all the running pods in a given namespace and context.
+    It then looks at each of those pods to find the PersistentVolumeClaims (PVCs)
+    that are connected to it. After finding the PVCs, it searches for the VolumeNames
+    associated with them. It also finds the mountPath where the VolumeName is mounted
+    in its container and the name of the container. Finally, it runs the ''df -h''
+    command against the mountPath and outputs the results for each Pod, PVC, Volume
+    Name, Container Name and Mount Path.'
+  multi_line_details: "\n\n# This command will list the mount paths, mount name and\
+    \ container name of every running pod in a given Namespace. It takes several individual\
+    \ commands to complete. \n# First, use the `kubectl get` command to generate a\
+    \ list of all running pods in the desired namespace and store it in a variable\
+    \ named \"pod\".\n# Loop through each running pod:\nfor pod in $(kubectl get pods\
+    \ -n ${NAMESPACE} --field-selector=status.phase=Running --context ${CONTEXT} -o\
+    \ jsonpath='{range .items[*]}{.metadata.name}{\"\\n\"}{end}'); do \n    # Get\
+    \ a list of all associated persistent volume claims and store it in a variable\
+    \ named \"pvc\":\n    for pvc in $(kubectl get pods $pod -n ${NAMESPACE} --context\
+    \ ${CONTEXT} -o jsonpath='{range .spec.volumes[*]}{.persistentVolumeClaim.claimName}{\"\
+    \\n\"}{end}'); do \n        # Retrieve all related volume names:\n        for\
+    \ volumeName in $(kubectl get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o\
+    \ json | jq -r '.spec.volumes[] | select(has(\"persistentVolumeClaim\")) | .name');\
+    \ do \n            # Find the mountPath of a given volume name:\n            mountPath=$(kubectl\
     \ get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r --arg vol\
-    \ \"$volumeName\" '.spec.containers[] | select(.volumeMounts[].name == $vol) |\
-    \ .name');\n      \n      # Write out the information to the output\n      echo\
+    \ \"$volumeName\" '.spec.containers[].volumeMounts[] | select(.name == $vol) |\
+    \ .mountPath'); \n            # Find the associated container name:\n        \
+    \    containerName=$(kubectl get pod $pod -n ${NAMESPACE} --context ${CONTEXT}\
+    \ -o json | jq -r --arg vol \"$volumeName\" '.spec.containers[] | select(.volumeMounts[].name\
+    \ == $vol) | .name'); \n            # Output the relevant info\n            echo\
     \ -e \"\\n---\\nPod: $pod, PVC: $pvc, volumeName: $volumeName, containerName:\
-    \ $containerName, mountPath: $mountPath\";\n      # Execute df -h to get an output\
-    \ of the disk usage information\n      kubectl exec $pod -n ${NAMESPACE} --context\
-    \ ${CONTEXT} -c $containerName -- df -h $mountPath;\n    done;\n  done;\ndone;"
+    \ $containerName, mountPath: $mountPath\"; \n            # Use `kubectl exec`\
+    \ to query disk usage on the mountPath:\n            kubectl exec $pod -n ${NAMESPACE}\
+    \ --context ${CONTEXT} -c $containerName -- df -h $mountPath; \n        done;\
+    \ \n    done; \ndone;"
   name: fetch_the_storage_utilization_for_pvc_mounts
 - command: 'NAMESPACE="${NAMESPACE}"; CONTEXT="${CONTEXT}"; PODS=$(kubectl get pods
     -n $NAMESPACE --context=$CONTEXT -o json); for pod in $(jq -r ''.items[] | @base64''
@@ -200,51 +272,64 @@ commands:
     requires attention."; fi; echo "Pod: $POD_NAME"; echo "PVC: $pvc_name"; echo "PV:
     $PV_NAME"; echo "Node with Pod: $POD_NODE_NAME"; echo "Node with Storage: $STORAGE_NODE_NAME";
     echo; fi; done; done'
-  explanation: '
+  doc_links: '
 
+    - [Kubernetes Documentation for ''kubectl get pods'' Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-pod){:target="_blank"}
 
-    This command checks if the pod and its associated storage node are running on
-    the same node. It starts by setting two variables: NAMESPACE and CONTEXT. Then,
-    it gets a list of pods from the Kubernetes cluster in the specified namespace
-    using the Kubectl command. The loop iterates over each pod, getting its name and
-    the nodes it is running on. The command then checks for PVC''s (persistent volume
-    claims) and their access modes going through only those with ReadWriteOnce mode.
-    For each found PVC, it gets the associated PV (persistent volume), and the nodes
-    that processing these volumes; compares the nodes running the Pod and the ones
-    hosting the storage and prints the appropriate message.'
-  multi_line_details: "\n\n# Defining a few variables to make the script easier to\
-    \ follow \nNAMESPACE=\"${NAMESPACE}\"; \nCONTEXT=\"${CONTEXT}\";\n\n# Retrieve\
-    \ and store the list of all KR pods in the \"pods\" variable\nPODS=$(kubectl get\
-    \ pods -n $NAMESPACE --context=$CONTEXT -o json);\n\n# Starting the main loop\
-    \ which iterates over every pod and does the checks\nfor pod in $(jq -r '.items[]\
-    \ | @base64' <<< \"$PODS\"); do\n    # Helper (or child) function for convenience\
-    \ that returns the value of requested JSON field\n    _jq() { \n        jq -r\
-    \ \\${1} <<< \"$(base64 --decode <<< \\${pod})\"; \n    };\n\n    # Get pod name\
-    \ from the stored json\n    POD_NAME=$(_jq '.metadata.name');\n\n    # Get the\
-    \ node name where that pod is running\n    POD_NODE_NAME=$(kubectl get pod $POD_NAME\
-    \ -n $NAMESPACE --context=$CONTEXT -o custom-columns=:.spec.nodeName --no-headers);\n\
-    \    \n    # Retrieve the names of any PVCS associated with the pod\n    PVC_NAMES=$(kubectl\
-    \ get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o jsonpath='{.spec.volumes[*].persistentVolumeClaim.claimName}');\n\
-    \n    # Iterate throught the list of PVCs, if available\n    for pvc_name in $PVC_NAMES;\
-    \ do\n\n        # Get details of the PVC in JSON format\n        PVC=$(kubectl\
-    \ get pvc $pvc_name -n $NAMESPACE --context=$CONTEXT -o json);\n\n        # Extract\
-    \ Access Mode from the PVC details\n        ACCESS_MODE=$(jq -r '.spec.accessModes[0]'\
-    \ <<< \"$PVC\");\n\n        # This condition ensures, we only check RWO type of\
-    \ PVCs\n        if [[ \"$ACCESS_MODE\" == \"ReadWriteOnce\" ]]; then\n\n     \
-    \       # Extract PV Name from the retrieved PVC details\n            PV_NAME=$(jq\
-    \ -r '.spec.volumeName' <<< \"$PVC\");\n\n            # Lookup the Node where\
-    \ the storage which backs the PVC is located\n            STORAGE_NODE_NAME=$(jq\
-    \ -r --arg pv \"$PV_NAME\" '.items[] | select(.status.volumesAttached != null)\
-    \ | select(.status.volumesInUse[] | contains($pv)) | .metadata.name' <<< \"$(kubectl\
-    \ get nodes --context=$CONTEXT -o json)\");\n\n            # Print some information\n\
-    \            echo \"-----\";\n\n            # Check if Pod and Storage nodes match\n\
+    - [Kubernetes Documentation for ''jq'' Command](https://stedolan.github.io/jq/){:target="_blank"}
+
+    - [Kubernetes Documentation for ''base64'' Command](https://linux.die.net/man/1/base64){:target="_blank"}
+
+    - [Kubernetes Documentation for ''kubectl get custom-columns'' Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-custom-columns){:target="_blank"}
+
+    - [Kubernetes Documentation for ''kubectl get nodes'' Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-node){:target="_blank"}'
+  explanation: "\n\nThis command checks that all pods in a Kubernetes Namespace are\
+    \ using Persistent Volumes from the same node. Specifically, it performs the following\
+    \ steps: \n1. It sets the NAMESPACE and CONTEXT variables so that Kubernetes knows\
+    \ which namespace and context you're working with.\n2. It gets a list of all of\
+    \ the pods in the namespace at the given context. \n3. It loops through each pod\
+    \ and gets its name. \n4. It then gets the node name for the pod. \n5. For each\
+    \ pod, it finds all of the Persistent Volume Claims (PVCs).\n6. It gets more information\
+    \ about each PVC (including the access mode and the name of the Persistent Volume\
+    \ associated with it). \n7. It looks at the Access Mode for each PVC and only\
+    \ runs the remaining steps if the Access Mode is \"ReadWriteOnce\". \n8. It looks\
+    \ up the node name associated with the Persistent Volume (the storage node). \n\
+    9. Lastly, it compares the two node names: the node hosting the pod, and the node\
+    \ hosting the storage. If the nodes match, an \"OK\" message is printed, otherwise\
+    \ an \"Error\" message is printed. "
+  multi_line_details: "\n\n# Get the Kubernetes namespace and context from variables\
+    \ \nNAMESPACE=\"${NAMESPACE}\";\nCONTEXT=\"${CONTEXT}\";\n\n# Get information\
+    \ about all pods in the specified namespace and context\nPODS=$(kubectl get pods\
+    \ -n $NAMESPACE --context=$CONTEXT -o json)\n\n# Loop through each of the pods\
+    \ found in the query\nfor pod in $(jq -r '.items[] | @base64' <<< \"$PODS\");\
+    \ do\n    # Define a function that can be used to extract any given JSON field\
+    \ using jq\n    _jq() {\n        jq -r \\${1} <<< \"$(base64 --decode <<< \\${pod})\"\
+    ;\n    };\n\n    # Use the jq function to retrieve the Pod's name\n    POD_NAME=$(_jq\
+    \ '.metadata.name');\n\n    # Retrieve the Node on which the Pod is running\n\
+    \    POD_NODE_NAME=$(kubectl get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT\
+    \ -o custom-columns=:.spec.nodeName --no-headers);\n\n    # Retrieve the PVCs\
+    \ associated with this Pod\n    PVC_NAMES=$(kubectl get pod $POD_NAME -n $NAMESPACE\
+    \ --context=$CONTEXT -o jsonpath='{.spec.volumes[*].persistentVolumeClaim.claimName}');\n\
+    \n    # Loop through all associated PVCs\n    for pvc_name in $PVC_NAMES; do\n\
+    \        # Retrieve information about the PVC\n        PVC=$(kubectl get pvc $pvc_name\
+    \ -n $NAMESPACE --context=$CONTEXT -o json);\n\n        # Check the Access Mode\
+    \ - We only need to check if it is ReadWriteOnce\n        ACCESS_MODE=$(jq -r\
+    \ '.spec.accessModes[0]' <<< \"$PVC\");\n        \n        # If the Access Mode\
+    \ is ReadWriteOnce\n        if [[ \"$ACCESS_MODE\" == \"ReadWriteOnce\" ]]; then\n\
+    \            # Extract the PV's name\n            PV_NAME=$(jq -r '.spec.volumeName'\
+    \ <<< \"$PVC\");\n\n            # Retrieve the Node where the PV is mounted\n\
+    \            STORAGE_NODE_NAME=$(jq -r --arg pv \"$PV_NAME\" '.items[] | select(.status.volumesAttached\
+    \ != null) | select(.status.volumesInUse[] | contains($pv)) | .metadata.name'\
+    \ <<< \"$(kubectl get nodes --context=$CONTEXT -o json)\");\n\n            # Print\
+    \ some information about the checks we have done\n            echo \"-----\";\n\
     \            if [[ \"$POD_NODE_NAME\" == \"$STORAGE_NODE_NAME\" ]]; then\n   \
-    \             echo \"OK: Pod and Storage Node Matched\"; \n            else\n\
-    \                echo \"Error: Pod and Storage Node Mismatched - If the issue\
-    \ persists, the node requires attention.\"; \n            fi;\n\n            #\
-    \ Print additional useful information\n            echo \"Pod: $POD_NAME\";\n\
-    \            echo \"PVC: $pvc_name\";\n            echo \"PV: $PV_NAME\";\n  \
-    \          echo \"Node with Pod: $POD_NODE_NAME\";\n            echo \"Node with\
-    \ Storage: $STORAGE_NODE_NAME\";\n            echo;\n        fi;\n    done;\n\
-    done"
+    \             # The Node where the Pod is running matches the Node where the PV\
+    \ is mounted\n                echo \"OK: Pod and Storage Node Matched\";\n   \
+    \         else\n                # The Node where the Pod is running does not match\
+    \ the Node where the PV is mounted\n                echo \"Error: Pod and Storage\
+    \ Node Mismatched - If the issue persists, the node requires attention.\";\n \
+    \           fi;\n            echo \"Pod: $POD_NAME\";\n            echo \"PVC:\
+    \ $pvc_name\";\n            echo \"PV: $PV_NAME\";\n            echo \"Node with\
+    \ Pod: $POD_NODE_NAME\";\n            echo \"Node with Storage: $STORAGE_NODE_NAME\"\
+    ;\n            echo;\n        fi;\n    done;\ndone"
   name: check_for_rwo_persistent_volume_node_attachment_issues

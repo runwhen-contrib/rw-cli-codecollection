@@ -6,63 +6,41 @@ commands:
     | jq -r ''if .data.result[0] then "Host:" + .data.result[0].metric.host + " Ingress:"
     + .data.result[0].metric.ingress + " Namespace:" + .data.result[0].metric.exported_namespace
     + " Service:" + .data.result[0].metric.service else "" end'''
+  doc_links: '
+
+    - [Overview of gcloud auth](https://cloud.google.com/sdk/gcloud/reference/auth/){:target="_blank"}
+
+    - [activate-service-account information for gcloud](https://cloud.google.com/sdk/gcloud/reference/auth/activate-service-account){:target="_blank"}
+
+    - [Information on curl''s data option](https://curl.haxx.se/docs/manpage.html#-d){:target="_blank"}
+
+    - [Information on HTTP Header Authorization](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Authorization){:target="_blank"}
+
+    - [Information on gcloud auth command](https://cloud.google.com/sdk/gcloud/reference/auth/){:target="_blank"}
+
+    - [Information on jq command](https://stedolan.github.io/jq/){:target="_blank"}'
   explanation: '
 
 
-    This command is used to check if there are any errors codes that have occurred
-    in a Kubernetes environment. To do this, it activates the Google Cloud service
-    account and authenticates it with a key file. Then it runs a curl command which
-    passes a query to the Monitoring API of Google Cloud Platform to extract metrics
-    about requests from a specific host and service with a status code matching with
-    the provided error codes. Finally, it checks if there are any results, and displays
-    relevant details such as host, namespace, service, etc.'
-  multi_line_details: '
-
-
-    #This script will authorize a  service account, send a curl request with that
-    account information and then parse the response.
-
-
-    #Define Constants
-
-    GOOGLE_APPLICATION_CREDENTIALS=""
-
-    INGRESS_HOST=""
-
-    INGRESS_SERVICE=""
-
-    ERROR_CODES=""
-
-    TIME_SLICE=""
-
-    GCP_PROJECT_ID=""
-
-
-    # Activate Service Account using gcloud auth
-
-    gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
-
-
-    # Generate Access Token
-
-    ACCESS_TOKEN="$(gcloud auth print-access-token)"
-
-
-    # Construct curl request
-
-    QUERY="query=rate(nginx_ingress_controller_requests{host=''${INGRESS_HOST}'',
-    service=''${INGRESS_SERVICE}'', status=~''${ERROR_CODES}''}[${TIME_SLICE}]) >
-    0"
-
-    ENDPOINT="https://monitoring.googleapis.com/v1/projects/${GCP_PROJECT_ID}/location/global/prometheus/api/v1/query"
-
-
-    # Send curl request
-
-    curl -d "${QUERY}" -H "Authorization: Bearer ${ACCESS_TOKEN}" "${ENDPOINT}" |
-    jq -r ''if .data.result[0] then "Host:" + .data.result[0].metric.host + " Ingress:"
-    + .data.result[0].metric.ingress + " Namespace:" + .data.result[0].metric.exported_namespace
-    + " Service:" + .data.result[0].metric.service else "" end'''
+    This command is used to query the Nginx Ingress controller for request statuses.
+    It will gather information such as the host, ingress, namespace and service and
+    print it out in json format. This can be helpful when troubleshooting issues with
+    the controller. It can also help in monitoring incoming requests and ensuring
+    that the controller is working as expected.'
+  multi_line_details: "\n\n#This command does a number of things in one-line, which\
+    \ can be daunting for new users to Kubernetes and related CLIs. To make it easier\
+    \ to understand, we will break it down into its individual steps: \n\n#Step 1:\
+    \ Authenticate to Google Cloud Platform with the provided credentials\ngcloud\
+    \ auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS\n\n\
+    #Step 2: Create a Bearer Token \nAUTH_TOKEN=\"$(gcloud auth print-access-token)\"\
+    \n\n#Step 3: Constructs a query and set headers\nQUERY=\"query=rate(nginx_ingress_controller_requests{host='${INGRESS_HOST}',\
+    \ service='${INGRESS_SERVICE}', status=~'${ERROR_CODES}'}[${TIME_SLICE}]) > 0\"\
+    \nHEADERS=\"Authorization: Bearer $(gcloud auth print-access-token)\"\n\n#Step\
+    \ 4: Make an API call \ncurl -d \"${QUERY}\" -H \"Authorization: Bearer ${AUTH_TOKEN}\"\
+    \ 'https://monitoring.googleapis.com/v1/projects/${GCP_PROJECT_ID}/location/global/prometheus/api/v1/query'\
+    \ | jq -r 'if .data.result[0] then \"Host:\" + .data.result[0].metric.host + \"\
+    \ Ingress:\" + .data.result[0].metric.ingress + \" Namespace:\" + .data.result[0].metric.exported_namespace\
+    \ + \" Service:\" + .data.result[0].metric.service else \"\" end'"
   name: fetch_nginx_ingress_metrics_from_gmp_and_perform_inspection_on_results
 - command: 'namespace="${NAMESPACE}"; context="${CONTEXT}"; ingress="${INGRESS_OBJECT_NAME}";
     echo "Ingress: $ingress"; health_status="NA"; services=(); backend_services=$(kubectl
@@ -101,69 +79,95 @@ commands:
     = "Unhealthy" ]; then echo "Health Status: $health_status"; echo "=====================";
     elif [ "$health_status" = "Healthy" ]; then echo "Health Status: $health_status";
     fi; echo "------------"'
-  explanation: '
+  doc_links: '
 
+    - [Kubernetes Overview](https://kubernetes.io/docs/concepts/){:target="_blank"}
 
-    This command is used to check the health status of an ingress object in a Kubernetes
-    cluster. It uses the specified namespace, context, and ingress object name (INGRESS_OBJECT_NAME)
-    to get information about the ingress object. It will then print out the ingress
-    object''s backend services, as well as the port and name of each service. The
-    command then checks to see if each service exists in the specified namespace.
-    If it does, it will additionally print out information about the endpoint pods
-    associated with the service. It also prints out additional information such as
-    the name and kind of the owner of each pod. Finally, it prints out a Health Status
-    based on whether or not each service and endpoint exist in the cluster.'
-  multi_line_details: ";\n\n# This script is designed to educate new Kubernetes users\
-    \ about ingress and service syntax. \n# It will print out the Ingress, its Backend\
-    \ Services, any Endpoint Pods, as well as their Owners. \n# Additionally, it will\
-    \ determine whether or not that Ingress is Healthy or Unhealthy.\n\n# Assign variables\
-    \ for the Namespace, Context, and Ingress Object Name\nNAMESPACE=\"${NAMESPACE}\"\
-    ; \nCONTEXT=\"${CONTEXT}\"; \nINGRESS_OBJECT_NAME=\"${INGRESS_OBJECT_NAME}\";\n\
-    \n# Print out the Ingress Object Name\necho \"Ingress: $INGRESS_OBJECT_NAME\"\
-    ;\n\n# Initialize a health status variable to 'NA'\nhealth_status=\"NA\";\n\n\
-    # Create an empty array to store services\nservices=();\n\n# Get the backend services\
-    \ of the Ingress object\nbackend_services=$(kubectl get ingress \"$INGRESS_OBJECT_NAME\"\
-    \ -n \"$NAMESPACE\" --context \"$CONTEXT\" -ojsonpath='{range .spec.rules[*].http.paths[*]}{.backend.service.name}{\"\
-    \ \"}{.backend.service.port.number}{\"\\n\"}{end}');\n\n# Separate each line with\
-    \ a new line character\nIFS=$'\\n';\n\n# Iterate through each line\nfor line in\
-    \ $backend_services; do  \n\t# Get the name of the service and port number from\
-    \ the line\n    service=$(echo \"$line\" | cut -d \" \" -f 1); \n    port=$(echo\
-    \ \"$line\" | cut -d \" \" -f 2); \n\n    # Make sure that both the service and\
-    \ port exist before proceeding\n    if [ -n \"$service\" ] && [ -n \"$port\" ];\
-    \ then \n    \techo \"Backend Service: $service, Port: $port\"; \n    \t\n   \
-    \ \t# Check if the service exists\n    \tservice_exists=$(kubectl get service\
-    \ \"$service\" -n \"$NAMESPACE\" --context \"$CONTEXT\" -ojsonpath='{.metadata.name}');\n\
-    \    \tif [ -z \"$service_exists\" ]; then \n    \t\thealth_status=\"Unhealthy\"\
-    ; \n    \t\techo \"Validation: Service $service does not exist\"; \n    \telse\
-    \ \n    \t\t# Get the endpoint pods\n    \t\tendpoint_pods=$(kubectl get endpoints\
-    \ \"$service\" -n \"$NAMESPACE\" --context \"$CONTEXT\" -ojsonpath='{range .subsets[*].addresses[*]}-\
-    \ Pod Name: {.targetRef.name}, Pod IP: {.ip}\\n{end}');\n\n    \t\t# If there\
-    \ are no endpoints, then set the health status as unhealthy\n    \t\tif [ -z \"\
-    $endpoint_pods\" ]; then \n    \t\t\thealth_status=\"Unhealthy\"; \n      \t\t\
-    \techo \"Validation: Endpoint for service $service does not have any pods\"; \n\
-    \      \t\telse \n      \t\t\t# Print out the endpoint pod information\n     \
-    \ \t\t\techo \"Endpoint Pod:\"; \n \t\t\t\techo -e \"$endpoint_pods\";\n\t\t\t\
-    \t\n\t\t\t\t# Iterate through all of the endpoint pods\n\t\t\t\tfor pod in $endpoint_pods;\
-    \ do\n\t\t\t\t\t# Get the pod name from the endpoint pod\n\t\t\t\t\tif [[ $pod\
-    \ == *\"- Pod Name: \"* ]]; then \n\t\t\t\t\t\tpod_name=\"\\${pod#*- Pod Name:\
-    \ }\"; \n\t\t\t\t\t\tpod_name=\"\\${pod_name%%,*}\"; \n\n\t\t\t\t\t\t# If the\
-    \ pod name exists, find its owner information\n\t\t\t\t\t\tif [ -n \"$pod_name\"\
-    \ ]; then \n\t\t\t\t\t\t\towner_kind=$(kubectl get pod \"$pod_name\" -n \"$NAMESPACE\"\
-    \ --context \"$CONTEXT\" -o=jsonpath='{.metadata.ownerReferences[0].kind}');\n\
-    \t\t\t\t\t\t\t\n\t\t\t\t\t\t\t# If the kind of owner exists...\n\t\t\t\t\t\t\t\
-    if [ -n \"$owner_kind\" ]; then \n\t\t\t\t\t\t\t\tif [ \"$owner_kind\" = \"StatefulSet\"\
-    \ ] || [ \"$owner_kind\" = \"DaemonSet\" ]; then \n\t\t\t\t\t\t\t\t\t# Then grab\
-    \ the name of the owner\n\t\t\t\t\t\t\t\t\towner_info=\"$(kubectl get pod \"$pod_name\"\
-    \ -n \"$NAMESPACE\" --context \"$CONTEXT\" -o=jsonpath='{.metadata.ownerReferences[0].name}')\
-    \ $owner_kind\";\n\t\t\t\t\t\t\t\telse \n\t\t\t\t\t\t\t\t\t# Otherwise, find the\
-    \ ReplicaSet information\n\t\t\t\t\t\t\t\t\treplicaset=$(kubectl get pod \"$pod_name\"\
-    \ -n \"$NAMESPACE\" --context \"$CONTEXT\" -o=jsonpath='{.metadata.ownerReferences[0].name}');\n\
-    \t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t# Find the kind of the ReplicaSet\n\t\t\t\
-    \t\t\t\t\t\tif [ -n \"$replicaset\" ]; then \n\t\t\t\t\t\t\t\t\t\towner_kind=$(kubectl\
-    \ get replicaset \"$replicaset\" -n \"$NAMESPACE\" --context \"$CONTEXT\" -o=jsonpath='{.metadata.ownerReferences[0].kind}');\n\
-    \t\t\t\t\t\t\t\t\t\t# Also grab the name of the owner\n\t\t\t\t\t\t\t\t\t\towner_name=$(kubectl\
-    \ get replicaset \"$replicaset\" -n \"$NAMESPACE\" --context \"$CONTEXT\" -o=jsonpath='{.metadata.ownerReferences[0].name}');\n\
-    \t\t\t\t\t\t\t\t\t\towner_info=\"$owner_name $owner_kind\";\n\t\t\t\t\t\t\t\t\t\
-    fi; \n\t\t\t\t\t\t\t\tfi;\n\t\t\t\t\t\t\tfi; \n\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\
-    # If the owner info exists, print it out\n\t\t\t\t\t\t"
+    - [Kubectl Overview](https://kubernetes.io/docs/tasks/tools/install-kubectl/){:target="_blank"}
+
+    - [Ingress Documentation](https://kubernetes.io/docs/concepts/services-networking/ingress/){:target="_blank"}
+
+    - [Service Documentation](https://kubernetes.io/docs/concepts/services-networking/service/){:target="_blank"}
+
+    - [StatefulSets Documentation](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
+
+    - [DaemonSets Documentation](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/){:target="_blank"}
+
+    - [ReplicaSets Documentation](https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/){:target="_blank"}'
+  explanation: "\n\nThis command checks the health status of an Ingress in a Kubernetes\
+    \ cluster. It takes three parameters \u2013 NAMESPACE, CONTEXT and INGRESS_OBJECT_NAME.\
+    \ The command first retrieves all the backend services and ports associated with\
+    \ the Ingress object using the kubectl get ingress command. It then uses a for\
+    \ loop to iterate through each service to check if it exists in the cluster. If\
+    \ it does, it checks the Endpoints associated with the service to check if the\
+    \ pods exist and get information on its owner. Based on the information gathered\
+    \ from these steps, it assigns a Health Status of either \u201CUnhealthy\u201D\
+    \ or \u201CHealthy\u201D and prints the results."
+  multi_line_details: "\n\n# Define variables\nNAMESPACE=\"${NAMESPACE}\"\nCONTEXT=\"\
+    ${CONTEXT}\"\nINGRESS_OBJECT_NAME=\"${INGRESS_OBJECT_NAME}\"\necho \"Ingress:\
+    \ $INGRESS_OBJECT_NAME\"\n\n# Initial Health Status\nHEALTH_STATUS=\"NA\"\n\n\
+    # Initialize Services array for later validation\ndeclare -a SERVICES=()\n\n#\
+    \ Get information about the ingress path and available back-end services\nBACKEND_SERVICES=$(kubectl\
+    \ get ingress \"$INGRESS_OBJECT_NAME\" -n \"$NAMESPACE\" --context \"$CONTEXT\"\
+    \ -ojsonpath='{range .spec.rules[*].http.paths[*]}{.backend.service.name}{\" \"\
+    }{.backend.service.port.number}{\"\\n\"}{end}')\n\n# Set IFS (Internal Field Separator)\
+    \ temporarily to \\n in order to split each line\nIFS=\"$'\\n'\" \n\n# Iterate\
+    \ through each line of the Backend Services\nfor LINE in $BACKEND_SERVICES; do\
+    \ \n    # From each line, extract only the Service name and Port number\n    SERVICE=$(echo\
+    \ \"$LINE\" | cut -d \" \" -f 1)\n    PORT=$(echo \"$LINE\" | cut -d \" \" -f\
+    \ 2)\n\n    # Check that non-empty values were extracted\n    if [ -n \"$SERVICE\"\
+    \ ] && [ -n \"$PORT\" ]; then\n        echo \"Backend Service: $SERVICE, Port:\
+    \ $PORT\"\n\n        # Validate that the Service actually exists\n        SERVICE_EXISTS=$(kubectl\
+    \ get service \"$SERVICE\" -n \"$NAMESPACE\" --context \"$CONTEXT\" -ojsonpath='{.metadata.name}')\n\
+    \        if [ -z \"$SERVICE_EXISTS\" ]; then\n            HEALTH_STATUS=\"Unhealthy\"\
+    \n            echo \"Validation: Service $SERVICE does not exist\"\n        else\n\
+    \            # Extract information for the pods associated with the Service's\
+    \ endpoint\n            ENDPOINT_PODS=$(kubectl get endpoints \"$SERVICE\" -n\
+    \ \"$NAMESPACE\" --context \"$CONTEXT\" -ojsonpath='{range .subsets[*].addresses[*]}-\
+    \ Pod Name: {.targetRef.name}, Pod IP: {.ip}\\n{end}')\n            \n       \
+    \     # If at least one pod exists\n            if [ -n \"$ENDPOINT_PODS\" ];\
+    \ then\n                echo \"Endpoint Pod:\"\n                echo -e \"$ENDPOINT_PODS\"\
+    \n                \n                # Iterate through the list of pods\n     \
+    \           for POD in $ENDPOINT_PODS; do\n                    # Extract out only\
+    \ the Pod Name from the list\n                    POD_NAME=\"${POD#*- Pod Name:\
+    \ }\"\n                    POD_NAME=\"${POD_NAME%,*}\"\n                    \n\
+    \                    # Deepen the validation by making sure the Pod is associated\
+    \ to a specific owner\n                    if [ -n \"$POD_NAME\" ]; then\n   \
+    \                     # Obtain the kind of owner associated to the pod\n     \
+    \                   OWNER_KIND=$(kubectl get pod \"$POD_NAME\" -n \"$NAMESPACE\"\
+    \ --context \"$CONTEXT\" -o=jsonpath='{.metadata.ownerReferences[0].kind}')\n\
+    \                        \n                        # If the Pod is owned by either\
+    \ a StatefulSet or a DaemonSet\n                        if [ -n \"$OWNER_KIND\"\
+    \ ]; then\n                            if [ \"$OWNER_KIND\" = \"StatefulSet\"\
+    \ ] || [ \"$OWNER_KIND\" = \"DaemonSet\" ]; then\n                           \
+    \     # Extract only the name of the owner\n                                OWNER_INFO=\"\
+    $(kubectl get pod \"$POD_NAME\" -n \"$NAMESPACE\" --context \"$CONTEXT\" -o=jsonpath='{.metadata.ownerReferences[0].name}')\
+    \ $OWNER_KIND\"\n                            else\n                          \
+    \      # Possible ReplicaSet owner. Extract ReplicaSet name first before extracting\
+    \ its related kind\n                                REPLICASET=$(kubectl get pod\
+    \ \"$POD_NAME\" -n \"$NAMESPACE\" --context \"$CONTEXT\" -o=jsonpath='{.metadata.ownerReferences[0].name}')\n\
+    \                                \n                                if [ -n \"\
+    $REPLICASET\" ]; then\n                                    OWNER_KIND=$(kubectl\
+    \ get replicaset \"$REPLICASET\" -n \"$NAMESPACE\" --context \"$CONTEXT\" -o=jsonpath='{.metadata.ownerReferences[0].kind}')\n\
+    \                                    OWNER_NAME=$(kubectl get replicaset \"$REPLICASET\"\
+    \ -n \"$NAMESPACE\" --context \"$CONTEXT\" -o=jsonpath='{.metadata.ownerReferences[0].name}')\n\
+    \                                    OWNER_INFO=\"$OWNER_NAME $OWNER_KIND\"\n\
+    \                                fi\n                            fi\n        \
+    \                fi\n                        \n                        # Check\
+    \ if valid owner info was obtained per Pod; if so, show it\n                 \
+    \       if [ -n \"$OWNER_INFO\" ]; then\n                            echo \"Owner:\
+    \ $OWNER_INFO\"\n                        fi\n                    fi \n       \
+    \         done \n                \n                # Indicate that the status\
+    \ is currently Healthy\n                HEALTH_STATUS=\"Healthy\" \n         \
+    \   else # No Pods were found\n                HEALTH_STATUS=\"Unhealthy\"\n \
+    \               echo \"Validation: Endpoint for service $SERVICE does not have\
+    \ any pods\"\n            fi\n        fi\n        \n        # Add this Service\
+    \ to a list for later use\n        SERVICES+=(\"$SERVICE\")\n    fi\ndone\n\n\
+    # For each previously added Service\nfor SERVICE in \"${SERVICES[@]}\"; do\n \
+    \   # Validate that the Service still exists\n    SERVICE_EXISTS=$(kubectl get\
+    \ service \"$SERVICE\" -n \"$NAMESPACE\" --context \"$CONTEXT\" -ojsonpath='{.metadata.name}')\n\
+    \    if [ -z \"$SERVICE_EXISTS\" ]; then\n        HEALTH_STATUS=\"Unhealthy\"\n\
+    \        echo \"Validation: Service $SERVICE does not exist\"\n    else\n    \
+    \    ENDPOINT_EXISTS=$(kubectl get endpoints \"$SERVICE\" -n \"$NAMESPACE\" --context\
+    \ \"$CONTEXT\" -ojsonpath='{.metadata.name}')\n        # Validate that the Service"
   name: find_ingress_owner_and_service_health
