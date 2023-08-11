@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       This codebundle runs a series of tasks to identify potential helm release issues related to ArgoCD managed Helm objects.
-Metadata            Author    Nitin Madhok (nmadhok@icloud.com)
+Metadata            Author    nmadhok
 Metadata            Display Name    Kubernetes ArgoCD HelmRelease TaskSet
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,ArgoCD
 
