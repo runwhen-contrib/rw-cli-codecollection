@@ -18,18 +18,23 @@ Fetch Ingress Object Health in Namespace
     [Documentation]    Fetches all ingress objects in the namespace and outputs the name, health status, services, and endpoints. 
     [Tags]    service    ingress    endpoint   health 
     ${ingress_object_summary}=    RW.CLI.Run Cli
-    ...    cmd=namespace="${NAMESPACE}"; context="${CONTEXT}"; for ingress in $(kubectl get ingress -n "$namespace" --context "$context" -ojsonpath='{range .items[*]}{.metadata.name}{"\\n"}{end}'); do echo "Ingress: $ingress"; health_status="NA"; services=(); backend_services=$(kubectl get ingress "$ingress" -n "$namespace" --context "$context" -ojsonpath='{range .spec.rules[*].http.paths[*]}{.backend.service.name}{"|"}{.backend.service.port.number}{"\\n"}{end}'); while IFS='|' read -r service port; do if [ -n "$service" ] && [ -n "$port" ]; then echo "Backend Service: $service, Port: $port"; service_exists=$(kubectl get service "$service" -n "$namespace" --context "$context" -ojsonpath='{.metadata.name}'); if [ -z "$service_exists" ]; then health_status="Unhealthy"; echo "Validation: Service $service does not exist"; else endpoint_pods=$(kubectl get endpoints "$service" -n "$namespace" --context "$context" -ojsonpath='{range .subsets[*].addresses[*]}- Pod Name: {.targetRef.name}\\n Pod IP: {.ip}\\n{end}'); if [ -z "$endpoint_pods" ]; then health_status="Unhealthy"; echo "Validation: Endpoint for service $service does not have any pods"; else echo "Endpoint Pod:"; echo "$endpoint_pods"; health_status="Healthy"; fi; fi; services+=("$service"); fi; done <<< "$backend_services"; if [ "$health_status" = "Unhealthy" ]; then echo "Health Status: $health_status"; echo "====================="; elif [ "$health_status" = "Healthy" ]; then echo "Health Status: $health_status"; fi; echo "------------"; done
+    ...    cmd=namespace="${NAMESPACE}"; context="${CONTEXT}"; for ingress in $(kubectl get ingress -n "$namespace" --context "$context" -ojsonpath='{range .items[*]}{.metadata.name}{"\\n"}{end}'); do echo "Ingress: $ingress"; health_status="NA"; services=(); backend_services=$(kubectl get ingress "$ingress" -n "$namespace" --context "$context" -ojsonpath='{range .spec.rules[*].http.paths[*]}{.backend.service.name}{"|"}{.backend.service.port.number}{"\\n"}{end}'); while IFS='|' read -r service port; do if [ -n "$service" ] && [ -n "$port" ]; then echo "Backend Service: $service, Port: $port"; service_exists=$(kubectl get service "$service" -n "$namespace" --context "$context" -ojsonpath='{.metadata.name}'); if [ -z "$service_exists" ]; then health_status="Unhealthy"; echo "Validation: Service $service does not exist"; else endpoint_pods=$(kubectl get endpoints "$service" -n "$namespace" --context "$context" -ojsonpath='{range .subsets[*].addresses[*]}- Pod Name: {.targetRef.name}\\n Pod IP: {.ip}\\n{end}'); if [ -z "$endpoint_pods" ]; then health_status="Unhealthy"; echo "Validation: Endpoint for service $service does not have any pods"; else echo "Endpoint Pod:"; echo "$endpoint_pods"; health_status="Healthy"; fi; fi; services+=("$service"); fi; done <<< "$backend_services"; if [ "$health_status" = "Unhealthy" ]; then echo "Health Status: $health_status"; echo "------------"; elif [ "$health_status" = "Healthy" ]; then echo "Health Status: $health_status"; fi; echo "------------"; done
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
+    ${unhealthy_objects}=    RW.CLI.Run Cli
+    ...    cmd=echo "${ingress_object_summary.stdout}" | awk '/^Ingress:/ {rec=$0; next} {rec=rec ORS $0} /^Health Status: Unhealthy$/ {print rec ORS "------------"}'
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
     RW.CLI.Parse Cli Output By Line
-    ...    rsp=${ingress_object_summary}
+    ...    rsp=${unhealthy_objects}
     ...    set_severity_level=3
     ...    set_issue_expected=All ingress objects should have services and active endpoints in namespace: ${NAMESPACE}
     ...    set_issue_actual=Ingress objects missing services or endpoints found in namespace: ${NAMESPACE}
     ...    set_issue_title=Unhealthy ingress objects found in ${NAMESPACE}
-    ...    set_issue_details=Ingress object health is:\n\n$_stdout\n\n
+    ...    set_issue_details=The following unhealthy objects were found:\n\n$${unhealthy_objects.stdout}\n\n
     ...    set_issue_next_steps=${NAMESPACE} Troubleshoot Namespace Services And Application Workloads
     ...    _line__raise_issue_if_contains=Unhealthy
     ${history}=    RW.CLI.Pop Shell History
