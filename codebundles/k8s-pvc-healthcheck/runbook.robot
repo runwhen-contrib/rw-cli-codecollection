@@ -110,6 +110,11 @@ Fetch the Storage Utilization for PVC Mounts
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ${unhealthy_volume_list}=    RW.CLI.Run Cli
+    ...    cmd=echo "${unhealthy_volume_capacity.stdout}" | awk -F'[,:]' '/Pod:/ {print "Pod:" $2, "PVC:" $4}'
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${unhealthy_volume_capacity}
     ...    set_severity_level=2
@@ -118,6 +123,7 @@ Fetch the Storage Utilization for PVC Mounts
     ...    set_issue_title=PVC Storage Utilization As Report by Pod
     ...    set_issue_details=Found excessive PVC Utilization for: \n${unhealthy_volume_capacity.stdout}
     ...    _line__raise_issue_if_contains=Pod
+    ...    set_issue_next_steps=Clean up or expand Persistent Volume Claims for: \n ${unhealthy_volume_list.stdout}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of PVC storage mount utilization in ${NAMESPACE}:
     RW.Core.Add Pre To Report    ${pod_pvc_utilization.stdout}
