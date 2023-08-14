@@ -105,16 +105,19 @@ Fetch the Storage Utilization for PVC Mounts
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
-    ${regexp}=    Evaluate    r'.*\\s(?P<pvc_utilization>\\d+)%'
+    ${unhealthy_volume_capacity}=    RW.CLI.Run Cli
+    ...    cmd=echo "${pod_pvc_utilization.stdout}" | awk '/---/ { if (flag) { print record "\\n" $0; } record = ""; flag = 0; next; } $5 ~ /[9][5-9]%/ || $5 == "100%" { flag = 1; } { if (record == "") { record = $0; } else { record = record "\\n" $0; } } END { if (flag) { print record; } }'
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
     RW.CLI.Parse Cli Output By Line
-    ...    rsp=${pod_pvc_utilization}
-    ...    lines_like_regexp=${regexp}
+    ...    rsp=${unhealthy_volume_capacity}
     ...    set_severity_level=2
     ...    set_issue_expected=PVC should be less than 95% utilized.
     ...    set_issue_actual=PVC is 95% or greater.
     ...    set_issue_title=PVC Storage Utilization As Report by Pod
-    ...    set_issue_details=Found PVC Utilization of: $pvc_utilization in namespace ${NAMESPACE}\nReview PersistentVolumeClaims utilization above 95% as they will be at or nearing capacity. Expand PersistentVolumeClaims, PersistentVolumes, remove uneeded storage, or check application configuration such as database logs and backup jobs.
-    ...    pvc_utilization__raise_issue_if_gt=95
+    ...    set_issue_details=Found excessive PVC Utilization for: \n${unhealthy_volume_capacity.stdout}
+    ...    _line__raise_issue_if_contains=Pod
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of PVC storage mount utilization in ${NAMESPACE}:
     RW.Core.Add Pre To Report    ${pod_pvc_utilization.stdout}
