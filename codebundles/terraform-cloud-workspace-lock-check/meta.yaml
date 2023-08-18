@@ -1,0 +1,34 @@
+commands:
+- command: 'TERRAFORM_API_TOKEN_VALUE=$(cat $TERRAFORM_API_TOKEN) && curl --header
+    "Authorization: Bearer $TERRAFORM_API_TOKEN_VALUE" --header "Content-Type: application/vnd.api+json"
+    -s ''${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}'''
+  doc_links: '
+
+    - [How to Use Variables in Bash](https://www.lifewire.com/passing-variables-in-bash-script-2200571){:target="_blank"}
+
+    - [Linux Curl Command Tutorial with Examples](https://linuxize.com/post/curl-command-examples/){:target="_blank"}
+
+    - [API Documentation for Terraform Cloud API](https://www.terraform.io/docs/cloud/api/index.html){:target="_blank"}
+
+    - [Request Header Field Authorization - MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Authorization){:target="_blank"}'
+  explanation: ' | jq -r .data.id
+
+
+    Kubernetes is an open source platform for managing containerized applications.
+    This command will allow you to access the Kubernetes API with a token in order
+    to get the ID of a workspace in your organization. It stores the token in the
+    TERRAFORM_API_TOKEN environment variable and then uses curl and jq (a command-line
+    JSON processor) to make an HTTP request and retrieve the workspace ID.'
+  multi_line_details: " | jq '.data | {id, workspace_id}' | tr -d '\\n\"'\n\n# First,\
+    \ we'll grab the contents of $TERRAFORM_API_TOKEN and save it to a new environment\
+    \ variable called TERRAFORM_API_TOKEN_VALUE:\nTERRAFORM_API_TOKEN_VALUE=$(cat\
+    \ $TERRAFORM_API_TOKEN) \n\n# Next, we'll use curl to set appropriate headers\
+    \ containing the saved auth token in the Environment variable.\n# The --header\
+    \ flag is used to add custom headers to the request.\ncurl \\\n  --header \"Authorization:\
+    \ Bearer $TERRAFORM_API_TOKEN_VALUE\" \\\n  --header \"Content-Type: application/vnd.api+json\"\
+    \ \\\n  -s \\ # Unused here. Switches curl to silent mode.\n  '$TERRAFORM_API_URL/organizations/$TERRAFORM_ORGANIZATION_NAME/workspaces/$TERRAFORM_WORKSPACE_NAME'\
+    \ \\\n\n# Then, pipe the output to jq, which will filter out only the parts we\
+    \ care about for the following step.\n| jq '.data | {id, workspace_id}'\n\n# Finally,\
+    \ we can remove trailing newlines using tr and enclose the command in double quotes:\n\
+    | tr -d '\\n\"'"
+  name: checking_whether_the_terraform_cloud_workspace_is_in_a_locked_state
