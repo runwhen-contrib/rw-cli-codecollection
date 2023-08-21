@@ -1,3 +1,8 @@
+## 0.0.4 2023-08-21
+- Adding codebundle (terraform-cloud-workspace-lock-check) (#177) e8d4ca9
+- Add's pvc storage next step (#183) f2d8235
+- Adding codebundle (k8s-argocd-helm-health)  (#178) 321947d
+
 ## 0.0.3 2023-08-10
 - Add build flow and devcontainer spec, update readme header d90aaab
 - Add test issue codebundle 77641f8
