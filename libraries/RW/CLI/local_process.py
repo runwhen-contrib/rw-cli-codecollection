@@ -26,6 +26,10 @@ def execute_local_command(
     files: dict = {},
     timeout_seconds: int = 30,
 ):
+    USER_ENV: str = os.getenv("USER", None)
+    logging.info(f"Local process user detected as: {USER_ENV}")
+    if not USER_ENV:
+        raise Exception(f"USER environment variable not properly set, found: {USER_ENV}")
     request_secrets = request_secrets if request_secrets else []
     if request_secrets:
         request_secrets = _deserialize_secrets(request_secrets=request_secrets)
@@ -65,6 +69,21 @@ def execute_local_command(
                 tmp.write(content)
         logger.debug(
             f"running {parsed_cmd} with env {run_with_env.keys()} and files {files.keys()}, secret names {secret_keys}"
+        )
+        # enable file permissions
+        p = subprocess.run(
+            ["chown", USER_ENV, "."],
+            text=True,
+            capture_output=True,
+            timeout=timeout_seconds,
+            cwd=os.path.abspath(tmpdir),
+        )
+        p = subprocess.run(
+            ["chmod", "-R", "u+x", "."],
+            text=True,
+            capture_output=True,
+            timeout=timeout_seconds,
+            cwd=os.path.abspath(tmpdir),
         )
         p = subprocess.run(
             parsed_cmd,

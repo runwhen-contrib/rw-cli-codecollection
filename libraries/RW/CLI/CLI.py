@@ -55,17 +55,10 @@ def execute_command(
         ShellServiceResponse: _description_
     """
     if not service:
-        return execute_local_command(
-            cmd=cmd,
-            request_secrets=request_secrets,
-            env=env,
-        )
+        return execute_local_command(cmd=cmd, request_secrets=request_secrets, env=env, files=files)
     else:
         return platform.execute_shell_command(
-            cmd=cmd,
-            service=service,
-            request_secrets=request_secrets,
-            env=env,
+            cmd=cmd, service=service, request_secrets=request_secrets, env=env, files=files
         )
 
 
@@ -118,6 +111,39 @@ def _create_secrets_from_kwargs(**kwargs) -> list[platform.ShellServiceRequestSe
     return request_secrets
 
 
+def run_bash_file(
+    bash_file: str,
+    target_service: platform.Service = None,
+    env: dict = None,
+    include_in_history: bool = True,
+    cmd_overide: str = "",
+    **kwargs,
+) -> platform.ShellServiceResponse:
+    if not cmd_overide:
+        cmd_overide = f"./{bash_file}"
+    logger.info(f"Received kwargs: {kwargs}")
+    request_secrets = _create_secrets_from_kwargs(**kwargs)
+    file_contents: str = ""
+    with open(f"{bash_file}", "r") as fh:
+        file_contents = fh.read()
+    logger.info(f"Script file contents:\n\n{file_contents}")
+    rsp = execute_command(
+        cmd=cmd_overide,
+        files={f"{bash_file}": file_contents},
+        service=target_service,
+        request_secrets=request_secrets,
+        env=env,
+    )
+    if include_in_history:
+        SHELL_HISTORY.append(file_contents)
+    logger.info(f"shell stdout: {rsp.stdout}")
+    logger.info(f"shell stderr: {rsp.stderr}")
+    logger.info(f"shell status: {rsp.status}")
+    logger.info(f"shell returncode: {rsp.returncode}")
+    logger.info(f"shell rsp: {rsp}")
+    return rsp
+
+
 def run_cli(
     cmd: str,
     target_service: platform.Service = None,
@@ -127,6 +153,7 @@ def run_cli(
     run_in_workload_with_labels: str = "",
     optional_namespace: str = "",
     optional_context: str = "",
+    include_in_history: bool = True,
     **kwargs,
 ) -> platform.ShellServiceResponse:
     global SHELL_HISTORY
@@ -151,7 +178,8 @@ def run_cli(
         for item in loop_with_items:
             cmd = cmd.format(item=item)
             iter_rsp = execute_command(cmd=cmd, service=target_service, request_secrets=request_secrets, env=env)
-            SHELL_HISTORY.append(cmd)
+            if include_in_history:
+                SHELL_HISTORY.append(cmd)
             looped_results.append(iter_rsp.stdout)
             # keep track of last rsp codes we got
             # TODO: revisit how we aggregate these
@@ -169,7 +197,8 @@ def run_cli(
         )
     else:
         rsp = execute_command(cmd=cmd, service=target_service, request_secrets=request_secrets, env=env)
-        SHELL_HISTORY.append(cmd)
+        if include_in_history:
+            SHELL_HISTORY.append(cmd)
     logger.info(f"shell stdout: {rsp.stdout}")
     logger.info(f"shell stderr: {rsp.stderr}")
     logger.info(f"shell status: {rsp.status}")
