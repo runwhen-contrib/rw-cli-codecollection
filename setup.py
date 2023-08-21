@@ -6,7 +6,8 @@ with open("requirements.txt") as f:
 setup(
     name="runwhen-cli-keywords",
     version=open("VERSION").read(),
-    packages=find_packages(),
+    packages=["RW"],
+    package_dir={"RW": "RW"},
     license="Apache License 2.0",
     description="A set of RunWhen published CLI keywords and python libraries for interacting with APIs using CLIs",
     long_description=open("README.md").read(),
