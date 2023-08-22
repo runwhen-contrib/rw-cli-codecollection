@@ -1,0 +1,20 @@
+# Mapping of Kubernetes issues
+# structure adheres to following rules to keep things DRY:
+# 1. If you foresee a set of titles/objects used under many keys (errors), create anchors and reference them
+# 2. if the set of tasks for the key (error) is unlikely to be used elsewhere, simply hardcode them
+# If an array index contains a ':' it will be formatted seperately as a object hint
+
+# BEGIN PersistentVolumeTroubleshooting
+PersistentVolumeTroubleshooting: &pvt
+  - Fetch Events for Unhealthy Kubernetes PersistentVolumeClaims
+  - List PersistentVolumeClaims in Terminating State
+  - List PersistentVolumes in Terminating State
+  - List Pods with Attached Volumes and Related PersistentVolume Details
+  - Fetch the Storage Utilization for PVC Mounts
+  - Check for RWO Persistent Volume Node Attachment Issues
+  - PersistentVolumeClaim:$workloadpvc
+# Aliases
+FailedMount: *pvt
+FailedAttachVolume: *pvt
+FailedBinding: *pvt
+# END PersistentVolumeTroubleshooting

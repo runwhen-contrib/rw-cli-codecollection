@@ -7,6 +7,7 @@ Library             RW.Core
 Library             RW.platform
 Library             OperatingSystem
 Library             RW.CLI
+Library             RW.NextSteps
 
 Suite Setup         Suite Initialization
 
@@ -24,7 +25,7 @@ Run CLI Command
     RW.Core.Add Pre To Report    Command Stderr:\n${rsp.stderr}
 
 Run Bash File
-    [Documentation]    Runs a bash file to
+    [Documentation]    Runs a bash file to verify script passthrough works
     [Tags]    file    script
     ${rsp}=    RW.CLI.Run Bash File
     ...    bash_file=getdeploys.sh
@@ -32,6 +33,11 @@ Run Bash File
     ...    env=${env}
     RW.Core.Add Pre To Report    Command Stdout:\n${rsp.stdout}
     RW.Core.Add Pre To Report    Command Stderr:\n${rsp.stderr}
+
+Log Suggestion
+    [Documentation]    Generate a next step suggestion, format it, and log it
+    ${next_step}=    RW.NextSteps.Suggest    Bind Mount
+    RW.Core.Add Pre To Report    ${next_step}
 
 
 *** Keywords ***
