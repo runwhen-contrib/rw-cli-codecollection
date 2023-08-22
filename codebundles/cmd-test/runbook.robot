@@ -36,8 +36,14 @@ Run Bash File
 
 Log Suggestion
     [Documentation]    Generate a next step suggestion, format it, and log it
-    ${next_step}=    RW.NextSteps.Suggest    Bind Mount
-    RW.Core.Add Pre To Report    ${next_step}
+    ${next_steps}=    RW.NextSteps.Suggest    Bind Mount
+    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
+    ...    pvc_name=cartservicestorage
+    RW.Core.Add Pre To Report    ${next_steps}
+    ${next_steps}=    RW.NextSteps.Suggest    Useless Error Message
+    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
+    ...    blah=foo
+    RW.Core.Add Pre To Report    ${next_steps}
 
 
 *** Keywords ***
