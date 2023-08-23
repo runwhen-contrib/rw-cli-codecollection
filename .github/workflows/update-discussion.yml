@@ -15,7 +15,7 @@ jobs:
       - name: Check if codebundle discussion exists
         id: find_and_create_codebundle_discussions
         run: |
-          codebundles=$(find codebundles -type d \( -name .runwhen -o -path '*/.runwhen/*' \) -prune -o -type d -exec basename {} \; | grep -v "codebundles")   
+          codebundles=$(find codebundles -maxdepth 1 -type d -exec basename {} \; | grep -v "codebundles")  
           echo "Found codebundles: $codebundles"
           echo "Searching discussions..."
           # Read the queries from separate files
