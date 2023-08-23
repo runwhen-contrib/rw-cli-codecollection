@@ -39,7 +39,7 @@ Fetch Ingress Object Health in Namespace
     ...    set_issue_expected=All ingress objects should have services and active endpoints in namespace: ${NAMESPACE}
     ...    set_issue_actual=Ingress objects missing services or endpoints found in namespace: ${NAMESPACE}
     ...    set_issue_title=Unhealthy ingress objects found in ${NAMESPACE}
-    ...    set_issue_details=The following unhealthy objects were found:\n\n$${unhealthy_objects.stdout}\n\n
+    ...    set_issue_details=The following unhealthy objects were found:\n\n${unhealthy_objects.stdout}\n\n
     ...    set_issue_next_steps=\n\n${unhealthy_objects_next_steps.stdout}
     ...    _line__raise_issue_if_contains=Unhealthy
     ${history}=    RW.CLI.Pop Shell History
