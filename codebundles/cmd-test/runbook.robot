@@ -40,9 +40,28 @@ Log Suggestion
     ${next_steps}=    RW.NextSteps.Format    ${next_steps}
     ...    pvc_name=cartservicestorage
     RW.Core.Add Pre To Report    ${next_steps}
+
     ${next_steps}=    RW.NextSteps.Suggest    Useless Error Message
     ${next_steps}=    RW.NextSteps.Format    ${next_steps}
     ...    blah=foo
+    RW.Core.Add Pre To Report    ${next_steps}
+
+    ${next_steps}=    RW.NextSteps.Suggest    HTTP 500 errors found in logs
+    # pretend to fetch ingress name
+    ${db_name}=    RW.CLI.Run Cli
+    ...    cmd=echo "online-boutique"
+    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
+    ...    ingress_name=online-boutique
+    RW.Core.Add Pre To Report    ${next_steps}
+
+    # simulate a connection err pulled from API logs
+    ${next_steps}=    RW.NextSteps.Suggest    OperationalError: FATAL: connection limit exceeded for non-superusers
+    # simulate fetch object name from k8s api
+    ${db_name}=    RW.CLI.Run Cli
+    ...    cmd=echo "mypostgresdb"
+    # inject db name into next steps
+    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
+    ...    postgres_name=${db_name.stdout}
     RW.Core.Add Pre To Report    ${next_steps}
 
 

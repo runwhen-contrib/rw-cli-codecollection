@@ -40,7 +40,7 @@ def suggest(
     pretty_answer: bool = True,
     include_object_hints: bool = True,
     k_nearest: int = 1,
-    minimum_match_score: int = 50,
+    minimum_match_score: int = 60,
     **kwargs,
 ):
     mapping = _load_mapping(platform)
@@ -51,7 +51,7 @@ def suggest(
     next_steps_data = []
     for match_tuple in key_results:
         # tuple structure: ('FailedMount', 67)
-        # logger.info(f"Fuzzy Match: {match_tuple}")
+        logger.info(f"Fuzzy Match: {match_tuple}")
         if match_tuple[1] < minimum_match_score:
             continue
         map_key = match_tuple[0]
