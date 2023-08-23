@@ -1,74 +1,122 @@
 commands:
-- command: 'namespace="${NAMESPACE}"; context="${CONTEXT}"; for ingress in $(kubectl
-    get ingress -n "$namespace" --context "$context" -ojsonpath=''{range .items[*]}{.metadata.name}{"\n"}{end}'');
-    do echo "Ingress: $ingress"; health_status="NA"; services=(); backend_services=$(kubectl
-    get ingress "$ingress" -n "$namespace" --context "$context" -ojsonpath=''{range
-    .spec.rules[*].http.paths[*]}{.backend.service.name}{"|"}{.backend.service.port.number}{"\n"}{end}'');
-    while IFS=''|'' read -r service port; do if [ -n "$service" ] && [ -n "$port"
-    ]; then echo "Backend Service: $service, Port: $port"; service_exists=$(kubectl
-    get service "$service" -n "$namespace" --context "$context" -ojsonpath=''{.metadata.name}'');
-    if [ -z "$service_exists" ]; then health_status="Unhealthy"; echo "Validation:
-    Service $service does not exist"; else endpoint_pods=$(kubectl get endpoints "$service"
-    -n "$namespace" --context "$context" -ojsonpath=''{range .subsets[*].addresses[*]}-
-    Pod Name: {.targetRef.name}\n Pod IP: {.ip}\n{end}''); if [ -z "$endpoint_pods"
-    ]; then health_status="Unhealthy"; echo "Validation: Endpoint for service $service
-    does not have any pods"; else echo "Endpoint Pod:"; echo "$endpoint_pods"; health_status="Healthy";
-    fi; fi; services+=("$service"); fi; done <<< "$backend_services"; if [ "$health_status"
-    = "Unhealthy" ]; then echo "Health Status: $health_status"; echo "------------";
-    elif [ "$health_status" = "Healthy" ]; then echo "Health Status: $health_status";
-    fi; echo "------------"; done'
+- command: 'NAMESPACE="${NAMESPACE}";CONTEXT="${CONTEXT}";ingresses=$(kubectl get
+    ingress -n "$NAMESPACE" --context "$CONTEXT" -o jsonpath=''{range .items[*]}{.metadata.name}{"\n"}{end}'');for
+    ingress in $ingresses;do echo "Ingress: $ingress";health_status="NA";backend_services=$(kubectl
+    get ingress "$ingress" -n "$NAMESPACE" --context "$CONTEXT" -o jsonpath=''{range
+    .spec.rules[*].http.paths[*]}{.backend.service.name}{"|"}{.backend.service.port.number}{"\n"}{end}'');while
+    IFS=''|'' read -r service port;do echo "Backend Service: $service, Port: $port";target_ports=$(kubectl
+    get service "$service" -n "$NAMESPACE" --context "$CONTEXT" -o jsonpath="{.spec.ports[?(@.port==$port)].targetPort}");service_exists=$(kubectl
+    get service "$service" -n "$NAMESPACE" --context "$CONTEXT" -ojsonpath=''{.metadata.name}'');if
+    [ -z "$service_exists" ];then health_status="Unhealthy";echo "Error: Service $service
+    does not exist";echo "Next Step: Check namespace $NAMESPACE for service name $service.";continue;else
+    selectors=$(kubectl get svc "$service" -n "$NAMESPACE" --context "$CONTEXT" -o
+    jsonpath=''{.spec.selector}'');label_selector="";for key in $(echo $selectors
+    | jq -r ''keys[]'');do value=$(echo $selectors | jq -r --arg key "$key" ''.[$key]'');label_selector="\${label_selector}\${key}=\${value},";done;label_selector=\${label_selector::-1};found_owner=0;for
+    kind in deployment statefulset daemonset;do matching_owners=$(kubectl get $kind
+    -n "$NAMESPACE" --context "$CONTEXT" -l "$label_selector" -o jsonpath=''{.items[*].metadata.name}'');if
+    [ -n "$matching_owners" ];then for owner in $matching_owners;do echo "Owner Kind:
+    $kind";echo "Owner Name: $owner";found_owner=1;done;fi;done;if [ "$found_owner"
+    == 0 ];then echo "Error: No matching deployment, statefulset, or daemonset found";echo
+    "Next Step: Check namespace $NAMESPACE for deployment, statefulset, or daemonset
+    with labels that match $label_selector";fi;port_found="No";associated_pods=$(kubectl
+    get pods -n "$NAMESPACE" --context "$CONTEXT" -l "$label_selector" -o jsonpath=''{.items[*].metadata.name}'');for
+    pod in $associated_pods;do container_ports=$(kubectl get pod "$pod" -n "$NAMESPACE"
+    --context "$CONTEXT" -o jsonpath=''{.spec.containers[*].ports[*].containerPort}'');for
+    target_port in $target_ports;do if echo "$container_ports" | grep -wq "$target_port";then
+    port_found="Yes";break;fi;done;done;if [ "$port_found" = "No" ];then health_status="Unhealthy";echo
+    "Warning: targetPort $target_ports of service $service is not found as a containerPort
+    in associated pods";else health_status="Healthy";fi;endpoint_pods=$(kubectl get
+    endpoints "$service" -n "$NAMESPACE" --context "$CONTEXT" -ojsonpath=''{range
+    .subsets[*].addresses[*]}- Pod Name: {.targetRef.name}\n Pod IP: {.ip}\n{end}'');if
+    [ -z "$endpoint_pods" ];then health_status="Unhealthy";echo "Error: Endpoint for
+    service $service does not have any pods"; echo "Next Step: Check namespace $NAMESPACE
+    for failed pods";else echo "Endpoint Pod:";echo "$endpoint_pods";health_status="Healthy";fi;fi;done<<<"$backend_services";echo
+    "Health Status: $health_status";echo "------------";done'
   doc_links: '
 
-    - [Kubernetes Documentation for the `kubectl get ingress` command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-ingress){:target="_blank"}
+    - [Kubectl Get Ingress - Introduction and Examples](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-ingress){:target="_blank"}
 
-    - [Kubectl command line reference](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
+    - [Kubernetes cs.Ingress - API Reference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#ingress-v1beta1-networking-k8s-io){:target="_blank"}
 
-    - [Kubernetes Documentation for the `kubectl context` command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#context){:target="_blank"}
+    - [Kubectl Get Service - Introduction and Examples](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-service){:target="_blank"}
 
-    - [Kubernetes Documentation for the `kubectl get endpoints` command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-endpoints){:target="_blank"}'
-  explanation: '
+    - [Kubernetes cs.Service - API Reference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#service-v1-core){:target="_blank"}
 
+    - [Kubectl Get Endpoints - Introduction and Examples](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-endpoints){:target="_blank"}
 
-    This command is used to check the health of a Kubernetes Ingress by validating
-    it against the associated Services and Endpoints. The command will take two environment
-    variables as input: NAMESPACE and CONTEXT, which are the namespace in the cluster
-    and the context the user is currently working with. This command will retrieve
-    all Ingress objects within the specified namespace, and then it will loop through
-    each Ingress object and validate that the Service name and port of the Ingress
-    exists in the current context. If the Service name and port do exist, the command
-    will then retrieve all Endpoint IP addresses for that service in the namespace
-    in the current context and print them out. Lastly, it will print the health status
-    of the Ingress being tested.'
-  multi_line_details: "\n\n#Namespace and Context Variables\nNAMESPACE=\"<insert_namespace>\"\
-    \nCONTEXT=\"<insert_context>\"\n\n#Retrieve the Available Ingresses\ningresses=$(kubectl\
-    \ get ingress -n \"$NAMESPACE\" --context \"$CONTEXT\" -ojsonpath='{range .items[*]}{.metadata.name}{\"\
-    \\n\"}{end}')\n\n#Loop Through Retrieved Ingresses\nfor ingress in $ingresses;\
-    \ do\n    echo \"Ingress: $ingress\"\n\n    #Initialize Health Status (Default:\
-    \ NA)\n    health_status=\"NA\"\n\n    #Create Empty Array to Store Services\n\
-    \    services=()\n\n    #Retrieve Backend Services for Ingress\n    backend_services=$(kubectl\
-    \ get ingress \"$ingress\" -n \"$NAMESPACE\" --context \"$CONTEXT\" -ojsonpath='{range\
+    - [Kubernetes cs.Endpoints - API Reference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#endpoints-v1-core){:target="_blank"}'
+  explanation: "\n\nThis command checks the status of ingresses in a given Kubernetes\
+    \ namespace. It first gets all of the Ingresses from the namespace using kubectl\
+    \ and stores them as names in a list. The script then goes through each Ingress\
+    \ one by one. For each Ingress, it looks at the backend services, as well as any\
+    \ associated selector labels, services and pods. It also checks if the target\
+    \ port of the service exists as a containerPort in the pods associated. Finally,\
+    \ it lists the Pods that are associated with the endpoint. After going through\
+    \ everything, the Health Status is displayed for each Ingress. \n\nKubernetes\
+    \ is an open-source container-orchestration system used to deploy applications\
+    \ in a cluster environment. In a Kubernetes cluster, Ingress objects are used\
+    \ to control the external access to the services in a cluster. This script helps\
+    \ to identify issues with the Ingresses such as missing or incorrect services,\
+    \ selectors, ports, and pods. It can be used to quickly check the health status\
+    \ of the Ingress."
+  multi_line_details: " \n\n# Variables used in this command\nNAMESPACE=\"${NAMESPACE}\"\
+    ;\nCONTEXT=\"${CONTEXT}\";\n\n# Get a list of ingresses in the current namespace/context\n\
+    ingresses=$(kubectl get ingress -n \"$NAMESPACE\" --context \"$CONTEXT\" -o jsonpath='{range\
+    \ .items[*]}{.metadata.name}{\"\\n\"}{end}')\n\n# Loop through each ingress, and\
+    \ check if it is healthy or not\nfor ingress in $ingresses; do\n\n    echo \"\
+    Ingress: $ingress\"\n    health_status=\"NA\"\n    \n    # Get a list of backend\
+    \ services with their specific ports per ingress\n    backend_services=$(kubectl\
+    \ get ingress \"$ingress\" -n \"$NAMESPACE\" --context \"$CONTEXT\" -o jsonpath='{range\
     \ .spec.rules[*].http.paths[*]}{.backend.service.name}{\"|\"}{.backend.service.port.number}{\"\
-    \\n\"}{end}')\n\n    #Use IFS For Iterating Service Names and Ports\n    while\
-    \ IFS='|' read -r service port; do\n        #Check if Service and Port Exist\n\
-    \        if [ -n \"$service\" ] && [ -n \"$port\" ]; then\n            echo \"\
-    Backend Service: $service, Port: $port\"\n\n            #Check If Service Exists\n\
-    \            service_exists=$(kubectl get service \"$service\" -n \"$NAMESPACE\"\
-    \ --context \"$CONTEXT\" -ojsonpath='{.metadata.name}')\n            if [ -z \"\
-    $service_exists\" ]; then\n                health_status=\"Unhealthy\"\n     \
-    \           echo \"Validation: Service $service does not exist\"\n           \
-    \ else\n                #Retrieve Endpoint Pods for Service\n                endpoint_pods=$(kubectl\
+    \\n\"}{end}')\n    \n    # Parse through the above output one-by-one\n    while\
+    \ IFS='|' read -r service port; do \n        echo \"Backend Service: $service,\
+    \ Port: $port\"\n        \n        # Get the target port of the backend service\n\
+    \        target_ports=$(kubectl get service \"$service\" -n \"$NAMESPACE\" --context\
+    \ \"$CONTEXT\" -o jsonpath=\"{.spec.ports[?(@.port==$port)].targetPort}\")\n \
+    \           \n        # Check if the service exists, if not report an error  \
+    \  \n        service_exists=$(kubectl get service \"$service\" -n \"$NAMESPACE\"\
+    \ --context \"$CONTEXT\" -ojsonpath='{.metadata.name}')\n        if [ -z \"$service_exists\"\
+    \ ]; then\n            health_status=\"Unhealthy\"\n            echo \"Error:\
+    \ Service $service does not exist\"\n            echo \"Next Step: Check namespace\
+    \ $NAMESPACE for service name $service.\"\n            continue  \n        else\n\
+    \            # Proceed with finding the owner deployment/statefulset/daemonset\
+    \ of the service\n            selectors=$(kubectl get svc \"$service\" -n \"$NAMESPACE\"\
+    \ --context \"$CONTEXT\" -o jsonpath='{.spec.selector}')\n            label_selector=\"\
+    \"\n            for key in $(echo $selectors | jq -r 'keys[]'); do\n         \
+    \       value=$(echo $selectors | jq -r --arg key \"$key\" '.[$key]')\n      \
+    \          label_selector=\"\\${label_selector}\\${key}=\\${value},\"\n      \
+    \      done\n            label_selector=\\${label_selector::-1}\n            found_owner=0\n\
+    \            for kind in deployment statefulset daemonset; do\n              \
+    \  matching_owners=$(kubectl get $kind -n \"$NAMESPACE\" --context \"$CONTEXT\"\
+    \ -l \"$label_selector\" -o jsonpath='{.items[*].metadata.name}')\n          \
+    \      if [ -n \"$matching_owners\" ]; then \n                    for owner in\
+    \ $matching_owners; do\n                        echo \"Owner Kind: $kind\"\n \
+    \                       echo \"Owner Name: $owner\"\n                        found_owner=1\n\
+    \                    done   \n                fi\n            done\n         \
+    \   if [ \"$found_owner\" == 0 ];then\n                echo \"Error: No matching\
+    \ deployment, statefulset, or daemonset found\"\n                echo \"Next Step:\
+    \ Check namespace $NAMESPACE for deployment, statefulset, or daemonset with labels\
+    \ that match $label_selector\"\n            fi\n            \n            # Now\
+    \ check if the target port of the service is exposed in any associated pods\n\
+    \            port_found=\"No\"\n            associated_pods=$(kubectl get pods\
+    \ -n \"$NAMESPACE\" --context \"$CONTEXT\" -l \"$label_selector\" -o jsonpath='{.items[*].metadata.name}')\n\
+    \            for pod in $associated_pods; do\n                container_ports=$(kubectl\
+    \ get pod \"$pod\" -n \"$NAMESPACE\" --context \"$CONTEXT\" -o jsonpath='{.spec.containers[*].ports[*].containerPort}')\n\
+    \                for target_port in $target_ports; do\n                    if\
+    \ echo \"$container_ports\" | grep -wq \"$target_port\"; then \n             \
+    \           port_found=\"Yes\"\n                        break \n             \
+    \       fi\n                done\n            done\n            if [ \"$port_found\"\
+    \ = \"No\" ]; then \n                health_status=\"Unhealthy\"\n           \
+    \     echo \"Warning: targetPort $target_ports of service $service is not found\
+    \ as a containerPort in associated pods\"\n            else\n                health_status=\"\
+    Healthy\"\n            fi\n        fi\n    done<<<\"$backend_services\"\n   \n\
+    \    # Check if endpoint has any associated pods\n    endpoint_pods=$(kubectl\
     \ get endpoints \"$service\" -n \"$NAMESPACE\" --context \"$CONTEXT\" -ojsonpath='{range\
     \ .subsets[*].addresses[*]}- Pod Name: {.targetRef.name}\\n Pod IP: {.ip}\\n{end}')\n\
-    \n                #Check if Endpoint Has Any Pods\n                if [ -z \"\
-    $endpoint_pods\" ]; then\n                    health_status=\"Unhealthy\"\n  \
-    \                  echo \"Validation: Endpoint for service $service does not have\
-    \ any pods\"\n                else\n                    echo \"Endpoint Pod:\"\
-    \n                    echo \"$endpoint_pods\"\n                    health_status=\"\
-    Healthy\"\n                fi;\n            fi;\n\n            #Save Service To\
-    \ Services Array For Further Use\n            services+=(\"$service\") \n    \
-    \    fi;\n    done <<< \"$backend_services\"\n\n    #Check Health Status Of Ingress\
-    \ Based On Services Validation Results\n    if [ \"$health_status\" = \"Unhealthy\"\
-    \ ]; then\n        echo \"Health Status: $health_status\"\n        echo \"------------\"\
-    \n    elif [ \"$health_status\" = \"Healthy\" ]; then\n        echo \"Health Status:\
-    \ $health_status\"\n    fi\n\n    echo \"------------\"\ndone"
+    \    if [ -z \"$endpoint_pods\" ]; then \n        health_status=\"Unhealthy\"\
+    \ \n        echo \"Error: Endpoint for service $service does not have any pods\"\
+    \ \n        echo \"Next Step: Check namespace $NAMESPACE for failed pods\"\n \
+    \   else \n        echo \"Endpoint Pod:\"\n        echo \"$endpoint_pods\"\n \
+    \       health_status=\"Healthy\"\n    fi\n   \n    echo \"Health Status: $health_status\"\
+    \n    echo \"------------\"\ndone"
   name: fetch_ingress_object_health_in_namespace
