@@ -19,4 +19,5 @@ RUN chown 1000:0 -R $WORKDIR
 RUN chown 1000:0 -R /app/codecollection
 
 # Set the user to $USER
+ENV USER "python"
 USER python
