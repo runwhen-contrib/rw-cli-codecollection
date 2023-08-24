@@ -1,4 +1,4 @@
-Troubleshooting Tasks in Codecollection: **101**
+Troubleshooting Tasks in Codecollection: **103**
 Codebundles in Codecollection: **36**
 
 ![](docs/GitHub_Banner.jpg)
@@ -79,5 +79,5 @@ Run the codebundle
 | [Test Issues](https://github.com/runwhen-contrib/rw-cli-codecollection/blob/main/codebundles/test-issue/runbook.robot) | `Test` | `Raise Full Issue` | A codebundle for testing the issues feature. Purely for testing flow. [Docs](https://docs.runwhen.com/public/v/cli-codecollection/test-issue) |
 | [cURL HTTP OK](https://github.com/runwhen-contrib/rw-cli-codecollection/blob/main/codebundles/curl-http-ok/sli.robot) | `Linux macOS Windows HTTP` | `Checking HTTP URL Is Available And Timely` | This taskset uses curl to validate the response code of the endpoint and provides the total time of the request. [Docs](https://docs.runwhen.com/public/v/cli-codecollection/curl-http-ok) |
 | [cli-test-taskset](https://github.com/runwhen-contrib/rw-cli-codecollection/blob/main/codebundles/cli-test/runbook.robot) | `cli` | `Run CLI and Parse Output For Issues`, `Exec Test`, `Local Process Test` | This taskset smoketests the CLI codebundle setup and run process [Docs](https://docs.runwhen.com/public/v/cli-codecollection/cli-test) |
-| [cmd-test-taskset](https://github.com/runwhen-contrib/rw-cli-codecollection/blob/main/codebundles/cmd-test/runbook.robot) | `cmd` | `Run CLI Command` | This taskset smoketests the CLI codebundle setup and run process by running a bare command [Docs](https://docs.runwhen.com/public/v/cli-codecollection/cmd-test) |
+| [cmd-test-taskset](https://github.com/runwhen-contrib/rw-cli-codecollection/blob/main/codebundles/cmd-test/runbook.robot) | `cmd` | `Run CLI Command`, `Run Bash File`, `Log Suggestion` | This taskset smoketests the CLI codebundle setup and run process by running a bare command [Docs](https://docs.runwhen.com/public/v/cli-codecollection/cmd-test) |
 
