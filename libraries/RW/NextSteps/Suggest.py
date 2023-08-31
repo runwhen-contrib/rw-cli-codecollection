@@ -30,12 +30,15 @@ def _load_mapping(platform: str) -> dict:
 
 
 def format(suggestions: str, **kwargs) -> str:
+    for k, v in kwargs.items():
+        if type(v) is str:
+            kwargs[k] = v.strip("\n")
     suggestions = Template(suggestions).safe_substitute(kwargs)
     return suggestions
 
 
 def suggest(
-    search_error: str,
+    search,
     platform: str = "Kubernetes",
     pretty_answer: bool = True,
     include_object_hints: bool = True,
@@ -43,11 +46,18 @@ def suggest(
     minimum_match_score: int = 60,
     **kwargs,
 ):
+    # allow search to be str or list, allowing combinations of K>1 and multi search
+    if type(search) == str:
+        search = [search]
     mapping = _load_mapping(platform)
     results: list[str] = []
     if not mapping:
         return results
-    key_results = fuzzprocessor.extract(search_error, mapping.keys(), limit=k_nearest)
+    key_results: list = []
+    for single_search in search:
+        if not single_search:
+            continue
+        key_results += fuzzprocessor.extract(single_search.replace("\n", ""), mapping.keys(), limit=k_nearest)
     next_steps_data = []
     for match_tuple in key_results:
         # tuple structure: ('FailedMount', 67)
@@ -57,15 +67,16 @@ def suggest(
         map_key = match_tuple[0]
         next_steps_data += mapping[map_key]
     if not next_steps_data:
-        next_steps_data.append(NO_RESULT_STRING)
+        return NO_RESULT_STRING
     if pretty_answer:
-        titles: str = ""
-        object_hints: str = ""
+        titles: list = []
+        object_hints: list = []
         for suggestion in next_steps_data:
-            if ":" in suggestion:
-                object_hints += f"\n{suggestion}"
-            else:
-                titles += f", {suggestion}"
-        titles = titles.lstrip(", ")
+            if ":" in suggestion and suggestion not in object_hints:
+                object_hints.append(f"{suggestion}")
+            elif ":" not in suggestion and suggestion not in titles:
+                titles.append(f"{suggestion}")
+        object_hints = "\n".join(object_hints)
+        titles = ", ".join(titles)
         results = f"{titles}\n\n{object_hints}"
     return results

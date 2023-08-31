@@ -29,6 +29,32 @@ FailedAttachVolume: *pvt
 FailedBinding: *pvt
 # END PersistentVolumeTroubleshooting
 
+# BEGIN DeploymentTroubleshooting
+DeploymentTroubleshooting: &dt
+  - Check Deployment Log For Issues
+  - Troubleshoot Deployment Warning Events
+  - Troubleshoot Deployment Replicas
+  - Check For Deployment Event Anomalies
+  - Deployment:$deployment_name
+# Aliases
+"Deployment has error or warning events": *dt
+"Deployments pods have error or warning events": *dt
+"Deployment failing to roll out": *dt
+"Deployment pods have errors": *dt
+"Deployment pods are failing": *dt
+"Deployment pods have run out of resources": *dt
+# END DeploymentTroubleshooting
+
+# BEGIN ImageTroubleshooting
+ImageTroubleshooting: &it
+  - Check Image Rollover Times In Namespace
+  - List Images and Tags for Every Container in Running Pods
+  - List ImagePullBackOff Events and Test Path and Tags
+# Aliases
+"Back-off pulling image": *it
+"The image in my container is not working": *it
+# END ImageTroubleshooting
+
 # BEGIN PostgresTroubleshooting
 PostgresTroubleshooting: &psqlt
   - Get Standard Postgres Resource Information

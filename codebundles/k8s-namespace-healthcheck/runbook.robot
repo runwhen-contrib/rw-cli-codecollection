@@ -7,6 +7,7 @@ Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
+Library             RW.NextSteps
 Library             RW.platform
 Library             OperatingSystem
 Library             DateTime
@@ -20,7 +21,15 @@ Trace And Troubleshoot Namespace Warning Events And Errors
     [Documentation]    Queries all error events in a given namespace within the last 30 minutes,
     ...    fetches the list of involved pod names, requests logs from them and parses
     ...    the logs for exceptions.
-    [Tags]    namespace    trace    error    pods    events    logs    grep    indicates there's HTTP error codes associated with this ingress and service. You need to investigate the application
+    [Tags]
+    ...    namespace
+    ...    trace
+    ...    error
+    ...    pods
+    ...    events
+    ...    logs
+    ...    grep
+    ...    indicates there's http error codes associated with this ingress and service. you need to investigate the application
     # get pods involved with error events
     ${error_events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json
@@ -82,7 +91,7 @@ Trace And Troubleshoot Namespace Warning Events And Errors
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Troubleshoot Container Restarts In Namespace
-    [Documentation]    Fetches pods that have container restarts and provides a report of the restart issues. 
+    [Documentation]    Fetches pods that have container restarts and provides a report of the restart issues.
     [Tags]    namespace    containers    status    restarts
     ${container_restart_details}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r --argjson exit_code_explanations '{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}' '.items[] | select(.status.containerStatuses != null) | select(.status.containerStatuses[].restartCount > 0) | "---\\npod_name: \\(.metadata.name)\\ncontainers: \\(.status.containerStatuses | map(.name) | join(", "))\\nrestart_count: \\(.status.containerStatuses[].restartCount)\\nmessage: \\(.status.message // "N/A")\\n\\(.status.containerStatuses[] | select(.state.running != null) | .lastState.terminated | "terminated_reason: \\(.reason // "N/A")\\nterminated_finishedAt: \\(.finishedAt // "N/A")\\nterminated_exitCode: \\(.exitCode // "N/A")\\nexit_code_explanation: \\($exit_code_explanations[.exitCode | tostring] // "Unknown exit code")")\\n---\\n"'
@@ -95,7 +104,7 @@ Troubleshoot Container Restarts In Namespace
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${container_restart_details}
     ...    set_severity_level=2
-    ...    set_issue_expected=Containers should not be restarting. 
+    ...    set_issue_expected=Containers should not be restarting.
     ...    set_issue_actual=We found the following containers with restarts: $_stdout
     ...    set_issue_title=Container Restarts Detected In Namespace ${NAMESPACE}
     ...    set_issue_details=Pods with Container Restarts:\n"$_stdout" in the namespace ${NAMESPACE}
@@ -112,7 +121,7 @@ Troubleshoot Container Restarts In Namespace
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Troubleshoot Pending Pods In Namespace
-    [Documentation]    Fetches pods that are pending and provides details. 
+    [Documentation]    Fetches pods that are pending and provides details.
     [Tags]    namespace    pods    status    pending
     ${pending_pods}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending --no-headers -o json | jq -r '.items[] | "---\\npod_name: \\(.metadata.name)\\nstatus: \\(.status.phase // "N/A")\\nmessage: \\(.status.conditions[].message // "N/A")\\nreason: \\(.status.conditions[].reason // "N/A")\\ncontainerStatus: \\((.status.containerStatuses // [{}])[].state // "N/A")\\ncontainerMessage: \\((.status.containerStatuses // [{}])[].state?.waiting?.message // "N/A")\\ncontainerReason: \\((.status.containerStatuses // [{}])[].state?.waiting?.reason // "N/A")\\n---\\n"'
@@ -123,7 +132,7 @@ Troubleshoot Pending Pods In Namespace
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${pending_pods}
     ...    set_severity_level=1
-    ...    set_issue_expected=Pods should not be stuck pending.  
+    ...    set_issue_expected=Pods should not be stuck pending.
     ...    set_issue_actual=We found the following pods in a pending state: $_stdout
     ...    set_issue_title=Pending Pods Found In Namespace ${NAMESPACE}
     ...    set_issue_details=Pods pending with reasons:\n"$_stdout" in the namespace ${NAMESPACE}
@@ -141,7 +150,7 @@ Troubleshoot Pending Pods In Namespace
 
 Troubleshoot Failed Pods In Namespace
     [Documentation]    Fetches all pods which are not running (unready) in the namespace and adds them to a report for future review.
-    [Tags]    namespace    pods    status    unready    not starting    phase    failed    
+    [Tags]    namespace    pods    status    unready    not starting    phase    failed
     ${unreadypods_details}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed --no-headers -o json | jq -r --argjson exit_code_explanations '{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}' '.items[] | "---\\npod_name: \\(.metadata.name)\\nrestart_count: \\(.status.containerStatuses[0].restartCount // "N/A")\\nmessage: \\(.status.message // "N/A")\\nterminated_finishedAt: \\(.status.containerStatuses[0].state.terminated.finishedAt // "N/A")\\nexit_code: \\(.status.containerStatuses[0].state.terminated.exitCode // "N/A")\\nexit_code_explanation: \\($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode | tostring] // "Unknown exit code")\\n---\\n"'
     ...    target_service=${kubectl}
@@ -176,8 +185,19 @@ Troubleshoot Workload Status Conditions In Namespace
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
-    ${dply_name}=    RW.CLI.Run Cli
-    ...    cmd=echo "${all_resources.stdout}" | grep -oP "(?<={'kind': 'Deployment', 'name': ')[^ ]*" | grep -oP "[^.]*(?=',)" | head -n 1
+    ${workload_info}=    RW.CLI.Run Cli
+    ...    cmd=cat << 'EOF' | jq -r '[.items[] | {kind: .kind, name: .metadata.name, conditions: .status.conditions[]? | select(.status == "False")}][0] // null'\n${all_resources.stdout}EOF
+    ...    include_in_history=False
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ${condition}=    RW.CLI.Run Cli
+    ...    cmd=cat << 'EOF' | jq -r '.conditions.reason'\n${workload_info.stdout}EOF
+    ${workload_name}=    RW.CLI.Run Cli
+    ...    cmd=cat << 'EOF' | jq -r '.name'\n${workload_info.stdout}EOF
+    ${workload_kind}=    RW.CLI.Run Cli
+    ...    cmd=cat << 'EOF' | jq -r '.kind'\n${workload_info.stdout}EOF
+    ${next_steps}=    RW.NextSteps.Suggest    ${workload_kind.stdout} ${condition.stdout}
     ${failing_conditions}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${all_resources}
     ...    extract_path_to_var__workload_conditions=items[].{kind:kind, name:metadata.name, conditions:status.conditions[?status == `False`]}
@@ -216,14 +236,26 @@ Get Listing Of Resources In Namespace
 
 Check For Namespace Event Anomalies
     [Documentation]    Parses all events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
-    [Tags]    namespace    events    info    state    anomolies    count    occurences    <service_name>    indicates there's HTTP error codes associated with this ingress and service. You need to investigate the application
+    [Tags]    namespace    events    info    state    anomolies    count    occurences
     ${recent_anomalies}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select( .count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) > ${ANOMALY_THRESHOLD}) | "Event(s) Per Minute:" + (.count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) |tostring) +" Count:" + (.count|tostring) + " Minute(s):" + (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60|tostring)+ " Object:" + .involvedObject.namespace + "/" + .involvedObject.kind + "/" + .involvedObject.name + " Reason:" + .reason + " Message:" + .message'
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ${event_messages}=    RW.CLI.Run CLI
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r .items[].message
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=False
+    ${event_messages}=    Evaluate    """${event_messages.stdout}""".split("\\n")
     ${pod_name}=    RW.CLI.Run Cli
     ...    cmd=echo "${recent_anomalies.stdout}" | grep -oP '(?<=Pod/)[^ ]*' | grep -oP '[^.]*(?=-[a-z0-9]+-[a-z0-9]+)' | head -n 1
+    ...    include_in_history=False
+    ${next_steps}=    RW.NextSteps.Suggest    ${event_messages}
+    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
+    ...    pod_name=${pod_name.stdout}
+    ...    deployment_name=${pod_name.stdout}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${recent_anomalies}
     ...    set_severity_level=2
@@ -231,7 +263,7 @@ Check For Namespace Event Anomalies
     ...    set_issue_actual=We detected events in the namespace ${NAMESPACE} which are considered anomalies
     ...    set_issue_title=Event Anomalies Detected In Namespace ${NAMESPACE}
     ...    set_issue_details=Anomaly non-warning events in namespace ${NAMESPACE}:\n"$_stdout"
-    ...    set_issue_next_steps=${pod_name.stdout} Check For Deployment Event Anomalies
+    ...    set_issue_next_steps=${next_steps}
     ...    _line__raise_issue_if_contains=Object
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add To Report    Summary Of Anomalies Detected:\n
@@ -255,7 +287,7 @@ Troubleshoot Namespace Services And Application Workloads
     ...    aggregate
     ...    filter
     ...    <service_name>
-    ...    indicates there's HTTP error codes associated with this ingress and service. You need to investigate the application
+    ...    indicates there's http error codes associated with this ingress and service. you need to investigate the application
     ${aggregate_service_logs}=    RW.CLI.Run Cli
     ...    cmd=services=($(${KUBERNETES_DISTRIBUTION_BINARY} get svc -o=name --context=${CONTEXT} -n ${NAMESPACE})); logs=""; for service in "\${services[@]}"; do logs+=$(${KUBERNETES_DISTRIBUTION_BINARY} logs $service --limit-bytes=256000 --since=2h --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${SERVICE_ERROR_PATTERN}" | grep -Ev "${SERVICE_EXCLUDE_PATTERN}" | sort | uniq -c | awk '{print "Issue Occurences:",$0}'); done; echo "\${logs}"
     ...    target_service=${kubectl}
@@ -277,8 +309,8 @@ Troubleshoot Namespace Services And Application Workloads
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Check Missing or Risky PodDisruptionBudget Policies
-    [Documentation]    Searches through deployemnts and statefulsets to determine if they are missing PodDistruptionBudgets or have them configured in a risky way that prohibits cluster or node upgrades. 
-    [Tags]    poddisruptionbudget    availability    unavailable    risky   missing    policy    <service_name>
+    [Documentation]    Searches through deployemnts and statefulsets to determine if they are missing PodDistruptionBudgets or have them configured in a risky way that prohibits cluster or node upgrades.
+    [Tags]    poddisruptionbudget    availability    unavailable    risky    missing    policy    <service_name>
     ${pdb_check}=    RW.CLI.Run Cli
     ...    cmd=context="${CONTEXT}"; namespace="${NAMESPACE}"; check_health() { local type=$1; local name=$2; local replicas=$3; local selector=$4; local pdbs=$(${KUBERNETES_DISTRIBUTION_BINARY} --context "$context" --namespace "$namespace" get pdb -o json | jq -c --arg selector "$selector" '.items[] | select(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value == $selector)'); if [[ $replicas -gt 1 && -z "$pdbs" ]]; then printf "%-30s %-30s %-10s\\n" "$type/$name" "" "Missing"; else echo "$pdbs" | jq -c . | while IFS= read -r pdb; do local pdbName=$(echo "$pdb" | jq -r '.metadata.name'); local minAvailable=$(echo "$pdb" | jq -r '.spec.minAvailable // ""'); local maxUnavailable=$(echo "$pdb" | jq -r '.spec.maxUnavailable // ""'); if [[ "$minAvailable" == "100%" || "$maxUnavailable" == "0" || "$maxUnavailable" == "0%" ]]; then printf "%-30s %-30s %-10s\\n" "$type/$name" "$pdbName" "Risky"; elif [[ $replicas -gt 1 && ("$minAvailable" != "100%" || "$maxUnavailable" != "0" || "$maxUnavailable" != "0%") ]]; then printf "%-30s %-30s %-10s\\n" "$type/$name" "$pdbName" "OK"; fi; done; fi; }; echo "Deployments:"; echo "-----------"; printf "%-30s %-30s %-10s\\n" "NAME" "PDB" "STATUS"; ${KUBERNETES_DISTRIBUTION_BINARY} --context "$context" --namespace "$namespace" get deployments -o json | jq -c '.items[] | "\\(.metadata.name) \\(.spec.replicas) \\(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value)"' | while read -r line; do check_health "Deployment" $(echo $line | tr -d '"'); done; echo ""; echo "Statefulsets:"; echo "-------------"; printf "%-30s %-30s %-10s\\n" "NAME" "PDB" "STATUS"; ${KUBERNETES_DISTRIBUTION_BINARY} --context "$context" --namespace "$namespace" get statefulsets -o json | jq -c '.items[] | "\\(.metadata.name) \\(.spec.replicas) \\(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value)"' | while read -r line; do check_health "StatefulSet" $(echo $line | tr -d '"'); done
     ...    target_service=${kubectl}
