@@ -53,6 +53,8 @@ ImageTroubleshooting: &it
 # Aliases
 "Back-off pulling image": *it
 "The image in my container is not working": *it
+"failed to pull and unpack image": *it
+"Failed to pull image": *it
 # END ImageTroubleshooting
 
 # BEGIN PostgresTroubleshooting

@@ -21,15 +21,7 @@ Trace And Troubleshoot Namespace Warning Events And Errors
     [Documentation]    Queries all error events in a given namespace within the last 30 minutes,
     ...    fetches the list of involved pod names, requests logs from them and parses
     ...    the logs for exceptions.
-    [Tags]
-    ...    namespace
-    ...    trace
-    ...    error
-    ...    pods
-    ...    events
-    ...    logs
-    ...    grep
-    ...    indicates there's http error codes associated with this ingress and service. you need to investigate the application
+    [Tags]    namespace    trace    error    pods    events    logs    grep
     # get pods involved with error events
     ${error_events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json
@@ -42,6 +34,20 @@ Trace And Troubleshoot Namespace Warning Events And Errors
     ...    extract_path_to_var__recent_events=items
     ...    recent_events__filter_older_than__60m=lastTimestamp
     ...    assign_stdout_from_var=recent_events
+
+    ${involved_pod_names}=    RW.CLI.Run Cli
+    ...    cmd=cat << 'EOF' | jq -r '.items[] | select(.involvedObject.kind == "Pod") | .involvedObject.name' | tr -d "\n"\n${error_events.stdout}EOF
+    ...    include_in_history=False
+    ${involved_pod_names_array}=    Evaluate    """${involved_pod_names.stdout}""".split("\\n")
+    ${event_messages}=    RW.CLI.Run Cli
+    ...    cmd=cat << 'EOF' | jq -r '.items[] | select(.involvedObject.kind == "Pod") | .message' | tr -d "\n"\n${error_events.stdout}EOF
+    ...    include_in_history=False
+    ${event_messages_array}=    Evaluate    """${event_messages.stdout}""".split("\\n")
+    ${next_steps}=    RW.NextSteps.Suggest
+    ...    Pods in namespace ${NAMESPACE} have associated warning events ${event_messages_array}
+    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
+    ...    pod_names=${involved_pod_names_array}
+
     ${involved_pod_names}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${error_events}
     ...    extract_path_to_var__involved_pod_names=items[?involvedObject.kind=='Pod'].involvedObject.name
@@ -49,7 +55,7 @@ Trace And Troubleshoot Namespace Warning Events And Errors
     ...    pod_count__raise_issue_if_gt=0
     ...    set_issue_title=$pod_count Pods Found With Recent Warning Events In Namespace ${NAMESPACE}
     ...    set_issue_details=Warning events in the namespace ${NAMESPACE}.\nName of pods with issues:\n"$involved_pod_names"\nTroubleshoot pod or namespace events:\n"${recent_error_events.stdout}"
-    ...    set_issue_next_steps=Check For Deployment Event Anomalies
+    ...    set_issue_next_steps=${next_steps}
     ...    assign_stdout_from_var=involved_pod_names
     # get pods with restarts > 0
     ${pods_in_namespace}=    RW.CLI.Run Cli
@@ -58,6 +64,12 @@ Trace And Troubleshoot Namespace Warning Events And Errors
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${restart_age}=    RW.CLI.String To Datetime    30m
+    ${pod_names}=    RW.CLI.Run Cli
+    ...    cmd=cat << 'EOF' | jq -r '.items[].metadata.name'\n${error_events.stdout}EOF
+    ...    include_in_history=False
+    ${next_steps}=    RW.NextSteps.Suggest    Pods in namespace ${NAMESPACE} are restarting: ${pod_names.stdout}
+    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
+    ...    pod_name=${pod_names.stdout}
     ${restarting_pods}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${pods_in_namespace}
     ...    extract_path_to_var__pod_restart_stats=items[].{name:metadata.name, containerRestarts:status.containerStatuses[].{restartCount:restartCount, terminated_at:lastState.terminated.finishedAt}|[?restartCount > `0` && terminated_at >= `${restart_age}`]}
@@ -67,7 +79,7 @@ Trace And Troubleshoot Namespace Warning Events And Errors
     ...    pod_count__raise_issue_if_gt=0
     ...    set_issue_title=Frequently Restarting Pods In Namespace ${NAMESPACE}
     ...    set_issue_details=Found $pod_count pods that are frequently restarting in ${NAMESPACE}. Troubleshoot these pods:\n"$pods_with_recent_restarts"
-    ...    set_issue_next_steps=Check For Deployment Event Anomalies
+    ...    set_issue_next_steps=${next_steps}
     ...    assign_stdout_from_var=restart_pod_names
     # fetch logs with pod names
     ${restarting_pods}=    RW.CLI.From Json    json_str=${restarting_pods.stdout}
@@ -80,9 +92,9 @@ Trace And Troubleshoot Namespace Warning Events And Errors
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    loop_with_items=${podnames_to_query}
     ${history}=    RW.CLI.Pop Shell History
-    IF    """${pod_logs_errors}""" != ""
+    IF    """${pod_logs_errors.stdout}""" != ""
         ${error_trace_results}=    Set Variable
-        ...    Found error logs:\nEffected Pods: ${podnames_to_query}\n${pod_logs_errors}\n
+        ...    Found error logs:\n${pod_logs_errors.stdout}\n\nEffected Pods: ${podnames_to_query}\n
     ELSE
         ${error_trace_results}=    Set Variable    No trace errors found!
     END
@@ -99,8 +111,12 @@ Troubleshoot Container Restarts In Namespace
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
-    ${svc_name}=    RW.CLI.Run Cli
+    ${pod_name}=    RW.CLI.Run Cli
     ...    cmd=echo "${container_restart_details.stdout}" | grep -oP '(?<=pod_name:)[^ ]*' | grep -oP '[^.]*(?=-[a-z0-9]+-[a-z0-9]+)'
+    ${next_steps}=    RW.NextSteps.Suggest    Pod ${container_restart_details.details}
+    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
+    ...    pod_name=${pod_name}
+    ...    workload_name=${pod_name}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${container_restart_details}
     ...    set_severity_level=2
@@ -108,7 +124,7 @@ Troubleshoot Container Restarts In Namespace
     ...    set_issue_actual=We found the following containers with restarts: $_stdout
     ...    set_issue_title=Container Restarts Detected In Namespace ${NAMESPACE}
     ...    set_issue_details=Pods with Container Restarts:\n"$_stdout" in the namespace ${NAMESPACE}
-    ...    set_issue_next_steps=${svc_name.stdout} Check For Deployment Event Anomalies
+    ...    set_issue_next_steps=${next_steps}
     ...    _line__raise_issue_if_contains=-
     ${history}=    RW.CLI.Pop Shell History
     IF    """${container_restart_details.stdout}""" == ""
@@ -129,6 +145,7 @@ Troubleshoot Pending Pods In Namespace
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
+    ${next_steps}=    RW.NextSteps.Suggest    ${pending_pods.details}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${pending_pods}
     ...    set_severity_level=1
@@ -136,7 +153,7 @@ Troubleshoot Pending Pods In Namespace
     ...    set_issue_actual=We found the following pods in a pending state: $_stdout
     ...    set_issue_title=Pending Pods Found In Namespace ${NAMESPACE}
     ...    set_issue_details=Pods pending with reasons:\n"$_stdout" in the namespace ${NAMESPACE}
-    ...    set_issue_next_steps=Check For Deployment Event Anomalies
+    ...    set_issue_next_steps=${next_steps}
     ...    _line__raise_issue_if_contains=-
     ${history}=    RW.CLI.Pop Shell History
     IF    """${pending_pods.stdout}""" == ""
@@ -157,6 +174,7 @@ Troubleshoot Failed Pods In Namespace
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
+    ${next_steps}=    RW.NextSteps.Suggest    ${unreadypods_details.details}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${unreadypods_details}
     ...    set_severity_level=1
@@ -164,7 +182,7 @@ Troubleshoot Failed Pods In Namespace
     ...    set_issue_actual=We found the following unready pods: $_stdout
     ...    set_issue_title=Unready Pods Detected In Namespace ${NAMESPACE}
     ...    set_issue_details=Unready pods:\n"$_stdout" in the namespace ${NAMESPACE}
-    ...    set_issue_next_steps=Check For Deployment Event Anomalies
+    ...    set_issue_next_steps=${next_steps}
     ...    _line__raise_issue_if_contains=-
     ${history}=    RW.CLI.Pop Shell History
     IF    """${unreadypods_details.stdout}""" == ""
@@ -192,12 +210,17 @@ Troubleshoot Workload Status Conditions In Namespace
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${condition}=    RW.CLI.Run Cli
-    ...    cmd=cat << 'EOF' | jq -r '.conditions.reason'\n${workload_info.stdout}EOF
+    ...    cmd=cat << 'EOF' | jq -r '.conditions.reason' | tr -d "\n"\n${workload_info.stdout}EOF
+    ...    include_in_history=False
     ${workload_name}=    RW.CLI.Run Cli
-    ...    cmd=cat << 'EOF' | jq -r '.name'\n${workload_info.stdout}EOF
+    ...    cmd=cat << 'EOF' | jq -r '.name' | tr -d "\n"\n${workload_info.stdout}EOF
+    ...    include_in_history=False
     ${workload_kind}=    RW.CLI.Run Cli
-    ...    cmd=cat << 'EOF' | jq -r '.kind'\n${workload_info.stdout}EOF
+    ...    cmd=cat << 'EOF' | jq -r '.kind' | tr -d "\n"\n${workload_info.stdout}EOF
+    ...    include_in_history=False
     ${next_steps}=    RW.NextSteps.Suggest    ${workload_kind.stdout} ${condition.stdout}
+    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
+    ...    ${workload_kind.stdout}_name=${workload_name.stdout}
     ${failing_conditions}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${all_resources}
     ...    extract_path_to_var__workload_conditions=items[].{kind:kind, name:metadata.name, conditions:status.conditions[?status == `False`]}
@@ -208,7 +231,7 @@ Troubleshoot Workload Status Conditions In Namespace
     ...    set_severity_level=1
     ...    set_issue_title=$pods_with_failures Pods With Unhealthy Status In Namespace ${NAMESPACE}
     ...    set_issue_details=Pods with unhealthy status condition in the namespace ${NAMESPACE}. Here's a summary of potential issues we found:\n"$aggregate_failures"
-    ...    set_issue_next_steps=${dply_name.stdout} Check For Deployment Event Anomalies
+    ...    set_issue_next_steps=${next_steps}
     ...    assign_stdout_from_var=aggregate_failures
     ${history}=    RW.CLI.Pop Shell History
     IF    """${failing_conditions.stdout}""" == ""
