@@ -309,8 +309,6 @@ Troubleshoot Namespace Services And Application Workloads
     ...    logs
     ...    aggregate
     ...    filter
-    ...    <service_name>
-    ...    indicates there's http error codes associated with this ingress and service. you need to investigate the application
     ${aggregate_service_logs}=    RW.CLI.Run Cli
     ...    cmd=services=($(${KUBERNETES_DISTRIBUTION_BINARY} get svc -o=name --context=${CONTEXT} -n ${NAMESPACE})); logs=""; for service in "\${services[@]}"; do logs+=$(${KUBERNETES_DISTRIBUTION_BINARY} logs $service --limit-bytes=256000 --since=2h --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${SERVICE_ERROR_PATTERN}" | grep -Ev "${SERVICE_EXCLUDE_PATTERN}" | sort | uniq -c | awk '{print "Issue Occurences:",$0}'); done; echo "\${logs}"
     ...    target_service=${kubectl}

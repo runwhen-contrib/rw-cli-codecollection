@@ -66,6 +66,20 @@ def format(suggestions: str, expand_arrays: bool = True, **kwargs) -> str:
         formatted_kwargs = reformatted_kwargs
     suggestions = "\n".join(suggestions)
     suggestions = Template(suggestions).safe_substitute(formatted_kwargs)
+    # remove any object hints that didn't get values, de-duplicate
+    # and re-order to allow joining of multiple nextsteps blocks
+    object_hints: list[str] = []
+    ordered_suggestions: list[str] = []
+    for line in suggestions.split("\n"):
+        if line and not line.isspace() and OBJECT_HINT_SYMBOL not in line and line not in ordered_suggestions:
+            ordered_suggestions.append(line)
+        elif (
+            line and not line.isspace() and OBJECT_HINT_SYMBOL in line and "$" not in line and line not in object_hints
+        ):
+            object_hints.append(line)
+    object_hints = "\n".join(object_hints)
+    ordered_suggestions = "\n".join(ordered_suggestions)
+    suggestions = f"{ordered_suggestions}\n\n{object_hints}"
     return suggestions
 
 
