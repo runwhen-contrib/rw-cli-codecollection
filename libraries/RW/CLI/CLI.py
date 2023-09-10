@@ -4,6 +4,7 @@ CLI Generic keyword library for running and parsing CLI stdout
 Scope: Global
 """
 import re, logging, json, jmespath
+import os
 from datetime import datetime
 from robot.libraries.BuiltIn import BuiltIn
 
