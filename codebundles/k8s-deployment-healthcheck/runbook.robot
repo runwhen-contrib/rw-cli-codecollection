@@ -21,7 +21,7 @@ Check Deployment Log For Issues
     ...    bash_file=/collection/codebundles/k8s-deployment-healthcheck/deployment_logs.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    cmd_overide = /collection/codebundles/k8s-deployment-healthcheck/deployment_logs.sh
+    ...    cmd_overide=/collection/codebundles/k8s-deployment-healthcheck/deployment_logs.sh
     ${recommendations}=    RW.CLI.Run Cli
     ...    cmd=echo "${logs.stdout}" | awk '/Recommended Next Steps:/ {flag=1; next} flag'
     ...    env=${env}
