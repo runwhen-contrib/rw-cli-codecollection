@@ -21,6 +21,7 @@ Check Deployment Log For Issues
     ...    bash_file=deployment_logs.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    cmd_overide="ls -lha"
     ${recommendations}=    RW.CLI.Run Cli
     ...    cmd=echo "${logs.stdout}" | awk '/Recommended Next Steps:/ {flag=1; next} flag'
     ...    env=${env}
