@@ -25,6 +25,7 @@ Check Deployment Log For Issues
     ${recommendations}=    RW.CLI.Run Cli
     ...    cmd=echo "${logs.stdout}" | awk '/Recommended Next Steps:/ {flag=1; next} flag'
     ...    env=${env}
+    ...    include_in_history=false
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${logs}
     ...    set_severity_level=2
