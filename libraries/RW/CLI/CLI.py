@@ -124,6 +124,9 @@ def run_bash_file(
     logger.info(f"Received kwargs: {kwargs}")
     request_secrets = _create_secrets_from_kwargs(**kwargs)
     file_contents: str = ""
+    # Debug working dir
+    cwd = os.getcwd()
+    logger.info(f"Working Directory: {cwd}")
     with open(f"{bash_file}", "r") as fh:
         file_contents = fh.read()
     logger.info(f"Script file contents:\n\n{file_contents}")
