@@ -134,8 +134,8 @@ def run_bash_file(
         request_secrets=request_secrets,
         env=env,
     )
-    # if include_in_history:
-    #     SHELL_HISTORY.append(file_contents)
+    if include_in_history:
+        SHELL_HISTORY.append(file_contents)
     logger.info(f"shell stdout: {rsp.stdout}")
     logger.info(f"shell stderr: {rsp.stderr}")
     logger.info(f"shell status: {rsp.status}")
