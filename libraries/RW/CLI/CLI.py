@@ -121,7 +121,7 @@ def run_bash_file(
     **kwargs,
 ) -> platform.ShellServiceResponse:
     if not cmd_overide:
-        cmd_overide = f"./{bash_file}"
+        cmd_overide = f"{bash_file}"
     logger.info(f"Received kwargs: {kwargs}")
     request_secrets = _create_secrets_from_kwargs(**kwargs)
     file_contents: str = ""
