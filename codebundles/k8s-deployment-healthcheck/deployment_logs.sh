@@ -22,7 +22,7 @@ if ! command -v lnav &> /dev/null; then
     exit
 else
     # Load custom formats for lnav
-    cp -rf ../../../extras/lnav/formats/* $HOME/.lnav/formats/installed
+    cp -rf /collection/extras/lnav/formats/* $HOME/.lnav/formats/installed
 fi
 
 
