@@ -2,7 +2,6 @@
 
 # Add script requirements
 # Need to get this passed through from runtime
-export HOME="/home/gitpod"
 export PATH="$PATH:$HOME/.lnav:$HOME/.local/bin"
 
 # Ensure ${KUBERNETES_DISTRIBUTION_BINARY} is installed and accessible
