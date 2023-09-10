@@ -128,9 +128,9 @@ def run_bash_file(
     # Debug working dir
     cwd = os.getcwd()
     logger.info(f"Working Directory: {cwd}")
-    with open(f"{bash_file}", "r") as fh:
-        file_contents = fh.read()
-    logger.info(f"Script file contents:\n\n{file_contents}")
+    # with open(f"{bash_file}", "r") as fh:
+    #     file_contents = fh.read()
+    # logger.info(f"Script file contents:\n\n{file_contents}")
     rsp = execute_command(
         cmd=cmd_overide,
         files={f"{bash_file}": file_contents},
@@ -138,8 +138,8 @@ def run_bash_file(
         request_secrets=request_secrets,
         env=env,
     )
-    if include_in_history:
-        SHELL_HISTORY.append(file_contents)
+    # if include_in_history:
+    #     SHELL_HISTORY.append(file_contents)
     logger.info(f"shell stdout: {rsp.stdout}")
     logger.info(f"shell stderr: {rsp.stderr}")
     logger.info(f"shell status: {rsp.status}")
