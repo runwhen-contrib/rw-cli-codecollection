@@ -131,7 +131,7 @@ def run_bash_file(
     # with open(f"{bash_file}", "r") as fh:
     #     file_contents = fh.read()
     # logger.info(f"Script file contents:\n\n{file_contents}")
-    os.chmod({bash_file}, 0o777)
+    os.chmod(f"{bash_file}", 0o777)
     rsp = execute_command(
         cmd=cmd_overide,
         files={f"{bash_file}": file_contents},
