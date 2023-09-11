@@ -66,6 +66,7 @@ DeploymentTroubleshooting: &dt
 "Deployment pods have errors": *dt
 "Deployment pods are failing": *dt
 "Deployment pods have run out of resources": *dt
+"Pod back-off restarting failed": *dt
 # END DeploymentTroubleshooting
 
 # BEGIN ImageTroubleshooting

@@ -112,12 +112,15 @@ Troubleshoot Container Restarts In Namespace
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
     ${pod_name}=    RW.CLI.Run Cli
-    ...    cmd=echo "${container_restart_details.stdout}" | grep -oP '(?<=pod_name:)[^ ]*' | grep -oP '[^.]*(?=-[a-z0-9]+-[a-z0-9]+)'
+    ...    cmd=echo "${container_restart_details.stdout}" | awk -F': ' '/pod_name:/ {print $2}'
     ...    include_in_history=false
-    ${next_steps}=    RW.NextSteps.Suggest    Pod ${container_restart_details.stdout}
+    ${message_details}=    RW.CLI.Run Cli
+    ...    cmd=echo "${container_restart_details.stdout}" | awk -F': ' '/message:/ {print $2}'
+    ...    include_in_history=false
+    ${next_steps}=    RW.NextSteps.Suggest    ${message_details.stdout}
     ${next_steps}=    RW.NextSteps.Format    ${next_steps}
-    ...    pod_name=${pod_name}
-    ...    workload_name=${pod_name}
+    ...    pod_name=${pod_name.stdout}
+    ...    workload_name=${pod_name.stdout}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${container_restart_details}
     ...    set_severity_level=2
