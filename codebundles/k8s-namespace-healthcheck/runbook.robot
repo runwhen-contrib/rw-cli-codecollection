@@ -113,6 +113,7 @@ Troubleshoot Container Restarts In Namespace
     ...    render_in_commandlist=true
     ${pod_name}=    RW.CLI.Run Cli
     ...    cmd=echo "${container_restart_details.stdout}" | grep -oP '(?<=pod_name:)[^ ]*' | grep -oP '[^.]*(?=-[a-z0-9]+-[a-z0-9]+)'
+    ...    include_in_history=false
     ${next_steps}=    RW.NextSteps.Suggest    Pod ${container_restart_details.stdout}
     ${next_steps}=    RW.NextSteps.Format    ${next_steps}
     ...    pod_name=${pod_name}
