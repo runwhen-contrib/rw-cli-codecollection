@@ -25,12 +25,16 @@ Check Deployment Log For Issues
     ...    cmd=echo "${logs.stdout}" | awk '/Recommended Next Steps:/ {flag=1; next} flag'
     ...    env=${env}
     ...    include_in_history=false
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=echo "${logs.stdout}" | awk '/Issues Identified:/,/^$/' | tail -n +2
+    ...    env=${env}
+    ...    include_in_history=false
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${logs}
     ...    set_severity_level=2
     ...    set_issue_expected=No logs matching error patterns found in deployment ${DEPLOYMENT_NAME} in namespace: ${NAMESPACE}
     ...    set_issue_actual=Error logs found in deployment ${DEPLOYMENT_NAME} in namespace: ${NAMESPACE}
-    ...    set_issue_title=Deployment ${DEPLOYMENT_NAME} has error logs and recommendations
+    ...    set_issue_title=Deployment ${DEPLOYMENT_NAME} in ${NAMESPACE} has: \n${issues.stdout}
     ...    set_issue_details=Deployment ${DEPLOYMENT_NAME} has error logs:\n\n$_stdout
     ...    set_issue_next_steps=${recommendations.stdout}
     ...    _line__raise_issue_if_contains=Recommended

@@ -79,6 +79,9 @@ while read POD; do
     done
 done < <(${KUBERNETES_DISTRIBUTION_BINARY} get pods --selector=$SELECTOR --namespace=$NAMESPACE -o=jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
 
+# Initialize an issue description array
+issue_descriptions=()
+
 # ------------------------------- lnav queries --------------------------------
 # The gist here is to provide various types of lnav queries. If a query has
 # results, then we can perform some additional tasks that suggest resources
@@ -91,7 +94,7 @@ done < <(${KUBERNETES_DISTRIBUTION_BINARY} get pods --selector=$SELECTOR --names
 # or can we just use logline
 
 ##### Begin query #####
-# Search for http log format used by online-boutique
+# Search for http log format used by online-boutique (which uses logrus but is custom)
 for FILE in "${LOG_FILES[@]}"; do
     echo "$FILE"
     LOG_SUMMARY=$(lnav -n -c ';SELECT COUNT(*) AS error_count, CASE WHEN "http.req.path" LIKE "/product%" THEN "/product" ELSE "http.req.path" END AS root_path, "http.resp.status" FROM logline WHERE "http.resp.status" = 500 AND NOT "http.req.path" = "/" GROUP BY root_path, "http.resp.status" ORDER BY error_count DESC;' $FILE)
@@ -101,17 +104,20 @@ done
 
 if [[ -n "$INTERESTING_PATHS" ]]; then
     SEARCH_RESOURCES=$(echo "$INTERESTING_PATHS" | awk -F'/' '{for (i=1; i<=NF; i++) print $i}' | sort | uniq)
+    issue_descriptions+=("HTTP Errors found for paths: $SEARCH_RESOURCES")
 else
     echo "No interesting paths found."
 fi
 ##### End query #####
 
 
+
+
 # # Fetch a list of all resources in the namespace
 ## Heavyweight - this times out after 30s, but is a better way to get any and all resources
 # SEARCH_LIST=$(${KUBERNETES_DISTRIBUTION_BINARY} api-resources --verbs=list --namespaced -o name  | xargs -n 1 ${KUBERNETES_DISTRIBUTION_BINARY} get --show-kind --ignore-not-found -n $NAMESPACE)
 
-## Lightweight - we explicitly specify which resources we want to interrogate
+## Lightweight - we explicitly specify which resources we want to search
 # Run RESOURCE_SEARCH_LIST only if SEARCH_RESOURCES has content
 if [[ -n "$SEARCH_RESOURCES" ]]; then
     RESOURCE_SEARCH_LIST=$(${KUBERNETES_DISTRIBUTION_BINARY} get deployment,pods,service,statefulset --context=${CONTEXT} -n ${NAMESPACE})
@@ -119,8 +125,10 @@ else
     echo "No search queries returned results."
     exit
 fi
+
+
 EVENT_SEARCH_LIST=$(${KUBERNETES_DISTRIBUTION_BINARY}  get events --context=${CONTEXT} -n ${NAMESPACE})
-event_details="The namespace ${NAMESPACE} has produced the following interesting events:"
+event_details="\nThe namespace ${NAMESPACE} has produced the following interesting events:"
 event_details+="\n"
 
 # For each value, search the namespace for applicable resources
@@ -132,42 +140,53 @@ done
 
 # Try to generate some recommendations from the resource strings we discovered
 recommendations=()
-while read -r line; do
-    # Splitting columns into array
-    IFS=' ' read -ra cols <<< "$line"
-    resource="${cols[0]}"
-    status="${cols[1]}"
-    restarts="${cols[3]}"
+if [[ -n "$INTERESTING_RESOURCES" ]]; then
+    while read -r line; do
+        # Splitting columns into array
+        IFS=' ' read -ra cols <<< "$line"
+        resource="${cols[0]}"
+        status="${cols[1]}"
+        restarts="${cols[3]}"
 
-    # Extracting resource type and name
-    IFS='/' read -ra details <<< "$resource"
-    type="${details[0]}"
-    name="${details[1]}"
+        # Extracting resource type and name
+        IFS='/' read -ra details <<< "$resource"
+        type="${details[0]}"
+        name="${details[1]}"
 
-    case "$type" in
-    pod)
-        if [[ "$status" != "Running" ]]; then
-            recommendations+=("Troubleshoot failed pods in namespace ${NAMESPACE}")
-        fi
-        if ((restarts > 0)); then
-            recommendations+=("Troubleshoot container restarts in namespace ${NAMESPACE}")
-        fi
-        ;;
-    deployment)
-        recommendations+=("Check deployment health $name in namespace ${NAMESPACE}")
-        ;;
-    service)
-        recommendations+=("Check service health $name in namespace ${NAMESPACE}")
-        ;;
-    statefulset)
-        recommendations+=("Check statefulSet health $name in namespace ${NAMESPACE}")
-        ;;
-    esac
-done <<< "$INTERESTING_RESOURCES"
+        case "$type" in
+        pod)
+            if [[ "$status" != "Running" ]]; then
+                recommendations+=("Troubleshoot failed pods in namespace ${NAMESPACE}")
+            fi
+            if ((restarts > 0)); then
+                recommendations+=("Troubleshoot container restarts in namespace ${NAMESPACE}")
+            fi
+            ;;
+        deployment)
+            recommendations+=("Check deployment health $name in namespace ${NAMESPACE}")
+            ;;
+        service)
+            recommendations+=("Check service health $name in namespace ${NAMESPACE}")
+            ;;
+        statefulset)
+            recommendations+=("Check statefulSet health $name in namespace ${NAMESPACE}")
+            ;;
+        esac
+    done <<< "$INTERESTING_RESOURCES"
+else
+    echo "No resources found based on log query output"
+fi 
+
+# Display the issue descriptions
+if [[ ${#issue_descriptions[@]} -ne 0 ]]; then
+    printf "\nIssues Identified: \n"
+    printf "%s\n" "${issue_descriptions[@]}" | sort -u
+fi 
 
 # Display the interesting events for report details
-printf "\nInteresting Events: \n"
-echo -e "$event_details"
+if [[ -n "$event_details" ]]; then
+    echo -e "$event_details"
+fi
 
 # Display all unique recommendations that can be shown as Next Steps
 if [[ ${#recommendations[@]} -ne 0 ]]; then
