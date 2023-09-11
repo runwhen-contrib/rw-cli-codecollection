@@ -171,6 +171,7 @@ def run_bash_file(
                         bash_file = os.path.join(new_path, bash_file)
                         if os.path.exists(bash_file):
                             logger.info(f"File '{bash_file}' found at derived path: {new_path}.")
+                            cmd_overide = f"{bash_file}"
                             break
                         else:
                             logger.warning(f"File '{bash_file}' not found at derived path: {new_path}.")
