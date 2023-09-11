@@ -129,7 +129,7 @@ Troubleshoot Container Restarts In Namespace
     ...    set_issue_title=Container Restarts Detected In Namespace ${NAMESPACE}
     ...    set_issue_details=Pods with Container Restarts:\n"$_stdout" in the namespace ${NAMESPACE}
     ...    set_issue_next_steps=${next_steps}
-    ...    _line__raise_issue_if_contains=-
+    ...    _line__raise_issue_if_contains=restart_count
     ${history}=    RW.CLI.Pop Shell History
     IF    """${container_restart_details.stdout}""" == ""
         ${container_restart_details}=    Set Variable    No container restarts found
