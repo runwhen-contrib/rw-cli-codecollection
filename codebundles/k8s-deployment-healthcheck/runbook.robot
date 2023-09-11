@@ -18,11 +18,9 @@ Check Deployment Log For Issues
     [Documentation]    Fetches recent logs for the given deployment in the namespace and checks the logs output for issues.
     [Tags]    fetch    log    pod    container    errors    inspect    trace    info    deployment    <service_name>
     ${logs}=    RW.CLI.Run Bash File
-    # ...    bash_file=/collection/codebundles/k8s-deployment-healthcheck/deployment_logs.sh
     ...    bash_file=deployment_logs.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    # ...    cmd_overide=/collection/codebundles/k8s-deployment-healthcheck/deployment_logs.sh
     ${recommendations}=    RW.CLI.Run Cli
     ...    cmd=echo "${logs.stdout}" | awk '/Recommended Next Steps:/ {flag=1; next} flag'
     ...    env=${env}
