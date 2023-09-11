@@ -113,7 +113,7 @@ Troubleshoot Container Restarts In Namespace
     ...    render_in_commandlist=true
     ${pod_name}=    RW.CLI.Run Cli
     ...    cmd=echo "${container_restart_details.stdout}" | grep -oP '(?<=pod_name:)[^ ]*' | grep -oP '[^.]*(?=-[a-z0-9]+-[a-z0-9]+)'
-    ${next_steps}=    RW.NextSteps.Suggest    Pod ${container_restart_details.details}
+    ${next_steps}=    RW.NextSteps.Suggest    Pod ${container_restart_details.stdout}
     ${next_steps}=    RW.NextSteps.Format    ${next_steps}
     ...    pod_name=${pod_name}
     ...    workload_name=${pod_name}
@@ -145,7 +145,7 @@ Troubleshoot Pending Pods In Namespace
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
-    ${next_steps}=    RW.NextSteps.Suggest    ${pending_pods.details}
+    ${next_steps}=    RW.NextSteps.Suggest    ${pending_pods.stdout}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${pending_pods}
     ...    set_severity_level=1
@@ -174,7 +174,7 @@ Troubleshoot Failed Pods In Namespace
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
-    ${next_steps}=    RW.NextSteps.Suggest    ${unreadypods_details.details}
+    ${next_steps}=    RW.NextSteps.Suggest    ${unreadypods_details.stdout}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${unreadypods_details}
     ...    set_severity_level=1
