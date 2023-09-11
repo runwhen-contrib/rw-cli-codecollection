@@ -352,16 +352,16 @@ Check Missing or Risky PodDisruptionBudget Policies
     ...    set_issue_expected=PodDisruptionBudgets in ${NAMESPACE} do not block regular maintenance
     ...    set_issue_actual=We detected PodDisruptionBudgets in namespace ${NAMESPACE} which are considered Risky to maintenance operations
     ...    set_issue_title=Risky PodDisruptionBudgets Found in namespace ${NAMESPACE}
-    ...    set_issue_details=Review the PodDisruptionBudget check for ${NAMESPACE}:\n"$_stdout"
+    ...    set_issue_details=Review the PodDisruptionBudget check for ${NAMESPACE}:\n$_stdout
     ...    set_issue_next_steps=${svc_name.stdout} check deployments anomolies
     ...    _line__raise_issue_if_contains=Risky
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${pdb_check}
     ...    set_severity_level=4
-    ...    set_issue_expected=PodDisruptionBudgets in ${NAMESPACE} should exist for applications
+    ...    set_issue_expected=PodDisruptionBudgets in ${NAMESPACE} should exist for applications that have more than 1 replica
     ...    set_issue_actual=We detected Deployments or StatefulSets in namespace ${NAMESPACE} which are missing PodDisruptionBudgets
     ...    set_issue_title=Deployments or StatefulSets in namespace ${NAMESPACE} are missing PodDisruptionBudgets
-    ...    set_issue_details=Review the Deployments and StatefulSets missing PodDisruptionBudget in ${NAMESPACE}:\n"$_stdout"
+    ...    set_issue_details=Review the Deployments and StatefulSets missing PodDisruptionBudget in ${NAMESPACE}:\n$_stdout
     ...    set_issue_next_steps=${dply_name.stdout} check deployments anomolies
     ...    _line__raise_issue_if_contains=Missing
     ${history}=    RW.CLI.Pop Shell History
