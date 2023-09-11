@@ -32,9 +32,10 @@ check_command_exists jq
 check_command_exists lnav
 
 # Load custom formats for lnav if it's installed
-# FIXME: This needs to sort out dev and runtime environment
-cp -rf /collection/extras/lnav/formats/* $HOME/.lnav/formats/installed
-cp -rf /workspace/codecollection-devtools/codecollection/extras/lnav/formats/* $HOME/.lnav/formats/installed
+# FIXME: This could be done more effeciently
+# Search for the formats directory
+lnav_formats_path=$(find / -type d -path '*/extras/lnav/formats' -print -quit 2>/dev/null)
+cp -rf $lnav_formats_path/* $HOME/.lnav/formats/installed
 
 
 # Ensure a deployment name was provided
@@ -139,7 +140,7 @@ for RESOURCE in "${SEARCH_RESOURCES[@]}"; do
     event_details+=$(echo "$EVENT_SEARCH_LIST" | grep "$RESOURCE" | grep -Eiv "Normal")
     INTERESTING_RESOURCES+=$(echo "$RESOURCE_SEARCH_LIST" | grep "$RESOURCE")
 done
-
+echo $INTERESTING_RESOURCES
 # Try to generate some recommendations from the resource strings we discovered
 recommendations=()
 if [[ -n "$INTERESTING_RESOURCES" ]]; then
@@ -164,14 +165,14 @@ if [[ -n "$INTERESTING_RESOURCES" ]]; then
                 recommendations+=("Troubleshoot container restarts in namespace ${NAMESPACE}")
             fi
             ;;
-        deployment)
+        deployment|deployment.apps)
             recommendations+=("Check deployment health $name in namespace ${NAMESPACE}")
             ;;
         service)
             recommendations+=("Check service health $name in namespace ${NAMESPACE}")
             ;;
-        statefulset)
-            recommendations+=("Check statefulSet health $name in namespace ${NAMESPACE}")
+        statefulset|statefulset.apps)
+            recommendations+=("Check statefulset health $name in namespace ${NAMESPACE}")
             ;;
         esac
     done <<< "$INTERESTING_RESOURCES"
