@@ -341,10 +341,10 @@ Check Missing or Risky PodDisruptionBudget Policies
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true
     ${risky_pdbs}=    RW.CLI.Run Cli
-    ...    cmd=echo "${pdb_check.stdout}" | grep 'Risky' | cut -f 1 -d ' ' | awk -F'/' '{print $1, $2}'
+    ...    cmd=echo "${pdb_check.stdout}" | grep 'Risky' | cut -f 1 -d ' ' | awk -F'/' '{print $1 ":" $2}'
     ...    include_in_history=False
     ${missing_pdbs}=    RW.CLI.Run Cli
-    ...    cmd=echo "${pdb_check.stdout}" | grep 'Missing' | cut -f 1 -d ' ' | awk -F'/' '{print $1, $2}'
+    ...    cmd=echo "${pdb_check.stdout}" | grep 'Missing' | cut -f 1 -d ' ' | awk -F'/' '{print $1 ":" $2}'
     ...    include_in_history=False
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${pdb_check}
@@ -353,7 +353,7 @@ Check Missing or Risky PodDisruptionBudget Policies
     ...    set_issue_actual=We detected PodDisruptionBudgets in namespace ${NAMESPACE} which are considered Risky to maintenance operations
     ...    set_issue_title=Risky PodDisruptionBudgets Found in namespace ${NAMESPACE}
     ...    set_issue_details=Review the PodDisruptionBudget check for ${NAMESPACE}:\n$_stdout
-    ...    set_issue_next_steps=Manually Validate & Fix PodDisruptionBudget for ${risky_pdbs.stdout}
+    ...    set_issue_next_steps=Review & Edit PodDisruptionBudget for ${risky_pdbs.stdout}
     ...    _line__raise_issue_if_contains=(.*?)
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${pdb_check}
@@ -362,7 +362,7 @@ Check Missing or Risky PodDisruptionBudget Policies
     ...    set_issue_actual=We detected Deployments or StatefulSets in namespace ${NAMESPACE} which are missing PodDisruptionBudgets
     ...    set_issue_title=Deployments or StatefulSets in namespace ${NAMESPACE} are missing PodDisruptionBudgets
     ...    set_issue_details=Review the Deployments and StatefulSets missing PodDisruptionBudget in ${NAMESPACE}:\n$_stdout
-    ...    set_issue_next_steps=Manually create missing Pod Distruption Budgets for ${missing_pdbs.stdout}
+    ...    set_issue_next_steps=Create missing Pod Distruption Budgets for ${missing_pdbs.stdout}
     ...    _line__raise_issue_if_contains=Missing
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add To Report    ${pdb_check.stdout}\n
