@@ -4,3 +4,4 @@ python-dateutil==2.8.2
 requests>=2.31.0
 thefuzz==0.20.0
 pyyaml==6.0.1
+Flask==2.3.3

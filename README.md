@@ -82,3 +82,15 @@ Run the codebundle
 | [cli-test-taskset](https://github.com/runwhen-contrib/rw-cli-codecollection/blob/main/codebundles/cli-test/runbook.robot) | `cli` | `Run CLI and Parse Output For Issues`, `Exec Test`, `Local Process Test` | This taskset smoketests the CLI codebundle setup and run process [Docs](https://docs.runwhen.com/public/v/cli-codecollection/cli-test) |
 | [cmd-test-taskset](https://github.com/runwhen-contrib/rw-cli-codecollection/blob/main/codebundles/cmd-test/runbook.robot) | `cmd` | `Run CLI Command`, `Run Bash File`, `Log Suggestion` | This taskset smoketests the CLI codebundle setup and run process by running a bare command [Docs](https://docs.runwhen.com/public/v/cli-codecollection/cmd-test) |
 
+## Running API
+
+### Run Codebundle generator with docker-compose file
+https://github.com/Peikae3IWaeG/robotgen
+
+### Build dockerfile and start generator-api/main.py script. 
+
+Example commands:
+
+`docker build --no-cache --tag robot-runner .`
+
+`docker run --name dev-api --network robotgen_default --rm  -p 8001:8001 -v $PWD:/app/codecollection -v $PWD/auth:/app/auth --env-file .env robot-runner python codecollection/generator-api/main.py`
