@@ -24,17 +24,21 @@ function check_command_exists() {
 
 # Tasks to perform when container exit code is "Success"
 function exit_code_success() {
-    echo "The exit code returned was 'Success' for pod $1. This usually means that the container has successfully run to completion... "
+    echo "The exit code returned was 'Success' for pod $1. This usually means that the container has successfully run to completion."
+    echo "Checking which resources might be related to this pod..."
     owner=$(find_resource_owner $1)
+    owner_kind=$(echo $owner | jq -r '.kind')
+    owner_name=$(echo $owner | jq -r '.metadata.name')
     labels_json=$(echo $owner | jq -r '.metadata.labels')
     flux_labels=$(find_matching_labels "$labels_json" "flux")
     argocd_labels=$(find_matching_labels "$labels_json" "argo")
+    echo "Detected that $owner_kind/$owner_name manages this pod. Checking for other controllers that might be related..."
     if [[ "$flux_labels" ]]; then
-        echo "Detected FluxCD controlled resource..."
+        echo "Detected FluxCD controlled resource."
         flux_labels=$(echo "$flux_labels" | tr ' ' '\n')
         namespace=$(echo "$flux_labels" | grep namespace: | awk -F ":" '{print $2}') 
         name=$(echo "$flux_labels" | grep name: | awk -F ":" '{print $2}')
-        recommendations+=("Check that the FluxCD resources are not suspended and the manifests are accurate for app $name, configured in GitOps namespace $namespace")  
+        recommendations+=("Check that the FluxCD resources are not suspended and the manifests are accurate for app:$name, configured in GitOps namespace:$namespace")  
     elif [[ "$argocd_labels" ]]; then
         echo "Detected ArgoCD"
         argocd_labels=$(echo "$argocd_labels" | tr ' ' '\n')
@@ -43,7 +47,6 @@ function exit_code_success() {
     else
       recommendations+=("Owner resources appear to be manually applied. Please review the manifest for $owner in $NAMESPACE for accuracy.")
     fi
-
 }
 
 function find_resource_owner(){
@@ -100,13 +103,50 @@ container_restarts_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=$
   ]
 }'
 )
-
 declare -A container_restarts_dict
 container_restarts_dict=$(echo "$container_restarts_json" | jq -r '.container_restarts[] | {"item": .}' | jq -s add)
 
+
+# Extract data and print in a clean text format
+container_details_dict=()
+
+containers=$(echo "$container_restarts_json" | jq -c '.container_restarts[]')
+
+while read -r container; do
+  pod_name=$(echo "$container" | jq -r '.pod_name')
+  
+  container_text="Pod Name: $pod_name\n"
+
+  container_list=$(echo "$container" | jq -c '.containers[]')
+
+  while read -r c; do
+    name=$(echo "$c" | jq -r '.name')
+    restart_count=$(echo "$c" | jq -r '.restart_count')
+    message=$(echo "$c" | jq -r '.message')
+    terminated_reason=$(echo "$c" | jq -r '.terminated_reason')
+    terminated_finishedAt=$(echo "$c" | jq -r '.terminated_finishedAt')
+    terminated_exitCode=$(echo "$c" | jq -r '.terminated_exitCode')
+    exit_code_explanation=$(echo "$c" | jq -r '.exit_code_explanation')
+
+    container_text+="Containers:\n"
+    container_text+="Name: $name\n"
+    container_text+="Restart Count: $restart_count\n"
+    container_text+="Message: $message\n"
+    container_text+="Terminated Reason: $terminated_reason\n"
+    container_text+="Terminated FinishedAt: $terminated_finishedAt\n"
+    container_text+="Terminated ExitCode: $terminated_exitCode\n"
+    container_text+="Exit Code Explanation: $exit_code_explanation\n\n"
+
+  done <<< "$container_list"
+
+  container_details_dict+=("$container_text")
+done <<< "$containers"
+
+
+# Print the container restart details
 printf "\nContainer Restart Details: \n"
-for container in "${container_restarts_dict[@]}"; do
-    echo "$container"
+for container_text in "${container_details_dict[@]}"; do
+    echo -e "$container_text"
 done
 
 recommendations=()
