@@ -34,7 +34,7 @@ function exit_code_success() {
         flux_labels=$(echo "$flux_labels" | tr ' ' '\n')
         namespace=$(echo "$flux_labels" | grep namespace: | awk -F ":" '{print $2}') 
         name=$(echo "$flux_labels" | grep name: | awk -F ":" '{print $2}')
-        recommendations+=("Check that the FluxCD resources are not suspended and the manifests are accurate for app $name is configured in GitOps namespace $namespace")  
+        recommendations+=("Check that the FluxCD resources are not suspended and the manifests are accurate for app $name, configured in GitOps namespace $namespace")  
     elif [[ "$argocd_labels" ]]; then
         echo "Detected ArgoCD"
         argocd_labels=$(echo "$argocd_labels" | tr ' ' '\n')
