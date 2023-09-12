@@ -120,7 +120,7 @@ Troubleshoot Container Restarts In Namespace
     ...    env=${env}
     ...    include_in_history=false
     RW.CLI.Parse Cli Output By Line
-    ...    rsp=${container_restart_details}
+    ...    rsp=${container_restart_analysis}
     ...    set_severity_level=2
     ...    set_issue_expected=Containers should not be restarting.
     ...    set_issue_actual=We found the following containers with restarts: $_stdout
@@ -433,5 +433,6 @@ Suite Initialization
     Set Suite Variable    ${SERVICE_ERROR_PATTERN}    ${SERVICE_ERROR_PATTERN}
     Set Suite Variable    ${SERVICE_EXCLUDE_PATTERN}    ${SERVICE_EXCLUDE_PATTERN}
     Set Suite Variable    ${HOME}    ${HOME}
-    Set Suite Variable    ${env}    
+    Set Suite Variable
+    ...    ${env}
     ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "HOME":"${HOME}"}
