@@ -1,3 +1,6 @@
+## 0.0.5 2023-09-12
+- Add nextsteps logic to k8s namespace and gmp kong ingress codebundles (#200) d46d90c
+
 ## 0.0.4 2023-08-21
 - Adding codebundle (terraform-cloud-workspace-lock-check) (#177) e8d4ca9
 - Add's pvc storage next step (#183) f2d8235
