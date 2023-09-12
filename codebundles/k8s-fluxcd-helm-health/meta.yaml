@@ -181,9 +181,7 @@ commands:
 
     - [Kubectl Documentation - Resource Types](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
-    - [jq Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}
-
-    - [Helm Documentation - Search Command](https://helm.sh/docs/helm/helm_search/){:target="_blank"}'
+    - [jq Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
   explanation: "\n\nThis command retrieves Helm releases from a Kubernetes namespace\
     \ and compares their installed versions to the available versions in their corresponding\
     \ repository, in order to determine if an update is available. \n\nIt takes five\
