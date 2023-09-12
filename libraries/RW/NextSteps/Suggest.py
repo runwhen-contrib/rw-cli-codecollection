@@ -30,7 +30,13 @@ def _load_mapping(platform: str) -> dict:
     return data
 
 
-def format(suggestions: str, expand_arrays: bool = True, **kwargs) -> str:
+def format(
+    suggestions: str,
+    expand_arrays: bool = True,
+    manual_kwargs: dict = {},
+    **kwargs,
+) -> str:
+    kwargs = {**manual_kwargs, **kwargs}
     reformatted_suggestions: list[str] = []
     suggestions = suggestions.split("\n")
     formatted_kwargs: dict = {}
@@ -46,6 +52,7 @@ def format(suggestions: str, expand_arrays: bool = True, **kwargs) -> str:
     if expand_arrays:
         reformatted_kwargs: dict = {}
         for line in suggestions:
+            skip_add_line: bool = False
             for k, v in formatted_kwargs.items():
                 if k in line and OBJECT_HINT_SYMBOL in line and type(v) is list:
                     line_parts = line.split(OBJECT_HINT_SYMBOL)
@@ -55,15 +62,23 @@ def format(suggestions: str, expand_arrays: bool = True, **kwargs) -> str:
                     object_type = line_parts[0]
                     object_var_name = line_parts[1]
                     new_lines: list[str] = []
-                    # eg: kwargs[pod_name] = ["myapp-0303", "myapp-3221"] -> kwargs[pod_name0] = "myapp-0303", etc
+                    # eg: kwargs["pod_name"] = ["myapp-0303", "myapp-3221"] -> kwargs[pod_name0] = "myapp-0303", etc
                     for index, subval in enumerate(v):
-                        reformatted_kwargs[f"{k}{index}"] = subval
-                    new_lines = [f"{object_type}{index}" for index, subval in enumerate(v)]
+                        reformatted_kwargs[f"{object_var_name}{index}".replace("$", "")] = subval
+                    new_lines = [
+                        f"{object_type}{OBJECT_HINT_SYMBOL}{object_var_name}{index}" for index, subval in enumerate(v)
+                    ]
                     reformatted_suggestions += new_lines
-                else:
+                    skip_add_line = True
+                elif k in line and OBJECT_HINT_SYMBOL in line and type(v) is not list:
                     reformatted_kwargs[k] = v
                     reformatted_suggestions.append(line)
+                    skip_add_line = True
+
+            if not skip_add_line:
+                reformatted_suggestions.append(line)
         formatted_kwargs = reformatted_kwargs
+        suggestions = reformatted_suggestions
     suggestions = "\n".join(suggestions)
     suggestions = Template(suggestions).safe_substitute(formatted_kwargs)
     # remove any object hints that didn't get values, de-duplicate

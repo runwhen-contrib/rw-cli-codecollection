@@ -1,0 +1,24 @@
+#
+#
+#
+
+Kubernetes:
+  - type: prefix
+    boost: 1.6
+    value: Deployment/
+  - type: prefix
+    boost: 1.6
+    value: deployment.apps/
+  - type: prefix
+    boost: 1.6
+    value: StatefulSet/
+  - type: prefix
+    boost: 1.6
+    value: statefulset.apps/
+  - type: prefix
+    boost: 1.4
+    value: Service/
+  - type: prefix
+    boost: 1.4
+    value: service/
+  

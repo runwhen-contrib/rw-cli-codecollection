@@ -315,6 +315,10 @@ Troubleshoot Namespace Services And Application Workloads
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true
+    ${error_match}=    RW.CLI.Run Cli
+    ...    cmd=cat << 'EOF' | grep -i Error | head -n 1\n${aggregate_service_logs.stdout}EOF
+    ...    include_in_history=False
+    ${next_steps}=    RW.NextSteps.Suggest    ${error_match.stdout}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${aggregate_service_logs}
     ...    set_severity_level=3
@@ -322,7 +326,7 @@ Troubleshoot Namespace Services And Application Workloads
     ...    set_issue_actual=Service workload logs in namespace ${NAMESPACE} contain errors entries
     ...    set_issue_title=Service Workloads In Namespace ${NAMESPACE} Have Error Log Entries
     ...    set_issue_details=We found the following distinctly counted errors in the service workloads of namespace ${NAMESPACE}:\n\n$_stdout\n\nThese errors may be related to other workloads that need triaging
-    ...    set_issue_next_steps=Check For Deployment Event Anomalies
+    ...    set_issue_next_steps=${next_steps}
     ...    _line__raise_issue_if_contains=Error
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add To Report    Sample Of Aggregate Counted Logs Found:\n
@@ -331,17 +335,33 @@ Troubleshoot Namespace Services And Application Workloads
 
 Check Missing or Risky PodDisruptionBudget Policies
     [Documentation]    Searches through deployemnts and statefulsets to determine if they are missing PodDistruptionBudgets or have them configured in a risky way that prohibits cluster or node upgrades.
-    [Tags]    poddisruptionbudget    availability    unavailable    risky    missing    policy    <service_name>
+    [Tags]    poddisruptionbudget    availability    unavailable    risky    missing    policy
     ${pdb_check}=    RW.CLI.Run Cli
     ...    cmd=context="${CONTEXT}"; namespace="${NAMESPACE}"; check_health() { local type=$1; local name=$2; local replicas=$3; local selector=$4; local pdbs=$(${KUBERNETES_DISTRIBUTION_BINARY} --context "$context" --namespace "$namespace" get pdb -o json | jq -c --arg selector "$selector" '.items[] | select(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value == $selector)'); if [[ $replicas -gt 1 && -z "$pdbs" ]]; then printf "%-30s %-30s %-10s\\n" "$type/$name" "" "Missing"; else echo "$pdbs" | jq -c . | while IFS= read -r pdb; do local pdbName=$(echo "$pdb" | jq -r '.metadata.name'); local minAvailable=$(echo "$pdb" | jq -r '.spec.minAvailable // ""'); local maxUnavailable=$(echo "$pdb" | jq -r '.spec.maxUnavailable // ""'); if [[ "$minAvailable" == "100%" || "$maxUnavailable" == "0" || "$maxUnavailable" == "0%" ]]; then printf "%-30s %-30s %-10s\\n" "$type/$name" "$pdbName" "Risky"; elif [[ $replicas -gt 1 && ("$minAvailable" != "100%" || "$maxUnavailable" != "0" || "$maxUnavailable" != "0%") ]]; then printf "%-30s %-30s %-10s\\n" "$type/$name" "$pdbName" "OK"; fi; done; fi; }; echo "Deployments:"; echo "-----------"; printf "%-30s %-30s %-10s\\n" "NAME" "PDB" "STATUS"; ${KUBERNETES_DISTRIBUTION_BINARY} --context "$context" --namespace "$namespace" get deployments -o json | jq -c '.items[] | "\\(.metadata.name) \\(.spec.replicas) \\(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value)"' | while read -r line; do check_health "Deployment" $(echo $line | tr -d '"'); done; echo ""; echo "Statefulsets:"; echo "-------------"; printf "%-30s %-30s %-10s\\n" "NAME" "PDB" "STATUS"; ${KUBERNETES_DISTRIBUTION_BINARY} --context "$context" --namespace "$namespace" get statefulsets -o json | jq -c '.items[] | "\\(.metadata.name) \\(.spec.replicas) \\(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value)"' | while read -r line; do check_health "StatefulSet" $(echo $line | tr -d '"'); done
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true
-    ${dply_name}=    RW.CLI.Run Cli
-    ...    cmd=echo "${pdb_check.stdout}" | grep -oP '(?<=Deployment/)[^ ]*' | grep -oP '[^.]*(?=-[a-z0-9]+-[a-z0-9]+)'
-    ${svc_name}=    RW.CLI.Run Cli
-    ...    cmd=echo "${pdb_check.stdout}" | grep -oP "(?<='name': ')[^ ]*" | grep -oP "[^.]*(?=-[a-z0-9]+-[a-z0-9]+)"
+    ${risky_pdb_workload}=    RW.CLI.Run Cli
+    ...    cmd=echo """${pdb_check.stdout}""" | grep -i Risky | head -n 1 | awk '{print $1}' | awk -F'/' '{print $2}' | tr -d "\n"
+    ...    include_in_history=False
+    ${risky_pdb_workload_kind}=    RW.CLI.Run Cli
+    ...    cmd=echo """${pdb_check.stdout}""" | grep -i Risky | head -n 1 | awk '{print $1}' | awk -F'/' '{print $1}' | tr -d "\n"
+    ...    include_in_history=False
+    ${missing_pdb_workload}=    RW.CLI.Run Cli
+    ...    cmd=echo """${pdb_check.stdout}""" | grep -i Missing | head -n 1 | awk '{print $1}' | awk -F'/' '{print $2}' | tr -d "\n"
+    ...    include_in_history=False
+    ${missing_pdb_workload_kind}=    RW.CLI.Run Cli
+    ...    cmd=echo """${pdb_check.stdout}""" | grep -i Missing | head -n 1 | awk '{print $1}' | awk -F'/' '{print $1}' | tr -d "\n"
+    ...    include_in_history=False
+    ${risky_next_steps}=    RW.NextSteps.Suggest
+    ...    Workload ${risky_pdb_workload.stdout} of kind ${risky_pdb_workload_kind.stdout} has a risky PodDisruptionBudget
+    ${missing_next_steps}=    RW.NextSteps.Suggest
+    ...    Workload ${missing_pdb_workload.stdout} of kind ${missing_pdb_workload_kind.stdout} has a missing PodDisruptionBudget
+    ${risky_next_steps}=    RW.NextSteps.Format    ${risky_next_steps}
+    ...    ${risky_pdb_workload_kind.stdout}_name=${risky_pdb_workload.stdout}
+    ${missing_next_steps}=    RW.NextSteps.Format    ${missing_next_steps}
+    ...    ${missing_pdb_workload_kind.stdout}_name=${missing_pdb_workload.stdout}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${pdb_check}
     ...    set_severity_level=2
@@ -349,7 +369,7 @@ Check Missing or Risky PodDisruptionBudget Policies
     ...    set_issue_actual=We detected PodDisruptionBudgets in namespace ${NAMESPACE} which are considered Risky to maintenance operations
     ...    set_issue_title=Risky PodDisruptionBudgets Found in namespace ${NAMESPACE}
     ...    set_issue_details=Review the PodDisruptionBudget check for ${NAMESPACE}:\n"$_stdout"
-    ...    set_issue_next_steps=${svc_name.stdout} check deployments anomolies
+    ...    set_issue_next_steps=${risky_next_steps}
     ...    _line__raise_issue_if_contains=Risky
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${pdb_check}
@@ -358,7 +378,7 @@ Check Missing or Risky PodDisruptionBudget Policies
     ...    set_issue_actual=We detected Deployments or StatefulSets in namespace ${NAMESPACE} which are missing PodDisruptionBudgets
     ...    set_issue_title=Deployments or StatefulSets in namespace ${NAMESPACE} are missing PodDisruptionBudgets
     ...    set_issue_details=Review the Deployments and StatefulSets missing PodDisruptionBudget in ${NAMESPACE}:\n"$_stdout"
-    ...    set_issue_next_steps=${dply_name.stdout} check deployments anomolies
+    ...    set_issue_next_steps=${missing_next_steps}
     ...    _line__raise_issue_if_contains=Missing
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add To Report    ${pdb_check.stdout}\n

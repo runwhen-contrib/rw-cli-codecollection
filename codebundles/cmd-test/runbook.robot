@@ -8,6 +8,7 @@ Library             RW.platform
 Library             OperatingSystem
 Library             RW.CLI
 Library             RW.NextSteps
+Library             RW.Inventory
 
 Suite Setup         Suite Initialization
 
@@ -63,6 +64,38 @@ Log Suggestion
     ${next_steps}=    RW.NextSteps.Format    ${next_steps}
     ...    postgres_name=${db_name.stdout}
     RW.Core.Add Pre To Report    ${next_steps}
+
+Test Inventory
+    [Documentation]    Creates an inventory from a kubernetes namespace and demonstrates related-service search
+    [Tags]    resources    inventory    search
+    ${rsp}=    RW.CLI.Run Cli
+    ...    cmd=kubectl get all -n online-boutique --no-headers | awk '{print $1}'
+    ...    target_service=${kubectl}
+    ...    env={"KUBECONFIG":"./${kubeconfig.key}"}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ${inventory}=    Evaluate    """${rsp.stdout}""".split("\\n")
+    RW.Inventory.Set Inventory    ${inventory}
+    ${related_product}=    RW.Inventory.Related    /product
+    ...    k_nearest=3
+    ${related_checkout}=    RW.Inventory.Related    /cart/checkout
+    ...    k_nearest=3
+    ${related_cart}=    RW.Inventory.Related    /cart
+    ...    k_nearest=3
+    ${object_hint_kwargs}=    RW.Inventory.To Kwargs
+    ...    ${related_product}
+    ...    ${related_checkout}
+    ...    ${related_cart}
+    ${product_next_steps}=    RW.NextSteps.Suggest
+    ...    The application workload ${related_product[0].item_name} related to /product in namespace online-boutique has http 500 errors
+    ${checkout_next_steps}=    RW.NextSteps.Suggest
+    ...    The application workload ${related_checkout[0].item_name} related to /cart/checkout in namespace online-boutique has http 500 errors
+    ${cart_next_steps}=    RW.NextSteps.Suggest
+    ...    The application workload ${related_cart[0].item_name} related to /cart in namespace online-boutique has http 500 errors
+    ${next_steps}=    RW.NextSteps.Format    ${product_next_steps}\n${checkout_next_steps}\n${cart_next_steps}
+    ...    manual_kwargs=${object_hint_kwargs}
+    RW.Core.Add Pre To Report    Next Steps:\n${next_steps}
+    RW.Core.Add Pre To Report    Related:\n${related_product}\n\n${related_checkout}\n\n${related_cart}
+    RW.Core.Add Pre To Report    Command Stderr:\n${rsp.stderr}
 
 
 *** Keywords ***
