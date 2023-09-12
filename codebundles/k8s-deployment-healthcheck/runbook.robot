@@ -8,6 +8,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             RW.NextSteps
 Library             OperatingSystem
 
 Suite Setup         Suite Initialization
@@ -52,13 +53,16 @@ Troubleshoot Deployment Warning Events
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
+    ${next_steps}=    RW.NextSteps.Suggest    ${events.stdout}
+    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
+    ...    deployment_name=${DEPLOYMENT_NAME}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${events}
     ...    set_severity_level=1
     ...    set_issue_expected=No events of type warning should exist for deployment.
     ...    set_issue_actual=Events of type warning found for deployment.
     ...    set_issue_title=The deployment ${DEPLOYMENT_NAME} has warning events.
-    ...    set_issue_details=Warning events found for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE} eg: $_line \n - check event output and related nodes, PersistentVolumes, PersistentVolumeClaims, image registry authenticaiton, or fluxcd or argocd logs.
+    ...    set_issue_details=Warning events found for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE}\n  $_line \n
     ...    set_issue_next_steps=${DEPLOYMENT_NAME} Check Deployment Log For Issues
     ...    _line__raise_issue_if_contains=Warning
     ${history}=    RW.CLI.Pop Shell History
