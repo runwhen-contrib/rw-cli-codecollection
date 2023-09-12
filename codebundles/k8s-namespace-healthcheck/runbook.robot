@@ -111,25 +111,23 @@ Troubleshoot Container Restarts In Namespace
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
-    ${pod_name}=    RW.CLI.Run Cli
-    ...    cmd=echo "${container_restart_details.stdout}" | awk -F': ' '/pod_name:/ {print $2}'
+    ${container_restart_analysis}=    RW.CLI.Run Bash File
+    ...    bash_file=container_restarts.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ${recommendations}=    RW.CLI.Run Cli
+    ...    cmd=echo "${container_restart_analysis.stdout}" | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+    ...    env=${env}
     ...    include_in_history=false
-    ${message_details}=    RW.CLI.Run Cli
-    ...    cmd=echo "${container_restart_details.stdout}" | awk -F': ' '/message:/ {print $2}'
-    ...    include_in_history=false
-    ${next_steps}=    RW.NextSteps.Suggest    ${message_details.stdout}
-    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
-    ...    pod_name=${pod_name.stdout}
-    ...    workload_name=${pod_name.stdout}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${container_restart_details}
     ...    set_severity_level=2
     ...    set_issue_expected=Containers should not be restarting.
     ...    set_issue_actual=We found the following containers with restarts: $_stdout
     ...    set_issue_title=Container Restarts Detected In Namespace ${NAMESPACE}
-    ...    set_issue_details=Pods with Container Restarts:\n"$_stdout" in the namespace ${NAMESPACE}
-    ...    set_issue_next_steps=${next_steps}
-    ...    _line__raise_issue_if_contains=restart_count
+    ...    set_issue_details=${container_restart_analysis.stdout}
+    ...    set_issue_next_steps=${recommendations.stdout}
+    ...    _line__raise_issue_if_contains=Recommend
     ${history}=    RW.CLI.Pop Shell History
     IF    """${container_restart_details.stdout}""" == ""
         ${container_restart_details}=    Set Variable    No container restarts found
@@ -137,7 +135,7 @@ Troubleshoot Container Restarts In Namespace
         ${container_restart_details}=    Set Variable    ${container_restart_details.stdout}
     END
     RW.Core.Add Pre To Report    Summary of unready container restarts in namespace: ${NAMESPACE}
-    RW.Core.Add Pre To Report    ${container_restart_details}
+    RW.Core.Add Pre To Report    ${container_restart_analysis.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Troubleshoot Pending Pods In Namespace
@@ -424,6 +422,7 @@ Suite Initialization
     ...    enum=[kubectl,oc]
     ...    example=kubectl
     ...    default=kubectl
+    ${HOME}=    RW.Core.Import User Variable    HOME
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${kubectl}    ${kubectl}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
@@ -433,4 +432,6 @@ Suite Initialization
     Set Suite Variable    ${ANOMALY_THRESHOLD}    ${ANOMALY_THRESHOLD}
     Set Suite Variable    ${SERVICE_ERROR_PATTERN}    ${SERVICE_ERROR_PATTERN}
     Set Suite Variable    ${SERVICE_EXCLUDE_PATTERN}    ${SERVICE_EXCLUDE_PATTERN}
-    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
+    Set Suite Variable    ${HOME}    ${HOME}
+    Set Suite Variable    ${env}    
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "HOME":"${HOME}"}
