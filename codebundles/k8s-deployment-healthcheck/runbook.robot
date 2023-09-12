@@ -62,7 +62,7 @@ Troubleshoot Deployment Warning Events
     ...    set_issue_expected=No events of type warning should exist for deployment.
     ...    set_issue_actual=Events of type warning found for deployment.
     ...    set_issue_title=The deployment ${DEPLOYMENT_NAME} has warning events.
-    ...    set_issue_details=Warning events found for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE}\n  $_line \n
+    ...    set_issue_details=Warning events found for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE}\n$_line\n
     ...    set_issue_next_steps=${DEPLOYMENT_NAME} Check Deployment Log For Issues
     ...    _line__raise_issue_if_contains=Warning
     ${history}=    RW.CLI.Pop Shell History
