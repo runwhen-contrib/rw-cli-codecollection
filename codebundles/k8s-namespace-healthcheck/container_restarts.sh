@@ -32,13 +32,17 @@ function exit_code_success() {
     labels_json=$(echo $owner | jq -r '.metadata.labels')
     flux_labels=$(find_matching_labels "$labels_json" "flux")
     argocd_labels=$(find_matching_labels "$labels_json" "argo")
+    command_override_check=$(check_manifest_configuration $owner_kind/$owner_name)
+    if [[ "$command_override_check" ]]; then 
+        echo "The command for $owner_kind/$owner_name has an explicit configuration. Please verify this is accurate: $command_override_check"
+    fi
     echo "Detected that $owner_kind/$owner_name manages this pod. Checking for other controllers that might be related..."
     if [[ "$flux_labels" ]]; then
         echo "Detected FluxCD controlled resource."
         flux_labels=$(echo "$flux_labels" | tr ' ' '\n')
         namespace=$(echo "$flux_labels" | grep namespace: | awk -F ":" '{print $2}') 
         name=$(echo "$flux_labels" | grep name: | awk -F ":" '{print $2}')
-        recommendations+=("Check that the FluxCD resources are not suspended and the manifests are accurate for app:$name, configured in GitOps namespace:$namespace")  
+        recommendations+=("Check that the FluxCD resources are not suspended and the manifests are accurate for app:$name, configured in GitOps namespace:$namespace") 
     elif [[ "$argocd_labels" ]]; then
         echo "Detected ArgoCD"
         argocd_labels=$(echo "$argocd_labels" | tr ' ' '\n')
@@ -73,6 +77,19 @@ function find_matching_labels() {
     done
 
     echo "${matching_labels[*]}"
+}
+function check_manifest_configuration() {
+    resource="$1"
+    command_override_check=$(kubectl get $1 --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r '
+    .spec.template.spec.containers[] |
+    select(.command != null) |
+    {
+        container: .name,
+        command: .command,
+        args: .args
+    }
+    ')
+    echo $command_override_check
 }
 # ------------------------- Dependency Verification ---------------------------
 
