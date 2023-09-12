@@ -106,26 +106,28 @@ Troubleshoot Container Restarts In Namespace
     [Documentation]    Fetches pods that have container restarts and provides a report of the restart issues.
     [Tags]    namespace    containers    status    restarts
     ${container_restart_details}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r --argjson exit_code_explanations '{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}' '.items[] | select(.status.containerStatuses != null) | select(.status.containerStatuses[].restartCount > 0) | "---\\npod_name: \\(.metadata.name)\\ncontainers: \\(.status.containerStatuses | map(.name) | join(", "))\\nrestart_count: \\(.status.containerStatuses[].restartCount)\\nmessage: \\(.status.message // "N/A")\\n\\(.status.containerStatuses[] | select(.state.running != null) | .lastState.terminated | "terminated_reason: \\(.reason // "N/A")\\nterminated_finishedAt: \\(.finishedAt // "N/A")\\nterminated_exitCode: \\(.exitCode // "N/A")\\nexit_code_explanation: \\($exit_code_explanations[.exitCode | tostring] // "Unknown exit code")")\\n---\\n"'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r --argjson exit_code_explanations '{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}' '.items[] | select(.status.containerStatuses != null) | select(any(.status.containerStatuses[]; .restartCount > 0)) | "---\\npod_name: \\(.metadata.name)\\n" + (.status.containerStatuses[] | "containers: \\(.name)\\nrestart_count: \\(.restartCount)\\nmessage: \\(.state.waiting.message // "N/A")\\nterminated_reason: \\(.lastState.terminated.reason // "N/A")\\nterminated_finishedAt: \\(.lastState.terminated.finishedAt // "N/A")\\nterminated_exitCode: \\(.lastState.terminated.exitCode // "N/A")\\nexit_code_explanation: \\($exit_code_explanations[.lastState.terminated.exitCode | tostring] // "Unknown exit code")") + "\\n---\\n"'
     ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
-    ${pod_name}=    RW.CLI.Run Cli
-    ...    cmd=echo "${container_restart_details.stdout}" | grep -oP '(?<=pod_name:)[^ ]*' | grep -oP '[^.]*(?=-[a-z0-9]+-[a-z0-9]+)'
-    ${next_steps}=    RW.NextSteps.Suggest    Pod ${container_restart_details.details}
-    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
-    ...    pod_name=${pod_name}
-    ...    workload_name=${pod_name}
+    ${container_restart_analysis}=    RW.CLI.Run Bash File
+    ...    bash_file=container_restarts.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ${recommendations}=    RW.CLI.Run Cli
+    ...    cmd=echo "${container_restart_analysis.stdout}" | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+    ...    env=${env}
+    ...    include_in_history=false
     RW.CLI.Parse Cli Output By Line
-    ...    rsp=${container_restart_details}
+    ...    rsp=${container_restart_analysis}
     ...    set_severity_level=2
     ...    set_issue_expected=Containers should not be restarting.
     ...    set_issue_actual=We found the following containers with restarts: $_stdout
     ...    set_issue_title=Container Restarts Detected In Namespace ${NAMESPACE}
-    ...    set_issue_details=Pods with Container Restarts:\n"$_stdout" in the namespace ${NAMESPACE}
-    ...    set_issue_next_steps=${next_steps}
-    ...    _line__raise_issue_if_contains=-
+    ...    set_issue_details=${container_restart_analysis.stdout}
+    ...    set_issue_next_steps=${recommendations.stdout}
+    ...    _line__raise_issue_if_contains=Recommend
     ${history}=    RW.CLI.Pop Shell History
     IF    """${container_restart_details.stdout}""" == ""
         ${container_restart_details}=    Set Variable    No container restarts found
@@ -133,7 +135,7 @@ Troubleshoot Container Restarts In Namespace
         ${container_restart_details}=    Set Variable    ${container_restart_details.stdout}
     END
     RW.Core.Add Pre To Report    Summary of unready container restarts in namespace: ${NAMESPACE}
-    RW.Core.Add Pre To Report    ${container_restart_details}
+    RW.Core.Add Pre To Report    ${container_restart_analysis.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Troubleshoot Pending Pods In Namespace
@@ -145,7 +147,7 @@ Troubleshoot Pending Pods In Namespace
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
-    ${next_steps}=    RW.NextSteps.Suggest    ${pending_pods.details}
+    ${next_steps}=    RW.NextSteps.Suggest    ${pending_pods.stdout}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${pending_pods}
     ...    set_severity_level=1
@@ -174,7 +176,7 @@ Troubleshoot Failed Pods In Namespace
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
-    ${next_steps}=    RW.NextSteps.Suggest    ${unreadypods_details.details}
+    ${next_steps}=    RW.NextSteps.Suggest    ${unreadypods_details.stdout}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${unreadypods_details}
     ...    set_severity_level=1
@@ -338,27 +340,29 @@ Check Missing or Risky PodDisruptionBudget Policies
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true
-    ${dply_name}=    RW.CLI.Run Cli
-    ...    cmd=echo "${pdb_check.stdout}" | grep -oP '(?<=Deployment/)[^ ]*' | grep -oP '[^.]*(?=-[a-z0-9]+-[a-z0-9]+)'
-    ${svc_name}=    RW.CLI.Run Cli
-    ...    cmd=echo "${pdb_check.stdout}" | grep -oP "(?<='name': ')[^ ]*" | grep -oP "[^.]*(?=-[a-z0-9]+-[a-z0-9]+)"
+    ${risky_pdbs}=    RW.CLI.Run Cli
+    ...    cmd=echo "${pdb_check.stdout}" | grep 'Risky' | cut -f 1 -d ' ' | awk -F'/' '{print $1 ":" $2}'
+    ...    include_in_history=False
+    ${missing_pdbs}=    RW.CLI.Run Cli
+    ...    cmd=echo "${pdb_check.stdout}" | grep 'Missing' | cut -f 1 -d ' ' | awk -F'/' '{print $1 ":" $2}'
+    ...    include_in_history=False
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${pdb_check}
     ...    set_severity_level=2
-    ...    set_issue_expected=PodDisruptionBudgets in ${NAMESPACE} do not block regular maintenance
+    ...    set_issue_expected=PodDisruptionBudgets in ${NAMESPACE} should not block regular maintenance
     ...    set_issue_actual=We detected PodDisruptionBudgets in namespace ${NAMESPACE} which are considered Risky to maintenance operations
     ...    set_issue_title=Risky PodDisruptionBudgets Found in namespace ${NAMESPACE}
-    ...    set_issue_details=Review the PodDisruptionBudget check for ${NAMESPACE}:\n"$_stdout"
-    ...    set_issue_next_steps=${svc_name.stdout} check deployments anomolies
-    ...    _line__raise_issue_if_contains=Risky
+    ...    set_issue_details=Review the PodDisruptionBudget check for ${NAMESPACE}:\n$_stdout
+    ...    set_issue_next_steps=Review & Edit PodDisruptionBudget for ${risky_pdbs.stdout}
+    ...    _line__raise_issue_if_contains=(.*?)
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${pdb_check}
     ...    set_severity_level=4
-    ...    set_issue_expected=PodDisruptionBudgets in ${NAMESPACE} should exist for applications
+    ...    set_issue_expected=PodDisruptionBudgets in ${NAMESPACE} should exist for applications that have more than 1 replica
     ...    set_issue_actual=We detected Deployments or StatefulSets in namespace ${NAMESPACE} which are missing PodDisruptionBudgets
     ...    set_issue_title=Deployments or StatefulSets in namespace ${NAMESPACE} are missing PodDisruptionBudgets
-    ...    set_issue_details=Review the Deployments and StatefulSets missing PodDisruptionBudget in ${NAMESPACE}:\n"$_stdout"
-    ...    set_issue_next_steps=${dply_name.stdout} check deployments anomolies
+    ...    set_issue_details=Review the Deployments and StatefulSets missing PodDisruptionBudget in ${NAMESPACE}:\n$_stdout
+    ...    set_issue_next_steps=Create missing Pod Distruption Budgets for ${missing_pdbs.stdout}
     ...    _line__raise_issue_if_contains=Missing
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add To Report    ${pdb_check.stdout}\n
@@ -418,6 +422,7 @@ Suite Initialization
     ...    enum=[kubectl,oc]
     ...    example=kubectl
     ...    default=kubectl
+    ${HOME}=    RW.Core.Import User Variable    HOME
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${kubectl}    ${kubectl}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
@@ -427,4 +432,7 @@ Suite Initialization
     Set Suite Variable    ${ANOMALY_THRESHOLD}    ${ANOMALY_THRESHOLD}
     Set Suite Variable    ${SERVICE_ERROR_PATTERN}    ${SERVICE_ERROR_PATTERN}
     Set Suite Variable    ${SERVICE_EXCLUDE_PATTERN}    ${SERVICE_EXCLUDE_PATTERN}
-    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
+    Set Suite Variable    ${HOME}    ${HOME}
+    Set Suite Variable
+    ...    ${env}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "HOME":"${HOME}"}

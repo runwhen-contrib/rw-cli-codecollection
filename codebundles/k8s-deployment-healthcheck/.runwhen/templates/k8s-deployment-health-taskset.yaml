@@ -30,7 +30,7 @@ spec:
     - name: LOGS_ERROR_PATTERN
       value: "500"
     - name: LOGS_EXCLUDE_PATTERN
-      value: ""
+      value: "info"
   secretsProvided:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}

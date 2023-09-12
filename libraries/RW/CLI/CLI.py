@@ -3,7 +3,7 @@ CLI Generic keyword library for running and parsing CLI stdout
 
 Scope: Global
 """
-import re, logging, json, jmespath
+import re, logging, json, jmespath, os
 from datetime import datetime
 from robot.libraries.BuiltIn import BuiltIn
 
@@ -110,7 +110,6 @@ def _create_secrets_from_kwargs(**kwargs) -> list[platform.ShellServiceRequestSe
             request_secrets.append(platform.ShellServiceRequestSecret(value, as_file=True))
     return request_secrets
 
-
 def run_bash_file(
     bash_file: str,
     target_service: platform.Service = None,
@@ -119,6 +118,36 @@ def run_bash_file(
     cmd_overide: str = "",
     **kwargs,
 ) -> platform.ShellServiceResponse:
+
+    # Check if the file exists in the current working directory
+    if os.path.exists(bash_file):
+        logger.info(f"File '{bash_file}' found in the current working directory.")
+    else:
+        cwd = os.getcwd()
+
+        # Check if the current working directory is the root
+        if cwd == "/":
+            # Check if RW_PATH_TO_ROBOT environment variable exists
+            rw_path_to_robot = os.environ.get('RW_PATH_TO_ROBOT', None)
+            if rw_path_to_robot:
+                # Split the path at the patterns you provided and join with the new prefix
+                for pattern in ['sli.robot', 'runbook.robot']:
+                    if pattern in rw_path_to_robot:
+                        path, _ = rw_path_to_robot.split(pattern)
+                        new_path = os.path.join('/collection', path)
+                        # Modify the bash_file to point to the new directory
+                        bash_file = os.path.join(new_path, bash_file)
+                        if os.path.exists(bash_file):
+                            logger.info(f"File '{bash_file}' found at derived path: {new_path}.")
+                            cmd_overide = f"{bash_file}"
+                            break
+                        else:
+                            logger.warning(f"File '{bash_file}' not found at derived path: {new_path}.")
+            else:
+                logger.warning("Current directory is root, but 'RW_PATH_TO_ROBOT' is not set.")
+        else:
+            logger.warning(f"File '{bash_file}' not found in the current directory and current directory is not root.")
+    
     if not cmd_overide:
         cmd_overide = f"./{bash_file}"
     logger.info(f"Received kwargs: {kwargs}")
@@ -142,6 +171,7 @@ def run_bash_file(
     logger.info(f"shell returncode: {rsp.returncode}")
     logger.info(f"shell rsp: {rsp}")
     return rsp
+
 
 
 def run_cli(

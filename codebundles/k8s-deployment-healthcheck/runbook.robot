@@ -8,6 +8,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             RW.NextSteps
 Library             OperatingSystem
 
 Suite Setup         Suite Initialization
@@ -17,21 +18,27 @@ Suite Setup         Suite Initialization
 Check Deployment Log For Issues
     [Documentation]    Fetches recent logs for the given deployment in the namespace and checks the logs output for issues.
     [Tags]    fetch    log    pod    container    errors    inspect    trace    info    deployment    <service_name>
-    ${logs}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} --limit-bytes=256000 --since=3h --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${LOGS_ERROR_PATTERN}" | grep -Eiv "${LOGS_EXCLUDE_PATTERN}" | sort | uniq -c | awk '{print "Occurences:",$0}'
-    ...    target_service=${kubectl}
+    ${logs}=    RW.CLI.Run Bash File
+    ...    bash_file=deployment_logs.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
+    ${recommendations}=    RW.CLI.Run Cli
+    ...    cmd=echo "${logs.stdout}" | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+    ...    env=${env}
+    ...    include_in_history=false
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=echo "${logs.stdout}" | awk '/Issues Identified:/,/^$/' | tail -n +2
+    ...    env=${env}
+    ...    include_in_history=false
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${logs}
-    ...    set_severity_level=3
+    ...    set_severity_level=2
     ...    set_issue_expected=No logs matching error patterns found in deployment ${DEPLOYMENT_NAME} in namespace: ${NAMESPACE}
     ...    set_issue_actual=Error logs found in deployment ${DEPLOYMENT_NAME} in namespace: ${NAMESPACE}
-    ...    set_issue_title=Deployment ${DEPLOYMENT_NAME} Has Error Logs
-    ...    set_issue_details=Deployment ${DEPLOYMENT_NAME} has error logs:\n\n$_stdout\n\nThese errors may be related to other workloads that need triaging
-    ...    set_issue_next_steps=${DEPLOYMENT_NAME} Check For Deployment Event Anomalies
-    ...    _line__raise_issue_if_contains=Occurences
+    ...    set_issue_title=Deployment ${DEPLOYMENT_NAME} in ${NAMESPACE} has: \n${issues.stdout}
+    ...    set_issue_details=Deployment ${DEPLOYMENT_NAME} has error logs:\n\n$_stdout
+    ...    set_issue_next_steps=${recommendations.stdout}
+    ...    _line__raise_issue_if_contains=Recommended
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report
     ...    Recent logs from deployment/${DEPLOYMENT_NAME} in ${NAMESPACE}:\n\n${logs.stdout}
@@ -46,14 +53,17 @@ Troubleshoot Deployment Warning Events
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
+    ${next_steps}=    RW.NextSteps.Suggest    ${events.stdout}
+    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
+    ...    deployment_name=${DEPLOYMENT_NAME}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${events}
     ...    set_severity_level=1
     ...    set_issue_expected=No events of type warning should exist for deployment.
     ...    set_issue_actual=Events of type warning found for deployment.
     ...    set_issue_title=The deployment ${DEPLOYMENT_NAME} has warning events.
-    ...    set_issue_details=Warning events found for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE} eg: $_line \n - check event output and related nodes, PersistentVolumes, PersistentVolumeClaims, image registry authenticaiton, or fluxcd or argocd logs.
-    ...    set_issue_next_steps=${DEPLOYMENT_NAME} Check Deployment Log For Issues
+    ...    set_issue_details=Warning events found for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE}\n$_line\n
+    ...    set_issue_next_steps=${next_steps}
     ...    _line__raise_issue_if_contains=Warning
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${events.stdout}
@@ -92,36 +102,39 @@ Troubleshoot Deployment Replicas
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
+    ${no_replicas_next_steps}=    RW.NextSteps.Suggest    Pods not running for deployment/${DEPLOYMENT_NAME}
+    ${no_replicas_next_steps}=    RW.NextSteps.Format    ${no_replicas_next_steps}
+    ...    deployment_name=${DEPLOYMENT_NAME}
     ${available_replicas}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${deployment}
     ...    extract_path_to_var__available_replicas=status.availableReplicas || `0`
     ...    available_replicas__raise_issue_if_lt=1
     ...    assign_stdout_from_var=available_replicas
     ...    set_issue_title=No replicas available for deployment/${DEPLOYMENT_NAME}
-    ...    set_issue_details=No replicas available for deployment/${DEPLOYMENT_NAME} in namespace ${NAMESPACE}, we found 0. Check deployment has not been scaled down, deployment events, PersistentVolumes, deployment configuration, or applicable fluxcd or argo gitops configurations or status.
-    ...    set_issue_next_steps=${DEPLOYMENT_NAME} Check Deployment Log For Issues
+    ...    set_issue_details=No replicas available for deployment/${DEPLOYMENT_NAME} in namespace ${NAMESPACE}, we found 0.
+    ...    set_issue_next_steps=${no_replicas_next_steps} 
     RW.CLI.Parse Cli Json Output
     ...    rsp=${available_replicas}
     ...    extract_path_to_var__available_replicas=@
     ...    available_replicas__raise_issue_if_lt=${EXPECTED_AVAILABILITY}
     ...    set_issue_title=Fewer Than Expected Available Replicas For Deployment ${DEPLOYMENT_NAME}
     ...    set_issue_details=Fewer than expected replicas available (we found $available_replicas) for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE} - check manifests, kubernetes events, pod logs, resource constraints and PersistentVolumes
-    ...    set_issue_next_steps=${DEPLOYMENT_NAME} Check Deployment Log For Issues
+    ...    set_issue_next_steps=Troubleshoot Container Restarts in Namespace\n\nnamespace:${NAMESPACE}
     ${desired_replicas}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${deployment}
     ...    extract_path_to_var__desired_replicas=status.replicas || `0`
     ...    desired_replicas__raise_issue_if_lt=1
     ...    assign_stdout_from_var=desired_replicas
     ...    set_issue_title=Less than desired replicas for deployment/${DEPLOYMENT_NAME}
-    ...    set_issue_details=Less than desired replicas for deployment/${DEPLOYMENT_NAME} in ${NAMESPACE}. Check deployment has not been scaled down, deployment events, PersistentVolumes, deployment configuration, or applicable fluxcd or argo gitops configurations or status.
-    ...    set_issue_next_steps=${DEPLOYMENT_NAME} Check Deployment Log For Issues
+    ...    set_issue_details=Less than desired replicas for deployment/${DEPLOYMENT_NAME} in ${NAMESPACE}. 
+    ...    set_issue_next_steps=Troubleshoot Deployment Warning Events\n\n Deployment:${DEPLOYMENT_NAME}
     RW.CLI.Parse Cli Json Output
     ...    rsp=${desired_replicas}
     ...    extract_path_to_var__desired_replicas=@
     ...    desired_replicas__raise_issue_if_neq=${available_replicas.stdout}
     ...    set_issue_title=Desired and ready pods for deployment/${DEPLOYMENT_NAME} do not match as expected.
-    ...    set_issue_details=Desired and ready pods for deployment/${DEPLOYMENT_NAME} do not match in namespace ${NAMESPACE}, desired: $desired_replicas vs ready: ${available_replicas.stdout}. We got ready:${available_replicas.stdout} vs desired: $desired_replicas - check deployment events, deployment configuration, PersistentVolumes, or applicable fluxcd or argo gitops configurations or status. Check node events, or if the cluster is undergoing a scaling event or upgrade. Check cloud provider service availability for any known outages.
-    ...    set_issue_next_steps=${DEPLOYMENT_NAME} Check Deployment Log For Issues
+    ...    set_issue_details=Desired and ready pods for deployment/${DEPLOYMENT_NAME} do not match in namespace ${NAMESPACE}, desired: $desired_replicas vs ready: ${available_replicas.stdout}. We got ready:${available_replicas.stdout} vs desired: $desired_replicas
+    ...    set_issue_next_steps=Troubleshoot Deployment Warning Events\n\n Deployment:${DEPLOYMENT_NAME}
     ${desired_replicas}=    Convert To Number    ${desired_replicas.stdout}
     ${available_replicas}=    Convert To Number    ${available_replicas.stdout}
     RW.Core.Add Pre To Report    Deployment State:\n${deployment.stdout}
@@ -224,6 +237,7 @@ Suite Initialization
     ...    enum=[kubectl,oc]
     ...    example=kubectl
     ...    default=kubectl
+    ${HOME}=    RW.Core.Import User Variable    HOME
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${kubectl}    ${kubectl}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
@@ -234,4 +248,7 @@ Suite Initialization
     Set Suite Variable    ${ANOMALY_THRESHOLD}    ${ANOMALY_THRESHOLD}
     Set Suite Variable    ${LOGS_ERROR_PATTERN}    ${LOGS_ERROR_PATTERN}
     Set Suite Variable    ${LOGS_EXCLUDE_PATTERN}    ${LOGS_EXCLUDE_PATTERN}
-    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
+    Set Suite Variable    ${HOME}    ${HOME}
+    Set Suite Variable
+    ...    ${env}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "LOGS_ERROR_PATTERN":"${LOGS_ERROR_PATTERN}", "LOGS_EXCLUDE_PATTERN":"${LOGS_EXCLUDE_PATTERN}", "ANOMALY_THRESHOLD":"${ANOMALY_THRESHOLD}", "DEPLOYMENT_NAME": "${DEPLOYMENT_NAME}", "HOME":"${HOME}"}

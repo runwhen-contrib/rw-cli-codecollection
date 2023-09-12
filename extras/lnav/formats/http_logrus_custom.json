@@ -1,0 +1,78 @@
+{
+    "$schema": "https://lnav.org/schemas/format-v1.schema.json",
+    "http_logrus_custom": {
+        "title": "HTTP Logrus Custom (used in online-boutique)",
+        "description": "A custom format for specific http router logs from logrus with online-boutique.",
+        "json": true,
+        "timestamp-format": [
+            "%Y-%m-%dT%H:%M:%S"
+        ],
+        "timestamp-field": "timestamp",
+        "level-field": "severity",
+        "opid-field": "http.req.id",
+        "convert-to-local-time": true,
+        "multiline": false,
+        "body-field": "message",
+        "line-format": [
+            {
+                "field": "__timestamp__"
+            },
+            " ",
+            {
+                "field": "severity",
+                "auto-width": true
+            },
+            " ",
+            {
+                "field": "message"
+            },
+            " ",
+            {
+                "field": "http.req.method"
+            },
+            " ",
+            {
+                "field": "http.req.path",
+                "default-value": ""
+            }
+        ],
+        "value": {
+            "http.req.id": {
+                "kind": "string",
+                "identifier": true
+            },
+            "http.req.method": {
+                "kind": "string",
+                "identifier": true
+            },
+            "http.req.path": {
+                "kind": "json",
+                "identifier": true
+            },
+            "http.resp.bytes": {
+                "kind": "integer"
+            },
+            "http.resp.status": {
+                "kind": "integer",
+                "identifier": true
+            },
+            "http.resp.took.ms": {
+                "kind": "integer"
+            },
+            "session": {
+                "kind": "string"
+            },
+            "currency": {
+                "kind": "string",
+                "identifier": false
+            },
+            "product.id": {
+                "kind": "string",
+                "identifier": true
+            },
+            "error": {
+                "kind": "string"
+            }
+        }
+    }
+}
