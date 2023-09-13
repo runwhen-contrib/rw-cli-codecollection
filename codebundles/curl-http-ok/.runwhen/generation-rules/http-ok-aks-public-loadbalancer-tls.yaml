@@ -16,8 +16,8 @@ spec:
               properties: [spec/type]
               mode: substring
             - type: pattern
-              pattern: "kustomize.toolkit.fluxcd.io/name: app-trouble-town"
-              properties: [metadata/labels]
+              pattern: "app-trouble-town"
+              properties: [metadata/labels/["*"]]
               mode: substring
       slxs:
         - baseName: https-ok-aks
