@@ -16,8 +16,8 @@ spec:
               properties: [spec/type]
               mode: substring
             - type: pattern
-              pattern: "false"
-              properties: [metadata/annotations.get('service.beta.kubernetes.io/azure-load-balancer-internal', None)]
+              pattern: "app-trouble-town"
+              properties: [metadata/labels/"kustomize.toolkit.fluxcd.io/name"]
               mode: substring
       slxs:
         - baseName: https-ok-aks
