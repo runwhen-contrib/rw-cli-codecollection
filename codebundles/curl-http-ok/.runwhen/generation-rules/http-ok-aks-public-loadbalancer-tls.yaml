@@ -28,4 +28,4 @@ spec:
             - type: slx
             - type: sli
             - type: runbook
-              templateName: http-ok-tls-taskset.yaml
+              templateName: http-ok-aks-public-loadbalancer-tls-taskset.yaml
