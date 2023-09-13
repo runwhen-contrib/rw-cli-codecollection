@@ -17,7 +17,7 @@ spec:
               mode: substring
             - type: pattern
               pattern: "app-trouble-town"
-              properties: [metadata/labels/*]
+              properties: [metadata/annotations/service.beta.kubernetes.io\\/azure-load-balancer-internal]
               mode: substring
       slxs:
         - baseName: https-ok-aks
