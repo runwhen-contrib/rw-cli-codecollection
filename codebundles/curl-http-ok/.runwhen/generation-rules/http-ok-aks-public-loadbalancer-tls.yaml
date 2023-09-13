@@ -16,7 +16,7 @@ spec:
               properties: [spec/type]
               mode: substring
             - type: pattern
-              pattern: "app-trouble-town"
+              pattern: "false"
               properties: [metadata/annotations/service.beta.kubernetes.io\\/azure-load-balancer-internal]
               mode: substring
       slxs:
