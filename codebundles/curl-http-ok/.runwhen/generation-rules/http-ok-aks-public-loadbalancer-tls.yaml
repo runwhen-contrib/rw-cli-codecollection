@@ -16,8 +16,8 @@ spec:
               properties: [spec/type]
               mode: substring
             - type: pattern
-              pattern: "276153463"
-              properties: [metadata/resourceVersion]
+              pattern: "false"
+              properties: [metadata/annotations/service\.beta\.kubernetes\.io\/azure-load-balancer-internal]
               mode: substring
       slxs:
         - baseName: https-ok-aks
