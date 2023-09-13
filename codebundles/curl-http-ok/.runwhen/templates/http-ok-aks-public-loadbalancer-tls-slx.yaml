@@ -15,7 +15,7 @@ spec:
   icon: Cloud
   owners:
   - {{workspace.owner_email}}
-  statement: HTTP Ingress resources should respond with HTTP 200 in under 1s 
+  statement: HTTP AKS LoadBalancer and Service resources should respond with HTTP 200 in under 1s 
   additionalContext:  
     namespace: "{{match_resource.resource.metadata.namespace}}"
     labelMap: "{{match_resource.resource.metadata.labels}}" 
