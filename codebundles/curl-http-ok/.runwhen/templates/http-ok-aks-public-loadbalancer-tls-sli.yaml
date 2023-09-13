@@ -18,7 +18,7 @@ spec:
   intervalSeconds: 30
   configProvided:
     - name: URL
-      value: https://{{match_resource.resource['metadata']['annotations']['service.beta.kubernetes.io/azure-load-balancer-internal']}}
+      value: https://{{match_resource['annotations']['service.beta.kubernetes.io/azure-load-balancer-internal']}}
     - name: TARGET_LATENCY
       value: "1.2"
     - name: DESIRED_RESPONSE_CODE
