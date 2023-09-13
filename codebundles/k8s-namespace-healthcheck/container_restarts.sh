@@ -83,11 +83,7 @@ function check_manifest_configuration() {
     command_override_check=$(kubectl get $1 --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r '
     .spec.template.spec.containers[] |
     select(.command != null) |
-    {
-        container: .name,
-        command: .command,
-        args: .args
-    }
+    "Container Name: \(.name)\nCommand: \(.command | join(" "))\nArguments: \(.args | join(" "))\n---"
     ')
     echo $command_override_check
 }
