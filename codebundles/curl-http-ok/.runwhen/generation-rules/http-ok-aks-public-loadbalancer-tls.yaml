@@ -7,10 +7,10 @@ spec:
       matchRules:
         - type: and
           matches:
-            - type: pattern
-              pattern: ".+"
-              properties: [name]
-              mode: substring
+            # - type: pattern
+            #   pattern: ".+"
+            #   properties: [name]
+            #   mode: substring
             # - type: pattern
             #   pattern: "false"
             #   properties: [metadata/annotations/'service.beta.kubernetes.io/azure-load-balancer-internal']
