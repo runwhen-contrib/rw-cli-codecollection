@@ -17,7 +17,7 @@ spec:
               mode: substring
             - type: pattern
               pattern: "app-trouble-town"
-              properties: [metadata/labels/["*"]]
+              properties: [metadata/labels/*]
               mode: substring
       slxs:
         - baseName: https-ok-aks
