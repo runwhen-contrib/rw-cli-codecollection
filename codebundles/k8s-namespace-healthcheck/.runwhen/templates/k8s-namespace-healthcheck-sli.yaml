@@ -13,9 +13,9 @@ spec:
     - {{default_location}}
   description: Measures the health of a namespace by scoring Warning events, container restarts, and pods not ready. 
   codeBundle:
-    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection
+    repoUrl: https://github.com/runwhen-contrib/rw-public-codecollection
     ref: main
-    pathToRobot: codebundles/k8s-deployment-healthcheck/sli.robot
+    pathToRobot: codebundles/k8s-kubectl-namespace-healthcheck/sli.robot
   intervalStrategy: intermezzo
   intervalSeconds: 60
   configProvided:
