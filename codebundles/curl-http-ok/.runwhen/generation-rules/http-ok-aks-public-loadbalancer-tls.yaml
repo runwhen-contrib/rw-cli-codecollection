@@ -27,5 +27,5 @@ spec:
           outputItems:
             - type: slx
             - type: sli
-            - type: runbook
-              templateName: http-ok-aks-public-loadbalancer-tls-taskset.yaml
+            # - type: runbook
+            #   templateName: http-ok-aks-public-loadbalancer-tls-taskset.yaml
