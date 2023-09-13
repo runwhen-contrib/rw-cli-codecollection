@@ -22,7 +22,7 @@ spec:
       slxs:
         - baseName: https-ok-aks
           qualifiers: [resource]
-          baseTemplateName: http-ok-aks-public-loadbalancer-tls-sli
+          baseTemplateName: http-ok-aks-public-loadbalancer-tls
           levelOfDetail: basic
           outputItems:
             - type: slx
