@@ -19,11 +19,11 @@ spec:
               pattern: "LoadBalancer"
               properties: [spec/type]
               mode: substring
-          slxs:
-            - baseName: https-ok-aks
-              qualifiers: [resource]
-              baseTemplateName: http-ok-aks-public-loadbalancer-tls
-              levelOfDetail: basic
-              outputItems:
-                - type: slx
-                - type: sli
+      slxs:
+        - baseName: https-ok-aks
+          qualifiers: [resource]
+          baseTemplateName: http-ok-aks-public-loadbalancer-tls
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
