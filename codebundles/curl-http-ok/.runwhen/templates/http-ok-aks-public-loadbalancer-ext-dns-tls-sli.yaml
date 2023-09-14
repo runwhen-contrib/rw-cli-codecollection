@@ -13,8 +13,8 @@ spec:
     - {{ default_location }}
   description: Measures the response code and latency to the AKS LoadBalancer Object.
   codeBundle:
-    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection
-    ref: main
+    repoUrl: {{ repo_url }}
+    ref: {{ ref }}
     pathToRobot: codebundles/curl-http-ok/sli.robot
   intervalStrategy: intermezzo
   intervalSeconds: 30
