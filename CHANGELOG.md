@@ -1,3 +1,6 @@
+## 0.0.6 2023-09-14
+- Minor codebundle fixes and azure rule (#208) 91d6c42
+
 ## 0.0.5 2023-09-12
 - Add nextsteps logic to k8s namespace and gmp kong ingress codebundles (#200) d46d90c
 
