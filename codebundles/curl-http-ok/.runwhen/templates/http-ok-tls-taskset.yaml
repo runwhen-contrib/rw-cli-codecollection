@@ -12,8 +12,6 @@ spec:
     repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection
     ref: main
     pathToRobot: codebundles/curl-http-ok/runbook.robot
-  intervalStrategy: intermezzo
-  intervalSeconds: 30
   configProvided:
     - name: URL
       value: https://{{match_resource.resource.spec.tls[0].hosts[0]}}

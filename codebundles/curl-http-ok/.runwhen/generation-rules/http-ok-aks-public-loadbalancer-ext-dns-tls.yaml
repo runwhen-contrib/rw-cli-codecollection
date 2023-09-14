@@ -22,10 +22,10 @@ spec:
       slxs:
         - baseName: https-ok-aks
           qualifiers: [resource]
-          baseTemplateName: http-ok-aks-public-loadbalancer-tls
+          baseTemplateName: http-ok-aks-public-loadbalancer-ext-dns-tls
           levelOfDetail: basic
           outputItems:
             - type: slx
             - type: sli
             - type: runbook
-              templateName: http-ok-aks-public-loadbalancer-tls-taskset.yaml
+              templateName: http-ok-aks-public-loadbalancer-ext-dns-tls-taskset.yaml
