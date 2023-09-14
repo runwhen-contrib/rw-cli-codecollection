@@ -17,7 +17,7 @@ spec:
               mode: substring
             - type: pattern
               pattern: "false"
-              properties: ["annotations/service.beta.kubernetes.io/azure-load-balancer-internal"]
+              properties: ["annotations/service.beta.kubernetes.io\/azure-load-balancer-internal"]
               mode: substring
       slxs:
         - baseName: https-ok-aks
