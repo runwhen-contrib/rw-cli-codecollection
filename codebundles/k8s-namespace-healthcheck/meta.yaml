@@ -29,47 +29,59 @@ commands:
     --argjson exit_code_explanations ''{"0": "Success", "1": "Error", "2": "Misconfiguration",
     "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137":
     "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}''
-    ''.items[] | select(.status.containerStatuses != null) | select(.status.containerStatuses[].restartCount
-    > 0) | "---\npod_name: \(.metadata.name)\ncontainers: \(.status.containerStatuses
-    | map(.name) | join(", "))\nrestart_count: \(.status.containerStatuses[].restartCount)\nmessage:
-    \(.status.message // "N/A")\n\(.status.containerStatuses[] | select(.state.running
-    != null) | .lastState.terminated | "terminated_reason: \(.reason // "N/A")\nterminated_finishedAt:
-    \(.finishedAt // "N/A")\nterminated_exitCode: \(.exitCode // "N/A")\nexit_code_explanation:
-    \($exit_code_explanations[.exitCode | tostring] // "Unknown exit code")")\n---\n"'''
-  doc_links: "\n- [Kubernetes Documentation \u2014\_kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target=\"\
-    _blank\"}\n- [Kubernetes Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target=\"\
-    _blank\"}\n- [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target=\"\
-    _blank\"}\n- [jq Manual](https://stedolan.github.io/jq/){:target=\"_blank\"}"
+    ''.items[] | select(.status.containerStatuses != null) | select(any(.status.containerStatuses[];
+    .restartCount > 0)) | "---\npod_name: \(.metadata.name)\n" + (.status.containerStatuses[]
+    | "containers: \(.name)\nrestart_count: \(.restartCount)\nmessage: \(.state.waiting.message
+    // "N/A")\nterminated_reason: \(.lastState.terminated.reason // "N/A")\nterminated_finishedAt:
+    \(.lastState.terminated.finishedAt // "N/A")\nterminated_exitCode: \(.lastState.terminated.exitCode
+    // "N/A")\nexit_code_explanation: \($exit_code_explanations[.lastState.terminated.exitCode
+    | tostring] // "Unknown exit code")") + "\n---\n"'''
+  doc_links: '
+
+    - [Kubernetes Documentation on `kubectl get pods`](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-pods){:target="_blank"}
+
+    - [Kubernetes Documentation on `kubectl get`](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+
+    - [Kubernetes Documentation on the -o parameter](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#-o){:target="_blank"}
+
+    - [Kubernetes Documentation on the --context parameter](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#--context){:target="_blank"}
+
+    - [Kubernetes Documentation on the -n parameter](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#-n){:target="_blank"}
+
+    - [jq Manual](https://stedolan.github.io/jq/manual/){:target="_blank"}'
   explanation: '
 
 
-    This command is used to get all of the pods in a Kubernetes cluster. Context and
-    namespace are provided, along with an output type of json. We then add jq -r for
-    json manipulation and execution of further commands to provide info about the
-    pod status. This command then outputs detailed information about each of the pods,
-    like its name, containers names, restart count, message, terminated reason, finishedAt
-    time, exit code and corresponding explanation.'
+    This command uses kubectl to get information about the pods in the specified context
+    and namespace. The -o json argument gets the output in JSON format which is then
+    piped into jq, a program used to parse and manipulate JSON data. The -r argument
+    makes sure that jq doesn''t add quotes around strings and the --argjson argument
+    sets up a variable called exit_code_explanations which contains a map of exit
+    codes and their explanations. Finally, jq is used to select all pods that have
+    containers with a restart count greater than 0 and returns the pod name, container
+    name, restart count, message, terminated reason, terminated finished at, the explanation
+    for the exit code, and an "---" so the results are easier to read.'
   multi_line_details: "\n\n# Convert this one-line command into a multi-line command,\
-    \ adding verbose comments to educate new users of Kubernetes and related cli commands.\n\
-    # This command is used to find the container in a Kubernetes deployment that have\
-    \ more than one restart count. \n\n# Get all Pods associated with the given context\
-    \ & namespace\nkubectl get pods --context=${CONTEXT} -n ${NAMESPACE} \\\n\n# Output\
-    \ the response as JSON\n-o json \\\n\n# Use jq to query & filter the output of\
-    \ kubctl\n| jq -r --argjson exit_code_explanations '{\"0\": \"Success\", \"1\"\
-    : \"Error\", \"2\": \"Misconfiguration\", \"130\": \"Pod terminated by SIGINT\"\
-    , \"134\": \"Abnormal Termination SIGABRT\", \"137\": \"Pod terminated by SIGKILL\
-    \ - Possible OOM\", \"143\":\"Graceful Termination SIGTERM\"}' \\\n\n# Get Pods\
-    \ that satisfy two conditions\n# i)The Pod has containers\n# ii)At least on container\
-    \ has more than one restart count\n'.items[] | \n select(.status.containerStatuses\
-    \ != null) \n | select(.status.containerStatuses[].restartCount > 0) \n\n# Output\
-    \ the result as multiline text\n| \"---\\npod_name: \\(.metadata.name)\\ncontainers:\
-    \ \\(.status.containerStatuses | map(.name) | join(\", \"))\\nrestart_count: \\\
-    (.status.containerStatuses[].restartCount)\\nmessage: \\(.status.message // \"\
-    N/A\")\\n\\(.status.containerStatuses[] | select(.state.running != null) | .lastState.terminated\
-    \ | \"terminated_reason: \\(.reason // \"N/A\")\\nterminated_finishedAt: \\(.finishedAt\
-    \ // \"N/A\")\\nterminated_exitCode: \\(.exitCode // \"N/A\")\\nexit_code_explanation:\
-    \ \\($exit_code_explanations[.exitCode | tostring] // \"Unknown exit code\")\"\
-    )\\n---\\n\"'"
+    \ adding verbose comments to educate new users of Kubernetes and related cli commands\
+    \ \n# Get pods in a given CONTEXT and NAMESPACE with kubectl\nkubectl get pods\
+    \ \\\n    --context=${CONTEXT} \\ \n    -n ${NAMESPACE} \\ \n    -o json\n\n#\
+    \ Pipe output from kubectl to jq processor\n| jq -r \\ \n\n# Pass JSON argument\
+    \ containing dictonary key-value pairs mapping exit codes to their explanations\n\
+    --argjson exit_code_explanations '{\"0\": \"Success\", \"1\": \"Error\", \"2\"\
+    : \"Misconfiguration\", \"130\": \"Pod terminated by SIGINT\", \"134\": \"Abnormal\
+    \ Termination SIGABRT\", \"137\": \"Pod terminated by SIGKILL - Possible OOM\"\
+    , \"143\":\"Graceful Termination SIGTERM\"}' \\\n\n# Select any Items from results\
+    \ which have containerStatuses and any of them had restartCount more than 0\n\
+    # Also provide information such as pod name, container names, restart count (if\
+    \ greater than 0), message, terminated reason, finished at date and time, \n#\
+    \ and exit code eith explanations for each item found \n.items[] | select(.status.containerStatuses\
+    \ != null) | select(any(.status.containerStatuses[]; .restartCount > 0)) | \"\
+    ---\\npod_name: \\(.metadata.name)\\n\" + (.status.containerStatuses[] | \"containers:\
+    \ \\(.name)\\nrestart_count: \\(.restartCount)\\nmessage: \\(.state.waiting.message\
+    \ // \"N/A\")\\nterminated_reason: \\(.lastState.terminated.reason // \"N/A\"\
+    )\\nterminated_finishedAt: \\(.lastState.terminated.finishedAt // \"N/A\")\\nterminated_exitCode:\
+    \ \\(.lastState.terminated.exitCode // \"N/A\")\\nexit_code_explanation: \\($exit_code_explanations[.lastState.terminated.exitCode\
+    \ | tostring] // \"Unknown exit code\")\") + \"\\n---\\n\""
   name: troubleshoot_container_restarts_in_namespace
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending
     --no-headers -o json | jq -r ''.items[] | "---\npod_name: \(.metadata.name)\nstatus:
