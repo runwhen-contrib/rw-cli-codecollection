@@ -9,8 +9,8 @@ metadata:
 spec:
   location: {{ default_location }}
   codeBundle:
-    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection
-    ref: main
+    repoUrl: {{ repo_url }}
+    ref: {{ ref }}
     pathToRobot: codebundles/curl-http-ok/runbook.robot
   configProvided:
     - name: URL
