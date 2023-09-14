@@ -20,12 +20,12 @@ spec:
               properties: [metadata/annotations/service.beta.kubernetes.io//azure-load-balancer-internal]
               mode: substring
       slxs:
-        - baseName: https-ok-aks
+        - baseName: http-ok-tls-aks
           qualifiers: [resource]
-          baseTemplateName: http-ok-aks-public-loadbalancer-ext-dns-tls
+          baseTemplateName: http-ok-tls-aks-public-loadbalancer-ext-dns-tls
           levelOfDetail: basic
           outputItems:
             - type: slx
             - type: sli
             - type: runbook
-              templateName: http-ok-aks-public-loadbalancer-ext-dns-tls-taskset.yaml
+              templateName: http-ok-tls-aks-public-loadbalancer-ext-dns-tls-taskset.yaml
