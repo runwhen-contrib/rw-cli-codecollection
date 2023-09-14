@@ -16,9 +16,7 @@ spec:
               properties: [spec/type]
               mode: substring
             - type: pattern
-              pattern: 
-              - key: "service.beta.kubernetes.io/azure-load-balancer-internal"
-                value: "false"
+              pattern: "{'service.beta.kubernetes.io/azure-load-balancer-internal': 'false'}"
               properties: [annotations]
               mode: substring
       slxs:
