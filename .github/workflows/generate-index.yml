@@ -7,6 +7,7 @@ on:
       - main
     paths: 
       - "codebundles/**.robot"
+      - "libraries/**.py"
       - "readme_header.md"
       - ".github/scripts/index.py"
       - ".github/scripts/meta.py"
@@ -35,6 +36,11 @@ jobs:
           python3 .github/scripts/meta.py codebundles/
           git add codebundles/**/meta.yaml
 
+
+          # Generate keyword docs
+          pip install pydoc-markdown==4.8.2
+          ./.github/scripts/pydoc2md.sh libraries/ libraries/.docs/ 
+          git add libraries/.docs/
 
           # Test if any git changes are made. If not, bail out and send instruction. 
           if [ -z "$(git diff-index HEAD)" ] 
