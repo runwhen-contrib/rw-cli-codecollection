@@ -15,7 +15,7 @@ spec:
   codeBundle:
     repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection
     ref: main
-    pathToRobot: codebundles/k8s-deployment-healthcheck/sli.robot
+    pathToRobot: codebundles/k8s-kubectl-namespace-healthcheck/sli.robot
   intervalStrategy: intermezzo
   intervalSeconds: 60
   configProvided:

@@ -3,7 +3,7 @@ kind: GenerationRules
 spec:
   generationRules:
     - resourceTypes:
-        - ingress
+        - service
       matchRules:
         - type: and
           matches:
@@ -12,17 +12,20 @@ spec:
               properties: [name]
               mode: substring
             - type: pattern
-              pattern: ".+"
-              properties: [spec/tls/hosts]
+              pattern: "LoadBalancer"
+              properties: [spec/type]
+              mode: substring
+            - type: pattern
+              pattern: "false"
+              properties: [metadata/annotations/service.beta.kubernetes.io//azure-load-balancer-internal]
               mode: substring
       slxs:
-        - baseName: http-ok-tls-test
+        - baseName: http-ok-tls-aks
           qualifiers: [resource]
-          baseTemplateName: http-ok-tls
+          baseTemplateName: http-ok-tls-aks-public-loadbalancer-ext-dns-tls
           levelOfDetail: basic
           outputItems:
             - type: slx
             - type: sli
-            - type: slo
             - type: runbook
-              templateName: http-ok-tls-taskset.yaml
+              templateName: http-ok-tls-aks-public-loadbalancer-ext-dns-tls-taskset.yaml

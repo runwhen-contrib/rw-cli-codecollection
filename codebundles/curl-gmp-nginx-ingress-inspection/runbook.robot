@@ -35,7 +35,7 @@ Fetch Nginx Ingress HTTP Errors From GMP And Perform Inspection On Results
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${ingress_owner}=    RW.CLI.Run Cli
-    ...    cmd=echo "${k8s_ingress_details.stdout}" | grep 'Owner:[^ ]*' | awk -F':' '{print $2 ":" print $3}'
+    ...    cmd=echo "${k8s_ingress_details.stdout}" | grep 'Owner:[^ ]*' | awk -F': ' '{print $2}'
     ...    target_service=${GCLOUD_SERVICE}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${gmp_rsp}

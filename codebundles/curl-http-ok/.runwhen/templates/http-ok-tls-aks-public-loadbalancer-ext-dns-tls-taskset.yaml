@@ -6,18 +6,18 @@ metadata:
     {% include "common-labels.yaml" %}
   annotations:
     {% include "common-annotations.yaml" %}
-spec: 
-  location: {{default_location}}
+spec:
+  location: {{ default_location }}
   codeBundle:
-    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection
-    ref: main
+    repoUrl: {{ repo_url }}
+    ref: {{ ref }}
     pathToRobot: codebundles/curl-http-ok/runbook.robot
   configProvided:
     - name: URL
-      value: https://{{match_resource.resource.spec.tls[0].hosts[0]}}
+      value: https://{{match_resource.resource.metadata.annotations.get('external-dns.alpha.kubernetes.io/hostname', None)}}
     - name: TARGET_LATENCY
-      value: '1.2'
+      value: "1.2"
     - name: DESIRED_RESPONSE_CODE
-      value: '200'
+      value: "200"
   secretsProvided: []
   servicesProvided: []
