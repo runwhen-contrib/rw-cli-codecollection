@@ -45,6 +45,47 @@ def parse_cli_output_by_line(
     raise_issue_from_rsp_code: bool = False,
     **kwargs,
 ) -> platform.ShellServiceResponse:
+    """A parser that executes platform API requests as it traverses the provided stdout by line.
+    This allows authors to 'raise an issue' for a given line in stdout, providing valuable information for troubleshooting.
+
+    For each line traversed, the parser will check the contents using a variety of functions based on the kwargs provided
+    with the following structure:
+
+        <capture_group_name>__raise_issue_<query_type>=<value>
+
+    the following capture groups are always set:
+    - _stdout: the entire stdout contents
+    - _line: the current line being parsed
+
+    example: _line__raise_issue_if_contains=Error
+    This will raise an issue to the platform if any _line contains the string "Error"
+
+    - parsing needs to be performed on a platform.ShellServiceResponse object (contains the stdout)
+
+    To set the payload of the issue that will be submitted to the platform, you can use the various
+    set_issue_* arguments.
+
+    Args:
+        rsp (platform.ShellServiceResponse): The structured response from a previous command
+        lines_like_regexp (str, optional): the regexp to use to create capture groups. Defaults to "".
+        issue_if_no_capture_groups (bool, optional): raise an issue if no contents could be parsed to groups. Defaults to False.
+        set_severity_level (int, optional): The severity of the issue, with 1 being the most critical. Defaults to 4.
+        set_issue_expected (str, optional): A explanation for what we expected to see for a healthy state. Defaults to "".
+        set_issue_actual (str, optional): What we actually found that's unhealthy. Defaults to "".
+        set_issue_reproduce_hint (str, optional): Steps to reproduce the problem if applicable. Defaults to "".
+        set_issue_title (str, optional): The title of the issue. Defaults to "".
+        set_issue_details (str, optional): Further details or explanations for the issue. Defaults to "".
+        set_issue_next_steps (str, optional): A next_steps query for the platform to infer suggestions from. Defaults to "".
+        expected_rsp_statuscodes (list[int], optional): Acceptable http codes in the response object. Defaults to [200].
+        expected_rsp_returncodes (list[int], optional): Acceptable shell return codes in the response object. Defaults to [0].
+        contains_stderr_ok (bool, optional): If it's acceptable for the response object to contain stderr contents. Defaults to True.
+        raise_issue_if_no_groups_found (bool, optional):  Defaults to True.
+        raise_issue_from_rsp_code (bool, optional): Switch to raise issue or actual exception depending on response object codes. Defaults to False.
+
+    Returns:
+        platform.ShellServiceResponse: The response object used. Typically unchanged but the stdout can be
+        overrided by using the kwarg: assign_stdout_from_var=<group>
+    """
     _core: Core = Core()
     issue_count: int = 0
     capture_groups: dict = {}
