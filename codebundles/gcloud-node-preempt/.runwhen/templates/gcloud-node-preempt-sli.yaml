@@ -13,8 +13,16 @@ spec:
     - {{default_location}}
   description: Measures ____
   codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
     repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
     ref: main
+    {% endif %}
     pathToRobot: codebundles/gcloud-node-preempt/sli.robot
   intervalStrategy: intermezzo
   intervalSeconds: 300
