@@ -1,3 +1,5 @@
+## 0.0.7 2023-09-18
+
 ## 0.0.6 2023-09-14
 - Minor codebundle fixes and azure rule (#208) 91d6c42
 
