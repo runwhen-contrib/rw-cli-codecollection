@@ -1,29 +1,65 @@
 commands:
 - command: kubectl get certificates.cert-manager.io --context=${CONTEXT} -n ${NAMESPACE}
-    -ojson | jq -r '.items[] | select(.status.conditions[] | select(.type == "Ready"
-    and .status == "True")) | select(.status.renewalTime) | "Namespace:" + .metadata.namespace
+    -ojson | jq -r --arg now "$(date +%Y-%m-%dT%H:%M:%SZ)" '.items[] | select(.status.conditions[]
+    | select(.type == "Ready" and .status == "True")) | select(.status.renewalTime)
+    | select((.status.notAfter | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime) <= ($now
+    | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime)) | "Namespace:" + .metadata.namespace
     + " URL:" + .spec.dnsNames[0] + " Renews:" + .status.renewalTime + " Expires:"
     + .status.notAfter'
   doc_links: '
 
-    - [Kubernetes Documentation - Kubectl Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/){:target="_blank"}
+    - [Kubectl reference page](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 
-    - [Kubernetes Documentation - Certificate Manager Configuration and Installation](https://cert-manager.io/docs/configuration/){:target="_blank"}
+    - [Cert-manager reference page](https://docs.cert-manager.io/en/latest/){:target="_blank"}
 
-    - [JSONPath Syntax Documentation](https://goessner.net/articles/JsonPath/){:target="_blank"}'
-  explanation: " \n\nThis command will query a Certificate Manager in a Kubernetes\
-    \ environment, looking for certificates that are ready and active, and then output\
-    \ information about them. It will output the namespace, the domain name it's associated\
-    \ with, when it needs to be renewed, and when it expires. This is useful information\
-    \ when deploying applications on the Kubernetes cluster that require secure TLS/SSL\
-    \ certificates."
-  multi_line_details: "\n# Get the certificate from cert-manager.io in the specified\
-    \ context and namespace:\nkubectl get certificates.cert-manager.io \\ \n    --context=${CONTEXT}\
-    \ \\\n    -n ${NAMESPACE} \\\n    -ojson \n\n# Filter for Ready certificate that\
-    \ have a time to renewal set (renewalTime)\njq -r '.items[] | select(.status.conditions[]\
-    \ | select(.type == \"Ready\" and .status == \"True\")) | select(.status.renewalTime)\
-    \ | \"Namespace:\" + .metadata.namespace + \" URL:\" + .spec.dnsNames[0] + \"\
-    \ Renews:\" + .status.renewalTime + \" Expires:\" + .status.notAfter'"
+    - [date command reference page](https://linux.die.net/man/1/date){:target="_blank"}
+
+    - [jq reference page](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: '
+
+
+    This command uses the kubectl command line tool to list all of the certificates
+    in the given context and namespace. It then filters these certificates to only
+    include those with a status of "Ready" and that will expire before a given date.
+    Once it has filtered the certificates, it will print out their details including
+    the namespace they reside in, the domain name(s), when they will need to be renewed,
+    and when they will expire.'
+  multi_line_details: '
+
+
+    # This command is used to list cert-manager certificates (i.e., certificates requested
+    and managed using cert-manager) in a Kubernetes cluster.
+
+    # The --context option sets the specific cluster context that will be used to
+    list the certificates
+
+    CONTEXT="${CONTEXT}"
+
+
+    # The -n option sets the namespace in which the certificate are being requested
+
+    NAMESPACE="${NAMESPACE}"
+
+
+    # Get all the Certificates in JSON format from the specified namespace
+
+    CERTIFICATES_JSON=$(kubectl get certificates.cert-manager.io --context=${CONTEXT}
+    -n ${NAMESPACE} -ojson)
+
+
+    # Use jq to filter the output and select the right values for our needs
+
+    RESULT=$(echo "${CERTIFICATES_JSON}" | jq -r --arg now "$(date +%Y-%m-%dT%H:%M:%SZ)"
+    ''.items[] | select(.status.conditions[] | select(.type == "Ready" and .status
+    == "True")) | select(.status.renewalTime) | select((.status.notAfter | strptime("%Y-%m-%dT%H:%M:%SZ")
+    | mktime) <= ($now | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime)) | "Namespace:"
+    + .metadata.namespace + " URL:" + .spec.dnsNames[0] + " Renews:" + .status.renewalTime
+    + " Expires:" + .status.notAfter'')
+
+
+    # Echo the final result
+
+    echo "${RESULT}"'
   name: get_namespace_certificate_summary
 - command: 'kubectl get certificaterequests.cert-manager.io --context=${CONTEXT} -n
     ${NAMESPACE} -o json | jq -r ''.items[] | select(.status.conditions[] | select(.type
