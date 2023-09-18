@@ -9,7 +9,6 @@ metadata:
 spec: 
   location: {{default_location}}
   codeBundle:
-  codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
     {% else %}
