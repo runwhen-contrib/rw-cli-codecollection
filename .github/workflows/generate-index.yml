@@ -19,6 +19,10 @@ jobs:
       - uses: actions/checkout@v3
         with: 
           ref: ${{ github.ref }}
+      - name: Update PYTHONPATH
+        run: |
+          echo "PYTHONPATH=$PYTHONPATH:.:$(pwd)/libraries:$(pwd)/coebundles:$(pwd)/dev_facade" >> $GITHUB_ENV
+          echo "Python path set as: $PYTHONPATH"
       - name: Update readme and commit back to repo
         run: | 
           DATETIME=$(date '+%Y%m%d-%H%M%S')
@@ -35,7 +39,6 @@ jobs:
           # Run the index update script
           python3 .github/scripts/meta.py codebundles/
           git add codebundles/**/meta.yaml
-
 
           # Generate keyword docs
           pip install pydoc-markdown==4.8.2
