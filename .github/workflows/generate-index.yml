@@ -42,6 +42,10 @@ jobs:
           ./.github/scripts/pydoc2md.sh libraries/ libraries/.docs/ 
           git add libraries/.docs/
 
+          # Generate gitbook summary
+          ./.github/scripts/gitbook-summary.sh
+          git add SUMMARY.md
+
           # Test if any git changes are made. If not, bail out and send instruction. 
           if [ -z "$(git diff-index HEAD)" ] 
           then 
