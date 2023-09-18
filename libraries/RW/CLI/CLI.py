@@ -26,6 +26,11 @@ SECRET_FILE_PREFIX = "secret_file__"
 
 
 def pop_shell_history() -> str:
+    """Deletes the shell history up to this point and returns it as a string for display.
+
+    Returns:
+        str: the string of shell command history
+    """
     global SHELL_HISTORY
     history: str = "\n".join(SHELL_HISTORY)
     SHELL_HISTORY = []
@@ -45,11 +50,11 @@ def execute_command(
     Somewhat hacky as we're faking ShellResponses. Revisit this.
 
     Args:
-        cmd (str): _description_
-        service (Service, optional): _description_. Defaults to None.
-        request_secrets (List[ShellServiceRequestSecret], optional): _description_. Defaults to None.
-        env (dict, optional): _description_. Defaults to None.
-        files (dict, optional): _description_. Defaults to None.
+        cmd (str): the shell command to run
+        service (Service, optional): the remote shellservice API to send the command to, if left empty defaults to run locally. Defaults to None.
+        request_secrets (List[ShellServiceRequestSecret], optional): a list of secret objects to include in the request. Defaults to None.
+        env (dict, optional): environment variables to set during the running of the command. Defaults to None.
+        files (dict, optional): a list of files to include in the environment during the command. Defaults to None.
 
     Returns:
         ShellServiceResponse: _description_
@@ -72,6 +77,7 @@ def _create_kubernetes_remote_exec(
     context: str = "",
     **kwargs,
 ) -> str:
+    """**DEPRECATED**"""
     # if no specific workload name but labels provided, fetch the first running pod with labels
     if not workload_name and labels:
         request_secrets: [platform.ShellServiceRequestSecret] = [] if len(kwargs.keys()) > 0 else None
@@ -95,6 +101,11 @@ def _create_kubernetes_remote_exec(
 
 
 def _create_secrets_from_kwargs(**kwargs) -> list[platform.ShellServiceRequestSecret]:
+    """Helper to organize dynamically set secrets in a kwargs list
+
+    Returns:
+        list[platform.ShellServiceRequestSecret]: secrets objects in list form.
+    """
     global SECRET_PREFIX
     global SECRET_FILE_PREFIX
     request_secrets: list[platform.ShellServiceRequestSecret] = [] if len(kwargs.keys()) > 0 else None
@@ -110,6 +121,7 @@ def _create_secrets_from_kwargs(**kwargs) -> list[platform.ShellServiceRequestSe
             request_secrets.append(platform.ShellServiceRequestSecret(value, as_file=True))
     return request_secrets
 
+
 def run_bash_file(
     bash_file: str,
     target_service: platform.Service = None,
@@ -118,7 +130,18 @@ def run_bash_file(
     cmd_overide: str = "",
     **kwargs,
 ) -> platform.ShellServiceResponse:
+    """Runs a bash file from the local file system or remotely on a shellservice.
 
+    Args:
+        bash_file (str): the name of the bashfile to run
+        target_service (platform.Service, optional): the shellservice to use if provided. Defaults to None.
+        env (dict, optional): a mapping of environment variables to set for the environment. Defaults to None.
+        include_in_history (bool, optional): whether to include in the shell history or not. Defaults to True.
+        cmd_overide (str, optional): the entrypoint command to use, similar to a dockerfile. Defaults to "./<bash_file" internally.
+
+    Returns:
+        platform.ShellServiceResponse: the structured response from running the file.
+    """
     # Check if the file exists in the current working directory
     if os.path.exists(bash_file):
         logger.info(f"File '{bash_file}' found in the current working directory.")
@@ -128,13 +151,13 @@ def run_bash_file(
         # Check if the current working directory is the root
         if cwd == "/":
             # Check if RW_PATH_TO_ROBOT environment variable exists
-            rw_path_to_robot = os.environ.get('RW_PATH_TO_ROBOT', None)
+            rw_path_to_robot = os.environ.get("RW_PATH_TO_ROBOT", None)
             if rw_path_to_robot:
                 # Split the path at the patterns you provided and join with the new prefix
-                for pattern in ['sli.robot', 'runbook.robot']:
+                for pattern in ["sli.robot", "runbook.robot"]:
                     if pattern in rw_path_to_robot:
                         path, _ = rw_path_to_robot.split(pattern)
-                        new_path = os.path.join('/collection', path)
+                        new_path = os.path.join("/collection", path)
                         # Modify the bash_file to point to the new directory
                         bash_file = os.path.join(new_path, bash_file)
                         if os.path.exists(bash_file):
@@ -147,7 +170,7 @@ def run_bash_file(
                 logger.warning("Current directory is root, but 'RW_PATH_TO_ROBOT' is not set.")
         else:
             logger.warning(f"File '{bash_file}' not found in the current directory and current directory is not root.")
-    
+
     if not cmd_overide:
         cmd_overide = f"./{bash_file}"
     logger.info(f"Received kwargs: {kwargs}")
@@ -173,7 +196,6 @@ def run_bash_file(
     return rsp
 
 
-
 def run_cli(
     cmd: str,
     target_service: platform.Service = None,
@@ -186,6 +208,29 @@ def run_cli(
     include_in_history: bool = True,
     **kwargs,
 ) -> platform.ShellServiceResponse:
+    """Executes a string of shell commands either locally or remotely on a shellservice.
+
+    For passing through secrets securely this can be done by using kwargs with a specific naming convention:
+    - for files: secret_file__kubeconfig
+    - for secret strings: secret__mytoken
+
+    and then to use these within your shell command use the following syntax: $${<secret_name>.key} which will cause the shell command to access where
+    the secret is stored in the environment it's running in.
+
+    Args:
+        cmd (str): the string of shell commands to run, eg: ls -la | grep myfile
+        target_service (platform.Service, optional): the remote shellservice to run the commands on if provided, otherwise run locally if None. Defaults to None.
+        env (dict, optional): a mapping of environment variables to set in the environment where the shell commands are run. Defaults to None.
+        loop_with_items (list, optional): deprecated. Defaults to None.
+        run_in_workload_with_name (str, optional): deprecated. Defaults to "".
+        run_in_workload_with_labels (str, optional): deprecated. Defaults to "".
+        optional_namespace (str, optional): deprecated. Defaults to "".
+        optional_context (str, optional): deprecated. Defaults to "".
+        include_in_history (bool, optional): whether or not to include the shell commands in the total history. Defaults to True.
+
+    Returns:
+        platform.ShellServiceResponse: the structured response from running the shell commands.
+    """
     global SHELL_HISTORY
     looped_results = []
     rsp = None
@@ -238,4 +283,7 @@ def run_cli(
 
 
 def string_to_datetime(duration_str: str) -> datetime:
+    """
+    Helper to convert readable duration strings (eg: 1d2m36s) to a datetime.
+    """
     return _string_to_datetime(duration_str)
