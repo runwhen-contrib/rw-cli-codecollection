@@ -1,4 +1,4 @@
 root: ./
 structure:
-    readme: ./GITBOOK_README.md
+    readme: ./Introduction.md
     summary: ./SUMMARY.md
