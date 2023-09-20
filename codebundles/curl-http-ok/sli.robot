@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       This taskset uses curl to validate the response code of the endpoint and provides the total time of the request. 
+Documentation       This taskset uses curl to validate the response code of the endpoint. Returns ascore of 1 if healthy, an 0 if unhealthy. 
 Metadata            Author    stewartshea
 Metadata            Display Name    cURL HTTP OK
 Metadata            Supports    Linux macOS Windows HTTP
