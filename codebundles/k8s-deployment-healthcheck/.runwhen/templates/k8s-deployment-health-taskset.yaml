@@ -21,8 +21,6 @@ spec:
     {% endif %}
     pathToRobot: codebundles/k8s-deployment-healthcheck/runbook.robot
   configProvided:
-    - name: DISTRIBUTION
-      value: {{custom.kubernetes_distribution}}
     - name: NAMESPACE
       value: {{match_resource.resource.metadata.namespace}}
     - name: CONTEXT
@@ -39,6 +37,8 @@ spec:
       value: "500"
     - name: LOGS_EXCLUDE_PATTERN
       value: "info"
+    - name: HOME
+      value: ""
   secretsProvided:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
