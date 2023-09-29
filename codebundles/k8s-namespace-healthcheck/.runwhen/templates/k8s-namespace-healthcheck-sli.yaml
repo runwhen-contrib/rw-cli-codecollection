@@ -23,7 +23,7 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/k8s-kubectl-namespace-healthcheck/sli.robot
+    pathToRobot: codebundles/k8s-namespace-healthcheck/sli.robot
   intervalStrategy: intermezzo
   intervalSeconds: 60
   configProvided:
