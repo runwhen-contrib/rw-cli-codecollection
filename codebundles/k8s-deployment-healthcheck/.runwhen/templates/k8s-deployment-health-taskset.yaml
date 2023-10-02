@@ -21,8 +21,6 @@ spec:
     {% endif %}
     pathToRobot: codebundles/k8s-deployment-healthcheck/runbook.robot
   configProvided:
-    - name: DISTRIBUTION
-      value: {{custom.kubernetes_distribution}}
     - name: NAMESPACE
       value: {{match_resource.resource.metadata.namespace}}
     - name: CONTEXT
