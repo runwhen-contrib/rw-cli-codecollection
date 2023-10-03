@@ -52,7 +52,7 @@ Scan Labeled Pods and Show All Containers Without Resource Limit or Resource Req
     ${no_requests_count}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${pods_without_requests}
     ...    extract_path_to_var__no_requests_count=length(@)
-    ...    set_issue_title=Found pod without resource requests specified in namespace ${NAMESPACE}.
+    ...    set_issue_title=Found pod without resource requests specified in namespace ${NAMESPACE}
     ...    set_severity_level=4
     ...    no_requests_count__raise_issue_if_gt=0
     ...    set_issue_details=Pods found without resource requests applied in namespace ${NAMESPACE}. \n $_stdout \n Review each manifest and edit configuration to set appropriate resource limits.

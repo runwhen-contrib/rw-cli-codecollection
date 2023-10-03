@@ -61,7 +61,7 @@ Troubleshoot Deployment Warning Events
     ...    set_severity_level=1
     ...    set_issue_expected=No events of type warning should exist for deployment.
     ...    set_issue_actual=Events of type warning found for deployment.
-    ...    set_issue_title=The deployment ${DEPLOYMENT_NAME} has warning events.
+    ...    set_issue_title=The deployment ${DEPLOYMENT_NAME} has warning events
     ...    set_issue_details=Warning events found for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE}\n$_line\n
     ...    set_issue_next_steps=${next_steps}
     ...    _line__raise_issue_if_contains=Warning
@@ -112,7 +112,7 @@ Troubleshoot Deployment Replicas
     ...    assign_stdout_from_var=available_replicas
     ...    set_issue_title=No replicas available for deployment/${DEPLOYMENT_NAME}
     ...    set_issue_details=No replicas available for deployment/${DEPLOYMENT_NAME} in namespace ${NAMESPACE}, we found 0.
-    ...    set_issue_next_steps=${no_replicas_next_steps} 
+    ...    set_issue_next_steps=${no_replicas_next_steps}
     RW.CLI.Parse Cli Json Output
     ...    rsp=${available_replicas}
     ...    extract_path_to_var__available_replicas=@
@@ -126,13 +126,13 @@ Troubleshoot Deployment Replicas
     ...    desired_replicas__raise_issue_if_lt=1
     ...    assign_stdout_from_var=desired_replicas
     ...    set_issue_title=Less than desired replicas for deployment/${DEPLOYMENT_NAME}
-    ...    set_issue_details=Less than desired replicas for deployment/${DEPLOYMENT_NAME} in ${NAMESPACE}. 
+    ...    set_issue_details=Less than desired replicas for deployment/${DEPLOYMENT_NAME} in ${NAMESPACE}.
     ...    set_issue_next_steps=Troubleshoot Deployment Warning Events\n\n Deployment:${DEPLOYMENT_NAME}
     RW.CLI.Parse Cli Json Output
     ...    rsp=${desired_replicas}
     ...    extract_path_to_var__desired_replicas=@
     ...    desired_replicas__raise_issue_if_neq=${available_replicas.stdout}
-    ...    set_issue_title=Desired and ready pods for deployment/${DEPLOYMENT_NAME} do not match as expected.
+    ...    set_issue_title=Desired and ready pods for deployment/${DEPLOYMENT_NAME} do not match as expected
     ...    set_issue_details=Desired and ready pods for deployment/${DEPLOYMENT_NAME} do not match in namespace ${NAMESPACE}, desired: $desired_replicas vs ready: ${available_replicas.stdout}. We got ready:${available_replicas.stdout} vs desired: $desired_replicas
     ...    set_issue_next_steps=Troubleshoot Deployment Warning Events\n\n Deployment:${DEPLOYMENT_NAME}
     ${desired_replicas}=    Convert To Number    ${desired_replicas.stdout}

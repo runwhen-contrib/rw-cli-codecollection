@@ -21,7 +21,7 @@ function main (){
 
     # Generate Keywords section
     echo "## Keywords" >> "$output_file"
-    find libraries/.docs -name "*.md" | while read -r file; do
+    find libraries/.docs -name "*.md" | grep -Ev "Suggest|local_process" | while read -r file; do
         # Exclude the main README.md if needed
         if [ "$file" != "${dir_adjustment}libraries/.docs/README.md" ]; then
             # Extract the filename without extension as title
