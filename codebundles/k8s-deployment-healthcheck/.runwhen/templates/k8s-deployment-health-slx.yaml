@@ -19,4 +19,5 @@ spec:
   additionalContext:  
     namespace: "{{match_resource.resource.metadata.namespace}}"
     labelMap: "{{match_resource.resource.metadata.labels}}"
-    cluster: "{{ cluster }}"
+    cluster: "{{ cluster.name }}"
+    context: "{{ cluster.context }}"
