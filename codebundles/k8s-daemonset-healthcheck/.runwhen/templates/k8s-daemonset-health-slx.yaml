@@ -18,4 +18,6 @@ spec:
   statement: Statefulset {{match_resource.resource.metadata.name}} should be in a healthy state. 
   additionalContext:  
     namespace: "{{match_resource.resource.metadata.namespace}}"
-    labelMap: "{{match_resource.resource.metadata.labels}}"  
+    labelMap: "{{match_resource.resource.metadata.labels}}"
+    cluster: "{{ cluster.name }}"
+    context: "{{ cluster.context }}"

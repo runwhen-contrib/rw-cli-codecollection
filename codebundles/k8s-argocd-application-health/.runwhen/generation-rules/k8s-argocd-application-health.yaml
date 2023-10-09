@@ -11,7 +11,7 @@ spec:
           mode: substring
       slxs:
         - baseName: argocd-app
-          qualifiers: [resource]
+          qualifiers: ["resource", "namespace", "cluster"]
           baseTemplateName: k8s-argocd-application-health
           levelOfDetail: detailed
           outputItems:

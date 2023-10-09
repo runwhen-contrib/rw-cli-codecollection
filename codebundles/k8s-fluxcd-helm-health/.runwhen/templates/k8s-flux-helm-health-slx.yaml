@@ -18,4 +18,6 @@ spec:
   statement: Helm releases for {{namespace.name}} should be reconciled in a good state. 
   additionalContext:  
     namespace: "{{match_resource.resource.metadata.namespace}}"
-    labelMap: "{{match_resource.resource.metadata.labels}}" 
+    labelMap: "{{match_resource.resource.metadata.labels}}"
+    cluster: "{{ cluster.name }}"
+    context: "{{ cluster.context }}"

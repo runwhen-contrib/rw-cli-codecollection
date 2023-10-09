@@ -12,7 +12,7 @@ spec:
       slxs:
         - baseName: ds-health
           levelOfDetail: detailed
-          qualifiers: [resource]
+          qualifiers: ["resource", "namespace", "cluster"]
           baseTemplateName: k8s-daemonset-health
           outputItems:
             - type: slx

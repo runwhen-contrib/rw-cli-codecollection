@@ -21,7 +21,7 @@ spec:
               mode: exact
       slxs:
         - baseName: node-preempt
-          qualifiers: [resource]
+          qualifiers: ["resource", "cluster"]
           baseTemplateName: gcloud-node-preempt
           levelOfDetail: detailed
           outputItems:

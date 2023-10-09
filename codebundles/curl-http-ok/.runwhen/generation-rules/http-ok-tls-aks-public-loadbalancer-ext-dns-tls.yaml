@@ -21,7 +21,7 @@ spec:
               mode: substring
       slxs:
         - baseName: http-ok-tls-aks
-          qualifiers: [resource]
+          qualifiers: ["resource", "namespace", "cluster"]
           baseTemplateName: http-ok-tls-aks-public-loadbalancer-ext-dns-tls
           levelOfDetail: basic
           outputItems:

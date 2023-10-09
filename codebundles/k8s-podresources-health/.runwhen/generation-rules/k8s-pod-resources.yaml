@@ -12,7 +12,7 @@ spec:
     slxs:
     - baseName: pod-resources
       levelOfDetail: detailed
-      qualifiers: [namespace]
+      qualifiers: ["namespace", "cluster"]
       baseTemplateName: k8s-pod-resources
       outputItems:
         - type: slx

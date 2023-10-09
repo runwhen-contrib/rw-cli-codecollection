@@ -18,4 +18,6 @@ spec:
   statement: Overall health for {{namespace.name}} should be 1, 99% of the time. 
   additionalContext:  
     namespace: "{{match_resource.resource.metadata.namespace}}"
-    labelMap: "{{match_resource.resource.metadata.labels}}" 
+    labelMap: "{{match_resource.resource.metadata.labels}}"
+    cluster: "{{ cluster.name }}"
+    context: "{{ cluster.context }}"

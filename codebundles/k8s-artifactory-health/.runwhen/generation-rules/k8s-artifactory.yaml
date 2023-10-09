@@ -12,7 +12,7 @@ spec:
       slxs:
         - baseName: arti-health
           levelOfDetail: basic
-          qualifiers: [namespace]
+          qualifiers: ["resource", "namespace", "cluster"]
           baseTemplateName: k8s-artifactory-healthcheck
           outputItems:
             - type: slx

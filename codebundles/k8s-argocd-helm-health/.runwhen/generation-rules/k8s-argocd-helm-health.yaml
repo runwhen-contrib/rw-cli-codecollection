@@ -11,7 +11,7 @@ spec:
           mode: substring
       slxs:
         - baseName: argocd-helm
-          qualifiers: [resource]
+          qualifiers: ["resource", "namespace", "cluster"]
           baseTemplateName: k8s-argocd-helm-health
           levelOfDetail: detailed
           outputItems:

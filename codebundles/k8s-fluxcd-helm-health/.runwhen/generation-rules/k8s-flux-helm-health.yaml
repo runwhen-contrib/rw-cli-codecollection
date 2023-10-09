@@ -13,7 +13,7 @@ spec:
               mode: substring
       slxs:
         - baseName: flux-helm
-          qualifiers: [resource]
+          qualifiers: ["resource", "namespace", "cluster"]
           baseTemplateName: k8s-flux-helm-health
           levelOfDetail: detailed
           outputItems:
