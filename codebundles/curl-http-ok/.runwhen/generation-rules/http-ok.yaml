@@ -17,7 +17,7 @@ spec:
             path: spec/tls/hosts
       slxs:
         - baseName: http-ok
-          qualifiers: [resource]
+          qualifiers: ["resource", "namespace", "cluster"]
           baseTemplateName: http-ok
           levelOfDetail: basic
           outputItems:

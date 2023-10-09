@@ -24,6 +24,22 @@ function check_command_exists() {
     fi
 }
 
+# Function to filter out common words
+filter_common_words() {
+    local input_string="$1"
+    local common_words=" to on add could desc not lookup "
+    local filtered_string=""
+    
+    # Loop through each word in the input string
+    while IFS= read -r word; do
+        # If the word is not in the common words list, add to filtered string
+        if [[ ! " $common_words " =~ " $word " ]]; then
+            filtered_string+="$word"$'\n'
+        fi
+    done <<< "$input_string"
+    
+    echo "$filtered_string"
+}
 # ------------------------- Dependency Verification ---------------------------
 
 # Ensure all the required binaries are accessible
@@ -32,7 +48,7 @@ check_command_exists jq
 check_command_exists lnav
 
 # Load custom formats for lnav if it's installed
-# FIXME: This could be done more effeciently
+# FIXME: This could be done more efficiently
 # Search for the formats directory
 lnav_formats_path=$(find / -type d -path '*/extras/lnav/formats' -print -quit 2>/dev/null)
 cp -rf $lnav_formats_path/* $HOME/.lnav/formats/installed
@@ -94,6 +110,7 @@ issue_descriptions=()
 # fields and the format - need to figure out how to best match the right formats, 
 # or can we just use logline
 
+SEARCH_RESOURCES=""
 ##### Begin query #####
 
 # Format file / table http_logrus_custom
@@ -106,11 +123,20 @@ for FILE in "${LOG_FILES[@]}"; do
 done
 
 if [[ -n "$INTERESTING_PATHS" ]]; then
-    SEARCH_RESOURCES=$(echo "$INTERESTING_PATHS" | awk -F'/' '{for (i=1; i<=NF; i++) print $i}' | sort | uniq)
+    SEARCH_RESOURCES+=$(echo "$INTERESTING_PATHS" | awk -F'/' '{for (i=1; i<=NF; i++) print $i}' | sort | uniq)
     issue_descriptions+=("HTTP Errors found for paths: $SEARCH_RESOURCES")
 else
-    echo "No interesting paths found."
+    echo "No interesting HTTP paths found."
 fi
+
+# Search for error fields and strings
+for FILE in "${LOG_FILES[@]}"; do
+    echo "$FILE"
+    ERROR_SUMMARY=$(lnav -n -c ';SELECT error, COUNT(*) AS count FROM http_logrus_custom WHERE error IS NOT NULL GROUP BY error;' $FILE)
+    echo "$ERROR_SUMMARY"
+    ERROR_FUZZY_STRING+=$(echo "$ERROR_SUMMARY" | head -n 3 | tr -d '":' | tr ' ' '\n' | awk '{ for (i=1; i<=NF; i++) if (i != 2) print $i }')
+done
+ERROR_FUZZY_STRING=$(echo "$ERROR_FUZZY_STRING" | sort | uniq)
 ##### End query #####
 
 
@@ -130,19 +156,113 @@ else
 fi
 
 
+
+# # Fuzzy match env vars in deployments with ERROR_FUZZY_STRING
+# declare -a FUZZY_ENV_VAR_RESOURCE_MATCHES
+# if [[ -n "$SEARCH_RESOURCES" && -n "$ERROR_FUZZY_STRING" ]]; then
+#     # Filter out common words from ERROR_FUZZY_STRING
+#     FILTERED_ERROR_STRING=$(filter_common_words "$ERROR_FUZZY_STRING")
+
+#     # Convert FILTERED_ERROR_STRING into an array
+#     mapfile -t PATTERNS <<< "$FILTERED_ERROR_STRING"
+
+#     for resource_type in "deployments" "statefulsets"; do
+#         for pattern in "${PATTERNS[@]}"; do
+#             while read -r resource_name; do
+#                 FUZZY_ENV_VAR_RESOURCE_MATCHES+=("$resource_type/$resource_name")
+#             done < <(${KUBERNETES_DISTRIBUTION_BINARY} get "$resource_type" -n "$NAMESPACE" -o=json | jq --arg pattern "$pattern" -r \
+#             ".items[] |
+#                 select(
+#                     .spec.template.spec.containers[]? |
+#                     .env[]? |
+#                     select(
+#                         (.name? // empty | ascii_downcase | contains(\$pattern)) or 
+#                         (.value? // empty | ascii_downcase | contains(\$pattern))
+#                     )
+#                 ) |
+#                 .metadata.name")
+#         done
+#     done
+# else
+#     echo "No search queries or fuzzy matches to perform."
+#     exit
+# fi
+
+# Fuzzy match env vars in deployments with ERROR_FUZZY_STRING
+declare -a FUZZY_ENV_VAR_RESOURCE_MATCHES
+if [[ -n "$SEARCH_RESOURCES" && -n "$ERROR_FUZZY_STRING" ]]; then
+    # Filter out common words from ERROR_FUZZY_STRING
+    FILTERED_ERROR_STRING=$(filter_common_words "$ERROR_FUZZY_STRING")
+
+    # Convert FILTERED_ERROR_STRING into an array
+    mapfile -t PATTERNS <<< "$FILTERED_ERROR_STRING"
+
+    for resource_type in "deployments" "statefulsets"; do
+        for pattern in "${PATTERNS[@]}"; do
+            while IFS="|" read -r resource_name env_key env_value; do
+                formatted_string="$pattern:$resource_type/$resource_name:$env_key:$env_value"
+                FUZZY_ENV_VAR_RESOURCE_MATCHES+=("$formatted_string")
+            done < <(${KUBERNETES_DISTRIBUTION_BINARY} get "$resource_type" -n "$NAMESPACE" -o=json | jq --arg pattern "$pattern" -r \
+                    ".items[] | 
+                    select(
+                        .spec.template.spec.containers[]? |
+                        .env[]? |
+                        select(
+                            (.name? // empty | ascii_downcase | contains(\$pattern)) or 
+                            (.value? // empty | ascii_downcase | contains(\$pattern))
+                        )
+                    ) |
+                    {resource_name: .metadata.name, matched_env: (.spec.template.spec.containers[] | .env[] | select((.name? // empty | ascii_downcase | contains(\$pattern)) or (.value? // empty | ascii_downcase | contains(\$pattern))))} |
+                    [.resource_name, .matched_env.name, .matched_env.value] | join(\"|\")")
+
+        done
+    done
+else
+    echo "No search queries or fuzzy matches to perform."
+    exit
+fi
+
+for match in "${FUZZY_ENV_VAR_RESOURCE_MATCHES[@]}"; do
+    IFS=':' read -ra parts <<< "$match"
+    string=${parts[0]}
+    resource=${parts[1]}
+    env_key=${parts[2]}
+    env_value=${parts[3]}
+    echo "Found string **$string** in resource **$resource**. Check manifest and environment variable **$env_key** for accuracy."
+done
+
+# Fetch namespace events for searching through
 EVENT_SEARCH_LIST=$(${KUBERNETES_DISTRIBUTION_BINARY}  get events --context=${CONTEXT} -n ${NAMESPACE})
 event_details="\nThe namespace ${NAMESPACE} has produced the following interesting events:"
 event_details+="\n"
 
-# For each value, search the namespace for applicable resources
-INTERESTING_RESOURCES=""
+# For each value, search the namespace for applicable resources and events
 for RESOURCE in "${SEARCH_RESOURCES[@]}"; do 
     event_details+=$(echo "$EVENT_SEARCH_LIST" | grep "$RESOURCE" | grep -Eiv "Normal")
     INTERESTING_RESOURCES+=$(echo "$RESOURCE_SEARCH_LIST" | grep "$RESOURCE")
 done
-echo $INTERESTING_RESOURCES
+
+
 # Try to generate some recommendations from the resource strings we discovered
 recommendations=()
+
+declare -A seen_resources
+
+if [[ ${#FUZZY_ENV_VAR_RESOURCE_MATCHES[@]} -ne 0 ]]; then
+    for match in "${FUZZY_ENV_VAR_RESOURCE_MATCHES[@]}"; do        
+        IFS=':' read -ra parts <<< "$match"
+        string=${parts[0]}
+        resource=${parts[1]}
+        env_key=${parts[2]}
+        env_value=${parts[3]}
+
+        if [[ -z ${seen_resources[$resource]} ]]; then
+            recommendations+=("Review manifest for **$resource** in namespace: **${NAMESPACE}**. Matched error log string **$string** in environment variable **$env_key**.")
+            seen_resources[$resource]=1
+        fi
+    done
+fi
+
 if [[ -n "$INTERESTING_RESOURCES" ]]; then
     while read -r line; do
         # Splitting columns into array
@@ -159,20 +279,20 @@ if [[ -n "$INTERESTING_RESOURCES" ]]; then
         case "$type" in
         pod)
             if [[ "$status" != "Running" ]]; then
-                recommendations+=("Troubleshoot failed pods in namespace ${NAMESPACE}")
+                recommendations+=("Troubleshoot *failed pods* in *namespace* **${NAMESPACE}**")
             fi
             if ((restarts > 0)); then
-                recommendations+=("Troubleshoot container restarts in namespace ${NAMESPACE}")
+                recommendations+=("Troubleshoot *container restarts* in *namespace* **${NAMESPACE}**")
             fi
             ;;
         deployment|deployment.apps)
-            recommendations+=("Check deployment health $name in namespace ${NAMESPACE}")
+            recommendations+=("Check *deployment* health **$name** in *namespace* **${NAMESPACE}**")
             ;;
         service)
-            recommendations+=("Check service health $name in namespace ${NAMESPACE}")
+            recommendations+=("Check *service* health **$name** in *namespace* **${NAMESPACE}**")
             ;;
         statefulset|statefulset.apps)
-            recommendations+=("Check statefulset health $name in namespace ${NAMESPACE}")
+            recommendations+=("Check *statefulset* health **$name** in *namespace* **${NAMESPACE}**")
             ;;
         esac
     done <<< "$INTERESTING_RESOURCES"

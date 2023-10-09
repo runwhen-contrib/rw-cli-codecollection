@@ -12,7 +12,7 @@ spec:
       slxs:
         - baseName: redis-health
           levelOfDetail: detailed
-          qualifiers: [resource]
+          qualifiers: ["resource", "namespace", "cluster"]
           baseTemplateName: k8s-redis-health
           outputItems:
             - type: slx

@@ -12,7 +12,7 @@ spec:
       slxs:
         - baseName: jenkins-health
           levelOfDetail: detailed
-          qualifiers: [resource]
+          qualifiers: ["resource", "namespace", "cluster"]
           baseTemplateName: k8s-jenkins-health
           outputItems:
             - type: slx

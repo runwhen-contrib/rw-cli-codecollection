@@ -13,7 +13,7 @@ spec:
               mode: substring
       slxs:
         - baseName: ingress-health
-          qualifiers: [resource]
+          qualifiers: ["resource", "namespace", "cluster"]
           baseTemplateName: k8s-ingress-healthcheck
           levelOfDetail: basic
           outputItems:

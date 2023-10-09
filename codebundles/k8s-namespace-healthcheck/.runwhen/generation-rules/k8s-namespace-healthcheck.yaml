@@ -12,7 +12,7 @@ spec:
       slxs:
         - baseName: ns-health
           levelOfDetail: detailed
-          qualifiers: [namespace]
+          qualifiers: ["namespace", "cluster"]
           baseTemplateName: k8s-namespace-healthcheck
           outputItems:
             - type: slx

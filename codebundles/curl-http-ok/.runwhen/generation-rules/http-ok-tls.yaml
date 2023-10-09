@@ -17,7 +17,7 @@ spec:
               mode: substring
       slxs:
         - baseName: http-ok-tls-test
-          qualifiers: [resource]
+          qualifiers: ["resource", "namespace", "cluster"]
           baseTemplateName: http-ok-tls
           levelOfDetail: basic
           outputItems:

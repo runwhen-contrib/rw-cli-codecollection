@@ -12,7 +12,7 @@ spec:
       slxs:
         - baseName: depl-health
           levelOfDetail: detailed
-          qualifiers: [resource]
+          qualifiers: ["resource", "namespace", "cluster"]
           baseTemplateName: k8s-deployment-health
           outputItems:
             - type: slx
