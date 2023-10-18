@@ -22,6 +22,7 @@ Check Prometheus Service Monitors
     ...    bash_file=validate_servicemonitors.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=false
     ${nextsteps}=    RW.CLI.Run Cli
     ...    cmd=echo "${sm_report.stdout}" | tail -n +2 | grep -i "next steps" -A 5
     ...    env=${env}
@@ -42,7 +43,7 @@ Check For Successful Rule Setup
     [Documentation]    Inspects operator instance logs for failed rules setup
     Log To Console    Prometheus
     ${rsp}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${PROM_NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/name=prometheus -o=jsonpath='{.items[0].metadata.name}') -c prometheus | grep -iE "(failed)*(load)"
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${PROM_NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/name=prometheus -o=jsonpath='{.items[0].metadata.name}') -c prometheus | grep -iP "(load.*.fail)" || true
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -87,7 +88,7 @@ Verify Prometheus RBAC Can Access ServiceMonitors
 Identify Endpoint Scraping Errors
     [Documentation]    Inspect the prometheus operator logs for scraping errors and raise issues if any found
     ${rsp}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${PROM_NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/name=prometheus -o=jsonpath='{.items[0].metadata.name}') -c prometheus | grep -iE "scrape.*error"
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${PROM_NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/name=prometheus -o=jsonpath='{.items[0].metadata.name}') -c prometheus | grep -iP "(scrape.*.error)" || true
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -111,7 +112,7 @@ Identify Endpoint Scraping Errors
 Check Prometheus API Healthy
     [Documentation]    Ping Prometheus healthy API endpoint for a 200 response code.
     ${rsp}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} exec $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/name=prometheus -o=jsonpath='{.items[0].metadata.name}') --container prometheus -- wget -qO- -S 127.0.0.1:9090/-/healthy 2>&1 | grep "HTTP/" | awk '{print $2}'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${PROM_NAMESPACE} exec $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/name=prometheus -o=jsonpath='{.items[0].metadata.name}') --container prometheus -- wget -qO- -S 127.0.0.1:9090/-/healthy 2>&1 | grep "HTTP/" | awk '{print $2}'
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}

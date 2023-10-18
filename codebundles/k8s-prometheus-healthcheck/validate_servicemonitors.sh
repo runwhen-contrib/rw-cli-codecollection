@@ -19,12 +19,10 @@ if ! command -v kubectl &> /dev/null; then
 fi
 
 # Check for namespace argument
-if [ "$#" -ne 1 ]; then
-    echo "Usage: $0 <namespace>"
+if [ -z "$NAMESPACE" ]; then
+    echo "Please set the NAMESPACE environment variable"
     exit 1
 fi
-
-NAMESPACE=$1
 
 # Fetch all ServiceMonitors in the given namespace
 SERVICEMONITORS=$(kubectl get servicemonitors -n "$NAMESPACE" -o json)

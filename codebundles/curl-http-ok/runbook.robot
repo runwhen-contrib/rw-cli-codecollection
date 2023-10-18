@@ -22,7 +22,7 @@ Checking HTTP URL Is Available And Timely
     ${http_rsp_code}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${curl_rsp}
     ...    extract_path_to_var__http_code=http_code
-    ...    set_issue_title=Actual HTTP Response Code Does Not Match Desired HTTP Response Code
+    ...    set_issue_title=Actual HTTP Response Code $http_code Does Not Match Desired HTTP Response Code ${DESIRED_RESPONSE_CODE}
     ...    set_severity_level=4
     ...    http_code__raise_issue_if_neq=${DESIRED_RESPONSE_CODE}
     ...    set_issue_details=${URL} responded with a status of:$http_code - check service, pods, namespace, virtual machines & load balancers.
