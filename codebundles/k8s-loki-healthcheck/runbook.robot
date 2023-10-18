@@ -19,7 +19,7 @@ Check Loki Ring API
     [Documentation]    Request and inspect the state of the Loki hash rings for non-active (potentially unhealthy) shards.
     # TODO: extend to dedicated script for parsing complex ring output/state
     ${rsp}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} exec $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath='{.items[0].metadata.name}') -- wget -q --header="Accept: application/json" -O - http://localhost:3100/ring | jq -r '.shards[] | select(.state != "ACTIVE") | {name: .id, state: .state}'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} exec $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath='{.items[0].metadata.name}') -- wget -q --header="Accept: application/json" -O - http://localhost:3100/ring | jq -r '.shards[] | select(.state != "ACTIVE") | {name: .id, state: .state}'
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -30,16 +30,15 @@ Check Loki Ring API
     ...    set_issue_actual=The Loki hash ring contains non-active members.
     ...    set_issue_title=Loki Hash Ring Contains Non-Active Members
     ...    set_issue_details=The Loki ring API returned the following non-active members: ${rsp.stdout}
-    ...    set_issue_next_steps=Investigate the following ring members: ${rsp.stdout} if their status does not return to ACTIVE shortly or they are fully removed from the ring.
+    ...    set_issue_next_steps=Investigate the following ring members:\n${rsp.stdout}\nif their status does not return to ACTIVE shortly or they are not fully removed from the ring.
     ...    _line__raise_issue_if_ncontains=ACTIVE
-    RW.Core.Add Pre To Report    Ring API Response:\n${rsp.stdout}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Check Loki API Ready
     [Documentation]    Pings the internal Loki API to check it's ready.
     ${rsp}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} exec $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath='{.items[0].metadata.name}') -- wget -q --header="Accept: application/json" -O - http://localhost:3100/ready
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} exec $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath='{.items[0].metadata.name}') -- wget -q --header="Accept: application/json" -O - http://localhost:3100/ready
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -90,16 +89,9 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=loki
     ...    default=loki
-    ${PROM_NAMESPACE}=    RW.Core.Import User Variable    PROM_NAMESPACE
-    ...    type=string
-    ...    description=The name of the namespace that kubeprometheus resides in.
-    ...    pattern=\w*
-    ...    example=kube-prometheus-stack
-    ...    default=kube-prometheus-stack
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${kubectl}    ${kubectl}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
-    Set Suite Variable    ${PROM_NAMESPACE}    ${PROM_NAMESPACE}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "NAMESPACE":"${NAMESPACE}"}
