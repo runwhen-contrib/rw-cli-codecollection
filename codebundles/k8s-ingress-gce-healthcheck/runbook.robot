@@ -31,10 +31,33 @@ Search For GCE Ingress Warnings in GKE
     ...    set_issue_actual=Ingress and service objects have warnings in namespace `${NAMESPACE}` for ingress `${INGRESS}`
     ...    set_issue_title=Unhealthy GCE ingress or service objects found in namespace `${NAMESPACE}` for ingress `${INGRESS}`
     ...    set_issue_details=The following warning events were found:\n\n${event_warnings.stdout}\n\n
-    ...    set_issue_next_steps=Validate GCP HTTP Load Balancer Configurations
+    ...    set_issue_next_steps=Validate GCP HTTP Load Balancer Configurations for ${INGRESS}
     ...    _line__raise_issue_if_contains=Warning
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    GCE Ingress warnings for ${NAMESPACE}:\n\n${event_warnings.stdout}
+    RW.Core.Add Pre To Report    Commands Used: ${history}
+
+Identify Unhealthy GCE HTTP Ingress Backends
+    [Documentation]    Checks the backend annotations on the ingress object to determine if they are not regstered as healthy
+    [Tags]    service    ingress    endpoint    health    ingress-gce    gke
+    ${unhealthy_backends}=    RW.CLI.Run Cli
+    ...    cmd=INGRESS_NAME=my-ingress; NAMESPACE=argo; ${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS_NAME -n $NAMESPACE -o=json | jq -r '.metadata.annotations["ingress.kubernetes.io/backends"] | fromjson | to_entries[] | select(.value != "HEALTHY") | "Backend: " + .key + " Status: " + .value'
+    ...    target_service=${kubectl}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
+
+    RW.CLI.Parse Cli Output By Line
+    ...    rsp=${unhealthy_backends}
+    ...    set_severity_level=2
+    ...    set_issue_expected=GCE HTTP Load Balancer should have all backends in a HEALTHY state for ingress `${INGRESS}`
+    ...    set_issue_actual=GCE HTTP Load Balancer has unhealthy backends for ingress `${INGRESS}`
+    ...    set_issue_title=GCE HTTP Load Balancer has unhealthy backends for ingress `${INGRESS}`
+    ...    set_issue_details=The following GCP HTTP Load Balancer backends are not healthy :\n\n${unhealthy_backends.stdout}\n\n
+    ...    set_issue_next_steps=Fetch Logs from GCP Operations Manager for HTTP Load Balancer for backends:\n\n${unhealthy_backends.stdout}\n\n
+    ...    _line__raise_issue_if_contains=Backend
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    GCE Ingress warnings for ${NAMESPACE}:\n\n${unhealthy_backends.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
 # Validate GCP HTTP Load Balancer Configurations
