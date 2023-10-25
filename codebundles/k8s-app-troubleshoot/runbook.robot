@@ -19,7 +19,7 @@ Get Resource Logs
     [Documentation]    Collects the last approximately 200 lines of logs from the resource before restarting it.
     [Tags]    resource    application    workload    logs    state
     ${logs}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs daemonset,deployment,statefulset -l ${LABELS} --tail=200 --limit-bytes=256000
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs deployment,statefulset -l ${LABELS} --tail=200 --limit-bytes=256000
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
