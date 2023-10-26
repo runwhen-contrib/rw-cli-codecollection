@@ -2,10 +2,10 @@
 
 
 # Extract the necessary annotations from the Ingress
-FORWARDING_RULE=$(${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS -n $NAMESPACE -o=jsonpath='{.metadata.annotations.ingress\.kubernetes\.io/forwarding-rule}')
-URL_MAP=$(${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS -n $NAMESPACE -o=jsonpath='{.metadata.annotations.ingress\.kubernetes\.io/url-map}')
-TARGET_PROXY=$(${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS -n $NAMESPACE -o=jsonpath='{.metadata.annotations.ingress\.kubernetes\.io/target-proxy}')
-BACKENDS_JSON=$(${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS -n $NAMESPACE -o=jsonpath='{.metadata.annotations.ingress\.kubernetes\.io/backends}')
+FORWARDING_RULE=$(${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS -n $NAMESPACE --context $CONTEXT -o=jsonpath='{.metadata.annotations.ingress\.kubernetes\.io/forwarding-rule}')
+URL_MAP=$(${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS -n $NAMESPACE --context $CONTEXT -o=jsonpath='{.metadata.annotations.ingress\.kubernetes\.io/url-map}')
+TARGET_PROXY=$(${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS -n $NAMESPACE --context $CONTEXT -o=jsonpath='{.metadata.annotations.ingress\.kubernetes\.io/target-proxy}')
+BACKENDS_JSON=$(${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS -n $NAMESPACE --context $CONTEXT -o=jsonpath='{.metadata.annotations.ingress\.kubernetes\.io/backends}')
 BACKENDS=( $(echo $BACKENDS_JSON | jq -r 'keys[]') )  # Assuming jq is installed for JSON parsing
 
 recommendations=()

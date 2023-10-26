@@ -18,7 +18,7 @@ Search For GCE Ingress Warnings in GKE
     [Documentation]    Find warning events related to GCE Ingress and services objects
     [Tags]    service    ingress    endpoint    health    ingress-gce    gke
     ${event_warnings}=    RW.CLI.Run Cli
-    ...    cmd=INGRESS_NAME=my-ingress; NAMESPACE=argo; ${KUBERNETES_DISTRIBUTION_BINARY} get events -n $NAMESPACE --field-selector involvedObject.kind=Ingress,involvedObject.name=$INGRESS_NAME,type!=Normal; for SERVICE_NAME in $(${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS_NAME -n $NAMESPACE -o=jsonpath='{.spec.rules[*].http.paths[*].backend.service.name}'); do ${KUBERNETES_DISTRIBUTION_BINARY} get events -n $NAMESPACE --field-selector involvedObject.kind=Service,involvedObject.name=$SERVICE_NAME,type!=Normal; done
+    ...    cmd=INGRESS_NAME=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT=${CONTEXT}; ${KUBERNETES_DISTRIBUTION_BINARY} get events -n $NAMESPACE --context $CONTEXT --field-selector involvedObject.kind=Ingress,involvedObject.name=$INGRESS_NAME,type!=Normal; for SERVICE_NAME in $(${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS_NAME -n $NAMESPACE --context $CONTEXT -o=jsonpath='{.spec.rules[*].http.paths[*].backend.service.name}'); do ${KUBERNETES_DISTRIBUTION_BINARY} get events -n $NAMESPACE --context $CONTEXT --field-selector involvedObject.kind=Service,involvedObject.name=$SERVICE_NAME,type!=Normal; done
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
@@ -40,7 +40,7 @@ Identify Unhealthy GCE HTTP Ingress Backends
     [Documentation]    Checks the backend annotations on the ingress object to determine if they are not regstered as healthy
     [Tags]    service    ingress    endpoint    health    ingress-gce    gke
     ${unhealthy_backends}=    RW.CLI.Run Cli
-    ...    cmd=INGRESS_NAME=${INGRESS}; NAMESPACE=${NAMESPACE}; ${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS_NAME -n $NAMESPACE -o=json | jq -r '.metadata.annotations["ingress.kubernetes.io/backends"] | fromjson | to_entries[] | select(.value != "HEALTHY") | "Backend: " + .key + " Status: " + .value'
+    ...    cmd=INGRESS_NAME=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT=${CONTEXT}; ${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS_NAME -n $NAMESPACE --context $CONTEXT -o=json | jq -r '.metadata.annotations["ingress.kubernetes.io/backends"] | fromjson | to_entries[] | select(.value != "HEALTHY") | "Backend: " + .key + " Status: " + .value'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
@@ -91,11 +91,7 @@ Fetch Network Error Logs from GCP Operations Manager for Ingress Backends
    [Documentation]    Fetch logs from the last 1d that are specific to the HTTP Load Balancer within the last 60 minutes
    [Tags]    service    ingress    endpoint    health
    ${network_error_logs}=    RW.CLI.Run Cli
-    ...    cmd=echo $PATH
-    ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
-   ${network_error_logs}=    RW.CLI.Run Cli
-    ...    cmd=INGRESS_NAME=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT="${CONTEXT}"; GCP_PROJECT_ID="${GCP_PROJECT_ID}";for backend in $(${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS_NAME -n $NAMESPACE --context $CONTEXT -o=json | jq -r '.metadata.annotations["ingress.kubernetes.io/backends"] | fromjson | to_entries[] | select(.value != "HEALTHY") | .key'); do echo "Backend: \${backend}" && gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud logging read 'severity="ERROR" AND resource.type="gce_network" AND protoPayload.resourceName=~"'\${backend}'"' --freshness=1d --limit=50 --project "$GCP_PROJECT_ID" --format=json | jq '[.[] | {timestamp: .timestamp, ip: .protoPayload.request.networkEndpoints[].ipAddress, message: .protoPayload.response.error.message}] | group_by(.message) | map(max_by(.timestamp)) | .[] | (.timestamp + " | IP: " + .ip + " | Error: " + .message)'; done
+    ...    cmd=INGRESS_NAME=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT=${CONTEXT}; GCP_PROJECT_ID=${GCP_PROJECT_ID};for backend in $(${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS_NAME -n $NAMESPACE --context $CONTEXT -o=json | jq -r '.metadata.annotations["ingress.kubernetes.io/backends"] | fromjson | to_entries[] | select(.value != "HEALTHY") | .key'); do echo "Backend: \${backend}" && gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud logging read 'severity="ERROR" AND resource.type="gce_network" AND protoPayload.resourceName=~"'\${backend}'"' --freshness=1d --limit=50 --project "$GCP_PROJECT_ID" --format=json | jq '[.[] | {timestamp: .timestamp, ip: .protoPayload.request.networkEndpoints[].ipAddress, message: .protoPayload.response.error.message}] | group_by(.message) | map(max_by(.timestamp)) | .[] | (.timestamp + " | IP: " + .ip + " | Error: " + .message)'; done
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
