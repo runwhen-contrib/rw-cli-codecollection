@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/cloud_load_balancing/cloud_load_balancing.svg
-  alias: {{name}} GCP HTTP Load Balancer Ingress Health
+  alias: {{match_resource.resource.metadata.name}} GCP HTTP Load Balancer Ingress Health
   asMeasuredBy: GCP HTTP Load Balancer and GKE Ingress objects with healthy backends.
   configProvided:
   - name: OBJECT_NAME
