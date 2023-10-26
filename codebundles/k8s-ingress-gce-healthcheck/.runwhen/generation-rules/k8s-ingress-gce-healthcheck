@@ -13,7 +13,7 @@ spec:
               mode: substring
             - type: pattern
               pattern: "networking.gke.io/ingress-finalizer-V2"
-              properties: [metadata/finalizers[0]]
+              properties: [metadata/finalizers]
               mode: substring
             - resourceType: variables
               type: pattern
