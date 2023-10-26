@@ -11,10 +11,10 @@ spec:
               pattern: ".+"
               properties: [name]
               mode: substring
-            # - type: pattern
-            #   pattern: "networking.gke.io/ingress-finalizer-V2"
-            #   properties: [metadata/finalizers]
-            #   mode: substring
+            - type: pattern
+              pattern: "networking.gke.io/ingress-finalizer-V2"
+              properties: [metadata/finalizers[0]]
+              mode: substring
             - resourceType: variables
               type: pattern
               pattern: "gcp"
