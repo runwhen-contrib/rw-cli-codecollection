@@ -15,7 +15,7 @@ spec:
     value: {{match_resource.resource.metadata.name}}
   owners:
   - {{workspace.owner_email}}
-  statement: All ingress objects should have services and endpoints backing them. 
+  statement: Ingress objects with HTTP Load Balancers should have healthy backends. 
   additionalContext:  
     namespace: "{{match_resource.resource.metadata.namespace}}"
     labelMap: "{{match_resource.resource.metadata.labels}}"  

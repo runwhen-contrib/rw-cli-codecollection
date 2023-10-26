@@ -11,10 +11,10 @@ spec:
               pattern: ".+"
               properties: [name]
               mode: substring
-            - type: pattern
-              pattern: "networking.gke.io/ingress-finalizer-v2"
-              properties: [metadata/finalizers]
-              mode: substring
+            # - type: pattern
+            #   pattern: "networking.gke.io/ingress-finalizer-V2"
+            #   properties: [metadata/finalizers]
+            #   mode: substring
             - resourceType: variables
               type: pattern
               pattern: "gcp"
@@ -24,7 +24,7 @@ spec:
         - baseName: ingress-gce-health
           qualifiers: ["resource", "namespace", "cluster"]
           baseTemplateName: k8s-ingress-gce-healthcheck
-          levelOfDetail: basic
+          levelOfDetail: detailed
           outputItems:
             - type: slx
             - type: runbook
