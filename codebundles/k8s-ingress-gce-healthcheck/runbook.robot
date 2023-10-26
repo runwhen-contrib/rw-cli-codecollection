@@ -1,7 +1,7 @@
 *** Settings ***
-Documentation       Troubleshoot GCE Ingress Resources in GKE
+Documentation       Troubleshoot GCE Ingress Resources related to GCP HTTP Load Balancer in GKE
 Metadata            Author    stewartshea
-Metadata            Display Name    Kubernetes Ingress GCE Healthcheck
+Metadata            Display Name    Kubernetes Ingress GCE & GCP HTTP Load Balancer Healthcheck
 Metadata            Supports    Kubernetes,GKE,GCE,GCP
 
 Library             BuiltIn
@@ -19,7 +19,6 @@ Search For GCE Ingress Warnings in GKE
     [Tags]    service    ingress    endpoint    health    ingress-gce    gke
     ${event_warnings}=    RW.CLI.Run Cli
     ...    cmd=INGRESS_NAME=my-ingress; NAMESPACE=argo; ${KUBERNETES_DISTRIBUTION_BINARY} get events -n $NAMESPACE --field-selector involvedObject.kind=Ingress,involvedObject.name=$INGRESS_NAME,type!=Normal; for SERVICE_NAME in $(${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS_NAME -n $NAMESPACE -o=jsonpath='{.spec.rules[*].http.paths[*].backend.service.name}'); do ${KUBERNETES_DISTRIBUTION_BINARY} get events -n $NAMESPACE --field-selector involvedObject.kind=Service,involvedObject.name=$SERVICE_NAME,type!=Normal; done
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
@@ -42,7 +41,6 @@ Identify Unhealthy GCE HTTP Ingress Backends
     [Tags]    service    ingress    endpoint    health    ingress-gce    gke
     ${unhealthy_backends}=    RW.CLI.Run Cli
     ...    cmd=INGRESS_NAME=${INGRESS}; NAMESPACE=${NAMESPACE}; ${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS_NAME -n $NAMESPACE -o=json | jq -r '.metadata.annotations["ingress.kubernetes.io/backends"] | fromjson | to_entries[] | select(.value != "HEALTHY") | "Backend: " + .key + " Status: " + .value'
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
@@ -163,12 +161,6 @@ Suite Initialization
     ...    description=Which Ingress object to troubleshoot.
     ...    pattern=\w*
     ...    example=my-ingress
-    ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
-    ...    type=string
-    ...    description=Which binary to use for Kubernetes CLI commands.
-    ...    enum=[kubectl,oc]
-    ...    example=kubectl
-    ...    default=kubectl
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
