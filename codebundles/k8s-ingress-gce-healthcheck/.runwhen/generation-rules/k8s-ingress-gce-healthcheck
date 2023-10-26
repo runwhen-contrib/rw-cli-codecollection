@@ -15,10 +15,6 @@ spec:
               pattern: "networking.gke.io/ingress-finalizer-v2"
               properties: [metadata/finalizers]
               mode: substring
-            - type: pattern
-              pattern: "networking.gke.io/ingress-finalizer-v2"
-              properties: [metadata/finalizers]
-              mode: substring
             - resourceType: variables
               type: pattern
               pattern: "gcp"
