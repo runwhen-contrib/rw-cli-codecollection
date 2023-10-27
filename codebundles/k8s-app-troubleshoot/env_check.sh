@@ -1,4 +1,12 @@
 #!/bin/bash
+# -----------------------------------------------------------------------------
+# Script Information and Metadata
+# -----------------------------------------------------------------------------
+# Author: @jon-funk
+# Description: This script checks a resource's logs for errors or potential problems 
+# related to environment variables and attempts to pinpoint them to recent code changes in the repo.
+# -----------------------------------------------------------------------------
+
 # Setup error handling
 set -Euo pipefail
 # Function to handle errors
@@ -23,10 +31,6 @@ if [ -z "$NAMESPACE" ] || [ -z "$CONTEXT" ] || [ -z "$LABELS" ] || [ -z "$REPO_U
     exit 1
 fi
 
-# clone code repo
-# search for ENV var in code
-# parse recent commits for matching files/lines
-# generate url to files
 APPLOGS=$(kubectl -n ${NAMESPACE} --context ${CONTEXT} logs deployment,statefulset -l ${LABELS} --all-containers --tail=50 --limit-bytes=256000 | grep -i env || true)
 APP_REPO_PATH=/tmp/app_repo
 git clone $REPO_URI $APP_REPO_PATH || true
