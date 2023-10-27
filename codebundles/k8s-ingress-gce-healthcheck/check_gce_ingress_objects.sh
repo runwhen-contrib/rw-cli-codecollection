@@ -16,6 +16,9 @@ function check_command_exists() {
 check_command_exists ${KUBERNETES_DISTRIBUTION_BINARY}
 check_command_exists gcloud
 
+# Auth to gcloud
+gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+
 # Extract the necessary annotations from the Ingress
 FORWARDING_RULE=$(${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS -n $NAMESPACE --context $CONTEXT -o=jsonpath='{.metadata.annotations.ingress\.kubernetes\.io/forwarding-rule}')
 URL_MAP=$(${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS -n $NAMESPACE --context $CONTEXT -o=jsonpath='{.metadata.annotations.ingress\.kubernetes\.io/url-map}')
