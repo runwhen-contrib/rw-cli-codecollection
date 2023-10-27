@@ -71,6 +71,7 @@ Validate GCP HTTP Load Balancer Configurations
     [Tags]    service    ingress    endpoint    health    backends    urlmap     gce
     ${gce_config_objects}=    RW.CLI.Run Bash File
     ...    bash_file=check_gce_ingress_objects.sh
+    ...    target_service=None
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    env=${env}
