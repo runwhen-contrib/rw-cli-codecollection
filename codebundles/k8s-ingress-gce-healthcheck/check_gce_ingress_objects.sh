@@ -1,4 +1,6 @@
 #!/bin/bash
+set -eo pipefail
+
 
 # Check if a command exists
 function check_command_exists() {
