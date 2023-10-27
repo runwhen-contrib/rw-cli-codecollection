@@ -14,13 +14,6 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Debug
-    [Documentation]    debug
-    [Tags]    service    ingress    endpoint    health    ingress-gce    gke
-    ${event_warnings}=    RW.CLI.Run Cli
-    ...    cmd=echo $PATH; echo $ENV
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
 Search For GCE Ingress Warnings in GKE
     [Documentation]    Find warning events related to GCE Ingress and services objects
     [Tags]    service    ingress    endpoint    health    ingress-gce    gke
@@ -71,7 +64,6 @@ Validate GCP HTTP Load Balancer Configurations
     [Tags]    service    ingress    endpoint    health    backends    urlmap     gce
     ${gce_config_objects}=    RW.CLI.Run Bash File
     ...    bash_file=check_gce_ingress_objects.sh
-    ...    target_service=None
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    env=${env}
