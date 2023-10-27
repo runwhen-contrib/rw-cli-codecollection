@@ -18,6 +18,7 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 
 ## TODO
 - [ ] Refine issues raised
-- [ ] Look at cross az/kubectl support and if keeping it in this codebundle makes sense
+- [ ] Array support for issues
+- [ ] Look at cross az/kubectl for better triage
 - [ ] Add additional documentation.
 
