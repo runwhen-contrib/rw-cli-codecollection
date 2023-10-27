@@ -1,5 +1,18 @@
 #!/bin/bash
 
+# Check if a command exists
+function check_command_exists() {
+    if ! command -v $1 &> /dev/null; then
+        echo "$1 could not be found"
+        exit
+    fi
+}
+
+# ------------------------- Dependency Verification ---------------------------
+
+# Ensure all the required binaries are accessible
+check_command_exists ${KUBERNETES_DISTRIBUTION_BINARY}
+check_command_exists gcloud
 
 # Extract the necessary annotations from the Ingress
 FORWARDING_RULE=$(${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS -n $NAMESPACE --context $CONTEXT -o=jsonpath='{.metadata.annotations.ingress\.kubernetes\.io/forwarding-rule}')
