@@ -187,6 +187,8 @@ Suite Initialization
     ...    description=The GCP Project ID to scope the API to.
     ...    pattern=\w*
     ...    example=myproject-ID
+    ${OS_PATH}=    Get Environment Variable    PATH
+
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     # Set Suite Variable    ${kubectl}    ${kubectl}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
@@ -198,4 +200,4 @@ Suite Initialization
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "GCP_PROJECT_ID":"${GCP_PROJECT_ID}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}","NAMESPACE":"${NAMESPACE}","INGRESS":"${INGRESS}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "GCP_PROJECT_ID":"${GCP_PROJECT_ID}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}","NAMESPACE":"${NAMESPACE}","INGRESS":"${INGRESS}", "PATH":"$PATH:${OS_PATH}"}
