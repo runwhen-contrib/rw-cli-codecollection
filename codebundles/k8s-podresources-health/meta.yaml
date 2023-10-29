@@ -66,9 +66,7 @@ commands:
 
     - [Kubernetes Documentation - Kubernetes labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
 
-    - [Kubernetes Documentation - Field Selector Syntax](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#field-selectors){:target="_blank"}
-
-    - [Shell Scripting Tutorial - Understanding jq](https://www.shellscript.sh/jq.html){:target="_blank"}'
+    - [Kubernetes Documentation - Field Selector Syntax](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#field-selectors){:target="_blank"}'
   explanation: '
 
 
