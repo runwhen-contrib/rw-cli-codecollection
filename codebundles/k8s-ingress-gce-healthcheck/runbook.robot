@@ -68,6 +68,7 @@ Validate GCP HTTP Load Balancer Configurations
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    env=${env}
     ...    include_in_history=false
+    ...    timeout_seconds=120
 
     ${recommendations}=    RW.CLI.Run Cli
     ...    cmd=echo '''${gce_config_objects.stdout}''' | awk "/Recommendations:/ {start=1; getline} start"
@@ -138,10 +139,6 @@ Suite Initialization
     ...    description=The kubernetes kubeconfig yaml containing connection configuration used to connect to cluster(s).
     ...    pattern=\w*
     ...    example=For examples, start here https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
-    # ${kubectl}=    RW.Core.Import Service    kubectl
-    # ...    description=The location service used to interpret shell commands.
-    # ...    default=kubectl-service.shared
-    # ...    example=kubectl-service.shared
     ${NAMESPACE}=    RW.Core.Import User Variable    NAMESPACE
     ...    type=string
     ...    description=The name of the Kubernetes namespace to scope actions and searching to.
@@ -163,12 +160,6 @@ Suite Initialization
     ...    enum=[kubectl,oc]
     ...    example=kubectl
     ...    default=kubectl
-    # ${GCLOUD_SERVICE}=    RW.Core.Import Service    gcloud
-    # ...    type=string
-    # ...    description=The selected RunWhen Service to use for accessing services within a network.
-    # ...    pattern=\w*
-    # ...    example=gcloud-service.shared
-    # ...    default=gcloud-service.shared
     ${gcp_credentials_json}=    RW.Core.Import Secret    gcp_credentials_json
     ...    type=string
     ...    description=GCP service account json used to authenticate with GCP APIs.
@@ -182,12 +173,10 @@ Suite Initialization
     ${OS_PATH}=    Get Environment Variable    PATH
 
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
-    # Set Suite Variable    ${kubectl}    ${kubectl}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${INGRESS}    ${INGRESS}
-    # Set Suite Variable    ${GCLOUD_SERVICE}    ${GCLOUD_SERVICE}
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable
