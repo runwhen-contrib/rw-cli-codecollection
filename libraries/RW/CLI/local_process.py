@@ -24,7 +24,7 @@ def execute_local_command(
     request_secrets: list[platform.ShellServiceRequestSecret] = [],
     env: dict = {},
     files: dict = {},
-    timeout_seconds: int = 30,
+    timeout_seconds: int = 60,
 ):
     USER_ENV: str = os.getenv("USER", None)
     # logging.info(f"Local process user detected as: {USER_ENV}")

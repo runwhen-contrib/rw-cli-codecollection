@@ -43,6 +43,7 @@ def execute_command(
     request_secrets: list[platform.ShellServiceRequestSecret] = None,
     env: dict = None,
     files: dict = None,
+    timeout_seconds: int = 60,
 ) -> platform.ShellServiceResponse:
     """Handle split between shellservice command and local process discretely.
     If the user provides a service, use the traditional shellservice flow.
@@ -60,10 +61,17 @@ def execute_command(
         ShellServiceResponse: _description_
     """
     if not service:
-        return execute_local_command(cmd=cmd, request_secrets=request_secrets, env=env, files=files)
+        return execute_local_command(
+            cmd=cmd, request_secrets=request_secrets, env=env, files=files, timeout_seconds=timeout_seconds
+        )
     else:
         return platform.execute_shell_command(
-            cmd=cmd, service=service, request_secrets=request_secrets, env=env, files=files
+            cmd=cmd,
+            service=service,
+            request_secrets=request_secrets,
+            env=env,
+            files=files,
+            timeout_seconds=timeout_seconds,
         )
 
 
@@ -128,6 +136,7 @@ def run_bash_file(
     env: dict = None,
     include_in_history: bool = True,
     cmd_overide: str = "",
+    timeout_seconds: int = 60,
     **kwargs,
 ) -> platform.ShellServiceResponse:
     """Runs a bash file from the local file system or remotely on a shellservice.
@@ -185,6 +194,7 @@ def run_bash_file(
         service=target_service,
         request_secrets=request_secrets,
         env=env,
+        timeout_seconds=timeout_seconds,
     )
     if include_in_history:
         SHELL_HISTORY.append(file_contents)
@@ -206,6 +216,7 @@ def run_cli(
     optional_namespace: str = "",
     optional_context: str = "",
     include_in_history: bool = True,
+    timeout_seconds: int = 60,
     **kwargs,
 ) -> platform.ShellServiceResponse:
     """Executes a string of shell commands either locally or remotely on a shellservice.
@@ -252,7 +263,13 @@ def run_cli(
     if loop_with_items and len(loop_with_items) > 0:
         for item in loop_with_items:
             cmd = cmd.format(item=item)
-            iter_rsp = execute_command(cmd=cmd, service=target_service, request_secrets=request_secrets, env=env)
+            iter_rsp = execute_command(
+                cmd=cmd,
+                service=target_service,
+                request_secrets=request_secrets,
+                env=env,
+                timeout_seconds=timeout_seconds,
+            )
             if include_in_history:
                 SHELL_HISTORY.append(cmd)
             looped_results.append(iter_rsp.stdout)
@@ -271,7 +288,9 @@ def run_cli(
             errors=rsp.errors,
         )
     else:
-        rsp = execute_command(cmd=cmd, service=target_service, request_secrets=request_secrets, env=env)
+        rsp = execute_command(
+            cmd=cmd, service=target_service, request_secrets=request_secrets, env=env, timeout_seconds=timeout_seconds
+        )
         if include_in_history:
             SHELL_HISTORY.append(cmd)
     logger.info(f"shell stdout: {rsp.stdout}")
