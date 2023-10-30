@@ -156,4 +156,4 @@ Suite Initialization
     Set Suite Variable    ${INGRESS_OBJECT_NAME}    ${INGRESS_OBJECT_NAME}
     Set Suite Variable
     ...    ${env}
-    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}", "KUBECONFIG":"./${kubeconfig.key}"}
+    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}", "KUBECONFIG":"./${kubeconfig.key}","PATH":"$PATH:${OS_PATH}"}
