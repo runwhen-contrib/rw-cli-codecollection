@@ -2,6 +2,7 @@
 
 ## Codebundles
 * [k8s-deployment-healthcheck](codebundles/k8s-deployment-healthcheck/README.md)
+* [azure-monitor-event-triage](codebundles/azure-monitor-event-triage/README.md)
 * [k8s-fluxcd-helm-health](codebundles/k8s-fluxcd-helm-health/README.md)
 * [k8s-argocd-helm-health](codebundles/k8s-argocd-helm-health/README.md)
 * [k8s-certmanager-healthcheck](codebundles/k8s-certmanager-healthcheck/README.md)
@@ -13,9 +14,12 @@
 * [k8s-argocd-application-health](codebundles/k8s-argocd-application-health/README.md)
 * [curl-gmp-nginx-ingress-inspection](codebundles/curl-gmp-nginx-ingress-inspection/README.md)
 * [k8s-daemonset-healthcheck](codebundles/k8s-daemonset-healthcheck/README.md)
+* [k8s-app-troubleshoot](codebundles/k8s-app-troubleshoot/README.md)
 * [curl-gmp-kong-ingress-inspection](codebundles/curl-gmp-kong-ingress-inspection/README.md)
 * [k8s-artifactory-health](codebundles/k8s-artifactory-health/README.md)
+* [azure-loadbalancer-triage](codebundles/azure-loadbalancer-triage/README.md)
 * [k8s-redis-healthcheck](codebundles/k8s-redis-healthcheck/README.md)
+* [k8s-restart-resource](codebundles/k8s-restart-resource/README.md)
 * [k8s-fluxcd-kustomization-health](codebundles/k8s-fluxcd-kustomization-health/README.md)
 * [k8s-image-check](codebundles/k8s-image-check/README.md)
 * [aws-cloudwatch-overused-ec2](codebundles/aws-cloudwatch-overused-ec2/README.md)
