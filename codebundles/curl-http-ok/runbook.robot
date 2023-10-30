@@ -28,10 +28,13 @@ Checking HTTP URL Is Available And Timely
     ...    http_code__raise_issue_if_neq=${DESIRED_RESPONSE_CODE}
     ...    set_issue_details=${URL} responded with a status of:$http_code - check service, pods, namespace, virtual machines & load balancers.
     ...    assign_stdout_from_var=http_code
-    ${session}=     RW.platform.Get Authenticated Session
-    ${env_var}=   Get Environment Variables
+    ${session}=     RW.platform.Get Authenticated Session   
+    ${env_vars}=   Get Environment Variables
+    ${rsp} =    Evaluate
+    ...    session.get('${env_vars}["RW_SLX_API_URL"]')
     RW.Core.Add Pre To Report  ${env_var}
-    RW.Core.Add Pre To Report  ${session} 
+    RW.Core.Add Pre To Report  ${session}
+    RW.Core.Add Pre To Report  ${rsp}
     ${http_latency}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${curl_rsp}
     ...    extract_path_to_var__time_total=time_total
