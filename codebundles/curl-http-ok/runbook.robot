@@ -17,6 +17,7 @@ Suite Setup         Suite Initialization
 Checking HTTP URL Is Available And Timely
     [Documentation]    Use cURL to validate the http response
     [Tags]    curl    http    ingress    latency    errors
+    ${kind_value} =    Get From Dictionary    ${OWNER}    kind    none
     ${curl_rsp}=    RW.CLI.Run Cli
     ...    cmd=curl -o /dev/null -w '{"http_code": \%{http_code}, "time_total": \%{time_total}}' -s ${URL}
     ...    render_in_commandlist=true
@@ -26,7 +27,7 @@ Checking HTTP URL Is Available And Timely
     ...    set_issue_title=Actual HTTP Response Code Does Not Match Desired HTTP Response Code
     ...    set_severity_level=4
     ...    http_code__raise_issue_if_neq=${DESIRED_RESPONSE_CODE}
-    ...    set_issue_details=${URL} responded with a status of:$http_code \n\n Check ${OWNER["kind"]} ${OWNER["name"]}.
+    ...    set_issue_details=${URL} responded with a status of:$http_code \n\n Check ${OWNER['kind']} ${OWNER['name']}.
     ...    assign_stdout_from_var=http_code
     ${session}=     RW.platform.Get Authenticated Session   
     ${env_vars}=   Get Environment Variables
@@ -75,7 +76,7 @@ Suite Initialization
     ...    type=string
     ...    description=Json dict of owner references
     ...    pattern=\w*
-    ...    default=None
+    ...    default={'kind':'ingress', 'name':'my-ingress'}
     ...    example={'name':'my-ingress', 'platform':'kubernetes', 'kind':'ingress', 'namespace':'my-namespace'}
     Set Suite Variable    ${DESIRED_RESPONSE_CODE}    ${DESIRED_RESPONSE_CODE}
     Set Suite Variable    ${URL}    ${URL}
