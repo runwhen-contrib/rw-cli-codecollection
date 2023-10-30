@@ -1,0 +1,118 @@
+commands:
+- command: kubectl --context=${CONTEXT} -n ${NAMESPACE} get daemonset,deployment,statefulset
+    -l ${LABELS} -oyaml
+  doc_links: '
+
+    - [Kubernetes official documentation: kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+
+    - [Kubernetes official documentation: Concepts](https://kubernetes.io/docs/concepts/){:target="_blank"}
+
+    - [Kubernetes official documentation: DaemonSet](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset){:target="_blank"}
+
+    - [Kubernetes official documentation: Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment){:target="_blank"}
+
+    - [Kubernetes official documentation: StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset){:target="_blank"}'
+  explanation: '
+
+
+    This command will query and list resources of the three types (daemonset, deployment,
+    statefulset) in a Kubernetes cluster. The resources that get listed will be from
+    the namespace specified and labelled with the labels you provide. The output of
+    the command will be in yaml format for easier parsing or other purposes. "$CONTEXT"
+    is the name of the Kubernetes cluster you are running this command against, "$NAMESPACE"
+    is the namespace within the cluster where we search for these resources and "$LABELS"
+    represent one or more labels in the form of label=value[,label2=value2].'
+  multi_line_details: "\n\n#Split the command into two lines with verbose comments\n\
+    #This first section is used to set the Kubernetes context and namespace we want\
+    \ to query in\nkubectl --context=${CONTEXT} \\ #Set the context to ${CONTEXT},\
+    \ where ${CONTEXT} is a variable for the desired context. \n        -n ${NAMESPACE}\
+    \ \\ #Use (or switch to) the namespace ${NAMESPACE}. Where ${NAMESPACE} is a variable\
+    \ for the desired namespace,\n\n#This second section specifies what kind of resources,\
+    \ labels, and output format we want\nget daemonset,deployment,statefulset \\ #Retrieve\
+    \ DaemonSet, Deployment, and StatefulSet resouces from the above namespcae and\
+    \ context\n        -l ${LABELS} \\ #Filter resources using for `labels` key-value\
+    \ pairs defined by the variable ${LABELS}: `{key1:value1, key2:value2,...}` \n\
+    \        -o yaml   #Output the results as 'yaml'"
+  name: get_current_resource_state
+- command: kubectl --context=${CONTEXT} -n ${NAMESPACE} logs daemonset,deployment,statefulset
+    -l ${LABELS} --tail=200 --limit-bytes=256000
+  doc_links: '
+
+    - [Kubernetes documentation for the kubectl command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+
+    - [Documentation for context configuration in kubectl](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
+
+    - [Documentation about Kubernetes namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+
+    - [Documentation for writing a label selector expression](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors){:target="_blank"}'
+  explanation: '
+
+
+    This command with kubectl allows you to view logs from a Kubernetes cluster. It
+    will get the logs from daemonsets, deployments, and statefulsets that have labels
+    matching the provided label ( -l ${LABELS} ). The command also caps the amount
+    of data returned to the last 200 log lines or a total of 256KB ( --tail=200 --limit-bytes=256000
+    ), whichever comes first. This is done by guaranteed by setting the context (--context=${CONTEXT})to
+    the Kubernetes cluster you are targetting, and the namespace (-n ${NAMESPACE})
+    where the resources exist.'
+  multi_line_details: "\n\n# Run this command on your Kubernetes cluster to fetch\
+    \ the last 200 log lines with a maximum size of 256000 bytes \n# for daemon sets,\
+    \ deployments, and stateful sets matching certain labels.\nCONTEXT=\"${CONTEXT}\"\
+    \    # Provide the context to run the command against\nNAMESPACE=\"${NAMESPACE}\"\
+    \     # Namespace in which to find the Pod\nLABELS=\"${LABELS}\"   # Label used\
+    \ to identify matching pods\n\nkubectl --context=\"${CONTEXT}\" \\\n-n \"${NAMESPACE}\"\
+    \ \\\nlogs daemonset,deployment,statefulset \\\n-l \"${LABELS}\" \\\n--tail=200\
+    \ \\\n--limit-bytes=256000"
+  name: get_resource_logs
+- command: kubectl --context=${CONTEXT} -n ${NAMESPACE} get daemonset,deployment,statefulset
+    -l ${LABELS} -o=jsonpath='{.items[0].kind}/{.items[0].metadata.name}'
+  doc_links: '
+
+    - [Kubernetes documentation on the kubectl command line tool](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+
+    - [Kubernetes documentation on Daemon Set configuration options](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/){:target="_blank"}
+
+    - [Kubernetes documentation on Deployment configuration options](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
+
+    - [Kubernetes documentation on StatefulSet configuration options](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
+
+    - [Kubernetes documentation on Labels used for selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}'
+  explanation: '
+
+
+    Kubectl is the command line tool that you use to manage clusters and manage workloads
+    in Kubernetes. The "--context" flag sets the cluster context, the "-n" flag sets
+    the namespace for which you can specify a name, and finally the "get" command
+    will get a listing DaemonSets, Deployments, or StatefulSets in that specific cluster.
+    The "-l" flag adds a set of labels to be applied to these items and the "-o=jsonpath"
+    argument returns a string containing the kind and name of the first result.'
+  multi_line_details: "\n\n# Set values for CONTEXT, NAMESPACE, and LABELS to be used\
+    \ in command\nCONTEXT=\"mycontext\"\nNAMESPACE=\"mynamespace\"\nLABELS=\"app=myapp\"\
+    \n\n# Execute multi-line command using variables\nkubectl --context=${CONTEXT}\
+    \ \\\n  -n ${NAMESPACE} \\ # Query the specified Namespace for the Resource\n\
+    \  get daemonset,deployment,statefulset \\ # Retrieve a list of Daemon Sets, Deployments,\
+    \ and/or StatefulSets\n  -l ${LABELS} \\ # Filter the list based on given labels\n\
+    \  -o=jsonpath='{.items[0].kind}/{.items[0].metadata.name}' \\ # Output only the\
+    \ type and name of the first item in the returned list"
+  name: restart_resource
+- command: kubectl rollout restart ${resource_name.stdout} --context=${CONTEXT} -n
+    ${NAMESPACE}
+  doc_links: '
+
+    - [Kubernetes Documentation for Kubectl Rollout](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#rollout){:target="_blank"}'
+  explanation: '
+
+
+    This command restarts a previously deployed resource in a Kubernetes cluster.
+    Specifically, it restarts the resource named `resource_name` using the provided
+    context (in this case `CONTEXT`) and in the provided namespace (in this case `NAMESPACE`).
+    In other words, this command will restart a specified resource in the given context
+    and within the specified namespace. This is useful for restarting a deployment
+    or removing changes after an upgrade, for example.'
+  multi_line_details: "\n\n#This command will restart a pod/deployment using the kubectl\
+    \ command. It specifies the resource name, context, and namespace to be used.\n\
+    #First we set the variables for resource_name, CONTEXT, and NAMESPACE. \nresource_name=resource_name\n\
+    CONTEXT=<your-context>\nNAMESPACE=<your-namespace>\n\n#Next, we use the kubectl\
+    \ command to implement the roll out restart. \nkubectl rollout restart ${resource_name}\
+    \ \\\n    --context=${CONTEXT} \\\n    -n ${NAMESPACE}"
+  name: restart_resource

@@ -1,0 +1,33 @@
+commands:
+- command: kubectl --context=${CONTEXT} -n ${NAMESPACE} logs deployment,statefulset
+    -l ${LABELS} --tail=200 --limit-bytes=256000
+  doc_links: '
+
+    - [Kubernetes official documentation about kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+
+    - [Kubernetes official documentation about namespaces](https://kubernetes.io/docs/tasks/administer-cluster/namespaces/){:target="_blank"}
+
+    - [Kubernetes official documentation about labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
+
+    - [Kubernetes official documentation about deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
+
+    - [Kubernetes official documentation about statefulsets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}'
+  explanation: "\n\nThis command allows you to see the logs from your Kubernetes deployment,\
+    \ statefulset or other objects with labels specified. By using \u2018kubectl\u2019\
+    \ and specifying the context , namespace and label flags, you can quickly view\
+    \ the latest 200 lines of logs (tail) up to 256KB in size. This is helpful for\
+    \ debugging during development or troubleshooting of services running in Kubernetes\
+    \ clusters."
+  multi_line_details: "\n\n# Use the Kubernetes command-line tool (kubectl) to view\
+    \ logs \n# from a deployment or statefulset, limit the amount of log output,\n\
+    # and tail the latest 200 lines of logs\n\nkubectl \\\n  --context=${CONTEXT}\
+    \ \\   # Context represents the cluster you wish to interact with \n  -n ${NAMESPACE}\
+    \ \\        # Namespace provides an additional isolation layer for resources \n\
+    \  logs \\                   # Logs will produce an ASCII version of the resource\u2019\
+    s recent logs\n  deployment,statefulset \\ # Logs will be returned for the provided\
+    \ deployments and/or statefulsets\n  -l ${LABELS} \\           # Label is a selector\
+    \ that returns objects with keys matching set values \n  --tail=200 \\       \
+    \      # Tail flag allows users to specify the last number of log lines to show\n\
+    \  --limit-bytes=256000     # Limit byte flag allows users to define the maximum\
+    \ bytes of log output"
+  name: get_resource_logs
