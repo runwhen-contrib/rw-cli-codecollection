@@ -26,12 +26,12 @@ Checking HTTP URL Is Available And Timely
     ...    set_issue_title=Actual HTTP Response Code Does Not Match Desired HTTP Response Code
     ...    set_severity_level=4
     ...    http_code__raise_issue_if_neq=${DESIRED_RESPONSE_CODE}
-    ...    set_issue_details=${URL} responded with a status of:$http_code - check service, pods, namespace, virtual machines & load balancers.
+    ...    set_issue_details=${URL} responded with a status of:$http_code \n\n Check ${OWNER["kind"]} ${OWNER["name"]}.
     ...    assign_stdout_from_var=http_code
     ${session}=     RW.platform.Get Authenticated Session   
     ${env_vars}=   Get Environment Variables
     ${rsp} =    Evaluate
-    ...    session.get('${env_vars}["RW_SLX_API_URL"]')
+    ...    session.get(${env_vars}['RW_SLX_API_URL'])
     RW.Core.Add Pre To Report  ${env_var}
     RW.Core.Add Pre To Report  ${session}
     RW.Core.Add Pre To Report  ${rsp}
