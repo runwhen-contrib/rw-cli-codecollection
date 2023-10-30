@@ -76,7 +76,7 @@ Validate GCP HTTP Load Balancer Configurations
     ...    include_in_history=false
 
     RW.CLI.Parse Cli Output By Line
-    ...    rsp=${recommendations_lengh}
+    ...    rsp=${recommendations}
     ...    set_severity_level=3
     ...    set_issue_expected=GCP HTTP Load Balancer objects should exist in a healthy state for ingress: `${INGRESS}`
     ...    set_issue_actual=GCP HTTP Load Balancer objects are unhealthy, unknown, or missing for ingress : `${INGRESS}`
@@ -86,7 +86,7 @@ Validate GCP HTTP Load Balancer Configurations
     ...    _line__raise_issue_if_contains=-
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Ingress object summary for ${NAMESPACE}:\n\n${gce_config_objects.stdout}
-    RW.Core.Add Pre To Report    Recommendations:\n\n${recommendations_lengh.stdout}
+    RW.Core.Add Pre To Report    Recommendations:\n\n${recommendations.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
