@@ -6,6 +6,7 @@ Documentation     Fetches logs from a GCP using a configurable query and raises 
 Suite Setup       Suite Initialization
 Library           RW.Core
 Library           RW.CLI
+Library           OperatingSystem
 
 *** Keywords ***
 Suite Initialization
@@ -38,6 +39,7 @@ Suite Initialization
     ...    description=The GCP Project ID to scope the API to.
     ...    pattern=\w*
     ...    example=myproject-ID
+    ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${SEVERITY}    ${SEVERITY}
     Set Suite Variable    ${GCLOUD_SERVICE}    ${GCLOUD_SERVICE}
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
@@ -46,7 +48,7 @@ Suite Initialization
         ${ADD_FILTERS}=    Set Variable    \ AND ${ADD_FILTERS}        
     END
     Set Suite Variable    ${ADD_FILTERS}    ${ADD_FILTERS}
-    Set Suite Variable    ${env}    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}"}
+    Set Suite Variable    ${env}    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}","PATH":"$PATH:${OS_PATH}"}
 
 *** Tasks ***
 Inspect GCP Logs For Common Errors
@@ -55,7 +57,6 @@ Inspect GCP Logs For Common Errors
     ${cmd}    Set Variable    gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud logging read "severity>=${SEVERITY}${ADD_FILTERS}" --freshness=120m --limit=50 --format=json
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${cmd}
-    ...    target_service=${GCLOUD_SERVICE}
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ${namespace_list}=       RW.CLI.Parse Cli Json Output

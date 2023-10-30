@@ -19,7 +19,6 @@ List all nodes in an active prempt operation
     [Tags]    stdout    gcloud    node    preempt    gcp
     ${preempt_node_list}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud compute operations list --filter="operationType:( compute.instances.preempted ) AND NOT status:( DONE )" --format=json --project=${GCP_PROJECT_ID} | jq '[.[] | {startTime,targetLink, statusMessage, progress, zone, selfLink}]'
-    ...    target_service=${GCLOUD_SERVICE}
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    render_in_commandlist=true
@@ -55,9 +54,10 @@ Suite Initialization
     ...    description=The GCP Project ID to scope the API to.
     ...    pattern=\w*
     ...    example=myproject-ID
+    ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${GCLOUD_SERVICE}    ${GCLOUD_SERVICE}
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
     Set Suite Variable
     ...    ${env}
-    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}"}
+    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}","PATH":"$PATH:${OS_PATH}"}

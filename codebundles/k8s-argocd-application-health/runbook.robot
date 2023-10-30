@@ -73,7 +73,6 @@ Fetch ArgoCD Application Sync Status & Health
     [Tags]    Application    Sync    Health    ArgoCD
     ${app_sync_status}=    RW.CLI.Run Cli
     ...    cmd=${binary_name} get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT} -o jsonpath='Application Name: {.metadata.name}, Sync Status: {.status.sync.status}, Health Status: {.status.health.status}, Message: {.status.conditions[].message}'
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
@@ -87,7 +86,6 @@ Fetch ArgoCD Application Last Sync Operation Details
     [Tags]    Application    SyncOperation    History    ArgoCD
     ${last_sync_status}=    RW.CLI.Run Cli
     ...    cmd=${binary_name} get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT} -o json | jq -r '"Application Name: " + .metadata.name + "\\nApplication Namespace: "+ .metadata.namespace + "\\nLast Sync Start Time: " + .status.operationState.finishedAt + "\\nLast Sync Finish Time: " + .status.operationState.startedAt + "\\nLast Sync Status: " + .status.operationState.phase + "\\nLast Sync Message: " + .status.operationState.message'
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
@@ -102,7 +100,6 @@ Fetch Unhealthy ArgoCD Application Resources
     [Tags]    Resources    Unhealthy    SyncStatus    ArgoCD
     ${unhealthy_resources}=    RW.CLI.Run Cli
     ...    cmd=${binary_name} get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT} -o json | jq -r '[.status.resources[] | select(.health.status != null) | select(.health.status != "Healthy") | {name,kind,namespace,health}]'
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
@@ -125,7 +122,6 @@ Scan For Errors in Pod Logs Related to ArgoCD Application Deployments
     [Tags]    Error    Logs    Deployments    ArgoCD    Pods
     ${log_errors}=    RW.CLI.Run Cli
     ...    cmd=for deployment_name in $(${binary_name} get deployments -l argocd.argoproj.io/instance=${APPLICATION_TARGET_NAMESPACE}_${APPLICATION} -o=custom-columns=NAME:.metadata.name --no-headers -n ${APPLICATION_TARGET_NAMESPACE}); do echo "\\nDEPLOYMENT NAME: $deployment_name \\n" && kubectl logs deployment/$deployment_name --tail=50 -n ${APPLICATION_TARGET_NAMESPACE} | grep -E '${ERROR_PATTERN}'; done
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
@@ -139,7 +135,6 @@ Fully Describe ArgoCD Application
     [Tags]    Application    Describe    ArgoCD
     ${application_describe}=    RW.CLI.Run Cli
     ...    cmd=${binary_name} describe applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT}
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
