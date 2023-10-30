@@ -71,10 +71,10 @@ Validate GCP HTTP Load Balancer Configurations
     ...    timeout_seconds=120
 
     ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=echo '''${gce_config_objects.stdout}''' | awk "/Recommendations:/ {start=0; getline} start"
+    ...    cmd=echo '''${gce_config_objects.stdout}''' | awk "/Recommendations:/ {start=1; getline} start"
     ...    env=${env}
     ...    include_in_history=false
-    ${recommendations_lengh}=    Evaluate    len(${recommendations.stdout})  
+    ${recommendations_lengh}=    Evaluate    len(${recommendations.stdout}) if '${recommendations.stdout}' is not None and '${recommendations.stdout}' else 0
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${recommendations_lengh}
     ...    set_severity_level=3
