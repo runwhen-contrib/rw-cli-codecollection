@@ -17,7 +17,6 @@ Suite Setup         Suite Initialization
 Checking HTTP URL Is Available And Timely
     [Documentation]    Use cURL to validate the http response
     [Tags]    curl    http    ingress    latency    errors
-    ${kind_value} =    Get From Dictionary    ${OWNER}    kind    none
     ${curl_rsp}=    RW.CLI.Run Cli
     ...    cmd=curl -o /dev/null -w '{"http_code": \%{http_code}, "time_total": \%{time_total}}' -s ${URL}
     ...    render_in_commandlist=true
