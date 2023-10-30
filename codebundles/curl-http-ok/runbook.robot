@@ -4,6 +4,7 @@ Metadata            Author    stewartshea
 Metadata            Display Name    cURL HTTP OK
 Metadata            Supports    Linux macOS Windows HTTP
 
+Library             OperatingSystem
 Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
@@ -27,8 +28,10 @@ Checking HTTP URL Is Available And Timely
     ...    http_code__raise_issue_if_neq=${DESIRED_RESPONSE_CODE}
     ...    set_issue_details=${URL} responded with a status of:$http_code - check service, pods, namespace, virtual machines & load balancers.
     ...    assign_stdout_from_var=http_code
-    ${owner}=     RW.CLI.Run Cli
-    ...    cmd=env && curl -H "Authorization: Bearer $RW_ACCESS_TOKEN" $RW_SLX_API_URL | jq .additionalContext
+    ${session}=     RW.platform.Get Authenticated Session
+    ${env_var}=  %{RW_SLX_API_URL}
+    RW.Core.Add Pre To Report  ${env_var}
+    RW.Core.Add Pre To Report  ${session} 
     ${http_latency}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${curl_rsp}
     ...    extract_path_to_var__time_total=time_total
