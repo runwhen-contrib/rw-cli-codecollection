@@ -27,5 +27,7 @@ spec:
       value: '1.2'
     - name: DESIRED_RESPONSE_CODE
       value: '200'
+    - name: OWNER_DETAILS
+      value: "{'name':'{{match_resource.resource.metadata.name}}', 'kind':'{{match_resource.resource.metadata.kind}}','namespace':'{{match_resource.resource.metadata.namespace}}'}"
   secretsProvided: []
   servicesProvided: []
