@@ -81,8 +81,8 @@ Validate GCP HTTP Load Balancer Configurations
     ...    set_issue_expected=GCP HTTP Load Balancer objects should exist in a healthy state for ingress: `${INGRESS}`
     ...    set_issue_actual=GCP HTTP Load Balancer objects are unhealthy, unknown, or missing for ingress : `${INGRESS}`
     ...    set_issue_title=Unhealthy or missing GCP HTTP Load Balancer configurations found for ingress `${INGRESS}`
-    ...    set_issue_details=The following report is related to all GCP HTTP Load Balancer objects:\n\n${recommendations.stdout}\n\n
-    ...    set_issue_next_steps=Recreate the ingress object to generate helpful Kubernetes events.  Fetch Logs from GCP Operations Manager for HTTP Load Balancer. Review GCP Operations Logging Dashboard
+    ...    set_issue_details=The following report is related to all GCP HTTP Load Balancer objects:\n\n${gce_config_objects.stdout}\n\n
+    ...    set_issue_next_steps=${recommendations.stdout}
     ...    _line__raise_issue_if_contains=-
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Ingress object summary for ingress: `${INGRESS}` in namespace: `${NAMESPACE}`:\n\n${gce_config_objects.stdout}
@@ -105,6 +105,7 @@ Fetch Network Error Logs from GCP Operations Manager for Ingress Backends
    ...    set_issue_title=Network error logs are found for Ingress `${INGRESS}`
    ...    set_issue_details=Network error logs were found:\n\n${network_error_logs.stdout}\n\n
    ...    set_issue_next_steps=Review Logs and check GCP documentation to help verify configuration vaility. 
+   ...    set_issue_reproduce_hint=Check the ingress object for related annotations. Inspect those objects in the GCP Console. 
    ...    _line__raise_issue_if_contains=
    ${history}=    RW.CLI.Pop Shell History
    RW.Core.Add Pre To Report    Network error logs possibly related to Ingress ${INGRESS}:\n\n${network_error_logs.stdout}
