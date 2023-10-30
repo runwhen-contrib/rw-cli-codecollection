@@ -20,9 +20,9 @@ Checking HTTP URL Is Available And Timely
     ...    cmd=curl -o /dev/null -w '{"http_code": \%{http_code}, "time_total": \%{time_total}}' -s ${URL}
     ...    render_in_commandlist=true
     ${owner_details_dict}=    Evaluate    eval(json.loads($OWNER_DETAILS))
-    ${owner_kind} =    Set Variable    ${owner_details_dict['kind']}
-    ${owner_name} =    Set Variable    ${owner_details_dict['name']}
-    ${owner_namespace} =    Set Variable    ${owner_details_dict['namespace']}
+    ${owner_kind}=    Set Variable    ${owner_details_dict['kind']}
+    ${owner_name}=    Set Variable    ${owner_details_dict['name']}
+    ${owner_namespace}=    Set Variable    ${owner_details_dict['namespace']}
     ${http_rsp_code}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${curl_rsp}
     ...    extract_path_to_var__http_code=http_code
@@ -30,7 +30,7 @@ Checking HTTP URL Is Available And Timely
     ...    set_severity_level=4
     ...    http_code__raise_issue_if_neq=${DESIRED_RESPONSE_CODE}
     ...    set_issue_details=${URL} responded with a status of:$http_code \n\n Check related ingress objects, services, and pods.
-    ...    set_issue_next_steps=Check:\n\n `${owner_name}` `${owner_kind}` Health\n `${owner_namespace}` Health
+    ...    set_issue_next_steps=Check:\n\n `${owner_name}` `${owner_kind}`Health\`${owner_namespace}` Health
     ...    assign_stdout_from_var=http_code
     ${http_latency}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${curl_rsp}
