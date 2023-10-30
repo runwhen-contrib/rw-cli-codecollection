@@ -28,6 +28,6 @@ spec:
     - name: DESIRED_RESPONSE_CODE
       value: '200'
     - name: OWNER_DETAILS
-      value: "{'name':'{{match_resource.resource.metadata.name}}', 'kind':'{{match_resource.resource.kind}}','namespace':'{{match_resource.resource.metadata.namespace}}'}"
+      value: "{'name':'{{match_resource.resource.metadata.name}}', 'kind':'Ingress','namespace':'{{match_resource.resource.metadata.namespace}}'}"
   secretsProvided: []
   servicesProvided: []
