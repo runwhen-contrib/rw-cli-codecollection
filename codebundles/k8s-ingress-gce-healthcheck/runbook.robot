@@ -81,7 +81,7 @@ Validate GCP HTTP Load Balancer Configurations
     ...    set_issue_expected=GCP HTTP Load Balancer objects should exist in a healthy state for ingress: `${INGRESS}`
     ...    set_issue_actual=GCP HTTP Load Balancer objects are unhealthy, unknown, or missing for ingress : `${INGRESS}`
     ...    set_issue_title=Unhealthy or missing GCP HTTP Load Balancer configurations found for ingress `${INGRESS}`
-    ...    set_issue_details=The following report is related to all GCP HTTP Load Balancer objects:\n\n`${gce_config_objects.stdout}`\n\n
+    ...    set_issue_details=The following report is related to all GCP HTTP Load Balancer objects:\n\n${gce_config_objects.stdout}\n\n
     ...    set_issue_next_steps=${recommendations.stdout}
     ...    _line__raise_issue_if_contains=-
     ${history}=    RW.CLI.Pop Shell History
