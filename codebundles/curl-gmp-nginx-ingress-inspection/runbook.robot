@@ -9,6 +9,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             OperatingSystem
 
 Suite Setup         Suite Initialization
 
@@ -142,6 +143,7 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=500
     ...    default=500|501|502
+    ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${kubectl}    ${kubectl}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
