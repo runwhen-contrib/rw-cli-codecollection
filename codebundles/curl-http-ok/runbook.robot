@@ -29,7 +29,7 @@ Checking HTTP URL Is Available And Timely
     ...    set_severity_level=4
     ...    http_code__raise_issue_if_neq=${DESIRED_RESPONSE_CODE}
     ...    set_issue_details=${URL} responded with a status of:$http_code \n\n Check related ingress objects, services, and pods.
-    ...    set_issue_next_steps=Check:\n\n `${owner_name}` `${owner_kind}` Health\n `${owner_namespace}` Namespace Health
+    ...    set_issue_next_steps=Check:\n\n `${owner_name}` `${owner_kind}` Health\n `${owner_namespace}` Health
     ...    assign_stdout_from_var=http_code
     ${http_latency}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${curl_rsp}
@@ -61,11 +61,16 @@ Suite Initialization
     ...    example=1.2
     ${DESIRED_RESPONSE_CODE}=    RW.Core.Import User Variable    DESIRED_RESPONSE_CODE
     ...    type=string
+    ...    description=The response code that indicates success.
+    ...    pattern=\w*
+    ...    default=200
+    ...    example=200
+    ${OWNER_DETAILS}=        RW.Core.Import User Variable    OWNER_DETAILS
+    ...    type=string
     ...    description=Json list of owner details
     ...    pattern=\w*
     ...    default="{'name':'my-ingress', 'kind':'Ingress','namespace':'default'}"
     ...    example="{'name':'my-ingress', 'kind':'Ingress','namespace':'default'}"
-    ${OWNER_DETAILS}=        RW.Core.Import User Variable    OWNER_DETAILS
     Set Suite Variable    ${DESIRED_RESPONSE_CODE}    ${DESIRED_RESPONSE_CODE}
     Set Suite Variable    ${URL}    ${URL}
     Set Suite Variable    ${TARGET_LATENCY}    ${TARGET_LATENCY}
