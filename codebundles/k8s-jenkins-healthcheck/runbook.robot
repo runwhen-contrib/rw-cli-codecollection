@@ -108,7 +108,6 @@ Query For Stuck Jenkins Jobs
     ...    secret__jenkins_sa_username=${JENKINS_SA_USERNAME}
     ...    secret__jenkins_sa_token=${JENKINS_SA_TOKEN}
     ...    env=${env}
-    ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
     RW.CLI.Parse Cli Output By Line

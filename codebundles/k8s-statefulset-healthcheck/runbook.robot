@@ -19,7 +19,6 @@ Fetch StatefulSet Logs
     [Tags]    fetch    log    pod    container    errors    inspect    trace    info    statefulset
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs --tail=100 statefulset/${STATEFULSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
@@ -32,7 +31,6 @@ Get Related StatefulSet Events
     [Tags]    events    workloads    errors    warnings    get    statefulset
     ${events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} | grep -i "${STATEFULSET_NAME}" || true
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
@@ -45,7 +43,6 @@ Fetch StatefulSet Manifest Details
     [Tags]    statefulset    details    manifest    info
     ${statefulset}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${LABELS} --context=${CONTEXT} -n ${NAMESPACE} -o yaml
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
@@ -69,13 +66,11 @@ List StatefulSets with Unhealthy Replica Counts
     ...    pods
     RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset -n ${NAMESPACE} -o json --context ${CONTEXT} | jq -r '.items[] | select(.status.availableReplicas < .status.replicas) | "---\\nStatefulSet Name: " + (.metadata.name|tostring) + "\\nDesired Replicas: " + (.status.replicas|tostring) + "\\nAvailable Replicas: " + (.status.availableReplicas|tostring)'
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
     ${statefulset}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${LABELS} --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r 'if (.items | length) > 0 then .items[0] else {} end'
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${available_replicas}=    RW.CLI.Parse Cli Json Output

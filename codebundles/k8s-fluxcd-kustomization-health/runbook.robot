@@ -16,7 +16,6 @@ List all available Kustomization objects
     [Tags]        FluxCD     Kustomization     Available    List
     ${kustomizations}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true
@@ -29,7 +28,6 @@ Get details for unready Kustomizations
     [Tags]        FluxCD     Kustomization    Versions
     ${kustomizations_not_ready}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select (.status.conditions[] | select(.type == "Ready" and .status == "False")) | "---\\nKustomization Name: \\(.metadata.name)\\n\\nReady Status: \\(.status.conditions[] | select(.type == "Ready") | "\\n ready: \\(.status)\\n message: \\(.message)\\n reason: \\(.reason)\\n last_transition_time: \\(.lastTransitionTime)")\\n\\nReconcile Status:\\(.status.conditions[] | select(.type == "Reconciling") |"\\n reconciling: \\(.status)\\n message: \\(.message)")\\n---\\n"'
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true

@@ -77,7 +77,6 @@ Get Event Count and Score
     [Tags]    Event    Count    Warning
     ${error_events}=    RW.CLI.Run Cli
     ...    cmd=kubectl get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${EVENT_AGE}=    RW.CLI.String To Datetime    ${EVENT_AGE}
@@ -95,7 +94,6 @@ Get Container Restarts and Score
     [Tags]    Restarts    Pods    Containers    Count    Status
     ${pods}=    RW.CLI.Run Cli
     ...    cmd=kubectl get pods --context ${CONTEXT} -n ${NAMESPACE} -o json
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${CONTAINER_RESTART_AGE}=    RW.CLI.String To Datetime    ${CONTAINER_RESTART_AGE}
@@ -114,7 +112,6 @@ Get NotReady Pods
     [Tags]    Pods    Status    Phase    Ready    Unready    Running
     ${unreadypods_results}=    RW.CLI.Run Cli
     ...    cmd=kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --sort-by='status.containerStatuses[0].restartCount' --field-selector=status.phase!=Running -ojson
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${unready_pod_count}=    RW.CLI.Parse Cli Json Output

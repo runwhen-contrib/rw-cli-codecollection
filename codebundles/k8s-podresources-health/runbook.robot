@@ -33,7 +33,6 @@ Scan Labeled Pods and Show All Containers Without Resource Limit or Resource Req
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running -ojson | jq -r '[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.limits == null) | {pod: $pod.metadata.name, container_without_limits: .name}]'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    target_service=${kubectl}
     ...    render_in_commandlist=true
     ${no_limits_count}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${pods_without_limits}
@@ -47,7 +46,6 @@ Scan Labeled Pods and Show All Containers Without Resource Limit or Resource Req
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running -ojson | jq -r '[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.requests == null) | {pod: $pod.metadata.name, container_without_requests: .name}]'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    target_service=${kubectl}
     ...    render_in_commandlist=true
     ${no_requests_count}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${pods_without_requests}
@@ -74,7 +72,6 @@ Get Labeled Container Top Info
     [Tags]    top    resources    utilization    pods    workloads    cpu    memory    allocation    labeled
     ${pods_top}=    RW.CLI.Run Cli
     ...    cmd=for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods ${LABELS} -n ${NAMESPACE} --context ${CONTEXT} -o custom-columns=":metadata.name" --field-selector=status.phase=Running); do ${KUBERNETES_DISTRIBUTION_BINARY} top pod $pod -n ${NAMESPACE} --context ${CONTEXT} --containers; done
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true

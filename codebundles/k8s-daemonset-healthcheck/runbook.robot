@@ -20,7 +20,6 @@ Get DaemonSet Log Details For Report
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs --tail=100 daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     ...    env=${env}
-    ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
@@ -33,7 +32,6 @@ Get Related Daemonset Events
     ${events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} | grep -i "${DAEMONSET_NAME}" || true
     ...    env=${env}
-    ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
@@ -58,13 +56,11 @@ Check Daemonset Replicas
     ${daemonset_describe}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} describe daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     ...    env=${env}
-    ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
     ${daemonset}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json
     ...    env=${env}
-    ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
     # status fields
     ${current_scheduled}=    RW.CLI.Parse Cli Json Output
