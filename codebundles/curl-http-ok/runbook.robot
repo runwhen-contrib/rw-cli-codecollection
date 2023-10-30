@@ -30,7 +30,7 @@ Checking HTTP URL Is Available And Timely
     ...    set_severity_level=4
     ...    http_code__raise_issue_if_neq=${DESIRED_RESPONSE_CODE}
     ...    set_issue_details=${URL} responded with a status of:$http_code \n\n Check related ingress objects, services, and pods.
-    ...    set_issue_next_steps=Check:\n\n `${owner_name}` `${owner_kind}`Health, `${owner_namespace}` Namespace Health
+    ...    set_issue_next_steps=Check:\n\n `${owner_name}` `${owner_kind}` Health, `${owner_namespace}` Namespace Health
     ...    assign_stdout_from_var=http_code
     ${http_latency}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${curl_rsp}
