@@ -19,9 +19,10 @@ Checking HTTP URL Is Available And Timely
     ${curl_rsp}=    RW.CLI.Run Cli
     ...    cmd=curl -o /dev/null -w '{"http_code": \%{http_code}, "time_total": \%{time_total}}' -s ${URL}
     ...    render_in_commandlist=true
-    ${owner_kind} =    Set Variable    ${OWNER_DETAILS['kind']}
-    ${owner_name} =    Set Variable    ${OWNER_DETAILS['name']}
-    ${owner_namespace} =    Set Variable    ${OWNER_DETAILS['namespace']}
+    ${owner_details_dict}=    Evaluate    eval(json.loads($OWNER_DETAILS))
+    ${owner_kind} =    Set Variable    ${owner_details_dict['kind']}
+    ${owner_name} =    Set Variable    ${owner_details_dict['name']}
+    ${owner_namespace} =    Set Variable    ${owner_details_dict['namespace']}
     ${http_rsp_code}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${curl_rsp}
     ...    extract_path_to_var__http_code=http_code
@@ -65,7 +66,7 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=200
     ...    example=200
-    ${OWNER_DETAILS}=        RW.Core.Import User Variable    OWNER_DETAILS
+    ${OWNER_DETAILS}=    RW.Core.Import User Variable    OWNER_DETAILS
     ...    type=string
     ...    description=Json list of owner details
     ...    pattern=\w*
