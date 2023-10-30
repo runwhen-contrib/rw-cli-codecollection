@@ -25,12 +25,13 @@ Deletes the shell history up to this point and returns it as a string for displa
 #### execute\_command
 
 ```python
-def execute_command(cmd: str,
-                    service: platform.Service = None,
-                    request_secrets: list[
-                        platform.ShellServiceRequestSecret] = None,
-                    env: dict = None,
-                    files: dict = None) -> platform.ShellServiceResponse
+def execute_command(
+        cmd: str,
+        service: platform.Service = None,
+        request_secrets: list[platform.ShellServiceRequestSecret] = None,
+        env: dict = None,
+        files: dict = None,
+        timeout_seconds: int = 60) -> platform.ShellServiceResponse
 ```
 
 Handle split between shellservice command and local process discretely.
@@ -61,6 +62,7 @@ def run_bash_file(bash_file: str,
                   env: dict = None,
                   include_in_history: bool = True,
                   cmd_overide: str = "",
+                  timeout_seconds: int = 60,
                   **kwargs) -> platform.ShellServiceResponse
 ```
 
@@ -93,6 +95,7 @@ def run_cli(cmd: str,
             optional_namespace: str = "",
             optional_context: str = "",
             include_in_history: bool = True,
+            timeout_seconds: int = 60,
             **kwargs) -> platform.ShellServiceResponse
 ```
 
