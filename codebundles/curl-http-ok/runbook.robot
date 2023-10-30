@@ -4,7 +4,6 @@ Metadata            Author    stewartshea
 Metadata            Display Name    cURL HTTP OK
 Metadata            Supports    Linux macOS Windows HTTP
 
-Library             OperatingSystem
 Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
@@ -20,21 +19,18 @@ Checking HTTP URL Is Available And Timely
     ${curl_rsp}=    RW.CLI.Run Cli
     ...    cmd=curl -o /dev/null -w '{"http_code": \%{http_code}, "time_total": \%{time_total}}' -s ${URL}
     ...    render_in_commandlist=true
+    ${owner_kind} =    Set Variable    ${OWNER_DETAILS['kind']}
+    ${owner_name} =    Set Variable    ${OWNER_DETAILS['name']}
+    ${owner_namespace} =    Set Variable    ${OWNER_DETAILS['namespace']}
     ${http_rsp_code}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${curl_rsp}
     ...    extract_path_to_var__http_code=http_code
     ...    set_issue_title=Actual HTTP Response Code Does Not Match Desired HTTP Response Code
     ...    set_severity_level=4
     ...    http_code__raise_issue_if_neq=${DESIRED_RESPONSE_CODE}
-    ...    set_issue_details=${URL} responded with a status of:$http_code \n\n Check ${OWNER['kind']} ${OWNER['name']}.
+    ...    set_issue_details=${URL} responded with a status of:$http_code \n\n Check related ingress objects, services, and pods.
+    ...    set_issue_next_steps=Check:\n\n `${owner_name}` `${owner_kind}` Health\n `${owner_namespace}` Namespace Health
     ...    assign_stdout_from_var=http_code
-    ${session}=     RW.platform.Get Authenticated Session   
-    ${env_vars}=   Get Environment Variables
-    ${rsp} =    Evaluate
-    ...    session.get(${env_vars}['RW_SLX_API_URL'])
-    RW.Core.Add Pre To Report  ${env_var}
-    RW.Core.Add Pre To Report  ${session}
-    RW.Core.Add Pre To Report  ${rsp}
     ${http_latency}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${curl_rsp}
     ...    extract_path_to_var__time_total=time_total
@@ -47,8 +43,6 @@ Checking HTTP URL Is Available And Timely
     RW.Core.Add Pre To Report    Commands Used: ${history}
     RW.Core.Add Pre To Report    URL Latency: ${http_latency.stdout}
     RW.Core.Add Pre To Report    URL Response Code: ${http_rsp_code.stdout}
-
-
 
 
 *** Keywords ***
@@ -67,17 +61,12 @@ Suite Initialization
     ...    example=1.2
     ${DESIRED_RESPONSE_CODE}=    RW.Core.Import User Variable    DESIRED_RESPONSE_CODE
     ...    type=string
-    ...    description=The response code that indicates success.
+    ...    description=Json list of owner details
     ...    pattern=\w*
-    ...    default=200
-    ...    example=200
-    ${OWNER}=    RW.Core.Import User Variable    OWNER
-    ...    type=string
-    ...    description=Json dict of owner references
-    ...    pattern=\w*
-    ...    default={'kind':'ingress', 'name':'my-ingress'}
-    ...    example={'name':'my-ingress', 'platform':'kubernetes', 'kind':'ingress', 'namespace':'my-namespace'}
+    ...    default="{'name':'my-ingress', 'kind':'Ingress','namespace':'default'}"
+    ...    example="{'name':'my-ingress', 'kind':'Ingress','namespace':'default'}"
+    ${OWNER_DETAILS}=        RW.Core.Import User Variable    OWNER_DETAILS
     Set Suite Variable    ${DESIRED_RESPONSE_CODE}    ${DESIRED_RESPONSE_CODE}
     Set Suite Variable    ${URL}    ${URL}
     Set Suite Variable    ${TARGET_LATENCY}    ${TARGET_LATENCY}
-    Set Suite Variable    ${OWNER}        ${OWNER}
+    Set Suite Variable    ${OWNER_DETAILS}    ${OWNER_DETAILS}
