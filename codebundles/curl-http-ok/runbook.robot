@@ -29,7 +29,7 @@ Checking HTTP URL Is Available And Timely
     ...    set_issue_details=${URL} responded with a status of:$http_code - check service, pods, namespace, virtual machines & load balancers.
     ...    assign_stdout_from_var=http_code
     ${session}=     RW.platform.Get Authenticated Session
-    ${env_var}=  %{RW_SLX_API_URL}
+    ${env_var}=   Get Environment Variables
     RW.Core.Add Pre To Report  ${env_var}
     RW.Core.Add Pre To Report  ${session} 
     ${http_latency}=    RW.CLI.Parse Cli Json Output
@@ -68,6 +68,13 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=200
     ...    example=200
+    ${OWNER}=    RW.Core.Import User Variable    OWNER
+    ...    type=string
+    ...    description=Json dict of owner references
+    ...    pattern=\w*
+    ...    default=None
+    ...    example={'name':'my-ingress', 'platform':'kubernetes', 'kind':'ingress', 'namespace':'my-namespace'}
     Set Suite Variable    ${DESIRED_RESPONSE_CODE}    ${DESIRED_RESPONSE_CODE}
     Set Suite Variable    ${URL}    ${URL}
     Set Suite Variable    ${TARGET_LATENCY}    ${TARGET_LATENCY}
+    Set Suite Variable    ${OWNER}        ${OWNER}
