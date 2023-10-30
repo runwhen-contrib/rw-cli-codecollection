@@ -28,7 +28,7 @@ Checking HTTP URL Is Available And Timely
     ...    set_issue_details=${URL} responded with a status of:$http_code - check service, pods, namespace, virtual machines & load balancers.
     ...    assign_stdout_from_var=http_code
     ${owner}=     RW.CLI.Run Cli
-    ...    cmd=curl -H "Authorization: Bearer $RW_ACCESS_TOKEN" $RW_SLX_API_URL | jq .additionalContext
+    ...    cmd=env && curl -H "Authorization: Bearer $RW_ACCESS_TOKEN" $RW_SLX_API_URL | jq .additionalContext
     ${http_latency}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${curl_rsp}
     ...    extract_path_to_var__time_total=time_total
