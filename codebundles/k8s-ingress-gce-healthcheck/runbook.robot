@@ -82,9 +82,10 @@ Validate GCP HTTP Load Balancer Configurations
     ...    set_issue_title=Unhealthy or missing GCP HTTP Load Balancer configurations found for ingress `${INGRESS}`
     ...    set_issue_details=The following report is related to all GCP HTTP Load Balancer objects:\n\n${recommendations.stdout}\n\n
     ...    set_issue_next_steps=Recreate the ingress object to generate helpful Kubernetes events.\nFetch Logs from GCP Operations Manager for HTTP Load Balancer
-    ...    _line__raise_issue_if_contains=Recommended
+    ...    _line__raise_issue_if_contains=Recommendations
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Ingress object summary for ${NAMESPACE}:\n\n${gce_config_objects.stdout}
+    RW.Core.Add Pre To Report    Recommendations:\n\n${recommendations.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
