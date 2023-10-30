@@ -20,7 +20,6 @@ Fetch Vault CSI Driver Logs
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs --tail=100 daemonset.apps/vault-csi-provider --context ${CONTEXT} -n ${NAMESPACE}
     ...    env=${env}
-    ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
     ${found_logs}=    Set Variable    No Vault CSI driver logs found!
@@ -37,7 +36,6 @@ Get Vault CSI Driver Warning Events
     ${events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} | grep -i "vault-csi-provider" || true
     ...    env=${env}
-    ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
     ${found_events}=    Set Variable    No Vault CSI driver Events found!
@@ -65,13 +63,11 @@ Check Vault CSI Driver Replicas
     ${daemonset_describe}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} describe daemonset.apps/vault-csi-provider --context ${CONTEXT} -n ${NAMESPACE}
     ...    env=${env}
-    ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
     ${daemonset}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get daemonset.apps/vault-csi-provider --context ${CONTEXT} -n ${NAMESPACE} -o json
     ...    env=${env}
-    ...    target_service=${kubectl}
     ...    secret_file__kubeconfig=${kubeconfig}
     # status fields
     ${current_scheduled}=    RW.CLI.Parse Cli Json Output
@@ -136,7 +132,6 @@ Fetch Vault Logs
     [Tags]    fetch    log    pod    container    errors    inspect    trace    info    statefulset    vault
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs --tail=100 statefulset.apps/vault --context ${CONTEXT} -n ${NAMESPACE}
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
@@ -153,7 +148,6 @@ Get Related Vault Events
     [Tags]    events    workloads    errors    warnings    get    statefulset    vault
     ${events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} | grep -i "vault" || true
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
@@ -170,7 +164,6 @@ Fetch Vault StatefulSet Manifest Details
     [Tags]    statefulset    details    manifest    info    vault
     ${statefulset}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset.apps/vault --context=${CONTEXT} -n ${NAMESPACE} -o yaml
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
@@ -183,7 +176,6 @@ Fetch Vault DaemonSet Manifest Details
     [Tags]    statefulset    details    manifest    info    vault
     ${statefulset}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get daemonset.apps/vault-csi-provider --context=${CONTEXT} -n ${NAMESPACE} -o yaml
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
@@ -224,7 +216,6 @@ Check Vault StatefulSet Replicas
     ...    vault
     ${statefulset}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset.apps/vault --context=${CONTEXT} -n ${NAMESPACE} -o json
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true

@@ -16,7 +16,6 @@ List all available FluxCD Helmreleases
     [Tags]        FluxCD     Helmrelease     Available    List
     ${helmreleases}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true
@@ -29,7 +28,6 @@ Fetch Installed FluxCD Helmrelease Versions
     [Tags]        FluxCD     Helmrelease    Versions
     ${helmrelease_versions}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} -o=jsonpath="{range .items[*]}{'\\nName: '}{@.metadata.name}{'\\nlastAppliedRevision:'}{@.status.lastAppliedRevision}{'\\nlastAttemptedRevision:'}{@.status.lastAttemptedRevision}{'\\n---'}{end}" --context ${CONTEXT} || true
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true
@@ -42,7 +40,6 @@ Fetch Mismatched FluxCD HelmRelease Version
     [Tags]        FluxCD     Helmrelease    Version    Mismatched    Unhealthy
     ${helmrelease_version_mismatches}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} -o json --context ${CONTEXT} | jq -r '.items[] | select(.status.lastAppliedRevision!=.status.lastAttemptedRevision) | "Name: " + .metadata.name + " Last Attempted Version: " + .status.lastAttemptedRevision + " Last Applied Revision: " + .status.lastAppliedRevision'
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true
@@ -66,7 +63,6 @@ Fetch FluxCD HelmRelease Error Messages
     [Tags]        FluxCD     Helmrelease    Errors     Unhealthy    Message
     ${helmrelease_errors}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} -o=jsonpath="{range .items[?(@.status.conditions[].status=='False')]}{'-----\\nName: '}{@.metadata.name}{'\\n'}{@.status.conditions[*].message}{'\\n'}{end}" --context ${CONTEXT} || true
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true
@@ -90,7 +86,6 @@ Check for Available Helm Chart Updates
     [Tags]        FluxCD     Helmchart    Errors     Unhealthy    Message   HelmRelease
     ${helmchart_updates_available}=    RW.CLI.Run Cli
     ...    cmd=namespace="${NAMESPACE}" context="${CONTEXT}"; helm_releases=$(${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n "$namespace" --context "$context" -o json | jq -r '.items[] | .metadata.name'); echo "$helm_releases" | while IFS= read -r release; do chart_details=$(${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} "$release" -n "$namespace" --context "$context" -o json | jq -r '.spec.chart.spec // empty'); if [[ -n "$chart_details" ]]; then chart_kind=$(echo "$chart_details" | jq -r '.sourceRef.kind // empty'); chart_name=$(echo "$chart_details" | jq -r '.chart // empty'); chart_source_name=$(echo "$chart_details" | jq -r '.sourceRef.name // empty'); chart_namespace=$(echo "$chart_details" | jq -r '.sourceRef.namespace // empty'); chart_version=$(echo "$chart_details" | jq -r '.version // "N/A"'); if [[ "$chart_kind" == "HelmRepository" && -n "$chart_name" && -n "$chart_namespace" ]]; then repo_url=$(${KUBERNETES_DISTRIBUTION_BINARY} get helmrepositories.source.toolkit.fluxcd.io "$chart_source_name" -n "$chart_namespace" --context "$context" -o json | jq -r '.spec.url // empty'); if [[ -n "$repo_url" ]]; then temp_repo_name="$chart_source_name-temp-$release"; add_repo=$(helm repo add "$temp_repo_name" "$repo_url"); available_chart_version=$(helm search repo "$temp_repo_name"/"$chart_name" --version ">$chart_version" --output json | jq -r '.[].version'); if [[ -n "$available_chart_version" ]]; then sorted_versions=($(echo "\${available_chart_version[@]}" | tr ' ' '\\n' | sort -V)); available_version=\${sorted_versions[-1]}; version_update_available="True"; else available_version="N/A"; version_update_available="False"; fi; remove_repo=$(helm repo remove "$temp_repo_name"); else available_version="N/A"; version_update_available="False"; fi; else available_version="N/A"; version_update_available="False"; fi; else chart_name="N/A"; chart_namespace="N/A"; chart_version="N/A"; available_version="N/A"; version_update_available="False"; fi; echo "Release: $release | Chart: $chart_namespace/$chart_name | Installed Version: $chart_version | Available Update: $version_update_available | Available Version: $available_version"; done
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true

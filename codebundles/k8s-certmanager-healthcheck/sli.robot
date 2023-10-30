@@ -44,7 +44,6 @@ Get Health Score of CertManager Workloads
     [Tags]    Pods    Containers    Running    Status    Count    Health    CertManager    Cert
     ${cm_pods}=    RW.CLI.Run Cli
     ...    cmd=kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} -ojson
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${not_ready_count}=    RW.CLI.Parse Cli Json Output

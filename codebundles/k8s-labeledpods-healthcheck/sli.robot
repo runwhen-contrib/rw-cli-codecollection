@@ -56,7 +56,6 @@ Measure Number of Running Pods with Label
     [Tags]    Pods    Containers    Running    Status    Count    Health
     ${running_pods}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} -l ${LABELS} --field-selector=status.phase=Running -ojson
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${pod_count}=    RW.CLI.Parse Cli Json Output
