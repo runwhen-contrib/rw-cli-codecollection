@@ -18,7 +18,6 @@ Run CLI Command
     [Tags]    stdout    test    output    pods
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${CLI_COMMAND}
-    ...    target_service=${kubectl}
     ...    env={"KUBECONFIG":"./${kubeconfig.key}"}
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    Command Stdout:\n${rsp.stdout}

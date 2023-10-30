@@ -41,7 +41,6 @@ Run CLI and Parse Output For Issues
     [Tags]    Stdout    Test    Output    Pods
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=kubectl get pods --context ${CONTEXT} -n ${NAMESPACE}
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     # TODO: remove double slashes and find WYSIWYG method for regex passing
@@ -66,7 +65,6 @@ Run CLI and Parse Output For Issues
 
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=kubectl get pods --context ${CONTEXT} -n ${NAMESPACE} -ojson
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${rsp}=    RW.CLI.Parse Cli Json Output
@@ -89,7 +87,6 @@ Exec Test
     [Tags]    Remote    Exec    Command    Tags    Workload    Pod
     ${df}=    RW.CLI.Run Cli
     ...    cmd=df
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    run_in_workload_with_name=deploy/crashi
@@ -97,7 +94,6 @@ Exec Test
     ...    optional_context=${CONTEXT}
     ${ls}=    RW.CLI.Run Cli
     ...    cmd=ls
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    run_in_workload_with_labels=app=crashi

@@ -228,7 +228,7 @@ for match in "${FUZZY_ENV_VAR_RESOURCE_MATCHES[@]}"; do
     resource=${parts[1]}
     env_key=${parts[2]}
     env_value=${parts[3]}
-    echo "Found string **$string** in resource **$resource**. Check manifest and environment variable **$env_key** for accuracy."
+    echo "Found string `$string` in resource `$resource`. Check manifest and environment variable `$env_key` for accuracy.  "
 done
 
 # Fetch namespace events for searching through
@@ -257,7 +257,7 @@ if [[ ${#FUZZY_ENV_VAR_RESOURCE_MATCHES[@]} -ne 0 ]]; then
         env_value=${parts[3]}
 
         if [[ -z ${seen_resources[$resource]} ]]; then
-            recommendations+=("Review manifest for **$resource** in namespace: **${NAMESPACE}**. Matched error log string **$string** in environment variable **$env_key**.")
+            recommendations+=("Review manifest for `$resource` in namespace: `${NAMESPACE}`. Matched error log string `$string` in environment variable `$env_key`.  ")
             seen_resources[$resource]=1
         fi
     done
@@ -279,20 +279,20 @@ if [[ -n "$INTERESTING_RESOURCES" ]]; then
         case "$type" in
         pod)
             if [[ "$status" != "Running" ]]; then
-                recommendations+=("Troubleshoot *failed pods* in *namespace* **${NAMESPACE}**")
+                recommendations+=("Troubleshoot *failed pods* in *namespace* `${NAMESPACE}`  ")
             fi
             if ((restarts > 0)); then
-                recommendations+=("Troubleshoot *container restarts* in *namespace* **${NAMESPACE}**")
+                recommendations+=("Troubleshoot *container restarts* in *namespace* `${NAMESPACE}`  ")
             fi
             ;;
         deployment|deployment.apps)
-            recommendations+=("Check *deployment* health **$name** in *namespace* **${NAMESPACE}**")
+            recommendations+=("Check *deployment* health `$name` in *namespace* `${NAMESPACE}`  ")
             ;;
         service)
-            recommendations+=("Check *service* health **$name** in *namespace* **${NAMESPACE}**")
+            recommendations+=("Check *service* health `$name` in *namespace* `${NAMESPACE}`  ")
             ;;
         statefulset|statefulset.apps)
-            recommendations+=("Check *statefulset* health **$name** in *namespace* **${NAMESPACE}**")
+            recommendations+=("Check *statefulset* health `$name` in *namespace* `${NAMESPACE}`  ")
             ;;
         esac
     done <<< "$INTERESTING_RESOURCES"

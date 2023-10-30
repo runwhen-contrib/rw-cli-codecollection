@@ -10,6 +10,7 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
 Library             RW.NextSteps
+Library             OperatingSystem
 
 Suite Setup         Suite Initialization
 
@@ -21,7 +22,6 @@ Check If Kong Ingress HTTP Error Rate Violates HTTP Error Threshold
     ${gmp_rsp}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && response=$(curl -s -d "query=rate(kong_http_requests_total{service='${INGRESS_SERVICE}',code=~'${HTTP_ERROR_CODES}'}[${TIME_SLICE}]) > ${HTTP_ERROR_RATE_THRESHOLD}" -H "Authorization: Bearer $(gcloud auth print-access-token)" 'https://monitoring.googleapis.com/v1/projects/runwhen-nonprod-sandbox/location/global/prometheus/api/v1/query') && echo "$response" | jq -e '.data.result | length > 0' && echo "$response" | jq -r '.data.result[] | "Route:" + .metric.route + " Service:" + .metric.service + " Kong Instance:" + .metric.instance + " HTTP Error Count:" + .value[1]' || echo "No HTTP Error threshold violations found for ${INGRESS_SERVICE}."
     ...    render_in_commandlist=true
-    ...    target_service=${GCLOUD_SERVICE}
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ${ingress_name}=    RW.CLI.Run Cli
@@ -48,7 +48,6 @@ Check If Kong Ingress HTTP Error Rate Violates HTTP Error Threshold
     ...    _line__raise_issue_if_contains=Route
     ${gmp_json}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && curl -s -d "query=rate(kong_http_requests_total{service='${INGRESS_SERVICE}',code=~'${HTTP_ERROR_CODES}'}[${TIME_SLICE}])" -H "Authorization: Bearer $(gcloud auth print-access-token)" 'https://monitoring.googleapis.com/v1/projects/runwhen-nonprod-sandbox/location/global/prometheus/api/v1/query' | jq .
-    ...    target_service=${GCLOUD_SERVICE}
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ${history}=    RW.CLI.Pop Shell History
@@ -62,7 +61,6 @@ Check If Kong Ingress HTTP Request Latency Violates Threshold
     ${gmp_rsp}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && response=$(curl -s -d "query=histogram_quantile(0.99, sum(rate(kong_request_latency_ms_bucket{service='${INGRESS_SERVICE}'}[${TIME_SLICE}])) by (le)) > ${REQUEST_LATENCY_THRESHOLD}" -H "Authorization: Bearer $(gcloud auth print-access-token)" 'https://monitoring.googleapis.com/v1/projects/runwhen-nonprod-sandbox/location/global/prometheus/api/v1/query') && echo "$response" | jq -e '.data.result | length > 0' && echo "$response" | jq -r '.data.result[] | "Service: ${INGRESS_SERVICE}" + " HTTP Request Latency(ms):" + .value[1]' || echo "No HTTP request latency threshold violations found for ${INGRESS_SERVICE}."
     ...    render_in_commandlist=true
-    ...    target_service=${GCLOUD_SERVICE}
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ${ingress_name}=    RW.CLI.Run Cli
@@ -99,7 +97,6 @@ Check If Kong Ingress Controller Reports Upstream Errors
     ${gmp_healthchecks_off_rsp}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && response=$(curl -s -d "query=kong_upstream_target_health{upstream='${INGRESS_UPSTREAM}',state='healthchecks_off'} > 0" -H "Authorization: Bearer $(gcloud auth print-access-token)" 'https://monitoring.googleapis.com/v1/projects/runwhen-nonprod-sandbox/location/global/prometheus/api/v1/query') && echo "$response" | jq -e '.data.result | length > 0' && echo "$response" | jq -r '.data.result[] | "Service: ${INGRESS_UPSTREAM}" + " Healthchecks Disabled!' || echo "${INGRESS_UPSTREAM} has healthchecks enabled."
     ...    render_in_commandlist=true
-    ...    target_service=${GCLOUD_SERVICE}
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ${next_steps}=    RW.NextSteps.Suggest
@@ -118,7 +115,6 @@ Check If Kong Ingress Controller Reports Upstream Errors
     ${gmp_healthchecks_rsp}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && response=$(curl -s -d "query=kong_upstream_target_health{upstream='${INGRESS_UPSTREAM}',state=~'dns_error|unhealthy'} > 0" -H "Authorization: Bearer $(gcloud auth print-access-token)" 'https://monitoring.googleapis.com/v1/projects/runwhen-nonprod-sandbox/location/global/prometheus/api/v1/query') && echo "$response" | jq -e '.data.result | length > 0' && echo "$response" | jq -r '.data.result[] | "Issue detected with Service: ${INGRESS_UPSTREAM}" + " Healthcheck subsystem-state: " + .metric.subsystem + "-" + .metric.state + " Target: " + .metric.target' || echo "${INGRESS_UPSTREAM} is reported as healthy from the Kong ingress controller."
     ...    render_in_commandlist=true
-    ...    target_service=${GCLOUD_SERVICE}
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ${next_steps}=    RW.NextSteps.Suggest
@@ -193,6 +189,7 @@ Suite Initialization
     ...    description=The threshold in ms for request latency to be considered unhealthy.
     ...    pattern=\w*
     ...    example=100
+    ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${GCLOUD_SERVICE}    ${GCLOUD_SERVICE}
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
@@ -204,4 +201,4 @@ Suite Initialization
     Set Suite Variable    ${HTTP_ERROR_CODES}    ${HTTP_ERROR_CODES}
     Set Suite Variable
     ...    ${env}
-    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}"}
+    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}","PATH":"$PATH:${OS_PATH}"}
