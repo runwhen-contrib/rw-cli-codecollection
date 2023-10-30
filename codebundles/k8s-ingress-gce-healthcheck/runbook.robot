@@ -74,7 +74,7 @@ Validate GCP HTTP Load Balancer Configurations
     ...    cmd=echo '''${gce_config_objects.stdout}''' | awk "/Recommendations:/ {start=0; getline} start"
     ...    env=${env}
     ...    include_in_history=false
-    ${recommendations_lengh}=.   Get Length    ${recommendations}  
+    ${recommendations_lengh}=    Evaluate    len(${recommendations})  
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${recommendations_lengh}
     ...    set_severity_level=3
