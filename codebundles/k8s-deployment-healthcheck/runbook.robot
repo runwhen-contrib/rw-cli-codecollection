@@ -22,6 +22,7 @@ Check Deployment Log For Issues
     ...    bash_file=deployment_logs.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=180
     ${recommendations}=    RW.CLI.Run Cli
     ...    cmd=echo '''${logs.stdout}''' | awk "/Recommended Next Steps:/ {start=1; getline} start"
     ...    env=${env}
