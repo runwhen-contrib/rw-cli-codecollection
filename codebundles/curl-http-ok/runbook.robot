@@ -27,6 +27,8 @@ Checking HTTP URL Is Available And Timely
     ...    http_code__raise_issue_if_neq=${DESIRED_RESPONSE_CODE}
     ...    set_issue_details=${URL} responded with a status of:$http_code - check service, pods, namespace, virtual machines & load balancers.
     ...    assign_stdout_from_var=http_code
+    ${owner}=     RW.CLI.Run Cli
+    ...    cmd=curl -H "Authorization: Bearer $RW_ACCESS_TOKEN" $RW_SLX_API_URL | jq .additionalContext
     ${http_latency}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${curl_rsp}
     ...    extract_path_to_var__time_total=time_total
@@ -39,6 +41,8 @@ Checking HTTP URL Is Available And Timely
     RW.Core.Add Pre To Report    Commands Used: ${history}
     RW.Core.Add Pre To Report    URL Latency: ${http_latency.stdout}
     RW.Core.Add Pre To Report    URL Response Code: ${http_rsp_code.stdout}
+
+
 
 
 *** Keywords ***
