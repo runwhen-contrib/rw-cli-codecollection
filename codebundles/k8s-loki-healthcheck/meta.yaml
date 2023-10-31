@@ -1,0 +1,60 @@
+commands:
+- command: 'kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
+    -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath=''{.items[0].metadata.name}'')
+    -- wget -q --header="Accept: application/json" -O - http://localhost:3100/ring
+    | jq -r ''.shards[] | select(.state != "ACTIVE") | {name: .id, state: .state}'''
+  doc_links: '
+
+    - [Kubernetes: kubectl Overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+
+    - [JSONPath in kubectl](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}
+
+    - [jq Manual](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: '
+
+
+    This command is used to check the status of a single binary application on Kubernetes.
+    Specifically, this command gets the name of the pod (which holds the single-binary
+    application) within a given namespace and context, then executes an query against
+    that pod to get its status and lastly, it will extracting information about any
+    shards that are not in an active state. This helps you understand how the application
+    is performing so you can troubleshoot any issues and take appropriate actions.'
+  multi_line_details: "\n\n# This command retrieves information about shards from\
+    \ an application running on Kubernetes.\n# We will break it down into two separate\
+    \ components: getting the information and then parsing it.\n\n# First, we need\
+    \ to get information about a pod in the cluster:\nPOD_ID=$(kubectl --context=${CONTEXT}\
+    \ -n ${NAMESPACE} get pods \\\n    -l app.kubernetes.io/component=single-binary\
+    \ \\\n    -o=jsonpath='{.items[0].metadata.name}')\n\n# Next, using that Pod ID,\
+    \ we can get data from the application in that pod:\nDATA=$(kubectl --context=${CONTEXT}\
+    \ -n ${NAMESPACE} exec $POD_ID \\\n    -- wget -q --header=\"Accept: application/json\"\
+    \ -O - http://localhost:3100/ring)\n\n# Finally, we will parse that data using\
+    \ jq to get the required information:\nRESULT=$(echo \"$DATA\" | jq -r '.shards[]\
+    \ | select(.state != \"ACTIVE\") | {name: .id, state: .state}')\n\necho \"$RESULT\""
+  name: check_loki_ring_api
+- command: 'kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
+    -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath=''{.items[0].metadata.name}'')
+    -- wget -q --header="Accept: application/json" -O - http://localhost:3100/ready'
+  doc_links: "\n- [Kubernetes Documentation \u2014 kubectl command reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target=\"\
+    _blank\"}\n- [Create a Context \u2014 Kubernetes Clusters documentation](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target=\"\
+    _blank\"}\n- [jsonpath Expression Reference Guide \u2014 Kubernetes official documentation](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target=\"\
+    _blank\"}\n- [Annotations Pod \u2014 Kubernetes Components documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations#pod-annotations){:target=\"\
+    _blank\"}\n- [How to Use Labels \u2014 Kubernetes official documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target=\"\
+    _blank\"}"
+  explanation: "\n\nThis command allows you to access a Kubernetes pod running in\
+    \ a specific namespace with a certain label. It first identifies the pod's name\
+    \ based on the context and namespace using the \u201Cget\u201D command, then it\
+    \ \u201Cexecutes\u201D the command which performs a \u201Cwget\u201D HTTP request\
+    \ to retrieve data from the pod\u2019s localhost port 3100 address. This command\
+    \ is useful when checking the readiness of an application or debugging problems\
+    \ within your Kubernetes environment."
+  multi_line_details: "\n\n# This command connects to one of the pods in a specified\
+    \ Kubernetes namespace, which contains an application, and fetches readiness information\
+    \ by connecting to the app's \"ready\" endpoint. \n\n# Setting up context and\
+    \ namespace variables\nCONTEXT=\"<specify context>\"\nNAMESPACE=\"<specify namespace>\"\
+    \n\n# Get the pod name of the instances with an app component label of single-binary\n\
+    POD_NAME=$(kubectl --context=${CONTEXT} -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary\
+    \ -o=jsonpath='{.items[0].metadata.name}')\n\n# Execute a command on the specified\
+    \ pod to fetch readiness information from the \"ready\" endpoint\nkubectl --context=${CONTEXT}\
+    \ -n ${NAMESPACE} exec ${POD_NAME} -- wget -q --header=\"Accept: application/json\"\
+    \ -O - http://localhost:3100/ready"
+  name: check_loki_api_ready
