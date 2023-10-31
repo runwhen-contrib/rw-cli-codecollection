@@ -71,7 +71,6 @@ def execute_command(
             request_secrets=request_secrets,
             env=env,
             files=files,
-            timeout_seconds=timeout_seconds,
         )
 
 
