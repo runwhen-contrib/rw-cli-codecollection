@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/flux-icon-color.svg
-  alias: {{namespace.name}} Kustomization Health
+  alias: Loki Stack Health
   asMeasuredBy: The Loki stack is up and healthy.   
   configProvided:
   - name: OBJECT_NAME

@@ -17,7 +17,7 @@ spec:
     {% if ref %}
     ref: {{ref}}
     {% else %}
-    ref: main
+    ref: jon-genrules
     {% endif %}
     pathToRobot: codebundles/k8s-loki-healthcheck/runbook.robot
   configProvided:
