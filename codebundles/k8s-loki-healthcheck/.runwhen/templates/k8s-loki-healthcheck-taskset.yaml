@@ -21,12 +21,8 @@ spec:
     {% endif %}
     pathToRobot: codebundles/k8s-loki-healthcheck/runbook.robot
   configProvided:
-    - name: DISTRIBUTION
-      value: {{custom.kubernetes_distribution}}
     - name: NAMESPACE
       value: '{{match_resource.resource.metadata.namespace}}'
-    - name: RESOURCE_NAME
-      value: '{{match_resource.resource.kind}}.{{match_resource.resource.apiVersion.split('/')[0]}}'
     - name: CONTEXT
       value: {{context}}
     - name: KUBERNETES_DISTRIBUTION_BINARY
