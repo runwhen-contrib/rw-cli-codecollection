@@ -19,9 +19,11 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/k8s-loki-healthcheck/runbook.robot
+    pathToRobot: codebundles/k8s-prometheus-healthcheck/runbook.robot
   configProvided:
     - name: NAMESPACE
+      value: '{{match_resource.resource.metadata.namespace}}'
+    - name: PROM_NAMESPACE # TODO: look at fan-out namespaces for this codebundle (ServiceMonitors across many namespaces)
       value: '{{match_resource.resource.metadata.namespace}}'
     - name: CONTEXT
       value: {{context}}

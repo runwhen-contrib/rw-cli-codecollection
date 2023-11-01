@@ -7,15 +7,15 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/grafana-loki.svg
-  alias: Loki Stack Health
-  asMeasuredBy: The Loki stack is up, and healthy.
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/prometheus_color.svg
+  alias: Kubeprometheus Operator Health
+  asMeasuredBy: The Kubeprometheus operator is healthy and its ServiceMonitors are functional.
   configProvided:
   - name: OBJECT_NAME
     value: {{match_resource.resource.metadata.name}}
   owners:
   - {{workspace.owner_email}}
-  statement: Loki's stack should be up, healthy with a up-to-date hash ring in the {{namespace.name}} namespace. 
+  statement: The Kubeprometheus operator should be healthy in the {{namespace.name}} namespace and its ServiceMonitors are functional. 
   additionalContext:  
     namespace: "{{match_resource.resource.metadata.namespace}}"
     labelMap: "{{match_resource.resource.metadata.labels}}" 
