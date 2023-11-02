@@ -33,7 +33,7 @@ filter_common_words() {
     # Loop through each word in the input string
     while IFS= read -r word; do
         # If the word is not in the common words list, add to filtered string
-        if [[ ! " $common_words " =~ " $word " ]]; then
+        if [[ ! " $common_words " =~ " $word " ]] && [[ ! "$word" =~ ^[0-9]+$ ]]; then
             filtered_string+="$word"$'\n'
         fi
     done <<< "$input_string"
