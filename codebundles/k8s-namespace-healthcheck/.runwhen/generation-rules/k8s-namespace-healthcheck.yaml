@@ -10,7 +10,7 @@ spec:
           properties: [name]
           mode: substring
       slxs:
-        - baseName: ns-health
+        - baseName: ns-chk
           levelOfDetail: detailed
           qualifiers: [resource, namespace, cluster]
           baseTemplateName: k8s-namespace-healthcheck
