@@ -4,7 +4,7 @@ spec:
   generationRules:
   - resourceTypes:
   # Should this be changed to a persistent volume for matching? The codebundle works at a namespace level, but not all namespaces might have pvcs. 
-    - persistentvolumeclaim
+    - persistentVolumeClaim
     matchRules:
     - type: pattern
       pattern: "."
