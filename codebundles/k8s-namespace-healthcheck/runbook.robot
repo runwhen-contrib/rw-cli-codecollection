@@ -272,6 +272,7 @@ Check For Namespace Event Anomalies
     ...    deployment_name=${pod_name.stdout}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${recent_anomalies}
+    ...    expected_rsp_returncodes=[0,5]
     ...    set_severity_level=2
     ...    set_issue_expected=No unusual recent anomaly events with high counts in the namespace ${NAMESPACE}
     ...    set_issue_actual=We detected events in the namespace ${NAMESPACE} which are considered anomalies
