@@ -12,7 +12,7 @@ spec:
       slxs:
         - baseName: ns-chk
           levelOfDetail: detailed
-          qualifiers: [namespace, cluster, context]
+          qualifiers: ["resource", "namespace", "cluster"]
           baseTemplateName: k8s-namespace-healthcheck
           outputItems:
             - type: slx
