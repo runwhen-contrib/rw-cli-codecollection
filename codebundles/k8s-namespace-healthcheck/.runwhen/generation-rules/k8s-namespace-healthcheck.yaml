@@ -6,7 +6,7 @@ spec:
         - namespace
       matchRules:
         - type: pattern
-          pattern: "."
+          pattern: ".+"
           properties: [name]
           mode: substring
       slxs:
