@@ -1,0 +1,37 @@
+apiVersion: runwhen.com/v1
+kind: Runbook
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  location: {{default_location}}
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/k8s-prometheus-healthcheck/runbook.robot
+  configProvided:
+    - name: NAMESPACE
+      value: '{{match_resource.resource.metadata.namespace}}'
+    - name: PROM_NAMESPACE # TODO: look at fan-out namespaces for this codebundle (ServiceMonitors across many namespaces)
+      value: '{{match_resource.resource.metadata.namespace}}'
+    - name: CONTEXT
+      value: {{context}}
+    - name: KUBERNETES_DISTRIBUTION_BINARY
+      value: {{custom.kubernetes_distribution_binary}}
+  secretsProvided:
+    - name: kubeconfig
+      workspaceKey: {{custom.kubeconfig_secret_name}}
+  servicesProvided:
+    - name: {{custom.kubernetes_distribution_binary}}
+      locationServiceName: {{custom.kubernetes_distribution_binary}}-service.shared
