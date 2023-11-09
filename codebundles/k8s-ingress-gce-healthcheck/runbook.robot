@@ -104,7 +104,7 @@ Fetch Network Error Logs from GCP Operations Manager for Ingress Backends
    ...    set_issue_actual=Network error logs are found in GCP Operations Console related to Ingress `${INGRESS}`
    ...    set_issue_title=Network error logs are found for Ingress `${INGRESS}`
    ...    set_issue_details=Network error logs were found:\n\n${network_error_logs.stdout}\n\n
-   ...    set_issue_next_steps=Review Logs and check GCP documentation to help verify configuration vaility. 
+   ...    set_issue_next_steps=Review Logs and check GCP documentation to help verify configuration accuracy. 
    ...    set_issue_reproduce_hint=Check the ingress object for related annotations. Inspect those objects in the GCP Console. 
    ...    _line__raise_issue_if_contains=
    ${history}=    RW.CLI.Pop Shell History
