@@ -9,6 +9,8 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
 Library             OperatingSystem
+Library             String
+Library             Collections
 
 Suite Setup         Suite Initialization
 
@@ -43,6 +45,36 @@ Fetch Ingress Object Health in Namespace
     RW.Core.Add Pre To Report    Ingress object summary for ${NAMESPACE}:\n\n${ingress_object_summary.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
+Check for Ingress and Service Conflicts
+    [Documentation]    Look for conflicting configuration between service and ingress objects.  
+    [Tags]    service    ingress    health    conflict
+    ${ingress_object_conflict}=    RW.CLI.Run Cli
+    ...    cmd=CONTEXT="${CONTEXT}"; NAMESPACE="${NAMESPACE}"; ${KUBERNETES_DISTRIBUTION_BINARY} --context "${CONTEXT}" --namespace "${NAMESPACE}" get ingress -o json | jq -r '.items[] | select(.status.loadBalancer.ingress) | .metadata.name as \$name | .status.loadBalancer.ingress[0].ip as \$ingress_ip | .spec.rules[]?.http.paths[]? | "\\($name) \\($ingress_ip) \\(.backend.service.name) \\(.backend.service.port.number)"' | while read -r ingress_name ingress_ip service_name service_port; do ${KUBERNETES_DISTRIBUTION_BINARY} --context "${CONTEXT}" --namespace "${NAMESPACE}" get svc "$service_name" -o json | jq --arg ingress_name "$ingress_name" --arg ingress_ip "$ingress_ip" --arg service_name "$service_name" --arg service_port "$service_port" -r 'if .spec.type == "LoadBalancer" then .status.loadBalancer.ingress[0].ip as $service_ip | if $ingress_ip and $service_ip and $service_ip != $ingress_ip then "WARNING: Ingress \\($ingress_name) IP (\\($ingress_ip)) differs from Service \\($service_name) IP (\\($service_ip))" else "OK: Ingress \\($ingress_name) - Service \\($service_name) is of type LoadBalancer with IP (\\($service_ip))" end else "OK: Ingress \\($ingress_name) - Service \\($service_name) is of type \\(.spec.type) on port \\($service_port)" end'; done
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
+    ${matches}=    Get Lines Matching Regexp    ${ingress_object_conflict.stdout}    ^WARNING: Ingress [\\w-]+.*
+    @{lines}=    Create List    ${matches}
+    FOR    ${line}    IN    @{lines}
+        ${ingress_name}=    RW.CLI.Run Cli
+        ...    cmd=echo "${line}" | awk '/^WARNING: Ingress /{print $3}' | tr -d '\n'
+        ...    env=${env}
+        ${service_name}=    RW.CLI.Run Cli
+        ...    cmd=echo "${line}" | awk -F'Service | IP' '{print $3}' | tr -d '\n'
+        ...    env=${env}  
+        ${warning_details}=    RW.CLI.Run Cli
+        ...    cmd=CONTEXT="${CONTEXT}"; NAMESPACE="${NAMESPACE}"; ${KUBERNETES_DISTRIBUTION_BINARY} get ingress ${ingress_name.stdout} -n $NAMESPACE --context $CONTEXT -o yaml && ${KUBERNETES_DISTRIBUTION_BINARY} get svc ${service_name.stdout} -n $NAMESPACE --context $CONTEXT -o yaml
+        ...    env=${env}
+        ...    secret_file__kubeconfig=${kubeconfig}  
+        RW.Core.Add Issue
+            ...    severity=2
+            ...    title=Ingress `${ingress_name.stdout}` in namespace `${NAMESPACE}` has a possible configuration conflict.
+            ...    details=The following potential ingress and service conflicts were found:\n\n`${warning_details.stdout}`\n\n
+            ...    next_steps=The ingress `${ingress_name.stdout}` has a likely configuration conflict with service `${service_name.stdout}`. In most cases, ingress objects should point to a service of type ClusterIP or NodePort, not LoadBalancer. Please verify that the configurations for ingress `${ingress_name.stdout}` and service `${service_name.stdout}` are set as expected.         
+    END
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    Ingress object summary for ${NAMESPACE}:\n\n${ingress_object_conflict.stdout}
+    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 *** Keywords ***
 Suite Initialization
