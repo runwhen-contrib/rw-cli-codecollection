@@ -70,6 +70,7 @@ Check for Ingress and Service Conflicts
             ...    severity=2
             ...    expected=Ingress objects should point at service types of ClusterIP. 
             ...    actual=There is a configuraiton mismatch between the Ingress object and Service object. 
+            ...    reproduce_hint=${warning_details.cmd}
             ...    title=Ingress `${ingress_name.stdout}` in namespace `${NAMESPACE}` has a possible configuration conflict.
             ...    details=The following potential ingress and service conflicts were found:\n\n`${warning_details.stdout}`\n\n
             ...    next_steps=The ingress `${ingress_name.stdout}` has a likely configuration conflict with service `${service_name.stdout}`. In most cases, ingress objects should point to a service of type ClusterIP or NodePort, not LoadBalancer. Please verify that the configurations for ingress `${ingress_name.stdout}` and service `${service_name.stdout}` are set as expected.         
