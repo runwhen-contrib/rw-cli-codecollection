@@ -40,13 +40,13 @@ class GitCommit:
 
 
 @dataclass
-class SourceCodeSearchResult:
+class RepositorySearchResult:
     line_num: int
-    source_file: "SourceCodeFile"
+    source_file: "RepositoryFile"
 
 
 @dataclass
-class SourceCodeFile:
+class RepositoryFile:
     git_file_url: str
     relative_file_path: str
     absolute_file_path: str
@@ -55,32 +55,40 @@ class SourceCodeFile:
     filesystem_basepath: str
     branch: str
 
-    def __init__(self, absolute_filepath, filesystem_basepath, repo_base_url, branch="main") -> None:
+    def __init__(
+        self, absolute_filepath, filesystem_basepath, repo_base_url, branch="main"
+    ) -> None:
         self.absolute_file_path = str(absolute_filepath)
         self.git_url_base = str(repo_base_url)
         self.branch = branch
-        self.relative_file_path = str(Path(self.absolute_file_path).relative_to(filesystem_basepath))
+        self.relative_file_path = str(
+            Path(self.absolute_file_path).relative_to(filesystem_basepath)
+        )
         # logger.info(f"Counting: {self.absolute_file_path}")
-        self.line_count = sum(1 for line in open(self.absolute_file_path) if line.strip())
-        self.git_file_url = f"{self.git_url_base}/blob/{self.branch}/{self.relative_file_path}"
+        self.line_count = sum(
+            1 for line in open(self.absolute_file_path) if line.strip()
+        )
+        self.git_file_url = (
+            f"{self.git_url_base}/blob/{self.branch}/{self.relative_file_path}"
+        )
 
-    def search(self, search_term: str) -> SourceCodeSearchResult:
+    def search(self, search_term: str) -> RepositorySearchResult:
         # do not implement this stub
         return None
 
 
 @dataclass
-class SourceCodeFiles:
-    files: dict[str, SourceCodeFile]
+class RepositoryFiles:
+    files: dict[str, RepositoryFile]
 
     def __init__(self) -> None:
         self.files = {}
 
-    def add_source_file(self, src_file: SourceCodeFile) -> None:
+    def add_source_file(self, src_file: RepositoryFile) -> None:
         self.files[src_file.relative_file_path] = src_file
 
 
-class SourceCode:
+class Repository:
     EXCLUDE_PATHS: list[str] = [
         ".git",
         ".gitmodules",
@@ -88,7 +96,7 @@ class SourceCode:
     EXCLUDE_EXT: list[str] = [".png", ".jpg", ".jpeg", ".ico"]
     source_uri: str
     auth_token: str
-    files: SourceCodeFiles
+    files: RepositoryFiles
     clone_directory: str
     branch: str
     commit_history: list[GitCommit] = []
@@ -103,13 +111,15 @@ class SourceCode:
             commit_summary += f"{commit_seperator}{commit.sha[:7]} by {commit.author_name} on {commit.date}: {commit.message[:50]}{'...' if len(commit.message) > 50 else ''}\n"
         return f"{repo_summary}\n{branch_summary}\n{file_summary}\n{commit_summary}"
 
-    def __init__(self, source_uri: str, auth_token: platform.Secret = None, branch="main") -> None:
+    def __init__(
+        self, source_uri: str, auth_token: platform.Secret = None, branch="main"
+    ) -> None:
         self.source_uri = source_uri
         if auth_token:
             self.auth_token = auth_token.value
         else:
             self.auth_token = None
-        self.files = SourceCodeFiles()
+        self.files = RepositoryFiles()
         self.branch = branch
 
     def clone_repo(
@@ -128,21 +138,35 @@ class SourceCode:
 
         # Modify the Git URI to include the token for authentication
         if "https://" in self.source_uri and self.auth_token:
-            auth_uri = self.source_uri.replace("https://", f"https://oauth2:{self.auth_token}@")
+            auth_uri = self.source_uri.replace(
+                "https://", f"https://oauth2:{self.auth_token}@"
+            )
         elif "https://":
             auth_uri = self.source_uri
         else:
-            raise ValueError("Unsupported Git URI. Please use HTTPS URL for cloning with a token.")
+            raise ValueError(
+                "Unsupported Git URI. Please use HTTPS URL for cloning with a token."
+            )
 
         # Execute the Git clone command with the modified URI
         subprocess.run(
-            ["git", "clone", "--branch", self.branch, "--single-branch", auth_uri, self.clone_directory],
+            [
+                "git",
+                "clone",
+                "--branch",
+                self.branch,
+                "--single-branch",
+                auth_uri,
+                self.clone_directory,
+            ],
             check=True,
             env={"GIT_TERMINAL_PROMPT": "0"},
         )
 
         self.create_file_list()
-        self.commit_history = self.serialize_git_commits(self.get_git_log(num_commits_history))
+        self.commit_history = self.serialize_git_commits(
+            self.get_git_log(num_commits_history)
+        )
         return self.clone_directory
 
     def get_repo_base_url(self) -> str:
@@ -168,11 +192,13 @@ class SourceCode:
     def create_file_list(self) -> None:
         for root, dirs, files in os.walk(self.clone_directory):
             for name in files:
-                if name not in SourceCode.EXCLUDE_PATHS and all(ext not in name for ext in SourceCode.EXCLUDE_EXT):
+                if name not in Repository.EXCLUDE_PATHS and all(
+                    ext not in name for ext in Repository.EXCLUDE_EXT
+                ):
                     file_path = os.path.join(root, name)
-                    if not SourceCode.is_text_file(file_path=file_path):
+                    if not Repository.is_text_file(file_path=file_path):
                         continue
-                    src_file = SourceCodeFile(
+                    src_file = RepositoryFile(
                         absolute_filepath=file_path,
                         filesystem_basepath=self.clone_directory,
                         repo_base_url=self.get_repo_base_url(),
@@ -180,8 +206,8 @@ class SourceCode:
                     )
                     self.files.add_source_file(src_file)
 
-    def search(self, search_term: str, file_path: str) -> [SourceCodeSearchResult]:
-        # iterates over source files and calls their search method with the search_term, returning a list of SourceCodeSearchResult
+    def search(self, search_term: str, file_path: str) -> [RepositorySearchResult]:
+        # iterates over source files and calls their search method with the search_term, returning a list of RepositorySearchResult
         pass
 
     def serialize_git_commits(self, commit_list: list) -> list[GitCommit]:
@@ -232,3 +258,45 @@ class SourceCode:
                     }
                     commits.append(commit_dict)
         return commits
+
+    def create_issue(self, title, body):
+        url = f"{self.source_uri}"
+        data = {"title": title, "body": body}
+        result = subprocess.run(
+            [
+                "curl",
+                "-X",
+                "POST",
+                "-H",
+                f"Authorization: token {self.auth_token}",
+                "-H",
+                "Accept: application/vnd.github.v3+json",
+                "-d",
+                json.dumps(data),
+                url,
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if result.stderr:
+            print("Error:", result.stderr)
+        else:
+            print("Issue created:", result.stdout)
+
+    def list_issues(self):
+        url = f"{self.source_uri}"
+        result = subprocess.run(
+            [
+                "curl",
+                "-H",
+                f"Authorization: token {self.auth_token}",
+                "-H",
+                "Accept: application/vnd.github.v3+json",
+                url,
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if result.stderr:
+            print("Error:", result.stderr)
+        return result.stdout
