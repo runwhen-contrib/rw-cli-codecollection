@@ -45,7 +45,7 @@ Fetch Ingress Object Health in Namespace
     RW.Core.Add Pre To Report    Ingress object summary for ${NAMESPACE}:\n\n${ingress_object_summary.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Check for Ingress and Service Conflicts
+Check for Ingress and Service Conflicts in Namespace `${NAMESPACE}`
     [Documentation]    Look for conflicting configuration between service and ingress objects.  
     [Tags]    service    ingress    health    conflict
     ${ingress_object_conflict}=    RW.CLI.Run Cli
@@ -66,7 +66,7 @@ Check for Ingress and Service Conflicts
         ...    cmd=CONTEXT="${CONTEXT}"; NAMESPACE="${NAMESPACE}"; ${KUBERNETES_DISTRIBUTION_BINARY} get ingress ${ingress_name.stdout} -n $NAMESPACE --context $CONTEXT -o yaml && ${KUBERNETES_DISTRIBUTION_BINARY} get svc ${service_name.stdout} -n $NAMESPACE --context $CONTEXT -o yaml
         ...    env=${env}
         ...    secret_file__kubeconfig=${kubeconfig}
-        ${next_steps}=     Catenate  SEPERATOR=\${\n}
+        ${next_steps}=     Catenate  SEPARATOR=\n
         ...    Review the current configuration of the ingress `${ingress_name.stdout}` to identify any conflicts.
         ...    Check the service type for `${service_name.stdout}` and ensure it is set to ClusterIP or NodePort instead of LoadBalancer.
         ...    Adjust the `${service_name.stdout}` service definition if it is incorrectly set to use a LoadBalancer.
