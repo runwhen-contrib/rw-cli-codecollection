@@ -45,7 +45,7 @@ Fetch Ingress Object Health in Namespace
     RW.Core.Add Pre To Report    Ingress object summary for ${NAMESPACE}:\n\n${ingress_object_summary.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Check for Ingress and Service Conflicts in Namespace `${NAMESPACE}`
+Check for Ingress and Service Conflicts in Namespace
     [Documentation]    Look for conflicting configuration between service and ingress objects.  
     [Tags]    service    ingress    health    conflict
     ${ingress_object_conflict}=    RW.CLI.Run Cli
