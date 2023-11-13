@@ -328,10 +328,10 @@ Check Missing or Risky PodDisruptionBudget Policies
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true
     ${risky_pdbs}=    RW.CLI.Run Cli
-    ...    cmd=echo "${pdb_check.stdout}" | grep 'Risky' | cut -f 1 -d ' ' | sed 's/^ *//; s/ *$//' | awk -F'/' '{ gsub(/^ *| *$/, "", $1); gsub(/^ *| *$/, "", $2); print $1 "/" $2 }' | sed 's/ *$//'
+    ...    cmd=echo "${pdb_check.stdout}" | grep 'Risky' | cut -f 1 -d ' ' | sed 's/^ *//; s/ *$//' | awk -F'/' '{ gsub(/^ *| *$/, "", $1); gsub(/^ *| *$/, "", $2); print $1 "/" $2 }' | sed 's/ *$//' |  tr -d '\n'
     ...    include_in_history=False
     ${missing_pdbs}=    RW.CLI.Run Cli
-    ...    cmd=echo "${pdb_check.stdout}" | grep 'Missing' | cut -f 1 -d ' ' | sed 's/^ *//; s/ *$//' | awk -F'/' '{ gsub(/^ *| *$/, "", $1); gsub(/^ *| *$/, "", $2); print $1 "/" $2 }' | sed 's/ *$//'
+    ...    cmd=echo "${pdb_check.stdout}" | grep 'Missing' | cut -f 1 -d ' ' | sed 's/^ *//; s/ *$//' | awk -F'/' '{ gsub(/^ *| *$/, "", $1); gsub(/^ *| *$/, "", $2); print $1 "/" $2 }' | sed 's/ *$//' |  tr -d '\n'
     ...    include_in_history=False
     # Raise Issues on Missing PDBS
     IF    len($missing_pdbs.stdout) > 0
