@@ -342,7 +342,7 @@ Check Missing or Risky PodDisruptionBudget Policies
             ...    reproduce_hint=${pdb_check.cmd}
             ...    title=PodDisruptionBudget missing for `${missing_pdb}` in namespace `${NAMESPACE}`
             ...    details=${pdb_check.stdout}
-            ...    next_steps=Create missing PodDistruptionBudgets for `${missing_pdb.stdout}`  
+            ...    next_steps=Create missing PodDistruptionBudgets for `${missing_pdb}`  
     END
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${pdb_check}
