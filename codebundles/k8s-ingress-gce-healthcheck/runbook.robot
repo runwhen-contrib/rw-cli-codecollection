@@ -97,6 +97,7 @@ Fetch Network Error Logs from GCP Operations Manager for Ingress Backends
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    render_in_commandlist=true
+   
    RW.CLI.Parse Cli Output By Line
    ...    rsp=${network_error_logs}
    ...    set_severity_level=2

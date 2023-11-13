@@ -54,31 +54,33 @@ Check for Ingress and Service Conflicts in Namespace
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
     ${matches}=    Get Lines Matching Regexp    ${ingress_object_conflict.stdout}    ^WARNING: Ingress [\\w-]+.*
-    @{lines}=    Create List    ${matches}
-    FOR    ${line}    IN    @{lines}
-        ${ingress_name}=    RW.CLI.Run Cli
-        ...    cmd=echo "${line}" | awk '/^WARNING: Ingress /{print $3}' | tr -d '\n'
-        ...    env=${env}
-        ${service_name}=    RW.CLI.Run Cli
-        ...    cmd=echo "${line}" | awk -F'Service | IP' '{print $3}' | tr -d '\n'
-        ...    env=${env}  
-        ${warning_details}=    RW.CLI.Run Cli
-        ...    cmd=CONTEXT="${CONTEXT}"; NAMESPACE="${NAMESPACE}"; ${KUBERNETES_DISTRIBUTION_BINARY} get ingress ${ingress_name.stdout} -n $NAMESPACE --context $CONTEXT -o yaml && ${KUBERNETES_DISTRIBUTION_BINARY} get svc ${service_name.stdout} -n $NAMESPACE --context $CONTEXT -o yaml
-        ...    env=${env}
-        ...    secret_file__kubeconfig=${kubeconfig}
-        ${next_steps}=     Catenate  SEPARATOR=\n
-        ...    Review the current configuration of the ingress `${ingress_name.stdout}` to identify any conflicts.
-        ...    Check the service type for `${service_name.stdout}` and ensure it is set to ClusterIP or NodePort instead of LoadBalancer.
-        ...    Adjust the `${service_name.stdout}` service definition if it is incorrectly set to use a LoadBalancer.
-        ...    Validate that the ingress `${ingress_name.stdout}` and service `${service_name.stdout}` configurations are aligned with the intended access patterns and security policies.
-        RW.Core.Add Issue
-            ...    severity=2
-            ...    expected=Ingress objects should point at service types of ClusterIP. 
-            ...    actual=There is a configuraiton mismatch between the Ingress object and Service object. 
-            ...    reproduce_hint=${warning_details.cmd}
-            ...    title=Ingress `${ingress_name.stdout}` in namespace `${NAMESPACE}` has a likely configuration conflict with service `${service_name.stdout}`.
-            ...    details=`${line}\n${warning_details.stdout}`
-            ...    next_steps=The ingress `${ingress_name.stdout}` has a likely configuration conflict with service `${service_name.stdout}`. In most cases, ingress objects should point to a service of type ClusterIP or NodePort, not LoadBalancer.\n${next_steps}        
+    IF    len($matches) > 0  
+        @{lines}=    Create List    ${matches}
+        FOR    ${line}    IN    @{lines}
+            ${ingress_name}=    RW.CLI.Run Cli
+            ...    cmd=echo "${line}" | awk '/^WARNING: Ingress /{print $3}' | tr -d '\n'
+            ...    env=${env}
+            ${service_name}=    RW.CLI.Run Cli
+            ...    cmd=echo "${line}" | awk -F'Service | IP' '{print $3}' | tr -d '\n'
+            ...    env=${env}  
+            ${warning_details}=    RW.CLI.Run Cli
+            ...    cmd=CONTEXT="${CONTEXT}"; NAMESPACE="${NAMESPACE}"; ${KUBERNETES_DISTRIBUTION_BINARY} get ingress ${ingress_name.stdout} -n $NAMESPACE --context $CONTEXT -o yaml && ${KUBERNETES_DISTRIBUTION_BINARY} get svc ${service_name.stdout} -n $NAMESPACE --context $CONTEXT -o yaml
+            ...    env=${env}
+            ...    secret_file__kubeconfig=${kubeconfig}
+            ${next_steps}=     Catenate  SEPARATOR=\n
+            ...    Review the current configuration of the ingress `${ingress_name.stdout}` to identify any conflicts.
+            ...    Check the service type for `${service_name.stdout}` and ensure it is set to ClusterIP or NodePort instead of LoadBalancer.
+            ...    Adjust the `${service_name.stdout}` service definition if it is incorrectly set to use a LoadBalancer.
+            ...    Validate that the ingress `${ingress_name.stdout}` and service `${service_name.stdout}` configurations are aligned with the intended access patterns and security policies.
+            RW.Core.Add Issue
+                ...    severity=2
+                ...    expected=Ingress objects should point at service types of ClusterIP. 
+                ...    actual=There is a configuraiton mismatch between the Ingress object and Service object. 
+                ...    reproduce_hint=${warning_details.cmd}
+                ...    title=Ingress `${ingress_name.stdout}` in namespace `${NAMESPACE}` has a likely configuration conflict with service `${service_name.stdout}`.
+                ...    details=`${line}\n${warning_details.stdout}`
+                ...    next_steps=The ingress `${ingress_name.stdout}` has a likely configuration conflict with service `${service_name.stdout}`. In most cases, ingress objects should point to a service of type ClusterIP or NodePort, not LoadBalancer.\n${next_steps}        
+        END
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Ingress and service conflict summary for `${NAMESPACE}`:\n\n`${ingress_object_conflict.stdout}`
