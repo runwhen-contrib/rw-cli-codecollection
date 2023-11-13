@@ -335,8 +335,8 @@ Check Missing or Risky PodDisruptionBudget Policies
     ...    include_in_history=False
     # Raise Issues on Missing PDBS
     @{missing_pdb_list}=    Create List    ${missing_pdbs.stdout} 
-    FOR    ${missing_pdb}    IN    @{missing_pdb_list}
-        IF    len($missing_pdb) > 0  
+    IF    len($missing_pdb_list) > 0  
+        FOR    ${missing_pdb}    IN    @{missing_pdb_list}
             RW.Core.Add Issue
                 ...    severity=4
                 ...    expected=PodDisruptionBudgets in namespace `${NAMESPACE}` should exist for applications that have more than 1 replica
@@ -349,8 +349,8 @@ Check Missing or Risky PodDisruptionBudget Policies
     END
     # Raise issues on Risky PDBS
     @{risky_pdb_list}=    Create List    ${risky_pdbs.stdout}
-    FOR    ${risky_pdb}    IN    @{risky_pdb_list}
-        IF    len($risky_pdb) > 0  
+    IF    len($risky_pdb_list) > 0  
+        FOR    ${risky_pdb}    IN    @{risky_pdb_list}
             RW.Core.Add Issue
                 ...    severity=4
                 ...    expected=PodDisruptionBudgets in `${NAMESPACE}` should not block regular maintenance
