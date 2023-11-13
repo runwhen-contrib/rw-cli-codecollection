@@ -20,27 +20,47 @@ Fetch Ingress Object Health in Namespace
     [Documentation]    Fetches all ingress objects in the namespace and outputs the name, health status, services, and endpoints. 
     [Tags]    service    ingress    endpoint   health 
     ${ingress_object_summary}=    RW.CLI.Run Cli
-    ...    cmd=NAMESPACE="${NAMESPACE}";CONTEXT="${CONTEXT}";ingresses=$(${KUBERNETES_DISTRIBUTION_BINARY} get ingress -n "$NAMESPACE" --context "$CONTEXT" -o jsonpath='{range .items[*]}{.metadata.name}{"\\n"}{end}');for ingress in $ingresses;do echo "Ingress: $ingress";health_status="NA";backend_services=$(${KUBERNETES_DISTRIBUTION_BINARY} get ingress "$ingress" -n "$NAMESPACE" --context "$CONTEXT" -o jsonpath='{range .spec.rules[*].http.paths[*]}{.backend.service.name}{"|"}{.backend.service.port.number}{"\\n"}{end}');while IFS='|' read -r service port;do echo "Backend Service: $service, Port: $port";target_ports=$(${KUBERNETES_DISTRIBUTION_BINARY} get service "$service" -n "$NAMESPACE" --context "$CONTEXT" -o jsonpath="{.spec.ports[?(@.port==$port)].targetPort}");service_exists=$(${KUBERNETES_DISTRIBUTION_BINARY} get service "$service" -n "$NAMESPACE" --context "$CONTEXT" -ojsonpath='{.metadata.name}');if [ -z "$service_exists" ];then health_status="Unhealthy";echo "Error: Service $service does not exist";echo "Next Step: Check namespace $NAMESPACE for service name $service.";continue;else selectors=$(${KUBERNETES_DISTRIBUTION_BINARY} get svc "$service" -n "$NAMESPACE" --context "$CONTEXT" -o jsonpath='{.spec.selector}');label_selector="";for key in $(echo $selectors | jq -r 'keys[]');do value=$(echo $selectors | jq -r --arg key "$key" '.[$key]');label_selector="\${label_selector}\${key}=\${value},";done;label_selector=\${label_selector::-1};found_owner=0;for kind in deployment statefulset daemonset;do matching_owners=$(${KUBERNETES_DISTRIBUTION_BINARY} get $kind -n "$NAMESPACE" --context "$CONTEXT" -l "$label_selector" -o jsonpath='{.items[*].metadata.name}');if [ -n "$matching_owners" ];then for owner in $matching_owners;do echo "Owner Kind: $kind";echo "Owner Name: $owner";found_owner=1;done;fi;done;if [ "$found_owner" == 0 ];then echo "Error: No matching deployment, statefulset, or daemonset found";echo "Next Step: Check namespace $NAMESPACE for deployment, statefulset, or daemonset with labels that match $label_selector";fi;port_found="No";associated_pods=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n "$NAMESPACE" --context "$CONTEXT" -l "$label_selector" -o jsonpath='{.items[*].metadata.name}');for pod in $associated_pods;do container_ports=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod "$pod" -n "$NAMESPACE" --context "$CONTEXT" -o jsonpath='{.spec.containers[*].ports[*].containerPort}');for target_port in $target_ports;do if echo "$container_ports" | grep -wq "$target_port";then port_found="Yes";break;fi;done;done;if [ "$port_found" = "No" ];then health_status="Unhealthy";echo "Warning: targetPort $target_ports of service $service is not found as a containerPort in associated pods";else health_status="Healthy";fi;endpoint_pods=$(${KUBERNETES_DISTRIBUTION_BINARY} get endpoints "$service" -n "$NAMESPACE" --context "$CONTEXT" -ojsonpath='{range .subsets[*].addresses[*]}- Pod Name: {.targetRef.name}\\n Pod IP: {.ip}\\n{end}');if [ -z "$endpoint_pods" ];then health_status="Unhealthy";echo "Error: Endpoint for service $service does not have any pods"; echo "Next Step: Check namespace $NAMESPACE for failed pods";else echo "Endpoint Pod:";echo "$endpoint_pods";health_status="Healthy";fi;fi;done<<<"$backend_services";echo "Health Status: $health_status";echo "------------";done
+    ...    cmd=NAMESPACE="${NAMESPACE}";CONTEXT="${CONTEXT}";ingresses=$(${KUBERNETES_DISTRIBUTION_BINARY} get ingress -n "$NAMESPACE" --context "$CONTEXT" -o jsonpath='{range .items[*]}{.metadata.name}{"\\n"}{end}');for ingress in $ingresses;do echo "Ingress: $ingress";health_status="NA";backend_services=$(${KUBERNETES_DISTRIBUTION_BINARY} get ingress "$ingress" -n "$NAMESPACE" --context "$CONTEXT" -o jsonpath='{range .spec.rules[*].http.paths[*]}{.backend.service.name}{"|"}{.backend.service.port.number}{"\\n"}{end}');while IFS='|' read -r service port;do echo "Backend Service: $service, Port: $port";target_ports=$(${KUBERNETES_DISTRIBUTION_BINARY} get service "$service" -n "$NAMESPACE" --context "$CONTEXT" -o jsonpath="{.spec.ports[?(@.port==$port)].targetPort}");service_exists=$(${KUBERNETES_DISTRIBUTION_BINARY} get service "$service" -n "$NAMESPACE" --context "$CONTEXT" -ojsonpath='{.metadata.name}');if [ -z "$service_exists" ];then health_status="Unhealthy";echo "Error: Service $service does not exist";echo "Next Step: Check namespace $NAMESPACE for service name $service.";continue;else selectors=$(${KUBERNETES_DISTRIBUTION_BINARY} get svc "$service" -n "$NAMESPACE" --context "$CONTEXT" -o jsonpath='{.spec.selector}');label_selector="";for key in $(echo $selectors | jq -r 'keys[]');do value=$(echo $selectors | jq -r --arg key "$key" '.[$key]');label_selector="\${label_selector}\${key}=\${value},";done;label_selector=\${label_selector::-1};found_owner=0;for kind in deployment statefulset daemonset;do matching_owners=$(${KUBERNETES_DISTRIBUTION_BINARY} get $kind -n "$NAMESPACE" --context "$CONTEXT" -l "$label_selector" -o jsonpath='{.items[*].metadata.name}');if [ -n "$matching_owners" ];then for owner in $matching_owners;do echo "Owner Kind: $kind";echo "Owner Name: $owner";found_owner=1;done;fi;done;if [ "$found_owner" == 0 ];then echo "Error: No matching deployment, statefulset, or daemonset found to match label selector \\`"$label_selector"\\`";echo "Next Steps:\n- Check namespace \\`"$NAMESPACE"\\` for deployment, statefulset, or daemonset with labels that match \\`"$label_selector"\\`";fi;port_found="No";associated_pods=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n "$NAMESPACE" --context "$CONTEXT" -l "$label_selector" -o jsonpath='{.items[*].metadata.name}');for pod in $associated_pods;do container_ports=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod "$pod" -n "$NAMESPACE" --context "$CONTEXT" -o jsonpath='{.spec.containers[*].ports[*].containerPort}');for target_port in $target_ports;do if echo "$container_ports" | grep -wq "$target_port";then port_found="Yes";break;fi;done;done;if [ "$port_found" = "No" ];then health_status="Unhealthy";echo "Warning: targetPort $target_ports of service $service is not found as a containerPort in associated pods";else health_status="Healthy";fi;endpoint_pods=$(${KUBERNETES_DISTRIBUTION_BINARY} get endpoints "$service" -n "$NAMESPACE" --context "$CONTEXT" -ojsonpath='{range .subsets[*].addresses[*]}- Pod Name: {.targetRef.name}\\n Pod IP: {.ip}\\n{end}');if [ -z "$endpoint_pods" ];then health_status="Unhealthy";echo "Error: Endpoint for service \\`"$service"\\` does not have any running pods"; echo "Next Steps:\n- Troubleshoot Container Restarts in Namespace \\`"$NAMESPACE"\\` \n- Troubleshoot Pending Pods In Namespace \\`"$NAMESPACE"\\`\n- Troubleshoot Failed Pods In Namespace \\`"$NAMESPACE"\\`";else echo "Endpoint Pod:";echo "$endpoint_pods";health_status="Healthy";fi;fi;done<<<"$backend_services";echo "Health Status: $health_status";echo "------------";done
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
     ${unhealthy_objects}=    RW.CLI.Run Cli
-    ...    cmd=echo "${ingress_object_summary.stdout}" | awk '/^Ingress:/ {rec=$0; next} {rec=rec ORS $0} /^Health Status: Unhealthy$/ {print rec ORS "------------"}'
+    ...    cmd=echo '${ingress_object_summary.stdout}' | awk '/^Ingress:/ {rec=$0; next} {rec=rec ORS $0} /^Health Status: Unhealthy$/ {print rec ORS "------------"}'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=false
     ${unhealthy_objects_next_steps}=    RW.CLI.Run Cli
-    ...    cmd=echo "${unhealthy_objects.stdout}" | grep '^Next Step:' | sed 's/Next Step: //'
+    ...    cmd=echo '${unhealthy_objects.stdout}' | grep '^Next Steps:' | sed 's/Next Steps: //'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${unhealthy_objects}
-    ...    set_severity_level=3
-    ...    set_issue_expected=All ingress objects should have services and active endpoints in namespace: ${NAMESPACE}
-    ...    set_issue_actual=Ingress objects missing services or endpoints found in namespace: ${NAMESPACE}
-    ...    set_issue_title=Unhealthy ingress objects found in ${NAMESPACE}
-    ...    set_issue_details=The following unhealthy objects were found:\n\n${unhealthy_objects.stdout}\n\n
-    ...    set_issue_next_steps=\n\n${unhealthy_objects_next_steps.stdout}
-    ...    _line__raise_issue_if_contains=Unhealthy
+    ...    include_in_history=false
+    ${unhealthy_object_list}=  Split String  ${unhealthy_objects.stdout}  ------------
+    IF    len($unhealthy_object_list) > 0  
+        FOR    ${item}    IN    @{unhealthy_object_list}
+            ${ingress_name}=    RW.CLI.Run Cli
+            ...    cmd=echo '${item}' | grep Ingress | awk -F":" '{print $2}'
+            ...    env=${env}
+            ...    include_in_history=false
+            ${error_string}=    RW.CLI.Run Cli
+            ...    cmd=echo '${item}' | grep Error | awk -F":" '{print $2}'
+            ...    env=${env}
+            ...    include_in_history=false
+            ${next_steps}=    RW.CLI.Run Cli
+            ...    cmd=echo '${item}' | awk '/^Next Steps:$/,/^Health Status: Unhealthy$/{if (!/Next Steps:|Health Status: Unhealthy/) print}'
+            ...    env=${env}
+            ...    include_in_history=false
+            IF    (len($ingress_name.stdout) > 0 and len($error_string.stdout) > 0 and len($next_steps.stdout) > 0)         
+                RW.Core.Add Issue
+                    ...    severity=2
+                    ...    expected=Ingress objects should point to a valid service and port with corresponding running pods. 
+                    ...    actual=The Ingress, service, or pods are not healthy.  
+                    ...    reproduce_hint=${ingress_object_summary.cmd}
+                    ...    title=${error_string.stdout}
+                    ...    details=${item}
+                    ...    next_steps= ${next_steps.stdout}
+            END
+        END
+    END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Ingress object summary for ${NAMESPACE}:\n\n${ingress_object_summary.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -60,9 +80,11 @@ Check for Ingress and Service Conflicts in Namespace
             ${ingress_name}=    RW.CLI.Run Cli
             ...    cmd=echo "${line}" | awk '/^WARNING: Ingress /{print $3}' | tr -d '\n'
             ...    env=${env}
+            ...    include_in_history=false
             ${service_name}=    RW.CLI.Run Cli
             ...    cmd=echo "${line}" | awk -F'Service | IP' '{print $3}' | tr -d '\n'
             ...    env=${env}  
+            ...    include_in_history=false
             ${warning_details}=    RW.CLI.Run Cli
             ...    cmd=CONTEXT="${CONTEXT}"; NAMESPACE="${NAMESPACE}"; ${KUBERNETES_DISTRIBUTION_BINARY} get ingress ${ingress_name.stdout} -n $NAMESPACE --context $CONTEXT -o yaml && ${KUBERNETES_DISTRIBUTION_BINARY} get svc ${service_name.stdout} -n $NAMESPACE --context $CONTEXT -o yaml
             ...    env=${env}
@@ -75,10 +97,10 @@ Check for Ingress and Service Conflicts in Namespace
             RW.Core.Add Issue
                 ...    severity=2
                 ...    expected=Ingress objects should point at service types of ClusterIP. 
-                ...    actual=There is a configuraiton mismatch between the Ingress object and Service object. 
+                ...    actual=There is a configuration mismatch between the Ingress object and Service object. 
                 ...    reproduce_hint=${warning_details.cmd}
                 ...    title=Ingress `${ingress_name.stdout}` in namespace `${NAMESPACE}` has a likely configuration conflict with service `${service_name.stdout}`.
-                ...    details=`${line}\n${warning_details.stdout}`
+                ...    details=${line}\n${warning_details.stdout}
                 ...    next_steps=The ingress `${ingress_name.stdout}` has a likely configuration conflict with service `${service_name.stdout}`. In most cases, ingress objects should point to a service of type ClusterIP or NodePort, not LoadBalancer.\n${next_steps}        
         END
     END
