@@ -336,7 +336,7 @@ Check Missing or Risky PodDisruptionBudget Policies
     # Raise Issues on Missing PDBS
     @{missing_pdb_list}=    Create List    ${missing_pdbs.stdout} 
     FOR    ${missing_pdb}    IN    @{missing_pdb_list}
-        IF    len($missing_pdb > 0  
+        IF    len($missing_pdb) > 0  
             RW.Core.Add Issue
                 ...    severity=4
                 ...    expected=PodDisruptionBudgets in namespace `${NAMESPACE}` should exist for applications that have more than 1 replica
