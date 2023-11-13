@@ -339,7 +339,7 @@ Check Missing or Risky PodDisruptionBudget Policies
             ...    severity=4
             ...    expected=PodDisruptionBudgets in namespace `${NAMESPACE}` should exist for applications that have more than 1 replica
             ...    actual=We detected Deployments or StatefulSets in namespace `${NAMESPACE}` which are missing PodDisruptionBudgets 
-            ...    reproduce_hint=${warning_details.cmd}
+            ...    reproduce_hint=${pdb_check.cmd}
             ...    title=PodDisruptionBudget missing for `${missing_pdb}` in namespace `${NAMESPACE}`
             ...    details=${pdb_check.stdout}
             ...    next_steps=Create missing PodDistruptionBudgets for `${missing_pdb.stdout}`  
