@@ -333,7 +333,7 @@ Check Missing or Risky PodDisruptionBudget Policies
     ${missing_pdbs}=    RW.CLI.Run Cli
     ...    cmd=echo "${pdb_check.stdout}" | grep 'Missing' | cut -f 1 -d ' ' | awk -F'/' '{print $1 ":" $2}'
     ...    include_in_history=False
-    @{missing_pdb_list}=    Create List    ${missing_pdbs} 
+    @{missing_pdb_list}=    Create List    ${missing_pdbs.stdout} 
     FOR    ${missing_pdb}    IN    @{missing_pdb_list}
         RW.Core.Add Issue
             ...    severity=4
