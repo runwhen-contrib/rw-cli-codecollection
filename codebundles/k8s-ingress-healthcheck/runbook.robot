@@ -14,7 +14,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Fetch Ingress Object Health in Namespace 
+Fetch Ingress Object Health in Namespace `${NAMESPACE}`
     [Documentation]    Fetches all ingress objects in the namespace and outputs the name, health status, services, and endpoints. 
     [Tags]    service    ingress    endpoint   health 
     ${ingress_object_summary}=    RW.CLI.Run Cli
