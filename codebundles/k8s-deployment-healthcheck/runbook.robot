@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check Deployment Log For Issues
+Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
     [Documentation]    Fetches recent logs for the given deployment in the namespace and checks the logs output for issues.
     [Tags]    fetch    log    pod    container    errors    inspect    trace    info    deployment    <service_name>
     ${logs}=    RW.CLI.Run Bash File
@@ -45,7 +45,7 @@ Check Deployment Log For Issues
     ...    Recent logs from deployment/${DEPLOYMENT_NAME} in ${NAMESPACE}:\n\n${logs.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Troubleshoot Deployment Warning Events
+Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
     [Documentation]    Fetches warning events related to the deployment workload in the namespace and triages any issues found in the events.
     [Tags]    events    workloads    errors    warnings    get    deployment    <service_name>
     ${events}=    RW.CLI.Run Cli
@@ -69,7 +69,7 @@ Troubleshoot Deployment Warning Events
     RW.Core.Add Pre To Report    ${events.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Get Deployment Workload Details For Report
+Get Deployment Workload Details For with `${DEPLOYMENT_NAME}` and Add to Report
     [Documentation]    Fetches the current state of the deployment for future review in the report.
     [Tags]    deployment    details    manifest    info    <service_name>
     ${deployment}=    RW.CLI.Run Cli
@@ -81,7 +81,7 @@ Get Deployment Workload Details For Report
     RW.Core.Add Pre To Report    Snapshot of deployment state:\n\n${deployment.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Troubleshoot Deployment Replicas
+Troubleshoot Deployment Replicas for with `${DEPLOYMENT_NAME}`
     [Documentation]    Pulls the replica information for a given deployment and checks if it's highly available
     ...    , if the replica counts are the expected / healthy values, and if not, what they should be.
     [Tags]
@@ -139,7 +139,7 @@ Troubleshoot Deployment Replicas
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Check For Deployment Event Anomalies
+Check For Deployment Event Anomalies with with `${DEPLOYMENT_NAME}`
     [Documentation]    Parses all events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
     [Tags]
     ...    deployment

@@ -12,6 +12,7 @@ Library             RW.platform
 Library             OperatingSystem
 Library             DateTime
 Library             Collections
+Library             String
 
 Suite Setup         Suite Initialization
 
@@ -285,7 +286,7 @@ Check For Namespace Event Anomalies
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Troubleshoot Namespace Services And Application Workloads
-    [Documentation]    Iterates through the services within a namespace for a given timeframe and byte length max, checking the resulting logs for distinct entries matching a given pattern in order to determine a root issue.
+    [Documentation]    Iterates through the services within a namespace for a given timeframe and byte length max, checking the resulting logs for distinct entries matching a given pattern, provide a summary of which services require additional investigation.
     [Tags]
     ...    namespace
     ...    services
@@ -300,20 +301,48 @@ Troubleshoot Namespace Services And Application Workloads
     ...    logs
     ...    aggregate
     ...    filter
+    # ${aggregate_service_logs}=    RW.CLI.Run Cli
+    # ...    cmd=services=($(${KUBERNETES_DISTRIBUTION_BINARY} get svc -o=name --context=${CONTEXT} -n ${NAMESPACE})); > "logs.json"; for service in "\${services[@]}"; do ${KUBERNETES_DISTRIBUTION_BINARY} logs $service --limit-bytes=256000 --since=2h --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${SERVICE_ERROR_PATTERN}" | grep -Ev "${SERVICE_EXCLUDE_PATTERN}" | while read -r line; do service_name="\${service#*/}"; message=$(echo "$line" | jq -aRs .); printf '{"service": "%s", "message": %s}\n' "\${service#*/}" "$message" >> "logs.json"; done; done; cat "logs.json"| jq -s '[ (group_by(.service) | map({service: .[0].service, total_logs: length})), (group_by(.service) | map({service: .[0].service, top_logs: (group_by(.message[0:200]) | map({message_start: .[0].message[0:200], count: length}) | sort_by(.count) | reverse | .[0:3])})) ] | add'
+    # ...    env=${env}
+    # ...    secret_file__kubeconfig=${KUBECONFIG}
+    # ...    render_in_commandlist=true
     ${aggregate_service_logs}=    RW.CLI.Run Cli
-    ...    cmd=services=($(${KUBERNETES_DISTRIBUTION_BINARY} get svc -o=name --context=${CONTEXT} -n ${NAMESPACE})); logs=""; for service in "\${services[@]}"; do logs+=$(${KUBERNETES_DISTRIBUTION_BINARY} logs $service --limit-bytes=256000 --since=2h --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${SERVICE_ERROR_PATTERN}" | grep -Ev "${SERVICE_EXCLUDE_PATTERN}" | sort | uniq -c | awk '{print "Issue Occurences:",$0}'); done; echo "\${logs}"
+    ...    cmd=services=($(${KUBERNETES_DISTRIBUTION_BINARY} get svc -o=name --context=${CONTEXT} -n ${NAMESPACE})) && [ \${#services[@]} -eq 0 ] && echo "No services found." || { > "logs.json"; for service in "\${services[@]}"; do ${KUBERNETES_DISTRIBUTION_BINARY} logs $service --limit-bytes=256000 --since=2h --context=${CONTEXT} -n ${NAMESPACE} 2>/dev/null | grep -Ei "${SERVICE_ERROR_PATTERN}" | grep -Ev "${SERVICE_EXCLUDE_PATTERN}" | while read -r line; do service_name="\${service#*/}"; message=$(echo "$line" | jq -aRs .); printf '{"service": "%s", "message": %s}\n' "\${service_name}" "$message" >> "logs.json"; done; done; [ ! -s "logs.json" ] && echo "No log entries found." || cat "logs.json" | jq -s '[ (group_by(.service) | map({service: .[0].service, total_logs: length})), (group_by(.service) | map({service: .[0].service, top_logs: (group_by(.message[0:200]) | map({message_start: .[0].message[0:200], count: length}) | sort_by(.count) | reverse | .[0:3])})) ] | add'; } > $HOME/output
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    render_in_commandlist=true
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${aggregate_service_logs}
-    ...    set_severity_level=3
-    ...    set_issue_expected=Service workload logs in namespace ${NAMESPACE} should not contain any error entries
-    ...    set_issue_actual=Service workload logs in namespace ${NAMESPACE} contain errors entries
-    ...    set_issue_title=Service Workloads In Namespace ${NAMESPACE} Have Error Log Entries
-    ...    set_issue_details=We found the following distinctly counted errors in the service workloads of namespace ${NAMESPACE}:\n\n$_stdout\n\nThese errors may be related to other workloads that need triaging
-    ...    set_issue_next_steps=Check For Deployment Event Anomalies
-    ...    _line__raise_issue_if_contains=Error
+    ${services_with_errors}=    RW.CLI.Run Cli
+    ...    cmd=jq -r '[ .[].service ] | unique[]' $HOME/output
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${KUBECONFIG}
+    ...    render_in_commandlist=false
+    ...    include_in_history=false
+    @{service_list}=    Split String    ${services_with_errors.stdout}
+    FOR    ${service}    IN    @{service_list}
+        ${service_owner}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get endpoints "${service}" -n "${NAMESPACE}" --context="${CONTEXT}" -o jsonpath='{range .subsets[*].addresses[*]}{.targetRef.name}{"\\n"}{end}' | xargs -I {} sh -c 'owner_kind=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod {} -n "${NAMESPACE}" --context="${CONTEXT}" -o=jsonpath="{.metadata.ownerReferences[0].kind}"); if [ "$owner_kind" = "ReplicaSet" ]; then replicaset=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod {} -n "${NAMESPACE}" --context="${CONTEXT}" -o=jsonpath="{.metadata.ownerReferences[0].name}"); deployment_name=$(${KUBERNETES_DISTRIBUTION_BINARY} get replicaset $replicaset -n "${NAMESPACE}" --context="${CONTEXT}" -o=jsonpath="{.metadata.ownerReferences[0].name}"); echo "Deployment $deployment_name"; else owner_info=$($owner_kind ${KUBERNETES_DISTRIBUTION_BINARY} get pod {} -n "${NAMESPACE}" --context="${CONTEXT}" -o=jsonpath="{.metadata.ownerReferences[0].name}"); echo "$owner_info"; fi' | sort | uniq
+        ...    secret_file__kubeconfig=${KUBECONFIG}
+        ...    env=${env}
+        ...    include_in_history=false
+        ${owner_kind}    ${owner_name}=    Split String    ${service_owner.stdout}    ${SPACE}
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=Service `${service}` should not have error logs in associated pods in namespace `${NAMESPACE}`.
+        ...    actual=Error logs were identified for service `${service}` in namespace `${NAMESPACE}`.
+        ...    title=Service `${service}` has error logs in namespace `${NAMESPACE}`.
+        ...    reproduce_hint=View Commands Used in Report Output
+        ...    details=${aggregate_service_logs.stdout}
+        ...    next_steps=Check ${owner_kind} Logs for Issues with `${owner_name}`
+    END
+    # RW.CLI.Parse Cli Output By Line
+    # ...    rsp=${aggregate_service_logs}
+    # ...    set_severity_level=3
+    # ...    set_issue_expected=Service workload logs in namespace ${NAMESPACE} should not contain any error entries
+    # ...    set_issue_actual=Service workload logs in namespace ${NAMESPACE} contain errors entries
+    # ...    set_issue_title=Service Workloads In Namespace ${NAMESPACE} Have Error Log Entries
+    # ...    set_issue_details=We found the following distinctly counted errors in the service workloads of namespace ${NAMESPACE}:\n\n$_stdout\n\nThese errors may be related to other workloads that need triaging
+    # ...    set_issue_next_steps=Check For Deployment Event Anomalies
+    # ...    _line__raise_issue_if_contains=Error
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add To Report    Sample Of Aggregate Counted Logs Found:\n
     RW.Core.Add To Report    ${aggregate_service_logs.stdout}\n
