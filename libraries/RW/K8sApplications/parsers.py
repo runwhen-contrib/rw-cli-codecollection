@@ -26,6 +26,7 @@ class StackTraceData:
 
 class BaseStackTraceParse:
     # TODO: pull from a chatgpt generated path list instead?
+    # TODO: revisit filtering approach
     exclude_file_paths: list[str] = ["site-packages", "/html"]
     exclude_endpoints: list[str] = [
         "/python",
@@ -82,7 +83,13 @@ class BaseStackTraceParse:
         regex = (
             r"(https?://|ftp://)[\w.-]+(?:\.[\w.-]+)+[\w/_-]*(?:(?:\?|\&amp;)[\w=]*)*"
         )
-        return re.findall(regex, text)
+        results = re.findall(regex, text)
+        deduplicated = []
+        for r in results:
+            if r not in deduplicated:
+                deduplicated.append(r)
+        results = deduplicated
+        return results
 
     @staticmethod
     def extract_endpoints(text, exclude_paths: list[str] = None) -> list[str]:
@@ -120,6 +127,8 @@ class PythonStackTraceParse(BaseStackTraceParse):
     def parse_log(log) -> StackTraceData:
         if "stacktrace" in log:
             return BaseStackTraceParse.parse_log(log)
+        else:
+            return None
 
 
 class DRFStackTraceParse(PythonStackTraceParse):

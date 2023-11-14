@@ -51,6 +51,7 @@ def parse_exceptions(logs: str) -> []:
             f"Length of logs provided for parsing exceptions is greater than {MAX_LOG_LINES}, be aware this could effect performance"
         )
     exception_data: list[StackTraceData] = []
+    # Add more parser types here and they will be attempted in-order until first success, per line
     parsers: list[BaseStackTraceParse] = [
         GoogleDRFStackTraceParse,
         PythonStackTraceParse,
