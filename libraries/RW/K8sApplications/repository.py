@@ -38,6 +38,33 @@ class GitCommit:
         self._diff = diff_output
         return diff_output
 
+    def _parse_diff_changes(self):
+        diff = self._get_diff()
+        additions = []
+        deletions = []
+        current_file = None
+        for line in diff.split("\n"):
+            if line.startswith("+++ b/"):
+                current_file = line[6:]
+            elif line.startswith("+") and not line.startswith("++"):
+                additions.append((current_file, line[1:]))
+            elif line.startswith("-") and not line.startswith("--"):
+                deletions.append((current_file, line[1:]))
+        self._diff_additions = additions
+        self._diff_deletions = deletions
+
+    @property
+    def diff_additions(self):
+        if self._diff_additions is None:
+            self._parse_diff_changes()
+        return self._diff_additions
+
+    @property
+    def diff_deletions(self):
+        if self._diff_deletions is None:
+            self._parse_diff_changes()
+        return self._diff_deletions
+
 
 @dataclass
 class RepositorySearchResult:
@@ -95,6 +122,9 @@ class Repository:
     ]
     EXCLUDE_EXT: list[str] = [".png", ".jpg", ".jpeg", ".ico"]
     source_uri: str
+    repo_url: str
+    repo_owner: str
+    repo_name: str
     auth_token: str
     files: RepositoryFiles
     clone_directory: str
@@ -102,9 +132,9 @@ class Repository:
     commit_history: list[GitCommit] = []
 
     def __str__(self):
+        repo_summary = f"Repository: {self.repo_owner}/{self.repo_name}\nRepository URI: {self.source_uri}"
         file_summary = f"Number of files: {len(self.files.files)}"
         branch_summary = f"Branch: {self.branch}"
-        repo_summary = f"Repository URI: {self.source_uri}"
         commit_summary = "Recent Commits:\n"
         commit_seperator = "--------------\n"
         for commit in self.commit_history:  # Show the last 5 commits as an example
@@ -115,6 +145,16 @@ class Repository:
         self, source_uri: str, auth_token: platform.Secret = None, branch="main"
     ) -> None:
         self.source_uri = source_uri
+        self.repo_url = self.get_repo_base_url()
+        # get owner and repo name from uri
+        parts = (
+            self.repo_url.replace("https://github.com/", "")
+            .replace("git@github.com:", "")
+            .rstrip(".git")
+            .split("/")
+        )
+        self.repo_owner = parts[0]
+        self.repo_name = parts[1]
         if auth_token:
             self.auth_token = auth_token.value
         else:
@@ -125,16 +165,19 @@ class Repository:
     def clone_repo(
         self,
         num_commits_history: int = 10,
+        cache: bool = True,
     ) -> str:
         repo_name = self.source_uri.split("/")[-1]
         if repo_name.endswith(".git"):
             repo_name = repo_name[:-4]
         self.clone_directory = f"/tmp/{repo_name}"
 
-        # Ensure the target directory is clean
-        if os.path.exists(self.clone_directory):
+        # Ensure the target directory is clean or use cache
+        if os.path.exists(self.clone_directory) and cache:
+            pass
+        elif os.path.exists(self.clone_directory):
             subprocess.run(["rm", "-rf", self.clone_directory], check=True)
-        os.makedirs(self.clone_directory, exist_ok=True)
+            os.makedirs(self.clone_directory, exist_ok=True)
 
         # Modify the Git URI to include the token for authentication
         if "https://" in self.source_uri and self.auth_token:
@@ -148,20 +191,21 @@ class Repository:
                 "Unsupported Git URI. Please use HTTPS URL for cloning with a token."
             )
 
-        # Execute the Git clone command with the modified URI
-        subprocess.run(
-            [
-                "git",
-                "clone",
-                "--branch",
-                self.branch,
-                "--single-branch",
-                auth_uri,
-                self.clone_directory,
-            ],
-            check=True,
-            env={"GIT_TERMINAL_PROMPT": "0"},
-        )
+        if not cache:
+            # Execute the Git clone command with the modified URI
+            subprocess.run(
+                [
+                    "git",
+                    "clone",
+                    "--branch",
+                    self.branch,
+                    "--single-branch",
+                    auth_uri,
+                    self.clone_directory,
+                ],
+                check=True,
+                env={"GIT_TERMINAL_PROMPT": "0"},
+            )
 
         self.create_file_list()
         self.commit_history = self.serialize_git_commits(
@@ -260,11 +304,13 @@ class Repository:
         return commits
 
     def create_issue(self, title, body):
-        url = f"{self.source_uri}"
+        # TODO: convert to rw.cli
+        url = f"https://api.github.com/repos/{self.repo_owner}/{self.repo_name}/issues"
         data = {"title": title, "body": body}
         result = subprocess.run(
             [
                 "curl",
+                "-L",
                 "-X",
                 "POST",
                 "-H",
@@ -280,14 +326,14 @@ class Repository:
         )
         if result.stderr:
             print("Error:", result.stderr)
-        else:
-            print("Issue created:", result.stdout)
 
     def list_issues(self):
-        url = f"{self.source_uri}"
+        # TODO: convert to rw.cli
+        url = f"https://api.github.com/repos/{self.repo_owner}/{self.repo_name}/issues"
         result = subprocess.run(
             [
                 "curl",
+                "-L",
                 "-H",
                 f"Authorization: token {self.auth_token}",
                 "-H",
@@ -299,4 +345,5 @@ class Repository:
         )
         if result.stderr:
             print("Error:", result.stderr)
-        return result.stdout
+        results = json.loads(result.stdout)
+        return results
