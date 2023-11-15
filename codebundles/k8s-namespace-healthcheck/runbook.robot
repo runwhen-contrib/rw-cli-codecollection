@@ -258,6 +258,10 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json > $HOME/events.json && cat $HOME/events.json | jq -r '[.items[] | {namespace: .involvedObject.namespace, kind: .involvedObject.kind, name: (.involvedObject.name | split("-")[0]), count: .count, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, reason: .reason, message: .message}] | group_by(.namespace, .kind, .name) | .[] | {(.[0].namespace + "/" + .[0].kind + "/" + .[0].name): {total_count: ([.[] | .count] | add), events: .}}' | jq -r --argjson threshold "${ANOMALY_THRESHOLD}" 'to_entries[] | {object: .key, total_count: .value.total_count, events: .value.events} | {object: .object, most_recent_timestamp: (reduce .events[] as $event ("1970-01-01T00:00:00Z"; if ($event.lastTimestamp > .) then $event.lastTimestamp else . end)), events_per_minute: (reduce .events[] as $event (0; . + ($event.count / (((($event.lastTimestamp | fromdateiso8601) - ($event.firstTimestamp | fromdateiso8601)) / 60) | if . == 0 then 1 else . end))) | round), total_events: .total_count, summary_messages: [.events[] | .message] | unique | join("; ")} | select(.events_per_minute > $threshold)' | jq -s '.'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ${recent_events_by_object}=    RW.CLI.Run Cli
+    ...    cmd=jq --version
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
     IF    len(${recent_events_by_object.stdout}) > 0
         ${object_list}=    Evaluate    json.loads(r'''${recent_events_by_object.stdout}''')    json
         FOR    ${item}    IN    @{object_list}
