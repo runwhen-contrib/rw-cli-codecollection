@@ -170,10 +170,12 @@ def run_bash_file(
                         bash_file = os.path.join(new_path, bash_file)
                         if os.path.exists(bash_file):
                             logger.info(f"File '{bash_file}' found at derived path: {new_path}.")
-                            if not cmd_overide:
-                                cmd_overide = f"./{bash_file}"
+                            if cmd_overide:
+                                cmd_overide = cmd_overide.replace(f"./{bash_file}", f"{new_path}")
+                                print(cmd_overide)
                             else:
-                                cmd_overide = cmd_overide.replace(f"./{bash_file}", new_path)
+                                cmd_overide = f"./{bash_file}"
+                                print(cmd_overide)
                             break
                         else:
                             logger.warning(f"File '{bash_file}' not found at derived path: {new_path}.")
