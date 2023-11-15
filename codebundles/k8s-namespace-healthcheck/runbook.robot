@@ -270,7 +270,7 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
             ...    env=${env}
             ...    include_in_history=False
             ${item_owner}=    RW.CLI.Run Cli
-            ...    cmd=../../../extras/scripts/find_resource_owners.sh ${object_kind.stdout} ${object_short_name.stdout} ${NAMESPACE} ${CONTEXT}
+            ...    cmd=../../extras/scripts/find_resource_owners.sh ${object_kind.stdout} ${object_short_name.stdout} ${NAMESPACE} ${CONTEXT}
             ...    env=${env}
             ...    secret_file__kubeconfig=${kubeconfig}
             ${owner_kind}    ${owner_name}=    Split String    ${item_owner.stdout}    ${SPACE}
