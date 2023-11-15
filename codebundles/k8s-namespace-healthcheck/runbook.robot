@@ -258,6 +258,7 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json > $HOME/events.json && cat $HOME/events.json | jq -r '[.items[] | {namespace: .involvedObject.namespace, kind: .involvedObject.kind, name: (.involvedObject.name | split("-")[0]), count: .count, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, reason: .reason, message: .message}] | group_by(.namespace, .kind, .name) | .[] | {(.[0].namespace + "/" + .[0].kind + "/" + .[0].name): {total_count: ([.[] | .count] | add), events: .}}' | jq -r --argjson threshold "${ANOMALY_THRESHOLD}" 'to_entries[] | {object: .key, total_count: .value.total_count, events: .value.events} | {object: .object, most_recent_timestamp: (reduce .events[] as $event ("1970-01-01T00:00:00Z"; if ($event.lastTimestamp > .) then $event.lastTimestamp else . end)), events_per_minute: (reduce .events[] as $event (0; . + ($event.count / (((($event.lastTimestamp | fromdateiso8601) - ($event.firstTimestamp | fromdateiso8601)) / 60) | if . == 0 then 1 else . end))) | floor), total_events: .total_count, summary_messages: [.events[] | .message] | unique | join("; ")} | select(.events_per_minute > $threshold)' | jq -s '.'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    render_in_commandlist=true
     IF    len(${recent_events_by_object.stdout}) > 0
         ${object_list}=    Evaluate    json.loads(r'''${recent_events_by_object.stdout}''')    json
         FOR    ${item}    IN    @{object_list}
@@ -271,9 +272,10 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
             ...    include_in_history=False
             ${item_owner}=    RW.CLI.Run Bash File
             ...    bash_file=find_resource_owners.sh
-            ...    cmd_overide="./find_resource_owners.sh ${object_kind.stdout} ${object_short_name.stdout} ${NAMESPACE} ${CONTEXT}"
+            ...    cmd_overide=./find_resource_owners.sh ${object_kind.stdout} ${object_short_name.stdout} ${NAMESPACE} ${CONTEXT}
             ...    env=${env}
             ...    secret_file__kubeconfig=${kubeconfig}
+            ...    include_in_history=False
             ${owner_kind}    ${owner_name}=    Split String    ${item_owner.stdout}    ${SPACE}
             RW.Core.Add Issue
             ...    severity=4
