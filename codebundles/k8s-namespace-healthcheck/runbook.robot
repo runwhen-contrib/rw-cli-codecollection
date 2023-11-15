@@ -269,15 +269,11 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
             ...    cmd=echo "${item["object"]}" | awk -F"/" '{print $3}' | tr -d '\n'
             ...    env=${env}
             ...    include_in_history=False
-            ${whereami}=    RW.CLI.Run Cli
-            ...    cmd=find / -type d -path '*/extras/scripts/find_resource_owners.sh'
-            ...    env=${env}
-            ...    include_in_history=False
             ${item_owner}=    RW.CLI.Run Bash File
             ...    bash_file=find_resource_owners.sh
+            ...    cmd_override=./find_resource_owners.sh ${object_kind.stdout} ${object_short_name.stdout} ${NAMESPACE} ${CONTEXT}
             ...    env=${env}
             ...    secret_file__kubeconfig=${kubeconfig}
-            ...    ${object_kind.stdout} ${object_short_name.stdout} ${NAMESPACE} ${CONTEXT}
             ${owner_kind}    ${owner_name}=    Split String    ${item_owner.stdout}    ${SPACE}
             RW.Core.Add Issue
             ...    severity=4
