@@ -167,11 +167,12 @@ def run_bash_file(
                         path, _ = rw_path_to_robot.split(pattern)
                         new_path = os.path.join("/collection", path)
                         # Modify the bash_file to point to the new directory
+                        local_bash_file=f"./{bash_file}"
                         bash_file = os.path.join(new_path, bash_file)
                         if os.path.exists(bash_file):
                             logger.info(f"File '{bash_file}' found at derived path: {new_path}.")
                             if cmd_overide:
-                                cmd_overide = cmd_overide.replace(f"./{bash_file}", f"{new_path}")
+                                cmd_overide = cmd_overide.replace(f"{local_bash_file}", f"{new_path}")
                                 logger.warning(cmd_overide)
                             else:
                                 cmd_overide = f"./{bash_file}"
