@@ -12,6 +12,9 @@ class StackTraceData:
     files: list[str]
     error_messages: list[str]
     raw: str
+    # TODO: create a in-mem db of exception types
+    # TODO: extract exception types and lookup in code
+    # TODO: integration for generating log service URL
 
     @property
     def has_results(self):
@@ -36,6 +39,7 @@ class BaseStackTraceParse:
         "/1.1",
         "/html",
     ]
+    # TODO: extract package names, include in next steps
 
     @staticmethod
     def is_json(data: str) -> bool:
@@ -64,7 +68,8 @@ class BaseStackTraceParse:
     def extract_files(text, exclude_paths: list[str] = None) -> list[str]:
         if exclude_paths is None:
             exclude_paths = BaseStackTraceParse.exclude_file_paths
-        regex = r"/[\w/._-]+"
+        # regex = r"/[\w/._-]+"
+        regex = r"/[\w./_-]+\.[a-zA-Z0-9]+"
         results = re.findall(regex, text)
         results = [
             r

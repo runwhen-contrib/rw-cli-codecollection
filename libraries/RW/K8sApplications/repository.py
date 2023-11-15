@@ -6,6 +6,7 @@ import json
 from typing import List
 from pathlib import Path
 from dataclasses import dataclass, field
+from thefuzz import process as fuzzprocessor
 
 from RW import platform
 from RW.Core import Core
@@ -70,6 +71,7 @@ class GitCommit:
 class RepositorySearchResult:
     line_num: int
     source_file: "RepositoryFile"
+    related_diffs: list[GitCommit]
 
 
 @dataclass
@@ -81,16 +83,20 @@ class RepositoryFile:
     git_url_base: str
     filesystem_basepath: str
     branch: str
+    content: str
 
     def __init__(
         self, absolute_filepath, filesystem_basepath, repo_base_url, branch="main"
     ) -> None:
         self.absolute_file_path = str(absolute_filepath)
+        self.filesystem_basepath = filesystem_basepath
         self.git_url_base = str(repo_base_url)
         self.branch = branch
         self.relative_file_path = str(
             Path(self.absolute_file_path).relative_to(filesystem_basepath)
         )
+        with open(self.absolute_file_path) as fh:
+            self.content = fh.read()
         # logger.info(f"Counting: {self.absolute_file_path}")
         self.line_count = sum(
             1 for line in open(self.absolute_file_path) if line.strip()
@@ -114,8 +120,13 @@ class RepositoryFiles:
     def add_source_file(self, src_file: RepositoryFile) -> None:
         self.files[src_file.relative_file_path] = src_file
 
+    @property
+    def file_paths(self) -> list[str]:
+        return self.files.keys()
+
 
 class Repository:
+    SEARCH_MIN: int = 15
     EXCLUDE_PATHS: list[str] = [
         ".git",
         ".gitmodules",
@@ -250,9 +261,58 @@ class Repository:
                     )
                     self.files.add_source_file(src_file)
 
-    def search(self, search_term: str, file_path: str) -> [RepositorySearchResult]:
-        # iterates over source files and calls their search method with the search_term, returning a list of RepositorySearchResult
-        pass
+    def search(
+        self,
+        search_words: list[str],
+        search_files: list[str],
+        max_results_per_word: int = 5,
+    ) -> [RepositorySearchResult]:
+        logger.info(f"Performing search with words: {search_words}")
+        # check both paths starting with / and without - this is a bit of hackery but
+        # needed to get around a weakness in regex parsing
+        file_paths: list[str] = self.files.file_paths
+        slashed_file_paths: list[str] = [f"/{fp}" for fp in file_paths]
+        logger.info(search_files)
+        files_to_examine: list[str] = set(search_files).intersection(file_paths)
+        slashed_files_to_examine: list[str] = set(search_files).intersection(
+            slashed_file_paths
+        )
+        logger.info(
+            f"Searching files: {files_to_examine} and {slashed_files_to_examine}"
+        )
+        # recombine, remove slashes and unique entries
+        search_in: list[str] = list(
+            set(list(files_to_examine) + [fp[1:] for fp in slashed_files_to_examine])
+        )
+        logger.info(f"SEARCHIN: {search_in}")
+        matches = []
+        for fp in search_in:
+            repo_file: RepositoryFile = self.files.files[fp]
+            logger.info(f"repo file: {repo_file}")
+            file_content: list[str] = repo_file.content.split("\n")
+            for i, fc in enumerate(file_content):
+                line_num = i + 1
+                if any(word in fc for word in search_words):
+                    match = RepositorySearchResult(
+                        line_num=line_num, source_file=repo_file, related_diffs=None
+                    )
+                    matches.append(match)
+                else:
+                    for word in search_words:
+                        extract_result = fuzzprocessor.extract(word, fc, limit=5)
+                        for er in extract_result:
+                            if er[1] > self.SEARCH_MIN:
+                                match = RepositorySearchResult(
+                                    line_num=line_num,
+                                    source_file=repo_file,
+                                    related_diffs=None,
+                                )
+                                matches.append(match)
+                                # rework intelligent fuzzy match lookup to line number
+                                break
+            # TODO: git diff lookups
+            # TODO: look at exception type lookup table
+        return matches
 
     def serialize_git_commits(self, commit_list: list) -> list[GitCommit]:
         git_commits: list[GitCommit] = []
@@ -260,7 +320,6 @@ class Repository:
             gc: GitCommit = GitCommit(**commit_data)
             logger.info(f"Serializing commit: {gc.sha} {gc.author_name}")
             git_commits.append(gc)
-
         return git_commits
 
     def get_git_log(self, num_commits: int = 10) -> list:
