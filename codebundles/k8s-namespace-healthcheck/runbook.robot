@@ -252,37 +252,88 @@ Get Listing Of Resources In Namespace
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Check For Namespace Event Anomalies
-    [Documentation]    Parses all events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
+    [Documentation]    Fetches non warning events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
     [Tags]    namespace    events    info    state    anomolies    count    occurences
-    ${recent_anomalies}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select( .count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) > ${ANOMALY_THRESHOLD}) | "Event(s) Per Minute:" + (.count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) |tostring) +" Count:" + (.count|tostring) + " Minute(s):" + (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60|tostring)+ " Object:" + .involvedObject.namespace + "/" + .involvedObject.kind + "/" + .involvedObject.name + " Reason:" + .reason + " Message:" + .message'
+    ${recent_events_by_object}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json > $HOME/events.json && cat $HOME/events.json | jq -r '[.items[] | {namespace: .involvedObject.namespace, kind: .involvedObject.kind, name: (.involvedObject.name | split("-")[0]), count: .count, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, reason: .reason, message: .message}] | group_by(.namespace, .kind, .name) | .[] | {(.[0].namespace + "/" + .[0].kind + "/" + .[0].name): {total_count: ([.[] | .count] | add), events: .}}' | jq -r --argjson threshold "${ANOMALY_THRESHOLD}" 'to_entries[] | {object: .key, total_count: .value.total_count, events: .value.events} | {object: .object, most_recent_timestamp: (reduce .events[] as $event ("1970-01-01T00:00:00Z"; if ($event.lastTimestamp > .) then $event.lastTimestamp else . end)), events_per_minute: (reduce .events[] as $event (0; . + ($event.count / (((($event.lastTimestamp | fromdateiso8601) - ($event.firstTimestamp | fromdateiso8601)) / 60) | if . == 0 then 1 else . end))) | round), total_events: .total_count, summary_messages: [.events[] | .message] | unique | join("; ")} | select(.events_per_minute > $threshold)' | jq -s '.'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ${event_messages}=    RW.CLI.Run CLI
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r .items[].message
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ...    include_in_history=False
-    ${event_messages}=    Evaluate    """${event_messages.stdout}""".split("\\n")
-    ${pod_name}=    RW.CLI.Run Cli
-    ...    cmd=echo "${recent_anomalies.stdout}" | grep -oP '(?<=Pod/)[^ ]*' | grep -oP '[^.]*(?=-[a-z0-9]+-[a-z0-9]+)' | head -n 1
-    ...    include_in_history=False
-    ${next_steps}=    RW.NextSteps.Suggest    ${event_messages}
-    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
-    ...    pod_name=${pod_name.stdout}
-    ...    deployment_name=${pod_name.stdout}
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${recent_anomalies}
-    ...    set_severity_level=2
-    ...    set_issue_expected=No unusual recent anomaly events with high counts in the namespace ${NAMESPACE}
-    ...    set_issue_actual=We detected events in the namespace ${NAMESPACE} which are considered anomalies
-    ...    set_issue_title=Event Anomalies Detected In Namespace ${NAMESPACE}
-    ...    set_issue_details=Anomaly non-warning events in namespace ${NAMESPACE}:\n"$_stdout"
-    ...    set_issue_next_steps=${next_steps}
-    ...    _line__raise_issue_if_contains=Object
+    IF    len(${recent_events_by_object.stdout}) > 0
+        ${object_list}=    Evaluate    json.loads(r'''${recent_events_by_object.stdout}''')    json
+        FOR    ${item}    IN    @{object_list}
+            ${object_kind}=    RW.CLI.Run Cli
+            ...    cmd=echo "${item["object"]}" | awk -F"/" '{print $2}' | tr -d '\n'
+            ...    env=${env}
+            ...    include_in_history=False
+            ${object_short_name}=    RW.CLI.Run Cli
+            ...    cmd=echo "${item["object"]}" | awk -F"/" '{print $3}' | tr -d '\n'
+            ...    env=${env}
+            ...    include_in_history=False
+            ${item_owner}=    RW.CLI.Run Cli
+            ...    cmd=../../../extras/scripts/find_resource_owners.sh ${object_kind.stdout} ${object_short_name.stdout} ${NAMESPACE} ${CONTEXT}
+            ...    env=${env}
+            ...    secret_file__kubeconfig=${kubeconfig}
+            ${owner_kind}    ${owner_name}=    Split String    ${item_owner.stdout}    ${SPACE}
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    expected=PodDisruptionBudgets in `${NAMESPACE}` should not block regular maintenance
+            ...    actual=PodDisruptionBudgets in namespace `${NAMESPACE}` are considered Risky to maintenance operations.
+            ...    title= ${owner_kind} `${owner_name}` create up to ${item["events_per_minute"]} events within a 1m period and should be reviewed.
+            ...    reproduce_hint=View Commands Used in Report Output
+            ...    details=Item `${item["object"]}` generated a total of ${item["total_events"]} events, and up to ${item["events_per_minute"]} events within a 1m period.\nContaining some of the following messages and types:\n`${item["summary_messages"]}`
+            ...    next_steps=boo
+        END
+    END
+    # ${recent_anomalies}=    RW.CLI.Run Cli
+    # ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select( .count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) > ${ANOMALY_THRESHOLD}) | "Event(s) Per Minute:" + (.count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) |tostring) +" Count:" + (.count|tostring) + " Minute(s):" + (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60|tostring)+ " Object:" + .involvedObject.namespace + "/" + .involvedObject.kind + "/" + .involvedObject.name + " Reason:" + .reason + " Message:" + .message'
+    # ...    env=${env}
+    # ...    secret_file__kubeconfig=${kubeconfig}
+    # ...    render_in_commandlist=true
+    # @{event_list}=    Split String    ${recent_events.stdout}    \n
+    # FOR    ${anomaly}    IN    @{anomaly_list}
+    #    ${object}=    RW.CLI.Run Cli
+    #    ...    cmd=echo "${anomaly}" | grep -oP 'Object:\K[^ ]+'
+    #    ...    env=${env}
+    #    ...    include_in_history=False
+    #    ${reason}=    RW.CLI.Run Cli
+    #    ...    cmd=echo "${anomaly}" | grep -oP 'Reason:\K[^ ]+'
+    #    ...    env=${env}
+    #    ...    include_in_history=False
+    #    # RW.Core.Add Issue
+    #    # ...    severity=4
+    #    # ...    expected=PodDisruptionBudgets in `${NAMESPACE}` should not block regular maintenance
+    #    # ...    actual=PodDisruptionBudgets in namespace `${NAMESPACE}` are considered Risky to maintenance operations.
+    #    # ...    title=PodDisruptionBudget configured for `${risky_pdb}` in namespace `${NAMESPACE}` could be a risk.
+    #    # ...    reproduce_hint=View Commands Used in Report Output
+    #    # ...    details=${pdb_check.stdout}
+    #    # ...    next_steps=Review PodDisruptionBudget for `${risky_pdb}` to ensure it does allows pods to be evacuated and rescheduled during maintenance periods.
+    # END
+
+    # ${event_messages}=    RW.CLI.Run CLI
+    # ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r .items[].message
+    # ...    env=${env}
+    # ...    secret_file__kubeconfig=${kubeconfig}
+    # ...    include_in_history=false
+    # ${event_messages}=    Evaluate    """${event_messages.stdout}""".split("\\n")
+    # ${pod_name}=    RW.CLI.Run Cli
+    # ...    cmd=echo "${recent_anomalies.stdout}" | grep -oP '(?<=Pod/)[^ ]*' | grep -oP '[^.]*(?=-[a-z0-9]+-[a-z0-9]+)' | head -n 1
+    # ...    include_in_history=False
+    # ${next_steps}=    RW.NextSteps.Suggest    ${event_messages}
+    # ${next_steps}=    RW.NextSteps.Format    ${next_steps}
+    # ...    pod_name=${pod_name.stdout}
+    # ...    deployment_name=${pod_name.stdout}
+    # RW.CLI.Parse Cli Output By Line
+    # ...    rsp=${recent_anomalies}
+    # ...    set_severity_level=2
+    # ...    set_issue_expected=No unusual recent anomaly events with high counts in the namespace ${NAMESPACE}
+    # ...    set_issue_actual=We detected events in the namespace ${NAMESPACE} which are considered anomalies
+    # ...    set_issue_title=Event Anomalies Detected In Namespace ${NAMESPACE}
+    # ...    set_issue_details=Anomaly non-warning events in namespace ${NAMESPACE}:\n"$_stdout"
+    # ...    set_issue_next_steps=${next_steps}
+    # ...    _line__raise_issue_if_contains=Object
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add To Report    Summary Of Anomalies Detected:\n
-    RW.Core.Add To Report    ${recent_anomalies.stdout}\n
+    # RW.Core.Add To Report    ${recent_anomalies.stdout}\n
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Troubleshoot Namespace Services And Application Workloads
@@ -301,11 +352,6 @@ Troubleshoot Namespace Services And Application Workloads
     ...    logs
     ...    aggregate
     ...    filter
-    # ${aggregate_service_logs}=    RW.CLI.Run Cli
-    # ...    cmd=services=($(${KUBERNETES_DISTRIBUTION_BINARY} get svc -o=name --context=${CONTEXT} -n ${NAMESPACE})); > "logs.json"; for service in "\${services[@]}"; do ${KUBERNETES_DISTRIBUTION_BINARY} logs $service --limit-bytes=256000 --since=2h --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${SERVICE_ERROR_PATTERN}" | grep -Ev "${SERVICE_EXCLUDE_PATTERN}" | while read -r line; do service_name="\${service#*/}"; message=$(echo "$line" | jq -aRs .); printf '{"service": "%s", "message": %s}\n' "\${service#*/}" "$message" >> "logs.json"; done; done; cat "logs.json"| jq -s '[ (group_by(.service) | map({service: .[0].service, total_logs: length})), (group_by(.service) | map({service: .[0].service, top_logs: (group_by(.message[0:200]) | map({message_start: .[0].message[0:200], count: length}) | sort_by(.count) | reverse | .[0:3])})) ] | add'
-    # ...    env=${env}
-    # ...    secret_file__kubeconfig=${KUBECONFIG}
-    # ...    render_in_commandlist=true
     ${aggregate_service_logs}=    RW.CLI.Run Cli
     ...    cmd=services=($(${KUBERNETES_DISTRIBUTION_BINARY} get svc -o=name --context=${CONTEXT} -n ${NAMESPACE})) && [ \${#services[@]} -eq 0 ] && echo "No services found." || { > "logs.json"; for service in "\${services[@]}"; do ${KUBERNETES_DISTRIBUTION_BINARY} logs $service --limit-bytes=256000 --since=2h --context=${CONTEXT} -n ${NAMESPACE} 2>/dev/null | grep -Ei "${SERVICE_ERROR_PATTERN}" | grep -Ev "${SERVICE_EXCLUDE_PATTERN}" | while read -r line; do service_name="\${service#*/}"; message=$(echo "$line" | jq -aRs .); printf '{"service": "%s", "message": %s}\n' "\${service_name}" "$message" >> "logs.json"; done; done; [ ! -s "logs.json" ] && echo "No log entries found." || cat "logs.json" | jq -s '[ (group_by(.service) | map({service: .[0].service, total_logs: length})), (group_by(.service) | map({service: .[0].service, top_logs: (group_by(.message[0:200]) | map({message_start: .[0].message[0:200], count: length}) | sort_by(.count) | reverse | .[0:3])})) ] | add'; } > $HOME/output; cat $HOME/output
     ...    env=${env}
@@ -320,6 +366,7 @@ Troubleshoot Namespace Services And Application Workloads
     @{service_list}=    Split String    ${services_with_errors.stdout}
     FOR    ${service}    IN    @{service_list}
         ${service}=    Strip String    ${service}
+        ${service}=    Replace String    ${service}    \n    ${EMPTY}
         ${service_owner}=    RW.CLI.Run Cli
         ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get endpoints "${service}" -n "${NAMESPACE}" --context="${CONTEXT}" -o jsonpath='{range .subsets[*].addresses[*]}{.targetRef.name}{"\\n"}{end}' | xargs -I {} sh -c 'owner_kind=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod {} -n "${NAMESPACE}" --context="${CONTEXT}" -o=jsonpath="{.metadata.ownerReferences[0].kind}"); if [ "$owner_kind" = "ReplicaSet" ]; then replicaset=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod {} -n "${NAMESPACE}" --context="${CONTEXT}" -o=jsonpath="{.metadata.ownerReferences[0].name}"); deployment_name=$(${KUBERNETES_DISTRIBUTION_BINARY} get replicaset $replicaset -n "${NAMESPACE}" --context="${CONTEXT}" -o=jsonpath="{.metadata.ownerReferences[0].name}"); echo "Deployment $deployment_name"; else owner_info=$($owner_kind ${KUBERNETES_DISTRIBUTION_BINARY} get pod {} -n "${NAMESPACE}" --context="${CONTEXT}" -o=jsonpath="{.metadata.ownerReferences[0].name}"); echo "$owner_info"; fi' | sort | uniq
         ...    secret_file__kubeconfig=${KUBECONFIG}
@@ -328,12 +375,10 @@ Troubleshoot Namespace Services And Application Workloads
         ${owner_kind}    ${owner_name}=    Split String    ${service_owner.stdout}    ${SPACE}
         ${total_logs}=    RW.CLI.Run Cli
         ...    cmd=jq '.[] | select(.service == "${service}") | .total_logs' $HOME/output
-        ...    secret_file__kubeconfig=${KUBECONFIG}
         ...    env=${env}
         ...    include_in_history=false
         ${logs_details}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '.[] | select(.service == "${service}") | .top_logs[]? | "\(.message_start) \(.count)"' $HOME/output
-        ...    secret_file__kubeconfig=${KUBECONFIG}
+        ...    cmd=jq -r '.[] | select(.service == "${service}") |.top_logs[]? | "\\(.message_start) \\(.count)"' $HOME/output
         ...    env=${env}
         ...    include_in_history=false
         RW.Core.Add Issue
@@ -345,15 +390,6 @@ Troubleshoot Namespace Services And Application Workloads
         ...    details=Total Logs: ${total_logs.stdout}\nTop Logs:\n${logs_details.stdout}
         ...    next_steps=Check ${owner_kind} Logs for Issues with `${owner_name}`
     END
-    # RW.CLI.Parse Cli Output By Line
-    # ...    rsp=${aggregate_service_logs}
-    # ...    set_severity_level=3
-    # ...    set_issue_expected=Service workload logs in namespace ${NAMESPACE} should not contain any error entries
-    # ...    set_issue_actual=Service workload logs in namespace ${NAMESPACE} contain errors entries
-    # ...    set_issue_title=Service Workloads In Namespace ${NAMESPACE} Have Error Log Entries
-    # ...    set_issue_details=We found the following distinctly counted errors in the service workloads of namespace ${NAMESPACE}:\n\n$_stdout\n\nThese errors may be related to other workloads that need triaging
-    # ...    set_issue_next_steps=Check For Deployment Event Anomalies
-    # ...    _line__raise_issue_if_contains=Error
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add To Report    Log Summary for Services in namespace `${NAMESPACE}`:\n
     RW.Core.Add To Report    ${aggregate_service_logs.stdout}\n
@@ -452,7 +488,7 @@ Suite Initialization
     ...    description=The rate of occurence per minute at which an Event becomes classified as an anomaly, even if Kubernetes considers it informational.
     ...    pattern=\d+(\.\d+)?
     ...    example=1.0
-    ...    default=1.0
+    ...    default=5.0
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
