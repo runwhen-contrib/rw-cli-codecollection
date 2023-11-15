@@ -270,7 +270,7 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
             ...    env=${env}
             ...    include_in_history=False
             ${whereami}=    RW.CLI.Run Cli
-            ...    cmd=pwd
+            ...    cmd=find / -type d -path '*/extras/scripts/find_resource_owners.sh' -print -quit 2>/dev/null
             ...    env=${env}
             ...    include_in_history=False
             ${item_owner}=    RW.CLI.Run Cli
