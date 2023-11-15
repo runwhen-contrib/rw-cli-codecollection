@@ -173,7 +173,7 @@ def run_bash_file(
                             if not cmd_overide:
                                 cmd_overide = f"./{bash_file}"
                             else:
-                                cmd_override = cmd_override.replace(f"./{bash_file}", new_path)
+                                cmd_overide = cmd_overide.replace(f"./{bash_file}", new_path)
                             break
                         else:
                             logger.warning(f"File '{bash_file}' not found at derived path: {new_path}.")
