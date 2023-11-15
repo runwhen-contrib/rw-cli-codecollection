@@ -269,6 +269,10 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
             ...    cmd=echo "${item["object"]}" | awk -F"/" '{print $3}' | tr -d '\n'
             ...    env=${env}
             ...    include_in_history=False
+            ${whereami}=    RW.CLI.Run Cli
+            ...    cmd=pwd
+            ...    env=${env}
+            ...    include_in_history=False
             ${item_owner}=    RW.CLI.Run Cli
             ...    cmd=../../extras/scripts/find_resource_owners.sh ${object_kind.stdout} ${object_short_name.stdout} ${NAMESPACE} ${CONTEXT}
             ...    env=${env}
