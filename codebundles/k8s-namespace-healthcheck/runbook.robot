@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Trace And Troubleshoot Warning Events And Errors in Namespace '${NAMESPACE}'
+Trace And Troubleshoot Warning Events And Errors in Namespace `${NAMESPACE}`
     [Documentation]    Queries all error events in a given namespace within the last 30 minutes,
     ...    fetches the list of involved pod names, requests logs from them and parses
     ...    the logs for exceptions.
