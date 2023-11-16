@@ -239,7 +239,7 @@ Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
             ...    severity=4
             ...    expected=Objects should post a status of True in `${NAMESPACE}`
             ...    actual=Objects in `${NAMESPACE}` were found with a status of False - indicating one or more unhealthy components.
-            ...    title= ${object_kind.stdout} `${object_name.stdout}` has posted a status of `"${item["conditions"]}"`
+            ...    title= ${object_kind.stdout} `${object_name.stdout}` has posted a status of `"${item["conditions"][2]["message"]}"`
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=${object_kind.stdout} `${object_name.stdout}` is owned by ${owner_kind} `${owner_name}` and has indicated an unhealthy status.\n${item}
             ...    next_steps=${item_next_steps.stdout}
@@ -290,8 +290,12 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
             ${messages}=    Replace String    ${item["summary_messages"]}    "    ${EMPTY}
-            ${owner_kind}    ${owner_name}=    Split String    ${item_owner.stdout}    ${SPACE}
-            ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
+            IF    len($item_owner.stdout) > 0
+                ${owner_kind}    ${owner_name}=    Split String    ${item_owner.stdout}    ${SPACE}
+                ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
+            ELSE
+                ${owner_kind}    ${owner_name}=    Set Variable    ""
+            END    
             ${item_next_steps}=    RW.CLI.Run Bash File
             ...    bash_file=anomaly_next_steps.sh
             ...    cmd_overide=./anomaly_next_steps.sh "${messages}" "${owner_kind}" "${owner_name}"
