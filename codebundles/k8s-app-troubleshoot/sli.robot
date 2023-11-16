@@ -19,8 +19,15 @@ Suite Setup         Suite Initialization
 Measure Application Exceptions
     [Documentation]    Examines recent logs for exceptions, providing a count of them.
     [Tags]    resource    application    workload    logs    state    exceptions    errors
+    ${cmd}=    Set Variable
+    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get deployment,statefulset -l ${LABELS} -oname | head -n 1) --tail=100 --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
+    IF    $EXCLUDE_PATTERN != ""
+        ${cmd}=    Set Variable
+        ...    ${cmd} | grep -EiV "${EXCLUDE_PATTERN}" || true
+    END
+
     ${logs}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get deployment,statefulset -l ${LABELS} -oname | head -n 1) --tail=100 --limit-bytes=256000 --since=${LOGS_SINCE} --all-containers
+    ...    cmd=${cmd}
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -66,12 +73,27 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=15m
     ...    default=15m
+    ${EXCLUDE_PATTERN}=    RW.Core.Import User Variable
+    ...    EXCLUDE_PATTERN
+    ...    type=string
+    ...    description=Grep pattern to use to exclude exceptions that don't indicate a critical issue.
+    ...    pattern=\w*
+    ...    example=FalseError|SecondErrorToSkip
+    ...    default=FalseError|SecondErrorToSkip
+    ${CONTAINER_NAME}=    RW.Core.Import User Variable
+    ...    CONTAINER_NAME
+    ...    type=string
+    ...    description=The name of the container within the selected pod that represents the application to troubleshoot.
+    ...    pattern=\w*
+    ...    example=myapp
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${LABELS}    ${LABELS}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${LOGS_SINCE}    ${LOGS_SINCE}
+    Set Suite Variable    ${EXCLUDE_PATTERN}    ${EXCLUDE_PATTERN}
+    Set Suite Variable    ${CONTAINER_NAME}    ${CONTAINER_NAME}
     Set Suite Variable
     ...    ${env}
     ...    {"LABELS":"${LABELS}", "KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}"}

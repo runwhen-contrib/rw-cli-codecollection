@@ -20,7 +20,7 @@ Get Workload Logs
     [Documentation]    Collects the last approximately 300 lines of logs from the workload before restarting it.
     [Tags]    resource    application    workload    logs    state
     ${logs}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs deployment,statefulset -l ${LABELS} --tail=100 --limit-bytes=256000 --all-containers --since=${LOGS_SINCE}
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs deployment,statefulset -l ${LABELS} --tail=300 --limit-bytes=256000 --all-containers --since=${LOGS_SINCE}
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -41,33 +41,38 @@ Scan For Misconfigured Environment
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Troubleshoot Application Logs
+    ${cmd}=    Set Variable
+    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get deployment,statefulset -l ${LABELS} -oname | head -n 1) --tail=100 --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
+    IF    $EXCLUDE_PATTERN != ""
+        ${cmd}=    Set Variable
+        ...    ${cmd} | grep -EiV "${EXCLUDE_PATTERN}" || true
+    END
     ${logs}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=300 --limit-bytes=256000 --all-containers
+    ...    cmd=${cmd}
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${printenv}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} exec $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head -n 1) -- printenv
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} exec $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head -n 1) --container=${CONTAINER_NAME} -- printenv
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${proc_list}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} exec $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head -n 1) -- ps -eo command --no-header | grep -v "ps -eo"
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} exec $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head -n 1) --container=${CONTAINER_NAME} -- ps -eo command --no-header | grep -v "ps -eo"
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+
+    ${proc_list}=    RW.K8sApplications.Format Process List    ${proc_list.stdout}
     ${serialized_env}=    RW.K8sApplications.Serialize env    ${printenv.stdout}
-    ${logs}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs deployment,statefulset -l ${LABELS} --tail=100 --limit-bytes=256000
-    ...    render_in_commandlist=true
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
     ${parsed_exceptions}=    RW.K8sApplications.Parse Exceptions    ${logs.stdout}
-    ${exceptions_found}=    RW.K8sApplications.test
-    ...    ${REPO_URI}
-    ...    ${REPO_AUTH_TOKEN}
-    ...    ${serialized_env}
-    ...    ${proc_list.stdout}
+    ${app_repo}=    RW.K8sApplications.Clone Repo    ${REPO_URI}    ${REPO_AUTH_TOKEN}
+    ${repos}=    Create List    ${app_repo}
+    ${ts_results}=    RW.K8sApplications.Troubleshoot Application
+    ...    repos=${repos}
+    ...    exceptions=${parsed_exceptions}
+    ...    env=${serialized_env}
+    ...    process_list=${proc_list}
 
 Troubleshoot Application Endpoints
     log
@@ -135,6 +140,19 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=15m
     ...    default=15m
+    ${EXCLUDE_PATTERN}=    RW.Core.Import User Variable
+    ...    EXCLUDE_PATTERN
+    ...    type=string
+    ...    description=Grep pattern to use to exclude exceptions that don't indicate a critical issue.
+    ...    pattern=\w*
+    ...    example=FalseError|SecondErrorToSkip
+    ...    default=FalseError|SecondErrorToSkip
+    ${CONTAINER_NAME}=    RW.Core.Import User Variable
+    ...    CONTAINER_NAME
+    ...    type=string
+    ...    description=The name of the container within the selected pod that represents the application to troubleshoot.
+    ...    pattern=\w*
+    ...    example=myapp
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
@@ -144,6 +162,8 @@ Suite Initialization
     Set Suite Variable    ${REPO_AUTH_TOKEN}    ${REPO_AUTH_TOKEN}
     Set Suite Variable    ${CREATE_ISSUES}    ${CREATE_ISSUES}
     Set Suite Variable    ${LOGS_SINCE}    ${LOGS_SINCE}
+    Set Suite Variable    ${EXCLUDE_PATTERN}    ${EXCLUDE_PATTERN}
+    Set Suite Variable    ${CONTAINER_NAME}    ${CONTAINER_NAME}
     Set Suite Variable
     ...    ${env}
     ...    {"NUM_OF_COMMITS":"${NUM_OF_COMMITS}", "REPO_URI":"${REPO_URI}", "LABELS":"${LABELS}", "KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}"}

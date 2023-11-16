@@ -22,6 +22,7 @@ class GitCommit:
     author_email: str
     date: str
     message: str
+    _filesystem_path: str
     _diff: str = field(default=None, repr=False, init=False)
     _changed_files: list = field(default=None, init=False, repr=False)
 
@@ -29,25 +30,25 @@ class GitCommit:
     def changed_files(self):
         if self._changed_files is not None:
             return self._changed_files
+        changed_files_output = subprocess.run(
+            ["git", "show", "--pretty=", "--name-only", f"{self.sha}"],
+            text=True,
+            capture_output=True,
+            check=True,
+            cwd=self._filesystem_path,
+        )
+
         # changed_files_output = subprocess.run(
-        #     ["git", "show", "--pretty=", "--name-only", f"{self.sha}"],
+        #     [
+        #         "git",
+        #         "diff",
+        #         "--name-only",
+        #         "9d8696ccc4b1d280b08bcb4197a673b321ad9e7c^!",
+        #     ],
         #     text=True,
         #     capture_output=True,
         #     check=True,
         # )
-        logger.info(f"git cmd: git show {self.sha}")
-
-        changed_files_output = subprocess.run(
-            [
-                "git",
-                "diff",
-                "--name-only",
-                "9d8696ccc4b1d280b08bcb4197a673b321ad9e7c^!",
-            ],
-            text=True,
-            capture_output=True,
-            check=True,
-        )
         logger.info(f"git err: {changed_files_output.stderr}")
         logger.info(f"git stdout: {changed_files_output.stdout}")
         changed_files_output = changed_files_output.stdout
@@ -316,45 +317,22 @@ class Repository:
         )
         logger.info(f"SEARCHIN: {search_in}")
         matches: RepositorySearchResult = []
-        # skip_regex = r"^[ \t\n\r#*,(){}\[\]\"\'\']*$"
+        # avoids bad query strings submitted to fuzz lib
         skip_regex = r"^[ \t\n\r#*,(){}\[\]\"\'\':]*$"
-
         for fp in search_in:
             repo_file: RepositoryFile = self.files.files[fp]
-            # logger.info(f"repo file: {repo_file}")
-            file_content: list[str] = repo_file.content.split("\n")
-            for i, fc in enumerate(file_content):
-                line_num: int = i + 1
-                if re.match(skip_regex, fc):
-                    continue
-                extract_result = fuzzprocessor.extract(fc, search_words, limit=1)
-                # logger.info(f"{fc} -> {search_words} -> FUZZY: {extract_result}")
-                if extract_result[0][1] > search_match_score_min:
-                    matches.append(
-                        RepositorySearchResult(
-                            line_num=line_num, source_file=repo_file, related_commits=[]
-                        )
-                    )
+            # file_content: list[str] = repo_file.content.split("\n")
             # for i, fc in enumerate(file_content):
-            #     line_num = i + 1
-            #     if any(word in fc for word in search_words):
-            #         match = RepositorySearchResult(
-            #             line_num=line_num, source_file=repo_file, related_diffs=None
+            #     line_num: int = i + 1
+            #     if re.match(skip_regex, fc):
+            #         continue
+            #     extract_result = fuzzprocessor.extract(fc, search_words, limit=1)
+            #     if extract_result[0][1] > search_match_score_min:
+            #         matches.append(
+            #             RepositorySearchResult(
+            #                 line_num=line_num, source_file=repo_file, related_commits=[]
+            #             )
             #         )
-            #         matches.append(match)
-            # else:
-            #     for word in search_words:
-            #         extract_result = fuzzprocessor.extract(word, [fc], limit=5)
-            #         for er in extract_result:
-            #             if er[1] > self.SEARCH_MIN:
-            #                 match = RepositorySearchResult(
-            #                     line_num=line_num,
-            #                     source_file=repo_file,
-            #                     related_diffs=None,
-            #                 )
-            #                 matches.append(match)
-            #                 # rework intelligent fuzzy match lookup to line number
-            #                 break
             # TODO: git diff lookups
             # TODO: look at exception type lookup table
         for match_result in matches:
@@ -366,7 +344,10 @@ class Repository:
     def serialize_git_commits(self, commit_list: list) -> list[GitCommit]:
         git_commits: list[GitCommit] = []
         for commit_data in commit_list:
-            gc: GitCommit = GitCommit(**commit_data)
+            gc: GitCommit = GitCommit(
+                _filesystem_path=self.clone_directory,
+                **commit_data,
+            )
             logger.info(f"Serializing commit: {gc.sha} {gc.author_name}")
             git_commits.append(gc)
         return git_commits
