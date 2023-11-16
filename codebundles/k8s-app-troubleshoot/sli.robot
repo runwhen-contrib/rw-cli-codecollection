@@ -20,12 +20,12 @@ Measure Application Exceptions
     [Documentation]    Examines recent logs for exceptions, providing a count of them.
     [Tags]    resource    application    workload    logs    state    exceptions    errors
     ${logs}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs deployment,statefulset -l ${LABELS} --tail=100 --limit-bytes=256000 --since=${LOGS_SINCE}
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get deployment,statefulset -l ${LABELS} -oname | head -n 1) --tail=100 --limit-bytes=256000 --since=${LOGS_SINCE} --all-containers
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${parsed_exceptions}=    RW.K8sApplications.Parse Exceptions    ${logs.stdout}
-    ${count}=    Evaluate    len(${parsed_exceptions})
+    ${count}=    Evaluate    len($parsed_exceptions)
     RW.Core.Push Metric    ${count}
 
 
