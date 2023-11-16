@@ -201,7 +201,7 @@ Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
     ${object_list}=    Evaluate    json.loads(r'''${workload_info.stdout}''')    json
-    IF    len(${object_list}) > 0
+    IF    len(@{object_list}) > 0
         FOR    ${item}    IN    @{object_list}
             ${object_kind}=    RW.CLI.Run Cli
             ...    cmd=echo "${item["kind"]}"| sed 's/ *$//' | tr -d '\n'
@@ -228,36 +228,16 @@ Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
             RW.Core.Add Issue
             ...    severity=4
             ...    expected=Objects should post a status of True in `${NAMESPACE}`
-            ...    actual=Objects in `${NAMESPACE}` were found with a status of False - indicating one or more unhealthy components. 
-            ...    title= ${object_kind.stdout} `${object_name.stdout}` has posted a status of `"${item["conditions"]["reason"]}"` 
+            ...    actual=Objects in `${NAMESPACE}` were found with a status of False - indicating one or more unhealthy components.
+            ...    title= ${object_kind.stdout} `${object_name.stdout}` has posted a status of `"${item["conditions"]["reason"]}"`
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=${object_kind.stdout} `${object_name.stdout}` is owned by ${owner_kind} `${owner_name}` and has indicated an unhealthy status.\n${item}
             ...    next_steps=${item_next_steps.stdout}
         END
     END
-    # ${next_steps}=    RW.NextSteps.Suggest    ${workload_kind.stdout} ${condition.stdout}
-    # ${next_steps}=    RW.NextSteps.Format    ${next_steps}
-    # ...    ${workload_kind.stdout}_name=${workload_name.stdout}
-    # ${failing_conditions}=    RW.CLI.Parse Cli Json Output
-    # ...    rsp=${all_resources}
-    # ...    extract_path_to_var__workload_conditions=items[].{kind:kind, name:metadata.name, conditions:status.conditions[?status == `False`]}
-    # ...    from_var_with_path__workload_conditions__to__failing_workload_conditions=[?length(conditions || `[]`) > `0`]
-    # ...    from_var_with_path__failing_workload_conditions__to__aggregate_failures=[].{kind:kind,name:name,conditions:conditions[].{reason:reason, type:type, status:status}}
-    # ...    from_var_with_path__aggregate_failures__to__pods_with_failures=length(@)
-    # ...    pods_with_failures__raise_issue_if_gt=0
-    # ...    set_severity_level=1
-    # ...    set_issue_title=$pods_with_failures Pods With Unhealthy Status In Namespace ${NAMESPACE}
-    # ...    set_issue_details=Pods with unhealthy status condition in the namespace ${NAMESPACE}. Here's a summary of potential issues:\n"$aggregate_failures"
-    # ...    set_issue_next_steps=${next_steps}
-    # ...    assign_stdout_from_var=aggregate_failures
     ${history}=    RW.CLI.Pop Shell History
-    # IF    """${failing_conditions.stdout}""" == ""
-    #     ${failing_conditions}=    Set Variable    No unready pods found
-    # ELSE
-    #     ${failing_conditions}=    Set Variable    ${failing_conditions.stdout}
-    # END
     RW.Core.Add Pre To Report    Summary of Pods with Failing Conditions in Namespace `${NAMESPACE}`
-    # RW.Core.Add Pre To Report    ${failing_conditions}
+    RW.Core.Add Pre To Report    ${workload_info.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Get Listing Of Resources In Namespace `${NAMESPACE}`
@@ -282,8 +262,8 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
-    IF    len(${recent_events_by_object.stdout}) > 0
-        ${object_list}=    Evaluate    json.loads(r'''${recent_events_by_object.stdout}''')    json
+    ${object_list}=    Evaluate    json.loads(r'''${recent_events_by_object.stdout}''')    json
+    IF    len(@{object_list}) > 0
         FOR    ${item}    IN    @{object_list}
             ${object_kind}=    RW.CLI.Run Cli
             ...    cmd=echo "${item["object"]}" | awk -F"/" '{print $2}' | sed 's/ *$//' | tr -d '\n'
