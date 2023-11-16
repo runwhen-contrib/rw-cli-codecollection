@@ -188,7 +188,7 @@ Troubleshoot Failed Pods In Namespace `${NAMESPACE}`
         ${unreadypods_details}=    Set Variable    ${unreadypods_details.stdout}
     END
     RW.Core.Add Pre To Report    Summary of unready pods in namespace: ${NAMESPACE}
-    RW.Core.Add Pre To Report    ${unreadypods_details}
+    RW.Core.Add Pre To Report    ${unreadypods_details.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
