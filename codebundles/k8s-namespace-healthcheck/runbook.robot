@@ -195,11 +195,17 @@ Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
     [Documentation]    Parses all workloads in a namespace and inspects their status conditions for issues. Status conditions with a status value of False are considered an error.
     [Tags]    namespace    status    conditions    pods    reasons    workloads
     ${workload_info}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get all --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '[.items[] | {kind: .kind, name: .metadata.name, conditions: .status.conditions[]? | select(.status == "False")}][0] // null' | jq -s '.'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select(.status.conditions[]? | select(.type == "Ready" and .status == "False")) | {kind: .kind, name: .metadata.name, conditions: .status.conditions}' | jq -s '.' 
     ...    include_in_history=True
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
+    # ${workload_info}=    RW.CLI.Run Cli
+    # ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '[.items[] | {kind: .kind, name: .metadata.name, conditions: .status.conditions[]? | select(.status == "False")}][0] // null' | jq -s '.'
+    # ...    include_in_history=True
+    # ...    env=${env}
+    # ...    secret_file__kubeconfig=${kubeconfig}
+    # ...    render_in_commandlist=true
     ${object_list}=    Evaluate    json.loads(r'''${workload_info.stdout}''')    json
     IF    len(@{object_list}) > 0
         FOR    ${item}    IN    @{object_list}
@@ -225,7 +231,7 @@ Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
             END               
             ${item_next_steps}=    RW.CLI.Run Bash File
             ...    bash_file=workload_next_steps.sh
-            ...    cmd_overide=./workload_next_steps.sh "${item["conditions"]["reason"]}" "${owner_kind}" "${owner_name}"
+            ...    cmd_overide=./workload_next_steps.sh "${item["conditions"]}" "${owner_kind}" "${owner_name}"
             ...    env=${env}
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
@@ -233,7 +239,7 @@ Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
             ...    severity=4
             ...    expected=Objects should post a status of True in `${NAMESPACE}`
             ...    actual=Objects in `${NAMESPACE}` were found with a status of False - indicating one or more unhealthy components.
-            ...    title= ${object_kind.stdout} `${object_name.stdout}` has posted a status of `"${item["conditions"]["reason"]}"`
+            ...    title= ${object_kind.stdout} `${object_name.stdout}` has posted a status of `"${item["conditions"]}"`
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=${object_kind.stdout} `${object_name.stdout}` is owned by ${owner_kind} `${owner_name}` and has indicated an unhealthy status.\n${item}
             ...    next_steps=${item_next_steps.stdout}
