@@ -188,7 +188,7 @@ Troubleshoot Failed Pods In Namespace `${NAMESPACE}`
         ${unreadypods_details}=    Set Variable    ${unreadypods_details.stdout}
     END
     RW.Core.Add Pre To Report    Summary of unready pods in namespace: ${NAMESPACE}
-    RW.Core.Add Pre To Report    ${unreadypods_details.stdout}
+    RW.Core.Add Pre To Report    ${unreadypods_details}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
@@ -217,8 +217,12 @@ Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
             ...    env=${env}
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
-            ${owner_kind}    ${owner_name}=    Split String    ${item_owner.stdout}    ${SPACE}
-            ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
+            IF    len($item_owner.stdout) > 0
+                ${owner_kind}    ${owner_name}=    Split String    ${item_owner.stdout}    ${SPACE}
+                ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
+            ELSE
+                ${owner_kind}    ${owner_name}=    Set Variable    ""
+            END               
             ${item_next_steps}=    RW.CLI.Run Bash File
             ...    bash_file=workload_next_steps.sh
             ...    cmd_overide=./workload_next_steps.sh "${item["conditions"]["reason"]}" "${owner_kind}" "${owner_name}"
