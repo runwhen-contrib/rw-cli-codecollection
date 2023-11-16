@@ -173,10 +173,8 @@ def run_bash_file(
                             logger.info(f"File '{bash_file}' found at derived path: {new_path}.")
                             if cmd_overide:
                                 cmd_overide = cmd_overide.replace(f"{local_bash_file}", f"{bash_file}")
-                                logger.warning(cmd_overide)
                             else:
                                 cmd_overide = f"./{bash_file}"
-                                logger.warning(cmd_overide)
                             break
                         else:
                             logger.warning(f"File '{bash_file}' not found at derived path: {new_path}.")

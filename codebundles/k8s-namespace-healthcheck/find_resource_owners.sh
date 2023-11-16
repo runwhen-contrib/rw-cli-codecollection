@@ -45,4 +45,4 @@ while read resource_name; do
     if [ ! -z "$resource_name" ]; then
         get_owner "$resource_name" "$RESOURCE_KIND"
     fi
-done | sort | uniq
+done | sort | uniq 

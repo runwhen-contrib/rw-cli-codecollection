@@ -81,7 +81,7 @@ Get Deployment Workload Details For with `${DEPLOYMENT_NAME}` and Add to Report
     RW.Core.Add Pre To Report    Snapshot of deployment state:\n\n${deployment.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Troubleshoot Deployment Replicas for with `${DEPLOYMENT_NAME}`
+Troubleshoot Deployment Replicas for `${DEPLOYMENT_NAME}`
     [Documentation]    Pulls the replica information for a given deployment and checks if it's highly available
     ...    , if the replica counts are the expected / healthy values, and if not, what they should be.
     [Tags]
@@ -139,7 +139,7 @@ Troubleshoot Deployment Replicas for with `${DEPLOYMENT_NAME}`
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Check For Deployment Event Anomalies with with `${DEPLOYMENT_NAME}`
+Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`
     [Documentation]    Parses all events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
     [Tags]
     ...    deployment
