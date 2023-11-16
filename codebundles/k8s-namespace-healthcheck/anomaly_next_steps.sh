@@ -10,15 +10,14 @@ set -eo pipefail
 # content and frequency of the message. 
 # -----------------------------------------------------------------------------
 
-#!/bin/bash
 
 # Input: List of event messages, related owner kind, and related owner name
-event_messages="$1"
+messages="$1"
 owner_kind="$2"  
 owner_name="$3"
 
 # Process the log messages
-echo "$event_messages" | awk -F';' -v owner_kind="$owner_kind" -v owner_name="$owner_name" '
+echo "$event_messages" | awk -F';' -v owner_kind="$owner_kind" -v owner_name="$owner_name"'
 function extract_common_pattern(str1, str2,  common_pattern) {
     # Function to extract common pattern from two strings
     len1 = length(str1)
@@ -70,7 +69,10 @@ function extract_common_pattern(str1, str2,  common_pattern) {
                 print "Troubleshoot Deployment Replicas for `"owner_name"`"
                 print "Check Deployment Event Anomalies for `"owner_name"`"
             }
-
+            if (index(pattern, "Successfully assigned") != 0) {
+                print "Troubleshoot Deployment Replicas for `"owner_name"`"
+                print "Check Deployment Event Anomalies for `"owner_name"`"
+            }
             pattern_found = 1
         }
     }

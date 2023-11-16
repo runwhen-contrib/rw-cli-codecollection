@@ -194,48 +194,70 @@ Troubleshoot Failed Pods In Namespace `${NAMESPACE}`
 Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
     [Documentation]    Parses all workloads in a namespace and inspects their status conditions for issues. Status conditions with a status value of False are considered an error.
     [Tags]    namespace    status    conditions    pods    reasons    workloads
-    ${all_resources}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get all --context ${CONTEXT} -n ${NAMESPACE} -o json
+    ${workload_info}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get all --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '[.items[] | {kind: .kind, name: .metadata.name, conditions: .status.conditions[]? | select(.status == "False")}][0] // null' | jq -s '.'
+    ...    include_in_history=False
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
-    ${workload_info}=    RW.CLI.Run Cli
-    ...    cmd=cat << 'EOF' | jq -r '[.items[] | {kind: .kind, name: .metadata.name, conditions: .status.conditions[]? | select(.status == "False")}][0] // null'\n${all_resources.stdout}EOF
-    ...    include_in_history=False
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ${condition}=    RW.CLI.Run Cli
-    ...    cmd=cat << 'EOF' | jq -r '.conditions.reason' | tr -d "\n"\n${workload_info.stdout}EOF
-    ...    include_in_history=False
-    ${workload_name}=    RW.CLI.Run Cli
-    ...    cmd=cat << 'EOF' | jq -r '.name' | tr -d "\n"\n${workload_info.stdout}EOF
-    ...    include_in_history=False
-    ${workload_kind}=    RW.CLI.Run Cli
-    ...    cmd=cat << 'EOF' | jq -r '.kind' | tr -d "\n"\n${workload_info.stdout}EOF
-    ...    include_in_history=False
-    ${next_steps}=    RW.NextSteps.Suggest    ${workload_kind.stdout} ${condition.stdout}
-    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
-    ...    ${workload_kind.stdout}_name=${workload_name.stdout}
-    ${failing_conditions}=    RW.CLI.Parse Cli Json Output
-    ...    rsp=${all_resources}
-    ...    extract_path_to_var__workload_conditions=items[].{kind:kind, name:metadata.name, conditions:status.conditions[?status == `False`]}
-    ...    from_var_with_path__workload_conditions__to__failing_workload_conditions=[?length(conditions || `[]`) > `0`]
-    ...    from_var_with_path__failing_workload_conditions__to__aggregate_failures=[].{kind:kind,name:name,conditions:conditions[].{reason:reason, type:type, status:status}}
-    ...    from_var_with_path__aggregate_failures__to__pods_with_failures=length(@)
-    ...    pods_with_failures__raise_issue_if_gt=0
-    ...    set_severity_level=1
-    ...    set_issue_title=$pods_with_failures Pods With Unhealthy Status In Namespace ${NAMESPACE}
-    ...    set_issue_details=Pods with unhealthy status condition in the namespace ${NAMESPACE}. Here's a summary of potential issues we found:\n"$aggregate_failures"
-    ...    set_issue_next_steps=${next_steps}
-    ...    assign_stdout_from_var=aggregate_failures
-    ${history}=    RW.CLI.Pop Shell History
-    IF    """${failing_conditions.stdout}""" == ""
-        ${failing_conditions}=    Set Variable    No unready pods found
-    ELSE
-        ${failing_conditions}=    Set Variable    ${failing_conditions.stdout}
+    ${object_list}=    Evaluate    json.loads(r'''${workload_info.stdout}''')    json
+    IF    len(${object_list}) > 0
+        FOR    ${item}    IN    @{object_list}
+            ${object_kind}=    RW.CLI.Run Cli
+            ...    cmd=echo "${item["kind"]}"| sed 's/ *$//' | tr -d '\n'
+            ...    env=${env}
+            ...    include_in_history=False
+            ${object_name}=    RW.CLI.Run Cli
+            ...    cmd=echo "${item["name"]}" | sed 's/ *$//' | tr -d '\n'
+            ...    env=${env}
+            ...    include_in_history=False
+            ${item_owner}=    RW.CLI.Run Bash File
+            ...    bash_file=find_resource_owners.sh
+            ...    cmd_overide=./find_resource_owners.sh ${object_kind.stdout} ${object_name.stdout} ${NAMESPACE} ${CONTEXT}
+            ...    env=${env}
+            ...    secret_file__kubeconfig=${kubeconfig}
+            ...    include_in_history=False
+            ${owner_kind}    ${owner_name}=    Split String    ${item_owner.stdout}    ${SPACE}
+            ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
+            ${item_next_steps}=    RW.CLI.Run Bash File
+            ...    bash_file=workload_next_steps.sh
+            ...    cmd_overide=./workload_next_steps.sh "${item["conditions"]["reason"]}" "${owner_kind}" "${owner_name}"
+            ...    env=${env}
+            ...    secret_file__kubeconfig=${kubeconfig}
+            ...    include_in_history=False
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    expected=Objects should post a status of True in `${NAMESPACE}`
+            ...    actual=Objects in `${NAMESPACE}` were found with a status of False - indicating one or more unhealthy components. 
+            ...    title= ${object_kind.stdout} `${object_name.stdout}` has posted a status of `"${item["conditions"]["reason"]}"` 
+            ...    reproduce_hint=View Commands Used in Report Output
+            ...    details=${object_kind.stdout} `${object_name.stdout}` is owned by ${owner_kind} `${owner_name}` and has indicated an unhealthy status.\n${item}
+            ...    next_steps=${item_next_steps.stdout}
+        END
     END
-    RW.Core.Add Pre To Report    Summary of Pods with Failing Conditions in Namespace: ${NAMESPACE}
-    RW.Core.Add Pre To Report    ${failing_conditions}
+    # ${next_steps}=    RW.NextSteps.Suggest    ${workload_kind.stdout} ${condition.stdout}
+    # ${next_steps}=    RW.NextSteps.Format    ${next_steps}
+    # ...    ${workload_kind.stdout}_name=${workload_name.stdout}
+    # ${failing_conditions}=    RW.CLI.Parse Cli Json Output
+    # ...    rsp=${all_resources}
+    # ...    extract_path_to_var__workload_conditions=items[].{kind:kind, name:metadata.name, conditions:status.conditions[?status == `False`]}
+    # ...    from_var_with_path__workload_conditions__to__failing_workload_conditions=[?length(conditions || `[]`) > `0`]
+    # ...    from_var_with_path__failing_workload_conditions__to__aggregate_failures=[].{kind:kind,name:name,conditions:conditions[].{reason:reason, type:type, status:status}}
+    # ...    from_var_with_path__aggregate_failures__to__pods_with_failures=length(@)
+    # ...    pods_with_failures__raise_issue_if_gt=0
+    # ...    set_severity_level=1
+    # ...    set_issue_title=$pods_with_failures Pods With Unhealthy Status In Namespace ${NAMESPACE}
+    # ...    set_issue_details=Pods with unhealthy status condition in the namespace ${NAMESPACE}. Here's a summary of potential issues:\n"$aggregate_failures"
+    # ...    set_issue_next_steps=${next_steps}
+    # ...    assign_stdout_from_var=aggregate_failures
+    ${history}=    RW.CLI.Pop Shell History
+    # IF    """${failing_conditions.stdout}""" == ""
+    #     ${failing_conditions}=    Set Variable    No unready pods found
+    # ELSE
+    #     ${failing_conditions}=    Set Variable    ${failing_conditions.stdout}
+    # END
+    RW.Core.Add Pre To Report    Summary of Pods with Failing Conditions in Namespace `${NAMESPACE}`
+    # RW.Core.Add Pre To Report    ${failing_conditions}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Get Listing Of Resources In Namespace `${NAMESPACE}`
@@ -254,8 +276,9 @@ Get Listing Of Resources In Namespace `${NAMESPACE}`
 Check Event Anomalies in Namespace `${NAMESPACE}`
     [Documentation]    Fetches non warning events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
     [Tags]    namespace    events    info    state    anomolies    count    occurences
+    ## FIXME - the calculation of events per minute is still wrong and needs deeper inspection, akin to something like a histogram
     ${recent_events_by_object}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json > $HOME/events.json && cat $HOME/events.json | jq -r '[.items[] | {namespace: .involvedObject.namespace, kind: .involvedObject.kind, name: (.involvedObject.name | split("-")[0]), count: .count, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, reason: .reason, message: .message}] | group_by(.namespace, .kind, .name) | .[] | {(.[0].namespace + "/" + .[0].kind + "/" + .[0].name): {total_count: ([.[] | .count] | add), events: .}}' | jq -r --argjson threshold "${ANOMALY_THRESHOLD}" 'to_entries[] | {object: .key, total_count: .value.total_count, events: .value.events} | {object: .object, most_recent_timestamp: (reduce .events[] as $event ("1970-01-01T00:00:00Z"; if ($event.lastTimestamp > .) then $event.lastTimestamp else . end)), events_per_minute: (reduce .events[] as $event (0; . + ($event.count / (((($event.lastTimestamp | fromdateiso8601) - ($event.firstTimestamp | fromdateiso8601)) / 60) | if . == 0 then 1 else . end))) | floor), total_events: .total_count, summary_messages: [.events[] | .message] | unique | join("; ")} | select(.events_per_minute > $threshold)' | jq -s '.'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json > $HOME/events.json && cat $HOME/events.json | jq -r '[.items[] | {namespace: .involvedObject.namespace, kind: .involvedObject.kind, name: (.involvedObject.name | split("-")[0]), count: .count, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, reason: .reason, message: .message}] | group_by(.namespace, .kind, .name) | .[] | {(.[0].namespace + "/" + .[0].kind + "/" + .[0].name): {events: .}}' | jq -r --argjson threshold "${ANOMALY_THRESHOLD}" 'to_entries[] | {object: .key, oldest_timestamp: ([.value.events[] | .firstTimestamp] | min), most_recent_timestamp: (reduce .value.events[] as $event (.value.firstTimestamp; if ($event.lastTimestamp > .) then $event.lastTimestamp else . end)), events_per_minute: (reduce .value.events[] as $event (0; . + ($event.count / (((($event.lastTimestamp | fromdateiso8601) - ($event.firstTimestamp | fromdateiso8601)) / 60) | if . == 0 then 1 else . end))) | floor), total_events: (reduce .value.events[] as $event (0; . + $event.count)), summary_messages: [.value.events[] | .message] | unique | join("; ")} | select(.events_per_minute > $threshold)' | jq -s '.'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
@@ -278,17 +301,17 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
             ...    include_in_history=False
             ${messages}=    Replace String    ${item["summary_messages"]}    "    ${EMPTY}
             ${owner_kind}    ${owner_name}=    Split String    ${item_owner.stdout}    ${SPACE}
-            ${owner_name}=     Replace String    ${owner_name}    \n    ${EMPTY}
+            ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
             ${item_next_steps}=    RW.CLI.Run Bash File
-            ...    bash_file=event_next_steps.sh
-            ...    cmd_overide=./event_next_steps.sh "${messages}" "${owner_kind}" "${owner_name}"
+            ...    bash_file=anomaly_next_steps.sh
+            ...    cmd_overide=./anomaly_next_steps.sh "${messages}" "${owner_kind}" "${owner_name}"
             ...    env=${env}
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
             RW.Core.Add Issue
             ...    severity=4
-            ...    expected=PodDisruptionBudgets in `${NAMESPACE}` should not block regular maintenance
-            ...    actual=PodDisruptionBudgets in namespace `${NAMESPACE}` are considered Risky to maintenance operations.
+            ...    expected=Normal events should not frequently repeat in `${NAMESPACE}`
+            ...    actual=Frequently events may be repeating in `${NAMESPACE}` which could indicate potential issues.
             ...    title= ${owner_kind} `${owner_name}` generated ${item["events_per_minute"]} events within a 1m period and should be reviewed.
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=Item `${item["object"]}` generated a total of ${item["total_events"]} events, and up to ${item["events_per_minute"]} events within a 1m period.\nContaining some of the following messages and types:\n`${item["summary_messages"]}`
@@ -338,6 +361,7 @@ Troubleshoot Services And Application Workloads in Namespace `${NAMESPACE}`
         ...    env=${env}
         ...    include_in_history=false
         ${owner_kind}    ${owner_name}=    Split String    ${service_owner.stdout}    ${SPACE}
+        ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
         ${total_logs}=    RW.CLI.Run Cli
         ...    cmd=jq '.[] | select(.service == "${service}") | .total_logs' $HOME/output
         ...    env=${env}
