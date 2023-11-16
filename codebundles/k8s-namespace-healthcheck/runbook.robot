@@ -196,7 +196,7 @@ Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
     [Tags]    namespace    status    conditions    pods    reasons    workloads
     ${workload_info}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get all --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '[.items[] | {kind: .kind, name: .metadata.name, conditions: .status.conditions[]? | select(.status == "False")}][0] // null' | jq -s '.'
-    ...    include_in_history=False
+    ...    include_in_history=True
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
