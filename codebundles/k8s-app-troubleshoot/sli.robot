@@ -23,7 +23,7 @@ Measure Application Exceptions
     ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get deployment,statefulset -l ${LABELS} -oname | head -n 1) --tail=100 --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     IF    $EXCLUDE_PATTERN != ""
         ${cmd}=    Set Variable
-        ...    ${cmd} | grep -EiV "${EXCLUDE_PATTERN}" || true
+        ...    ${cmd} | grep -Eiv "${EXCLUDE_PATTERN}" || true
     END
 
     ${logs}=    RW.CLI.Run Cli
