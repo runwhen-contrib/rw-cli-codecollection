@@ -21,6 +21,10 @@ if [[ $messages =~ "ContainersNotReady" && $owner_kind == "Deployment" ]]; then
     next_steps+=("Troubleshoot Deployment Replicas for \`$owner_name\`")
 fi
 
+if [[ $messages =~ "ImagePullBackoff" || $messages =~ "Back-off pulling image" ]]; then
+    next_steps+=("List ImagePullBackoff Events and Test Path and Tags for Namespace \`$owner_name\`")
+    next_steps+=("List Images and Tags for Every Container in Failed Pods for Namespace \`$owner_name\`")
+fi
 
 # Display the list of recommendations
 for next_step in "${next_steps[@]}"; do
