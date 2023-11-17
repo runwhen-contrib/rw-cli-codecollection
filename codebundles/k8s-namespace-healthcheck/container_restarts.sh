@@ -167,43 +167,43 @@ printf "Container Restart Analysis: \n"
 for item in "${container_restarts_dict[@]}"; do
     # Extract the exit code explanation from the container
     exit_code_explanation=$(jq -r '.item.containers[0].exit_code_explanation' <<< "$item")
-    pod_name=(echo "$item" | jq -r .item.pod_name)
+    pod_name=$(jq -r .item.pod_name <<< "$item")
     owner=$(find_resource_owner $pod_name)
-    owner_kind=$(echo $owner | jq -r '.kind')
-    owner_name=$(echo $owner | jq -r '.metadata.name')
+    owner_kind=$(jq -r '.kind' <<< "$item")
+    owner_name=$(jq -r '.metadata.name' <<< "$item")
     # Use a case statement to check the exit code and perform actions or recommendations
     case "$exit_code_explanation" in
         "Success")
-            exit_code_success $(echo "$item" | jq -r .item.pod_name)
+            exit_code_success $pod_name
             ;;
         "Error")
             echo "Container exited with an error code."
             # Add your action for Error here
-            recommendations+=("Check $owner_kind Log for Issues with `$owner_name`")
+            recommendations+=("Check $owner_kind Log for Issues with \`$owner_name\`")
             ;;
         "Misconfiguration")
             echo "Container stopped due to misconfiguration"
             # Add your action for Misconfiguration here
-            recommendations+=("Review $owner_kind `$owner_name` configuration for any mistakes. Ensure environment variables, volume mounts, and resource limits are correctly set.")
+            recommendations+=("Review $owner_kind \`$owner_name\` configuration for any mistakes. Ensure environment variables, volume mounts, and resource limits are correctly set.")
             ;;
         "Pod terminated by SIGINT")
             echo "Container received SIGINT signal, indicating an interrupted process."
             # Add your action for SIGINT here
-            recommendations+=("Check $owner_kind Event Anomalies for `$owner_name`")
+            recommendations+=("Check $owner_kind Event Anomalies for \`$owner_name\`")
             recommendations+=("If SIGINT is frequently occuring, escalate to the service or infrastructure owner for further investigation.")
             ;;
         "Abnormal Termination SIGABRT")
             echo "Container terminated abnormally with SIGABRT signal."
             # Add your action for SIGABRT here
-            recommendations+=("Check $owner_kind Log for Issues with `$owner_name`")
+            recommendations+=("Check $owner_kind Log for Issues with \`$owner_name\`")
             recommendations+=("SIGABRT is usually a serious error. If it doesn't appear application related, escalate to the service or infrastructure owner for further investigation.")
             ;;
         "Pod terminated by SIGKILL - Possible OOM")
             echo "Container terminated by SIGKILL, possibly due to Out Of Memory. Check if the container exceeded its memory limit. Consider increasing memory allocation or optimizing the application for better memory usage."
             # Add your action for SIGKILL - Possible OOM here
-            recommendations+=("Check $owner_kind Log for Issues with `$owner_name`")
-            recommendations+=("Get Pod Resource Utilization with Top in Namespace `$NAMESPACE`")
-            recommendations+=("Show Pods Without Resource Limit or Resource Requests Set in Namespace `$NAMESPACE`")
+            recommendations+=("Check $owner_kind Log for Issues with \`$owner_name\`")
+            recommendations+=("Get Pod Resource Utilization with Top in Namespace \`$NAMESPACE\`")
+            recommendations+=("Show Pods Without Resource Limit or Resource Requests Set in Namespace \`$NAMESPACE\`")
             ;;
         "Graceful Termination SIGTERM")
             echo "Container received SIGTERM signal for graceful termination.Ensure that the container's shutdown process is handling SIGTERM correctly. This may be a normal part of the pod lifecycle."
@@ -211,9 +211,10 @@ for item in "${container_restarts_dict[@]}"; do
             recommendations+=("If SIGTERM is frequently occuring, escalate to the service or infrastructure owner for further investigation.")
             ;;
         *)
-            echo "Unknown exit code: $exit_code_explanation"
+            echo "Unknown exit code for pod \`$pod_name\`: $exit_code_explanation"
+            echo "$item"
             # Handle unknown exit codes here
-            recommendations+=("Unknown exit code. Escalate to the service or infrastructure owner for further investigation.")
+            recommendations+=("Unknown exit code for pod \`$pod_name\`. Escalate to the service or infrastructure owner for further investigation.")
             ;;
     esac
 done

@@ -73,6 +73,13 @@ function extract_common_pattern(str1, str2,  common_pattern) {
                 print "Troubleshoot Deployment Replicas for `"owner_name"`"
                 print "Check Deployment Event Anomalies for `"owner_name"`"
             }
+            if (index(pattern, "Back-off pulling image") != 0) {
+                print "List ImagePullBackoff Events and Test Path and Tags for Namespace `"$NAMESPACE"`"
+                print "List Images and Tags for Every Container in Failed Pods for Namespace `"$NAMESPACE`""
+            }
+            if (index(pattern, "Saw completed job") != 0) {
+                print "This indicates a healthy log message and likely requires no further investigation. Review issue details for confirmation."
+            }
             pattern_found = 1
         }
     }
