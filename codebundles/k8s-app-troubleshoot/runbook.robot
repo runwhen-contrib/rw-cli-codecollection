@@ -89,8 +89,20 @@ Troubleshoot Application Logs
     ${issue_link}=    Set Variable    \n
     IF    "${CREATE_ISSUES}" == "YES"
         ${issue_link}=    RW.K8sApplications.Create Github Issue    ${repos[0]}    ${full_report}
+        RW.Core.Add Pre To Report    \n${issue_link}
     END
-    RW.Core.Add Pre To Report    \n${issue_link}
+    ${nextsteps}=    Evaluate
+    ...    "View the currently opened issue related to this application: ${issue_link}" if len($issue_link) > 5 else "View the provided report for links to the source code related to the exceptions found. "
+    IF    (len($parsed_exceptions)) > 0
+        RW.Core.Add Issue
+        ...    severity=3
+        ...    expected=No exceptions were found in the parsed logs of workload ${CONTAINER_NAME}
+        ...    actual=Found exceptions in the workload logs of ${CONTAINER_NAME}
+        ...    reproduce_hint=Run:\n${cmd}\n view logs results for exceptions.
+        ...    title=Found exception in ${CONTAINER_NAME} logs
+        ...    details=${full_report}
+        ...    next_steps=${nextsteps}
+    END
 
 # TODO: implement tasks:
 # Troubleshoot Application Endpoints
