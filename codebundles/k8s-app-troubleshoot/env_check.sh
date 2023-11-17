@@ -31,7 +31,7 @@ if [ -z "$NAMESPACE" ] || [ -z "$CONTEXT" ] || [ -z "$LABELS" ] || [ -z "$REPO_U
     exit 1
 fi
 
-APPLOGS=$(kubectl -n ${NAMESPACE} --context ${CONTEXT} logs deployment,statefulset -l ${LABELS} --all-containers --tail=50 --limit-bytes=256000 | grep -i env || true)
+APPLOGS=$(kubectl -n ${NAMESPACE} --context ${CONTEXT} logs $(kubectl --context=${CONTEXT} -n ${NAMESPACE} get deployment,statefulset -l ${LABELS} -oname | head -n 1) --all-containers --tail=50 --limit-bytes=256000 | grep -i env || true)
 APP_REPO_PATH=/tmp/app_repo
 git clone $REPO_URI $APP_REPO_PATH || true
 cd $APP_REPO_PATH
