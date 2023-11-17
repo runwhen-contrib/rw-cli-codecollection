@@ -80,8 +80,17 @@ Troubleshoot Application Logs
     ...    env=${serialized_env}
     ...    process_list=${proc_list}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    ${ts_results}
-    RW.Core.Add Pre To Report    Here's the command used to collect the exception data:\n${history}
+    ${full_report}=    Evaluate    $ts_results.get("report")
+    ${found_exceptions}=    Evaluate    $ts_results.get("found_exceptions")
+    ${full_report}=    Set Variable
+    ...    ${full_report}\nHere's the command used to collect the exception data:\n${history}
+    RW.Core.Add Pre To Report    ${full_report}
+
+    ${issue_link}=    Set Variable    \n
+    IF    "${CREATE_ISSUES}" == "YES"
+        ${issue_link}=    RW.K8sApplications.Create Github Issue    ${repos[0]}    ${full_report}
+    END
+    RW.Core.Add Pre To Report    \n${issue_link}
 
 # TODO: implement tasks:
 # Troubleshoot Application Endpoints

@@ -4,6 +4,7 @@ import logging
 import json
 import re
 import dateutil.parser
+import requests
 
 from datetime import datetime
 from typing import List, Optional
@@ -382,47 +383,40 @@ class Repository:
                     commits.append(commit_dict)
         return commits
 
-    def create_issue(self, title, body):
-        # TODO: convert to rw.cli
+    def list_issues(self, state="open"):
         url = f"https://api.github.com/repos/{self.repo_owner}/{self.repo_name}/issues"
-        data = {"title": title, "body": body}
-        result = subprocess.run(
-            [
-                "curl",
-                "-L",
-                "-X",
-                "POST",
-                "-H",
-                f"Authorization: token {self.auth_token}",
-                "-H",
-                "Accept: application/vnd.github.v3+json",
-                "-d",
-                json.dumps(data),
-                url,
-            ],
-            capture_output=True,
-            text=True,
-        )
-        if result.stderr:
-            print("Error:", result.stderr)
+        headers = {
+            "Authorization": f"token {self.auth_token}",
+            "Accept": "application/vnd.github.v3+json",
+        }
+        params = {"state": state}
 
-    def list_issues(self):
-        # TODO: convert to rw.cli
+        response = requests.get(url, headers=headers, params=params)
+
+        if response.status_code != 200:
+            logger.warning(f"Error: {response.status_code}")
+            return {}
+
+        return response.json()
+
+    def create_issue(self, title, body=None, labels=None, assignees=None):
         url = f"https://api.github.com/repos/{self.repo_owner}/{self.repo_name}/issues"
-        result = subprocess.run(
-            [
-                "curl",
-                "-L",
-                "-H",
-                f"Authorization: token {self.auth_token}",
-                "-H",
-                "Accept: application/vnd.github.v3+json",
-                url,
-            ],
-            capture_output=True,
-            text=True,
-        )
-        if result.stderr:
-            print("Error:", result.stderr)
-        results = json.loads(result.stdout)
-        return results
+        headers = {
+            "Authorization": f"token {self.auth_token}",
+            "Accept": "application/vnd.github.v3+json",
+        }
+        data = {"title": title}
+        if body:
+            data["body"] = body
+        if labels:
+            data["labels"] = labels
+        if assignees:
+            data["assignees"] = assignees
+
+        response = requests.post(url, headers=headers, json=data)
+
+        if response.status_code != 201:
+            logger.warning(f"Error: {response.status_code}, {response.text}")
+            return {}
+
+        return response.json()

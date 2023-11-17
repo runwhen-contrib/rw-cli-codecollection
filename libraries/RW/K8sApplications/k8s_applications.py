@@ -24,6 +24,8 @@ logger = logging.getLogger(__name__)
 THIS_DIR: str = "/".join(__file__.split("/")[:-1])
 MAX_LOG_LINES: int = 325
 
+RUNWHEN_ISSUE_KEYWORD: str = "[RunWhen]"
+
 
 def format_process_list(proc_list: str) -> list:
     if proc_list:
@@ -101,7 +103,7 @@ def troubleshoot_application(
     exceptions: list[StackTraceData],
     env: dict = {},
     process_list: list[str] = [],
-) -> str:
+) -> dict:
     logger.info(f"Received following repo(s) to troubleshoot: {repos}")
     logger.info(f"Received following parsed exceptions to troubleshoot: {exceptions}")
     search_words: list[str] = []
@@ -132,10 +134,15 @@ def troubleshoot_application(
             rsr_report += f"\n{rsr.source_file.git_file_url}\n"
             for commit in rsr.related_commits:
                 rsr_report += f"\t{repo.repo_url}/commit/{commit.sha}\n"
+        src_files_title = (
+            "Found associated files in exception stacktrace data:"
+            if rsr_report
+            else "No relevant source code or diffs could be found in the exception data."
+        )
         report += f"""
 Repository URL(s): {repo.source_uri}
 
-Found associated files in exception stacktrace data:
+{src_files_title}
 {rsr_report}
 
 """
@@ -146,9 +153,38 @@ Found associated files in exception stacktrace data:
         if count > max_count:
             max_count = count
             most_common_exception = exception_occurences[hashed_exception]["content"]
-    report += f"""
+    report += (
+        f"""
 This is the most common exception found:
 {most_common_exception}
 """
+        if most_common_exception
+        else "No common exceptions could be parsed. Try running the log command provided."
+    )
+    return {
+        "report": report,
+        "found_exceptions": (True if most_common_exception else False),
+    }
 
-    return report
+
+def create_github_issue(repo: Repository, content: str) -> str:
+    already_open: bool = False
+    issues = repo.list_issues()
+    report_url = None
+    for issue in issues:
+        title = issue["title"]
+        url = issue["html_url"]
+        if RUNWHEN_ISSUE_KEYWORD in title:
+            already_open = True
+            report_url = url
+    if not already_open:
+        data = repo.create_issue(
+            title=f"{RUNWHEN_ISSUE_KEYWORD} Application Issue",
+            body=content,
+        )
+        if "html_url" in data:
+            report_url = data["html_url"]
+    if report_url:
+        return f"Here's a link to an open GitHub issue for application exceptions: {report_url}"
+    else:
+        return "No related GitHub issue could be found."
