@@ -34,7 +34,7 @@ Fetch Ingress Object Health in Namespace
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    include_in_history=false
-    ${unhealthy_object_list}=  Split String  ${unhealthy_objects.stdout}  ------------
+    ${unhealthy_object_list}=      Split String  ${unhealthy_objects.stdout}  ------------
     IF    len($unhealthy_object_list) > 0  
         FOR    ${item}    IN    @{unhealthy_object_list}
             ${ingress_name}=    RW.CLI.Run Cli
@@ -74,7 +74,7 @@ Check for Ingress and Service Conflicts in Namespace
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
     ${matches}=    Get Lines Matching Regexp    ${ingress_object_conflict.stdout}    ^WARNING: Ingress [\\w-]+.*
-
+    IF    len($matches) > 0
         @{lines}=    Create List    ${matches}
         FOR    ${line}    IN    @{lines}    IF    len($matches) > 0  
             ${ingress_name}=    RW.CLI.Run Cli
