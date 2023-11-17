@@ -17,7 +17,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check Deployment Log For Issues
     [Documentation]    Fetches recent logs for the given deployment in the namespace and checks the logs output for issues.
-    [Tags]    fetch    log    pod    container    errors    inspect    trace    info    deployment    <service_name>
+    [Tags]    fetch    log    pod    container    errors    inspect    trace    info    deployment
     ${logs}=    RW.CLI.Run Bash File
     ...    bash_file=deployment_logs.sh
     ...    env=${env}
@@ -47,7 +47,7 @@ Check Deployment Log For Issues
 
 Troubleshoot Deployment Warning Events
     [Documentation]    Fetches warning events related to the deployment workload in the namespace and triages any issues found in the events.
-    [Tags]    events    workloads    errors    warnings    get    deployment    <service_name>
+    [Tags]    events    workloads    errors    warnings    get    deployment
     ${events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} --field-selector type=Warning | grep -i "${DEPLOYMENT_NAME}" || true
     ...    env=${env}
@@ -71,7 +71,7 @@ Troubleshoot Deployment Warning Events
 
 Get Deployment Workload Details For Report
     [Documentation]    Fetches the current state of the deployment for future review in the report.
-    [Tags]    deployment    details    manifest    info    <service_name>
+    [Tags]    deployment    details    manifest    info
     ${deployment}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o yaml
     ...    env=${env}
@@ -149,7 +149,6 @@ Check For Deployment Event Anomalies
     ...    anomolies
     ...    count
     ...    occurences
-    ...    <service_name>
     ...    we found the following distinctly counted errors in the service workloads of namespace
     ...    connection error
     ${recent_anomalies}=    RW.CLI.Run Cli
