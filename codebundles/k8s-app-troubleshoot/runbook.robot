@@ -20,7 +20,7 @@ Get Workload Logs
     [Documentation]    Collects the last approximately 300 lines of logs from the workload before restarting it.
     [Tags]    resource    application    workload    logs    state
     ${logs}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs deployment,statefulset -l ${LABELS} --tail=300 --limit-bytes=256000 --all-containers --since=${LOGS_SINCE}
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get deployment,statefulset -l ${LABELS} -oname | head -n 1) --tail=300 --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
