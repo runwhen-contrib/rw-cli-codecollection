@@ -92,7 +92,7 @@ Troubleshoot Application Logs
         RW.Core.Add Pre To Report    \n${issue_link}
     END
     ${nextsteps}=    Evaluate
-    ...    "View the currently opened issue related to this application: ${issue_link}" if len($issue_link) > 5 else "View the provided report for links to the source code related to the exceptions found. "
+    ...    "${issue_link}" if len($issue_link) > 5 else "View the summary in details for possible links to the source code related to the exceptions found in the ${CONTAINER_NAME} application."
     IF    (len($parsed_exceptions)) > 0
         RW.Core.Add Issue
         ...    severity=3
