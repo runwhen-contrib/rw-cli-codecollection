@@ -203,7 +203,7 @@ class Repository:
         repo_name = self.source_uri.split("/")[-1]
         if repo_name.endswith(".git"):
             repo_name = repo_name[:-4]
-        self.clone_directory = f"./{repo_name}"
+        self.clone_directory = f"/tmp/{repo_name}"
 
         # Ensure the target directory is clean or use cache
         if os.path.exists(self.clone_directory) and cache:
@@ -224,9 +224,9 @@ class Repository:
                 "Unsupported Git URI. Please use HTTPS URL for cloning with a token."
             )
 
-        if not cache:
+        if not os.path.exists(self.clone_directory):
             # Execute the Git clone command with the modified URI
-            subprocess.run(
+            gitcmd = subprocess.run(
                 [
                     "git",
                     "clone",
@@ -240,6 +240,10 @@ class Repository:
                 env={"GIT_TERMINAL_PROMPT": "0"},
             )
 
+        if not os.path.exists(self.clone_directory):
+            logger.error(
+                f"Could not create git repo, stdout: {gitcmd.stdout} stderr: {gitcmd.stderr}"
+            )
         self.create_file_list()
         self.commit_history = self.serialize_git_commits(
             self.get_git_log(num_commits_history)
