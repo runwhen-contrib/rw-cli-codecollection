@@ -203,7 +203,7 @@ class Repository:
         repo_name = self.source_uri.split("/")[-1]
         if repo_name.endswith(".git"):
             repo_name = repo_name[:-4]
-        self.clone_directory = f"/tmp/{repo_name}"
+        self.clone_directory = f"./{repo_name}"
 
         # Ensure the target directory is clean or use cache
         if os.path.exists(self.clone_directory) and cache:
