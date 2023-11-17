@@ -55,6 +55,7 @@ class GitCommit:
             text=True,
             capture_output=True,
             check=True,
+            cwd=self._clone_directory,
         ).stdout
         # Cache the diff
         self._diff = diff_output
@@ -223,8 +224,8 @@ class Repository:
             raise ValueError(
                 "Unsupported Git URI. Please use HTTPS URL for cloning with a token."
             )
-        test = subprocess.run(["git", "--help"], check=True)
-        logger.info(f"{test.stdout}::{test.stderr}")
+        # test = subprocess.run(["git", "--help"], check=True)
+        # logger.info(f"{test.stdout}::{test.stderr}")
         if not os.path.exists(f"{self.clone_directory}/.git"):
             # Execute the Git clone command with the modified URI
             gitcmd = subprocess.run(

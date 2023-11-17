@@ -20,7 +20,7 @@ Get Workload Logs
     [Documentation]    Collects the last approximately 300 lines of logs from the workload before restarting it.
     [Tags]    resource    application    workload    logs    state
     ${logs}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get deployment,statefulset -l ${LABELS} -oname | head -n 1) --tail=300 --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get deployment,statefulset -l ${LABELS} -oname | head -n 1) --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -44,7 +44,7 @@ Troubleshoot Application Logs
     [Documentation]    Performs an inspection on container logs for exceptions, parsing those exceptions and attempts to find relevant source code information
     [Tags]    application    debug    errors    troubleshoot    workload
     ${cmd}=    Set Variable
-    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get deployment,statefulset -l ${LABELS} -oname | head -n 1) --tail=100 --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
+    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get deployment,statefulset -l ${LABELS} -oname | head -n 1) --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     IF    $EXCLUDE_PATTERN != ""
         ${cmd}=    Set Variable
         ...    ${cmd} | grep -Eiv "${EXCLUDE_PATTERN}" || true
@@ -171,6 +171,13 @@ Suite Initialization
     ...    description=The name of the container within the selected pod that represents the application to troubleshoot.
     ...    pattern=\w*
     ...    example=myapp
+    ${MAX_LOG_LINES}=    RW.Core.Import User Variable
+    ...    MAX_LOG_LINES
+    ...    type=string
+    ...    description=The max number of log lines to request from Kubernetes workloads to be parsed. Setting this too high can adversely effect performance.
+    ...    pattern=\w*
+    ...    example=300
+    ...    default=300
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
@@ -183,6 +190,7 @@ Suite Initialization
     Set Suite Variable    ${EXCLUDE_PATTERN}    ${EXCLUDE_PATTERN}
     Set Suite Variable    ${CONTAINER_NAME}    ${CONTAINER_NAME}
     Set Suite Variable    ${NUM_OF_COMMITS}    ${NUM_OF_COMMITS}
+    Set Suite Variable    ${MAX_LOG_LINES}    ${MAX_LOG_LINES}
     Set Suite Variable
     ...    ${env}
     ...    {"NUM_OF_COMMITS":"${NUM_OF_COMMITS}", "REPO_URI":"${REPO_URI}", "LABELS":"${LABELS}", "KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}"}

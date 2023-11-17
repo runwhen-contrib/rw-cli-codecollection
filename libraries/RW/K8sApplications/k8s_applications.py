@@ -22,7 +22,7 @@ from RW.Core import Core
 
 logger = logging.getLogger(__name__)
 THIS_DIR: str = "/".join(__file__.split("/")[:-1])
-MAX_LOG_LINES: int = 325
+MAX_LOG_LINES: int = 1025
 
 RUNWHEN_ISSUE_KEYWORD: str = "[RunWhen]"
 
