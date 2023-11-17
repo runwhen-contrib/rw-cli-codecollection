@@ -151,50 +151,54 @@ Troubleshoot Pending Pods In Namespace `${NAMESPACE}`
     ${pendind_pod_list}=    Split String  ${pending_pods.stdout}  ------------
     IF    len($pendind_pod_list) > 0  
         FOR    ${item}    IN    @{pendind_pod_list}
-            ${pod_name}=    RW.CLI.Run Cli
-            ...    cmd=echo '${item}' | grep pod_name: | sed 's/^pod_name: //' | sed 's/ *$//' | tr -d '\n'
-            ...    env=${env}
-            ...    include_in_history=false
-            ${pod_message}=    RW.CLI.Run Cli
-            ...    cmd=echo '${item}' | grep message: | sed 's/^message: //' | sed 's/ *$//' | tr -d '\n'| sed 's/\"//g'
-            ...    env=${env}
-            ...    include_in_history=false
-            ${container_message}=    RW.CLI.Run Cli
-            ...    cmd=echo '${item}' | grep containerMessage: | sed 's/^containerMessage: //' | sed 's/ *$//' | tr -d '\n'| sed 's/\"//g'
-            ...    env=${env}
-            ...    include_in_history=false
-            ${container_reason}=    RW.CLI.Run Cli
-            ...    cmd=echo '${item}' | grep containerReason: | sed 's/^containerReason: //' | sed 's/ *$//' | tr -d '\n'| sed 's/\"//g'
-            ...    env=${env}
-            ...    include_in_history=false
-            ${item_owner}=    RW.CLI.Run Bash File
-            ...    bash_file=find_resource_owners.sh
-            ...    cmd_overide=./find_resource_owners.sh Pod ${pod_name.stdout} ${NAMESPACE} ${CONTEXT}
-            ...    env=${env}
-            ...    secret_file__kubeconfig=${kubeconfig}
-            ...    include_in_history=False
-            IF    len($item_owner.stdout) > 0
-                ${owner_kind}    ${owner_name}=    Split String    ${item_owner.stdout}    ${SPACE}
-                ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
-            ELSE
-                ${owner_kind}    ${owner_name}=    Set Variable    ""
-            END               
-            ${item_next_steps}=    RW.CLI.Run Bash File
-            ...    bash_file=workload_next_steps.sh
-            ...    cmd_overide=./workload_next_steps.sh "${container_reason.stdout};${pod_message.stdout};${container_reason.stdout}" "${owner_kind}" "${owner_name}"
-            ...    env=${env}
-            ...    secret_file__kubeconfig=${kubeconfig}
-            ...    include_in_history=False
-            RW.Core.Add Issue
-            ...    severity=2
-            ...    expected=Pods should not be pending in `${NAMESPACE}`. 
-            ...    actual=Pod `${pod_name.stdout}` in `${NAMESPACE}` is pending.
-            ...    title= Pod `${pod_name.stdout}` is pending with ``
-            ...    reproduce_hint=View Commands Used in Report Output
-            ...    details=Pod `${pod_name.stdout}` is owned by ${owner_kind} `${owner_name}` and is pending with the following details:\n${item}
-            ...    next_steps=${item_next_steps.stdout}
+            ${is_not_just_newline}=    Evaluate    '''${item}'''.strip() != ''
+            IF    ${is_not_just_newline}
+                ${pod_name}=    RW.CLI.Run Cli
+                ...    cmd=echo '${item}' | grep pod_name: | sed 's/^pod_name: //' | sed 's/ *$//' | tr -d '\n'
+                ...    env=${env}
+                ...    include_in_history=false
+                ${pod_message}=    RW.CLI.Run Cli
+                ...    cmd=echo '${item}' | grep message: | sed 's/^message: //' | sed 's/ *$//' | tr -d '\n'| sed 's/\"//g'
+                ...    env=${env}
+                ...    include_in_history=false
+                ${container_message}=    RW.CLI.Run Cli
+                ...    cmd=echo '${item}' | grep containerMessage: | sed 's/^containerMessage: //' | sed 's/ *$//' | tr -d '\n'| sed 's/\"//g'
+                ...    env=${env}
+                ...    include_in_history=false
+                ${container_reason}=    RW.CLI.Run Cli
+                ...    cmd=echo '${item}' | grep containerReason: | sed 's/^containerReason: //' | sed 's/ *$//' | tr -d '\n'| sed 's/\"//g'
+                ...    env=${env}
+                ...    include_in_history=false
+                ${item_owner}=    RW.CLI.Run Bash File
+                ...    bash_file=find_resource_owners.sh
+                ...    cmd_overide=./find_resource_owners.sh Pod ${pod_name.stdout} ${NAMESPACE} ${CONTEXT}
+                ...    env=${env}
+                ...    secret_file__kubeconfig=${kubeconfig}
+                ...    include_in_history=False
+                IF    len($item_owner.stdout) > 0
+                    ${owner_kind}    ${owner_name}=    Split String    ${item_owner.stdout}    ${SPACE}
+                    ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
+                ELSE
+                    ${owner_kind}    ${owner_name}=    Set Variable    ""
+                END               
+                ${item_next_steps}=    RW.CLI.Run Bash File
+                ...    bash_file=workload_next_steps.sh
+                ...    cmd_overide=./workload_next_steps.sh "${container_reason.stdout};${pod_message.stdout};${container_reason.stdout}" "${owner_kind}" "${owner_name}"
+                ...    env=${env}
+                ...    secret_file__kubeconfig=${kubeconfig}
+                ...    include_in_history=False
+                RW.Core.Add Issue
+                ...    severity=2
+                ...    expected=Pods should not be pending in `${NAMESPACE}`. 
+                ...    actual=Pod `${pod_name.stdout}` in `${NAMESPACE}` is pending.
+                ...    title= Pod `${pod_name.stdout}` is pending with `${container_reason.stdout}`
+                ...    reproduce_hint=View Commands Used in Report Output
+                ...    details=Pod `${pod_name.stdout}` is owned by ${owner_kind} `${owner_name}` and is pending with the following details:\n${item}
+                ...    next_steps=${item_next_steps.stdout}
+            END
         END
     END
+    ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of pendind pods in namespace: ${NAMESPACE}
     RW.Core.Add Pre To Report    ${pending_pods.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
