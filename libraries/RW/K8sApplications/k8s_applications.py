@@ -1,6 +1,7 @@
-import logging
+import logging, hashlib
 from dataclasses import dataclass, field
 from thefuzz import process as fuzzprocessor
+from datetime import datetime
 
 from .parsers import (
     StackTraceData,
@@ -54,6 +55,13 @@ def test(git_uri, git_token, k8s_env, process_list, *args, **kwargs):
     return report
 
 
+def get_test_data():
+    data = ""
+    with open(f"{THIS_DIR}/test_logs.txt", "r") as fh:
+        data = fh.read()
+    return data
+
+
 def parse_exceptions(logs: str) -> [StackTraceData]:
     logs = logs.split("\n")
     if len(logs) > MAX_LOG_LINES:
@@ -78,13 +86,14 @@ def parse_exceptions(logs: str) -> [StackTraceData]:
     return exception_data
 
 
-def clone_repo(
-    git_uri,
-    git_token,
-) -> Repository:
+def clone_repo(git_uri, git_token, number_of_commits_history: int = 10) -> Repository:
     repo = Repository(source_uri=git_uri, auth_token=git_token)
-    repo.clone_repo()
+    repo.clone_repo(number_of_commits_history)
     return repo
+
+
+def _hash_string_md5(input_string):
+    return hashlib.md5(input_string.encode()).hexdigest()
 
 
 def troubleshoot_application(
@@ -96,21 +105,50 @@ def troubleshoot_application(
     logger.info(f"Received following repo(s) to troubleshoot: {repos}")
     logger.info(f"Received following parsed exceptions to troubleshoot: {exceptions}")
     search_words: list[str] = []
-    results: list[RepositorySearchResult] = []
+    exception_occurences: dict = {}
+    most_common_exception: str = ""
     report: str = ""
-    related_files: list[str] = []
-    for excep in exceptions:
-        if excep is not None and excep.has_results:
-            search_words += excep.endpoints
-            search_words += excep.urls
-            search_words += excep.error_messages
-            related_files += excep.files
-            for repo in repos:
+    for repo in repos:
+        results: list[RepositorySearchResult] = []
+        for excep in exceptions:
+            if excep is not None and excep.has_results:
+                search_words += excep.endpoints
+                search_words += excep.urls
+                search_words += excep.error_messages
                 results += repo.search(
                     search_words=search_words, search_files=excep.files
                 )
+                # we hash the exception strings to shorten them for dict searches
+                hashed_exception = _hash_string_md5(excep.raw)
+                if hashed_exception not in exception_occurences:
+                    exception_occurences[hashed_exception] = {
+                        "count": 1,
+                        "content": excep.raw,
+                    }
+                elif hashed_exception in exception_occurences:
+                    exception_occurences[hashed_exception]["count"] += 1
+        rsr_report = ""
+        for rsr in results:
+            rsr_report += f"\n{rsr.source_file.git_file_url}\n"
+            for commit in rsr.related_commits:
+                rsr_report += f"\t{repo.repo_url}/commit/{commit.sha}\n"
+        report += f"""
+Repository URL(s): {repo.source_uri}
 
-    logger.info("SEARCH RESULTS")
-    logger.info(results)
-    logger.info(related_files)
-    return "REPORT"
+Found associated files in exception stacktrace data:
+{rsr_report}
+
+"""
+    # get most common exception
+    max_count = -1
+    for hashed_exception in exception_occurences:
+        count = exception_occurences[hashed_exception]["count"]
+        if count > max_count:
+            max_count = count
+            most_common_exception = exception_occurences[hashed_exception]["content"]
+    report += f"""
+This is the most common exception found:
+{most_common_exception}
+"""
+
+    return report

@@ -11,7 +11,7 @@ class StackTraceData:
     endpoints: list[str]
     files: list[str]
     error_messages: list[str]
-    raw: str
+    raw: str = field(default="", repr=False)
     # TODO: create a in-mem db of exception types
     # TODO: extract exception types and lookup in code
     # TODO: integration for generating log service URL

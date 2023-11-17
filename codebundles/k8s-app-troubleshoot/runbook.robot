@@ -41,6 +41,8 @@ Scan For Misconfigured Environment
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Troubleshoot Application Logs
+    [Documentation]    Performs an inspection on container logs for exceptions, parsing those exceptions and attempts to find relevant source code information
+    [Tags]    application    debug    errors    troubleshoot    workload
     ${cmd}=    Set Variable
     ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get deployment,statefulset -l ${LABELS} -oname | head -n 1) --tail=100 --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     IF    $EXCLUDE_PATTERN != ""
@@ -55,28 +57,35 @@ Troubleshoot Application Logs
     ${printenv}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} exec $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head -n 1) --container=${CONTAINER_NAME} -- printenv
     ...    render_in_commandlist=true
+    ...    include_in_history=False
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${proc_list}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} exec $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head -n 1) --container=${CONTAINER_NAME} -- ps -eo command --no-header | grep -v "ps -eo"
     ...    render_in_commandlist=true
+    ...    include_in_history=False
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
 
+    # ${test_data}=    RW.K8sApplications.Get Test Data
     ${proc_list}=    RW.K8sApplications.Format Process List    ${proc_list.stdout}
     ${serialized_env}=    RW.K8sApplications.Serialize env    ${printenv.stdout}
     ${parsed_exceptions}=    RW.K8sApplications.Parse Exceptions    ${logs.stdout}
-    ${app_repo}=    RW.K8sApplications.Clone Repo    ${REPO_URI}    ${REPO_AUTH_TOKEN}
+    # ${parsed_exceptions}=    RW.K8sApplications.Parse Exceptions    ${test_data}
+    ${app_repo}=    RW.K8sApplications.Clone Repo    ${REPO_URI}    ${REPO_AUTH_TOKEN}    ${NUM_OF_COMMITS}
     ${repos}=    Create List    ${app_repo}
     ${ts_results}=    RW.K8sApplications.Troubleshoot Application
     ...    repos=${repos}
     ...    exceptions=${parsed_exceptions}
     ...    env=${serialized_env}
     ...    process_list=${proc_list}
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    ${ts_results}
+    RW.Core.Add Pre To Report    Here's the command used to collect the exception data:\n${history}
 
-Troubleshoot Application Endpoints
-    log
-    ...    get urls from env and souce code -> inspect namespace for URLs -> ping URLs -> wait, query logs for matching urls
+# TODO: implement tasks:
+# Troubleshoot Application Endpoints
+# Check Database Migrations
 
 
 *** Keywords ***
@@ -125,8 +134,8 @@ Suite Initialization
     ...    type=string
     ...    description=The number of commits to look through when troubleshooting. Adjust this based on your team's git usage and commit frequency.
     ...    pattern=\w*
-    ...    example=10
-    ...    default=10
+    ...    example=50
+    ...    default=50
     ${CREATE_ISSUES}=    RW.Core.Import User Variable    CREATE_ISSUES
     ...    type=string
     ...    description=Whether or not the taskset should create github issues when it finds problems.
@@ -164,6 +173,7 @@ Suite Initialization
     Set Suite Variable    ${LOGS_SINCE}    ${LOGS_SINCE}
     Set Suite Variable    ${EXCLUDE_PATTERN}    ${EXCLUDE_PATTERN}
     Set Suite Variable    ${CONTAINER_NAME}    ${CONTAINER_NAME}
+    Set Suite Variable    ${NUM_OF_COMMITS}    ${NUM_OF_COMMITS}
     Set Suite Variable
     ...    ${env}
     ...    {"NUM_OF_COMMITS":"${NUM_OF_COMMITS}", "REPO_URI":"${REPO_URI}", "LABELS":"${LABELS}", "KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}"}
