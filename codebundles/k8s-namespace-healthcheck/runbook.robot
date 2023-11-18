@@ -46,7 +46,6 @@ Troubleshoot Warning Events in Namespace `${NAMESPACE}`
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
             ${messages}=    Replace String    ${item["summary_messages"]}    "    ${EMPTY}
-            ${messages}=    Replace String    ${item["summary_messages"]}    "    ${EMPTY}
             IF    len($item_owner.stdout) > 0
                 ${owner_kind}    ${owner_name}=    Split String    ${item_owner.stdout}    ${SPACE}
                 ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
@@ -261,8 +260,16 @@ Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
             ...    cmd=echo "${item["name"]}" | sed 's/ *$//' | tr -d '\n'
             ...    env=${env}
             ...    include_in_history=False
+            # ${object_status_string}=    Replace String    ${item["conditions"]}    '    "
+            # ${object_status_string}=    Replace String    ${object_status_string}    False   false
+            # ${object_status_string}=    Replace String    ${object_status_string}    True    true
+            # ${object_status_string}=    Replace String    ${object_status_string}    None    null
+            ${object_status_string}=    RW.CLI.Run Cli
+            ...    cmd=echo "${item["conditions"]}" | sed 's/True/true/g; s/False/false/g; s/None/null/g; s/'\\''/\"/g' 
+            ...    env=${env}
+            ...    include_in_history=False
             ${object_status}=    RW.CLI.Run Cli
-            ...    cmd=echo "${item["conditions"]}" jq '.conditions[] | select(.type == "Ready") | if .message then .message else .reason end'| sed 's/ *$//' | tr -d '\n'
+            ...    cmd=echo '${object_status_string.stdout}' | jq -r '.[] | select(.type == "Ready") | if .message then .message else .reason end' | sed 's/ *$//' | tr -d '\n'
             ...    env=${env}
             ...    include_in_history=False
             ${item_owner}=    RW.CLI.Run Bash File
@@ -287,7 +294,7 @@ Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
             ...    severity=4
             ...    expected=Objects should post a status of True in `${NAMESPACE}`
             ...    actual=Objects in `${NAMESPACE}` were found with a status of False - indicating one or more unhealthy components.
-            ...    title= ${object_kind.stdout} `${object_name.stdout}` has posted a status of `"${object_status.stdout}"`
+            ...    title= ${object_kind.stdout} `${object_name.stdout}` has posted a status of ${object_status.stdout}
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=${object_kind.stdout} `${object_name.stdout}` is owned by ${owner_kind} `${owner_name}` and has indicated an unhealthy status.\n${item}
             ...    next_steps=${item_next_steps.stdout}
