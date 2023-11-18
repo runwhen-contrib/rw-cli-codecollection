@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       This taskset runs general troubleshooting checks against all applicable objects in a namespace. Looks for warning events, odd or frequent normal events, restarting containers and failed or pending pods. 
-Metadata            Author    jon-funk
+Metadata            Author    stewartshea
 Metadata            Display Name    Kubernetes Namespace Troubleshoot
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 

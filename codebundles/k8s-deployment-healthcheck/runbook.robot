@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       Triages issues related to a deployment and its replicas.
-Metadata            Author    jon-funk
+Metadata            Author    stewartshea
 Metadata            Display Name    Kubernetes Deployment Triage
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 
@@ -17,12 +17,13 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
     [Documentation]    Fetches recent logs for the given deployment in the namespace and checks the logs output for issues.
-    [Tags]    fetch    log    pod    container    errors    inspect    trace    info    deployment    <service_name>
+    [Tags]    fetch    log    pod    container    errors    inspect    trace    info    deployment    ${DEPLOYMENT_NAME}
     ${logs}=    RW.CLI.Run Bash File
     ...    bash_file=deployment_logs.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=180
+    ...    include_in_history=false
     ${recommendations}=    RW.CLI.Run Cli
     ...    cmd=echo '''${logs.stdout}''' | awk "/Recommended Next Steps:/ {start=1; getline} start"
     ...    env=${env}
@@ -45,9 +46,39 @@ Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
     ...    Recent logs from deployment/${DEPLOYMENT_NAME} in ${NAMESPACE}:\n\n${logs.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
+# Fetch Previous Logs for Deployment `${DEPLOYMENT_NAME}`
+#     [Documentation]    Fetches recent logs for the given deployment in the namespace and checks the logs output for issues.
+#     [Tags]    fetch    log    pod    container    errors    inspect    trace    info    deployment    ${DEPLOYMENT_NAME}
+#     ${logs}=    RW.CLI.Run Bash File
+#     ...    bash_file=deployment_logs.sh
+#     ...    env=${env}
+#     ...    secret_file__kubeconfig=${kubeconfig}
+#     ...    timeout_seconds=180
+#     ${recommendations}=    RW.CLI.Run Cli
+#     ...    cmd=echo '''${logs.stdout}''' | awk "/Recommended Next Steps:/ {start=1; getline} start"
+#     ...    env=${env}
+#     ...    include_in_history=false
+#     ${issues}=    RW.CLI.Run Cli
+#     ...    cmd=echo '''${logs.stdout}''' | awk '/Issues Identified:/ {start=1} /The namespace online-boutique has produced the following interesting events:/ {start=0} start'
+#     ...    env=${env}
+#     ...    include_in_history=false
+#     RW.CLI.Parse Cli Output By Line
+#     ...    rsp=${logs}
+#     ...    set_severity_level=2
+#     ...    set_issue_expected=No logs matching error patterns found in deployment ${DEPLOYMENT_NAME} in namespace: ${NAMESPACE}
+#     ...    set_issue_actual=Error logs found in deployment ${DEPLOYMENT_NAME} in namespace: ${NAMESPACE}
+#     ...    set_issue_title=Deployment ${DEPLOYMENT_NAME} in ${NAMESPACE} has: \n${issues.stdout}
+#     ...    set_issue_details=Deployment ${DEPLOYMENT_NAME} has error logs:\n\n$_stdout
+#     ...    set_issue_next_steps=${recommendations.stdout}
+#     ...    _line__raise_issue_if_contains=Recommended
+#     ${history}=    RW.CLI.Pop Shell History
+#     RW.Core.Add Pre To Report
+#     ...    Recent logs from deployment/${DEPLOYMENT_NAME} in ${NAMESPACE}:\n\n${logs.stdout}
+#     RW.Core.Add Pre To Report    Commands Used: ${history}
+
 Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
     [Documentation]    Fetches warning events related to the deployment workload in the namespace and triages any issues found in the events.
-    [Tags]    events    workloads    errors    warnings    get    deployment    <service_name>
+    [Tags]    events    workloads    errors    warnings    get    deployment    ${DEPLOYMENT_NAME}
     ${events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} --field-selector type=Warning | grep -i "${DEPLOYMENT_NAME}" || true
     ...    env=${env}
@@ -71,7 +102,7 @@ Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
 
 Get Deployment Workload Details For `${DEPLOYMENT_NAME}` and Add to Report
     [Documentation]    Fetches the current state of the deployment for future review in the report.
-    [Tags]    deployment    details    manifest    info    <service_name>
+    [Tags]    deployment    details    manifest    info    ${DEPLOYMENT_NAME}
     ${deployment}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o yaml
     ...    env=${env}
@@ -95,6 +126,7 @@ Troubleshoot Deployment Replicas for `${DEPLOYMENT_NAME}`
     ...    rollout
     ...    stuck
     ...    pods
+    ...    ${DEPLOYMENT_NAME}
     ${deployment}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json
     ...    env=${env}
@@ -152,6 +184,7 @@ Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`
     ...    <service_name>
     ...    we found the following distinctly counted errors in the service workloads of namespace
     ...    connection error
+    ...    ${DEPLOYMENT_NAME}
     ${recent_anomalies}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select(.involvedObject.name|contains("${DEPLOYMENT_NAME}")) | select( .count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) > ${ANOMALY_THRESHOLD}) | "Event(s) Per Minute:" + (.count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) |tostring) +" Count:" + (.count|tostring) + " Minute(s):" + (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60|tostring)+ " Object:" + .involvedObject.namespace + "/" + .involvedObject.kind + "/" + .involvedObject.name + " Reason:" + .reason + " Message:" + .message'
     ...    env=${env}
