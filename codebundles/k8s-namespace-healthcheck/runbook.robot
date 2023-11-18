@@ -294,7 +294,7 @@ Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
             ...    severity=4
             ...    expected=Objects should post a status of True in `${NAMESPACE}`
             ...    actual=Objects in `${NAMESPACE}` were found with a status of False - indicating one or more unhealthy components.
-            ...    title= ${object_kind.stdout} `${object_name.stdout}` has posted a status of ${object_status.stdout}
+            ...    title= ${object_kind.stdout} `${object_name.stdout}` has posted a status of: ${object_status.stdout}
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=${object_kind.stdout} `${object_name.stdout}` is owned by ${owner_kind} `${owner_name}` and has indicated an unhealthy status.\n${item}
             ...    next_steps=${item_next_steps.stdout}
