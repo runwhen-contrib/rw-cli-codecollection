@@ -75,10 +75,14 @@ function extract_common_pattern(str1, str2,  common_pattern) {
             }
             if (index(pattern, "Back-off pulling image") != 0) {
                 print "List ImagePullBackoff Events and Test Path and Tags for Namespace `"$NAMESPACE"`"
-                print "List Images and Tags for Every Container in Failed Pods for Namespace `"$NAMESPACE`""
+                print "List Images and Tags for Every Container in Failed Pods for Namespace `"$NAMESPACE"`"
             }
             if (index(pattern, "Saw completed job") != 0) {
                 print "This indicates a healthy log message and likely requires no further investigation. Review issue details for confirmation."
+            }
+            if (index(pattern, "No preemption victims found for incoming pod") != 0 || index(pattern, "Insufficient cpu") != 0) {
+                print "Check for Node Failures or Maintenance Activities in Cluster `"$CONTEXT"`"
+                print "Scheduling issues found in Cluster `"$CONTEXT"`"
             }
             pattern_found = 1
         }

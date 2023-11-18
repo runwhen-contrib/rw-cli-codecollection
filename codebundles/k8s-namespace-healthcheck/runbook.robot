@@ -203,20 +203,60 @@ Troubleshoot Failed Pods In Namespace `${NAMESPACE}`
     [Documentation]    Fetches all pods which are not running (unready) in the namespace and adds them to a report for future review.
     [Tags]    namespace    pods    status    unready    not starting    phase    failed    ${namespace}
     ${unreadypods_details}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed --no-headers -o json | jq -r --argjson exit_code_explanations '{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}' '.items[] | "---\\npod_name: \\(.metadata.name)\\nrestart_count: \\(.status.containerStatuses[0].restartCount // "N/A")\\nmessage: \\(.status.message // "N/A")\\nterminated_finishedAt: \\(.status.containerStatuses[0].state.terminated.finishedAt // "N/A")\\nexit_code: \\(.status.containerStatuses[0].state.terminated.exitCode // "N/A")\\nexit_code_explanation: \\($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode | tostring] // "Unknown exit code")\\n---\\n"'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed --no-headers -o json | jq -r --argjson exit_code_explanations '{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}' '.items[] | "pod_name: \\(.metadata.name)\\nrestart_count: \\(.status.containerStatuses[0].restartCount // "N/A")\\nmessage: \\(.status.message // "N/A")\\nterminated_finishedAt: \\(.status.containerStatuses[0].state.terminated.finishedAt // "N/A")\\nexit_code: \\(.status.containerStatuses[0].state.terminated.exitCode // "N/A")\\nexit_code_explanation: \\($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode | tostring] // "Unknown exit code")\\n------------"'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
-    ${next_steps}=    RW.NextSteps.Suggest    ${unreadypods_details.stdout}
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${unreadypods_details}
-    ...    set_severity_level=1
-    ...    set_issue_expected=No pods should be in an unready state
-    ...    set_issue_actual=We found the following unready pods: $_stdout
-    ...    set_issue_title=Unready Pods Detected In Namespace ${NAMESPACE}
-    ...    set_issue_details=Unready pods:\n"$_stdout" in the namespace ${NAMESPACE}
-    ...    set_issue_next_steps=${next_steps}
-    ...    _line__raise_issue_if_contains=-
+    ${unready_pods_list}=    Split String    ${unreadypods_details.stdout}    ------------
+    IF    len($unready_pods_list) > 0
+        FOR    ${item}    IN    @{unready_pods_list}
+            ${is_not_just_newline}=    Evaluate    '''${item}'''.strip() != ''
+            IF    ${is_not_just_newline}
+                ${pod_name}=    RW.CLI.Run Cli
+                ...    cmd=echo '${item}' | grep pod_name: | sed 's/^pod_name: //' | sed 's/ *$//' | tr -d '\n'
+                ...    env=${env}
+                ...    include_in_history=false
+                ${pod_message}=    RW.CLI.Run Cli
+                ...    cmd=echo '${item}' | grep message: | sed 's/^message: //' | sed 's/ *$//' | tr -d '\n'| sed 's/\"//g'
+                ...    env=${env}
+                ...    include_in_history=false
+                ${container_message}=    RW.CLI.Run Cli
+                ...    cmd=echo '${item}' | grep containerMessage: | sed 's/^containerMessage: //' | sed 's/ *$//' | tr -d '\n'| sed 's/\"//g'
+                ...    env=${env}
+                ...    include_in_history=false
+                ${exit_code_explanation}=    RW.CLI.Run Cli
+                ...    cmd=echo '${item}' | grep exit_code_explanation: | sed 's/^exit_code_explanation: //' | sed 's/ *$//' | tr -d '\n'| sed 's/\"//g'
+                ...    env=${env}
+                ...    include_in_history=false
+                ${item_owner}=    RW.CLI.Run Bash File
+                ...    bash_file=find_resource_owners.sh
+                ...    cmd_overide=./find_resource_owners.sh Pod ${pod_name.stdout} ${NAMESPACE} ${CONTEXT}
+                ...    env=${env}
+                ...    secret_file__kubeconfig=${kubeconfig}
+                ...    include_in_history=False
+                IF    len($item_owner.stdout) > 0
+                    ${owner_kind}    ${owner_name}=    Split String    ${item_owner.stdout}    ${SPACE}
+                    ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
+                ELSE
+                    ${owner_kind}    ${owner_name}=    Set Variable    ""
+                END
+                ${item_next_steps}=    RW.CLI.Run Bash File
+                ...    bash_file=workload_next_steps.sh
+                ...    cmd_overide=./workload_next_steps.sh "${container_message.stdout};${pod_message.stdout}" "${owner_kind}" "${owner_name}"
+                ...    env=${env}
+                ...    secret_file__kubeconfig=${kubeconfig}
+                ...    include_in_history=False
+                RW.Core.Add Issue
+                ...    severity=2
+                ...    expected=No pods should be in an unready state in namespace `${NAMESPACE}`.
+                ...    actual=Pod `${pod_name.stdout}` in `${NAMESPACE}` is NotReady or Failed.
+                ...    title= Pod `${pod_name.stdout}` exited with ${exit_code_explanation.stdout}
+                ...    reproduce_hint=View Commands Used in Report Output
+                ...    details=Pod `${pod_name.stdout}` is owned by ${owner_kind} `${owner_name}` and is pending with the following details:\n${item}
+                ...    next_steps=${item_next_steps.stdout}
+            END
+        END
+    END
     ${history}=    RW.CLI.Pop Shell History
     IF    """${unreadypods_details.stdout}""" == ""
         ${unreadypods_details}=    Set Variable    No unready pods found

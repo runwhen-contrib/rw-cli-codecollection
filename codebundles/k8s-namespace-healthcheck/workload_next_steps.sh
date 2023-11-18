@@ -21,10 +21,26 @@ if [[ $messages =~ "ContainersNotReady" && $owner_kind == "Deployment" ]]; then
     next_steps+=("Troubleshoot Deployment Replicas for \`$owner_name\`")
 fi
 
+if [[ $messages =~ "Misconfiguration" && $owner_kind == "Deployment"]]; then
+    next_steps+=("Check Deployment Log For Issues for \`$owner_name\`")
+    next_steps+=("Get Deployment Workload Details For \`$owner_name\` and Add to Report")
+fi
+
+if [[ $messages =~ "Misconfiguration"]]; then
+    next_steps+=("Review configuration of  owner_kind \`$owner_name\`")
+    next_steps+=("Check for Node Failures or Maintenance Activities in Cluster \`$CONTEXT\`")
+fi
+
 if [[ $messages =~ "ImagePullBackOff" || $messages =~ "Back-off pulling image" || $messages =~ "ErrImagePull" ]]; then
     next_steps+=("List ImagePullBackoff Events and Test Path and Tags for Namespace \`$NAMESPACE\`")
     next_steps+=("List Images and Tags for Every Container in Failed Pods for Namespace \`$NAMESPACE\`")
 fi
+
+if [[ $messages =~ "ImagePullBackOff" || $messages =~ "Back-off pulling image" || $messages =~ "ErrImagePull" ]]; then
+    next_steps+=("List ImagePullBackoff Events and Test Path and Tags for Namespace \`$NAMESPACE\`")
+    next_steps+=("List Images and Tags for Every Container in Failed Pods for Namespace \`$NAMESPACE\`")
+fi
+
 
 # Display the list of recommendations
 printf "%s\n" "${next_steps[@]}" | sort | uniq

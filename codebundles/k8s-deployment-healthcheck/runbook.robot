@@ -69,7 +69,7 @@ Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
     RW.Core.Add Pre To Report    ${events.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Get Deployment Workload Details For with `${DEPLOYMENT_NAME}` and Add to Report
+Get Deployment Workload Details For `${DEPLOYMENT_NAME}` and Add to Report
     [Documentation]    Fetches the current state of the deployment for future review in the report.
     [Tags]    deployment    details    manifest    info    <service_name>
     ${deployment}=    RW.CLI.Run Cli
