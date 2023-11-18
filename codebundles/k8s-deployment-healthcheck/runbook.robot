@@ -47,34 +47,12 @@ Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
 # Fetch Previous Logs for Deployment `${DEPLOYMENT_NAME}`
-#     [Documentation]    Fetches recent logs for the given deployment in the namespace and checks the logs output for issues.
-#     [Tags]    fetch    log    pod    container    errors    inspect    trace    info    deployment    ${DEPLOYMENT_NAME}
-#     ${logs}=    RW.CLI.Run Bash File
-#     ...    bash_file=deployment_logs.sh
-#     ...    env=${env}
-#     ...    secret_file__kubeconfig=${kubeconfig}
-#     ...    timeout_seconds=180
-#     ${recommendations}=    RW.CLI.Run Cli
-#     ...    cmd=echo '''${logs.stdout}''' | awk "/Recommended Next Steps:/ {start=1; getline} start"
-#     ...    env=${env}
-#     ...    include_in_history=false
-#     ${issues}=    RW.CLI.Run Cli
-#     ...    cmd=echo '''${logs.stdout}''' | awk '/Issues Identified:/ {start=1} /The namespace online-boutique has produced the following interesting events:/ {start=0} start'
-#     ...    env=${env}
-#     ...    include_in_history=false
-#     RW.CLI.Parse Cli Output By Line
-#     ...    rsp=${logs}
-#     ...    set_severity_level=2
-#     ...    set_issue_expected=No logs matching error patterns found in deployment ${DEPLOYMENT_NAME} in namespace: ${NAMESPACE}
-#     ...    set_issue_actual=Error logs found in deployment ${DEPLOYMENT_NAME} in namespace: ${NAMESPACE}
-#     ...    set_issue_title=Deployment ${DEPLOYMENT_NAME} in ${NAMESPACE} has: \n${issues.stdout}
-#     ...    set_issue_details=Deployment ${DEPLOYMENT_NAME} has error logs:\n\n$_stdout
-#     ...    set_issue_next_steps=${recommendations.stdout}
-#     ...    _line__raise_issue_if_contains=Recommended
-#     ${history}=    RW.CLI.Pop Shell History
-#     RW.Core.Add Pre To Report
-#     ...    Recent logs from deployment/${DEPLOYMENT_NAME} in ${NAMESPACE}:\n\n${logs.stdout}
-#     RW.Core.Add Pre To Report    Commands Used: ${history}
+
+
+# Check Liveliness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
+
+
+# Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
 
 Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
     [Documentation]    Fetches warning events related to the deployment workload in the namespace and triages any issues found in the events.
