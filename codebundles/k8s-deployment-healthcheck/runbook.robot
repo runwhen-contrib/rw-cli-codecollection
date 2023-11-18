@@ -10,6 +10,7 @@ Library             RW.CLI
 Library             RW.platform
 Library             RW.NextSteps
 Library             OperatingSystem
+Library             String
 
 Suite Setup         Suite Initialization
 
@@ -58,22 +59,42 @@ Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
     [Documentation]    Fetches warning events related to the deployment workload in the namespace and triages any issues found in the events.
     [Tags]    events    workloads    errors    warnings    get    deployment    ${DEPLOYMENT_NAME}
     ${events}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} --field-selector type=Warning | grep -i "${DEPLOYMENT_NAME}" || true
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '(now - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind == "Deployment" or .involvedObject.kind == "ReplicaSet" or .involvedObject.kind == "Pod") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}")) and (.lastTimestamp | fromdateiso8601) >= $time_limit) | {kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp} ] | group_by([.kind, .name]) | map({kind: .[0].kind, name: .[0].name, count: length, reasons: map(.reason) | unique, messages: map(.message) | unique, firstTimestamp: map(.firstTimestamp | fromdateiso8601) | sort | .[0] | todateiso8601, lastTimestamp: map(.lastTimestamp | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
-    ${next_steps}=    RW.NextSteps.Suggest    ${events.stdout}
-    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
-    ...    deployment_name=${DEPLOYMENT_NAME}
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${events}
-    ...    set_severity_level=1
-    ...    set_issue_expected=No events of type warning should exist for deployment.
-    ...    set_issue_actual=Events of type warning found for deployment.
-    ...    set_issue_title=The deployment ${DEPLOYMENT_NAME} has warning events
-    ...    set_issue_details=Warning events found for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE}\n$_line\n
-    ...    set_issue_next_steps=${next_steps}
-    ...    _line__raise_issue_if_contains=Warning
+    ${object_list}=    Evaluate    json.loads(r'''${events.stdout}''')    json
+    IF    len(@{object_list}) > 0
+        FOR    ${item}    IN    @{object_list}
+            # ${messages}=    Replace String    ${item["messages"]}    "    ${EMPTY}
+            ${item_next_steps}=    RW.CLI.Run Bash File
+            ...    bash_file=workload_next_steps.sh
+            ...    cmd_overide=./workload_next_steps.sh "${item["messages"]}" "${item["kind"]}" "${item["name"]}"
+            ...    env=${env}
+            ...    secret_file__kubeconfig=${kubeconfig}
+            ...    include_in_history=False
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    expected=Warning events should not be present in namespace `${NAMESPACE}` for Deployment `${DEPLOYMENT_NAME}`
+            ...    actual=Warning events are found in namespace `${NAMESPACE}` for Deployment `${DEPLOYMENT_NAME}` which indicate potential issues.
+            ...    title= deployment `${DEPLOYMENT_NAME}` generated warning events for ${item["kind"]} `${item["name"]}`.
+            ...    reproduce_hint=View Commands Used in Report Output
+            ...    details=${item["kind"]} `${item["name"]}` generated the following warning details:\n`${item}`
+            ...    next_steps=${item_next_steps.stdout}
+        END
+    END
+    # ${next_steps}=    RW.NextSteps.Suggest    ${events.stdout}
+    # ${next_steps}=    RW.NextSteps.Format    ${next_steps}
+    # ...    deployment_name=${DEPLOYMENT_NAME}
+    # RW.CLI.Parse Cli Output By Line
+    # ...    rsp=${events}
+    # ...    set_severity_level=1
+    # ...    set_issue_expected=No events of type warning should exist for deployment.
+    # ...    set_issue_actual=Events of type warning found for deployment.
+    # ...    set_issue_title=The deployment ${DEPLOYMENT_NAME} has warning events
+    # ...    set_issue_details=Warning events found for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE}\n$_line\n
+    # ...    set_issue_next_steps=${next_steps}
+    # ...    _line__raise_issue_if_contains=Warning
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${events.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
