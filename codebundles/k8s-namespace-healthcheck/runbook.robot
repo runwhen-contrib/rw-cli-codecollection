@@ -62,7 +62,7 @@ Troubleshoot Warning Events in Namespace `${NAMESPACE}`
             ...    severity=3
             ...    expected=Warning events should not be present in namespace `${NAMESPACE}` for ${owner_kind} `${owner_name}`
             ...    actual=Warning events are found in namespace `${NAMESPACE}` for ${owner_kind} `${owner_name}` which indicate potential issues.
-            ...    title= ${owner_kind} `${owner_name}` generated ${item["total_events"]} **warning events** and should be reviewed.
+            ...    title= ${owner_kind} `${owner_name}` generated ${item["total_events"]} warning events and should be reviewed.
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=Item `${item["object"]}` generated a total of ${item["total_events"]} events containing some of the following messages and types:\n`${item["summary_messages"]}`
             ...    next_steps=${item_next_steps.stdout}
