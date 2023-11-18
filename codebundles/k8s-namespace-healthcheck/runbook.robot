@@ -262,7 +262,7 @@ Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
             ...    env=${env}
             ...    include_in_history=False
             ${object_status}=    RW.CLI.Run Cli
-            ...    cmd=echo "${item["conditions"]}" jq '.conditions[] | select(.type == "Ready") | if .message then .message else .reason end' input.json | sed 's/ *$//' | tr -d '\n'
+            ...    cmd=echo "${item["conditions"]}" jq '.conditions[] | select(.type == "Ready") | if .message then .message else .reason end'| sed 's/ *$//' | tr -d '\n'
             ...    env=${env}
             ...    include_in_history=False
             ${item_owner}=    RW.CLI.Run Bash File
