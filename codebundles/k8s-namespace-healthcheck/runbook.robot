@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       This taskset runs general troubleshooting checks against all applicable objects in a namespace, checks error events, and searches pod logs for error entries.
+Documentation       This taskset runs general troubleshooting checks against all applicable objects in a namespace. Looks for warning events, odd or frequent normal events, restarting containers and failed or pending pods. 
 Metadata            Author    jon-funk
 Metadata            Display Name    Kubernetes Namespace Troubleshoot
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
@@ -18,86 +18,60 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Trace And Troubleshoot Warning Events And Errors in Namespace `${NAMESPACE}`
-    [Documentation]    Queries all error events in a given namespace within the last 30 minutes,
-    ...    fetches the list of involved pod names, requests logs from them and parses
-    ...    the logs for exceptions.
+Troubleshoot Warning Events in Namespace `${NAMESPACE}`
+    [Documentation]    Queries all warning events in a given namespace within the last 30 minutes,
+    ...    fetches the list of involved pod names, groups the events, collects event message details
+    ...    and searches for a useful next step based on these details.
     [Tags]    namespace    trace    error    pods    events    logs    grep    ${namespace}
-    # get pods involved with error events
-    ${error_events}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json
+    ${warning_events_by_object}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json > $HOME/warning_events.json && cat $HOME/warning_events.json | jq -r '[.items[] | {namespace: .involvedObject.namespace, kind: .involvedObject.kind, baseName: ((if .involvedObject.kind == "Pod" then (.involvedObject.name | split("-")[:-1] | join("-")) else .involvedObject.name end) // ""), count: .count, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, reason: .reason, message: .message}] | group_by(.namespace, .kind, .baseName) | map({object: (.[0].namespace + "/" + .[0].kind + "/" + .[0].baseName), total_events: (reduce .[] as $event (0; . + $event.count)), summary_messages: (map(.message) | unique | join("; ")), oldest_timestamp: (map(.firstTimestamp) | sort | first), most_recent_timestamp: (map(.lastTimestamp) | sort | last)}) | map(select((now - ((.most_recent_timestamp | fromdateiso8601)))/60 <= 30))'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
-    ${recent_error_events}=    RW.CLI.Parse Cli Json Output
-    ...    rsp=${error_events}
-    ...    extract_path_to_var__recent_events=items
-    ...    recent_events__filter_older_than__60m=lastTimestamp
-    ...    assign_stdout_from_var=recent_events
-
-    ${involved_pod_names}=    RW.CLI.Run Cli
-    ...    cmd=cat << 'EOF' | jq -r '.items[] | select(.involvedObject.kind == "Pod") | .involvedObject.name' | tr -d "\n"\n${error_events.stdout}EOF
-    ...    include_in_history=False
-    ${involved_pod_names_array}=    Evaluate    """${involved_pod_names.stdout}""".split("\\n")
-    ${event_messages}=    RW.CLI.Run Cli
-    ...    cmd=cat << 'EOF' | jq -r '.items[] | select(.involvedObject.kind == "Pod") | .message' | tr -d "\n"\n${error_events.stdout}EOF
-    ...    include_in_history=False
-    ${event_messages_array}=    Evaluate    """${event_messages.stdout}""".split("\\n")
-    ${next_steps}=    RW.NextSteps.Suggest
-    ...    Pods in namespace ${NAMESPACE} have associated warning events ${event_messages_array}
-    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
-    ...    pod_names=${involved_pod_names_array}
-
-    ${involved_pod_names}=    RW.CLI.Parse Cli Json Output
-    ...    rsp=${error_events}
-    ...    extract_path_to_var__involved_pod_names=items[?involvedObject.kind=='Pod'].involvedObject.name
-    ...    from_var_with_path__involved_pod_names__to__pod_count=length(@)
-    ...    pod_count__raise_issue_if_gt=0
-    ...    set_issue_title=$pod_count Pods Found With Recent Warning Events In Namespace ${NAMESPACE}
-    ...    set_issue_details=Warning events in the namespace ${NAMESPACE}.\nName of pods with issues:\n"$involved_pod_names"\nTroubleshoot pod or namespace events:\n"${recent_error_events.stdout}"
-    ...    set_issue_next_steps=${next_steps}
-    ...    assign_stdout_from_var=involved_pod_names
-    # get pods with restarts > 0
-    ${pods_in_namespace}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -o json
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ${restart_age}=    RW.CLI.String To Datetime    30m
-    ${pod_names}=    RW.CLI.Run Cli
-    ...    cmd=cat << 'EOF' | jq -r '.items[].metadata.name'\n${error_events.stdout}EOF
-    ...    include_in_history=False
-    ${next_steps}=    RW.NextSteps.Suggest    Pods in namespace ${NAMESPACE} are restarting: ${pod_names.stdout}
-    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
-    ...    pod_name=${pod_names.stdout}
-    ${restarting_pods}=    RW.CLI.Parse Cli Json Output
-    ...    rsp=${pods_in_namespace}
-    ...    extract_path_to_var__pod_restart_stats=items[].{name:metadata.name, containerRestarts:status.containerStatuses[].{restartCount:restartCount, terminated_at:lastState.terminated.finishedAt}|[?restartCount > `0` && terminated_at >= `${restart_age}`]}
-    ...    from_var_with_path__pod_restart_stats__to__pods_with_recent_restarts=[].{name: name, restartSum:sum(containerRestarts[].restartCount || [`0`])}|[?restartSum > `0`]
-    ...    from_var_with_path__pods_with_recent_restarts__to__restart_pod_names=[].name
-    ...    from_var_with_path__pods_with_recent_restarts__to__pod_count=length(@)
-    ...    pod_count__raise_issue_if_gt=0
-    ...    set_issue_title=Frequently Restarting Pods In Namespace ${NAMESPACE}
-    ...    set_issue_details=Found $pod_count pods that are frequently restarting in ${NAMESPACE}. Troubleshoot these pods:\n"$pods_with_recent_restarts"
-    ...    set_issue_next_steps=${next_steps}
-    ...    assign_stdout_from_var=restart_pod_names
-    # fetch logs with pod names
-    ${restarting_pods}=    RW.CLI.From Json    json_str=${restarting_pods.stdout}
-    ${involved_pod_names}=    RW.CLI.From Json    json_str=${involved_pod_names.stdout}
-    ${podnames_to_query}=    Combine Lists    ${restarting_pods}    ${involved_pod_names}
-    ${pod_logs_errors}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs --context=${CONTEXT} --namespace=${NAMESPACE} pod/{item} --tail=100 | grep -E -i "${ERROR_PATTERN}" || true
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ...    loop_with_items=${podnames_to_query}
-    ${history}=    RW.CLI.Pop Shell History
-    IF    """${pod_logs_errors.stdout}""" != ""
-        ${error_trace_results}=    Set Variable
-        ...    Found error logs:\n${pod_logs_errors.stdout}\n\nEffected Pods: ${podnames_to_query}\n
-    ELSE
-        ${error_trace_results}=    Set Variable    No trace errors found!
+    ${object_list}=    Evaluate    json.loads(r'''${warning_events_by_object.stdout}''')    json
+    IF    len(@{object_list}) > 0
+        FOR    ${item}    IN    @{object_list}
+            ${object_kind}=    RW.CLI.Run Cli
+            ...    cmd=echo "${item["object"]}" | awk -F"/" '{print $2}' | sed 's/ *$//' | tr -d '\n'
+            ...    env=${env}
+            ...    include_in_history=False
+            ${object_short_name}=    RW.CLI.Run Cli
+            ...    cmd=echo "${item["object"]}" | awk -F"/" '{print $3}' | sed 's/ *$//' | tr -d '\n'
+            ...    env=${env}
+            ...    include_in_history=False
+            ${item_owner}=    RW.CLI.Run Bash File
+            ...    bash_file=find_resource_owners.sh
+            ...    cmd_overide=./find_resource_owners.sh ${object_kind.stdout} ${object_short_name.stdout} ${NAMESPACE} ${CONTEXT}
+            ...    env=${env}
+            ...    secret_file__kubeconfig=${kubeconfig}
+            ...    include_in_history=False
+            ${messages}=    Replace String    ${item["summary_messages"]}    "    ${EMPTY}
+            ${messages}=    Replace String    ${item["summary_messages"]}    "    ${EMPTY}
+            IF    len($item_owner.stdout) > 0
+                ${owner_kind}    ${owner_name}=    Split String    ${item_owner.stdout}    ${SPACE}
+                ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
+            ELSE
+                ${owner_kind}    ${owner_name}=    Set Variable    ""
+            END
+            ${item_next_steps}=    RW.CLI.Run Bash File
+            ...    bash_file=workload_next_steps.sh
+            ...    cmd_overide=./workload_next_steps.sh "${messages}" "${owner_kind}" "${owner_name}"
+            ...    env=${env}
+            ...    secret_file__kubeconfig=${kubeconfig}
+            ...    include_in_history=False
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Warning events should not be present in namespace `${NAMESPACE}` for ${owner_kind} `${owner_name}`
+            ...    actual=Warning events are found in namespace `${NAMESPACE}` for ${owner_kind} `${owner_name}` which indicate potential issues.
+            ...    title= ${owner_kind} `${owner_name}` generated ${item["total_events"]} **warning events** and should be reviewed.
+            ...    reproduce_hint=View Commands Used in Report Output
+            ...    details=Item `${item["object"]}` generated a total of ${item["total_events"]} events containing some of the following messages and types:\n`${item["summary_messages"]}`
+            ...    next_steps=${item_next_steps.stdout}
+        END
     END
-    RW.Core.Add Pre To Report    Summary of error trace in namespace: ${NAMESPACE}
-    RW.Core.Add Pre To Report    ${error_trace_results}
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    Summary of Warning events in namespace: ${NAMESPACE}
+    RW.Core.Add Pre To Report    ${warning_events_by_object.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Troubleshoot Container Restarts In Namespace `${NAMESPACE}`

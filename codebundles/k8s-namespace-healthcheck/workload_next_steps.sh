@@ -21,14 +21,22 @@ if [[ $messages =~ "ContainersNotReady" && $owner_kind == "Deployment" ]]; then
     next_steps+=("Troubleshoot Deployment Replicas for \`$owner_name\`")
 fi
 
-if [[ $messages =~ "Misconfiguration" && $owner_kind == "Deployment"]]; then
+if [[ $messages =~ "Misconfiguration" && $owner_kind == "Deployment" ]]; then
     next_steps+=("Check Deployment Log For Issues for \`$owner_name\`")
     next_steps+=("Get Deployment Workload Details For \`$owner_name\` and Add to Report")
 fi
 
-if [[ $messages =~ "Misconfiguration"]]; then
+if [[ $messages =~ "Misconfiguration" ]]; then
     next_steps+=("Review configuration of  owner_kind \`$owner_name\`")
     next_steps+=("Check for Node Failures or Maintenance Activities in Cluster \`$CONTEXT\`")
+fi
+
+if [[ $messages =~ "Liveness probe failed" ]]; then
+    next_steps+=("Check Liveliness Probe Configuration for $owner_kind \`$owner_name\`")
+fi
+
+if [[ $messages =~ "Readiness probe errored" ]]; then
+    next_steps+=("Check Readiness Probe Configuration for $owner_kind \`$owner_name\`")
 fi
 
 if [[ $messages =~ "ImagePullBackOff" || $messages =~ "Back-off pulling image" || $messages =~ "ErrImagePull" ]]; then
