@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -eo pipefail
 # -----------------------------------------------------------------------------
 # Script Information and Metadata
 # -----------------------------------------------------------------------------
@@ -286,13 +286,13 @@ if [[ -n "$INTERESTING_RESOURCES" ]]; then
             fi
             ;;
         deployment|deployment.apps)
-            recommendations+=("Check *deployment* health \`$name\` in namespace \`${NAMESPACE}\`  ")
+            recommendations+=("Check deployment health \`$name\` in namespace \`${NAMESPACE}\`  ")
             ;;
         service)
-            recommendations+=("Check *service* health \`$name\` in namespace \`${NAMESPACE}\`  ")
+            recommendations+=("Check service health \`$name\` in namespace \`${NAMESPACE}\`  ")
             ;;
         statefulset|statefulset.apps)
-            recommendations+=("Check *statefulset* health \`$name\` in namespace \`${NAMESPACE}\`  ")
+            recommendations+=("Check statefulset health \`$name\` in namespace \`${NAMESPACE}\`  ")
             ;;
         esac
     done <<< "$INTERESTING_RESOURCES"
