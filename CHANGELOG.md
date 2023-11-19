@@ -1,3 +1,8 @@
+## 0.0.8 2023-11-19
+- Add Application Troubleshooting V2 (#242) 5100487
+- Add K8s Prometheus Triage and Loki Triage (#224) 46e6dba
+- Add application and Azure troubleshooting codebundles (#225) 28f452a
+
 ## 0.0.7 2023-09-18
 
 ## 0.0.6 2023-09-14
