@@ -134,9 +134,11 @@ Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
     ${object_list}=    Evaluate    json.loads(r'''${events.stdout}''')    json
     IF    len(@{object_list}) > 0
         FOR    ${item}    IN    @{object_list}
+            ${message_string}=    Catenate    SEPARATOR;    @{item["messages"]}   
+            ${messages}=    Replace String    ${message_string}    "    ${EMPTY}
             ${item_next_steps}=    RW.CLI.Run Bash File
             ...    bash_file=workload_next_steps.sh
-            ...    cmd_overide=./workload_next_steps.sh "${item["messages"]}" "${item["kind"]}" "${item["name"]}"
+            ...    cmd_overide=./workload_next_steps.sh "${messages}" "${item["kind"]}" "${item["name"]}"
             ...    env=${env}
             ...    include_in_history=False
             # FIXME - Should we add severity mappings in the next steps to make the issue more dynamic?
