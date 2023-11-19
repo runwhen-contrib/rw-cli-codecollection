@@ -39,7 +39,7 @@ Fetch Nginx HTTP Errors From GMP for  Ingress `${INGRESS_OBJECT_NAME}`
     ...    set_severity_level=2
     ...    set_issue_expected=The ingress in $_line should not have any HTTP responses with the following codes: ${ERROR_CODES}
     ...    set_issue_actual=We found the following HTTP error codes: ${ERROR_CODES} associated with the ingress in $_line
-    ...    set_issue_title=Detected HTTP Error Codes Across Network
+    ...    set_issue_title=Detected HTTP Error Codes for Ingress `${INGRESS_OBJECT_NAME}`
     ...    set_issue_details=HTTP error codes in ingress and service "$_line". Troubleshoot the application associated with: ${INGRESS_SERVICE}
     ...    set_issue_next_steps=Check Deployment Log For Issues `${ingress_owner.stdout}`
     ...    _line__raise_issue_if_contains=Host
