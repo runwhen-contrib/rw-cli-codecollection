@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Fetch Nginx Ingress HTTP Errors From GMP And Perform Inspection On Results
+Fetch Nginx HTTP Errors From GMP for  Ingress `${INGRESS_OBJECT_NAME}`
     [Documentation]    Fetches metrics for the Nginx ingress host from GMP and performs an inspection on the results.
     ...    If there are currently any results with more than zero errors, their name will be surfaced for further troubleshooting.
     [Tags]    curl    http    ingress    latency    errors    metrics    controller    nginx    gmp    500s
@@ -41,7 +41,7 @@ Fetch Nginx Ingress HTTP Errors From GMP And Perform Inspection On Results
     ...    set_issue_actual=We found the following HTTP error codes: ${ERROR_CODES} associated with the ingress in $_line
     ...    set_issue_title=Detected HTTP Error Codes Across Network
     ...    set_issue_details=HTTP error codes in ingress and service "$_line". Troubleshoot the application associated with: ${INGRESS_SERVICE}
-    ...    set_issue_next_steps=Check Deployment Log For Issues\n\n${ingress_owner.stdout}
+    ...    set_issue_next_steps=Check Deployment Log For Issues `${ingress_owner.stdout}`
     ...    _line__raise_issue_if_contains=Host
     ${ingress_info}=    Set Variable    ${gmp_rsp.stdout}
     IF    """${ingress_info}""" == "" or """${ingress_info}""".isspace()
@@ -54,7 +54,7 @@ Fetch Nginx Ingress HTTP Errors From GMP And Perform Inspection On Results
     RW.Core.Add Pre To Report    Ingress Info:\n${ingress_info} Ingress Owner:${ingress_owner.stdout}
     RW.Core.Add Pre To Report    GMP Json Data:\n${gmp_json.stdout}
 
-Find Ingress Owner and Service Health
+Find Owner and Service Health for Ingress `${INGRESS_OBJECT_NAME}`
     [Documentation]    Checks the ingress object service and endpoints. Also returns the owner of the pods that support the Ingress.
     [Tags]    owner    ingress    service    endpoints
     ${k8s_ingress_details}=    RW.CLI.Run Cli
