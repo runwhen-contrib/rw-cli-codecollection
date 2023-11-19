@@ -26,6 +26,11 @@ if [[ $messages =~ "Misconfiguration" && $owner_kind == "Deployment" ]]; then
     next_steps+=("Get Deployment Workload Details For \`$owner_name\` and Add to Report")
 fi
 
+if [[ $messages =~ "Deployment does not have minimum availability" && $owner_kind == "Deployment" ]]; then
+    next_steps+=("Troubleshoot Deployment Warning Events for \`$owner_name\`")
+    next_steps+=("Troubleshoot Container Restarts In Namespace \`$NAMESPACE\`")
+fi
+
 if [[ $messages =~ "Misconfiguration" ]]; then
     next_steps+=("Review configuration of  owner_kind \`$owner_name\`")
     next_steps+=("Check for Node Failures or Maintenance Activities in Cluster \`$CONTEXT\`")
