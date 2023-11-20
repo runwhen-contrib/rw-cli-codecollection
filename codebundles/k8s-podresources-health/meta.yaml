@@ -56,7 +56,7 @@ commands:
 
     | jq -r ''[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.limits
     == null) | {pod: $pod.metadata.name, container_without_limits: .name}]'''
-  name: scan_labeled_pods_and_show_all_containers_without_resource_limit_or_resource_requests_set
+  name: show_pods_without_resource_limit_or_resource_requests_set_in_namespace_namespace_
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running
     -ojson | jq -r ''[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.requests
     == null) | {pod: $pod.metadata.name, container_without_requests: .name}]'''
@@ -90,7 +90,7 @@ commands:
     \ | select(.resources.requests == null) | {pod: $pod.metadata.name, container_without_requests:\
     \ .name}]'  # Process output using the jq utility, returning the names of pods\
     \ and containers which have no requests set"
-  name: scan_labeled_pods_and_show_all_containers_without_resource_limit_or_resource_requests_set
+  name: show_pods_without_resource_limit_or_resource_requests_set_in_namespace_namespace_
 - command: for pod in $(kubectl get pods ${LABELS} -n ${NAMESPACE} --context ${CONTEXT}
     -o custom-columns=":metadata.name" --field-selector=status.phase=Running); do
     kubectl top pod $pod -n ${NAMESPACE} --context ${CONTEXT} --containers; done
@@ -114,4 +114,4 @@ commands:
     # Iterate through the retrieved pod list\nfor pod in $POD_LIST; do\n    \n   \
     \ # For each pod, perform the top command for containers\n    kubectl top pod\
     \ $pod -n ${NAMESPACE} --context ${CONTEXT} --containers; \ndone"
-  name: get_labeled_container_top_info
+  name: get_pod_resource_utilization_with_top_in_namespace_namespace_
