@@ -35,7 +35,11 @@
 * [k8s-redis-healthcheck](codebundles/k8s-redis-healthcheck/README.md)
 
 ## Keywords
+* [k8s_applications](libraries/.docs/k8s_applications.md)
+* [migrations_inspector](libraries/.docs/migrations_inspector.md)
 * [CLI](libraries/.docs/CLI.md)
 * [cli_utils](libraries/.docs/cli_utils.md)
 * [stdout_parser](libraries/.docs/stdout_parser.md)
+* [repository](libraries/.docs/repository.md)
+* [parsers](libraries/.docs/parsers.md)
 * [json_parser](libraries/.docs/json_parser.md)
