@@ -20,19 +20,19 @@ Checking HTTP URL Is Available And Timely
     ...    cmd=curl -o /dev/null -w '{"http_code": \%{http_code}, "time_total": \%{time_total}}' -s ${URL}
     ...    render_in_commandlist=true
     # ${owner_details_dict}=    Evaluate    json.loads(r"${OWNER_DETAILS}")
-    ${owner_details_dict}=    Evaluate    json.loads(r'''${OWNER_DETAILS}''')    json
+    # ${owner_details_dict}=    Evaluate    json.loads(r'''${OWNER_DETAILS}''')    json
 
     # ${owner_kind}=    Set Variable    ${owner_details_dict['kind']}
     # ${owner_name}=    Set Variable    ${owner_details_dict['name']}
     #     ${owner_namespace}=    Set Variable    ${owner_details_dict['namespace']}
     ${owner_kind}=    RW.CLI.Run Cli
-                ...    cmd=echo "${owner_details_dict["kind"]}" | sed 's/ *$//' | tr -d '\n'
+                ...    cmd=echo '${OWNER_DETAILS}' | jq -r .kind | sed 's/ *$//' | tr -d '\n'
                 ...    include_in_history=False
     ${owner_name}=    RW.CLI.Run Cli
-                ...    cmd=echo "${owner_details_dict["name"]}" | sed 's/ *$//' | tr -d '\n'
+                ...    cmd=echo '${OWNER_DETAILS}' | jq -r .name | sed 's/ *$//' | tr -d '\n'
                 ...    include_in_history=False
     ${owner_namespace}=    RW.CLI.Run Cli
-                ...    cmd=echo "${owner_details_dict["namespace"]}" | sed 's/ *$//' | tr -d '\n'
+                ...    cmd=echo '${OWNER_DETAILS}' | jq -r .namespace | sed 's/ *$//' | tr -d '\n'
                 ...    include_in_history=False
     ${http_rsp_code}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${curl_rsp}
@@ -82,8 +82,8 @@ Suite Initialization
     ...    type=string
     ...    description=Json list of owner details
     ...    pattern=\w*
-    ...    default={'name': 'my-ingress', 'kind': 'Ingress', 'namespace': 'default'}
-    ...    example={'name': 'my-ingress', 'kind': 'Ingress', 'namespace': 'default'}
+    ...    default={"name": "my-ingress", "kind": "Ingress", "namespace": "default"}
+    ...    example={"name": "my-ingress", "kind": "Ingress", "namespace": "default"}
     Set Suite Variable    ${DESIRED_RESPONSE_CODE}    ${DESIRED_RESPONSE_CODE}
     Set Suite Variable    ${URL}    ${URL}
     Set Suite Variable    ${TARGET_LATENCY}    ${TARGET_LATENCY}
