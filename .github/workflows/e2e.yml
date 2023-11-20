@@ -36,7 +36,7 @@ jobs:
           API_TOKEN: ${{ secrets.API_TOKEN }}
           API_URL: https://papi.test.runwhen.com/api/v3
           GIT_URL: https://github.com/runwhen-contrib/rw-cli-codecollection.git
-          WORKSPACE: t-ob-1
+          WORKSPACE: jon-rwl-test
         run: |
           if [ "${{ github.event.inputs.runall }}" = "yes" ] || [ "${{ github.event.inputs.runall }}" = "true" ]; then
             cd .github/scripts/ && python e2e.py $WORKSPACE $API_URL $GIT_URL --runall
