@@ -138,7 +138,7 @@ Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
             ${messages}=    Replace String    ${message_string}    "    ${EMPTY}
             ${item_next_steps}=    RW.CLI.Run Bash File
             ...    bash_file=workload_next_steps.sh
-            ...    cmd_overide=./workload_next_steps.sh "${messages}" "${item["kind"]}" "${item["name"]}"
+            ...    cmd_overide=./workload_next_steps.sh "${messages}" "Deployment" "${DEPLOYMENT_NAME}"
             ...    env=${env}
             ...    include_in_history=False
             # FIXME - Should we add severity mappings in the next steps to make the issue more dynamic?
