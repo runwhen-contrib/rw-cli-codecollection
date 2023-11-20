@@ -14,7 +14,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Fetch StatefulSet Logs
+Fetch StatefulSet `${STATEFULSET_NAME}` Logs
     [Documentation]    Fetches the last 100 lines of logs for the given statefulset in the namespace.
     [Tags]    fetch    log    pod    container    errors    inspect    trace    info    statefulset
     ${logs}=    RW.CLI.Run Cli
@@ -26,7 +26,7 @@ Fetch StatefulSet Logs
     RW.Core.Add Pre To Report    ${logs.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Get Related StatefulSet Events
+Get Related StatefulSet `${STATEFULSET_NAME}` Events
     [Documentation]    Fetches events related to the StatefulSet workload in the namespace.
     [Tags]    events    workloads    errors    warnings    get    statefulset
     ${events}=    RW.CLI.Run Cli
@@ -38,7 +38,7 @@ Get Related StatefulSet Events
     RW.Core.Add Pre To Report    ${events.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Fetch StatefulSet Manifest Details
+Fetch StatefulSet `${STATEFULSET_NAME}` Manifest Details
     [Documentation]    Fetches the current state of the statefulset manifest for inspection.
     [Tags]    statefulset    details    manifest    info
     ${statefulset}=    RW.CLI.Run Cli
@@ -50,7 +50,7 @@ Fetch StatefulSet Manifest Details
     RW.Core.Add Pre To Report    ${statefulset.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-List StatefulSets with Unhealthy Replica Counts
+List StatefulSets with Unhealthy Replica Counts In Namespace `${NAMESPACE}`
     [Documentation]    Pulls the replica information for a given StatefulSet and checks if it's highly available
     ...    , if the replica counts are the expected / healthy values, and if not, what they should be.
     [Tags]
