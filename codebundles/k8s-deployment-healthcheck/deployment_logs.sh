@@ -123,8 +123,8 @@ done
 
 if [[ -n "$INTERESTING_PATHS" ]]; then
     SEARCH_RESOURCES+=$(echo "$INTERESTING_PATHS" | awk -F'/' '{for (i=1; i<=NF; i++) print $i}' | sort | uniq)
-    FORMATTED_RESOURCES=$(echo "$SEARCH_RESOURCES" | sed 's/^/\//' | awk '{printf "\n%s", $0}')
-    issue_descriptions+=("HTTP Errors found for paths:$FORMATTED_RESOURCES")
+    FORMATTED_RESOURCES=$(echo "$SEARCH_RESOURCES" | sed 's/^/\//' | xargs)
+    issue_descriptions+=("HTTP Errors found for paths: $FORMATTED_RESOURCES")
 else
     echo "No interesting HTTP paths found."
 fi
