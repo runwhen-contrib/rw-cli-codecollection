@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Set deployment name and namespace
-PROBE_TYPE="${1:-livenessProbe}"  # Default to livenessProbe, can be set to readinessProbe
+PROBE_TYPE="${1:-readinessProbe}"  # Default to livenessProbe, can be set to readinessProbe
 
 # Function to extract data using jq
 extract_data() {
