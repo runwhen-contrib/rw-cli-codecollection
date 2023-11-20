@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Scan Labeled Pods and Show All Containers Without Resource Limit or Resource Requests Set
+Show Pods Without Resource Limit or Resource Requests Set in Namespace `${NAMESPACE}`
     [Documentation]    Scans a list of pods in a namespace using labels as a selector and checks if their resources are set.
     [Tags]
     ...    pods
@@ -29,6 +29,7 @@ Scan Labeled Pods and Show All Containers Without Resource Limit or Resource Req
     ...    prehook
     ...    liveness
     ...    readiness
+    ...    `${NAMESPACE}`
     ${pods_without_limits}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running -ojson | jq -r '[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.limits == null) | {pod: $pod.metadata.name, container_without_limits: .name}]'
     ...    env=${env}
@@ -67,7 +68,7 @@ Scan Labeled Pods and Show All Containers Without Resource Limit or Resource Req
     RW.Core.Add Pre To Report    ${summary}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Get Labeled Container Top Info
+Get Pod Resource Utilization with Top in Namespace `${NAMESPACE}`
     [Documentation]    Performs and a top command on list of labeled workloads to check pod resources.
     [Tags]    top    resources    utilization    pods    workloads    cpu    memory    allocation    labeled
     ${pods_top}=    RW.CLI.Run Cli

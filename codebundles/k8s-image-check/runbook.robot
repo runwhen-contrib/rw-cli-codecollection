@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check Image Rollover Times In Namespace
+Check Image Rollover Times for Namespace `${NAMESPACE}`
     [Documentation]    Fetches and checks when images last rolled over in a namespace.
     [Tags]
     ...    pods
@@ -41,7 +41,7 @@ Check Image Rollover Times In Namespace
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-List Images and Tags for Every Container in Running Pods
+List Images and Tags for Every Container in Running Pods for Namespace `${NAMESPACE}`
     [Documentation]    Display the status, image name, image tag, and container name for running pods in the namespace.
     [Tags]    pods    containers    image    images    tag
     ${image_details}=    RW.CLI.Run Cli
@@ -53,7 +53,7 @@ List Images and Tags for Every Container in Running Pods
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-List Images and Tags for Every Container in Failed Pods
+List Images and Tags for Every Container in Failed Pods for Namespace`${NAMESPACE}`
     [Documentation]    Display the status, image name, image tag, and container name for failed pods in the namespace.
     [Tags]    pods    containers    image    images    tag
     ${image_details}=    RW.CLI.Run Cli
@@ -65,7 +65,7 @@ List Images and Tags for Every Container in Failed Pods
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-List ImagePullBackOff Events and Test Path and Tags
+List ImagePullBackOff Events and Test Path and Tags for Namespace `${NAMESPACE}`
     [Documentation]    Search events in the last 5 minutes for BackOff events related to image pull issues. Run Skopeo to test if the image path exists and what tags are available.
     [Tags]    containers    image    images    tag    imagepullbackoff    skopeo    backoff
     ${image_path_and_tag_details}=    RW.CLI.Run Cli

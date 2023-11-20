@@ -14,9 +14,8 @@ Library             Collections
 
 Suite Setup         Suite Initialization
 
-
 *** Tasks ***
-Ping `${DEPLOYMENT_NAME}` Redis Workload
+Ping Redis Workload
     [Documentation]    Verifies that a PING can be peformed against the redis workload.
     [Tags]    redis    cli    ping    pong    alive    probe    ready
     ${rsp}=    RW.CLI.Run Cli
@@ -31,13 +30,12 @@ Ping `${DEPLOYMENT_NAME}` Redis Workload
     ...    set_issue_actual=The Redis workload was unable to properly repond to the PING request
     ...    set_issue_title=Redis PING Failed In Namespace ${NAMESPACE} For Redis Deployment ${DEPLOYMENT_NAME}
     ...    set_issue_details=Found $_line in namespace ${NAMESPACE}\nCheck if the redis workload is healthy and available. Attempt to run a 'redis-cli PING' directly on the workload and verify the response which should be PONG.
-    ...    set_issue_next_steps=Check PVC health status in namespace ${NAMESPACE}
     ...    _line__raise_issue_if_ncontains=PONG
     RW.Core.Add Pre To Report    Redis Response:\n${rsp.stdout}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Verify `${DEPLOYMENT_NAME}` Redis Read Write Operation
+Verify Redis Read Write Operation
     [Documentation]    Attempts to perform a write and read operation on the redis workload, checking that a key can be set, incremented, and read from.
     [Tags]    redis    cli    increment    health    check    read    write
     ${set_op}=    RW.CLI.Run Cli
@@ -62,7 +60,6 @@ Verify `${DEPLOYMENT_NAME}` Redis Read Write Operation
     ...    set_issue_actual=The redis workload failed to increment the key as expected.
     ...    set_issue_title=Redis Read Write Operation Failure In Namespace ${NAMESPACE} For Redis Deployment ${DEPLOYMENT_NAME}
     ...    set_issue_details=Found $_line in namespace ${NAMESPACE}\nCheck the PVC that the redis workload depends on and verify it's healthy. Try use 'redis-cli INCR ${REDIS_HEALTHCHECK_KEY}' yourself on the workload.
-    ...    set_issue_next_steps=Check PVC health status in namespace ${NAMESPACE}
     ...    _line__raise_issue_if_neq=1
     RW.Core.Add Pre To Report    Redis Response For Key ${REDIS_HEALTHCHECK_KEY}:${get_op.stdout}
     ${history}=    RW.CLI.Pop Shell History

@@ -13,7 +13,7 @@ spec:
               mode: substring
       slxs:
         - baseName: flux-kstmz
-          qualifiers: ["resource", "namespace", "cluster"]
+          qualifiers: ["namespace", "cluster"]
           baseTemplateName: k8s-flux-kustomize-health
           levelOfDetail: detailed
           outputItems:
