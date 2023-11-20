@@ -40,9 +40,10 @@ Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
     ...    env=${env}
     ...    include_in_history=false
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=echo '''${logs.stdout}''' | awk '/Issues Identified:/ {start=1} /The namespace online-boutique has produced the following interesting events:/ {start=0} start'
+    ...    cmd=echo '''${logs.stdout}''' | awk '/Issues Identified:/ {start=1; next} /The namespace online-boutique has produced the following interesting events:/ {start=0} start'
     ...    env=${env}
     ...    include_in_history=false
+    #FIXME: Refactor this to a loop of 1 issue per line of issue output - better alinging next steps with specific issues
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${logs}
     ...    set_severity_level=2
