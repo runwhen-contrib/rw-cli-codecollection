@@ -45,9 +45,13 @@ Troubleshoot Warning Events in Namespace `${NAMESPACE}`
             ...    env=${env}
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
+            ${item_owner_output}=    RW.CLI.Run Cli
+            ...    cmd=echo "${item_owner.stdout}" | sed 's/ *$//' | tr -d '\n'
+            ...    env=${env}
+            ...    include_in_history=False
             ${messages}=    Replace String    ${item["summary_messages"]}    "    ${EMPTY}
-            IF    len($item_owner.stdout) > 0
-                ${owner_kind}    ${owner_name}=    Split String    ${item_owner.stdout}    ${SPACE}
+            IF    len($item_owner_output.stdout) > 0
+                ${owner_kind}    ${owner_name}=    Split String    ${item_owner_output.stdout}    ${SPACE}
                 ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
             ELSE
                 ${owner_kind}    ${owner_name}=    Set Variable    ""
@@ -274,10 +278,14 @@ Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
             ...    env=${env}
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
+            ${item_owner_output}=    RW.CLI.Run Cli
+            ...    cmd=echo "${item_owner.stdout}" | sed 's/ *$//' | tr -d '\n'
+            ...    env=${env}
+            ...    include_in_history=False
             # FIXME: There's an odd condition where a pod with a name like this: jx-preview-gc-jobs-28337580-464vm produces no matches
             # as it's disappered, but events still linger. Need to catch this error later and validate a fix
-            IF    len($item_owner.stdout) > 0 and ($item_owner.stdout) != "No resource found\n"
-                ${owner_kind}    ${owner_name}=    Split String    ${item_owner.stdout}    ${SPACE}
+            IF    len($item_owner_output.stdout) > 0 and ($item_owner_output.stdout) != "No resource found"
+                ${owner_kind}    ${owner_name}=    Split String    ${item_owner_output.stdout}    ${SPACE}
                 ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
             ELSE
                 ${owner_kind}    ${owner_name}=    Set Variable    ""
