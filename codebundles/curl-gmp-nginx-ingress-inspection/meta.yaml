@@ -41,7 +41,7 @@ commands:
     \ | jq -r 'if .data.result[0] then \"Host:\" + .data.result[0].metric.host + \"\
     \ Ingress:\" + .data.result[0].metric.ingress + \" Namespace:\" + .data.result[0].metric.exported_namespace\
     \ + \" Service:\" + .data.result[0].metric.service else \"\" end'"
-  name: fetch_nginx_ingress_http_errors_from_gmp_and_perform_inspection_on_results
+  name: fetch_nginx_http_errors_from_gmp_for_ingress_ingress_object_name_
 - command: 'namespace="${NAMESPACE}"; context="${CONTEXT}"; ingress="${INGRESS_OBJECT_NAME}";
     echo "Ingress: $ingress"; health_status="NA"; services=(); backend_services=$(kubectl
     get ingress "$ingress" -n "$namespace" --context "$context" -ojsonpath=''{range
@@ -170,4 +170,4 @@ commands:
     \        echo \"Validation: Service $SERVICE does not exist\"\n    else\n    \
     \    ENDPOINT_EXISTS=$(kubectl get endpoints \"$SERVICE\" -n \"$NAMESPACE\" --context\
     \ \"$CONTEXT\" -ojsonpath='{.metadata.name}')\n        # Validate that the Service"
-  name: find_ingress_owner_and_service_health
+  name: find_owner_and_service_health_for_ingress_ingress_object_name_

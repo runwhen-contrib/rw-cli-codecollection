@@ -1,34 +1,60 @@
 commands:
-- command: kubectl get events --context ${CONTEXT} -n ${NAMESPACE} --field-selector
-    type=Warning | grep -i "${DEPLOYMENT_NAME}" || true
+- command: 'kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq ''(now
+    - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind
+    == "Deployment" or .involvedObject.kind == "ReplicaSet" or .involvedObject.kind
+    == "Pod") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}"))
+    and (.lastTimestamp | fromdateiso8601) >= $time_limit) | {kind: .involvedObject.kind,
+    name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp:
+    .firstTimestamp, lastTimestamp: .lastTimestamp} ] | group_by([.kind, .name]) |
+    map({kind: .[0].kind, name: .[0].name, count: length, reasons: map(.reason) |
+    unique, messages: map(.message) | unique, firstTimestamp: map(.firstTimestamp
+    | fromdateiso8601) | sort | .[0] | todateiso8601, lastTimestamp: map(.lastTimestamp
+    | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'''
   doc_links: '
 
-    - [Kubernetes Documentation for kubectl command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+    - [Kubectl get events command - official docs](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events){:target="_blank"}
 
-    - [Kubernetes Documentation on contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#specify-a-context){:target="_blank"}
+    - [Kubectl context command - official docs](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#context){:target="_blank"}
 
-    - [Kubernetes Documentation on namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+    - [Kubernetes namespaces - official docs](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [Grep Documentation](https://www.gnu.org/software/grep/manual/grep.html){:target="_blank"}'
+    - [Using jq command utility to parse JSON - official docs](https://stedolan.github.io/jq/tutorial/){:target="_blank"}'
   explanation: '
 
 
-    This command is using the kubectl command line tool to get events related to your
-    deployment in a specific namespace, with the context and name of the deployment
-    that you specify. It filters out all but Warning events (meaning that only Warnings
-    will be shown) and then uses grep to search the output for your deployment''s
-    name. The || true at the end ensures that even if the grep command returns no
-    results, the overall command will still succeed.'
-  multi_line_details: "\n\n# This command is designed to get events from the Kubernetes\
-    \ context, namesapce and deployment name that are of type Warning\n# The optional\
-    \ `|| true` ensures that the command will always return `0` even if it fails.\n\
-    \n# Split into multi-line command:\nkubectl \\\n    get events \\  # Get events\n\
-    \    --context ${CONTEXT} \\  # Specify what context by declaring variable\n \
-    \   -n ${NAMESPACE} \\  # Specify the namespace by declaring variable \n    --field-selector\
-    \ type=Warning \\  # Filter only events of type warning\n    | grep -i \"${DEPLOYMENT_NAME}\"\
-    \ \\  # Search for the deployment name using case insensitive search\n    || true\
-    \ \\  # Make sure command returns a 0 even if it fails"
-  name: troubleshoot_deployment_warning_events
+    This command will list all the events within a Kubernetes cluster in json format.
+    It filters for only warnings, deployments, replicasets, and pods with the specified
+    deployment name that have occurred within the last hour. The output includes the
+    kind of event, the name of the object that was affected by the event, the reason
+    for the event, any messages associated with the event, and the first and last
+    time stamp of the event.'
+  multi_line_details: "\n\n# This command gets events from a Kubernetes cluster, filtered\
+    \ to get only Warnings from Deployment, ReplicaSet or Pod which contain the specified\
+    \ DEPLOYMENT_NAME. It is then grouped by kind and name and mapped in to shorten\
+    \ form with additional fields\n\nkubectl get events \\  # Get events from the\
+    \ Kubernetes cluster \n    --context ${CONTEXT} \\  # Specify the context of the\
+    \ kubernetes cluster\n    -n ${NAMESPACE} \\  # The namespace from which to get\
+    \ events from\n    -o json | \\  # Output the result in json format\n    jq '(now\
+    \ - (60*60)) as $time_limit | \\  # Define time limit for the events i.e. last\
+    \ one hour\n        [ .items[] | \\  # Get all items from the response\n     \
+    \       select(.type == \"Warning\" and \\  # Filter for Warning type of events\n\
+    \            (.involvedObject.kind == \"Deployment\" \\  # Filter for Events related\
+    \ to Deployment objects\n            or .involvedObject.kind == \"ReplicaSet\"\
+    \ \\  # Filter for Events related to ReplicaSet objects\n            or .involvedObject.kind\
+    \ == \"Pod\") \\  # Filter for Events related to Pod objects\n            and\
+    \ (.involvedObject.name | tostring | contains(\"${DEPLOYMENT_NAME}\")) \\  # Filter\
+    \ on name of the deployment\n            and (.lastTimestamp | fromdateiso8601)\
+    \ >= $time_limit) \\  # Filter on timestamp of the events\n        | {kind: .involvedObject.kind,\
+    \ name: .involvedObject.name, reason: .reason, message: .message,  # Map events\
+    \ into simplified form with additional fields\n            firstTimestamp: .firstTimestamp,\
+    \ lastTimestamp: .lastTimestamp} ] \\\n        | group_by([.kind, .name]) \\ \
+    \ # Group the events based on kind and name\n        | map({kind: .[0].kind, name:\
+    \ .[0].name, count: length, \\  # Further map the data to list counts, reasons\
+    \ and messages\n            reasons: map(.reason) | unique, messages: map(.message)\
+    \ | unique, \n            firstTimestamp: map(.firstTimestamp | fromdateiso8601)\
+    \ | sort | .[0] | todateiso8601, \\\n            lastTimestamp: map(.lastTimestamp\
+    \ | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'"
+  name: troubleshoot_deployment_warning_events_for_deployment_name_
 - command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o yaml
   doc_links: '
@@ -61,100 +87,97 @@ commands:
     \ should be set separately, as it's value can change between users/environments.\n\
     \    -o yaml\\\n    #The output format will be in yaml, as specified by the '-o\
     \ yaml' option."
-  name: get_deployment_workload_details_for_report
-- command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
-    -o json
+  name: get_deployment_workload_details_for_deployment_name_and_add_to_report
+- command: 'kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
+    -o json | jq ''.status | {desired_replicas: .replicas, ready_replicas: (.readyReplicas
+    // 0), missing_replicas: ((.replicas // 0) - (.readyReplicas // 0)), unavailable_replicas:
+    (.unavailableReplicas // 0), available_condition: (if any(.conditions[]; .type
+    == "Available") then (.conditions[] | select(.type == "Available")) else "Condition
+    not available" end), progressing_condition: (if any(.conditions[]; .type == "Progressing")
+    then (.conditions[] | select(.type == "Progressing")) else "Condition not available"
+    end)}'''
   doc_links: '
 
-    - [Kubernetes - kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+    - [Kubectl Commands](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 
-    - [Kubernetes - Deployment Concepts](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
+    - [Kubectl Contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#set-the-current-context){:target="_blank"}
 
-    - [Kubernetes - Contexts and Config Files](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#use-multiple-contexts-in-the-same-kubeconfig-file){:target="_blank"}
+    - [Using JSON Path in JQ](https://stedolan.github.io/jq/manual/#Basicfilters%20and%20paths){:target="_blank"}
 
-    - [Kubernetes - Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [Kubernetes - JSON Path Support in kubectl](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}'
+    - [JQ Functions](https://stedolan.github.io/jq/manual/#Basicoperatorsandcomparisons){:target="_blank"}'
   explanation: '
 
 
-    This command allows you to retrieve information about a specific deployment in
-    Kubernetes. The ${DEPLOYMENT_NAME} argument is used to specify which deployment
-    you want to get info from. The ${CONTEXT} argument is used to specify the cluster
-    or context against which the request is made and the ${NAMESPACE} argument specifies
-    the namespace within the given cluster in which the deployment exists. Finally,
-    the -o json flag specifies that the resulting output should be in JSON format.'
-  multi_line_details: "path='{.spec.replicas}'\n\n# Get the current Deployment object\
-    \ based on a name, context, and namespace\nkubectl get deployment/${DEPLOYMENT_NAME}\
-    \ \\\n    --context ${CONTEXT} \\\n    -n ${NAMESPACE} \\\n# Output the number\
-    \ of replicas as defined in the Deployment Spec \n   -o jsonpath='{.spec.replicas}'"
-  name: troubleshoot_deployment_replicas
-- command: kubectl get events --field-selector type!=Warning --context ${CONTEXT}
-    -n ${NAMESPACE} -o json | jq -r '.items[] | select(.involvedObject.name|contains("${DEPLOYMENT_NAME}"))
-    | select( .count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60
-    == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end
-    ) > ${ANOMALY_THRESHOLD}) | "Event(s) Per Minute:" + (.count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60
-    == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end
-    ) |tostring) +" Count:" + (.count|tostring) + " Minute(s):" + (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60|tostring)+
-    " Object:" + .involvedObject.namespace + "/" + .involvedObject.kind + "/" + .involvedObject.name
-    + " Reason:" + .reason + " Message:" + .message'
+    This command is retrieving the status of a Kubernetes deployment. A deployment
+    defines how a particular pod or set of pods should be deployed and managed by
+    Kubernetes. It will retrieve the desired number of replicas (defined replicas)
+    for that deployment, the ready replicas (number of replicas already created and
+    working), the missing replicas (replicas defined but not yet created) and the
+    unavailable replicas (number of replicas that vice versa are working but not defined).
+    In addition, it will provide two conditions, available and progressing, to check
+    their related statuses. This command will allow you to see if the deployment is
+    up and running with all the given data.'
+  multi_line_details: "\n\n# Get deployment specified by the ${DEPLOYMENT_NAME} variable\
+    \ and associated context, namespace. Output in json format\nkubectl get deployment/${DEPLOYMENT_NAME}\
+    \ \\ \n    --context ${CONTEXT} \\\n    -n ${NAMESPACE} \\\n    -o json \n\n#\
+    \ Run jq command to specify desired replicas, ready replicas, missing replicas,\
+    \ unavailable replicas, available condition, and progressing condition\n| jq '.status\
+    \ | {desired_replicas: .replicas, ready_replicas: (.readyReplicas // 0), missing_replicas:\
+    \ ((.replicas // 0) - (.readyReplicas // 0)), unavailable_replicas: (.unavailableReplicas\
+    \ // 0), available_condition: (if any(.conditions[]; .type == \"Available\") then\
+    \ (.conditions[] | select(.type == \"Available\")) else \"Condition not available\"\
+    \ end), progressing_condition: (if any(.conditions[]; .type == \"Progressing\"\
+    ) then (.conditions[] | select(.type == \"Progressing\")) else \"Condition not\
+    \ available\" end)}'"
+  name: troubleshoot_deployment_replicas_for_deployment_name_
+- command: 'kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq ''(now
+    - (60*60)) as $time_limit | [ .items[] | select(.type != "Warning" and (.involvedObject.kind
+    == "Deployment" or .involvedObject.kind == "ReplicaSet" or .involvedObject.kind
+    == "Pod") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}")))
+    | {kind: .involvedObject.kind, count: .count, name: .involvedObject.name, reason:
+    .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp,
+    duration: (if (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp | fromdateiso8601))
+    == 0) then 1 else (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp | fromdateiso8601))/60)
+    end) } ] | group_by([.kind, .name]) | map({kind: .[0].kind, name: .[0].name, count:
+    (map(.count) | add), reasons: map(.reason) | unique, messages: map(.message) |
+    unique, average_events_per_minute: (if .[0].duration == 1 then 1 else ((map(.count)
+    | add)/.[0].duration ) end),firstTimestamp: map(.firstTimestamp | fromdateiso8601)
+    | sort | .[0] | todateiso8601, lastTimestamp: map(.lastTimestamp | fromdateiso8601)
+    | sort | reverse | .[0] | todateiso8601})'''
   doc_links: '
 
-    - [Kubernetes Documentation: kubectl get events](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events){:target="_blank"}
+    - [Kubernetes Documentation - kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 
-    - [jq Manual for .items[]](https://stedolan.github.io/jq/manual/#Itemsarraysstringsequencesandobjects){:target="_blank"}
-
-    - [Kubernetes Documentation: field selector type](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/){:target="_blank"}
-
-    - [jq Manual for select()](https://stedolan.github.io/jq/manual/#selectfilter){:target="_blank"}
-
-    - [jq Manual for Math Operations](https://stedolan.github.io/jq/manual/#MathOperations){:target="_blank"}
-
-    - [jq Manual for Info Functions](https://stedolan.github.io/jq/manual/#infofunctions){:target="_blank"}'
+    - [jq Manual](https://stedolan.github.io/jq/){:target="_blank"}'
   explanation: '
 
 
-    This command is used to get events from Kubernetes running in the specified context
-    and namespace. The command will filter out all Warning type events, and look for
-    events related to the deployment name that are occurring at a rate greater than
-    ANOMALY_THRESHOLD, as determined by dividing the number of events by the time
-    between the first occurrence and last occurrence. If it finds any such events,
-    it prints out information about them, including the event''s message, reason,
-    and object type.'
-  multi_line_details: "\n\n# This command calculates the number of events per minute\
-    \ created by a given deployment in Kubernetes. \n# It filters out events that\
-    \ aren't related to the deployment, and prints out useful information about any\
-    \ anomalies.\n\n# Break down the one-liner into multiple lines:\nkubectl get events\
-    \ \\\n    --field-selector type!=Warning \\\n    --context ${CONTEXT} \\\n   \
-    \ -n ${NAMESPACE}\\\n    -o json |\n    jq -r '.items[] | \\\n        select(.involvedObject.name|contains(\"\
-    ${DEPLOYMENT_NAME}\")) | \\\n        select( .count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60\
-    \ == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end\
-    \ ) > ${ANOMALY_THRESHOLD}) | \n        \"Event(s) Per Minute:\" + (.count / (\
-    \ if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else\
-    \ ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) |tostring) +\"\
-    \ Count:\" + (.count|tostring) + \" Minute(s):\" + (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60|tostring)+\
-    \ \" Object:\" + .involvedObject.namespace + \"/\" + .involvedObject.kind + \"\
-    /\" + .involvedObject.name + \" Reason:\" + .reason + \" Message:\" + .message'\n\
-    \n# Explanation:\n# kubectl get events \n#     Fetches the events in the cluster\
-    \ based on the following options.\n# \n# --field-selector type!=Warning\n#   \
-    \  Option to exclude events with Warning type from the output\n# \n# --context\
-    \ ${CONTEXT}\n#     Name of the context for which the events have to be fetched\n\
-    # \n# -n ${NAMESPACE}\n#     Namespace where the events are located\n# \n# -o\
-    \ json \n#     Output option to print events in JSON format\n# \n# jq -r\n#  \
-    \   Command to use the JSON parser jq to find specific items in the response\n\
-    # \n# '.items[] |\n#      Iterates over each event object stored as item\n# \n\
-    # select(.involvedObject.name|contains(\"${DEPLOYMENT_NAME}\"))\n#     Filters\
-    \ items according to the specified Deployment name defined by the variable\n#\
-    \ \n# select( .count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60\
-    \ == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end\
-    \ ) > ${ANOMALY_THRESHOLD})\n#     Calculates the number of events per minute\
-    \ using the first and last time stamps of the events, checks whether the value\
-    \ is greater then the anomaly threshold and selects only such items\n# \n# \"\
-    Event(s) Per Minute:\" + (.count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60\
-    \ == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end\
-    \ ) |tostring) +\" Count:\" + (.count|tostring) + \" Minute(s):\" + (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60|tostring)+\
-    \ \" Object:\" + .involvedObject.namespace + \"/\" + .involvedObject.kind + \"\
-    /\" + .involvedObject.name + \" Reason:\" + .reason + \" Message:\" + .message'\n\
-    #     Prints helpful details regarding the selected events, like the object's\
-    \ name, the reason behind the events, etc."
-  name: check_for_deployment_event_anomalies
+    This command allows the user to get events from Kubernetes based on a specified
+    context, namespace, and deployment name. It takes the output from kubectl and
+    adds additional contextual information like the count, messages, first and last
+    timestamp of the event, and the average number of events per minute. This makes
+    it easier to see what type of events happened related to the given context, namespace,
+    and deployment name, and how long each of those events took to complete.'
+  multi_line_details: "\n\n# This is a Kubernetes command to get events from the context\
+    \ of the given namespace filtered by specific deployment name and convert it into\
+    \ a JSON fromat.\n# This command can be broken down into multiple lines for better\
+    \ readability.\n\n# Set the CONTEXT, NAMESPACE, DEPLOYMENT_NAME environment variables\
+    \ in the current shell\nCONTEXT=\"<insert context>\"\nNAMESPACE=\"<insert namespace>\"\
+    \nDEPLOYMENT_NAME=\"<insert deployment>\"\n\n# Get events using the kubectl command\
+    \ with json formatting\nkubectl get events \\\n    --context ${CONTEXT} \\\n \
+    \   -n ${NAMESPACE} \\ \n    -o json \\\n\n# Pipe the output to jq for additional\
+    \ filtering.\n| jq '(now - (60*60)) as $time_limit | [ .items[] | select(.type\
+    \ != \"Warning\" and (.involvedObject.kind == \"Deployment\" or .involvedObject.kind\
+    \ == \"ReplicaSet\" or .involvedObject.kind == \"Pod\") and (.involvedObject.name\
+    \ | tostring | contains(\"${DEPLOYMENT_NAME}\"))) | {kind: .involvedObject.kind,\
+    \ count: .count, name: .involvedObject.name, reason: .reason, message: .message,\
+    \ firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, duration: (if\
+    \ (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp | fromdateiso8601))\
+    \ == 0) then 1 else (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp |\
+    \ fromdateiso8601))/60) end) } ] | group_by([.kind, .name]) | map({kind: .[0].kind,\
+    \ name: .[0].name, count: (map(.count) | add), reasons: map(.reason) | unique,\
+    \ messages: map(.message) | unique, average_events_per_minute: (if .[0].duration\
+    \ == 1 then 1 else ((map(.count) | add)/.[0].duration ) end),firstTimestamp: map(.firstTimestamp\
+    \ | fromdateiso8601) | sort | .[0] | todateiso8601, lastTimestamp: map(.lastTimestamp\
+    \ | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'"
+  name: check_deployment_event_anomalies_for_deployment_name_

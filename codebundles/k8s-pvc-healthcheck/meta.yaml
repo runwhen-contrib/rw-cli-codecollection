@@ -31,7 +31,7 @@ commands:
     \ name and message for each event\n    echo $events | jq '.items[]| \"Last Timestamp:\
     \ \" + .lastTimestamp + \" Name: \" + .involvedObject.name + \" Message: \" +\
     \ .message'\n done"
-  name: fetch_events_for_unhealthy_kubernetes_persistentvolumeclaims
+  name: fetch_events_for_unhealthy_kubernetes_persistentvolumeclaims_in_namespace_namespace_
 - command: 'namespace=${NAMESPACE}; context=${CONTEXT}; kubectl get pvc -n $namespace
     --context=$context -o json | jq -r ''.items[] | select(.metadata.deletionTimestamp
     != null) | .metadata.name as $name | .metadata.deletionTimestamp as $deletion_time
@@ -85,7 +85,7 @@ commands:
     as $name | .metadata.deletionTimestamp as $deletion_time | .metadata.finalizers
     as $finalizers | "\($name) is in Terminating state (Deletion started at: \($deletion_time)).
     Finalizers: \($finalizers)"'''
-  name: list_persistentvolumeclaims_in_terminating_state
+  name: list_persistentvolumeclaims_in_terminating_state_in_namespace_namespace_
 - command: 'for pv in $(kubectl get pv --context ${CONTEXT} -o json | jq -r ''.items[]
     | select(.status.phase == "Terminating") | .metadata.name''); do kubectl get events
     --all-namespaces --field-selector involvedObject.name=$pv --context ${CONTEXT}
@@ -125,7 +125,7 @@ commands:
     \ in $\u0420V_EVENTS; do \n            echo $(echo $event | jq '\"Last Timestamp:\
     \ \" + .lastTimestamp + \" Name: \" + .involvedObject.name + \" Message: \" +\
     \ .message')\n        done\n    fi\ndone"
-  name: list_persistentvolumes_in_terminating_state
+  name: list_persistentvolumes_in_terminating_state_in_namespace_namespace_
 - command: 'for pod in $(kubectl get pods -n ${NAMESPACE} --field-selector=status.phase=Running
     --context ${CONTEXT} -o jsonpath=''{range .items[*]}{.metadata.name}{"\n"}{end}'');
     do for pvc in $(kubectl get pods $pod -n ${NAMESPACE} --context ${CONTEXT} -o
@@ -195,7 +195,7 @@ commands:
     nPod: $pod\\nPVC: $pvc\\nPV: $pv\\nStatus: $status\\nNode: $node\\nZone: $zone\\\
     nIngressClass: $ingressclass\\nAccessModes: $accessmode\\nReclaimPolicy: $reclaimpolicy\\\
     nCSIDriver: $csidriver\\n\"; \n    done;  \ndone"
-  name: list_pods_with_attached_volumes_and_related_persistentvolume_details
+  name: list_pods_with_attached_volumes_and_related_persistentvolume_details_in_namespace_namespace_
 - command: 'for pod in $(kubectl get pods -n ${NAMESPACE} --field-selector=status.phase=Running
     --context ${CONTEXT} -o jsonpath=''{range .items[*]}{.metadata.name}{"\n"}{end}'');
     do for pvc in $(kubectl get pods $pod -n ${NAMESPACE} --context ${CONTEXT} -o
@@ -254,7 +254,7 @@ commands:
     \ to query disk usage on the mountPath:\n            kubectl exec $pod -n ${NAMESPACE}\
     \ --context ${CONTEXT} -c $containerName -- df -h $mountPath; \n        done;\
     \ \n    done; \ndone;"
-  name: fetch_the_storage_utilization_for_pvc_mounts
+  name: fetch_the_storage_utilization_for_pvc_mounts_in_namespace_namespace_
 - command: 'NAMESPACE="${NAMESPACE}"; CONTEXT="${CONTEXT}"; PODS=$(kubectl get pods
     -n $NAMESPACE --context=$CONTEXT -o json); for pod in $(jq -r ''.items[] | @base64''
     <<< "$PODS"); do _jq() { jq -r \${1} <<< "$(base64 --decode <<< \${pod})"; };
@@ -332,4 +332,4 @@ commands:
     \ $pvc_name\";\n            echo \"PV: $PV_NAME\";\n            echo \"Node with\
     \ Pod: $POD_NODE_NAME\";\n            echo \"Node with Storage: $STORAGE_NODE_NAME\"\
     ;\n            echo;\n        fi;\n    done;\ndone"
-  name: check_for_rwo_persistent_volume_node_attachment_issues
+  name: check_for_rwo_persistent_volume_node_attachment_issues_in_namespace_namespace_
