@@ -19,8 +19,8 @@ Checking HTTP URL Is Available And Timely
     ${curl_rsp}=    RW.CLI.Run Cli
     ...    cmd=curl -o /dev/null -w '{"http_code": \%{http_code}, "time_total": \%{time_total}}' -s ${URL}
     ...    render_in_commandlist=true
-    # ${owner_details_dict}=    Evaluate    json.loads($OWNER_DETAILS)
-    ${owner_details_dict}=    Evaluate    json.loads(r'''${OWNER_DETAILS}''')    json
+    ${owner_details_dict}=    Evaluate    json.loads($OWNER_DETAILS)
+    # ${owner_details_dict}=    Evaluate    json.loads(r'''${OWNER_DETAILS}''')    json
 
     # ${owner_kind}=    Set Variable    ${owner_details_dict['kind']}
     # ${owner_name}=    Set Variable    ${owner_details_dict['name']}
@@ -82,8 +82,8 @@ Suite Initialization
     ...    type=string
     ...    description=Json list of owner details
     ...    pattern=\w*
-    ...    default='{"name":"my-ingress", "kind":"Ingress","namespace":"default"}'
-    ...    example='{"name":"my-ingress", "kind":"Ingress","namespace":"default"}'
+    ...    default={'name': 'my-ingress', 'kind': 'Ingress', 'namespace': 'default'}
+    ...    example={'name': 'my-ingress', 'kind': 'Ingress', 'namespace': 'default'}
     Set Suite Variable    ${DESIRED_RESPONSE_CODE}    ${DESIRED_RESPONSE_CODE}
     Set Suite Variable    ${URL}    ${URL}
     Set Suite Variable    ${TARGET_LATENCY}    ${TARGET_LATENCY}
