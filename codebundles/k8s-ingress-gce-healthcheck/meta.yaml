@@ -70,46 +70,46 @@ commands:
     && gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
     && gcloud logging read ''severity="ERROR" AND resource.type="gce_network" AND
     protoPayload.resourceName=~"''\${backend}''"'' --freshness=1d --limit=50 --project
-    "$GCP_PROJECT_ID" --format=json | jq ''if length > 0 then [ .[] | select(.protoPayload.response.error.message?
-    or .protoPayload.status.message?) | { timestamp: .timestamp, ip: (if .protoPayload.request.networkEndpoints?
-    then .protoPayload.request.networkEndpoints[].ipAddress else null end), message:
-    (.protoPayload.response.error.message? // .protoPayload.status.message?) } ] |
-    group_by(.message) | map(max_by(.timestamp)) | .[] | (.timestamp + " | IP: " +
-    (.ip // "N/A") + " | Error: " + .message) else "No results found" end''; done'
+    "$GCP_PROJECT_ID" --format=json | jq ''[.[] | {timestamp: .timestamp, ip: .protoPayload.request.networkEndpoints[].ipAddress,
+    message: .protoPayload.response.error.message}] | group_by(.message) | map(max_by(.timestamp))
+    | .[] | (.timestamp + " | IP: " + .ip + " | Error: " + .message)''; done'
   doc_links: '
 
-    - [Kubernetes Ingress - Managing Traffic to Your Services](https://kubernetes.io/docs/concepts/services-networking/ingress/){:target="_blank"}
+    - [Kubernetes Documentation - Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/){:target="_blank"}
 
-    - [Google Cloud Monitor Reading Logs for GCE_NETWORK Errors](https://cloud.google.com/error-reporting/docs/setup/index#logging){:target="_blank"}'
-  explanation: '
+    - [jq - Command Line JSON Processor](https://stedolan.github.io/jq/){:target="_blank"}
 
+    - [Google Cloud gcloud logging read Command Reference](https://cloud.google.com/sdk/gcloud/reference/logging/read){:target="_blank"}
 
-    This command is used to debug an Ingress in Kubernetes. It retrieves errors from
-    GCP''s log streaming and prints out the timestamp, IP address, and error message
-    associated with it. The command first retrieves the backend values of the Ingress
-    indicated by the INGRESS_NAME variable and its corresponding NAMESPACE and CONTEXT.
-    It then uses GCP authentication tokens (GOOGLE_APPLICATION_CREDENTIALS) to access
-    the GCP logging system. A query is run for each backend which fetches the resourceName
-    that matches and limits to errors returned in the last 24 hours. Finally, the
-    information is formatted into a readable output containing the details of the
-    errors as required.'
-  multi_line_details: "\n\n# Variable declarations \nINGRESS_NAME=${INGRESS};\nNAMESPACE=${NAMESPACE};\n\
-    CONTEXT=${CONTEXT};\nGCP_PROJECT_ID=${GCP_PROJECT_ID};\n\n# Get information from\
-    \ resource\nfor backend in $(kubectl get ingress $INGRESS_NAME -n $NAMESPACE --context\
-    \ $CONTEXT -o=json | jq -r '.metadata.annotations[\"ingress.kubernetes.io/backends\"\
-    ] | fromjson | to_entries[] | select(.value != \"HEALTHY\") | .key'); do\n  #\
-    \ Print resource name\n  echo \"Backend: \\${backend}\"\n\n  # Authenticate with\
-    \ Google Application credentials\n  gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS\n\
-    \n  # Use the Google Cloud Logging command to read errors from resource\n  gcloud\
+    - [Google JSON Key file information](https://cloud.google.com/iam/docs/creating-managing-service-account-keys#sa-key-json-file){:target="_blank"}'
+  explanation: "\n\nThis command is for troubleshooting Ingress resources within Kubernetes.\
+    \ It uses the GCP Project ID, Ingress NAME, NAMESPACE and CONTEXT provided to\
+    \ output error messages related to backends that aren't HEALTHY. It first makes\
+    \ sure that the service account for GCloud can be used with 'gcloud auth activate-service-acccount'\
+    \ and then it reads the errors using GCloud logging with 'gcloud logging read'.\
+    \ The command is filtered to severity ERROR, about a network of type \u2018gce_network\u2019\
+    , associated with backend provided by the Ingress resource, and is limited to\
+    \ entries of the last day. Finally, 'jq' is used to output the timestamp, IP address,\
+    \ and error message related to each backend specified in the Ingress resources."
+  multi_line_details: " \n\n# Get name of ingress resource and namespace it's in,\
+    \ along with context and GCP project ID \nINGRESS_NAME=${INGRESS}\nNAMESPACE=${NAMESPACE}\n\
+    CONTEXT=${CONTEXT}\nGCP_PROJECT_ID=${GCP_PROJECT_ID}\n\n# Use kubectl to get a\
+    \ json file that contains annotations about the ingress (metadata about the resources)\
+    \ \nJSON=$(kubectl get ingress $INGRESS_NAME -n $NAMESPACE --context $CONTEXT\
+    \ -o=json)\n\n# Extract backends from JSON using jq to parse it\nBACKENDS=$(echo\
+    \ $JSON | jq -r '.metadata.annotations[\"ingress.kubernetes.io/backends\"] | fromjson\
+    \ | to_entries[] | select(.value != \"HEALTHY\") | .key') \n\n# Iterate over each\
+    \ backend\nfor backend in $BACKENDS; do \n    # Print out the backend name for\
+    \ reference\n    echo \"Backend: \\${backend}\"\n    \n    # Authenticate with\
+    \ gcloud\n    gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS\n\
+    \n    # Fetch error log entries from logging API for the past day\n    ERROR_LOGS=$(gcloud\
     \ logging read 'severity=\"ERROR\" AND resource.type=\"gce_network\" AND protoPayload.resourceName=~\"\
-    '\\${backend}'\"' --freshness=1d --limit=50 --project \"$GCP_PROJECT_ID\" --format=json\
-    \ | jq 'if length > 0 then [ .[] | select(.protoPayload.response.error.message?\
-    \ or.protoPayload.status.message?) | { timestamp: .timestamp, ip: (if .protoPayload.request.networkEndpoints?\
-    \ then .protoPayload.request.networkEndpoints[].ipAddress else null end), message:\
-    \ (.protoPayload.response.error.message? // .protoPayload.status.message?) } ]\
+    '$backend'\"' --freshness=1d --limit=50 --project \"$GCP_PROJECT_ID\" --format=json)\n\
+    \n    # Parse each log entry in logs returned by logging API, and print out relevant\
+    \ information\n    LOGS=$(echo $ERROR_LOGS | jq '[.[] | {timestamp: .timestamp,\
+    \ ip: .protoPayload.request.networkEndpoints[].ipAddress, message: .protoPayload.response.error.message}]\
     \ | group_by(.message) | map(max_by(.timestamp)) | .[] | (.timestamp + \" | IP:\
-    \ \" + (.ip // \"N/A\") + \" | Error: \" + .message) else \"No results found\"\
-    \ end'; done"
+    \ \" + .ip + \" | Error: \" + .message)') \ndone"
   name: fetch_network_error_logs_from_gcp_operations_manager_for_ingress_backends
 - command: INGRESS=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT=${CONTEXT}; FORWARDING_RULE=$(kubectl
     get ingress $INGRESS -n $NAMESPACE --context $CONTEXT -o=jsonpath='{.metadata.annotations.ingress\.kubernetes\.io/forwarding-rule}')

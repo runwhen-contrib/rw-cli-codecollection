@@ -6,12 +6,12 @@ spec:
         - namespace
       matchRules:
         - type: pattern
-          pattern: "."
+          pattern: ".+"
           properties: [name]
           mode: substring
       slxs:
         - baseName: ns-health
-          levelOfDetail: detailed
+          levelOfDetail: basic
           qualifiers: ["namespace", "cluster"]
           baseTemplateName: k8s-namespace-healthcheck
           outputItems:

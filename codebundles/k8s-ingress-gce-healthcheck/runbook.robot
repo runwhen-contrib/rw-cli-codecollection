@@ -97,6 +97,7 @@ Fetch Network Error Logs from GCP Operations Manager for Ingress Backends
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    render_in_commandlist=true
+   
    RW.CLI.Parse Cli Output By Line
    ...    rsp=${network_error_logs}
    ...    set_severity_level=2
@@ -104,7 +105,7 @@ Fetch Network Error Logs from GCP Operations Manager for Ingress Backends
    ...    set_issue_actual=Network error logs are found in GCP Operations Console related to Ingress `${INGRESS}`
    ...    set_issue_title=Network error logs are found for Ingress `${INGRESS}`
    ...    set_issue_details=Network error logs were found:\n\n${network_error_logs.stdout}\n\n
-   ...    set_issue_next_steps=Review Logs and check GCP documentation to help verify configuration vaility. 
+   ...    set_issue_next_steps=Review Logs and check GCP documentation to help verify configuration accuracy. 
    ...    set_issue_reproduce_hint=Check the ingress object for related annotations. Inspect those objects in the GCP Console. 
    ...    _line__raise_issue_if_contains=
    ${history}=    RW.CLI.Pop Shell History
