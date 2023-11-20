@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Fetch Nginx HTTP Errors From GMP for  Ingress `${INGRESS_OBJECT_NAME}`
+Fetch Nginx HTTP Errors From GMP for Ingress `${INGRESS_OBJECT_NAME}`
     [Documentation]    Fetches metrics for the Nginx ingress host from GMP and performs an inspection on the results.
     ...    If there are currently any results with more than zero errors, their name will be surfaced for further troubleshooting.
     [Tags]    curl    http    ingress    latency    errors    metrics    controller    nginx    gmp    500s
