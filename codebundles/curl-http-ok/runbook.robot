@@ -70,7 +70,7 @@ Suite Initialization
     ...    type=string
     ...    description=Json list of owner details
     ...    pattern=\w*
-    ...    default='{"name":"", "kind":"Ingress","namespace":""}'
+    ...    default='{"name":"my-ingress", "kind":"Ingress","namespace":"default"}'
     ...    example='{"name":"my-ingress", "kind":"Ingress","namespace":"default"}'
     Set Suite Variable    ${DESIRED_RESPONSE_CODE}    ${DESIRED_RESPONSE_CODE}
     Set Suite Variable    ${URL}    ${URL}

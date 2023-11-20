@@ -39,6 +39,10 @@ if [[ $messages =~ "Readiness probe errored" ]]; then
     next_steps+=("Check Readiness Probe Configuration for $owner_kind \`$owner_name\`")
 fi
 
+if [[ $messages =~ "PodFailed" ]]; then
+    next_steps+=("Check Readiness Probe Configuration for $owner_kind \`$owner_name\`")
+fi
+
 if [[ $messages =~ "ImagePullBackOff" || $messages =~ "Back-off pulling image" || $messages =~ "ErrImagePull" ]]; then
     next_steps+=("List ImagePullBackoff Events and Test Path and Tags for Namespace \`$NAMESPACE\`")
     next_steps+=("List Images and Tags for Every Container in Failed Pods for Namespace \`$NAMESPACE\`")

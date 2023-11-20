@@ -123,7 +123,8 @@ done
 
 if [[ -n "$INTERESTING_PATHS" ]]; then
     SEARCH_RESOURCES+=$(echo "$INTERESTING_PATHS" | awk -F'/' '{for (i=1; i<=NF; i++) print $i}' | sort | uniq)
-    issue_descriptions+=("HTTP Errors found for paths: $SEARCH_RESOURCES")
+    FORMATTED_RESOURCES=$(echo "$SEARCH_RESOURCES" | sed 's/^/\n\//' | tr '\n' ' ' | sed 's/ /\n/g')
+    issue_descriptions+=("HTTP Errors found for paths: $FORMATTED_RESOURCES")
 else
     echo "No interesting HTTP paths found."
 fi
@@ -278,20 +279,20 @@ if [[ -n "$INTERESTING_RESOURCES" ]]; then
         case "$type" in
         pod)
             if [[ "$status" != "Running" ]]; then
-                recommendations+=("Troubleshoot failed pods in namespace \`${NAMESPACE}\`  ")
+                recommendations+=("Troubleshoot failed pods in namespace \`${NAMESPACE}\`")
             fi
             if ((restarts > 0)); then
-                recommendations+=("Troubleshoot container restarts in namespace \`${NAMESPACE}\`  ")
+                recommendations+=("Troubleshoot container restarts in namespace \`${NAMESPACE}\`")
             fi
             ;;
         deployment|deployment.apps)
-            recommendations+=("Check deployment health \`$name\` in namespace \`${NAMESPACE}\`  ")
+            recommendations+=("Check deployment health \`$name\` in namespace \`${NAMESPACE}\`")
             ;;
         service)
-            recommendations+=("Check service health \`$name\` in namespace \`${NAMESPACE}\`  ")
+            recommendations+=("Check service health \`$name\` in namespace \`${NAMESPACE}\`")
             ;;
         statefulset|statefulset.apps)
-            recommendations+=("Check statefulset health \`$name\` in namespace \`${NAMESPACE}\`  ")
+            recommendations+=("Check statefulset health \`$name\` in namespace \`${NAMESPACE}\`")
             ;;
         esac
     done <<< "$INTERESTING_RESOURCES"

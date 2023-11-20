@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Get Namespace Certificate Summary
+Get Namespace Certificate Summary for Namespace `${NAMESPACE}`
     [Documentation]    Gets a list of certmanager certificates and summarize their information for review.
     [Tags]    tls    certificates    kubernetes    objects    expiration    summary    certmanager
     ${cert_info}=    RW.CLI.Run Cli
@@ -36,7 +36,7 @@ Get Namespace Certificate Summary
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Find Failed Certificate Requests and Identify Issues
+Find Failed Certificate Requests and Identify Issues for Namespace `${NAMESPACE}`
     [Documentation]    Gets a list of failed certmanager certificates and summarize their issues.
     [Tags]    tls    certificates    kubernetes    objects    failed    certificaterequest    certmanager
     ${failed_certificaterequests}=    RW.CLI.Run Cli
