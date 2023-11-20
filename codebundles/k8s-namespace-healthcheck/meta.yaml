@@ -24,7 +24,7 @@ commands:
     \n\n# Then, run the following command to get all the events of type \"Warning\"\
     \nkubectl get events \\\n    --field-selector type=Warning \\\n\t--context ${CONTEXT}\
     \ \\\n\t-n ${NAMESPACE} \\\n\t-o json"
-  name: trace_and_troubleshoot_namespace_warning_events_and_errors
+  name: trace_and_troubleshoot_namespace_namespace_warning_events_and_errors
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r
     --argjson exit_code_explanations ''{"0": "Success", "1": "Error", "2": "Misconfiguration",
     "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137":
@@ -82,7 +82,7 @@ commands:
     )\\nterminated_finishedAt: \\(.lastState.terminated.finishedAt // \"N/A\")\\nterminated_exitCode:\
     \ \\(.lastState.terminated.exitCode // \"N/A\")\\nexit_code_explanation: \\($exit_code_explanations[.lastState.terminated.exitCode\
     \ | tostring] // \"Unknown exit code\")\") + \"\\n---\\n\""
-  name: troubleshoot_container_restarts_in_namespace
+  name: troubleshoot_container_restarts_in_namespace_namespace_
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending
     --no-headers -o json | jq -r ''.items[] | "---\npod_name: \(.metadata.name)\nstatus:
     \(.status.phase // "N/A")\nmessage: \(.status.conditions[].message // "N/A")\nreason:
@@ -128,7 +128,7 @@ commands:
     \ // [{}])[].state?.waiting?.reason // \"N/A\")\\n---\\n\"' \\ # parse the data\
     \ using jq (JSON processor) to display fields from each pod object in the response\
     \ in a nicely formatted output"
-  name: troubleshoot_pending_pods_in_namespace
+  name: troubleshoot_pending_pods_in_namespace_namespace_
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed
     --no-headers -o json | jq -r --argjson exit_code_explanations ''{"0": "Success",
     "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134":
@@ -174,7 +174,7 @@ commands:
     \ \\(.status.containerStatuses[0].state.terminated.exitCode // \"N/A\")\\nexit_code_explanation:\
     \ \\($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode\
     \ | tostring] // \"Unknown exit code\")\\n---\\n\"'"
-  name: troubleshoot_failed_pods_in_namespace
+  name: troubleshoot_failed_pods_in_namespace_namespace_
 - command: kubectl get all --context ${CONTEXT} -n ${NAMESPACE} -o json
   doc_links: '
 
@@ -198,7 +198,7 @@ commands:
     \ can be used\nexport NAMESPACE=some-namespace\n\n# Query Kubernetes API to list\
     \ all objects/resources\nkubectl get all \\\n    --context ${CONTEXT} \\\n   \
     \ -n ${NAMESPACE} \\\n    -o jsonpath=\"{..ingress[*].host}\""
-  name: troubleshoot_workload_status_conditions_in_namespace
+  name: troubleshoot_workload_status_conditions_in_namespace_namespace_
 - command: kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT}
     | xargs -n 1 kubectl get --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}
   doc_links: '
@@ -231,7 +231,7 @@ commands:
     \ line-by-line\nxargs \\\n    -n 1 \\\n    kubectl \\\n        get \\\n      \
     \      --show-kind \\\n            --ignore-not-found \\\n            -n ${NAMESPACE}\
     \ \\\n            --context=${CONTEXT}"
-  name: get_listing_of_resources_in_namespace
+  name: get_listing_of_resources_in_namespace_namespace_
 - command: services=($(kubectl get svc -o=name --context=${CONTEXT} -n ${NAMESPACE}));
     logs=""; for service in "\${services[@]}"; do logs+=$(kubectl logs $service --limit-bytes=256000
     --since=2h --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${SERVICE_ERROR_PATTERN}"
@@ -270,7 +270,7 @@ commands:
     \ -n ${NAMESPACE} | grep -Ei \"${SERVICE_ERROR_PATTERN}\" | grep -Ev \"${SERVICE_EXCLUDE_PATTERN}\"\
     \ | sort | uniq -c | awk '{print \"Issue Occurences:\",$0}')\ndone\n\n# Echo out\
     \ the logs to the terminal\necho \"\\${logs}\""
-  name: troubleshoot_namespace_services_and_application_workloads
+  name: troubleshoot_namespace_namespace_services_and_application_workloads
 - command: context="${CONTEXT}"; namespace="${NAMESPACE}"; check_health() { local
     type=$1; local name=$2; local replicas=$3; local selector=$4; local pdbs=$(kubectl
     --context "$context" --namespace "$namespace" get pdb -o json | jq -c --arg selector
@@ -369,4 +369,4 @@ commands:
     \ | to_entries[] | .key + \"=\" + .value)\"' | while read -r line; do\n\n    #\
     \ Step 5c: Invoke the check_health with relevant parameters\n    check_health\
     \ \"StatefulSet\" $(echo $line | tr -d '\"');\ndone"
-  name: check_missing_or_risky_poddisruptionbudget_policies
+  name: check_missing_or_risky_poddisruptionbudget_policies_in_namespace_namespace_

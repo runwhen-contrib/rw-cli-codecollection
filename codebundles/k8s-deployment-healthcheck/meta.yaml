@@ -28,7 +28,7 @@ commands:
     \ type=Warning \\  # Filter only events of type warning\n    | grep -i \"${DEPLOYMENT_NAME}\"\
     \ \\  # Search for the deployment name using case insensitive search\n    || true\
     \ \\  # Make sure command returns a 0 even if it fails"
-  name: troubleshoot_deployment_warning_events
+  name: troubleshoot_deployment_deployment_name_warning_events
 - command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o yaml
   doc_links: '
@@ -61,7 +61,7 @@ commands:
     \ should be set separately, as it's value can change between users/environments.\n\
     \    -o yaml\\\n    #The output format will be in yaml, as specified by the '-o\
     \ yaml' option."
-  name: get_deployment_workload_details_for_report
+  name: get_deployment_deployment_name_details_for_report
 - command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o json
   doc_links: '
@@ -88,7 +88,7 @@ commands:
     \ based on a name, context, and namespace\nkubectl get deployment/${DEPLOYMENT_NAME}\
     \ \\\n    --context ${CONTEXT} \\\n    -n ${NAMESPACE} \\\n# Output the number\
     \ of replicas as defined in the Deployment Spec \n   -o jsonpath='{.spec.replicas}'"
-  name: troubleshoot_deployment_replicas
+  name: troubleshoot_deployment_deployment_name_replicas
 - command: kubectl get events --field-selector type!=Warning --context ${CONTEXT}
     -n ${NAMESPACE} -o json | jq -r '.items[] | select(.involvedObject.name|contains("${DEPLOYMENT_NAME}"))
     | select( .count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60
