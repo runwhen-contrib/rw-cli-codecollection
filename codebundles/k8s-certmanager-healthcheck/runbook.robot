@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Get Namespace Certificate Summary
+Get Namespace `${NAMESPACE}` Certificate Summary
     [Documentation]    Gets a list of certmanager certificates and summarize their information for review.
     [Tags]    tls    certificates    kubernetes    objects    expiration    summary    certmanager
     ${cert_info}=    RW.CLI.Run Cli
@@ -31,12 +31,13 @@ Get Namespace Certificate Summary
     ...    set_issue_actual=Certificates were found in the namespace ${NAMESPACE} that are past their renewal time and not renewed
     ...    set_issue_title=Found certificates due for renewal in namespace ${NAMESPACE} that are not renewing
     ...    set_issue_details=CertManager certificates not renewing: "$_stdout" - investigate CertManager.
+    ...    set_issue_next_steps=Check the health of the `cert-manager` deployment in the `cert-manager` namespace\nInspect `cert-manager` deployment logs for renewal errors in `cert-manager` namespace
     ...    _line__raise_issue_if_contains=Namespace
     RW.Core.Add Pre To Report    Certificate Information:\n${cert_info.stdout}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Find Failed Certificate Requests and Identify Issues
+Find Failed Certificate Requests and Identify Issues In Namespace `${NAMESPACE}`
     [Documentation]    Gets a list of failed certmanager certificates and summarize their issues.
     [Tags]    tls    certificates    kubernetes    objects    failed    certificaterequest    certmanager
     ${failed_certificaterequests}=    RW.CLI.Run Cli
@@ -51,6 +52,7 @@ Find Failed Certificate Requests and Identify Issues
     ...    set_issue_actual=Certificates are not ready in ${NAMESPACE}
     ...    set_issue_title=Found failed certificates in namespace ${NAMESPACE}
     ...    set_issue_details=CertManager certificates failed: "$_stdout" - investigate Issuers or ClusterIssuers.
+    ...    set_issue_next_steps=Check the health of the `cert-manager` deployment in `cert-manager` namespace\nInspect `cert-manager` deployment logs for renewal errors in `cert-manager` namespace
     ...    _line__raise_issue_if_contains=-
     RW.Core.Add Pre To Report    Certificate Information:\n${failed_certificaterequests.stdout}
     ${history}=    RW.CLI.Pop Shell History

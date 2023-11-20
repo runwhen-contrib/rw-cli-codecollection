@@ -20,3 +20,4 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 
 ## TODO
 - [ ] Add additional documentation.
+- [ ] Add cert-manager operator namespace as config field and genrules
