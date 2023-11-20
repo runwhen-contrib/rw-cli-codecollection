@@ -9,7 +9,6 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
-Library             RW.NextSteps
 Library             OperatingSystem
 
 Suite Setup         Suite Initialization
@@ -30,13 +29,6 @@ Check If Kong Ingress HTTP Error Rate Violates HTTP Error Threshold
     ${namespace_name}=    RW.CLI.Run Cli
     ...    cmd=cat << 'EOF' | awk -F'.' '{print $1}'\n${INGRESS_SERVICE}\nEOF
     ...    include_in_history=False
-    ${ingress_next_steps}=    RW.NextSteps.Suggest
-    ...    The ingress ${ingress_name.stdout} has a high amount of HTTP error responses matching the pattern: ${HTTP_ERROR_CODES}
-    ${ns_next_steps}=    RW.NextSteps.Suggest
-    ...    Application workloads receiving traffic through ingress ${ingress_name.stdout} in the namespace ${namespace_name.stdout} are producing HTTP error codes ${HTTP_ERROR_CODES}
-    ${next_steps}=    RW.NextSteps.Format    ${ingress_next_steps}\n${ns_next_steps}
-    ...    ingress_name=${ingress_name.stdout}
-    ...    namespace_name=${namespace_name.stdout}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${gmp_rsp}
     ...    set_severity_level=3
@@ -44,7 +36,7 @@ Check If Kong Ingress HTTP Error Rate Violates HTTP Error Threshold
     ...    set_issue_actual=We found the following HTTP error codes ${HTTP_ERROR_CODES} associated with the ingress in $_line
     ...    set_issue_title=Detected HTTP Error Codes Across Network
     ...    set_issue_details=The returned stdout line: $_line indicates there's HTTP error codes associated with this ingress and service. You need to investigate the application associated with: ${INGRESS_SERVICE}
-    ...    set_issue_next_steps=${next_steps}
+    ...    set_issue_next_steps=Check the health status of the Ingress object `${ingress_name.stdout}` in namespace `${namespace_name.stdout}`
     ...    _line__raise_issue_if_contains=Route
     ${gmp_json}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && curl -s -d "query=rate(kong_http_requests_total{service='${INGRESS_SERVICE}',code=~'${HTTP_ERROR_CODES}'}[${TIME_SLICE}])" -H "Authorization: Bearer $(gcloud auth print-access-token)" 'https://monitoring.googleapis.com/v1/projects/runwhen-nonprod-sandbox/location/global/prometheus/api/v1/query' | jq .
@@ -72,12 +64,6 @@ Check If Kong Ingress HTTP Request Latency Violates Threshold
     ${namespace_name}=    RW.CLI.Run Cli
     ...    cmd=cat << 'EOF' | awk -F'.' '{print $1}'\n${INGRESS_SERVICE}\nEOF
     ...    include_in_history=False
-    ${ingress_next_steps}=    RW.NextSteps.Suggest    High HTTP request Latency for ingress ${ingress_name.stdout}
-    ${ns_next_steps}=    RW.NextSteps.Suggest
-    ...    Application workloads receiving traffic through ingress ${ingress_name.stdout} and service ${service_name.stdout} in the namespace ${namespace_name.stdout} could be producing errors
-    ${next_steps}=    RW.NextSteps.Format    ${ingress_next_steps}\n${ns_next_steps}
-    ...    ingress_name=${ingress_name.stdout}
-    ...    namespace_name=${namespace_name.stdout}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${gmp_rsp}
     ...    set_severity_level=3
@@ -85,7 +71,7 @@ Check If Kong Ingress HTTP Request Latency Violates Threshold
     ...    set_issue_actual=We found HTTP request latencies greater than ${REQUEST_LATENCY_THRESHOLD} associated with the ingress in $_line
     ...    set_issue_title=Detected HTTP Request Latencies in network
     ...    set_issue_details=The returned stdout line: $_line indicates there's high HTTP request latencies. You need to investigate the application associated with: ${INGRESS_SERVICE} or the Kong ingress controller.
-    ...    set_issue_next_steps=${next_steps}
+    ...    set_issue_next_steps=Troubleshoot Namespace `${namespace_name.stdout}` Services and Application Workloads for HTTP-related errors.
     ...    _line__raise_issue_if_contains=Route
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -99,9 +85,6 @@ Check If Kong Ingress Controller Reports Upstream Errors
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
-    ${next_steps}=    RW.NextSteps.Suggest
-    ...    The Kong Ingress Upstream health checks are currently disabled for upstream ${INGRESS_UPSTREAM}
-    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
 
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${gmp_healthchecks_off_rsp}
@@ -110,16 +93,13 @@ Check If Kong Ingress Controller Reports Upstream Errors
     ...    set_issue_actual=We found Kong healthchecks disabled in $_line
     ...    set_issue_title=Detected Kong Ingress Upstream healthchecks disabled
     ...    set_issue_details=The returned stdout line: $_line indicates Kong ingress upstream healthchecks are disabled for ${INGRESS_UPSTREAM}.
-    ...    set_issue_next_steps=${next_steps}
+    ...    set_issue_next_steps=Modify your infrastructure definition for the Ingress ${INGRESS_UPSTREAM} to have healthchecks enabled.
     ...    _line__raise_issue_if_contains=Disabled
     ${gmp_healthchecks_rsp}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && response=$(curl -s -d "query=kong_upstream_target_health{upstream='${INGRESS_UPSTREAM}',state=~'dns_error|unhealthy'} > 0" -H "Authorization: Bearer $(gcloud auth print-access-token)" 'https://monitoring.googleapis.com/v1/projects/runwhen-nonprod-sandbox/location/global/prometheus/api/v1/query') && echo "$response" | jq -e '.data.result | length > 0' && echo "$response" | jq -r '.data.result[] | "Issue detected with Service: ${INGRESS_UPSTREAM}" + " Healthcheck subsystem-state: " + .metric.subsystem + "-" + .metric.state + " Target: " + .metric.target' || echo "${INGRESS_UPSTREAM} is reported as healthy from the Kong ingress controller."
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
-    ${next_steps}=    RW.NextSteps.Suggest
-    ...    The Kong Ingress ${INGRESS_UPSTREAM} currently has a potential health or DNS issue
-    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${gmp_healthchecks_rsp}
     ...    set_severity_level=3
@@ -127,7 +107,6 @@ Check If Kong Ingress Controller Reports Upstream Errors
     ...    set_issue_actual=We found Kong healthcheck errors in $_line
     ...    set_issue_title=Detected Kong Ingress Upstream healthcheck errors
     ...    set_issue_details=The returned stdout line: $_line indicates Kong ingress upstream healthchecks are reported unhealthy ${INGRESS_UPSTREAM}.
-    ...    set_issue_next_steps=${next_steps}
     ...    _line__raise_issue_if_contains=detected
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
