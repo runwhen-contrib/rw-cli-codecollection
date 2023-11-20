@@ -28,7 +28,7 @@ commands:
     \ # Targeting the specified StatefulSet by name\n  --context ${CONTEXT} \\  #\
     \ Setting the context value (e.g., acme-cluster)\n  -n ${NAMESPACE}  # Setting\
     \ the namespace value (e.g., AcmeCorpInc)"
-  name: fetch_statefulset_logs
+  name: fetch_statefulset_statefulset_name_logs
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "${STATEFULSET_NAME}" || true
   doc_links: '
@@ -67,7 +67,7 @@ commands:
     \ command with a non-zero exit code regardless of the result. This is helpful\
     \ when nested commands are being used (e.g., 0 exit code prevents further logic\
     \ in the multi-line command from being excuted"
-  name: get_related_statefulset_events
+  name: get_related_statefulset_statefulset_name_events
 - command: kubectl get statefulset ${LABELS} --context=${CONTEXT} -n ${NAMESPACE}
     -o yaml
   doc_links: '
@@ -94,7 +94,7 @@ commands:
     \    --context=${CONTEXT} \\\n    # Command should use the specified context \n\
     \    -n ${NAMESPACE} \\\n    # Target the provided namespace\n    -o yaml \n \
     \   # Represent information in a YAML format"
-  name: fetch_statefulset_manifest_details
+  name: fetch_statefulset_statefulset_name_manifest_details
 - command: 'kubectl get statefulset -n ${NAMESPACE} -o json --context ${CONTEXT} |
     jq -r ''.items[] | select(.status.availableReplicas < .status.replicas) | "---\nStatefulSet
     Name: " + (.metadata.name|tostring) + "\nDesired Replicas: " + (.status.replicas|tostring)
@@ -122,4 +122,4 @@ commands:
     -o json \\\n| jq -r '.items[] | select(.status.availableReplicas < .status.replicas)\
     \ | \"---\\nStatefulSet Name: \" + (.metadata.name|tostring) + \"\\nDesired Replicas:\
     \ \" + (.status.replicas|tostring) + \"\\nAvailable Replicas: \" + (.status.availableReplicas|tostring)'"
-  name: list_statefulsets_with_unhealthy_replica_counts
+  name: list_statefulsets_with_unhealthy_replica_counts_in_namespace_namespace_
