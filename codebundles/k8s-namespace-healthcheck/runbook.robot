@@ -7,7 +7,6 @@ Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
-Library             RW.NextSteps
 Library             RW.platform
 Library             OperatingSystem
 Library             DateTime
@@ -17,7 +16,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Trace And Troubleshoot Namespace Warning Events And Errors
+Trace And Troubleshoot Namespace `${NAMESPACE}` Warning Events And Errors
     [Documentation]    Queries all error events in a given namespace within the last 30 minutes,
     ...    fetches the list of involved pod names, requests logs from them and parses
     ...    the logs for exceptions.
@@ -42,10 +41,6 @@ Trace And Troubleshoot Namespace Warning Events And Errors
     ...    cmd=cat << 'EOF' | jq -r '.items[] | select(.involvedObject.kind == "Pod") | .message' | tr -d "\n"\n${error_events.stdout}EOF
     ...    include_in_history=False
     ${event_messages_array}=    Evaluate    """${event_messages.stdout}""".split("\\n")
-    ${next_steps}=    RW.NextSteps.Suggest
-    ...    Pods in namespace ${NAMESPACE} have associated warning events ${event_messages_array}
-    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
-    ...    pod_names=${involved_pod_names_array}
 
     ${involved_pod_names}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${error_events}
@@ -54,7 +49,7 @@ Trace And Troubleshoot Namespace Warning Events And Errors
     ...    pod_count__raise_issue_if_gt=0
     ...    set_issue_title=$pod_count Pods Found With Recent Warning Events In Namespace ${NAMESPACE}
     ...    set_issue_details=Warning events in the namespace ${NAMESPACE}.\nName of pods with issues:\n"$involved_pod_names"\nTroubleshoot pod or namespace events:\n"${recent_error_events.stdout}"
-    ...    set_issue_next_steps=${next_steps}
+    ...    set_issue_next_steps=Run Application Level Troubleshooting and Inspect Pod Logs In Namespace `${NAMESPACE}` For Pods: `${involved_pod_names_array}`
     ...    assign_stdout_from_var=involved_pod_names
     # get pods with restarts > 0
     ${pods_in_namespace}=    RW.CLI.Run Cli
@@ -65,9 +60,6 @@ Trace And Troubleshoot Namespace Warning Events And Errors
     ${pod_names}=    RW.CLI.Run Cli
     ...    cmd=cat << 'EOF' | jq -r '.items[].metadata.name'\n${error_events.stdout}EOF
     ...    include_in_history=False
-    ${next_steps}=    RW.NextSteps.Suggest    Pods in namespace ${NAMESPACE} are restarting: ${pod_names.stdout}
-    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
-    ...    pod_name=${pod_names.stdout}
     ${restarting_pods}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${pods_in_namespace}
     ...    extract_path_to_var__pod_restart_stats=items[].{name:metadata.name, containerRestarts:status.containerStatuses[].{restartCount:restartCount, terminated_at:lastState.terminated.finishedAt}|[?restartCount > `0` && terminated_at >= `${restart_age}`]}
@@ -77,7 +69,7 @@ Trace And Troubleshoot Namespace Warning Events And Errors
     ...    pod_count__raise_issue_if_gt=0
     ...    set_issue_title=Frequently Restarting Pods In Namespace ${NAMESPACE}
     ...    set_issue_details=Found $pod_count pods that are frequently restarting in ${NAMESPACE}. Troubleshoot these pods:\n"$pods_with_recent_restarts"
-    ...    set_issue_next_steps=${next_steps}
+    ...    set_issue_next_steps=Run Application Level Troubleshooting and Inspect Pod Logs In Namespace `${NAMESPACE}` For Pods: `${pod_names.stdout}`
     ...    assign_stdout_from_var=restart_pod_names
     # fetch logs with pod names
     ${restarting_pods}=    RW.CLI.From Json    json_str=${restarting_pods.stdout}
@@ -99,7 +91,7 @@ Trace And Troubleshoot Namespace Warning Events And Errors
     RW.Core.Add Pre To Report    ${error_trace_results}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Troubleshoot Container Restarts In Namespace
+Troubleshoot Container Restarts In Namespace `${NAMESPACE}`
     [Documentation]    Fetches pods that have container restarts and provides a report of the restart issues.
     [Tags]    namespace    containers    status    restarts
     ${container_restart_details}=    RW.CLI.Run Cli
@@ -134,7 +126,7 @@ Troubleshoot Container Restarts In Namespace
     RW.Core.Add Pre To Report    ${container_restart_analysis.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Troubleshoot Pending Pods In Namespace
+Troubleshoot Pending Pods In Namespace `${NAMESPACE}`
     [Documentation]    Fetches pods that are pending and provides details.
     [Tags]    namespace    pods    status    pending
     ${pending_pods}=    RW.CLI.Run Cli
@@ -142,7 +134,6 @@ Troubleshoot Pending Pods In Namespace
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
-    ${next_steps}=    RW.NextSteps.Suggest    ${pending_pods.stdout}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${pending_pods}
     ...    set_severity_level=1
@@ -150,7 +141,7 @@ Troubleshoot Pending Pods In Namespace
     ...    set_issue_actual=We found the following pods in a pending state: $_stdout
     ...    set_issue_title=Pending Pods Found In Namespace ${NAMESPACE}
     ...    set_issue_details=Pods pending with reasons:\n"$_stdout" in the namespace ${NAMESPACE}
-    ...    set_issue_next_steps=${next_steps}
+    ...    set_issue_next_steps=Run Application Level Troubleshooting and Inspect Pod Logs In Namespace `${NAMESPACE}`
     ...    _line__raise_issue_if_contains=-
     ${history}=    RW.CLI.Pop Shell History
     IF    """${pending_pods.stdout}""" == ""
@@ -162,7 +153,7 @@ Troubleshoot Pending Pods In Namespace
     RW.Core.Add Pre To Report    ${pending_pods}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Troubleshoot Failed Pods In Namespace
+Troubleshoot Failed Pods In Namespace `${NAMESPACE}`
     [Documentation]    Fetches all pods which are not running (unready) in the namespace and adds them to a report for future review.
     [Tags]    namespace    pods    status    unready    not starting    phase    failed
     ${unreadypods_details}=    RW.CLI.Run Cli
@@ -170,7 +161,6 @@ Troubleshoot Failed Pods In Namespace
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
-    ${next_steps}=    RW.NextSteps.Suggest    ${unreadypods_details.stdout}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${unreadypods_details}
     ...    set_severity_level=1
@@ -178,7 +168,7 @@ Troubleshoot Failed Pods In Namespace
     ...    set_issue_actual=We found the following unready pods: $_stdout
     ...    set_issue_title=Unready Pods Detected In Namespace ${NAMESPACE}
     ...    set_issue_details=Unready pods:\n"$_stdout" in the namespace ${NAMESPACE}
-    ...    set_issue_next_steps=${next_steps}
+    ...    set_issue_next_steps=Run Application Level Troubleshooting and Inspect Pod Logs In Namespace `${NAMESPACE}`
     ...    _line__raise_issue_if_contains=-
     ${history}=    RW.CLI.Pop Shell History
     IF    """${unreadypods_details.stdout}""" == ""
@@ -190,7 +180,7 @@ Troubleshoot Failed Pods In Namespace
     RW.Core.Add Pre To Report    ${unreadypods_details}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Troubleshoot Workload Status Conditions In Namespace
+Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
     [Documentation]    Parses all workloads in a namespace and inspects their status conditions for issues. Status conditions with a status value of False are considered an error.
     [Tags]    namespace    status    conditions    pods    reasons    workloads
     ${all_resources}=    RW.CLI.Run Cli
@@ -212,9 +202,6 @@ Troubleshoot Workload Status Conditions In Namespace
     ${workload_kind}=    RW.CLI.Run Cli
     ...    cmd=cat << 'EOF' | jq -r '.kind' | tr -d "\n"\n${workload_info.stdout}EOF
     ...    include_in_history=False
-    ${next_steps}=    RW.NextSteps.Suggest    ${workload_kind.stdout} ${condition.stdout}
-    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
-    ...    ${workload_kind.stdout}_name=${workload_name.stdout}
     ${failing_conditions}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${all_resources}
     ...    extract_path_to_var__workload_conditions=items[].{kind:kind, name:metadata.name, conditions:status.conditions[?status == `False`]}
@@ -225,7 +212,7 @@ Troubleshoot Workload Status Conditions In Namespace
     ...    set_severity_level=1
     ...    set_issue_title=$pods_with_failures Pods With Unhealthy Status In Namespace ${NAMESPACE}
     ...    set_issue_details=Pods with unhealthy status condition in the namespace ${NAMESPACE}. Here's a summary of potential issues we found:\n"$aggregate_failures"
-    ...    set_issue_next_steps=${next_steps}
+    ...    set_issue_next_steps=Run Application Level Troubleshooting On Workload `${workload_name.stdout}` to further diagnose condition: `${condition.stdout}`
     ...    assign_stdout_from_var=aggregate_failures
     ${history}=    RW.CLI.Pop Shell History
     IF    """${failing_conditions.stdout}""" == ""
@@ -237,7 +224,7 @@ Troubleshoot Workload Status Conditions In Namespace
     RW.Core.Add Pre To Report    ${failing_conditions}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Get Listing Of Resources In Namespace
+Get Listing Of Resources In Namespace `${NAMESPACE}`
     [Documentation]    Simple fetch all to provide a snapshot of information about the workloads in the namespace for future review in a report.
     [Tags]    get all    resources    info    workloads    namespace    manifests
     ${all_results}=    RW.CLI.Run Cli
@@ -250,7 +237,7 @@ Get Listing Of Resources In Namespace
     RW.Core.Add Pre To Report    ${all_results.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Check For Namespace Event Anomalies
+Check For Namespace `${NAMESPACE}` Event Anomalies
     [Documentation]    Parses all events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
     [Tags]    namespace    events    info    state    anomolies    count    occurences
     ${recent_anomalies}=    RW.CLI.Run Cli
@@ -266,10 +253,6 @@ Check For Namespace Event Anomalies
     ${pod_name}=    RW.CLI.Run Cli
     ...    cmd=echo "${recent_anomalies.stdout}" | grep -oP '(?<=Pod/)[^ ]*' | grep -oP '[^.]*(?=-[a-z0-9]+-[a-z0-9]+)' | head -n 1
     ...    include_in_history=False
-    ${next_steps}=    RW.NextSteps.Suggest    ${event_messages}
-    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
-    ...    pod_name=${pod_name.stdout}
-    ...    deployment_name=${pod_name.stdout}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${recent_anomalies}
     ...    expected_rsp_returncodes=[0,5]
@@ -278,14 +261,14 @@ Check For Namespace Event Anomalies
     ...    set_issue_actual=We detected events in the namespace ${NAMESPACE} which are considered anomalies
     ...    set_issue_title=Event Anomalies Detected In Namespace ${NAMESPACE}
     ...    set_issue_details=Anomaly non-warning events in namespace ${NAMESPACE}:\n"$_stdout"
-    ...    set_issue_next_steps=${next_steps}
+    ...    set_issue_next_steps=Run Application Level Troubleshooting On Pod `${pod_name.stdout}` In Namespace `${NAMESPACE}` and Inspect Logs.
     ...    _line__raise_issue_if_contains=Object
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add To Report    Summary Of Anomalies Detected:\n
     RW.Core.Add To Report    ${recent_anomalies.stdout}\n
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Troubleshoot Namespace Services And Application Workloads
+Troubleshoot Namespace `${NAMESPACE}` Services And Application Workloads
     [Documentation]    Iterates through the services within a namespace for a given timeframe and byte length max, checking the resulting logs for distinct entries matching a given pattern in order to determine a root issue.
     [Tags]
     ...    namespace
@@ -320,7 +303,7 @@ Troubleshoot Namespace Services And Application Workloads
     RW.Core.Add To Report    ${aggregate_service_logs.stdout}\n
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Check Missing or Risky PodDisruptionBudget Policies
+Check Missing or Risky PodDisruptionBudget Policies In Namespace `${NAMESPACE}`
     [Documentation]    Searches through deployemnts and statefulsets to determine if they are missing PodDistruptionBudgets or have them configured in a risky way that prohibits cluster or node upgrades.
     [Tags]    poddisruptionbudget    availability    unavailable    risky    missing    policy    <service_name>
     ${pdb_check}=    RW.CLI.Run Cli
