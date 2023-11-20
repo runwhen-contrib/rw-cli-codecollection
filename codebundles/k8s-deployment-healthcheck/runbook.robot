@@ -91,6 +91,9 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
         ...    details=${liveness_probe_health.stdout}
         ...    next_steps=${recommendations.stdout}
     END
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    Liveness probe testing results:\n\n${liveness_probe_health.stdout}
+    RW.Core.Add Pre To Report    Commands Used: ${history}
 Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     [Documentation]    Validates if a readiness probe has possible misconfigurations
     [Tags]
@@ -123,6 +126,9 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
         ...    details=${readiness_probe_health.stdout}
         ...    next_steps=${recommendations.stdout}
     END
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${readiness_probe_health.stdout}
+    RW.Core.Add Pre To Report    Commands Used: ${history}
 Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
     [Documentation]    Fetches warning events related to the deployment workload in the namespace and triages any issues found in the events.
     [Tags]    events    workloads    errors    warnings    get    deployment    ${deployment_name}
