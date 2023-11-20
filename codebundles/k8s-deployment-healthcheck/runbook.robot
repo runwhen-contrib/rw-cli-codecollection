@@ -8,14 +8,13 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
-Library             RW.NextSteps
 Library             OperatingSystem
 
 Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check Deployment Log For Issues
+Check Deployment ${DEPLOYMENT_NAME} Log For Issues
     [Documentation]    Fetches recent logs for the given deployment in the namespace and checks the logs output for issues.
     [Tags]    fetch    log    pod    container    errors    inspect    trace    info    deployment    <service_name>
     ${logs}=    RW.CLI.Run Bash File
@@ -45,7 +44,7 @@ Check Deployment Log For Issues
     ...    Recent logs from deployment/${DEPLOYMENT_NAME} in ${NAMESPACE}:\n\n${logs.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Troubleshoot Deployment Warning Events
+Troubleshoot Deployment `${DEPLOYMENT_NAME}` Warning Events
     [Documentation]    Fetches warning events related to the deployment workload in the namespace and triages any issues found in the events.
     [Tags]    events    workloads    errors    warnings    get    deployment    <service_name>
     ${events}=    RW.CLI.Run Cli
@@ -53,9 +52,6 @@ Troubleshoot Deployment Warning Events
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
-    ${next_steps}=    RW.NextSteps.Suggest    ${events.stdout}
-    ${next_steps}=    RW.NextSteps.Format    ${next_steps}
-    ...    deployment_name=${DEPLOYMENT_NAME}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${events}
     ...    set_severity_level=1
@@ -63,13 +59,13 @@ Troubleshoot Deployment Warning Events
     ...    set_issue_actual=Events of type warning found for deployment.
     ...    set_issue_title=The deployment ${DEPLOYMENT_NAME} has warning events
     ...    set_issue_details=Warning events found for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE}\n$_line\n
-    ...    set_issue_next_steps=${next_steps}
+    ...    set_issue_next_steps=Run Application Level Troubleshooting on Deployment `${DEPLOYMENT_NAME}` In Namespace `${NAMESPACE}` and Check Logs For Errors.
     ...    _line__raise_issue_if_contains=Warning
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${events.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Get Deployment Workload Details For Report
+Get Deployment `${DEPLOYMENT_NAME}` Details For Report
     [Documentation]    Fetches the current state of the deployment for future review in the report.
     [Tags]    deployment    details    manifest    info    <service_name>
     ${deployment}=    RW.CLI.Run Cli
@@ -81,7 +77,7 @@ Get Deployment Workload Details For Report
     RW.Core.Add Pre To Report    Snapshot of deployment state:\n\n${deployment.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Troubleshoot Deployment Replicas
+Troubleshoot Deployment `${DEPLOYMENT_NAME}` Replicas
     [Documentation]    Pulls the replica information for a given deployment and checks if it's highly available
     ...    , if the replica counts are the expected / healthy values, and if not, what they should be.
     [Tags]
@@ -100,9 +96,6 @@ Troubleshoot Deployment Replicas
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
-    ${no_replicas_next_steps}=    RW.NextSteps.Suggest    Pods not running for deployment/${DEPLOYMENT_NAME}
-    ${no_replicas_next_steps}=    RW.NextSteps.Format    ${no_replicas_next_steps}
-    ...    deployment_name=${DEPLOYMENT_NAME}
     ${available_replicas}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${deployment}
     ...    extract_path_to_var__available_replicas=status.availableReplicas || `0`
@@ -110,14 +103,14 @@ Troubleshoot Deployment Replicas
     ...    assign_stdout_from_var=available_replicas
     ...    set_issue_title=No replicas available for deployment/${DEPLOYMENT_NAME}
     ...    set_issue_details=No replicas available for deployment/${DEPLOYMENT_NAME} in namespace ${NAMESPACE}, we found 0.
-    ...    set_issue_next_steps=${no_replicas_next_steps}
+    ...    set_issue_next_steps=Run Application Level Troubleshooting For `Deployment/${DEPLOYMENT_NAME}`
     RW.CLI.Parse Cli Json Output
     ...    rsp=${available_replicas}
     ...    extract_path_to_var__available_replicas=@
     ...    available_replicas__raise_issue_if_lt=${EXPECTED_AVAILABILITY}
     ...    set_issue_title=Fewer Than Expected Available Replicas For Deployment ${DEPLOYMENT_NAME}
     ...    set_issue_details=Fewer than expected replicas available (we found $available_replicas) for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE} - check manifests, kubernetes events, pod logs, resource constraints and PersistentVolumes
-    ...    set_issue_next_steps=Troubleshoot Container Restarts in Namespace\n\nnamespace:${NAMESPACE}
+    ...    set_issue_next_steps=Troubleshoot Container Restarts in Namespace `${NAMESPACE}`
     ${desired_replicas}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${deployment}
     ...    extract_path_to_var__desired_replicas=status.replicas || `0`
@@ -125,14 +118,14 @@ Troubleshoot Deployment Replicas
     ...    assign_stdout_from_var=desired_replicas
     ...    set_issue_title=Less than desired replicas for deployment/${DEPLOYMENT_NAME}
     ...    set_issue_details=Less than desired replicas for deployment/${DEPLOYMENT_NAME} in ${NAMESPACE}.
-    ...    set_issue_next_steps=Troubleshoot Deployment Warning Events\n\n Deployment:${DEPLOYMENT_NAME}
+    ...    set_issue_next_steps=Troubleshoot Deployment `${DEPLOYMENT_NAME}` Warning Events
     RW.CLI.Parse Cli Json Output
     ...    rsp=${desired_replicas}
     ...    extract_path_to_var__desired_replicas=@
     ...    desired_replicas__raise_issue_if_neq=${available_replicas.stdout}
     ...    set_issue_title=Desired and ready pods for deployment/${DEPLOYMENT_NAME} do not match as expected
     ...    set_issue_details=Desired and ready pods for deployment/${DEPLOYMENT_NAME} do not match in namespace ${NAMESPACE}, desired: $desired_replicas vs ready: ${available_replicas.stdout}. We got ready:${available_replicas.stdout} vs desired: $desired_replicas
-    ...    set_issue_next_steps=Troubleshoot Deployment Warning Events\n\n Deployment:${DEPLOYMENT_NAME}
+    ...    set_issue_next_steps=Troubleshoot Deployment `${DEPLOYMENT_NAME}` Warning Events
     ${desired_replicas}=    Convert To Number    ${desired_replicas.stdout}
     ${available_replicas}=    Convert To Number    ${available_replicas.stdout}
     RW.Core.Add Pre To Report    Deployment State:\n${deployment.stdout}
@@ -141,17 +134,7 @@ Troubleshoot Deployment Replicas
 
 Check For Deployment Event Anomalies
     [Documentation]    Parses all events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
-    [Tags]
-    ...    deployment
-    ...    events
-    ...    info
-    ...    state
-    ...    anomolies
-    ...    count
-    ...    occurences
-    ...    <service_name>
-    ...    we found the following distinctly counted errors in the service workloads of namespace
-    ...    connection error
+    [Tags]    deployment    events    info    state    anomolies    count    occurences
     ${recent_anomalies}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select(.involvedObject.name|contains("${DEPLOYMENT_NAME}")) | select( .count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) > ${ANOMALY_THRESHOLD}) | "Event(s) Per Minute:" + (.count / ( if ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 == 0 then 1 else ((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60 end ) |tostring) +" Count:" + (.count|tostring) + " Minute(s):" + (((.lastTimestamp|fromdate)-(.firstTimestamp|fromdate))/60|tostring)+ " Object:" + .involvedObject.namespace + "/" + .involvedObject.kind + "/" + .involvedObject.name + " Reason:" + .reason + " Message:" + .message'
     ...    env=${env}
@@ -164,7 +147,7 @@ Check For Deployment Event Anomalies
     ...    set_issue_actual=We detected events in the namespace ${NAMESPACE} which are considered anomalies
     ...    set_issue_title=Event Anomalies Detected In Namespace ${NAMESPACE}
     ...    set_issue_details=Anomaly non-warning events in namespace ${NAMESPACE}:\n"$_stdout"
-    ...    set_issue_next_steps=${DEPLOYMENT_NAME} Check Deployment Log For Issues
+    ...    set_issue_next_steps=Check Deployment `${DEPLOYMENT_NAME}` Log For Issues
     ...    _line__raise_issue_if_contains=Object
     ${history}=    RW.CLI.Pop Shell History
     ${recent_anomalies}=    Set Variable    ${recent_anomalies.stdout}
