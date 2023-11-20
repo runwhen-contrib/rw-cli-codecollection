@@ -260,10 +260,6 @@ Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
             ...    cmd=echo "${item["name"]}" | sed 's/ *$//' | tr -d '\n'
             ...    env=${env}
             ...    include_in_history=False
-            # ${object_status_string}=    Replace String    ${item["conditions"]}    '    "
-            # ${object_status_string}=    Replace String    ${object_status_string}    False   false
-            # ${object_status_string}=    Replace String    ${object_status_string}    True    true
-            # ${object_status_string}=    Replace String    ${object_status_string}    None    null
             ${object_status_string}=    RW.CLI.Run Cli
             ...    cmd=echo "${item["conditions"]}" | sed 's/True/true/g; s/False/false/g; s/None/null/g; s/'\\''/\"/g' 
             ...    env=${env}
@@ -280,9 +276,11 @@ Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
             ...    include_in_history=False
             # FIXME: There's an odd condition where a pod with a name like this: jx-preview-gc-jobs-28337580-464vm produces no matches
             # as it's disappered, but events still linger. Need to catch this error later and validate a fix
-            IF    len($item_owner.stdout) > 0 and ($item_owner.stdout) != "No resource found"
+            IF    len($item_owner.stdout) > 0 and ($item_owner.stdout) != "No resource found\n"
                 ${owner_kind}    ${owner_name}=    Split String    ${item_owner.stdout}    ${SPACE}
                 ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
+            ELSE
+                ${owner_kind}    ${owner_name}=    Set Variable    ""
             END
             ${item_next_steps}=    RW.CLI.Run Bash File
             ...    bash_file=workload_next_steps.sh
