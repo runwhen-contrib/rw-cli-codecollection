@@ -60,7 +60,7 @@ commands:
     # Echo the final result
 
     echo "${RESULT}"'
-  name: get_namespace_certificate_summary
+  name: get_namespace_certificate_summary_for_namespace_namespace_
 - command: 'kubectl get certificaterequests.cert-manager.io --context=${CONTEXT} -n
     ${NAMESPACE} -o json | jq -r ''.items[] | select(.status.conditions[] | select(.type
     == "Ready" and .status != "True")) | {certRequest: .metadata.name, certificate:
@@ -111,4 +111,4 @@ commands:
     , \"Certificate: \\(.certificate)\", \"Issuer: \\(.issuer)\", \"Ready Status:\
     \ \\(.readyStatus)\", \"Ready Message: \\(.readyMessage)\", \"Approved Status:\
     \ \\(.approvedStatus)\", \"Approved Message: \\(.approvedMessage)\"'"
-  name: find_failed_certificate_requests_and_identify_issues
+  name: find_failed_certificate_requests_and_identify_issues_for_namespace_namespace_

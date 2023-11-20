@@ -22,7 +22,7 @@ commands:
     \n# Execute a redis-cli command (ping in this case) against the Kubernetes deployment\n\
     kubectl exec \\ \n    deployment/${DEPLOYMENT_NAME} \\\n    --context=${CONTEXT}\
     \ \\\n    -n ${NAMESPACE} \\\n    -- \\\n    redis-cli PING"
-  name: ping_redis_workload
+  name: ping_deployment_name_redis_workload
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli SET ${REDIS_HEALTHCHECK_KEY} 0
   doc_links: '
@@ -77,7 +77,7 @@ commands:
 
     ${KUBECTL_EXEC_COMMAND} ${DEPLOYMENT_NAME} ${CONTEXT} ${NAMESPACE} -- redis-cli
     SET ${REDIS_HEALTHCHECK_KEY} 0'
-  name: verify_redis_read_write_operation
+  name: verify_deployment_name_redis_read_write_operation
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli INCR ${REDIS_HEALTHCHECK_KEY}
   doc_links: '
@@ -111,7 +111,7 @@ commands:
     \ execute a redis-cli command \n# within the specified deployment, context & namespace\n\
     kubectl exec \\\n    deployment/$DEPLOYMENT_NAME \\\n    --context=$CONTEXT \\\
     \ \n    -n $NAMESPACE \\\n    -- redis-cli INCR $REDIS_HEALTHCHECK_KEY"
-  name: verify_redis_read_write_operation
+  name: verify_deployment_name_redis_read_write_operation
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli GET ${REDIS_HEALTHCHECK_KEY}
   doc_links: '
@@ -139,4 +139,4 @@ commands:
     \ the given name \nkubectl exec deployment/${DEPLOYMENT_NAME} \\\n    # With the\
     \ following context \n    --context=${CONTEXT} \\\n    # In the given namespace\n\
     \    -n ${NAMESPACE} \\\n    # Execute this command\n    -- redis-cli GET ${REDIS_HEALTHCHECK_KEY}"
-  name: verify_redis_read_write_operation
+  name: verify_deployment_name_redis_read_write_operation
