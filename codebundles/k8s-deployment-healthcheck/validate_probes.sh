@@ -97,7 +97,7 @@ for ((i=0; i<NUM_CONTAINERS; i++)); do
             printf "### END Exec Test\n"
 
             # Simple exec test to try substituting ports found in manifest
-            if [ -n "$CONTAINER_PORTS" ]; then
+            if [[ -n "$CONTAINER_PORTS" && "$EXEC_EXIT_CODE" != 0 ]]; then
                 for PORT in $CONTAINER_PORTS; do
                     MODIFIED_EXEC_COMMAND_ARRAY=("${EXEC_COMMAND_ARRAY[@]}")
                     for j in "${!MODIFIED_EXEC_COMMAND_ARRAY[@]}"; do

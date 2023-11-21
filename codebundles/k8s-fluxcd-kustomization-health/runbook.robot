@@ -11,9 +11,9 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-List all available Kustomization objects    
+List all available Kustomization objects in Namespace `${NAMESPACE}`    
     [Documentation]    List all FluxCD kustomization objects found in ${NAMESPACE}
-    [Tags]        FluxCD     Kustomization     Available    List
+    [Tags]        FluxCD     Kustomization     Available    List    ${NAMESPACE}
     ${kustomizations}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}
     ...    env=${env}
@@ -23,9 +23,9 @@ List all available Kustomization objects
     RW.Core.Add Pre To Report    Kustomizations available: \n ${kustomizations.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Get details for unready Kustomizations   
+Get details for unready Kustomizations in Namespace `${NAMESPACE}`  
     [Documentation]    List all Kustomizations that are not found in a ready state in namespace ${NAMESPACE}  
-    [Tags]        FluxCD     Kustomization    Versions
+    [Tags]        FluxCD     Kustomization    Versions    ${NAMESPACE}
     ${kustomizations_not_ready}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select (.status.conditions[] | select(.type == "Ready" and .status == "False")) | "---\\nKustomization Name: \\(.metadata.name)\\n\\nReady Status: \\(.status.conditions[] | select(.type == "Ready") | "\\n ready: \\(.status)\\n message: \\(.message)\\n reason: \\(.reason)\\n last_transition_time: \\(.lastTransitionTime)")\\n\\nReconcile Status:\\(.status.conditions[] | select(.type == "Reconciling") |"\\n reconciling: \\(.status)\\n message: \\(.message)")\\n---\\n"'
     ...    env=${env}

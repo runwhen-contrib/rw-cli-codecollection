@@ -12,6 +12,7 @@ Library             RW.platform
 Library             OperatingSystem
 Library             DateTime
 Library             Collections
+Library             String
 
 Suite Setup         Suite Initialization
 
@@ -104,19 +105,21 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
     ...    cmd=echo "${pod_pvc_utilization.stdout}" | awk '/---/ { if (flag) { print record "\\n" $0; } record = ""; flag = 0; next; } $5 ~ /[9][5-9]%/ || $5 == "100%" { flag = 1; } { if (record == "") { record = $0; } else { record = record "\\n" $0; } } END { if (flag) { print record; } }'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ${unhealthy_volume_list}=    RW.CLI.Run Cli
+    ${unhealthy_volume_details}=    RW.CLI.Run Cli
     ...    cmd=echo "${unhealthy_volume_capacity.stdout}" | awk -F'[,:]' '/Pod:/ {print "Pod:" $2, "PVC:" $4}'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    @{unhealthy_volume_list}=    Split To Lines  ${unhealthy_volume_details.stdout}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${unhealthy_volume_capacity}
     ...    set_severity_level=2
     ...    set_issue_expected=PVC should be less than 95% utilized.
+    ...    set_issue_reproduce_hint=View Commands Used in Report
     ...    set_issue_actual=PVC is 95% or greater.
     ...    set_issue_title=PVC Storage Utilization As Report by Pod
     ...    set_issue_details=Found excessive PVC Utilization for: \n${unhealthy_volume_capacity.stdout}
     ...    _line__raise_issue_if_contains=Pod
-    ...    set_issue_next_steps=Clean up or expand Persistent Volume Claims for: \n ${unhealthy_volume_list.stdout}
+    ...    set_issue_next_steps=Clean up or expand Persistent Volume Claims for: ${unhealthy_volume_list}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of PVC storage mount utilization in ${NAMESPACE}:
     RW.Core.Add Pre To Report    ${pod_pvc_utilization.stdout}
@@ -135,8 +138,9 @@ Check for RWO Persistent Volume Node Attachment Issues in Namespace `${NAMESPACE
     ...    set_severity_level=2
     ...    set_issue_expected=All pods with RWO storage must be scheduled on the same node in which the persistent volume is attached: ${NAMESPACE}
     ...    set_issue_actual=Pods with RWO found on a different node than their RWO storage: ${NAMESPACE}
-    ...    set_issue_title=Pods with RWO storage might not have storage scheduling issues for namespace: ${NAMESPACE}
+    ...    set_issue_title=Pods with RWO storage might have storage scheduling issues for namespace: ${NAMESPACE}
     ...    set_issue_details=All Pods and RWO their storage details are:\n\n$_stdout\n\n
+    ...    set_issue_next_steps=Escalate storage attach issues to service owner. 
     ...    _line__raise_issue_if_contains=Error
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of Pods with RWO storage and the nodes their scheduling details for namespace: ${NAMESPACE}:
