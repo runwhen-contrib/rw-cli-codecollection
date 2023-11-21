@@ -285,7 +285,7 @@ Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
             ...    include_in_history=False
             ${item_owner}=    RW.CLI.Run Bash File
             ...    bash_file=find_resource_owners.sh
-            ...    cmd_overide=./find_resource_owners.sh "${object_kind.stdout}" "${object_name.stdout}" "${NAMESPACE}" "${CONTEXT}"
+            ...    cmd_overide=./find_resource_owners.sh ${object_kind.stdout} ${object_name.stdout} ${NAMESPACE} ${CONTEXT}
             ...    env=${env}
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
@@ -331,6 +331,7 @@ Get Listing Of Resources In Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
+    ...    timeout_seconds=180
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Informational Get All for Namespace: ${NAMESPACE}
     RW.Core.Add Pre To Report    ${all_results.stdout}
