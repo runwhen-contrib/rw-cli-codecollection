@@ -123,7 +123,7 @@ commands:
     \         echo \"$endpoint_pods\";\n            health_status=\"Healthy\";\n \
     \       fi\n\n    done<<<\"$backend_services\";\n\n    echo \"Health Status: $health_status\"\
     ;\n    echo \"------------\";\ndone"
-  name: fetch_ingress_object_health_in_namespace_namespace_
+  name: fetch_ingress_object_health_in_namespace_namespace
 - command: 'CONTEXT="${CONTEXT}"; NAMESPACE="${NAMESPACE}"; kubectl --context "${CONTEXT}"
     --namespace "${NAMESPACE}" get ingress -o json | jq -r ''.items[] | select(.status.loadBalancer.ingress)
     | .metadata.name as \$name | .status.loadBalancer.ingress[0].ip as \$ingress_ip
@@ -182,4 +182,4 @@ commands:
     \ - Service \\($service_name) is of type LoadBalancer with IP (\\($service_ip))\"\
     \ end else \"OK: Ingress \\($ingress_name) - Service \\($service_name) is of type\
     \ \\(.spec.type) on port \\($service_port)\" end'; done"
-  name: check_for_ingress_and_service_conflicts_in_namespace_namespace_
+  name: check_for_ingress_and_service_conflicts_in_namespace_namespace

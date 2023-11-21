@@ -54,7 +54,7 @@ commands:
     \ | unique, \n            firstTimestamp: map(.firstTimestamp | fromdateiso8601)\
     \ | sort | .[0] | todateiso8601, \\\n            lastTimestamp: map(.lastTimestamp\
     \ | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'"
-  name: troubleshoot_deployment_warning_events_for_deployment_name_
+  name: troubleshoot_deployment_warning_events_for_deployment_name
 - command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o yaml
   doc_links: '
@@ -129,7 +129,7 @@ commands:
     \ end), progressing_condition: (if any(.conditions[]; .type == \"Progressing\"\
     ) then (.conditions[] | select(.type == \"Progressing\")) else \"Condition not\
     \ available\" end)}'"
-  name: troubleshoot_deployment_replicas_for_deployment_name_
+  name: troubleshoot_deployment_replicas_for_deployment_name
 - command: 'kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq ''(now
     - (60*60)) as $time_limit | [ .items[] | select(.type != "Warning" and (.involvedObject.kind
     == "Deployment" or .involvedObject.kind == "ReplicaSet" or .involvedObject.kind
@@ -180,4 +180,4 @@ commands:
     \ == 1 then 1 else ((map(.count) | add)/.[0].duration ) end),firstTimestamp: map(.firstTimestamp\
     \ | fromdateiso8601) | sort | .[0] | todateiso8601, lastTimestamp: map(.lastTimestamp\
     \ | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'"
-  name: check_deployment_event_anomalies_for_deployment_name_
+  name: check_deployment_event_anomalies_for_deployment_name
