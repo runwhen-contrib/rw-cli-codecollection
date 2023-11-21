@@ -31,12 +31,12 @@ if [[ $messages =~ "Misconfiguration" ]]; then
     next_steps+=("Check for Node Failures or Maintenance Activities in Cluster \`$CONTEXT\`")
 fi
 
-if [[ $messages =~ "Liveness probe failed" ]]; then
-    next_steps+=("Check Liveliness Probe Configuration for $owner_kind \`$owner_name\`")
+if [[ $messages =~ "Liveness probe failed" || $messages =~ "Liveness probe errored" ]]; then
+    next_steps+=("Check Liveliness Probe Configuration for Deployment \`${DEPLOYMENT_NAME}\`")
 fi
 
-if [[ $messages =~ "Readiness probe errored" ]]; then
-    next_steps+=("Check Readiness Probe Configuration for $owner_kind \`$owner_name\`")
+if [[ $messages =~ "Readiness probe errored" || $messages =~ "Readiness probe failed" ]]; then
+    next_steps+=("Check Readiness Probe Configuration for Deployment \`${DEPLOYMENT_NAME}\`")
 fi
 
 if [[ $messages =~ "PodFailed" ]]; then

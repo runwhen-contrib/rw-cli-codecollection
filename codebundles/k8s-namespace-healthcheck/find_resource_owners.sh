@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eo pipefail
+# set -eo pipefail
 
 # -----------------------------------------------------------------------------
 # Script Information and Metadata
@@ -27,7 +27,6 @@ KUBERNETES_DISTRIBUTION_BINARY="kubectl"
 get_owner() {
     local resource_name=$1
     local resource_kind=$2
-
     owner_kind=$(${KUBERNETES_DISTRIBUTION_BINARY} get $resource_kind $resource_name -n "${NAMESPACE}" --context="${CONTEXT}" -o=jsonpath="{.metadata.ownerReferences[0].kind}")
     if [ "$owner_kind" = "" ]; then
         # No owner reference means there is no parent object. Return the direct object.

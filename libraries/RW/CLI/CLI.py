@@ -62,7 +62,11 @@ def execute_command(
     """
     if not service:
         return execute_local_command(
-            cmd=cmd, request_secrets=request_secrets, env=env, files=files, timeout_seconds=timeout_seconds
+            cmd=cmd,
+            request_secrets=request_secrets,
+            env=env,
+            files=files,
+            timeout_seconds=timeout_seconds,
         )
     else:
         return platform.execute_shell_command(
@@ -87,21 +91,26 @@ def _create_kubernetes_remote_exec(
     """**DEPRECATED**"""
     # if no specific workload name but labels provided, fetch the first running pod with labels
     if not workload_name and labels:
-        request_secrets: [platform.ShellServiceRequestSecret] = [] if len(kwargs.keys()) > 0 else None
+        request_secrets: [platform.ShellServiceRequestSecret] = (
+            [] if len(kwargs.keys()) > 0 else None
+        )
         request_secrets = _create_secrets_from_kwargs(**kwargs)
         pod_name_cmd = (
             f"kubectl get pods --field-selector=status.phase==Running -l {labels}"
             + " -o jsonpath='{.items[0].metadata.name}'"
             + f" -n {namespace} --context={context}"
         )
-        rsp = execute_command(cmd=pod_name_cmd, service=target_service, request_secrets=request_secrets, env=env)
+        rsp = execute_command(
+            cmd=pod_name_cmd,
+            service=target_service,
+            request_secrets=request_secrets,
+            env=env,
+        )
         SHELL_HISTORY.append(pod_name_cmd)
         cli_utils.verify_rsp(rsp)
         workload_name = rsp.stdout
     # use eval so that env variables are evaluated in the subprocess
-    cmd_template: str = (
-        f"eval $(echo \"kubectl exec -n {namespace} --context={context} {workload_name} -- /bin/bash -c '{cmd}'\")"
-    )
+    cmd_template: str = f"eval $(echo \"kubectl exec -n {namespace} --context={context} {workload_name} -- /bin/bash -c '{cmd}'\")"
     cmd = cmd_template
     logger.info(f"Templated remote exec: {cmd}")
     return cmd
@@ -115,17 +124,23 @@ def _create_secrets_from_kwargs(**kwargs) -> list[platform.ShellServiceRequestSe
     """
     global SECRET_PREFIX
     global SECRET_FILE_PREFIX
-    request_secrets: list[platform.ShellServiceRequestSecret] = [] if len(kwargs.keys()) > 0 else None
+    request_secrets: list[platform.ShellServiceRequestSecret] = (
+        [] if len(kwargs.keys()) > 0 else None
+    )
     for key, value in kwargs.items():
         if not key.startswith(SECRET_PREFIX) and not key.startswith(SECRET_FILE_PREFIX):
             continue
         if not isinstance(value, platform.Secret):
-            logger.warning(f"kwarg secret {value} in key {key} is the wrong type, should be platform.Secret")
+            logger.warning(
+                f"kwarg secret {value} in key {key} is the wrong type, should be platform.Secret"
+            )
             continue
         if key.startswith(SECRET_PREFIX):
             request_secrets.append(platform.ShellServiceRequestSecret(value))
         elif key.startswith(SECRET_FILE_PREFIX):
-            request_secrets.append(platform.ShellServiceRequestSecret(value, as_file=True))
+            request_secrets.append(
+                platform.ShellServiceRequestSecret(value, as_file=True)
+            )
     return request_secrets
 
 
@@ -167,17 +182,31 @@ def run_bash_file(
                         path, _ = rw_path_to_robot.split(pattern)
                         new_path = os.path.join("/collection", path)
                         # Modify the bash_file to point to the new directory
+                        local_bash_file = f"./{bash_file}"
                         bash_file = os.path.join(new_path, bash_file)
                         if os.path.exists(bash_file):
-                            logger.info(f"File '{bash_file}' found at derived path: {new_path}.")
-                            cmd_overide = f"{bash_file}"
+                            logger.info(
+                                f"File '{bash_file}' found at derived path: {new_path}."
+                            )
+                            if cmd_overide:
+                                cmd_overide = cmd_overide.replace(
+                                    f"{local_bash_file}", f"{bash_file}"
+                                )
+                            else:
+                                cmd_overide = f"{bash_file}"
                             break
                         else:
-                            logger.warning(f"File '{bash_file}' not found at derived path: {new_path}.")
+                            logger.warning(
+                                f"File '{bash_file}' not found at derived path: {new_path}."
+                            )
             else:
-                logger.warning("Current directory is root, but 'RW_PATH_TO_ROBOT' is not set.")
+                logger.warning(
+                    "Current directory is root, but 'RW_PATH_TO_ROBOT' is not set."
+                )
         else:
-            logger.warning(f"File '{bash_file}' not found in the current directory and current directory is not root.")
+            logger.warning(
+                f"File '{bash_file}' not found in the current directory and current directory is not root."
+            )
 
     if not cmd_overide:
         cmd_overide = f"./{bash_file}"
@@ -244,7 +273,9 @@ def run_cli(
     global SHELL_HISTORY
     looped_results = []
     rsp = None
-    logger.info(f"Requesting command: {cmd} with service: {target_service} - None indicates run local")
+    logger.info(
+        f"Requesting command: {cmd} with service: {target_service} - None indicates run local"
+    )
     if run_in_workload_with_labels or run_in_workload_with_name:
         cmd = _create_kubernetes_remote_exec(
             cmd=cmd,
@@ -256,7 +287,9 @@ def run_cli(
             context=optional_context,
             **kwargs,
         )
-    request_secrets: [platform.ShellServiceRequestSecret] = [] if len(kwargs.keys()) > 0 else None
+    request_secrets: [platform.ShellServiceRequestSecret] = (
+        [] if len(kwargs.keys()) > 0 else None
+    )
     logger.info(f"Received kwargs: {kwargs}")
     request_secrets = _create_secrets_from_kwargs(**kwargs)
     if loop_with_items and len(loop_with_items) > 0:
@@ -288,7 +321,11 @@ def run_cli(
         )
     else:
         rsp = execute_command(
-            cmd=cmd, service=target_service, request_secrets=request_secrets, env=env, timeout_seconds=timeout_seconds
+            cmd=cmd,
+            service=target_service,
+            request_secrets=request_secrets,
+            env=env,
+            timeout_seconds=timeout_seconds,
         )
         if include_in_history:
             SHELL_HISTORY.append(cmd)
