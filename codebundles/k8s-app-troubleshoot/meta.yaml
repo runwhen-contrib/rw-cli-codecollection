@@ -43,8 +43,6 @@ commands:
 - command: ${cmd}
   doc_links: '
 
-    - [UNIX.com''s tutorial on crontab](https://www.unix.com/man-page/osx/1/crontab/){:target="_blank"}
-
     - [Wikipedia article on Cron job scheduling](https://en.wikipedia.org/wiki/Cron){:target="_blank"}'
   explanation: '
 
