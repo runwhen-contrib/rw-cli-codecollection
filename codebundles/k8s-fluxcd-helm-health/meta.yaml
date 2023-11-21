@@ -43,7 +43,7 @@ commands:
     #Invoke kubectl command to obtain the resource from cluster
 
     kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}'
-  name: list_all_available_fluxcd_helmreleases
+  name: list_all_available_fluxcd_helmreleases_in_namespace_namespace
 - command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} -o=jsonpath="{range .items[*]}{''\nName:
     ''}{@.metadata.name}{''\nlastAppliedRevision:''}{@.status.lastAppliedRevision}{''\nlastAttemptedRevision:''}{@.status.lastAttemptedRevision}{''\n---''}{end}"
     --context ${CONTEXT} || true'
@@ -70,7 +70,7 @@ commands:
     \ \\\n-n ${NAMESPACE} \\ \n-o=jsonpath=\"{range .items[*]}{'\\nName: '}{@.metadata.name}{'\\\
     nlastAppliedRevision:'}{@.status.lastAppliedRevision}{'\\nlastAttemptedRevision:'}{@.status.lastAttemptedRevision}{'\\\
     n---'}{end}\" \\\n--context ${CONTEXT} \\\n|| true"
-  name: fetch_installed_fluxcd_helmrelease_versions
+  name: fetch_installed_fluxcd_helmrelease_versions_in_namespace_namespace
 - command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} -o json --context ${CONTEXT}
     | jq -r ''.items[] | select(.status.lastAppliedRevision!=.status.lastAttemptedRevision)
     | "Name: " + .metadata.name + " Last Attempted Version: " + .status.lastAttemptedRevision
@@ -109,7 +109,7 @@ commands:
     \ json --context ${CONTEXT} \\\n | jq -r '.items[] \\\n  | select(.status.lastAppliedRevision!=.status.lastAttemptedRevision)\
     \ \\\n  | \"Name: \" + .metadata.name + \" Last Attempted Version: \" + .status.lastAttemptedRevision\
     \ + \" Last Applied Revision: \" + .status.lastAppliedRevision'"
-  name: fetch_mismatched_fluxcd_helmrelease_version
+  name: fetch_mismatched_fluxcd_helmrelease_version_in_namespace_namespace
 - command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} -o=jsonpath="{range .items[?(@.status.conditions[].status==''False'')]}{''-----\nName:
     ''}{@.metadata.name}{''\n''}{@.status.conditions[*].message}{''\n''}{end}" --context
     ${CONTEXT} || true'
@@ -146,7 +146,7 @@ commands:
     \ \\\n  -n ${NAMESPACE} \\\n  -o=jsonpath=\"{range .items[?(@.status.conditions[].status=='False')]}{'-----\\\
     nName: '}{@.metadata.name}{'\\n'}{@.status.conditions[*].message}{'\\n'}{end}\"\
     \ \\\n  --context ${CONTEXT} || true"
-  name: fetch_fluxcd_helmrelease_error_messages
+  name: fetch_fluxcd_helmrelease_error_messages_in_namespace_namespace
 - command: 'namespace="${NAMESPACE}" context="${CONTEXT}"; helm_releases=$(kubectl
     get ${RESOURCE_NAME} -n "$namespace" --context "$context" -o json | jq -r ''.items[]
     | .metadata.name''); echo "$helm_releases" | while IFS= read -r release; do chart_details=$(kubectl
@@ -250,4 +250,4 @@ commands:
     \ \"Release: $release | Chart: $chart_namespace/$chart_name | Installed Version:\
     \ $chart_version | Available Update: $version_update_available | Available Version:\
     \ $available_version\";\ndone"
-  name: check_for_available_helm_chart_updates
+  name: check_for_available_helm_chart_updates_in_namespace_namespace

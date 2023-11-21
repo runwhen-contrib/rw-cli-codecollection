@@ -43,7 +43,7 @@ commands:
     #Invoke kubectl command to obtain the resource from cluster
 
     kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}'
-  name: list_all_available_kustomization_objects
+  name: list_all_available_kustomization_objects_in_namespace_namespace
 - command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json
     | jq -r ''.items[] | select (.status.conditions[] | select(.type == "Ready" and
     .status == "False")) | "---\nKustomization Name: \(.metadata.name)\n\nReady Status:
@@ -102,4 +102,4 @@ commands:
     \ manipulate, and analyze a JSON object using a specific syntax. This command\
     \ will retrieve the Kustomization name, the ready status, and the reconciliation\
     \ status, all formatted to be readily readable."
-  name: get_details_for_unready_kustomizations
+  name: get_details_for_unready_kustomizations_in_namespace_namespace
