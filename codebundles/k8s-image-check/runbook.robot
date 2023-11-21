@@ -53,7 +53,7 @@ List Images and Tags for Every Container in Running Pods for Namespace `${NAMESP
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-List Images and Tags for Every Container in Failed Pods for Namespace`${NAMESPACE}`
+List Images and Tags for Every Container in Failed Pods for Namespace `${NAMESPACE}`
     [Documentation]    Display the status, image name, image tag, and container name for failed pods in the namespace.
     [Tags]    pods    containers    image    images    tag
     ${image_details}=    RW.CLI.Run Cli

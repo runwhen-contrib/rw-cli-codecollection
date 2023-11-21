@@ -33,7 +33,7 @@ commands:
     \ Started Times:\" + (.status.containerStatuses[].state.running.startedAt|tostring)]'\
     \ \\ \n# Select information for each pod including the image being used and the\
     \ last time it was started."
-  name: check_image_rollover_times_for_namespace_namespace_
+  name: check_image_rollover_times_for_namespace_namespace
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Running
     -o=json | jq -r ''.items[] | "---", "pod_name: " + .metadata.name, "Status: "
     + .status.phase, "containers:", (.spec.containers[] | "- container_name: " + .name,
@@ -71,7 +71,7 @@ commands:
     \ split(\":\")[0]), #Retrieves an image's path\n    \" \\ image_tag: \" + (.image\
     \ | split(\":\")[1])), #Retrievs an image's tag\n    \"---\"' #Represents end\
     \ of a pod data"
-  name: list_images_and_tags_for_every_container_in_running_pods_for_namespace_namespace_
+  name: list_images_and_tags_for_every_container_in_running_pods_for_namespace_namespace
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Failed
     -o=json | jq -r ''.items[] | "---", "pod_name: " + .metadata.name, "Status: "
     + .status.phase, "containers:", (.spec.containers[] | "- container_name: " + .name,
@@ -110,7 +110,7 @@ commands:
     \ | \"- container_name: \" + .name, \" \\ image_path: \" + \\(.image | split(\"\
     :\")[0]), \" \\ image_tag: \" + (.image | split(\":\")[1])), \"---\"')\n\n# Print\
     \ the result\necho $OUTPUT"
-  name: list_images_and_tags_for_every_container_in_failed_pods_for_namespace_namespace_
+  name: list_images_and_tags_for_every_container_in_failed_pods_for_namespace_namespace
 - command: 'NAMESPACE=${NAMESPACE}; POD_NAME="skopeo-pod"; CONTEXT="${CONTEXT}"; events=$(kubectl
     get events -n $NAMESPACE --context=$CONTEXT -o json | jq --arg timestamp "$(date
     -u -v -5M +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d "-5 minutes" +"%Y-%m-%dT%H:%M:%SZ")"
@@ -219,4 +219,4 @@ commands:
     \ );\n    echo \"$available_tags\";\n  fi;\n\n# Loop ends here.\ndone <<<\"$image_pull_backoff_events\"\
     \n# Cleanup the pod once the loop has finished.\necho \"Deleting Skopeo pod\"\n\
     kubectl delete pod $POD_NAME -n $NAMESPACE --context=$CONTEXT\necho \"Done\""
-  name: list_imagepullbackoff_events_and_test_path_and_tags_for_namespace_namespace_
+  name: list_imagepullbackoff_events_and_test_path_and_tags_for_namespace_namespace

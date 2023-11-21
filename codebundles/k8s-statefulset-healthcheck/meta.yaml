@@ -122,4 +122,4 @@ commands:
     -o json \\\n| jq -r '.items[] | select(.status.availableReplicas < .status.replicas)\
     \ | \"---\\nStatefulSet Name: \" + (.metadata.name|tostring) + \"\\nDesired Replicas:\
     \ \" + (.status.replicas|tostring) + \"\\nAvailable Replicas: \" + (.status.availableReplicas|tostring)'"
-  name: list_statefulsets_with_unhealthy_replica_counts_in_namespace_namespace_
+  name: list_statefulsets_with_unhealthy_replica_counts_in_namespace_namespace

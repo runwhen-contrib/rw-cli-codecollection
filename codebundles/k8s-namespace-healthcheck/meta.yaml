@@ -53,7 +53,7 @@ commands:
     \ | sort | first), most_recent_timestamp: (map(.lastTimestamp) | sort | last)})\
     \ | \\\n map(select((now - ((.most_recent_timestamp | fromdateiso8601)))/60 <=\
     \ 30))' \\\n > $HOME/warning_events_summary.json"
-  name: troubleshoot_warning_events_in_namespace_namespace_
+  name: troubleshoot_warning_events_in_namespace_namespace
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r
     --argjson exit_code_explanations ''{"0": "Success", "1": "Error", "2": "Misconfiguration",
     "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137":
@@ -111,7 +111,7 @@ commands:
     )\\nterminated_finishedAt: \\(.lastState.terminated.finishedAt // \"N/A\")\\nterminated_exitCode:\
     \ \\(.lastState.terminated.exitCode // \"N/A\")\\nexit_code_explanation: \\($exit_code_explanations[.lastState.terminated.exitCode\
     \ | tostring] // \"Unknown exit code\")\") + \"\\n---\\n\""
-  name: troubleshoot_container_restarts_in_namespace_namespace_
+  name: troubleshoot_container_restarts_in_namespace_namespace
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending
     --no-headers -o json | jq -r ''.items[] | "pod_name: \(.metadata.name)\nstatus:
     \(.status.phase // "N/A")\nmessage: \(.status.conditions[0].message // "N/A")\nreason:
@@ -147,7 +147,7 @@ commands:
     \ \\((.status.containerStatuses[0].state // \"N/A\"))\\ncontainerMessage: \\(.status.containerStatuses[0].state.waiting?.message\
     \ // \"N/A\")\\ncontainerReason: \\(.status.containerStatuses[0].state.waiting?.reason\
     \ // \"N/A\")\\n------------\"'"
-  name: troubleshoot_pending_pods_in_namespace_namespace_
+  name: troubleshoot_pending_pods_in_namespace_namespace
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed
     --no-headers -o json | jq -r --argjson exit_code_explanations ''{"0": "Success",
     "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134":
@@ -204,7 +204,7 @@ commands:
     \ \\($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode\
     \ | tostring] // \"Unknown exit code\")\\n------------\"' # Output the fields\
     \ we are interested in in a user friendly format"
-  name: troubleshoot_failed_pods_in_namespace_namespace_
+  name: troubleshoot_failed_pods_in_namespace_namespace
 - command: 'kubectl get pods --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r
     ''.items[] | select(.status.conditions[]? | select(.type == "Ready" and .status
     == "False" and .reason != "PodCompleted")) | {kind: .kind, name: .metadata.name,
@@ -236,7 +236,7 @@ commands:
     )) \n    # map the output to dictionary containing kind, name and conditions fields\n\
     \    | {kind: .kind, name: .metadata.name, conditions: .status.conditions}' \\\
     \n    # flatten results into an an array of objects\n    | jq -s '.'"
-  name: troubleshoot_workload_status_conditions_in_namespace_namespace_
+  name: troubleshoot_workload_status_conditions_in_namespace_namespace
 - command: kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT}
     | xargs -n 1 kubectl get --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}
   doc_links: '
@@ -269,7 +269,7 @@ commands:
     \ line-by-line\nxargs \\\n    -n 1 \\\n    kubectl \\\n        get \\\n      \
     \      --show-kind \\\n            --ignore-not-found \\\n            -n ${NAMESPACE}\
     \ \\\n            --context=${CONTEXT}"
-  name: get_listing_of_resources_in_namespace_namespace_
+  name: get_listing_of_resources_in_namespace_namespace
 - command: 'kubectl get events --field-selector type!=Warning --context ${CONTEXT}
     -n ${NAMESPACE} -o json > $HOME/events.json && cat $HOME/events.json | jq -r ''[.items[]
     | {namespace: .involvedObject.namespace, kind: .involvedObject.kind, name: ((if
@@ -330,7 +330,7 @@ commands:
     \ > $threshold)' \\\n\n# Convert the dataset into valid JSON array\n| jq -s '.'\
     \ \\\n\n# Validate and summarize the dataset using python3 script\n| python3 ${AIRGAP}/airgap_scripts/summary.py\
     \ -"
-  name: check_event_anomalies_in_namespace_namespace_
+  name: check_event_anomalies_in_namespace_namespace
 - command: 'services=($(kubectl get svc -o=name --context=${CONTEXT} -n ${NAMESPACE}))
     && [ \${#services[@]} -eq 0 ] && echo "No services found." || { > "logs.json";
     for service in "\${services[@]}"; do kubectl logs $service --limit-bytes=256000
@@ -390,7 +390,7 @@ commands:
     \ length}) | sort_by(.count) | reverse | .[0:3])})) ] | add' > $HOME/output;\n\
     \n        # Output the log entries in the formatted output\n        cat $HOME/output\n\
     \    fi\nfi"
-  name: troubleshoot_services_and_application_workloads_in_namespace_namespace_
+  name: troubleshoot_services_and_application_workloads_in_namespace_namespace
 - command: context="${CONTEXT}"; namespace="${NAMESPACE}"; check_health() { local
     type=$1; local name=$2; local replicas=$3; local selector=$4; local pdbs=$(kubectl
     --context "$context" --namespace "$namespace" get pdb -o json | jq -c --arg selector
@@ -489,4 +489,4 @@ commands:
     \ | to_entries[] | .key + \"=\" + .value)\"' | while read -r line; do\n\n    #\
     \ Step 5c: Invoke the check_health with relevant parameters\n    check_health\
     \ \"StatefulSet\" $(echo $line | tr -d '\"');\ndone"
-  name: check_missing_or_risky_poddisruptionbudget_policies_in_namepace_namespace_
+  name: check_missing_or_risky_poddisruptionbudget_policies_in_namepace_namespace
