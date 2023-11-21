@@ -50,4 +50,4 @@ commands:
     \ -- curl -s -k -H \"Authorization: Bearer $TOKEN\" $APISERVER$RESOURCE\n\necho\
     \ \"Cleaning up...\"\n\n# Clean up by deleting the pod.\nkubectl delete pod curl-pod\
     \ -n $NAMESPACE --context=$CONTEXT\n\necho \"Done\""
-  name: test_service_account_access_to_kubernetes_api_server
+  name: test_service_account_access_to_kubernetes_api_server_in_namespace_namespace
