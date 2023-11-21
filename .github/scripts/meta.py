@@ -198,6 +198,9 @@ def generate_metadata(directory_path):
         for item in interesting_commands:
             name = item['name']
             command = item['command']
+
+            #Remove special chars for vars in name
+            name = name.replace('`', '').replace('${', '').replace('}', '')
             # Convert name to lower snake case
             name_snake_case = re.sub(r'\W+', '_', name.lower())
 
