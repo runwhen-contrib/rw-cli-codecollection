@@ -288,7 +288,8 @@ Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
                 ${owner_kind}    ${owner_name}=    Split String    ${item_owner_output.stdout}    ${SPACE}
                 ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
             ELSE
-                ${owner_kind}    ${owner_name}=    Set Variable    ""
+                ${owner_kind}=    Set Variable    "Unknown"
+                ${owner_name}=    Set Variable    "Unknown"
             END
             ${item_next_steps}=    RW.CLI.Run Bash File
             ...    bash_file=workload_next_steps.sh
