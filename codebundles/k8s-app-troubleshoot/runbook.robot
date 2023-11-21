@@ -9,7 +9,6 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.K8sApplications
 Library             RW.platform
-Library             RW.NextSteps
 Library             OperatingSystem
 
 Suite Setup         Suite Initialization
@@ -18,7 +17,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Get Workload Logs
     [Documentation]    Collects the last approximately 300 lines of logs from the workload before restarting it.
-    [Tags]    resource    application    workload    logs    state
+    [Tags]    resource    application    workload    logs    state    ${container_name}
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get deployment,statefulset -l ${LABELS} -oname | head -n 1) --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     ...    render_in_commandlist=true
@@ -30,7 +29,7 @@ Get Workload Logs
 
 Scan For Misconfigured Environment
     [Documentation]    Compares codebase to configured infra environment variables and attempts to report missing environment variables in the app
-    [Tags]    environment    variables    env    infra
+    [Tags]    environment    variables    env    infra    ${container_name}
     ${script_run}=    RW.CLI.Run Bash File
     ...    bash_file=env_check.sh
     ...    include_in_history=False
@@ -41,8 +40,8 @@ Scan For Misconfigured Environment
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Troubleshoot Application Logs
-    [Documentation]    Performs an inspection on container logs for exceptions, parsing those exceptions and attempts to find relevant source code information
-    [Tags]    application    debug    errors    troubleshoot    workload
+    [Documentation]    Performs an inspection on container logs for exceptions/stacktraces, parsing them and attempts to find relevant source code information
+    [Tags]    application    debug    app    errors    troubleshoot    workload    api    logs    ${container_name}
     ${cmd}=    Set Variable
     ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get deployment,statefulset -l ${LABELS} -oname | head -n 1) --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     IF    $EXCLUDE_PATTERN != ""
@@ -87,7 +86,7 @@ Troubleshoot Application Logs
     RW.Core.Add Pre To Report    ${full_report}
 
     ${issue_link}=    Set Variable    \n
-    IF    "${CREATE_ISSUES}" == "YES"
+    IF    "${CREATE_ISSUES}" == "YES" and (len($parsed_exceptions)) > 0
         ${issue_link}=    RW.K8sApplications.Create Github Issue    ${repos[0]}    ${full_report}
         RW.Core.Add Pre To Report    \n${issue_link}
     END

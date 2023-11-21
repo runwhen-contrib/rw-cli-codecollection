@@ -135,12 +135,12 @@ def troubleshoot_application(
             for commit in rsr.related_commits:
                 rsr_report += f"\t{repo.repo_url}/commit/{commit.sha}\n"
         src_files_title = (
-            "Found associated files in exception stacktrace data:"
+            "## Found associated files in exception stacktrace data:"
             if rsr_report
-            else "No relevant source code or diffs could be found in the exception data."
+            else "## No relevant source code or diffs could be found in the exception data."
         )
         report += f"""
-Repository URL(s): {repo.source_uri}
+# Repository URL(s): {repo.source_uri}
 
 {src_files_title}
 {rsr_report}
@@ -155,11 +155,13 @@ Repository URL(s): {repo.source_uri}
             most_common_exception = exception_occurences[hashed_exception]["content"]
     report += (
         f"""
-This is the most common exception found:
+## This is the most common exception found:
+```
 {most_common_exception}
+```
 """
         if most_common_exception
-        else "No common exceptions could be parsed. Try running the log command provided."
+        else "## No common exceptions could be parsed. Try running the log command provided."
     )
     return {
         "report": report,

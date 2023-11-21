@@ -9,7 +9,6 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.K8sApplications
 Library             RW.platform
-Library             RW.NextSteps
 Library             OperatingSystem
 
 Suite Setup         Suite Initialization
