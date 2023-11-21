@@ -1,3 +1,5 @@
+## 0.0.9 2023-11-21
+
 ## 0.0.8 2023-11-19
 - Add Application Troubleshooting V2 (#242) 5100487
 - Add K8s Prometheus Triage and Loki Triage (#224) 46e6dba
