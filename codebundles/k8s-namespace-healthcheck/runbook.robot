@@ -45,16 +45,17 @@ Troubleshoot Warning Events in Namespace `${NAMESPACE}`
             ...    env=${env}
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
+            ${messages}=    Replace String    ${item["summary_messages"]}    "    ${EMPTY}
             ${item_owner_output}=    RW.CLI.Run Cli
             ...    cmd=echo "${item_owner.stdout}" | sed 's/ *$//' | tr -d '\n'
             ...    env=${env}
             ...    include_in_history=False
-            ${messages}=    Replace String    ${item["summary_messages"]}    "    ${EMPTY}
-            IF    len($item_owner_output.stdout) > 0
+            IF    len($item_owner_output.stdout) > 0 and ($item_owner_output.stdout) != "No resource found"
                 ${owner_kind}    ${owner_name}=    Split String    ${item_owner_output.stdout}    ${SPACE}
                 ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
             ELSE
-                ${owner_kind}    ${owner_name}=    Set Variable    ""
+                ${owner_kind}=    Set Variable    "Unknown"
+                ${owner_name}=    Set Variable    "Unknown"
             END
             ${item_next_steps}=    RW.CLI.Run Bash File
             ...    bash_file=workload_next_steps.sh
@@ -148,11 +149,16 @@ Troubleshoot Pending Pods In Namespace `${NAMESPACE}`
                 ...    env=${env}
                 ...    secret_file__kubeconfig=${kubeconfig}
                 ...    include_in_history=False
-                IF    len($item_owner.stdout) > 0
-                    ${owner_kind}    ${owner_name}=    Split String    ${item_owner.stdout}    ${SPACE}
+                ${item_owner_output}=    RW.CLI.Run Cli
+                ...    cmd=echo "${item_owner.stdout}" | sed 's/ *$//' | tr -d '\n'
+                ...    env=${env}
+                ...    include_in_history=False
+                IF    len($item_owner_output.stdout) > 0 and ($item_owner_output.stdout) != "No resource found"
+                    ${owner_kind}    ${owner_name}=    Split String    ${item_owner_output.stdout}    ${SPACE}
                     ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
                 ELSE
-                    ${owner_kind}    ${owner_name}=    Set Variable    ""
+                    ${owner_kind}=    Set Variable    "Unknown"
+                    ${owner_name}=    Set Variable    "Unknown"
                 END
                 ${item_next_steps}=    RW.CLI.Run Bash File
                 ...    bash_file=workload_next_steps.sh
@@ -211,11 +217,16 @@ Troubleshoot Failed Pods In Namespace `${NAMESPACE}`
                 ...    env=${env}
                 ...    secret_file__kubeconfig=${kubeconfig}
                 ...    include_in_history=False
-                IF    len($item_owner.stdout) > 0
-                    ${owner_kind}    ${owner_name}=    Split String    ${item_owner.stdout}    ${SPACE}
+                ${item_owner_output}=    RW.CLI.Run Cli
+                ...    cmd=echo "${item_owner.stdout}" | sed 's/ *$//' | tr -d '\n'
+                ...    env=${env}
+                ...    include_in_history=False
+                IF    len($item_owner_output.stdout) > 0 and ($item_owner_output.stdout) != "No resource found"
+                    ${owner_kind}    ${owner_name}=    Split String    ${item_owner_output.stdout}    ${SPACE}
                     ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
                 ELSE
-                    ${owner_kind}    ${owner_name}=    Set Variable    ""
+                    ${owner_kind}=    Set Variable    "Unknown"
+                    ${owner_name}=    Set Variable    "Unknown"
                 END
                 ${item_next_steps}=    RW.CLI.Run Bash File
                 ...    bash_file=workload_next_steps.sh
@@ -274,7 +285,7 @@ Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
             ...    include_in_history=False
             ${item_owner}=    RW.CLI.Run Bash File
             ...    bash_file=find_resource_owners.sh
-            ...    cmd_overide=./find_resource_owners.sh ${object_kind.stdout} ${object_name.stdout} ${NAMESPACE} ${CONTEXT}
+            ...    cmd_overide=./find_resource_owners.sh "${object_kind.stdout}" "${object_name.stdout}" "${NAMESPACE}" "${CONTEXT}"
             ...    env=${env}
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
@@ -352,11 +363,16 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
             ${messages}=    Replace String    ${item["summary_messages"]}    "    ${EMPTY}
-            IF    len($item_owner.stdout) > 0
-                ${owner_kind}    ${owner_name}=    Split String    ${item_owner.stdout}    ${SPACE}
+            ${item_owner_output}=    RW.CLI.Run Cli
+            ...    cmd=echo "${item_owner.stdout}" | sed 's/ *$//' | tr -d '\n'
+            ...    env=${env}
+            ...    include_in_history=False
+            IF    len($item_owner_output.stdout) > 0 and ($item_owner_output.stdout) != "No resource found"
+                ${owner_kind}    ${owner_name}=    Split String    ${item_owner_output.stdout}    ${SPACE}
                 ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
             ELSE
-                ${owner_kind}    ${owner_name}=    Set Variable    ""
+                ${owner_kind}=    Set Variable    "Unknown"
+                ${owner_name}=    Set Variable    "Unknown"
             END
             ${item_next_steps}=    RW.CLI.Run Bash File
             ...    bash_file=anomaly_next_steps.sh
