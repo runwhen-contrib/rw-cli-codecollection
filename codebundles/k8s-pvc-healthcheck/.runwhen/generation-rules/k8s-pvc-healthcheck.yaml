@@ -12,7 +12,7 @@ spec:
     slxs:
     - baseName: pvc-health
       levelOfDetail: detailed
-      qualifiers: ["resource", "namespace", "cluster"]
+      qualifiers: ["namespace", "cluster"]
       baseTemplateName: k8s-pvc-healthcheck
       outputItems:
         - type: slx
