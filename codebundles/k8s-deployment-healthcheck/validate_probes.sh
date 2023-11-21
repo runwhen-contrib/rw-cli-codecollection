@@ -56,8 +56,7 @@ for ((i=0; i<NUM_CONTAINERS; i++)); do
 
         if [[ ! " $CONTAINER_PORTS " == *"$PROBE_PORT"* ]]; then
             echo "Container \`$CONTAINER_NAME\`: Port $PROBE_PORT used in $PROBE_TYPE is not exposed by the container."
-            next_steps+=("Verify and Reconfigure Manifest $PROBE_TYPE with Valid Ports For \`${DEPLOYMENT_NAME}\`")
-            next_steps+=("Consider updating $PROBE_TYPE with port $PROBE_PORT to one of $CONTAINER_PORTS")
+            next_steps+=("Update $PROBE_TYPE For \`${DEPLOYMENT_NAME}\` to use one of $CONTAINER_PORTS")
         else
             echo "Container \`$CONTAINER_NAME\`: ${PROBE_TYPE} port $PROBE_PORT is valid."
         fi
