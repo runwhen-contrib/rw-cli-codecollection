@@ -64,7 +64,10 @@ def get_test_data():
     return data
 
 
-def parse_exceptions(logs: str) -> [StackTraceData]:
+def parse_exceptions(
+    logs: str,
+    debug_info: bool = False,
+) -> [StackTraceData]:
     logs = logs.split("\n")
     if len(logs) > MAX_LOG_LINES:
         logger.warning(
@@ -85,6 +88,8 @@ def parse_exceptions(logs: str) -> [StackTraceData]:
                 exception_data.append(st_data)
                 # got a successful parse, move onto next log line
                 break
+            elif debug_info:
+                logger.info(f"parser {parser} returned {st_data}")
     return exception_data
 
 
@@ -130,10 +135,15 @@ def troubleshoot_application(
                 elif hashed_exception in exception_occurences:
                     exception_occurences[hashed_exception]["count"] += 1
         rsr_report = ""
+        files_already_added = []
         for rsr in results:
+            if rsr.source_file.git_file_url in files_already_added:
+                continue
             rsr_report += f"\n{rsr.source_file.git_file_url}\n"
             for commit in rsr.related_commits:
                 rsr_report += f"\t{repo.repo_url}/commit/{commit.sha}\n"
+            files_already_added.append(rsr.source_file.git_file_url)
+
         src_files_title = (
             "## Found associated files in exception stacktrace data:"
             if rsr_report

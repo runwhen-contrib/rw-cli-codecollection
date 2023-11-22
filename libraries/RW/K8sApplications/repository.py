@@ -181,12 +181,12 @@ class Repository:
         self.source_uri = source_uri
         self.repo_url = self.get_repo_base_url()
         # get owner and repo name from uri
-        parts = (
-            self.repo_url.replace("https://github.com/", "")
-            .replace("git@github.com:", "")
-            .rstrip(".git")
-            .split("/")
+        repo_path = self.repo_url.replace("https://github.com/", "").replace(
+            "git@github.com:", ""
         )
+        if repo_path.endswith(".git"):
+            repo_path = repo_path[:-4]
+        parts = repo_path.split("/")
         self.repo_owner = parts[0]
         self.repo_name = parts[1]
         if auth_token:

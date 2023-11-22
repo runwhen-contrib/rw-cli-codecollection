@@ -82,7 +82,7 @@ Troubleshoot Application Logs
     ${full_report}=    Evaluate    $ts_results.get("report")
     ${found_exceptions}=    Evaluate    $ts_results.get("found_exceptions")
     ${full_report}=    Set Variable
-    ...    ${full_report}\nHere's the command used to collect the exception data:\n${history}
+    ...    ${full_report}\nHere's the command used to collect the exception data:\n```${history}```
     RW.Core.Add Pre To Report    ${full_report}
 
     ${issue_link}=    Set Variable    \n
@@ -91,7 +91,7 @@ Troubleshoot Application Logs
         RW.Core.Add Pre To Report    \n${issue_link}
     END
     ${nextsteps}=    Evaluate
-    ...    "${issue_link}" if len($issue_link) > 5 else "View the summary in details for possible links to the source code related to the exceptions found in the ${CONTAINER_NAME} application."
+    ...    "${issue_link}" if ("http" in """${issue_link}""") else "View the summary in details for possible links to the source code related to the exceptions found in the ${CONTAINER_NAME} application."
     IF    (len($parsed_exceptions)) > 0
         RW.Core.Add Issue
         ...    severity=3

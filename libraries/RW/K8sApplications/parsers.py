@@ -24,6 +24,7 @@ class StackTraceData:
             or len(self.endpoints) > 0
             or len(self.files) > 0
             or len(self.error_messages) > 0
+            or len(self.raw) > 0
         )
 
 
@@ -130,7 +131,7 @@ class BaseStackTraceParse:
 class PythonStackTraceParse(BaseStackTraceParse):
     @staticmethod
     def parse_log(log) -> StackTraceData:
-        if "stacktrace" in log:
+        if "stacktrace" in log or "Traceback" in log:
             return BaseStackTraceParse.parse_log(log)
         else:
             return None
