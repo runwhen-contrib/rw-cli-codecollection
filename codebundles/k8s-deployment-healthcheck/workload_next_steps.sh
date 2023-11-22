@@ -37,11 +37,11 @@ if [[ $messages =~ "Misconfiguration" ]]; then
 fi
 
 if [[ $messages =~ "Liveness probe failed" || $messages =~ "Liveness probe errored" ]]; then
-    next_steps+=("Check Liveliness Probe Configuration for Deployment \`${DEPLOYMENT_NAME}\`")
+    next_steps+=("Check Liveliness Probe Configuration for $owner_kind \`$owner_name\`")
 fi
 
 if [[ $messages =~ "Readiness probe errored" || $messages =~ "Readiness probe failed" ]]; then
-    next_steps+=("Check Readiness Probe Configuration for Deployment \`${DEPLOYMENT_NAME}\`")
+    next_steps+=("Check Readiness Probe Configuration for $owner_kind \`$owner_name\`")
 fi
 
 if [[ $messages =~ "ImagePullBackOff" || $messages =~ "Back-off pulling image" || $messages =~ "ErrImagePull" ]]; then
