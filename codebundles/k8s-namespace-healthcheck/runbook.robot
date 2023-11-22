@@ -39,6 +39,8 @@ Troubleshoot Warning Events in Namespace `${NAMESPACE}`
             ...    cmd=echo "${item["object"]}" | awk -F"/" '{print $3}' | sed 's/ *$//' | tr -d '\n'
             ...    env=${env}
             ...    include_in_history=False
+            #FIXME Theres a case where the object generating the event is gone. We need to figure out how 
+            # to best handle this case instead of "Unknown" "unknown"
             ${item_owner}=    RW.CLI.Run Bash File
             ...    bash_file=find_resource_owners.sh
             ...    cmd_overide=./find_resource_owners.sh ${object_kind.stdout} ${object_short_name.stdout} ${NAMESPACE} ${CONTEXT}
@@ -91,7 +93,7 @@ Troubleshoot Container Restarts In Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=echo "${container_restart_analysis.stdout}" | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+    ...    cmd=echo '${container_restart_analysis.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
     ...    env=${env}
     ...    include_in_history=false
     RW.CLI.Parse Cli Output By Line

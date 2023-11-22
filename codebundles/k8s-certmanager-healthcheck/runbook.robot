@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 Get Namespace Certificate Summary for Namespace `${NAMESPACE}`
-    [Documentation]    Gets a list of certmanager certificates and summarize their information for review.
+    [Documentation]    Gets a list of certmanager certificates that are due for renewal and summarize their information for review.
     [Tags]    tls    certificates    kubernetes    objects    expiration    summary    certmanager    ${NAMESPACE}
     ${cert_info}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get certificates.cert-manager.io --context=${CONTEXT} -n ${NAMESPACE} -ojson | jq -r --arg now "$(date +%Y-%m-%dT%H:%M:%SZ)" '.items[] | select(.status.conditions[] | select(.type == "Ready" and .status == "True")) | select(.status.renewalTime) | select((.status.notAfter | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime) <= ($now | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime)) | "Namespace:" + .metadata.namespace + " URL:" + .spec.dnsNames[0] + " Renews:" + .status.renewalTime + " Expires:" + .status.notAfter'
