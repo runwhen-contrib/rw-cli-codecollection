@@ -75,6 +75,7 @@ Find Failed Certificate Requests and Identify Issues for Namespace `${NAMESPACE}
                 ...    actual=Certificates are not ready in ${NAMESPACE}
                 ...    title=Certificate `${certificate_name.stdout}` has failed in namespace `${NAMESPACE}`
                 ...    details=CertManager certificates failure details: ${item}.
+                ...    reproduce_hint=${failed_certificaterequests.cmd}
                 ...    next_steps=${item_next_steps.stdout}
             END
         END
