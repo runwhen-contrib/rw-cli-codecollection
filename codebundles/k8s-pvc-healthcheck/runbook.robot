@@ -22,21 +22,51 @@ Fetch Events for Unhealthy Kubernetes PersistentVolumeClaims in Namespace `${NAM
     [Documentation]    Lists events related to PersistentVolumeClaims within the namespace that are not bound to PersistentVolumes.
     [Tags]    pvc    list    kubernetes    storage    persistentvolumeclaim    persistentvolumeclaims    events    ${NAMESPACE}
     ${unbound_pvc_events}=    RW.CLI.Run Cli
-    ...    cmd=for pvc in $(${KUBERNETES_DISTRIBUTION_BINARY} get pvc -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.status.phase != "Bound") | .metadata.name'); do ${KUBERNETES_DISTRIBUTION_BINARY} get events -n ${NAMESPACE} --context ${CONTEXT} --field-selector involvedObject.name=$pvc -o json | jq '.items[]| "Last Timestamp: " + .lastTimestamp + " Name: " + .involvedObject.name + " Message: " + .message'; done
+    ...    cmd=for pvc in $(${KUBERNETES_DISTRIBUTION_BINARY} get pvc -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.status.phase != "Bound") | .metadata.name'); do ${KUBERNETES_DISTRIBUTION_BINARY} get events -n ${NAMESPACE} --context ${CONTEXT} --field-selector involvedObject.name=$pvc -o json | jq '.items[]| "Last Timestamp: " + .lastTimestamp + ", Name: " + .involvedObject.name + ", Message: " + .message'; done
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
-    ${regexp}=    Catenate
-    ...    (?m)(?P<line>.+)
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${unbound_pvc_events}
-    ...    lines_like_regexp=${regexp}
-    ...    set_severity_level=1
-    ...    set_issue_expected=PVCs should be bound
-    ...    set_issue_actual=PVCs found pending with the following events
-    ...    set_issue_title=PVC Errors & Events In Namespace `${NAMESPACE}`
-    ...    set_issue_details=We found "$line" in the namespace ${NAMESPACE}\nReview list of unbound PersistentVolumeClaims - check node events, application configurations, StorageClasses and CSI drivers.
-    ...    line__raise_issue_if_contains=Name
+    ${unbound_pvc_event_list}=    Split String  ${unbound_pvc_events.stdout}    \n
+    @{next_steps}=     Create List
+    IF    len($unbound_pvc_event_list) > 0
+        FOR    ${item}    IN    @{unbound_pvc_event_list}
+            ${is_not_just_newline}=    Evaluate    '''${item}'''.strip() != ''
+            IF    ${is_not_just_newline}  
+                ${pvc}=    RW.CLI.Run Cli
+                ...    cmd=echo "${item}" | awk -F', ' '{split($2,a,": "); print a[2]}' | sed 's/ *$//' | tr -d '\n'
+                ...    env=${env}
+                ...    secret_file__kubeconfig=${kubeconfig}
+                ...    include_in_history=false
+                ${message}=    RW.CLI.Run Cli
+                ...    cmd=echo "${item}" | awk -F', ' '{split($3,a,": "); print a[2]}' | sed 's/ *$//' | tr -d '\n'
+                ...    env=${env}
+                ...    secret_file__kubeconfig=${kubeconfig}
+                ...    include_in_history=false
+                ${message}=    Replace String    ${message.stdout}    "    ${EMPTY}
+                ${item_next_steps}=    RW.CLI.Run Bash File
+                ...    bash_file=storage_next_steps.sh
+                ...    cmd_overide=./storage_next_steps.sh "${message}" "PersistentVolumeClaim" "${pvc.stdout}"
+                ...    env=${env}
+                ...    secret_file__kubeconfig=${kubeconfig}
+                ...    include_in_history=False
+                Append To List    ${next_steps}    "${item_next_steps.stdout}" 
+            END
+        END
+    END 
+    IF    len($next_steps) > 0
+        ${next_steps_string}=    Catenate    SEPARATOR=\n    @{next_steps} 
+        ${next_steps_string}=    Replace String    ${next_steps_string}    "    ${EMPTY}
+        ${next_steps_string}=    Replace String    ${next_steps_string}    ,    ${EMPTY}
+
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=PVCs should be bound in Namespace `${NAMESPACE}`
+        ...    actual=Unbound PVCs found in Namespace `${NAMESPACE}`
+        ...    title=Unbound PVCs found in Namespace `${NAMESPACE}`
+        ...    reproduce_hint=${unbound_pvc_events.cmd}
+        ...    details=Unbound PVC events are:\n${unbound_pvc_events.stdout}
+        ...    next_steps=${next_steps_string}
+    END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of events for unbound pvc in ${NAMESPACE}:
     RW.Core.Add Pre To Report    ${unbound_pvc_events.stdout}
@@ -144,7 +174,7 @@ Check for RWO Persistent Volume Node Attachment Issues in Namespace `${NAMESPACE
     [Documentation]    For each pod in a namespace, check if it has an RWO persistent volume claim and if so, validate that the pod and the pv are on the same node. 
     [Tags]    pod    storage    pvc    readwriteonce    node    persistentvolumeclaims    persistentvolumeclaim    scheduled   attachment    ${NAMESPACE}
     ${pod_rwo_node_and_pod_attachment}=    RW.CLI.Run Cli
-    ...    cmd=NAMESPACE="${NAMESPACE}"; CONTEXT="${CONTEXT}"; PODS=$(kubectl get pods -n $NAMESPACE --context=$CONTEXT -o json); for pod in $(jq -r '.items[] | @base64' <<< "$PODS"); do _jq() { jq -r \${1} <<< "$(base64 --decode <<< \${pod})"; }; POD_NAME=$(_jq '.metadata.name'); POD_NODE_NAME=$(kubectl get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o custom-columns=:.spec.nodeName --no-headers); PVC_NAMES=$(kubectl get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o jsonpath='{.spec.volumes[*].persistentVolumeClaim.claimName}'); for pvc_name in $PVC_NAMES; do PVC=$(kubectl get pvc $pvc_name -n $NAMESPACE --context=$CONTEXT -o json); ACCESS_MODE=$(jq -r '.spec.accessModes[0]' <<< "$PVC"); if [[ "$ACCESS_MODE" == "ReadWriteOnce" ]]; then PV_NAME=$(jq -r '.spec.volumeName' <<< "$PVC"); STORAGE_NODE_NAME=$(jq -r --arg pv "$PV_NAME" '.items[] | select(.status.volumesAttached != null) | select(.status.volumesInUse[] | contains($pv)) | .metadata.name' <<< "$(kubectl get nodes --context=$CONTEXT -o json)"); echo "------------"; if [[ "$POD_NODE_NAME" == "$STORAGE_NODE_NAME" ]]; then echo "OK: Pod and Storage Node Matched"; else echo "Error: Pod and Storage Node Mismatched - If the issue persists, the node requires attention."; fi; echo "Pod: $POD_NAME"; echo "PVC: $pvc_name"; echo "PV: $PV_NAME"; echo "Node with Pod: $POD_NODE_NAME"; echo "Node with Storage: $STORAGE_NODE_NAME"; echo; fi; done; done
+    ...    cmd=NAMESPACE="${NAMESPACE}"; CONTEXT="${CONTEXT}"; PODS=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n $NAMESPACE --context=$CONTEXT -o json); for pod in $(jq -r '.items[] | @base64' <<< "$PODS"); do _jq() { jq -r \${1} <<< "$(base64 --decode <<< \${pod})"; }; POD_NAME=$(_jq '.metadata.name'); POD_NODE_NAME=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o custom-columns=:.spec.nodeName --no-headers); PVC_NAMES=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o jsonpath='{.spec.volumes[*].persistentVolumeClaim.claimName}'); for pvc_name in $PVC_NAMES; do PVC=$(${KUBERNETES_DISTRIBUTION_BINARY} get pvc $pvc_name -n $NAMESPACE --context=$CONTEXT -o json); ACCESS_MODE=$(jq -r '.spec.accessModes[0]' <<< "$PVC"); if [[ "$ACCESS_MODE" == "ReadWriteOnce" ]]; then PV_NAME=$(jq -r '.spec.volumeName' <<< "$PVC"); STORAGE_NODE_NAME=$(jq -r --arg pv "$PV_NAME" '.items[] | select(.status.volumesAttached != null) | select(.status.volumesInUse[] | contains($pv)) | .metadata.name' <<< "$(${KUBERNETES_DISTRIBUTION_BINARY} get nodes --context=$CONTEXT -o json)"); echo "------------"; if [[ "$POD_NODE_NAME" == "$STORAGE_NODE_NAME" ]]; then echo "OK: Pod and Storage Node Matched"; else echo "Error: Pod and Storage Node Mismatched - If the issue persists, the node requires attention."; fi; echo "Pod: $POD_NAME"; echo "PVC: $pvc_name"; echo "PV: $PV_NAME"; echo "Node with Pod: $POD_NODE_NAME"; echo "Node with Storage: $STORAGE_NODE_NAME"; echo; fi; done; done
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
@@ -197,4 +227,4 @@ Suite Initialization
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
-    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
+    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}"}
