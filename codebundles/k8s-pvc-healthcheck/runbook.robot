@@ -99,13 +99,13 @@ List PersistentVolumeClaims in Terminating State in Namespace `${NAMESPACE}`
 List PersistentVolumes in Terminating State in Namespace `${NAMESPACE}`
     [Documentation]    Lists events related to persistent volumes in Terminating state.
     [Tags]    pv    list    kubernetes    storage    persistentvolume    terminating    events    ${NAMESPACE}
-    ${dangline_pvs}=    RW.CLI.Run Cli
+    ${dangling_pvs}=    RW.CLI.Run Cli
     ...    cmd=for pv in $(${KUBERNETES_DISTRIBUTION_BINARY} get pv --context ${CONTEXT} -o json | jq -r '.items[] | select(.status.phase == "Terminating") | .metadata.name'); do ${KUBERNETES_DISTRIBUTION_BINARY} get events --all-namespaces --field-selector involvedObject.name=$pv --context ${CONTEXT} -o json | jq '.items[]| "Last Timestamp: " + .lastTimestamp + " Name: " + .involvedObject.name + " Message: " + .message'; done
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
     RW.CLI.Parse Cli Output By Line
-    ...    rsp=${dangline_pvs}
+    ...    rsp=${dangling_pvs}
     ...    set_severity_level=4
     ...    set_issue_expected=PersistentVolumes should not be stuck terminating.
     ...    set_issue_actual=PersistentVolumes are in a terminating state and might be stuck.
@@ -115,7 +115,7 @@ List PersistentVolumes in Terminating State in Namespace `${NAMESPACE}`
     ...    set_next_steps=Escalate PersistentVolumes stuck terminating for namespace `${NAMESPACE}`
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of events for dangling persistent volumes:
-    RW.Core.Add Pre To Report    ${dangline_pvs.stdout}
+    RW.Core.Add Pre To Report    ${dangling_pvs.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 List Pods with Attached Volumes and Related PersistentVolume Details in Namespace `${NAMESPACE}`
