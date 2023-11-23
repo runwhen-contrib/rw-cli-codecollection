@@ -145,6 +145,10 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
         END
     END
     IF    len($next_steps) > 0
+        ${next_steps_string}=    Catenate    SEPARATOR=\n    @{next_steps} 
+        ${next_steps_string}=    Replace String    ${next_steps_string}    "    ${EMPTY}
+        ${next_steps_string}=    Replace String    ${next_steps_string}    ,    ${EMPTY}
+
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=PVCs should be less than 95% utilized for Namespace `${NAMESPACE}`
@@ -152,7 +156,7 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
         ...    title=PVC Storage Utilization Issues in Namespace `${NAMESPACE}`
         ...    reproduce_hint=${pod_pvc_utilization.cmd}
         ...    details=Found excessive PVC utilization for:\n${item}
-        ...    next_steps=@{next_steps}
+        ...    next_steps=${next_steps_string}
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of PVC storage mount utilization in ${NAMESPACE}:
