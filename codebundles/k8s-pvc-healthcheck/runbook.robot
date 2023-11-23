@@ -34,7 +34,7 @@ Fetch Events for Unhealthy Kubernetes PersistentVolumeClaims in Namespace `${NAM
     ...    set_severity_level=1
     ...    set_issue_expected=PVCs should be bound
     ...    set_issue_actual=PVCs found pending with the following events
-    ...    set_issue_title=PVC Errors & Events In Namespace ${NAMESPACE}
+    ...    set_issue_title=PVC Errors & Events In Namespace `${NAMESPACE}`
     ...    set_issue_details=We found "$line" in the namespace ${NAMESPACE}\nReview list of unbound PersistentVolumeClaims - check node events, application configurations, StorageClasses and CSI drivers.
     ...    line__raise_issue_if_contains=Name
     ${history}=    RW.CLI.Pop Shell History
@@ -84,7 +84,7 @@ List Pods with Attached Volumes and Related PersistentVolume Details in Namespac
     [Documentation]    For each pod in a namespace, collect details on configured PersistentVolumeClaim, PersistentVolume, and node.
     [Tags]    pod    storage    pvc    pv    status    csi    storagereport    ${NAMESPACE}
     ${pod_storage_report}=    RW.CLI.Run Cli
-    ...    cmd=for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} --field-selector=status.phase=Running --context ${CONTEXT} -o jsonpath='{range .items[*]}{.metadata.name}{"\\n"}{end}'); do for pvc in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods $pod -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{range .spec.volumes[*]}{.persistentVolumeClaim.claimName}{"\\n"}{end}'); do pv=$(${KUBERNETES_DISTRIBUTION_BINARY} get pvc $pvc -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.volumeName}') && status=$(${KUBERNETES_DISTRIBUTION_BINARY} get pv $pv --context ${CONTEXT} -o jsonpath='{.status.phase}') && node=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.nodeName}') && zone=$(${KUBERNETES_DISTRIBUTION_BINARY} get nodes $node --context ${CONTEXT} -o jsonpath='{.metadata.labels.topology\\.kubernetes\\.io/zone}') && ingressclass=$(${KUBERNETES_DISTRIBUTION_BINARY} get pvc $pvc -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.storageClassName}') && accessmode=$(${KUBERNETES_DISTRIBUTION_BINARY} get pvc $pvc -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.status.accessModes[0]}') && reclaimpolicy=$(${KUBERNETES_DISTRIBUTION_BINARY} get pv $pv --context ${CONTEXT} -o jsonpath='{.spec.persistentVolumeReclaimPolicy}') && csidriver=$(${KUBERNETES_DISTRIBUTION_BINARY} get pv $pv --context ${CONTEXT} -o jsonpath='{.spec.csi.driver}')&& echo -e "\\n---\\nPod: $pod\\nPVC: $pvc\\nPV: $pv\\nStatus: $status\\nNode: $node\\nZone: $zone\\nIngressClass: $ingressclass\\nAccessModes: $accessmode\\nReclaimPolicy: $reclaimpolicy\\nCSIDriver: $csidriver\\n"; done; done
+    ...    cmd=for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} --field-selector=status.phase=Running --context ${CONTEXT} -o jsonpath='{range .items[*]}{.metadata.name}{"\\n"}{end}'); do for pvc in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods $pod -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{range .spec.volumes[*]}{.persistentVolumeClaim.claimName}{"\\n"}{end}'); do pv=$(${KUBERNETES_DISTRIBUTION_BINARY} get pvc $pvc -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.volumeName}') && status=$(${KUBERNETES_DISTRIBUTION_BINARY} get pv $pv --context ${CONTEXT} -o jsonpath='{.status.phase}') && node=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.nodeName}') && zone=$(${KUBERNETES_DISTRIBUTION_BINARY} get nodes $node --context ${CONTEXT} -o jsonpath='{.metadata.labels.topology\\.kubernetes\\.io/zone}') && ingressclass=$(${KUBERNETES_DISTRIBUTION_BINARY} get pvc $pvc -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.storageClassName}') && accessmode=$(${KUBERNETES_DISTRIBUTION_BINARY} get pvc $pvc -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.status.accessModes[0]}') && reclaimpolicy=$(${KUBERNETES_DISTRIBUTION_BINARY} get pv $pv --context ${CONTEXT} -o jsonpath='{.spec.persistentVolumeReclaimPolicy}') && csidriver=$(${KUBERNETES_DISTRIBUTION_BINARY} get pv $pv --context ${CONTEXT} -o jsonpath='{.spec.csi.driver}')&& echo -e "\\n------------\\nPod: $pod\\nPVC: $pvc\\nPV: $pv\\nStatus: $status\\nNode: $node\\nZone: $zone\\nIngressClass: $ingressclass\\nAccessModes: $accessmode\\nReclaimPolicy: $reclaimpolicy\\nCSIDriver: $csidriver\\n"; done; done
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
@@ -97,29 +97,63 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
     [Documentation]    For each pod in a namespace, fetch the utilization of any PersistentVolumeClaims mounted using the linux df command. Requires kubectl exec permissions.
     [Tags]    pod    storage    pvc    utilization    capacity    persistentvolumeclaims    persistentvolumeclaim    check pvc    ${NAMESPACE}
     ${pod_pvc_utilization}=    RW.CLI.Run Cli
-    ...    cmd=for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} --field-selector=status.phase=Running --context ${CONTEXT} -o jsonpath='{range .items[*]}{.metadata.name}{"\\n"}{end}'); do for pvc in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods $pod -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{range .spec.volumes[*]}{.persistentVolumeClaim.claimName}{"\\n"}{end}'); do for volumeName in $(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.spec.volumes[] | select(has("persistentVolumeClaim")) | .name'); do mountPath=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r --arg vol "$volumeName" '.spec.containers[].volumeMounts[] | select(.name == $vol) | .mountPath'); containerName=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r --arg vol "$volumeName" '.spec.containers[] | select(.volumeMounts[].name == $vol) | .name'); echo -e "\\n---\\nPod: $pod, PVC: $pvc, volumeName: $volumeName, containerName: $containerName, mountPath: $mountPath"; ${KUBERNETES_DISTRIBUTION_BINARY} exec $pod -n ${NAMESPACE} --context ${CONTEXT} -c $containerName -- df -h $mountPath; done; done; done;
+    ...    cmd=for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} --field-selector=status.phase=Running --context ${CONTEXT} -o jsonpath='{range .items[*]}{.metadata.name}{"\\n"}{end}'); do for pvc in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods $pod -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{range .spec.volumes[*]}{.persistentVolumeClaim.claimName}{"\\n"}{end}'); do for volumeName in $(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.spec.volumes[] | select(has("persistentVolumeClaim")) | .name'); do mountPath=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r --arg vol "$volumeName" '.spec.containers[].volumeMounts[] | select(.name == $vol) | .mountPath'); containerName=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r --arg vol "$volumeName" '.spec.containers[] | select(.volumeMounts[].name == $vol) | .name'); echo -e "\\n------------\\nPod: $pod, PVC: $pvc, volumeName: $volumeName, containerName: $containerName, mountPath: $mountPath"; ${KUBERNETES_DISTRIBUTION_BINARY} exec $pod -n ${NAMESPACE} --context ${CONTEXT} -c $containerName -- df -h $mountPath; done; done; done;
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
     ${unhealthy_volume_capacity}=    RW.CLI.Run Cli
-    ...    cmd=echo "${pod_pvc_utilization.stdout}" | awk '/---/ { if (flag) { print record "\\n" $0; } record = ""; flag = 0; next; } $5 ~ /[9][5-9]%/ || $5 == "100%" { flag = 1; } { if (record == "") { record = $0; } else { record = record "\\n" $0; } } END { if (flag) { print record; } }'
+    ...    cmd=echo "${pod_pvc_utilization.stdout}" | awk '/------------/ { if (flag) { print record "\\n" $0; } record = ""; flag = 0; next; } $5 ~ /[9][5-9]%/ || $5 == "100%" { flag = 1; } { if (record == "") { record = $0; } else { record = record "\\n" $0; } } END { if (flag) { print record; } }'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ${unhealthy_volume_details}=    RW.CLI.Run Cli
-    ...    cmd=echo "${unhealthy_volume_capacity.stdout}" | awk -F'[,:]' '/Pod:/ {print "Pod:" $2, "PVC:" $4}'
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    @{unhealthy_volume_list}=    Split To Lines  ${unhealthy_volume_details.stdout}
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${unhealthy_volume_capacity}
-    ...    set_severity_level=2
-    ...    set_issue_expected=PVC should be less than 95% utilized.
-    ...    set_issue_reproduce_hint=View Commands Used in Report
-    ...    set_issue_actual=PVC is 95% or greater.
-    ...    set_issue_title=PVC Storage Utilization As Report by Pod
-    ...    set_issue_details=Found excessive PVC Utilization for: \n${unhealthy_volume_capacity.stdout}
-    ...    _line__raise_issue_if_contains=Pod
-    ...    set_issue_next_steps=Clean up or expand Persistent Volume Claims for: ${unhealthy_volume_list}
+    ...    include_in_history=false
+    # ${unhealthy_volume_details}=    RW.CLI.Run Cli
+    # ...    cmd=echo "${unhealthy_volume_capacity.stdout}" | awk -F'[,:]' '/Pod:/ {print "Pod:" $2, "PVC:" $4}'
+    # ...    env=${env}
+    # ...    secret_file__kubeconfig=${kubeconfig}
+    # ...    include_in_history=false
+    @{next_steps}=     Create List
+    ${unhealthy_volume_list}=    Split String  ${unhealthy_volume_capacity.stdout}    ------------
+    IF    len($unhealthy_volume_list) > 0
+        FOR    ${item}    IN    @{unhealthy_volume_list}
+            ${is_not_just_newline}=    Evaluate    '''${item}'''.strip() != ''
+            IF    ${is_not_just_newline}  
+                ${pvc}=    RW.CLI.Run Cli
+                ...    cmd=echo "${item}" | grep PVC | awk -F', ' '{split($2,a,": "); print a[2]}' | sed 's/ *$//' | tr -d '\n'
+                ...    env=${env}
+                ...    secret_file__kubeconfig=${kubeconfig}
+                ...    include_in_history=false
+                Append To List    ${next_steps}    "Expand Persistent Volume Claim in namespace `${NAMESPACE}`: `${pvc.stdout}`" 
+                # RW.Core.Add Issue
+                # ...    severity=2
+                # ...    expected=PVC `${pvc.stdout}` should be less than 95% utilized in Namespace `${NAMESPACE}`
+                # ...    actual=PVC `${pvc.stdout}` in `${NAMESPACE}` is full or nearly full.
+                # ...    title=PVC Storage Utilization Issues in Namespace `${NAMESPACE}` for PVC `${pvc.stdout}`
+                # ...    reproduce_hint=${pod_pvc_utilization.cmd}
+                # ...    details=The following pod is attached to PVCs with risky utilization:\n${item}
+                # ...    next_steps=Expand Persistent Volume Claim in namespace `${NAMESPACE}`: `${pvc.stdout}`
+            # RW.CLI.Parse Cli Output By Line
+            # ...    rsp=${unhealthy_volume_capacity}
+            # ...    set_severity_level=2
+            # ...    set_issue_expected=PVCs should be less than 95% utilized for Namespace `${NAMESPACE}`.
+            # ...    set_issue_reproduce_hint=View Commands Used in Report
+            # ...    set_issue_actual=PVC utilization is 95% or greater in Namespace `${NAMESPACE}`.
+            # ...    set_issue_title=PVC Storage Utilization Issues in Namespace `${NAMESPACE}`
+            # ...    set_issue_details=Found excessive PVC Utilization for: \n${unhealthy_volume_capacity.stdout}
+            # ...    _line__raise_issue_if_contains=Pod
+            # ...    set_issue_next_steps=Clean up or expand Persistent Volume Claims in namespace `${NAMESPACE}` for: ${unhealthy_volume_list}
+            END
+        END
+    END
+    IF    len($next_steps) > 0
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=PVCs should be less than 95% utilized for Namespace `${NAMESPACE}`
+        ...    actual=PVC utilization is 95% or greater in Namespace `${NAMESPACE}`
+        ...    title=PVC Storage Utilization Issues in Namespace `${NAMESPACE}`
+        ...    reproduce_hint=${pod_pvc_utilization.cmd}
+        ...    details=Found excessive PVC utilization for:\n${item}
+        ...    next_steps=@{next_steps}
+    END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of PVC storage mount utilization in ${NAMESPACE}:
     RW.Core.Add Pre To Report    ${pod_pvc_utilization.stdout}
@@ -129,18 +163,18 @@ Check for RWO Persistent Volume Node Attachment Issues in Namespace `${NAMESPACE
     [Documentation]    For each pod in a namespace, check if it has an RWO persistent volume claim and if so, validate that the pod and the pv are on the same node. 
     [Tags]    pod    storage    pvc    readwriteonce    node    persistentvolumeclaims    persistentvolumeclaim    scheduled   attachment    ${NAMESPACE}
     ${pod_rwo_node_and_pod_attachment}=    RW.CLI.Run Cli
-    ...    cmd=NAMESPACE="${NAMESPACE}"; CONTEXT="${CONTEXT}"; PODS=$(kubectl get pods -n $NAMESPACE --context=$CONTEXT -o json); for pod in $(jq -r '.items[] | @base64' <<< "$PODS"); do _jq() { jq -r \${1} <<< "$(base64 --decode <<< \${pod})"; }; POD_NAME=$(_jq '.metadata.name'); POD_NODE_NAME=$(kubectl get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o custom-columns=:.spec.nodeName --no-headers); PVC_NAMES=$(kubectl get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o jsonpath='{.spec.volumes[*].persistentVolumeClaim.claimName}'); for pvc_name in $PVC_NAMES; do PVC=$(kubectl get pvc $pvc_name -n $NAMESPACE --context=$CONTEXT -o json); ACCESS_MODE=$(jq -r '.spec.accessModes[0]' <<< "$PVC"); if [[ "$ACCESS_MODE" == "ReadWriteOnce" ]]; then PV_NAME=$(jq -r '.spec.volumeName' <<< "$PVC"); STORAGE_NODE_NAME=$(jq -r --arg pv "$PV_NAME" '.items[] | select(.status.volumesAttached != null) | select(.status.volumesInUse[] | contains($pv)) | .metadata.name' <<< "$(kubectl get nodes --context=$CONTEXT -o json)"); echo "-----"; if [[ "$POD_NODE_NAME" == "$STORAGE_NODE_NAME" ]]; then echo "OK: Pod and Storage Node Matched"; else echo "Error: Pod and Storage Node Mismatched - If the issue persists, the node requires attention."; fi; echo "Pod: $POD_NAME"; echo "PVC: $pvc_name"; echo "PV: $PV_NAME"; echo "Node with Pod: $POD_NODE_NAME"; echo "Node with Storage: $STORAGE_NODE_NAME"; echo; fi; done; done
+    ...    cmd=NAMESPACE="${NAMESPACE}"; CONTEXT="${CONTEXT}"; PODS=$(kubectl get pods -n $NAMESPACE --context=$CONTEXT -o json); for pod in $(jq -r '.items[] | @base64' <<< "$PODS"); do _jq() { jq -r \${1} <<< "$(base64 --decode <<< \${pod})"; }; POD_NAME=$(_jq '.metadata.name'); POD_NODE_NAME=$(kubectl get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o custom-columns=:.spec.nodeName --no-headers); PVC_NAMES=$(kubectl get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o jsonpath='{.spec.volumes[*].persistentVolumeClaim.claimName}'); for pvc_name in $PVC_NAMES; do PVC=$(kubectl get pvc $pvc_name -n $NAMESPACE --context=$CONTEXT -o json); ACCESS_MODE=$(jq -r '.spec.accessModes[0]' <<< "$PVC"); if [[ "$ACCESS_MODE" == "ReadWriteOnce" ]]; then PV_NAME=$(jq -r '.spec.volumeName' <<< "$PVC"); STORAGE_NODE_NAME=$(jq -r --arg pv "$PV_NAME" '.items[] | select(.status.volumesAttached != null) | select(.status.volumesInUse[] | contains($pv)) | .metadata.name' <<< "$(kubectl get nodes --context=$CONTEXT -o json)"); echo "------------"; if [[ "$POD_NODE_NAME" == "$STORAGE_NODE_NAME" ]]; then echo "OK: Pod and Storage Node Matched"; else echo "Error: Pod and Storage Node Mismatched - If the issue persists, the node requires attention."; fi; echo "Pod: $POD_NAME"; echo "PVC: $pvc_name"; echo "PV: $PV_NAME"; echo "Node with Pod: $POD_NODE_NAME"; echo "Node with Storage: $STORAGE_NODE_NAME"; echo; fi; done; done
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${pod_rwo_node_and_pod_attachment}
     ...    set_severity_level=2
-    ...    set_issue_expected=All pods with RWO storage must be scheduled on the same node in which the persistent volume is attached: ${NAMESPACE}
-    ...    set_issue_actual=Pods with RWO found on a different node than their RWO storage: ${NAMESPACE}
-    ...    set_issue_title=Pods with RWO storage might have storage scheduling issues for namespace: ${NAMESPACE}
+    ...    set_issue_expected=All pods with RWO storage must be scheduled on the same node in which the persistent volume is attached `${NAMESPACE}`
+    ...    set_issue_actual=Pods with RWO found on a different node than their RWO storage `${NAMESPACE}`
+    ...    set_issue_title=Pods with RWO storage might have storage scheduling issues for namespace `${NAMESPACE}`
     ...    set_issue_details=All Pods and RWO their storage details are:\n\n$_stdout\n\n
-    ...    set_issue_next_steps=Escalate storage attach issues to service owner. 
+    ...    set_issue_next_steps=Escalate storage attach issues to service owner for namespace `${NAMESPACE}`
     ...    _line__raise_issue_if_contains=Error
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of Pods with RWO storage and the nodes their scheduling details for namespace: ${NAMESPACE}:
