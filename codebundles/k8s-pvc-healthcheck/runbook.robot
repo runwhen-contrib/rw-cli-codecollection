@@ -80,6 +80,16 @@ List PersistentVolumeClaims in Terminating State in Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
+    RW.CLI.Parse Cli Output By Line
+    ...    rsp=${terminating_pvcs}
+    ...    set_severity_level=4
+    ...    set_issue_expected=PersistentVolumeClaims should not be stuck terminating.
+    ...    set_issue_actual=PersistentVolumeClaims are in a terminating state and might be stuck.
+    ...    set_issue_reproduce_hint=${terminating_pvcs.cmd}
+    ...    set_issue_title=PersistentVolumeClaims Found Terminating In Namespace `${NAMESPACE}`
+    ...    set_issue_details=We found "$_line" in the namespace `${NAMESPACE}`\nCheck the status of terminating PersistentVolumeClaims over the next few minutes, as they should disappear. If not, check that deployments or statefulsets attached to the PersistentVolumeClaims are scaled down and pods attached to the PersistentVolumeClaims are not running.
+    ...    _line__raise_issue_if_contains=Terminating
+    ...    set_next_steps=Escalate PersistentVolumeClaims stuck terminating for namespace `${NAMESPACE}`
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of events for dangling persistent volumes:
     RW.Core.Add Pre To Report    ${terminating_pvcs.stdout}
@@ -89,25 +99,23 @@ List PersistentVolumeClaims in Terminating State in Namespace `${NAMESPACE}`
 List PersistentVolumes in Terminating State in Namespace `${NAMESPACE}`
     [Documentation]    Lists events related to persistent volumes in Terminating state.
     [Tags]    pv    list    kubernetes    storage    persistentvolume    terminating    events    ${NAMESPACE}
-    ${dangline_pvcs}=    RW.CLI.Run Cli
+    ${dangline_pvs}=    RW.CLI.Run Cli
     ...    cmd=for pv in $(${KUBERNETES_DISTRIBUTION_BINARY} get pv --context ${CONTEXT} -o json | jq -r '.items[] | select(.status.phase == "Terminating") | .metadata.name'); do ${KUBERNETES_DISTRIBUTION_BINARY} get events --all-namespaces --field-selector involvedObject.name=$pv --context ${CONTEXT} -o json | jq '.items[]| "Last Timestamp: " + .lastTimestamp + " Name: " + .involvedObject.name + " Message: " + .message'; done
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    render_in_commandlist=true
-    ${regexp}=    Catenate
-    ...    (?m)(?P<line>.+)
     RW.CLI.Parse Cli Output By Line
-    ...    rsp=${dangline_pvcs}
-    ...    lines_like_regexp=${regexp}
+    ...    rsp=${dangline_pvs}
     ...    set_severity_level=4
-    ...    set_issue_expected=PV should not be stuck terminating.
-    ...    set_issue_actual=PV is in a terminating state.
-    ...    set_issue_title=PV Events While Terminating In Namespace ${NAMESPACE}
-    ...    set_issue_details=We found "$_line" in the namespace ${NAMESPACE}\nCheck the status of terminating PersistentVolumeClaims over the next few minutes, they should disappear. If not, check that deployments or statefulsets attached to the PersistentVolumeClaims are scaled down and pods attached to the PersistentVolumeClaims are not running.
+    ...    set_issue_expected=PersistentVolumes should not be stuck terminating.
+    ...    set_issue_actual=PersistentVolumes are in a terminating state and might be stuck.
+    ...    set_issue_title=PersistentVolumes Found Terminating In Namespace `${NAMESPACE}`
+    ...    set_issue_details=We found "$_line" in the namespace `${NAMESPACE}`\nCheck the status of terminating PersistentVolumes over the next few minutes, as they should disappear. If not, check that deployments or statefulsets attached to the related PersistentVolumeClaims are scaled down and pods attached to the PersistentVolumeClaims are not running.
     ...    _line__raise_issue_if_contains=Name
+    ...    set_next_steps=Escalate PersistentVolumes stuck terminating for namespace `${NAMESPACE}`
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of events for dangling persistent volumes:
-    RW.Core.Add Pre To Report    ${dangline_pvcs.stdout}
+    RW.Core.Add Pre To Report    ${dangline_pvs.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 List Pods with Attached Volumes and Related PersistentVolume Details in Namespace `${NAMESPACE}`
