@@ -123,24 +123,6 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
                 ...    secret_file__kubeconfig=${kubeconfig}
                 ...    include_in_history=false
                 Append To List    ${next_steps}    "Expand Persistent Volume Claim in namespace `${NAMESPACE}`: `${pvc.stdout}`" 
-                # RW.Core.Add Issue
-                # ...    severity=2
-                # ...    expected=PVC `${pvc.stdout}` should be less than 95% utilized in Namespace `${NAMESPACE}`
-                # ...    actual=PVC `${pvc.stdout}` in `${NAMESPACE}` is full or nearly full.
-                # ...    title=PVC Storage Utilization Issues in Namespace `${NAMESPACE}` for PVC `${pvc.stdout}`
-                # ...    reproduce_hint=${pod_pvc_utilization.cmd}
-                # ...    details=The following pod is attached to PVCs with risky utilization:\n${item}
-                # ...    next_steps=Expand Persistent Volume Claim in namespace `${NAMESPACE}`: `${pvc.stdout}`
-            # RW.CLI.Parse Cli Output By Line
-            # ...    rsp=${unhealthy_volume_capacity}
-            # ...    set_severity_level=2
-            # ...    set_issue_expected=PVCs should be less than 95% utilized for Namespace `${NAMESPACE}`.
-            # ...    set_issue_reproduce_hint=View Commands Used in Report
-            # ...    set_issue_actual=PVC utilization is 95% or greater in Namespace `${NAMESPACE}`.
-            # ...    set_issue_title=PVC Storage Utilization Issues in Namespace `${NAMESPACE}`
-            # ...    set_issue_details=Found excessive PVC Utilization for: \n${unhealthy_volume_capacity.stdout}
-            # ...    _line__raise_issue_if_contains=Pod
-            # ...    set_issue_next_steps=Clean up or expand Persistent Volume Claims in namespace `${NAMESPACE}` for: ${unhealthy_volume_list}
             END
         END
     END
@@ -155,7 +137,7 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
         ...    actual=PVC utilization is 95% or greater in Namespace `${NAMESPACE}`
         ...    title=PVC Storage Utilization Issues in Namespace `${NAMESPACE}`
         ...    reproduce_hint=${pod_pvc_utilization.cmd}
-        ...    details=Found excessive PVC utilization for:\n${item}
+        ...    details=Found excessive PVC utilization for:\n${unhealthy_volume_capacity.stdout}
         ...    next_steps=${next_steps_string}
     END
     ${history}=    RW.CLI.Pop Shell History
