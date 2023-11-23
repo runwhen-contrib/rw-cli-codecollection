@@ -106,11 +106,6 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    include_in_history=false
-    # ${unhealthy_volume_details}=    RW.CLI.Run Cli
-    # ...    cmd=echo "${unhealthy_volume_capacity.stdout}" | awk -F'[,:]' '/Pod:/ {print "Pod:" $2, "PVC:" $4}'
-    # ...    env=${env}
-    # ...    secret_file__kubeconfig=${kubeconfig}
-    # ...    include_in_history=false
     @{next_steps}=     Create List
     ${unhealthy_volume_list}=    Split String  ${unhealthy_volume_capacity.stdout}    ------------
     IF    len($unhealthy_volume_list) > 0
