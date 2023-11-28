@@ -5,12 +5,10 @@ spec:
     - resourceTypes:
         - certificates.cert-manager.io
       matchRules:
-        - type: and
-          matches:
-            - type: pattern
-              pattern: ".+"
-              properties: [name]
-              mode: substring
+        - type: pattern
+          pattern: "."
+          properties: [name]
+          mode: substring
       slxs:
         - baseName: cert-health
           qualifiers: ["namespace", "cluster"]
