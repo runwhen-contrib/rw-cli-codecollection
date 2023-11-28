@@ -5,15 +5,17 @@ spec:
     - resourceTypes:
         - certificates.cert-manager.io
       matchRules:
-        - type: pattern
-          pattern: "."
-          properties: [name]
-          mode: substring
+        - type: and
+          matches:
+            - type: pattern
+              pattern: ".+"
+              properties: [name]
+              mode: substring
       slxs:
         - baseName: cert-health
           qualifiers: ["namespace", "cluster"]
           baseTemplateName: k8s-certmanager-certificate-health
-          levelOfDetail: basic
+          levelOfDetail: detailed
           outputItems:
             - type: slx
             - type: sli
