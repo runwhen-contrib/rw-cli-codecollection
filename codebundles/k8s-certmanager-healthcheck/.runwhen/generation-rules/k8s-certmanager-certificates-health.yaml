@@ -4,7 +4,6 @@ spec:
   generationRules:
     - resourceTypes:
         - certificates.cert-manager.io
-        - certificaterequests.cert-manager.io
       matchRules:
         - type: and
           matches:
