@@ -60,7 +60,7 @@ if [ -z "$DEPLOYMENT_NAME" ]; then
 fi
 
 # Fetch label selectors for the provided deployment
-SELECTOR=$(${KUBERNETES_DISTRIBUTION_BINARY} get deployment $DEPLOYMENT_NAME --namespace=$NAMESPACE -o=jsonpath='{.spec.selector.matchLabels}' | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' | tr '\n' ',' | sed 's/,$//')
+SELECTOR=$(${KUBERNETES_DISTRIBUTION_BINARY} get deployment $DEPLOYMENT_NAME -n ${NAMESPACE} --context=${CONTEXT} -o=jsonpath='{.spec.selector.matchLabels}' | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' | tr '\n' ',' | sed 's/,$//')
 if [ -z "$SELECTOR" ]; then
     echo "No label selectors found for Deployment $DEPLOYMENT_NAME."
     exit 1
@@ -69,20 +69,20 @@ fi
 # Iterate through the pods based on the selector and fetch logs
 LOG_FILES=() 
 while read POD; do
-    CONTAINERS=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $POD --namespace=$NAMESPACE -o=jsonpath='{range .spec.containers[*]}{.name}{"\n"}{end}')
+    CONTAINERS=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $POD -n ${NAMESPACE} --context=${CONTEXT} -o=jsonpath='{range .spec.containers[*]}{.name}{"\n"}{end}')
     for CONTAINER in $CONTAINERS; do
         if [ -n "$LOGS_ERROR_PATTERN" ] && [ -n "$LOGS_EXCLUDE_PATTERN" ]; then
             # Both error and exclusion patterns provided
-            LOGS=$(${KUBERNETES_DISTRIBUTION_BINARY} logs $POD -c $CONTAINER --namespace=$NAMESPACE  --limit-bytes=256000 --since=3h --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${LOGS_ERROR_PATTERN}" | grep -Eiv "${LOGS_EXCLUDE_PATTERN}")
+            LOGS=$(${KUBERNETES_DISTRIBUTION_BINARY} logs $POD -c $CONTAINER --limit-bytes=256000 --since=3h --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${LOGS_ERROR_PATTERN}" | grep -Eiv "${LOGS_EXCLUDE_PATTERN}")
         elif [ -n "$LOGS_ERROR_PATTERN" ]; then
             # Only error pattern provided
-            LOGS=$(${KUBERNETES_DISTRIBUTION_BINARY} logs $POD -c $CONTAINER --namespace=$NAMESPACE  --limit-bytes=256000 --since=3h --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${LOGS_ERROR_PATTERN}")
+            LOGS=$(${KUBERNETES_DISTRIBUTION_BINARY} logs $POD -c $CONTAINER --limit-bytes=256000 --since=3h --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${LOGS_ERROR_PATTERN}")
         elif [ -n "$LOGS_EXCLUDE_PATTERN" ]; then
             # Only exclusion pattern provided
-            LOGS=$(${KUBERNETES_DISTRIBUTION_BINARY} logs $POD -c $CONTAINER --namespace=$NAMESPACE  --limit-bytes=256000 --since=3h --context=${CONTEXT} -n ${NAMESPACE} | grep -Eiv "${LOGS_EXCLUDE_PATTERN}")
+            LOGS=$(${KUBERNETES_DISTRIBUTION_BINARY} logs $POD -c $CONTAINER --limit-bytes=256000 --since=3h --context=${CONTEXT} -n ${NAMESPACE} | grep -Eiv "${LOGS_EXCLUDE_PATTERN}")
         else
             # Neither pattern provided
-            LOGS=$(${KUBERNETES_DISTRIBUTION_BINARY} logs $POD -c $CONTAINER --namespace=$NAMESPACE  --limit-bytes=256000 --since=3h --context=${CONTEXT} -n ${NAMESPACE})
+            LOGS=$(${KUBERNETES_DISTRIBUTION_BINARY} logs $POD -c $CONTAINER --limit-bytes=256000 --since=3h --context=${CONTEXT} -n ${NAMESPACE})
         fi
         
         # Check log format and store appropriately
@@ -93,7 +93,7 @@ while read POD; do
         echo "Fetching logs for Pod: $POD, Container: $CONTAINER. Saving to $FILENAME."
         echo "$LOGS" > $FILENAME
     done
-done < <(${KUBERNETES_DISTRIBUTION_BINARY} get pods --selector=$SELECTOR --namespace=$NAMESPACE -o=jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+done < <(${KUBERNETES_DISTRIBUTION_BINARY} get pods --selector=$SELECTOR -n ${NAMESPACE} --context=${CONTEXT}-o=jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
 
 # Initialize an issue description array
 issue_descriptions=()
@@ -202,7 +202,7 @@ if [[ -n "$SEARCH_RESOURCES" && -n "$ERROR_FUZZY_STRING" ]]; then
             while IFS="|" read -r resource_name env_key env_value; do
                 formatted_string="$pattern:$resource_type/$resource_name:$env_key:$env_value"
                 FUZZY_ENV_VAR_RESOURCE_MATCHES+=("$formatted_string")
-            done < <(${KUBERNETES_DISTRIBUTION_BINARY} get "$resource_type" -n "$NAMESPACE" -o=json | jq --arg pattern "$pattern" -r \
+            done < <(${KUBERNETES_DISTRIBUTION_BINARY} get "$resource_type" -n "$NAMESPACE" --context=$CONTEXT -o=json | jq --arg pattern "$pattern" -r \
                     ".items[] | 
                     select(
                         .spec.template.spec.containers[]? |
