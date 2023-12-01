@@ -1,5 +1,6 @@
 *** Settings ***
-Documentation       Triages issues related to a deployment and its replicas.
+Documentation       Performs application-level troubleshooting by inspecting the logs of a workload for parsable exceptions,
+...                 and attempts to determine next steps.
 Metadata            Author    jon-funk
 Metadata            Display Name    Kubernetes Application Troubleshoot
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
@@ -19,7 +20,7 @@ Get Workload Logs
     [Documentation]    Collects the last approximately 300 lines of logs from the workload before restarting it.
     [Tags]    resource    application    workload    logs    state    ${container_name}
     ${logs}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get deployment,statefulset -l ${LABELS} -oname | head -n 1) --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -43,7 +44,7 @@ Troubleshoot Application Logs
     [Documentation]    Performs an inspection on container logs for exceptions/stacktraces, parsing them and attempts to find relevant source code information
     [Tags]    application    debug    app    errors    troubleshoot    workload    api    logs    ${container_name}
     ${cmd}=    Set Variable
-    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get deployment,statefulset -l ${LABELS} -oname | head -n 1) --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
+    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     IF    $EXCLUDE_PATTERN != ""
         ${cmd}=    Set Variable
         ...    ${cmd} | grep -Eiv "${EXCLUDE_PATTERN}" || true
@@ -85,7 +86,7 @@ Troubleshoot Application Logs
     ...    ${full_report}\nHere's the command used to collect the exception data:\n```${history}```
     RW.Core.Add Pre To Report    ${full_report}
 
-    ${issue_link}=    Set Variable    \n
+    ${issue_link}=    Set Variable    None
     IF    "${CREATE_ISSUES}" == "YES" and (len($parsed_exceptions)) > 0
         ${issue_link}=    RW.K8sApplications.Create Github Issue    ${repos[0]}    ${full_report}
         RW.Core.Add Pre To Report    \n${issue_link}

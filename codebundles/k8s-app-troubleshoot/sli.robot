@@ -19,7 +19,7 @@ Measure Application Exceptions
     [Documentation]    Examines recent logs for exceptions, providing a count of them.
     [Tags]    resource    application    workload    logs    state    exceptions    errors
     ${cmd}=    Set Variable
-    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get deployment,statefulset -l ${LABELS} -oname | head -n 1) --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
+    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     IF    $EXCLUDE_PATTERN != ""
         ${cmd}=    Set Variable
         ...    ${cmd} | grep -Eiv "${EXCLUDE_PATTERN}" || true
