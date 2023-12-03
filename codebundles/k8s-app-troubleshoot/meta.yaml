@@ -1,44 +1,39 @@
 commands:
-- command: kubectl --context=${CONTEXT} -n ${NAMESPACE} logs $(kubectl --context=${CONTEXT}
-    -n ${NAMESPACE} get deployment,statefulset -l ${LABELS} -oname | head -n 1) --tail=${MAX_LOG_LINES}
+- command: kubectl --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES}
     --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
   doc_links: '
 
-    - [Kubernetes - kubectl Overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+    - [Kubernetes Documentation on kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 
-    - [Kubernetes container log documentation](https://kubernetes.io/docs/tasks/debug-application-cluster/get-shell-running-container/){:target="_blank"}
+    - [Kubernetes Contexts and Configurations page](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
 
-    - [Using the Newman log command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/#logs){:target="_blank"}'
-  explanation: "\n\nThis command provides a way to get the logs from a specific container\
-    \ within a deployment or statefulset in Kubernetes. The parameters at the end\
-    \ such as --tail, --limit-bytes, --since and --container are used for filtering\
-    \ the logs. \n\n--context defines which cluster you want to use so this command\
-    \ can be used across different clusters.\n\n--n specifies the namespace of the\
-    \ cluster.\n\n-l is used to specify labels associated with the deployment/statefulset\
-    \ which will be used to filter further.\n\n-oname outputs only the names of the\
-    \ resources in question (deployment/statefulset). In this case, the name of the\
-    \ deployment/statefulset is taken using the head -n 1 command and and then used\
-    \ in combination with the logs command to produce the log output.\n\n--tail is\
-    \ to print the last few lines of logs. Number of lines are given by ${MAX_LOG_LINES}.\n\
-    \n--limit-bytes limits the amount of bytes of log output produced. This is given\
-    \ by ${256000} bytes.\n\n--since is used to return logs newer than a given time\
-    \ duration from now. This is given by ${LOGS_SINCE}.\n\n--container is used to\
-    \ limit log output to a particular container in the pod. This given by ${CONTAINER_NAME}."
-  multi_line_details: "\n\n# First, we need to get the name of a Kubernetes resource\
-    \ that matches our labels.\n# This command uses the '-l ${LABELS}' flag, combined\
-    \ with the 'get' subcommand to \n# query Kubernetes for matching resources. Then,\
-    \ 'oname' tells Kubernetes to just\n# return the name of the resource (instead\
-    \ of all the resource's attributes). Lastly,\n# 'head -n 1' is used to select\
-    \ the first matching resource returned.\nNAME=$(kubectl --context=${CONTEXT} \\\
-    \n    -n ${NAMESPACE} \\\n    get deployment,statefulset \\ \n    -l ${LABELS}\
-    \ \\\n    -oname \\\n    | head -n 1)\n\n# Now that we have the name of the related\
-    \ Kubernetes resource, we can use the name \n# in the logs subcommand, which will\
-    \ return the logs from the resource.\n#\n# The other flags are used to specify\
-    \ when the logs should start from (--since), what container\n# the logs should\
-    \ be from (--container), how many lines should be returned (--tail) and,\n# optionally,\
-    \ how much data should be returned (--limit-bytes).\nkubectl --context=${CONTEXT}\
-    \ \\\n    -n ${NAMESPACE} \\\n    logs ${NAME} \\\n    --tail=${MAX_LOG_LINES}\
-    \ \\\n    --limit-bytes=256000 \\\n    --since=${LOGS_SINCE} \\\n    --container=${CONTAINER_NAME}"
+    - [Kubernetes Pods page](https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/){:target="_blank"}
+
+    - [Kubernetes Logging page](https://kubernetes.io/docs/concepts/cluster-administration/logging/){:target="_blank"}'
+  explanation: '
+
+
+    This command allows you to view the logs for a particular container in Kubernetes.
+    The CONTEXT, NAMESPACE, LABELS, MAX_LOG_LINES, LOGS_SINCE, and CONTAINER_NAME
+    are all parameters that you must specify in order to get the desired result. The
+    --context parameter is what type of cluster you wish to view the logs on, while
+    the -n --namespace parameter allows you to specify what namespace the container
+    is in (similar to a folder in a file system). The --labels parameter is used to
+    filter out specific container labels that may be associated with the particular
+    container. The --tail option allows you to specify how many log lines you would
+    like to view at once. --limit-bytes means that you can limit the size of the output
+    in bytes when viewing logs. And finally, the --since parameter allows you to view
+    logs based on how long they have been since they have been generated.'
+  multi_line_details: "\n\n# Set the context for this command. \nCONTEXT=\"production-cluster\"\
+    \n\n#The namespace within which to search for logs. \nNAMESPACE=\"my-app-namespace\"\
+    \n\n# Key-value pairs that are used to select pods from the cluster (i.e. match\
+    \ label values for pods that match key=value)\nLABELS=\"key1=value1,key2=value2\"\
+    \n\n# Maximum number of lines of logs to show from each container\nMAX_LOG_LINES=\"\
+    5000\"\n\n#Maximum bytes to return from each container.\n256000\n\n# Logs returned\
+    \ would not be older than timestamp\nLOGS_SINCE=\"3h\"\n\n#The name of the container\n\
+    CONTAINER_NAME=\"web-container\"\n\n#Multi-line command\nkubectl --context=${CONTEXT}\
+    \ \\\n  -n ${NAMESPACE} \\\n  logs -l ${LABELS} \\\n  --tail=${MAX_LOG_LINES}\
+    \ \\\n  --limit-bytes=256000 \\\n  --since=${LOGS_SINCE} \\\n  --container=${CONTAINER_NAME}"
   name: get_workload_logs
 - command: ${cmd}
   doc_links: '
