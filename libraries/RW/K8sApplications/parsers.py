@@ -156,8 +156,9 @@ class GoogleDRFStackTraceParse(DRFStackTraceParse):
         st_data = None
         if BaseStackTraceParse.is_json(log):
             log = json.loads(log)
-            log = log["message"]
-            st_data = DRFStackTraceParse.parse_log(log)
+            if "message" in log:
+                log = log["message"]
+                st_data = DRFStackTraceParse.parse_log(log)
             return st_data
         else:
             return st_data
