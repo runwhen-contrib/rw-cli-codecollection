@@ -78,6 +78,7 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     ...    env=${env}
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    display_in_runwhen_local_cheatsheet=true
    ${recommendations}=    RW.CLI.Run Cli
     ...    cmd=echo '${liveness_probe_health.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
     ...    env=${env}
@@ -137,7 +138,7 @@ Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '(now - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind == "Deployment" or .involvedObject.kind == "ReplicaSet" or .involvedObject.kind == "Pod") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}")) and (.lastTimestamp | fromdateiso8601) >= $time_limit) | {kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp} ] | group_by([.kind, .name]) | map({kind: .[0].kind, name: .[0].name, count: length, reasons: map(.reason) | unique, messages: map(.message) | unique, firstTimestamp: map(.firstTimestamp | fromdateiso8601) | sort | .[0] | todateiso8601, lastTimestamp: map(.lastTimestamp | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ${object_list}=    Evaluate    json.loads(r'''${events.stdout}''')    json
     IF    len(@{object_list}) > 0
         FOR    ${item}    IN    @{object_list}
@@ -170,7 +171,7 @@ Get Deployment Workload Details For `${DEPLOYMENT_NAME}` and Add to Report
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o yaml
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Snapshot of deployment state:\n\n${deployment.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -195,7 +196,7 @@ Troubleshoot Deployment Replicas for `${DEPLOYMENT_NAME}`
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '.status | {desired_replicas: .replicas, ready_replicas: (.readyReplicas // 0), missing_replicas: ((.replicas // 0) - (.readyReplicas // 0)), unavailable_replicas: (.unavailableReplicas // 0), available_condition: (if any(.conditions[]; .type == "Available") then (.conditions[] | select(.type == "Available")) else "Condition not available" end), progressing_condition: (if any(.conditions[]; .type == "Progressing") then (.conditions[] | select(.type == "Progressing")) else "Condition not available" end)}'
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    env=${env}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ${deployment_status}=    Evaluate    json.loads(r'''${deployment_replicas.stdout}''')    json
     IF    $deployment_status["available_condition"]["status"] == "False" and $deployment_status["progressing_condition"]["status"] == "False"
         ${item_next_steps}=    RW.CLI.Run Bash File
@@ -253,7 +254,7 @@ Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '(now - (60*60)) as $time_limit | [ .items[] | select(.type != "Warning" and (.involvedObject.kind == "Deployment" or .involvedObject.kind == "ReplicaSet" or .involvedObject.kind == "Pod") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}"))) | {kind: .involvedObject.kind, count: .count, name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, duration: (if (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp | fromdateiso8601)) == 0) then 1 else (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp | fromdateiso8601))/60) end) } ] | group_by([.kind, .name]) | map({kind: .[0].kind, name: .[0].name, count: (map(.count) | add), reasons: map(.reason) | unique, messages: map(.message) | unique, average_events_per_minute: (if .[0].duration == 1 then 1 else ((map(.count) | add)/.[0].duration ) end),firstTimestamp: map(.firstTimestamp | fromdateiso8601) | sort | .[0] | todateiso8601, lastTimestamp: map(.lastTimestamp | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ${anomaly_list}=    Evaluate    json.loads(r'''${recent_anomalies.stdout}''')    json
     IF    len($anomaly_list) > 0
         FOR    ${item}    IN    @{anomaly_list}
