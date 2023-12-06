@@ -61,7 +61,7 @@ def run_bash_file(bash_file: str,
                   target_service: platform.Service = None,
                   env: dict = None,
                   include_in_history: bool = True,
-                  cmd_overide: str = "",
+                  cmd_override: str = "",
                   timeout_seconds: int = 60,
                   **kwargs) -> platform.ShellServiceResponse
 ```
@@ -74,7 +74,7 @@ Runs a bash file from the local file system or remotely on a shellservice.
 - `target_service` _platform.Service, optional_ - the shellservice to use if provided. Defaults to None.
 - `env` _dict, optional_ - a mapping of environment variables to set for the environment. Defaults to None.
 - `include_in_history` _bool, optional_ - whether to include in the shell history or not. Defaults to True.
-- `cmd_overide` _str, optional_ - the entrypoint command to use, similar to a dockerfile. Defaults to "./<bash_file" internally.
+- `cmd_override` _str, optional_ - the entrypoint command to use, similar to a dockerfile. Defaults to "./<bash_file" internally.
   
 
 **Returns**:

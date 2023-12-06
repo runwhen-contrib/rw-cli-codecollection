@@ -45,7 +45,7 @@ Fetch Events for Unhealthy Kubernetes PersistentVolumeClaims in Namespace `${NAM
                 ${message}=    Replace String    ${message.stdout}    "    ${EMPTY}
                 ${item_next_steps}=    RW.CLI.Run Bash File
                 ...    bash_file=storage_next_steps.sh
-                ...    cmd_overide=./storage_next_steps.sh "${message}" "PersistentVolumeClaim" "${pvc.stdout}"
+                ...    cmd_override=./storage_next_steps.sh "${message}" "PersistentVolumeClaim" "${pvc.stdout}"
                 ...    env=${env}
                 ...    secret_file__kubeconfig=${kubeconfig}
                 ...    include_in_history=False

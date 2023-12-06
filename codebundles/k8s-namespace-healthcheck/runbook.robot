@@ -43,7 +43,7 @@ Troubleshoot Warning Events in Namespace `${NAMESPACE}`
             # to best handle this case instead of "Unknown" "unknown"
             ${item_owner}=    RW.CLI.Run Bash File
             ...    bash_file=find_resource_owners.sh
-            ...    cmd_overide=./find_resource_owners.sh ${object_kind.stdout} ${object_short_name.stdout} ${NAMESPACE} ${CONTEXT}
+            ...    cmd_override=./find_resource_owners.sh ${object_kind.stdout} ${object_short_name.stdout} ${NAMESPACE} ${CONTEXT}
             ...    env=${env}
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
@@ -61,7 +61,7 @@ Troubleshoot Warning Events in Namespace `${NAMESPACE}`
             END
             ${item_next_steps}=    RW.CLI.Run Bash File
             ...    bash_file=workload_next_steps.sh
-            ...    cmd_overide=./workload_next_steps.sh "${messages}" "${owner_kind}" "${owner_name}"
+            ...    cmd_override=./workload_next_steps.sh "${messages}" "${owner_kind}" "${owner_name}"
             ...    env=${env}
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
@@ -147,7 +147,7 @@ Troubleshoot Pending Pods In Namespace `${NAMESPACE}`
                 ...    include_in_history=false
                 ${item_owner}=    RW.CLI.Run Bash File
                 ...    bash_file=find_resource_owners.sh
-                ...    cmd_overide=./find_resource_owners.sh Pod ${pod_name.stdout} ${NAMESPACE} ${CONTEXT}
+                ...    cmd_override=./find_resource_owners.sh Pod ${pod_name.stdout} ${NAMESPACE} ${CONTEXT}
                 ...    env=${env}
                 ...    secret_file__kubeconfig=${kubeconfig}
                 ...    include_in_history=False
@@ -164,7 +164,7 @@ Troubleshoot Pending Pods In Namespace `${NAMESPACE}`
                 END
                 ${item_next_steps}=    RW.CLI.Run Bash File
                 ...    bash_file=workload_next_steps.sh
-                ...    cmd_overide=./workload_next_steps.sh "${container_reason.stdout};${pod_message.stdout};${container_reason.stdout}" "${owner_kind}" "${owner_name}"
+                ...    cmd_override=./workload_next_steps.sh "${container_reason.stdout};${pod_message.stdout};${container_reason.stdout}" "${owner_kind}" "${owner_name}"
                 ...    env=${env}
                 ...    secret_file__kubeconfig=${kubeconfig}
                 ...    include_in_history=False
@@ -215,7 +215,7 @@ Troubleshoot Failed Pods In Namespace `${NAMESPACE}`
                 ...    include_in_history=false
                 ${item_owner}=    RW.CLI.Run Bash File
                 ...    bash_file=find_resource_owners.sh
-                ...    cmd_overide=./find_resource_owners.sh Pod ${pod_name.stdout} ${NAMESPACE} ${CONTEXT}
+                ...    cmd_override=./find_resource_owners.sh Pod ${pod_name.stdout} ${NAMESPACE} ${CONTEXT}
                 ...    env=${env}
                 ...    secret_file__kubeconfig=${kubeconfig}
                 ...    include_in_history=False
@@ -232,7 +232,7 @@ Troubleshoot Failed Pods In Namespace `${NAMESPACE}`
                 END
                 ${item_next_steps}=    RW.CLI.Run Bash File
                 ...    bash_file=workload_next_steps.sh
-                ...    cmd_overide=./workload_next_steps.sh "${container_message.stdout};${pod_message.stdout}" "${owner_kind}" "${owner_name}"
+                ...    cmd_override=./workload_next_steps.sh "${container_message.stdout};${pod_message.stdout}" "${owner_kind}" "${owner_name}"
                 ...    env=${env}
                 ...    secret_file__kubeconfig=${kubeconfig}
                 ...    include_in_history=False
@@ -287,7 +287,7 @@ Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
             ...    include_in_history=False
             ${item_owner}=    RW.CLI.Run Bash File
             ...    bash_file=find_resource_owners.sh
-            ...    cmd_overide=./find_resource_owners.sh ${object_kind.stdout} ${object_name.stdout} ${NAMESPACE} ${CONTEXT}
+            ...    cmd_override=./find_resource_owners.sh ${object_kind.stdout} ${object_name.stdout} ${NAMESPACE} ${CONTEXT}
             ...    env=${env}
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
@@ -306,7 +306,7 @@ Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
             END
             ${item_next_steps}=    RW.CLI.Run Bash File
             ...    bash_file=workload_next_steps.sh
-            ...    cmd_overide=./workload_next_steps.sh "${item["conditions"]}" "${owner_kind}" "${owner_name}"
+            ...    cmd_override=./workload_next_steps.sh "${item["conditions"]}" "${owner_kind}" "${owner_name}"
             ...    env=${env}
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
@@ -361,7 +361,7 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
             ...    include_in_history=False
             ${item_owner}=    RW.CLI.Run Bash File
             ...    bash_file=find_resource_owners.sh
-            ...    cmd_overide=./find_resource_owners.sh ${object_kind.stdout} ${object_short_name.stdout} ${NAMESPACE} ${CONTEXT}
+            ...    cmd_override=./find_resource_owners.sh ${object_kind.stdout} ${object_short_name.stdout} ${NAMESPACE} ${CONTEXT}
             ...    env=${env}
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
@@ -379,7 +379,7 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
             END
             ${item_next_steps}=    RW.CLI.Run Bash File
             ...    bash_file=anomaly_next_steps.sh
-            ...    cmd_overide=./anomaly_next_steps.sh "${messages}" "${owner_kind}" "${owner_name}"
+            ...    cmd_override=./anomaly_next_steps.sh "${messages}" "${owner_kind}" "${owner_name}"
             ...    env=${env}
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False

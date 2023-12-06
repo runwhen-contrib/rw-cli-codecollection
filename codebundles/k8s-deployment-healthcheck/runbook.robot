@@ -74,7 +74,7 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     ...    ${DEPLOYMENT_NAME}
     ${liveness_probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_probes.sh
-    ...    cmd_overide=./validate_probes.sh livenessProbe
+    ...    cmd_override=./validate_probes.sh livenessProbe
     ...    env=${env}
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -111,7 +111,7 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     ...    ${DEPLOYMENT_NAME}
     ${readiness_probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_probes.sh
-    ...    cmd_overide=./validate_probes.sh readinessProbe
+    ...    cmd_override=./validate_probes.sh readinessProbe
     ...    env=${env}
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -148,7 +148,7 @@ Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
             ${messages}=    Replace String    ${message_string}    "    ${EMPTY}
             ${item_next_steps}=    RW.CLI.Run Bash File
             ...    bash_file=workload_next_steps.sh
-            ...    cmd_overide=./workload_next_steps.sh "${messages}" "Deployment" "${DEPLOYMENT_NAME}"
+            ...    cmd_override=./workload_next_steps.sh "${messages}" "Deployment" "${DEPLOYMENT_NAME}"
             ...    env=${env}
             ...    include_in_history=False
             # FIXME - Should we add severity mappings in the next steps to make the issue more dynamic?
@@ -203,7 +203,7 @@ Troubleshoot Deployment Replicas for `${DEPLOYMENT_NAME}`
     IF    $deployment_status["available_condition"]["status"] == "False" and $deployment_status["progressing_condition"]["status"] == "False"
         ${item_next_steps}=    RW.CLI.Run Bash File
         ...    bash_file=workload_next_steps.sh
-        ...    cmd_overide=./workload_next_steps.sh "${deployment_status["available_condition"]["message"]}" "Deployment" "${DEPLOYMENT_NAME}"
+        ...    cmd_override=./workload_next_steps.sh "${deployment_status["available_condition"]["message"]}" "Deployment" "${DEPLOYMENT_NAME}"
         ...    env=${env}
         ...    include_in_history=False
         RW.Core.Add Issue
@@ -264,7 +264,7 @@ Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`
                 ${messages}=    Replace String    ${item["messages"][0]}    "    ${EMPTY}
                 ${item_next_steps}=    RW.CLI.Run Bash File
                 ...    bash_file=workload_next_steps.sh
-                ...    cmd_overide=./workload_next_steps.sh "${messages}" "Deployment" "${DEPLOYMENT_NAME}"
+                ...    cmd_override=./workload_next_steps.sh "${messages}" "Deployment" "${DEPLOYMENT_NAME}"
                 ...    env=${env}
                 ...    include_in_history=False
                 RW.Core.Add Issue

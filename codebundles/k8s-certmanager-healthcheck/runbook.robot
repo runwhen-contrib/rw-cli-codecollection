@@ -65,7 +65,7 @@ Find Failed Certificate Requests and Identify Issues for Namespace `${NAMESPACE}
                 ...    include_in_history=false
                 ${item_next_steps}=    RW.CLI.Run Bash File
                 ...    bash_file=certificate_next_steps.sh
-                ...    cmd_overide=./certificate_next_steps.sh "${ready_message.stdout}" "${certificate_name.stdout}" "${Issuer_name.stdout}"
+                ...    cmd_override=./certificate_next_steps.sh "${ready_message.stdout}" "${certificate_name.stdout}" "${Issuer_name.stdout}"
                 ...    env=${env}
                 ...    secret_file__kubeconfig=${kubeconfig}
                 ...    include_in_history=False
