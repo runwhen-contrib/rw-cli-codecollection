@@ -20,7 +20,11 @@ USER_KEYS: list[str] = [
     "PGUSER_SUPERUSER",
 ]
 
+# TODO: iterate on this first draft and create well-refined db model for applications in the k8s application model
 # TODO: support non-postgres database lookup for app-level troubleshooting
+
+# simple global to cache first pass and reduce kubectl calls
+implicit_auth_enabled: bool = False
 
 
 def get_password(
@@ -32,6 +36,8 @@ def get_password(
     workload_name: str = "",
     container_name: str = "",
 ) -> platform.Secret:
+    if labels:
+        labels = f"-l {labels}"
     rsp: platform.ShellServiceResponse = run_cli(
         cmd=f"kubectl --context {context} -n {namespace} get all {labels} -oyaml",
         secret_file__kubeconfig=kubeconfig,
@@ -40,6 +46,10 @@ def get_password(
     if rsp.returncode == 0 and rsp.stdout:
         manifest = yaml.safe_load(rsp.stdout)
         pod_spec = {}
+        if "items" in manifest:
+            manifest = manifest["items"][
+                0
+            ]  # user more specific labels if the first result is incorrect
         if manifest["kind"] == "StatefulSet" or manifest["kind"] == "Deployment":
             pod_spec = manifest["spec"]["template"]["spec"]
         if manifest["kind"] == "Pod":
@@ -51,7 +61,7 @@ def get_password(
             if secret_name or secret_value:
                 break
             if "env" in container:
-                for container_env in container:
+                for container_env in container["env"]:
                     if container_env["name"] in PASSWORD_KEYS:
                         if "valueFrom" in container_env:
                             secret_name = container_env["valueFrom"]["secretKeyRef"][
@@ -71,10 +81,35 @@ def get_password(
                 cmd=f'kubectl --context {context} -n {namespace} get secret/{secret_name} -ojsonpath="{{.data.{secret_key}}}" | base64 -d',
                 secret_file__kubeconfig=kubeconfig,
                 env=env,
+                debug=False,
             )
             if rsp.returncode == 0 and rsp.stdout:
                 return platform.Secret(secret_key, rsp.stdout)
     return None
+
+
+def _test_implicit_auth(
+    base_cmd: str,
+    username: platform.Secret,
+    kubeconfig: platform.Secret,
+    env: dict = {},
+) -> bool:
+    # if we've already tested it, imediately return true to save on future calls
+    global implicit_auth_enabled
+    if implicit_auth_enabled:
+        return implicit_auth_enabled
+    test_qry: str = "SELECT 1;"
+    rsp: platform.ShellServiceResponse = run_cli(
+        cmd=f'{base_cmd} psql -U ${username.key} -c "{test_qry}"',
+        secret__username=username,
+        secret_file__kubeconfig=kubeconfig,
+        env=env,
+    )
+    if rsp.returncode == 0:
+        logger.info(f"Implicit auth test stdout: {rsp.stdout}")
+        implicit_auth_enabled = True
+        return implicit_auth_enabled
+    return False
 
 
 def get_user(
@@ -86,6 +121,8 @@ def get_user(
     workload_name: str = "",
     container_name: str = "",
 ) -> platform.Secret:
+    if labels:
+        labels = f"-l {labels}"
     rsp: platform.ShellServiceResponse = run_cli(
         cmd=f"kubectl --context {context} -n {namespace} get all {labels} -oyaml",
         secret_file__kubeconfig=kubeconfig,
@@ -93,6 +130,10 @@ def get_user(
     )
     if rsp.returncode == 0 and rsp.stdout:
         manifest = yaml.safe_load(rsp.stdout)
+        if "items" in manifest:
+            manifest = manifest["items"][
+                0
+            ]  # user more specific labels if the first result is incorrect
         pod_spec = {}
         if manifest["kind"] == "StatefulSet" or manifest["kind"] == "Deployment":
             pod_spec = manifest["spec"]["template"]["spec"]
@@ -105,7 +146,7 @@ def get_user(
             if secret_name or secret_value:
                 break
             if "env" in container:
-                for container_env in container:
+                for container_env in container["env"]:
                     if container_env["name"] in USER_KEYS:
                         if "valueFrom" in container_env:
                             secret_name = container_env["valueFrom"]["secretKeyRef"][
@@ -119,18 +160,21 @@ def get_user(
                             secret_key = container_env["name"]
                         break
         if secret_value:
+            logger.info(f"user env: {secret_key}={secret_value}")
             return platform.Secret(secret_key, secret_value)
         elif secret_key and secret_name:
             rsp: platform.ShellServiceResponse = run_cli(
                 cmd=f'kubectl --context {context} -n {namespace} get secret/{secret_name} -ojsonpath="{{.data.{secret_key}}}" | base64 -d',
                 secret_file__kubeconfig=kubeconfig,
                 env=env,
+                debug=False,
             )
             if rsp.returncode == 0 and rsp.stdout:
                 return platform.Secret(secret_key, rsp.stdout)
     return None
 
 
+# TODO: implement to support application-level checks
 def get_database(
     context: str,
     namespace: str,
@@ -164,6 +208,7 @@ def _get_workload_fqn(
     return fqn
 
 
+# TODO: support dynamic db name for app data
 def k8s_postgres_query(
     query: str,
     context: str,
@@ -174,6 +219,8 @@ def k8s_postgres_query(
     labels: str = "",
     workload_name: str = "",
     container_name: str = "",
+    database_name: str = "postgres",
+    opt_flags: str = "",
 ) -> platform.ShellServiceResponse:
     cnf: str = ""
     if container_name:
@@ -188,19 +235,8 @@ def k8s_postgres_query(
         )
     if not workload_name:
         raise Exception(f"Could not find workload name, got {workload_name} instead")
-    cli_base: str = (
-        f"{binary_name} --context {context} -n {namespace} exec {workload_name} {cnf}"
-    )
+    cli_base: str = f"{binary_name} --context {context} -n {namespace} exec {workload_name} {cnf} --"
     logger.info(f"Created cli base: {cli_base}")
-    password: platform.Secret = get_password(
-        context=context,
-        namespace=namespace,
-        kubeconfig=kubeconfig,
-        env=env,
-        labels=labels,
-        workload_name=workload_name,
-        container_name=container_name,
-    )
     username: platform.Secret = get_user(
         context=context,
         namespace=namespace,
@@ -210,13 +246,40 @@ def k8s_postgres_query(
         workload_name=workload_name,
         container_name=container_name,
     )
-    psql_config: str = f'PGPASSWORD="${password.key}" psql -qAt -U ${username.key}'
-    rsp: platform.ShellServiceResponse = run_cli(
-        cmd=f"{cli_base} {psql_config}",
-        secret__password=password,
-        secret__username=username,
-        secret_file__kubeconfig=kubeconfig,
+    rsp: platform.ShellServiceResponse = None
+    if _test_implicit_auth(
+        base_cmd=cli_base,
+        username=username,
+        kubeconfig=kubeconfig,
         env=env,
-    )
-
-    return None
+    ):
+        logger.info(f"Implicit auth test succeeded")
+        psql_config: str = (
+            f"psql {opt_flags} -qAt -U ${username.key} -d {database_name}"
+        )
+        rsp: platform.ShellServiceResponse = run_cli(
+            cmd=f'{cli_base} {psql_config} -c "{query}"',
+            # cmd=f"{cli_base} psql -U postgres -d postgres -c \"SELECT (total_exec_time / 1000 / 60) as total, (total_exec_time/calls) as avg, query FROM pg_stat_statements ORDER BY 1 DESC LIMIT 100;SELECT pg_stat_activity.pid, pg_locks.relation::regclass, pg_locks.mode, pg_locks.granted FROM pg_stat_activity, pg_locks WHERE pg_stat_activity.pid = pg_locks.pid; SELECT pg_database.datname, pg_size_pretty(pg_database_size(pg_database.datname)) AS size FROM pg_database; SELECT query, count(*) as total_executions, avg(total_exec_time) as avg_execution_time FROM pg_stat_statements GROUP BY query ORDER BY total_executions DESC; SELECT schemaname, relname, last_autovacuum, last_autoanalyze FROM pg_stat_user_tables WHERE last_autovacuum IS NOT NULL OR last_autoanalyze IS NOT NULL;\" && echo 'hello world'",
+            secret__username=username,
+            secret_file__kubeconfig=kubeconfig,
+            env=env,
+        )
+    else:
+        password: platform.Secret = get_password(
+            context=context,
+            namespace=namespace,
+            kubeconfig=kubeconfig,
+            env=env,
+            labels=labels,
+            workload_name=workload_name,
+            container_name=container_name,
+        )
+        psql_config: str = f'PGPASSWORD="${password.key}" psql {opt_flags} -qAt -U ${username.key} -d {database_name}'
+        rsp: platform.ShellServiceResponse = run_cli(
+            cmd=f"{cli_base} bash -c '{psql_config} -c \"{query}\"'",
+            secret__username=username,
+            secret__password=password,
+            secret_file__kubeconfig=kubeconfig,
+            env=env,
+        )
+    return rsp
