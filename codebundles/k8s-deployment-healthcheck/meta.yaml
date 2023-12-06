@@ -1,4 +1,166 @@
 commands:
+- command: bash 'validate_probes.sh' livenessProbe
+  doc_links: '
+
+    - [Kubernetes Documentation Homepage](https://kubernetes.io/docs/){:target="_blank"}
+
+    - [Overview of Containers, Pods, and Services](https://kubernetes.io/docs/concepts/workloads/pods/pod/){:target="_blank"}
+
+    - [Using Liveness and Readiness Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/){:target="_blank"}'
+  explanation: '
+
+
+    This script checks each container in a given Kubernetes deployment for its liveness
+    or readinessProbe configuration. The probe is responsible for checking whether
+    the pod/container is healthy or not, and typically defines a command to perform
+    a health check. The script checks to make sure that, if a port is declared in
+    the probe''s command, it is also exposed by the container as a valid port. The
+    script also performs some simple tests against the configured probe command to
+    validate that it works correctly. If any of the checks fail, the script displays
+    recommended "Next Steps" for how to reconfigure the probe to be valid.'
+  multi_line_details: "\n\n# Read and add docstrings to the following script content,\
+    \ returned in shell script format.\n#!/bin/bash\n\n# Set deployment name and namespace\n\
+    # Sets the type of probe to run (defaults to readinessProbe if nothing is passed\
+    \ as an argument)\nPROBE_TYPE=\"${1:-readinessProbe}\" \n\n# Function to extract\
+    \ data using jq\n# Extracts the data at a specific path from the given JSON data\n\
+    extract_data() {\n    echo \"$1\" | jq -r \"$2\" 2>/dev/null\n}\n\n# Function\
+    \ to extract port from command\n# Extracts the number after the ':' to get the\
+    \ port associated with a command\nextract_port_from_command() {\n    echo \"$1\"\
+    \ | grep -oP '(?<=:)\\d+' | head -n 1\n}\n\n# Get deployment manifest in JSON\
+    \ format\n# Retrieves the JSON manifest for the specified deployment in the given\
+    \ namespace on the given context\nMANIFEST=$(${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ get deployment \"$DEPLOYMENT_NAME\" -n \"$NAMESPACE\" --context \"$CONTEXT\"\
+    \ -o json)\nif [ $? -ne 0 ]; then\n    echo \"Error fetching deployment details:\
+    \ $MANIFEST\"\n    exit 1\nfi\n\n# Get number of containers\n# Gets the number\
+    \ of containers in the given deployment\nNUM_CONTAINERS=$(extract_data \"$MANIFEST\"\
+    \ '.spec.template.spec.containers | length')\nif [ -z \"$NUM_CONTAINERS\" ]; then\n\
+    \    echo \"No containers found in deployment.\"\n    exit 1\nfi\n\n\n# Loop through\
+    \ containers and validate probes\n# Loops through each container and runs a check\
+    \ to make sure the probe type specified follows the correct parameters\nfor ((i=0;\
+    \ i<NUM_CONTAINERS; i++)); do\n    PROBE=$(extract_data \"$MANIFEST\" \".spec.template.spec.containers[$i].${PROBE_TYPE}\"\
+    )\n    CONTAINER_NAME=$(extract_data \"$MANIFEST\" \".spec.template.spec.containers[$i].name\"\
+    )\n    printf \"## $CONTAINER_NAME $PROBE_TYPE START\\n\"\n    echo \"Container:\
+    \ \\`$CONTAINER_NAME\\`\"\n    echo \"$PROBE_TYPE: $PROBE\"\n\n    # List container\
+    \ ports\n    # Lists the exposed ports for the given container\n    CONTAINER_PORTS=$(extract_data\
+    \ \"$MANIFEST\" \".spec.template.spec.containers[$i].ports[].containerPort\")\n\
+    \    if [ -n \"$CONTAINER_PORTS\" ]; then\n        echo \"Exposed Ports: $CONTAINER_PORTS\"\
+    \n    else\n        echo \"No ports exposed.\"\n    fi\n\n    if [ -z \"$PROBE\"\
+    \ ]; then\n        echo \"Container \\`$CONTAINER_NAME\\`: ${PROBE_TYPE} not found.\"\
+    \n        continue\n    fi\n\n    # Validate that the port in the probe is defined\
+    \ in the container's ports\n    # Checks that the port used in the probe type\
+    \ is actually exposed by the container\n    if echo \"$PROBE\" | jq -e '.httpGet,\
+    \ .tcpSocket' >/dev/null; then\n        PROBE_PORT=$(extract_data \"$PROBE\" '.httpGet.port\
+    \ // .tcpSocket.port')\n        CONTAINER_PORTS=$(extract_data \"$MANIFEST\" \"\
+    .spec.template.spec.containers[$i].ports[].containerPort\")\n\n        if [[ !\
+    \ \" $CONTAINER_PORTS \" == *\"$PROBE_PORT\"* ]]; then\n            echo \"Container\
+    \ \\`$CONTAINER_NAME\\`: Port $PROBE_PORT used in $PROBE_TYPE is not exposed by\
+    \ the container.\"\n            next_steps+=(\"Update $PROBE_TYPE For \\`${DEPLOYMENT_NAME}\\\
+    ` to use one of the following ports: $CONTAINER_PORTS\")\n        else\n     \
+    \       echo \"Container \\`$CONTAINER_NAME\\`: ${PROBE_TYPE} port $PROBE_PORT\
+    \ is valid.\"\n        fi\n    fi\n\n    # Check if exec permissions are available\
+    \ (for exec type probes)\n    # Ensures that the user has permission to execute\
+    \ commands within pods on the given deployment\n    if echo \"$PROBE\" | jq -e\
+    \ '.exec' >/dev/null; then\n        IFS=$'\\n' read -r -d '' -a EXEC_COMMAND_ARRAY\
+    \ < <(echo \"$PROBE\" | jq -r '.exec.command[]' && printf '\\0')\n        PORT_IN_COMMAND=$(extract_port_from_command\
+    \ \"${EXEC_COMMAND_ARRAY[*]}\")\n\n        # Check if we see the port in the exec\
+    \ command, and if so, if it's defined in the manifest\n        # Runs checks to\
+    \ make sure that the port found in the targetted command is also beingexposed\
+    \ by the container\n        if [ -n \"$PORT_IN_COMMAND\" ]; then\n           \
+    \ CONTAINER_PORTS=$(extract_data \"$MANIFEST\" \".spec.template.spec.containers[$i].ports[].containerPort\"\
+    )\n            if [[ ! \" $CONTAINER_PORTS \" == *\"$PORT_IN_COMMAND\"* ]]; then\n\
+    \                echo \"Container \\`$CONTAINER_NAME\\`: Port $PORT_IN_COMMAND\
+    \ used in ${PROBE_TYPE} exec command is not exposed by the container. The following\
+    \ ports are exposed: $CONTAINER_PORTS\"\n                next_steps+=(\"Get Deployment\
+    \ Workload Details For \\`${DEPLOYMENT_NAME}\\`\")\n                next_steps+=(\"\
+    Verify and Reconfigure Manifest $PROBE_TYPE with Valid Ports For \\`${DEPLOYMENT_NAME}\\\
+    `\")\n            else\n                echo \"Container \\`$CONTAINER_NAME\\\
+    `: Port $PORT_IN_COMMAND in ${PROBE_TYPE} exec command is valid.\"\n         \
+    \   fi\n        fi\n\n        # Check exec permission and execute command\n  \
+    \      # Executes a given command to test while falling back to replacement ports\
+    \ if the original command failed\n        if ${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ auth can-i create pods/exec -n \"$NAMESPACE\" >/dev/null 2"
+  name: check_liveness_probe_configuration_for_deployment_deployment_name
+- command: bash 'validate_probes.sh' readinessProbe
+  doc_links: '
+
+    - [Kubernetes Documentation Homepage](https://kubernetes.io/docs/){:target="_blank"}
+
+    - [Overview of Containers, Pods, and Services](https://kubernetes.io/docs/concepts/workloads/pods/pod/){:target="_blank"}
+
+    - [Using Liveness and Readiness Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/){:target="_blank"}'
+  explanation: '
+
+
+    This script checks each container in a given Kubernetes deployment for its liveness
+    or readinessProbe configuration. The probe is responsible for checking whether
+    the pod/container is healthy or not, and typically defines a command to perform
+    a health check. The script checks to make sure that, if a port is declared in
+    the probe''s command, it is also exposed by the container as a valid port. The
+    script also performs some simple tests against the configured probe command to
+    validate that it works correctly. If any of the checks fail, the script displays
+    recommended "Next Steps" for how to reconfigure the probe to be valid.'
+  multi_line_details: "\n\n# Read and add docstrings to the following script content,\
+    \ returned in shell script format.\n#!/bin/bash\n\n# Set deployment name and namespace\n\
+    # Sets the type of probe to run (defaults to readinessProbe if nothing is passed\
+    \ as an argument)\nPROBE_TYPE=\"${1:-readinessProbe}\" \n\n# Function to extract\
+    \ data using jq\n# Extracts the data at a specific path from the given JSON data\n\
+    extract_data() {\n    echo \"$1\" | jq -r \"$2\" 2>/dev/null\n}\n\n# Function\
+    \ to extract port from command\n# Extracts the number after the ':' to get the\
+    \ port associated with a command\nextract_port_from_command() {\n    echo \"$1\"\
+    \ | grep -oP '(?<=:)\\d+' | head -n 1\n}\n\n# Get deployment manifest in JSON\
+    \ format\n# Retrieves the JSON manifest for the specified deployment in the given\
+    \ namespace on the given context\nMANIFEST=$(${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ get deployment \"$DEPLOYMENT_NAME\" -n \"$NAMESPACE\" --context \"$CONTEXT\"\
+    \ -o json)\nif [ $? -ne 0 ]; then\n    echo \"Error fetching deployment details:\
+    \ $MANIFEST\"\n    exit 1\nfi\n\n# Get number of containers\n# Gets the number\
+    \ of containers in the given deployment\nNUM_CONTAINERS=$(extract_data \"$MANIFEST\"\
+    \ '.spec.template.spec.containers | length')\nif [ -z \"$NUM_CONTAINERS\" ]; then\n\
+    \    echo \"No containers found in deployment.\"\n    exit 1\nfi\n\n\n# Loop through\
+    \ containers and validate probes\n# Loops through each container and runs a check\
+    \ to make sure the probe type specified follows the correct parameters\nfor ((i=0;\
+    \ i<NUM_CONTAINERS; i++)); do\n    PROBE=$(extract_data \"$MANIFEST\" \".spec.template.spec.containers[$i].${PROBE_TYPE}\"\
+    )\n    CONTAINER_NAME=$(extract_data \"$MANIFEST\" \".spec.template.spec.containers[$i].name\"\
+    )\n    printf \"## $CONTAINER_NAME $PROBE_TYPE START\\n\"\n    echo \"Container:\
+    \ \\`$CONTAINER_NAME\\`\"\n    echo \"$PROBE_TYPE: $PROBE\"\n\n    # List container\
+    \ ports\n    # Lists the exposed ports for the given container\n    CONTAINER_PORTS=$(extract_data\
+    \ \"$MANIFEST\" \".spec.template.spec.containers[$i].ports[].containerPort\")\n\
+    \    if [ -n \"$CONTAINER_PORTS\" ]; then\n        echo \"Exposed Ports: $CONTAINER_PORTS\"\
+    \n    else\n        echo \"No ports exposed.\"\n    fi\n\n    if [ -z \"$PROBE\"\
+    \ ]; then\n        echo \"Container \\`$CONTAINER_NAME\\`: ${PROBE_TYPE} not found.\"\
+    \n        continue\n    fi\n\n    # Validate that the port in the probe is defined\
+    \ in the container's ports\n    # Checks that the port used in the probe type\
+    \ is actually exposed by the container\n    if echo \"$PROBE\" | jq -e '.httpGet,\
+    \ .tcpSocket' >/dev/null; then\n        PROBE_PORT=$(extract_data \"$PROBE\" '.httpGet.port\
+    \ // .tcpSocket.port')\n        CONTAINER_PORTS=$(extract_data \"$MANIFEST\" \"\
+    .spec.template.spec.containers[$i].ports[].containerPort\")\n\n        if [[ !\
+    \ \" $CONTAINER_PORTS \" == *\"$PROBE_PORT\"* ]]; then\n            echo \"Container\
+    \ \\`$CONTAINER_NAME\\`: Port $PROBE_PORT used in $PROBE_TYPE is not exposed by\
+    \ the container.\"\n            next_steps+=(\"Update $PROBE_TYPE For \\`${DEPLOYMENT_NAME}\\\
+    ` to use one of the following ports: $CONTAINER_PORTS\")\n        else\n     \
+    \       echo \"Container \\`$CONTAINER_NAME\\`: ${PROBE_TYPE} port $PROBE_PORT\
+    \ is valid.\"\n        fi\n    fi\n\n    # Check if exec permissions are available\
+    \ (for exec type probes)\n    # Ensures that the user has permission to execute\
+    \ commands within pods on the given deployment\n    if echo \"$PROBE\" | jq -e\
+    \ '.exec' >/dev/null; then\n        IFS=$'\\n' read -r -d '' -a EXEC_COMMAND_ARRAY\
+    \ < <(echo \"$PROBE\" | jq -r '.exec.command[]' && printf '\\0')\n        PORT_IN_COMMAND=$(extract_port_from_command\
+    \ \"${EXEC_COMMAND_ARRAY[*]}\")\n\n        # Check if we see the port in the exec\
+    \ command, and if so, if it's defined in the manifest\n        # Runs checks to\
+    \ make sure that the port found in the targetted command is also beingexposed\
+    \ by the container\n        if [ -n \"$PORT_IN_COMMAND\" ]; then\n           \
+    \ CONTAINER_PORTS=$(extract_data \"$MANIFEST\" \".spec.template.spec.containers[$i].ports[].containerPort\"\
+    )\n            if [[ ! \" $CONTAINER_PORTS \" == *\"$PORT_IN_COMMAND\"* ]]; then\n\
+    \                echo \"Container \\`$CONTAINER_NAME\\`: Port $PORT_IN_COMMAND\
+    \ used in ${PROBE_TYPE} exec command is not exposed by the container. The following\
+    \ ports are exposed: $CONTAINER_PORTS\"\n                next_steps+=(\"Get Deployment\
+    \ Workload Details For \\`${DEPLOYMENT_NAME}\\`\")\n                next_steps+=(\"\
+    Verify and Reconfigure Manifest $PROBE_TYPE with Valid Ports For \\`${DEPLOYMENT_NAME}\\\
+    `\")\n            else\n                echo \"Container \\`$CONTAINER_NAME\\\
+    `: Port $PORT_IN_COMMAND in ${PROBE_TYPE} exec command is valid.\"\n         \
+    \   fi\n        fi\n\n        # Check exec permission and execute command\n  \
+    \      # Executes a given command to test while falling back to replacement ports\
+    \ if the original command failed\n        if ${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ auth can-i create pods/exec -n \"$NAMESPACE\" >/dev/null 2"
+  name: check_readiness_probe_configuration_for_deployment_deployment_name
 - command: 'kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq ''(now
     - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind
     == "Deployment" or .involvedObject.kind == "ReplicaSet" or .involvedObject.kind
