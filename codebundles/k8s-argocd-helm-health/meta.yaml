@@ -4,42 +4,72 @@ commands:
     + "\nSync Status:\t\t" + .status.sync.status + "\nHealth Status:\t\t" + .status.health.status'
   doc_links: '
 
-    - [Kubectl Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+    - [kubectl get command](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
-    - [JQ Documentation](https://stedolan.github.io/jq/){:target="_blank"}
+    - [Kubectl resource names](https://kubernetes.io/docs/reference/kubectl/overview/#resource-types){:target="_blank"}
 
-    - [Helm Documentation](https://v2.helm.sh/docs/){:target="_blank"}'
-  explanation: '
+    - [Kubectl namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+
+    - [Kubectl contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
+
+    - [Jq command](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: 'Hey there! So, this command is used to get information about a specific
+    resource within a Kubernetes cluster. Let''s break it down step by step:
 
 
-    This command uses the kubectl command, which is used to manage resources in Kubernetes.
-    It gets a specific resource from the Kubernetes cluster, located in the namespace
-    specified. The specific resource type is provided by the variable RESOURCE_NAME.
-    Then, it specifies the context of the Kubernetes cluster, using the CONTEXT parameter.
+    1. `kubectl get ${RESOURCE_NAME}` - This part of the command is asking Kubernetes
+    to retrieve information about a specific resource. You would replace `${RESOURCE_NAME}`
+    with the name of the resource you are interested in, like pods, deployments, services,
+    etc.
 
 
-    It then outputs the data in JSON format and passes it to the jq tool, which is
-    used to extract specific information from a json file. In this case, it filters
-    the results to only show the names and sync/health status of Helm charts, and
-    outputs the result into a readable format.'
-  multi_line_details: "\n\n# This command is used to get information about a particular\
-    \ Kubernetes resource in a given Namespace and Context. \nkubectl # Command used\
-    \ to interact with the Kubernetes API (Application Programming Interface)\nget\
-    \ ${RESOURCE_NAME} # The 'get' command will retrieve information about the specified\
-    \ Kubernetes RESOURCE_NAME. \n-n ${NAMESPACE} # This flag specifies which Namespace\
-    \ to use when querying the Kubernetes Cluster.\n--context ${CONTEXT} # The 'context'\
-    \ flag retrieves the Kubernetes cluster information associated with the specified\
-    \ CONTEXT.\n\n# The output format (-o) of the response from the Kubernetes cluster\
-    \ will be changed to JSON using the '-o=json' flag.\n|  # This symbol passes the\
-    \ output from the command on the left into the command on the right\njq -r '.items[]\
-    \ | select(.spec.source.helm != null) | \"\\nName:\\t\\t\\t\" + .metadata.name\
-    \ + \"\\nSync Status:\\t\\t\" + .status.sync.status + \"\\nHealth Status:\\t\\\
-    t\" + .status.health.status' # jq (short for \"JSON Query\") is a command line\
-    \ utility that can filter, transform, and reshape JSON data. Flags are used to\
-    \ define how jq should further refine the output returned from the Kubernetes\
-    \ cluster by filtering out only objects (.items[]) that have a 'spec.source.helm'\
-    \ property that does not equal null, and then transforming and formatting the\
-    \ remaining data into a readable string."
+    2. `-n ${NAMESPACE}` - This part specifies the namespace where the resource is
+    located. Namespaces are a way to divide cluster resources between multiple users
+    and groups.
+
+
+    3. `--context ${CONTEXT}` - This part of the command allows you to specify which
+    Kubernetes context you want to work with. A context is a group of access parameters,
+    including the cluster, user, and namespace.
+
+
+    4. `-o=json` - This part tells Kubernetes to output the information in JSON format,
+    which is a structured way of representing data.
+
+
+    5. `| jq -r ''.items[] | select(.spec.source.helm != null) | "\nName:\t\t\t" +
+    .metadata.name + "\nSync Status:\t\t" + .status.sync.status + "\nHealth Status:\t\t"
+    + .status.health.status''` - This is some additional processing of the JSON output
+    using the `jq` tool. It''s parsing through the JSON output and is selecting only
+    the resources that have been installed using Helm, which is a package manager
+    for Kubernetes. After filtering, it''s formatting the output to display the name
+    of the resource, its sync status, and its health status.
+
+
+    So, when you put it all together, this command is essentially asking Kubernetes
+    for detailed information about a particular resource, filtering out resources
+    that were installed using Helm, and displaying specific information about those
+    resources. This can be very helpful for understanding the status and health of
+    your applications running in the cluster.'
+  multi_line_details: '# Use kubectl command to get the specified resource in the
+    given namespace and context
+
+    kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json |
+
+
+    # Pipe the output of the previous command to jq command to filter and format the
+    json response
+
+    jq -r ''.items[] | select(.spec.source.helm != null) |
+
+
+    # Extract and format the desired fields from the json response
+
+    "\nName:\t\t\t" + .metadata.name +
+
+    "\nSync Status:\t\t" + .status.sync.status +
+
+    "\nHealth Status:\t\t" + .status.health.status'''
   name: fetch_all_available_argocd_helm_releases
 - command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json
     | jq -r '.items[] | select(.spec.source.helm != null) | "\nName:\t\t\t" + .metadata.name
@@ -48,42 +78,93 @@ commands:
     State:\t" + .status.operationState.message'
   doc_links: '
 
-    - [Kubernetes Documentation - kubectl overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
-
-    - [Kubernetes Reference - Resource Kinds](https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects/#resource){:target="_blank"}
-
-    - [Kubernetes Concepts - Namespaces](https://kubernetes.io/docs/tasks/administer-cluster/namespaces-walkthrough/){:target="_blank"}
-
-    - [Kubernetes Docs - Working with Contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#set-the-kubeconfig-context){:target="_blank"}
-
-    - [Kubernetes Docs - jq Installation](https://stedolan.github.io/jq/download/){:target="_blank"}
-
-    - [jq Manual - select()](https://stedolan.github.io/jq/manual/#selectselect){:target="_blank"}'
-  explanation: '
+    '
+  explanation: 'This command is used to retrieve information about a specific resource
+    in a Kubernetes cluster. Let''s break it down:
 
 
-    This command will retrieve information about the Helm-managed resource with name
-    ${RESOURCE_NAME} in namespace ${NAMESPACE}, using the context ${CONTEXT}. It will
-    return the Name, Target Revision (the revision which is desired to be achieved),
-    Attempted Revision (the revision that was attempted at last sync operation) and
-    the Sync Status of the resource (if the resource is considered to be out of sync).
-    This information will be provided in json format. Additionally, any appropriate
-    error messages will be returned if the operational state of the resource is not
-    valid.'
-  multi_line_details: '
+    - kubectl: This is the command-line interface (CLI) tool for interacting with
+    Kubernetes clusters.
 
 
-    # Command to get Helm releases in a particular namespace, context, and output
-    them as custom JSON format
+    - get: This is the operation we want to perform, which in this case is getting
+    information about a specific resource.
 
-    kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json  # Run
-    ''kubectl get'' to get Helm-managed resources in the given namespace and context
-    in a JSON format
 
-    | jq -r ''.items[] | select(.spec.source.helm != null) | "\nName:\t\t\t" + .metadata.name
+    - ${RESOURCE_NAME}: This is the name of the resource we want to retrieve information
+    about. For example, it could be "pods" to get information about pods in the cluster.
+
+
+    - -n ${NAMESPACE}: This specifies the namespace where the resource is located.
+    Namespaces are used to organize and divide resources within a cluster.
+
+
+    - --context ${CONTEXT}: This specifies the context or configuration to use for
+    the operation. A context in Kubernetes is a set of access parameters, including
+    the cluster, user, and namespace.
+
+
+    - -o=json: This specifies the output format for the information to be JSON. This
+    allows us to easily parse and manipulate the data.
+
+
+    - | jq -r ''.items[] | select(.spec.source.helm != null) | "\nName:\t\t\t" + .metadata.name
     + "\nTarget Revision:\t" + .spec.source.targetRevision + "\nAttempted Revision:\t"
-    + .status.sync.revision + "\nSync Status:\t\t" + .status.sync.status + "\nOperational
-    State:\t" + .status.operationState.message''  # Pipe the command into ''jq'',
-    to filter out items with a Helm spec, and print out the information for each item
-    in the format specified'
+    + .status.sync.revision\nSync Status:\t\t" + .status.sync.status + "\nOperational
+    State:\t" + .status.operationState.message'': This part of the command is using
+    the jq tool to parse and format the JSON output. It selects specific fields from
+    the resource and formats them into a human-readable output, including the name,
+    target revision, attempted revision, sync status, and operational state.
+
+
+    In summary, this command is used to retrieve specific information about a resource
+    in a Kubernetes cluster and format the output in a way that is easier for humans
+    to read and understand. As you continue to work with Kubernetes, you will become
+    more familiar with the different options and tools available for working with
+    resources in the cluster.'
+  multi_line_details: '```bash
+
+    # Set the resource name to be fetched
+
+    RESOURCE_NAME=pods
+
+
+    # Set the namespace to look for the resource
+
+    NAMESPACE=default
+
+
+    # Set the context to specify which cluster to work with
+
+    CONTEXT=cluster-1
+
+
+    # Use kubectl to get the specified resource in the specified namespace and context,
+    output as JSON
+
+    kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json \
+
+
+    # Pipe the output into jq to filter and format the data
+
+    | jq -r ''.items[] | select(.spec.source.helm != null) |
+
+
+    # Select specific fields and format them with new lines and tabs
+
+    "\nName:\t\t\t" + .metadata.name +
+
+    "\nTarget Revision:\t" + .spec.source.targetRevision +
+
+    "\nAttempted Revision:\t" + .status.sync.revision +
+
+    "\nSync Status:\t\t" + .status.sync.status +
+
+    "\nOperational State:\t" + .status.operationState.message''
+
+    ```
+
+    This multi-line command is broken down into separate steps with comments explaining
+    each part of the command. It helps new users understand the purpose and usage
+    of each cli command.'
   name: fetch_installed_argocd_helm_release_versions

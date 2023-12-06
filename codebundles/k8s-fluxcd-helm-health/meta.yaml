@@ -2,74 +2,123 @@ commands:
 - command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}
   doc_links: '
 
-    - [Kubernetes Documentation: kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+    - [Kubectl get documentation](https://kubernetes.io/docs/reference/kubectl/cheatsheet/#kubectl-get){:target="_blank"}
 
-    - [Kubernetes Docs Overview: The Basics of Kubernetes Objects](https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects/){:target="_blank"}
+    - [Kubernetes resource names](https://kubernetes.io/docs/concepts/overview/working-with-objects/names/){:target="_blank"}
 
-    - [Kubernetes Documentation: namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+    - [Kubernetes namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [Kubernetes Docs: Context and Configuration](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/){:target="_blank"}'
-  explanation: '
-
-
-    This command allows you to view the details of a particular resource in a Kubernetes
-    cluster. The ${RESOURCE_NAME} is the name of the resource you wish to view, and
-    must be one of the supported resources as listed on the official Kubernetes documentation
-    (https://kubernetes.io/docs/reference/kubectl/overview/). The ${NAMESPACE} is
-    the namespace within the cluster where the resource is located, while the ${CONTEXT}
-    is the name that you use to switch between clusters. This command will return
-    the details of the specified resource, or an error if the resource does not exist.'
-  multi_line_details: '
+    - [Kubectl contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}'
+  explanation: 'This command is used to retrieve information about a specific resource
+    in a Kubernetes cluster. Let me break it down for you:
 
 
-    #This command gets a specified resource from the desired Kubernetes context/namespace.
+    - "kubectl" is the command line tool used to interact with Kubernetes clusters.
+
+    - "get" is the action we want to perform, which in this case is retrieving information
+    about a resource.
+
+    - "${RESOURCE_NAME}" is the name of the resource you want to retrieve information
+    about. For example, it could be "pods", "services", "deployments", etc.
+
+    - "-n ${NAMESPACE}" specifies the namespace in which the resource is located.
+    A namespace is a way to organize and isolate resources within a cluster.
+
+    - "--context ${CONTEXT}" specifies the context, or the cluster configuration,
+    that you want to use for this operation. If you are working with multiple Kubernetes
+    clusters, you can use different contexts to switch between them.
 
 
-    #Get a reference to the desired resource
+    So, when you run this command, it will retrieve information about the specified
+    resource in the specified namespace within the specified cluster context. This
+    can be very useful for monitoring and troubleshooting your applications running
+    in a Kubernetes environment.'
+  multi_line_details: '# Set the kubernetes context to use
 
-    RESOURCE_NAME="<enter_resource_name>"
-
-
-    #Set the namespace identifier
-
-    NAMESPACE="<enter_namespace>"
-
-
-    #Identify desired Kubernetes context
-
-    CONTEXT="<enter_context>"
+    kubectl config use-context ${CONTEXT}
 
 
-    #Invoke kubectl command to obtain the resource from cluster
+    # Get the resource information from a specific namespace
 
-    kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}'
+    kubectl get ${RESOURCE_NAME} -n ${NAMESPACE}'
   name: list_all_available_fluxcd_helmreleases_in_namespace_namespace
 - command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} -o=jsonpath="{range .items[*]}{''\nName:
     ''}{@.metadata.name}{''\nlastAppliedRevision:''}{@.status.lastAppliedRevision}{''\nlastAttemptedRevision:''}{@.status.lastAttemptedRevision}{''\n---''}{end}"
     --context ${CONTEXT} || true'
   doc_links: '
 
-    - [Kubernetes Overview](https://kubernetes.io/docs/concepts/){:target="_blank"}
+    - [Understanding Kubernetes resource naming](https://kubernetes.io/docs/concepts/overview/working-with-objects/names/){:target="_blank"}
 
-    - [Core Concept in Kubernetes](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+    - [Using Kubernetes namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [Understanding Namespaces](https://kubernetes.io/docs/tasks/administer-cluster/namespaces-walkthrough/){:target="_blank"}
+    - [JSONPath syntax](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}'
+  explanation: 'This command is used to retrieve information about a specific resource
+    within a particular Kubernetes namespace. Let''s break it down step by step.
 
-    - [JSONPath](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}'
-  explanation: '
+
+    1. kubectl get: This is the command-line tool used to interact with the Kubernetes
+    API and perform various operations, such as retrieving information about resources.
 
 
-    This command is used to get a list of the specified resource type in the provided
-    namespace. It will return the name, the last applied revision, and the last attempted
-    revision for each item in the list. The command uses the context option to specify
-    which Kubernetes cluster to query. The results are then formatted using the jsonpath
-    option to display them in a user-friendly way.'
-  multi_line_details: "\n# This command is used to query a resource of type ${RESOURCE_NAME}\
-    \ from a namespace called \"${NAMESPACE}\" on a cluster pointed to by the context\
-    \ \"${CONTEXT}\". \n\n# Create multi line statement\nkubectl get ${RESOURCE_NAME}\
-    \ \\\n-n ${NAMESPACE} \\ \n-o=jsonpath=\"{range .items[*]}{'\\nName: '}{@.metadata.name}{'\\\
-    nlastAppliedRevision:'}{@.status.lastAppliedRevision}{'\\nlastAttemptedRevision:'}{@.status.lastAttemptedRevision}{'\\\
-    n---'}{end}\" \\\n--context ${CONTEXT} \\\n|| true"
+    2. ${RESOURCE_NAME}: This placeholder refers to the type of Kubernetes resource
+    you want to retrieve information about, such as pods, services, deployments, etc.
+    You would replace ${RESOURCE_NAME} with the actual name of the resource you''re
+    interested in, such as "pods" or "services".
+
+
+    3. -n ${NAMESPACE}: This specifies the namespace in which the resource is located.
+    Namespaces are used to organize and isolate resources within a Kubernetes cluster.
+    Replace ${NAMESPACE} with the actual name of the namespace you want to target.
+
+
+    4. -o=jsonpath="{range .items[*]}{''\nName: ''}{@.metadata.name}{''\nlastAppliedRevision:''}{@.status.lastAppliedRevision}{''\nlastAttemptedRevision:''}{@.status.lastAttemptedRevision}{''\n---''}{end}"
+    : This part of the command uses JSONPath to format the output of the `kubectl
+    get` command. It extracts specific fields from the retrieved resource objects,
+    such as name, lastAppliedRevision, and lastAttemptedRevision, and organizes them
+    into a custom format. For example, it will display the name of the resource and
+    its last applied and attempted revisions.
+
+
+    5. --context ${CONTEXT}: This specifies the context to use for the operation.
+    Contexts in Kubernetes are used to switch between different clusters and user
+    identities. Replace ${CONTEXT} with the actual name of the context you want to
+    use.
+
+
+    6. || true: This is a safety feature that ensures that the command will not return
+    an error if the resource or namespace does not exist. It essentially allows the
+    command to fail gracefully without causing issues.
+
+
+    In summary, this command is a way to retrieve specific information about a particular
+    resource within a Kubernetes namespace and format the output using JSONPath. As
+    you continue to work with Kubernetes, you will become more familiar with these
+    types of commands and how to customize them for different use cases.'
+  multi_line_details: '```bash
+
+    # Set the resource name, namespace, and context for the kubectl command
+
+    RESOURCE_NAME="pods"
+
+    NAMESPACE="my-namespace"
+
+    CONTEXT="my-kube-context"
+
+
+    # Use kubectl command to get specific information from the specified resource
+    and namespace in JSON format
+
+    # The -o=jsonpath flag allows us to format the output using a custom template
+
+
+    kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} -o=jsonpath="{range .items[*]}{''\nName:
+    ''}{@.metadata.name}{''\nlastAppliedRevision:''}{@.status.lastAppliedRevision}{''\nlastAttemptedRevision:''}{@.status.lastAttemptedRevision}{''\n---''}{end}"
+    --context ${CONTEXT} || true
+
+    # If the kubectl command fails, the "|| true" at the end ensures that it does
+    not affect the overall execution of the script.
+
+    ```'
   name: fetch_installed_fluxcd_helmrelease_versions_in_namespace_namespace
 - command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} -o json --context ${CONTEXT}
     | jq -r ''.items[] | select(.status.lastAppliedRevision!=.status.lastAttemptedRevision)
@@ -77,75 +126,123 @@ commands:
     + " Last Applied Revision: " + .status.lastAppliedRevision'''
   doc_links: '
 
-    - [Kubernetes Documentation - kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+    - [kubectl Resource Management](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
-    - [jq Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}
+    - [jq Manual](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: 'This command is used to get information about a specific resource
+    in a Kubernetes cluster. Let''s break it down:
 
-    - [Kubernetes Documentation - Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}'
-  explanation: '
+
+    - `kubectl`: This is the command-line tool for interacting with Kubernetes clusters.
 
 
-    This command will help retrieve information about a Kubernetes resource from within
-    a specified namespace and context. It retrieves the last attempted revision and
-    last applied revision for that resource, and prints it out in a readable format
-    on the command line. This command is useful when debugging issues related to application
-    updates or deployments, as it can be used to identify which versions of an application
-    are running on a particular node or cluster.'
-  multi_line_details: "\n\n# This command allows users to collect and parse information\
-    \ from a given Kubernetes resource in order to compare the last applied vs. last\
-    \ attempted revision for an update.\n\n# kubectl is Kubernetes's command-line\
-    \ interface (CLI) for performing operations on resources. \n# ${RESOURCE_NAME}\
-    \ is the name of the Kubernetes resource that the user wants to get information\
-    \ about. \n# -n ${NAMESPACE} specifies what namespaced the resource should be\
-    \ retrieved from.\n# -o json option adds an additional formatting, printing the\
-    \ results in JSON format.\n# --context ${CONTEXT} selects the Kubernetes context\
-    \ which contains information about the cluster connection settings.\n# jq is a\
-    \ lightweight command-line JSON processor and is used to filter, traverse, and\
-    \ format JSON output\n# '.items[] | select(.status.lastAppliedRevision!=.status.lastAttemptedRevision)\
-    \ | \"Name: \" + .metadata.name + \" Last Attempted Version: \" + .status.lastAttemptedRevision\
-    \ + \" Last Applied Revision: \" + .status.lastAppliedRevision' is a filtering\
-    \ expression used with jq to enable comparing the last applied vs. last attempted\
-    \ revisions for an update.\n\nkubectl get ${RESOURCE_NAME} -n ${NAMESPACE} -o\
-    \ json --context ${CONTEXT} \\\n | jq -r '.items[] \\\n  | select(.status.lastAppliedRevision!=.status.lastAttemptedRevision)\
-    \ \\\n  | \"Name: \" + .metadata.name + \" Last Attempted Version: \" + .status.lastAttemptedRevision\
-    \ + \" Last Applied Revision: \" + .status.lastAppliedRevision'"
+    - `get`: This is the action we want to perform, in this case, retrieve information
+    about a resource.
+
+
+    - `${RESOURCE_NAME}`: This is where you specify the type of resource you are interested
+    in, such as pods, services, deployments, etc.
+
+
+    - `-n ${NAMESPACE}`: This specifies the namespace in which the resource is located.
+    Namespaces are used to organize and isolate resources within a cluster.
+
+
+    - `-o json`: This option tells Kubernetes to output the information in JSON format.
+
+
+    - `--context ${CONTEXT}`: This specifies the context or configuration to use for
+    the command, usually referring to a specific cluster in your environment.
+
+
+    - `| jq -r ''.items[] | select(.status.lastAppliedRevision!=.status.lastAttemptedRevision)
+    | "Name: " + .metadata.name + " Last Attempted Version: " + .status.lastAttemptedRevision
+    + " Last Applied Revision: " + .status.lastAppliedRevision''`: This part of the
+    command takes the output of the previous command and applies a filter using the
+    `jq` tool to display only specific information. It selects items where the last
+    applied revision is not equal to the last attempted revision, and then formats
+    and prints out the name of the resource along with its last attempted and last
+    applied revisions.
+
+
+    In summary, this command allows you to retrieve and display specific information
+    about a Kubernetes resource in a particular namespace and context, while filtering
+    the data to show only the relevant details.'
+  multi_line_details: '# Step 1: Use kubectl to get the resource with the given RESOURCE_NAME
+    in the specified NAMESPACE and output it as JSON,
+
+    # using the specified context
+
+    kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} -o json --context ${CONTEXT}
+
+
+    # Step 2: Pipe the output of the previous command to jq, a lightweight and flexible
+    command-line JSON processor,
+
+    # which will filter the .items array to only include resources where the lastAppliedRevision
+    is different from the lastAttemptedRevision
+
+    | jq -r ''.items[] | select(.status.lastAppliedRevision!=.status.lastAttemptedRevision)
+    |
+
+    "Name: " + .metadata.name + " Last Attempted Version: " + .status.lastAttemptedRevision
+    + " Last Applied Revision: " + .status.lastAppliedRevision'''
   name: fetch_mismatched_fluxcd_helmrelease_version_in_namespace_namespace
 - command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} -o=jsonpath="{range .items[?(@.status.conditions[].status==''False'')]}{''-----\nName:
     ''}{@.metadata.name}{''\n''}{@.status.conditions[*].message}{''\n''}{end}" --context
     ${CONTEXT} || true'
   doc_links: '
 
-    - [Kubernetes Documentation of kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+    - [kubectl get command - Kubernetes Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
-    - [Kubernetes Documentation about Resource Names](https://kubernetes.io/docs/concepts/overview/working-with-objects/names/){:target="_blank"}
+    - [JSONPath support in kubectl - Kubernetes Documentation](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}
 
-    - [Kubernetes Documentation about Namespaces](https://kubernetes.io/docs/tasks/administer-cluster/namespaces/){:target="_blank"}
+    - [Kubernetes Namespaces - Kubernetes Documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [Kubernetes Documentation of jsonpath](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}
+    - [Kubectl context - Kubernetes Documentation](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/){:target="_blank"}'
+  explanation: 'This command is used to get and display certain resources in a Kubernetes
+    cluster. Let''s break it down step by step:
 
-    - [Kubernetes Documentation about Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}'
-  explanation: '
+
+    - `kubectl`: This is the command-line tool used to interact with Kubernetes clusters.
+
+    - `get`: This is the action we want to perform, which is getting information about
+    certain resources.
+
+    - `${RESOURCE_NAME}`: Replace this with the name of the resource you want to retrieve,
+    such as Pods, Deployments, or Services.
+
+    - `-n ${NAMESPACE}`: This flag specifies the namespace in which the resource is
+    located. Replace `${NAMESPACE}` with the actual namespace name.
+
+    - `-o=jsonpath="{range .items[?(@.status.conditions[].status==''False'')]}{''-----\nName:
+    ''}{@.metadata.name}{''\n''}{@.status.conditions[*].message}{''\n''}{end}"`: This
+    flag tells Kubernetes how we want the data to be formatted when it''s outputted.
+    It''s using JSONPath to filter and format the output according to our needs.
+
+    - `--context ${CONTEXT}`: This flag specifies the context/cluster where the command
+    should be executed. Replace `${CONTEXT}` with the actual context name.
+
+    - `|| true`: This part of the command says that if the previous command fails,
+    proceed and return a success status.
 
 
-    This command is used to check the status of an existing Kubernetes resource in
-    a given context and namespace. It will show all resources with a status of "False",
-    as well as the resource name and any associated messages that indicate why it
-    might not be functioning properly. The command uses `kubectl`, which is a command
-    line tool for communicating with the Kubernetes API, to get the desired information
-    from your cluster. The `-n` flag specifies the namespace in which the resource
-    exists, and the `-o=jsonpath` flag is used to format the output for easier readability.
-    The `--context` flag allows you to specify a particular context within your cluster.
-    This command can be especially useful when troubleshooting and debugging applications
-    or resources in Kubernetes.'
-  multi_line_details: "\n\n# Get info about a particular Kubernetes resource in an\
-    \ available namespace\n# using the 'kubectl' command and output it in JSON format\n\
-    RESOURCE_NAME=\"<type of k8s resource to get info about>\" # Example: \"pods\"\
-    \nNAMESPACE=\"<available namespace>\"    # Example: \"default\"\nCONTEXT=\"<name\
-    \ of the context>\"      # Obtained via 'kubectl config get-contexts'\n\n# Let's\
-    \ use the kubectl command to execute our task!\nkubectl \\\n  get ${RESOURCE_NAME}\
-    \ \\\n  -n ${NAMESPACE} \\\n  -o=jsonpath=\"{range .items[?(@.status.conditions[].status=='False')]}{'-----\\\
-    nName: '}{@.metadata.name}{'\\n'}{@.status.conditions[*].message}{'\\n'}{end}\"\
-    \ \\\n  --context ${CONTEXT} || true"
+    So in summary, this command fetches resource(s) of a given type within a specific
+    namespace and formats the output according to a specified template using JSONPath.
+    This will help you as an engineer to gather specific information about resources
+    in your Kubernetes clusters.'
+  multi_line_details: "```yaml\n# Set the resource name, namespace, and context you\
+    \ want to use\nRESOURCE_NAME=\"pods\" \nNAMESPACE=\"default\"\nCONTEXT=\"my-cluster\"\
+    \n\n# Use kubectl to get the pods from the specified namespace in the specific\
+    \ context\nkubectl get ${RESOURCE_NAME} -n ${NAMESPACE} \\\n  -o=jsonpath=\"{range\
+    \ .items[?(@.status.conditions[].status=='False')]}{'-----\\nName: '}{@.metadata.name}{'\\\
+    n'}{@.status.conditions[*].message}{'\\n'}{end}\" \\\n  --context ${CONTEXT} ||\
+    \ true\n```\n\nIn this multi-line command, we set the variables RESOURCE_NAME,\
+    \ NAMESPACE, and CONTEXT with the values we want to use. Then, we use the kubectl\
+    \ command to retrieve the pods from the specified namespace in the chosen context,\
+    \ using the output in jsonpath format, applying a filter to check for specific\
+    \ status conditions. The `|| true` at the end ensures that the command does not\
+    \ return an error even if no resources are found or there is any other issue."
   name: fetch_fluxcd_helmrelease_error_messages_in_namespace_namespace
 - command: 'namespace="${NAMESPACE}" context="${CONTEXT}"; helm_releases=$(kubectl
     get ${RESOURCE_NAME} -n "$namespace" --context "$context" -o json | jq -r ''.items[]
@@ -173,81 +270,67 @@ commands:
     | Available Version: $available_version"; done'
   doc_links: '
 
-    - [Kubernetes Documentation - Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [Kubernetes Documentation - Contexts and Configuration](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
-
-    - [Helm Documentation - Repository Charts](https://helm.sh/docs/developing_charts/#chart-repositories){:target="_blank"}
-
-    - [Kubectl Documentation - Resource Types](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
-
-    - [jq Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}
-
-    - [Helm Documentation - Search Command](https://helm.sh/docs/helm/helm_search/){:target="_blank"}'
-  explanation: "\n\nThis command retrieves Helm releases from a Kubernetes namespace\
-    \ and compares their installed versions to the available versions in their corresponding\
-    \ repository, in order to determine if an update is available. \n\nIt takes five\
-    \ parameters of information:\n\n1. NAMESPACE: This is the name of the Kubernetes\
-    \ namespace from which to fetch the Helm releases.\n2. CONTEXT: This is the name\
-    \ of the Kubernetes context that will be used for the API requests.\n3. RESOURCE_NAME:\
-    \ This is the resource type that contains the Helm releases, e.g. \"helmreleases\"\
-    .\n4. CHART_NAME: This is the name of chart as it appears in the Helm repository.\n\
-    5. CHART_VERSION: This is the version of the Helm chart that has already been\
-    \ installed.\n\nUsing these parameters, the command fetches the Helm Releases\
-    \ from the Kubernetes namespace and looks up the specified Chart in its repo.\
-    \ It then uses the installed Chart Version and the current available versions\
-    \ in the repo to determine whether an update is available. It then prints out\
-    \ this information with the following output format: \n\nRelease: <release name>\
-    \ | Chart: <chart namespace>/<chart name> | Installed Version: <version installed>\
-    \ | Available Update: <true or false> | Available Version: <available version>"
-  multi_line_details: "\n\n# Get the namespace from the environmental variable\nnamespace=\"\
-    ${NAMESPACE}\"\n\n# Get the context of the current kubernetes cluster\ncontext=\"\
-    ${CONTEXT}\"\n\n# Get all the helm releases in a namespace using kubectl and save\
-    \ them into the variable helm_releases\nhelm_releases=$(kubectl get ${RESOURCE_NAME}\
-    \ -n \"$namespace\" --context \"$context\" -o json | jq -r '.items[] | .metadata.name')\n\
-    \n# Loop through each of our helm releases\necho \"$helm_releases\" | while IFS=\
-    \ read -r release; do\n\n    # Get the chart details of the release using kubectl\n\
-    \    chart_details=$(kubectl get ${RESOURCE_NAME} \"$release\" -n \"$namespace\"\
-    \ --context \"$context\" -o json | jq -r '.spec.chart.spec // empty')\n\n    #\
-    \ Check if we have any chart details\n    if [[ -n \"$chart_details\" ]]; then\n\
-    \n        # Get the kind of chart, the name and the namespace referred by\n  \
-    \      chart_kind=$(echo \"$chart_details\" | jq -r '.sourceRef.kind // empty')\n\
-    \        chart_name=$(echo \"$chart_details\" | jq -r '.chart // empty')\n   \
-    \     chart_source_name=$(echo \"$chart_details\" | jq -r '.sourceRef.name //\
-    \ empty')\n        chart_namespace=$(echo \"$chart_details\" | jq -r '.sourceRef.namespace\
-    \ // empty')\n        chart_version=$(echo \"$chart_details\" | jq -r '.version\
-    \ // \"N/A\"')\n\n        # Only for helm charts check the update availability\n\
-    \        if [[ \"$chart_kind\" == \"HelmRepository\" && -n \"$chart_name\" &&\
-    \ -n \"$chart_namespace\" ]]; then\n            # Get the repository url from\
-    \ helm repository configmap\n            repo_url=$(kubectl get helmrepositories.source.toolkit.fluxcd.io\
-    \ \"$chart_source_name\" -n \"$chart_namespace\" --context \"$context\" -o json\
-    \ | jq -r '.spec.url // empty')\n            if [[ -n \"$repo_url\" ]]; then\n\
-    \                # Create a temp repo with helm to search for available versions\n\
-    \                temp_repo_name=\"$chart_source_name-temp-$release\"\n       \
-    \         add_repo=$(helm repo add \"$temp_repo_name\" \"$repo_url\")\n\n    \
-    \            # Search the temp repo for latest version\n                available_chart_version=$(helm\
+    '
+  explanation: "This command is a shell script that utilizes the `kubectl` and `helm`\
+    \ commands to gather information about Helm releases within a Kubernetes cluster.\
+    \ Let's break it down step by step.\n\nFirst, the variables `namespace` and `context`\
+    \ are set using the values contained in the environment variable `$NAMESPACE`\
+    \ and `$CONTEXT`.\n\nNext, the script retrieves a list of Helm releases in the\
+    \ specified namespace by running the `kubectl get` command with the `-o json`\
+    \ option, which formats the output as JSON. The results are then parsed using\
+    \ `jq` to extract the `metadata.name` of each release.\n\nFor each release, the\
+    \ script retrieves details about the Helm chart using the `kubectl get` command\
+    \ again, this time obtaining information from the `spec.chart.spec` field, if\
+    \ available. This includes details such as the kind of chart (`HelmRepository`),\
+    \ the chart name, source name, namespace, and version.\n\nIf the chart is sourced\
+    \ from a Helm repository, the script extracts the repository URL and uses `helm\
+    \ repo add` and `helm search repo` commands to check for available updates. If\
+    \ an update is found, the latest version is determined and compared to the installed\
+    \ version. \n\nFinally, the script prints out information about each release including\
+    \ the release name, chart namespace/name, installed version, whether an update\
+    \ is available, and the available version.\n\nIn essence, this script automates\
+    \ the process of checking for available updates for Helm releases within a Kubernetes\
+    \ cluster and provides relevant information for each release. As an engineer using\
+    \ Kubernetes daily, understanding and familiarizing yourself with commands like\
+    \ these will be beneficial for managing applications and deployments within your\
+    \ Kubernetes environment."
+  multi_line_details: "```bash\n# Define the context and namespace to be used in the\
+    \ commands below\nnamespace=\"${NAMESPACE}\" \ncontext=\"${CONTEXT}\" \n\n# Retrieve\
+    \ the list of releases for a specific resource in the defined namespace and context\n\
+    helm_releases=$(kubectl get ${RESOURCE_NAME} -n \"$namespace\" --context \"$context\"\
+    \ -o json | jq -r '.items[] | .metadata.name')\n\n# Iterate over each release\
+    \ obtained\necho \"$helm_releases\" | while IFS= read -r release; do\n  \n  #\
+    \ Access details of the chart for the current release\n  chart_details=$(kubectl\
+    \ get ${RESOURCE_NAME} \"$release\" -n \"$namespace\" --context \"$context\" -o\
+    \ json | jq -r '.spec.chart.spec // empty')\n  \n  # Check if chart details are\
+    \ available and proceed accordingly\n  if [[ -n \"$chart_details\" ]]; then\n\
+    \    chart_kind=$(echo \"$chart_details\" | jq -r '.sourceRef.kind // empty')\n\
+    \    chart_name=$(echo \"$chart_details\" | jq -r '.chart // empty')\n    chart_source_name=$(echo\
+    \ \"$chart_details\" | jq -r '.sourceRef.name // empty')\n    chart_namespace=$(echo\
+    \ \"$chart_details\" | jq -r '.sourceRef.namespace // empty')\n    chart_version=$(echo\
+    \ \"$chart_details\" | jq -r '.version // \"N/A\"')\n    \n    # If the chart\
+    \ kind is HelmRepository and required details are available, proceed to identify\
+    \ the available version\n    if [[ \"$chart_kind\" == \"HelmRepository\" && -n\
+    \ \"$chart_name\" && -n \"$chart_namespace\" ]]; then\n      repo_url=$(kubectl\
+    \ get helmrepositories.source.toolkit.fluxcd.io \"$chart_source_name\" -n \"$chart_namespace\"\
+    \ --context \"$context\" -o json | jq -r '.spec.url // empty')\n\n      # If the\
+    \ repository URL is available, apply further processing\n      if [[ -n \"$repo_url\"\
+    \ ]]; then\n        temp_repo_name=\"$chart_source_name-temp-$release\"\n    \
+    \    add_repo=$(helm repo add \"$temp_repo_name\" \"$repo_url\")\n        available_chart_version=$(helm\
     \ search repo \"$temp_repo_name\"/\"$chart_name\" --version \">$chart_version\"\
-    \ --output json | jq -r '.[].version')\n                if [[ -n \"$available_chart_version\"\
-    \ ]]; then\n\n                    # Sort the version array and assign the highest\
-    \ version to available_version\n                    sorted_versions=($(echo \"\
-    \\${available_chart_version[@]}\" | tr ' ' '\\n' | sort -V))\n               \
-    \     available_version=\\${sorted_versions[-1]}\n                    version_update_available=\"\
-    True\"\n                else\n                    # If not version is available\
-    \ assign N/A to available_version \n                    available_version=\"N/A\"\
-    \n                    version_update_available=\"False\"\n                fi\n\
-    \n                # Remove the temp repo since we have finished searching\n  \
-    \              remove_repo=$(helm repo remove \"$temp_repo_name\")\n         \
-    \   else\n                # If no repository is found assign N/A to available_version\
-    \ and False to version_update_available\n                available_version=\"\
-    N/A\"\n                version_update_available=\"False\"\n            fi\n  \
-    \      else\n            # If not a helm chart assign N/A to available_version\
-    \ and False to version_update_available\n            available_version=\"N/A\"\
-    \n            version_update_available=\"False\"\n        fi\n    else\n     \
-    \   # If no chart details are found set available values to N/A and version_update_available\
-    \ to False\n        chart_name=\"N/A\"\n        chart_namespace=\"N/A\"\n    \
-    \    chart_version=\"N/A\"\n        available_version=\"N/A\"\n        version_update_available=\"\
-    False\"\n    fi\n\n    # Output information about the current release\n    echo\
-    \ \"Release: $release | Chart: $chart_namespace/$chart_name | Installed Version:\
-    \ $chart_version | Available Update: $version_update_available | Available Version:\
-    \ $available_version\";\ndone"
+    \ --output json | jq -r '.[].version')\n        \n        # Identify the latest\
+    \ available version and check if an update is available\n        if [[ -n \"$available_chart_version\"\
+    \ ]]; then\n            sorted_versions=($(echo \"${available_chart_version[@]}\"\
+    \ | tr ' ' '\\n' | sort -V))\n            available_version=${sorted_versions[-1]}\n\
+    \            version_update_available=\"True\"\n        else\n            available_version=\"\
+    N/A\"\n            version_update_available=\"False\"\n        fi\n        \n\
+    \        remove_repo=$(helm repo remove \"$temp_repo_name\")\n      else\n   \
+    \     available_version=\"N/A\"\n        version_update_available=\"False\"\n\
+    \      fi\n    else\n      available_version=\"N/A\"\n      version_update_available=\"\
+    False\"\n    fi\n  else\n    chart_name=\"N/A\"\n    chart_namespace=\"N/A\"\n\
+    \    chart_version=\"N/A\"\n    available_version=\"N/A\"\n    version_update_available=\"\
+    False\"\n  fi\n  \n  # Print the details of the release, including available updates\
+    \ and versions\n  echo \"Release: $release | Chart: $chart_namespace/$chart_name\
+    \ | Installed Version: $chart_version | Available Update: $version_update_available\
+    \ | Available Version: $available_version\"\ndone\n```"
   name: check_for_available_helm_chart_updates_in_namespace_namespace

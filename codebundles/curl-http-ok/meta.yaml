@@ -3,20 +3,48 @@ commands:
     -s ${URL}'
   doc_links: '
 
-    - [Curl Command Documentation](https://ec.haxx.se/usingcurl-verboseoutput.html){:target="_blank"}
+    - [curl man page](https://linux.die.net/man/1/curl){:target="_blank"}
 
-    - [HTTP Status Codes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status){:target="_blank"}'
-  explanation: '
+    - [Understanding HTTP status codes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status){:target="_blank"}'
+  explanation: 'Sure! This is a command using the `curl` tool to make an HTTP request
+    to a specified URL. Let''s break it down step by step:
 
 
-    This command uses the Curl program to make an HTTP request to the URL provided,
-    and collects the HTTP response code and the total request time in terms of seconds.
-    This information can be useful for monitoring API endpoint health and performance.'
-  multi_line_details: "\n\n# This command will retrieve a website response code and\
-    \ timing information \n# for the provided ${URL} address using cURL.\n\n# Here\
-    \ is the same command broken into multiple lines:\n\n# Define our URL variable\n\
-    URL=\"http://example.com\"\n\n# Retrieve the status code of the URL address, as\
-    \ well as timing information,\n# with cURL and store the results in a file called\
-    \ 'null'\ncurl -o /dev/null \\\n     -w '{\"http_code\": %{http_code}, \"time_total\"\
-    : %{time_total}}' \\\n     -s ${URL}"
+    1. `curl`: This is the name of the command-line tool that allows us to transfer
+    data to or from a server. In this case, we''re using it to make an HTTP request.
+
+
+    2. `-o /dev/null`: The `-o` option is used to specify the file where the output
+    will be written. In this case, `/dev/null` is a special device file on Unix-like
+    operating systems that discards all data written to it. So, this part of the command
+    effectively tells `curl` not to save the output anywhere.
+
+
+    3. `-w ''{"http_code": %{http_code}, "time_total": %{time_total}}''`: The `-w`
+    option is used to specify a custom output format. In this case, we''re formatting
+    the output as a JSON object with two fields: `http_code` and `time_total`. The
+    `%{http_code}` and `%{time_total}` are placeholders that will be replaced with
+    the actual HTTP status code and total time taken for the request, respectively.
+
+
+    4. `-s`: The `-s` option is used to make `curl` operate in silent mode. This means
+    that it will not show progress or error messages.
+
+
+    5. `${URL}`: This is a placeholder for the actual URL to which the HTTP request
+    will be made. You should replace `${URL}` with the specific URL you want to request.
+
+
+    Overall, this command is making an HTTP request to a specified URL, measuring
+    the response time and status code, and formatting the output as a JSON object.
+    This could be useful for monitoring and analyzing the performance of web services
+    running on Kubernetes or any other platform.'
+  multi_line_details: "# Perform a GET request on the provided URL using curl\n# -o\
+    \ /dev/null: output response body to /dev/null (discard it)\n# -w '{\"http_code\"\
+    : %{http_code}, \"time_total\": %{time_total}}': write custom output format with\
+    \ HTTP code and total time\n# -s: silent mode, don't show progress or error messages\n\
+    # ${URL}: replace variable with the actual URL to request\n\ncurl \\\n  -o /dev/null\
+    \ \\    # Discard response body\n  -w '{\"http_code\": %{http_code}, \"time_total\"\
+    : %{time_total}}' \\  # Custom output format\n  -s \\  # Silent mode\n  ${URL}\
+    \  # Replace with actual URL for request"
   name: checking_http_url_is_available_and_timely

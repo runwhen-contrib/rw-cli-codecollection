@@ -3,140 +3,193 @@ commands:
     -- redis-cli PING
   doc_links: '
 
-    - [Kubectl Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/){:target="_blank"}
+    - [kubectl exec command documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
 
-    - [Kubectl Exec Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/#exec){:target="_blank"}
+    - [Deployments in Kubernetes](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
 
-    - [Official Redis Command Reference](https://redis.io/commands#generic){:target="_blank"}'
-  explanation: '
+    - [Kubernetes contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/){:target="_blank"}
+
+    - [Kubernetes namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+
+    - [Redis CLI documentation](https://redis.io/topics/quickstart){:target="_blank"}
+
+    - [REDIS PING command](https://redis.io/commands/ping){:target="_blank"}'
+  explanation: 'This command is used to execute the `redis-cli PING` command on a
+    specific deployment within your Kubernetes cluster. Let me break it down for you:
 
 
-    This command is used to run a redis-cli PING command on a Kubernetes Deployment.
-    The deployment name and namespace are passed in as variables, while the context
-    refers to the cluster from which this particular Kubernetes object is running.
-    This command is useful for verifying that the Redis installation on the Deployment
-    is up and running, which helps ensure that the application running on it is also
-    working properly.'
-  multi_line_details: "\n\n# Make sure the Kubernetes context and namespace are set\
-    \ correctly for the deployment\nexport CONTEXT=${CONTEXT}\nexport NAMESPACE=${NAMESPACE}\n\
-    \n# Execute a redis-cli command (ping in this case) against the Kubernetes deployment\n\
-    kubectl exec \\ \n    deployment/${DEPLOYMENT_NAME} \\\n    --context=${CONTEXT}\
-    \ \\\n    -n ${NAMESPACE} \\\n    -- \\\n    redis-cli PING"
+    - `kubectl exec` is the Kubernetes command-line tool used to execute commands
+    inside a container running in a pod.
+
+    - `deployment/${DEPLOYMENT_NAME}` specifies the name of the deployment where you
+    want to run the command. You''ll need to replace ${DEPLOYMENT_NAME} with the actual
+    name of the deployment you want to target.
+
+    - `--context=${CONTEXT}` allows you to specify the context of the Kubernetes cluster
+    where the deployment is running. The context includes information about the cluster,
+    user, and namespace you want to interact with.
+
+    - `-n ${NAMESPACE}` indicates the namespace in which the deployment is located.
+    Replace ${NAMESPACE} with the actual namespace of the deployment.
+
+    - `-- redis-cli PING` is the actual command that will be executed inside the specified
+    deployment. In this case, it''s running the `PING` command using `redis-cli`,
+    which is a command-line interface for interacting with a Redis database.
+
+
+    So, when you run this command, it will connect to the specified deployment, run
+    the `redis-cli PING` command, and return the response from the Redis server. This
+    can be useful for checking the status of the Redis server or testing the connectivity
+    from within the deployment.'
+  multi_line_details: "```bash\n# Set the deployment name to the variable DEPLOYMENT_NAME\n\
+    DEPLOYMENT_NAME=my-deployment\n# Set the context to the variable CONTEXT\nCONTEXT=my-context\n\
+    # Set the namespace to the variable NAMESPACE\nNAMESPACE=my-namespace\n\n# Execute\
+    \ the redis-cli command on the specified deployment and namespace with the PING\
+    \ argument\nkubectl exec deployment/${DEPLOYMENT_NAME} \\\n  --context=${CONTEXT}\
+    \ \\\n  -n ${NAMESPACE} \\\n  -- redis-cli PING\n```"
   name: ping_deployment_name_redis_workload
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli SET ${REDIS_HEALTHCHECK_KEY} 0
   doc_links: '
 
-    - [Kubernetes Documentation for the exec command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
+    - [Kubectl exec command documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
 
-    - [Kubernetes Documentation for contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
+    - [Redis CLI SET command documentation](https://redis.io/commands/set){:target="_blank"}'
+  explanation: "Sure, let me break it down for you. \n\n`kubectl exec` is a command\
+    \ used in Kubernetes to execute a command inside a container running in a pod.\
+    \ In this case, the command will be executed inside a deployment specified by\
+    \ ${DEPLOYMENT_NAME}.\n\nThe `${DEPLOYMENT_NAME}` is a placeholder for the name\
+    \ of the deployment where you want to run the command.\n\nThe `--context=${CONTEXT}`\
+    \ is specifying the context or cluster you want to execute the command in. A context\
+    \ in Kubernetes is a way to manage multiple clusters and authentication details.\n\
+    \nThe `-n ${NAMESPACE}` flag specifies the namespace where the deployment is located.\
+    \ A namespace is like a virtual cluster inside a physical cluster, used to create\
+    \ a scope for naming objects.\n\nAfter the `--` separator, the actual command\
+    \ to be executed inside the container is provided: `redis-cli SET ${REDIS_HEALTHCHECK_KEY}\
+    \ 0`. This command is using redis-cli to set a specific key (${REDIS_HEALTHCHECK_KEY})\
+    \ in Redis to the value 0. This could be part of a health check process to mark\
+    \ Redis as unhealthy if the key value is set to 0.\n\nSo overall, this command\
+    \ is telling Kubernetes to execute a command inside a specific deployment's container,\
+    \ targeting a specific namespace and context, to update a key in Redis to 0 as\
+    \ part of a health check."
+  multi_line_details: '```bash
 
-    - [Kubernetes Documentation for namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+    # Set the namespace where the deployment is located
 
-    - [Redis documentation for the SET command](https://redis.io/commands/set){:target="_blank"}'
-  explanation: '
-
-
-    This command allows you to execute a command in a Kubernetes deployment. The deployment
-    name is identified by the ${DEPLOYMENT_NAME} variable. This tells Kubernetes which
-    deployment the command should be executed on. You also need to tell Kubernetes
-    which context the command should run in, this is identified with the ${CONTEXT}
-    variable. You can think of a context as a workspace where your commands will be
-    executed. Finally, the last argument, the ${NAMESPACE}, tells Kubernetes in which
-    namespace the command needs to be executed. The Redis healthcheck key will be
-    set to 0 with this command.'
-  multi_line_details: '
-
-
-    # This command will run the redis-cli command on a Kubernetes deployment
-
-    KUBECTL_EXEC_COMMAND="kubectl exec"
-
-
-    # Declare the name of the deployment
-
-    DEPLOYMENT_NAME="deployment/<deploymentName>"
+    NAMESPACE="your-namespace"
 
 
-    # Declare the context to use
+    # Set the name of the deployment
 
-    CONTEXT="--context=<contextName>"
-
-
-    # Declare the namespace to deploy into
-
-    NAMESPACE="-n <namespaceName>"
+    DEPLOYMENT_NAME="your-deployment-name"
 
 
-    # The Redis key for the healthcheck
+    # Set the context to use for interacting with Kubernetes
 
-    REDIS_HEALTHCHECK_KEY="<redisKey>"
+    CONTEXT="your-kubernetes-context"
 
 
-    # Run the command with all of the input variables
+    # Use kubectl to connect to a running container within the specified deployment
+    and namespace
 
-    ${KUBECTL_EXEC_COMMAND} ${DEPLOYMENT_NAME} ${CONTEXT} ${NAMESPACE} -- redis-cli
-    SET ${REDIS_HEALTHCHECK_KEY} 0'
+    kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
+    --
+
+
+    # Use redis-cli to set the value of a key in the Redis database to 0, effectively
+    marking it as unhealthy
+
+    redis-cli SET ${REDIS_HEALTHCHECK_KEY} 0
+
+    ```'
   name: verify_deployment_name_redis_read_write_operation
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli INCR ${REDIS_HEALTHCHECK_KEY}
   doc_links: '
 
-    - [Kubernetes documentation for ''kubectl exec'' command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
+    - [kubectl exec command documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
 
-    - [Kubernetes documentation for ''contexts'' including information about when
-    to use them and how to select them](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#contexts){:target="_blank"}
+    - [Kubernetes Namespaces documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [Kubernetes documentation for ''namespaces''](https://kubernetes.io/docs/tasks/administer-cluster/namespaces/){:target="_blank"}
+    - [Redis CLI documentation](https://redis.io/topics/rediscli){:target="_blank"}'
+  explanation: 'This command is used in Kubernetes to execute a specific command inside
+    a running container within a deployment. Let me break it down for you.
 
-    - [Redis documentation for the CLI (''redis-cli'')](https://redis.io/topics/rediscli){:target="_blank"}
 
-    - [Redis documentation for the ''INCR'' command](https://redis.io/commands/incr){:target="_blank"}'
-  explanation: "\n\nThis command is used to increase an internal counter stored in\
-    \ a Redis database. It enables you to track the health of your application deployment\
-    \ on Kubernetes. \nThe command begins with the kubectl command, which allows you\
-    \ to interact with your Kubernetes objects like deployments and namespaces. In\
-    \ this case, it's targeting a particular deployment.\n\nThe --context option is\
-    \ what ties this command to a particular Kubernetes cluster you're using. This\
-    \ is the name of the context that was set up during configuration. \nNext, -n\
-    \ sets the namespace in the Kubernetes cluster where the command should run, followed\
-    \ by the actual instruction: redis-cli INCR. This informs Redis to increment (INCR)\
-    \ a key value (specifically, ${REDIS_HEALTHCHECK_KEY}).\n\nBy running this command,\
-    \ you can periodically check the health of deployments in your Kubernetes cluster."
-  multi_line_details: "\n\n# Set up environment variables containing connection information\
-    \ for the Kubernetes deployment\nDEPLOYMENT_NAME=\"<name of your deployment>\"\
-    \nCONTEXT=\"<The context you want to connect with>\"\nNAMESPACE=\"<The namespace\
-    \ where the deployment exists>'\"\nREDIS_HEALTHCHECK_KEY=\"<A key name for the\
-    \ desired Redis healthcheck to increment>\"\n\n# Execute the command that will\
-    \ execute a redis-cli command \n# within the specified deployment, context & namespace\n\
-    kubectl exec \\\n    deployment/$DEPLOYMENT_NAME \\\n    --context=$CONTEXT \\\
-    \ \n    -n $NAMESPACE \\\n    -- redis-cli INCR $REDIS_HEALTHCHECK_KEY"
+    - kubectl: This is the command-line tool used to interact with Kubernetes clusters.
+
+
+    - exec: This subcommand is used to execute a command inside a container.
+
+
+    - deployment/${DEPLOYMENT_NAME}: Here, you''ll replace ${DEPLOYMENT_NAME} with
+    the name of the deployment you want to target. The deployment represents the running
+    instances of your application.
+
+
+    - --context=${CONTEXT}: In Kubernetes, a context is a way to manage multiple clusters
+    and users. You''ll replace ${CONTEXT} with the context you want to use.
+
+
+    - -n ${NAMESPACE}: Kubernetes uses namespaces to group resources together. You''ll
+    replace ${NAMESPACE} with the specific namespace where your deployment is located.
+
+
+    - --: This indicates the end of the kubectl options and the beginning of the command
+    that will be executed inside the container.
+
+
+    - redis-cli INCR ${REDIS_HEALTHCHECK_KEY}: This is the command that you want to
+    execute inside the container. It''s running the "INCR" command using the "redis-cli"
+    tool, which increments the value of a key in a Redis database. You''ll replace
+    ${REDIS_HEALTHCHECK_KEY} with the specific key you want to increment.
+
+
+    So when you run this command, it will execute the specified Redis command inside
+    the container belonging to the specified deployment in the specified namespace
+    and cluster context.'
+  multi_line_details: "# Use kubectl to execute a command inside a running container\
+    \ in a Deployment\nkubectl exec \n\n# Specify the name of the Deployment where\
+    \ the container is running\ndeployment/${DEPLOYMENT_NAME} \n\n# Specify the Kubernetes\
+    \ context to use (optional)\n--context=${CONTEXT} \n\n# Specify the namespace\
+    \ where the Deployment is located\n-n ${NAMESPACE} \n\n# Specify the command to\
+    \ execute inside the container using the redis-cli tool\n-- redis-cli INCR ${REDIS_HEALTHCHECK_KEY}"
   name: verify_deployment_name_redis_read_write_operation
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli GET ${REDIS_HEALTHCHECK_KEY}
   doc_links: '
 
-    - [Kubernetes Exec Command Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
+    - [Kubectl exec command reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
 
-    - [Kubernetes Basic Concepts of Namespaces Documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+    - [Kubernetes namespaces documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [Redis CLI Commands Documentation](https://redis.io/commands){:target="_blank"}'
-  explanation: '
+    - [Redis-cli command documentation](https://redis.io/topics/rediscli){:target="_blank"}'
+  explanation: 'This command is used to execute a particular command inside a running
+    container in a Kubernetes deployment. Let''s break it down.
 
 
-    This command is used to check the health of a Redis deployment on Kubernetes.
-    In order to execute this command, you need to provide four pieces of information:
-    the name of the deployment, the context, the namespace, and the Redis key.  The
-    deployment name defines which application you want to target; the context tells
-    the system which cluster and user authentication to use; the namespace lets the
-    system know where to find the resources; and the Redis key is a specific value
-    stored in the Redis instance that is being checked. Once the command is invoked,
-    it will return the value associated with the Redis key as an indicator of the
-    current health status of your Redis deployment.'
-  multi_line_details: "\n\n# This command is used to check basic health of a deployment\
-    \ running in a Kubernetes pod.\n# kubectl is the command line interface used to\
-    \ interact with Kubernetes clusters\n\n# Execute redis-cli in the deployment with\
-    \ the given name \nkubectl exec deployment/${DEPLOYMENT_NAME} \\\n    # With the\
-    \ following context \n    --context=${CONTEXT} \\\n    # In the given namespace\n\
-    \    -n ${NAMESPACE} \\\n    # Execute this command\n    -- redis-cli GET ${REDIS_HEALTHCHECK_KEY}"
+    - `kubectl exec` is the command to execute something inside a container.
+
+    - `deployment/${DEPLOYMENT_NAME}` specifies the deployment where the container
+    is running.
+
+    - `--context=${CONTEXT}` allows you to specify which Kubernetes cluster and context
+    you want to use, if you are managing multiple clusters.
+
+    - `-n ${NAMESPACE}` specifies the namespace where the deployment is located. Namespaces
+    are a way to organize and isolate resources within a Kubernetes cluster.
+
+    - `-- redis-cli GET ${REDIS_HEALTHCHECK_KEY}` is the actual command that will
+    be executed inside the container. This command is using `redis-cli` to send a
+    "GET" command to a Redis server, with the key specified by `${REDIS_HEALTHCHECK_KEY}`.
+
+
+    So essentially, this command is telling Kubernetes to execute the `redis-cli GET`
+    command inside a specific container in a specific deployment, in a specific namespace,
+    on a specific Kubernetes cluster.'
+  multi_line_details: "# Set the context to the specified Kubernetes cluster\nkubectl\
+    \ config use-context ${CONTEXT}\n\n# Execute a command in a container of the specified\
+    \ deployment in the given namespace\nkubectl exec -n ${NAMESPACE} deployment/${DEPLOYMENT_NAME}\
+    \ -- \n\n# Use redis-cli to get the value of a specific key in the Redis database\n\
+    redis-cli GET ${REDIS_HEALTHCHECK_KEY}"
   name: verify_deployment_name_redis_read_write_operation

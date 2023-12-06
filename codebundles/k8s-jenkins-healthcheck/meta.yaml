@@ -3,60 +3,115 @@ commands:
     -- curl -s -o /dev/null -w "%{http_code}" localhost:8080/login
   doc_links: '
 
-    - [kubectl Reference - Executing a Command in a Container](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
+    - [Kubectl exec command documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
 
-    - [StatefulSet Concepts - Kubernetes](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#definition-of-a-statefulset){:target="_blank"}
+    - [Understanding Kubernetes contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#define-contexts){:target="_blank"}
 
-    - [Using Contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/){:target="_blank"}
+    - [Kubernetes namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [Fundamentals of HTTP Status Codes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status){:target="_blank"}'
-  explanation: '
+    - [Using the curl command](https://linux.die.net/man/1/curl){:target="_blank"}
+
+    - [Understanding HTTP status codes with curl](https://ec.haxx.se/http/http-status.html){:target="_blank"}'
+  explanation: 'This command is used to execute a specific stateful set in your Kubernetes
+    cluster and is commonly used by engineers when working with Kubernetes on a daily
+    basis. Let me break it down for you:
 
 
-    This command is used to run a curl command on a container that is part of a stateful
-    set in a specified Kubernetes context and namespace. The command will send a request
-    to the container''s localhost at port 8080, sending it to the /login resource.
-    The output of the command will be the HTTP status code from the response. This
-    can be useful for verifying that the application is running correctly within the
-    Kubernetes cluster.'
-  multi_line_details: "\n\n# Execute a command in a container in a pod of the specified\
-    \ statefulset \n# Context and namespace are arguments necessary in utilizing the\
-    \ Kubernetes cluster\nkubectl exec statefulset/${STATEFULSET_NAME} \\\n--context=${CONTEXT}\
-    \ \\\n-n ${NAMESPACE} \\\n-- \\            # Runs the command after this on the\
-    \ pod/container\ncurl -s -o /dev/null \\      # This sends an http request (-s\
-    \ silent, -o output)\n-w \"%{http_code}\" \\          # This reads the http response.\n\
-    localhost:8080/login         # This is the target endpoint."
+    1. `kubectl exec`: This part of the command is used to execute a command inside
+    a specific pod.
+
+
+    2. `statefulset/${STATEFULSET_NAME}`: Replace `${STATEFULSET_NAME}` with the name
+    of the stateful set you want to execute the command in.
+
+
+    3. `--context=${CONTEXT}`: The `--context` flag is used to specify the context
+    of the Kubernetes cluster you want to execute the command in. Replace `${CONTEXT}`
+    with the desired context.
+
+
+    4. `-n ${NAMESPACE}`: This part of the command specifies the namespace in which
+    the stateful set is located. Replace `${NAMESPACE}` with the desired namespace.
+
+
+    5. `-- curl -s -o /dev/null -w "%{http_code}" localhost:8080/login`: This is the
+    actual command that will be executed inside the specified stateful set. It uses
+    the `curl` tool to send an HTTP request to `localhost:8080/login`, and then prints
+    out the HTTP response code.
+
+
+    In summary, this command allows you to execute a specific command inside a stateful
+    set in your Kubernetes cluster, specifying the context, namespace, and the specific
+    stateful set where you want to run the command.'
+  multi_line_details: "# Set the STATEFULSET_NAME, CONTEXT, and NAMESPACE variables\n\
+    STATEFULSET_NAME=\"example-statefulset\"\nCONTEXT=\"example-context\"\nNAMESPACE=\"\
+    example-namespace\"\n\n# Use kubectl to execute a command in a pod within a specified\
+    \ statefulset\n# Use the specified context to select the Kubernetes cluster\n\
+    # Execute the command in the specified namespace\n# The command is to make a curl\
+    \ request to localhost:8080/login and output only the HTTP status code\nkubectl\
+    \ exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE} --\
+    \ \\\n  curl -s -o /dev/null -w \"%{http_code}\" localhost:8080/login"
   name: query_the_jenkins_kubernetes_workload_http_endpoint
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -s localhost:8080/api/json?pretty=true --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}
   doc_links: '
 
-    - [Kubernetes: Kubectl Overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
+    - [Kubectl exec command reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
 
-    - [Kubectl Cheat Sheet]( https://kubernetes.io/docs/reference/kubectl/cheatsheet/#execing-into-running-pods){:target="_blank"}
+    - [Kubernetes StatefulSet documentation](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
 
-    - [Context, Namespace and Secrets in Kubernetes](https://medium.com/teknomuslim/context-namespace-and-secrets-in-kubernetes-e27b984fe299){:target="_blank"}
+    - [Kubernetes namespaces overview](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [StatefulSets in Kubernetes](https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/){:target="_blank"}'
-  explanation: '
+    - [Curl command manual](https://curl.se/docs/manpage.html){:target="_blank"}
+
+    - [Jenkins API documentation](https://www.jenkins.io/doc/book/using/remote-access-api/){:target="_blank"}'
+  explanation: 'This command is used to execute a command inside a pod in a stateful
+    set in Kubernetes. Let''s break it down step by step.
 
 
-    Kubectl exec is a command that lets you execute commands inside a running Kubernetes
-    pod. This command executes a curl command on a statefulset which has the name
-    ${STATEFULSET_NAME} in the namespace ${NAMESPACE}, using the kubernetes context
-    ${CONTEXT}. The curl command is aimed at localhost on port 8080. It sends user
-    credentials to authenticate - these credentials are stored as environment variables
-    with the keys JENKINS_SA_USERNAME and JENKINS_SA_TOKEN. The parameter pretty=true
-    makes sure the response is formatted for easier reading.'
-  multi_line_details: "\n\n#Execute a command against a statefulset resource in the\
-    \ specified context and namespace \nkubectl exec \\\n    statefulset/${STATEFULSET_NAME}\
-    \ \\ #Specifying the target resource name \n    --context=${CONTEXT} \\ #Name\
-    \ of the current context\n    -n ${NAMESPACE} \\ #Specifying the desired namespace\n\
-    \    -- curl -s localhost:8080/api/json?pretty=true \\ #Specifying command to\
-    \ execute against the target resource  \n    --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}\
-    \ \\ #Specifying username and token as authentication credentials    \n    #No\
-    \ need for any further options as curl command will be executed against our target\
-    \ resource"
+    1. `kubectl exec`: This is the command to execute a command in a container.
+
+    2. `statefulset/${STATEFULSET_NAME}`: This specifies the name of the stateful
+    set where the pod is located. You will need to replace `${STATEFULSET_NAME}` with
+    the actual name of the stateful set.
+
+    3. `--context=${CONTEXT}`: This specifies the cluster context to use. You will
+    need to replace `${CONTEXT}` with the actual context name.
+
+    4. `-n ${NAMESPACE}`: This specifies the namespace where the stateful set is located.
+    You will need to replace `${NAMESPACE}` with the actual namespace.
+
+    5. `--`: This marks the end of the flags and the beginning of the command to be
+    executed inside the pod.
+
+    6. `curl -s localhost:8080/api/json?pretty=true`: This is the command that will
+    be executed inside the container. In this case, it is using the `curl` command
+    to make an HTTP request to `localhost:8080/api/json?pretty=true`.
+
+    7. `--user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}`: This specifies
+    the username and password for basic authentication. You will need to replace `${JENKINS_SA_USERNAME.key}`
+    and `$${JENKINS_SA_TOKEN.key}` with the actual username and token values.
+
+
+    In summary, this command allows you to run a `curl` command inside a specific
+    pod in a stateful set in a specific namespace in your Kubernetes cluster, and
+    it includes basic authentication credentials for accessing the API.'
+  multi_line_details: '# Setting the namespace where the statefulset is running
+
+    kubectl config set-context --current --namespace=${NAMESPACE}
+
+
+    # Executing a command inside a pod within the specified StatefulSet
+
+    kubectl exec statefulset/${STATEFULSET_NAME} \
+
+    --context=${CONTEXT} \
+
+    -n ${NAMESPACE} \
+
+    -- curl -s localhost:8080/api/json?pretty=true \
+
+    --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}'
   name: query_the_jenkins_kubernetes_workload_http_endpoint
 - command: 'kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -s localhost:8080/queue/api/json --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}
@@ -64,32 +119,42 @@ commands:
     + .why + "\nBlocked: " + (.blocked|tostring) + "\nStuck: " + (.stuck|tostring)'''
   doc_links: '
 
-    - [Learn how to use the kubectl exec command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
+    - [kubectl exec command documentation](https://kubernetes.io/docs/reference/kubectl/cheatsheet/#kubectl-context-and-configuration){:target="_blank"}
 
-    - [Understand more about statefulsets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
+    - [JSON processing with jq documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}
 
-    - [Gain an understanding of contexts in Kubernetes](https://kubernetes.io/docs/tasks/access-application-cluster/authenticate-across-clusters-kubeconfig/){:target="_blank"}
-
-    - [Check out the curl documentation](https://curl.haxx.se/docs/){:target="_blank"}
-
-    - [Get friendly with jq](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: "\n\nThis command is used to identify the cause of stuck or blocked\
-    \ jobs in a Jenkins instance. The command calls the Jenkins API and filters out\
-    \ stuck and/or blocked jobs, displaying the related \"why\" value as well as their\
-    \ respective statuses - blocked and/or stuck. \n\nThe command consists of several\
-    \ parts. The kubectl exec component enables the execution of a command within\
-    \ the StatefulSet, identified by its name (${STATEFULSET_NAME}). The --context\
-    \ flag specifies the Kubernetes context for the command's execution and the -n\
-    \ ${NAMESPACE} flag defines the namespace. After that, the command itself comes\
-    \ into play. It uses the curl utility, which connects to the Jenkins API at port\
-    \ 8080 on localhost and uses the ${JENKINS_SA_USERNAME.key} and ${JENKINS_SA_TOKEN.key}\
-    \ environment variables as credentials. Next, the output (in JSON format) is piped\
-    \ through jq - a command-line tool used to filter and parse JSON data - to select\
-    \ only what we need - stuck or blocked jobs and their why values."
-  multi_line_details: "\n\n# Execute a curl command against the api of the specified\
-    \ statefulset to retrieve stuck and blocked tasks\nkubectl exec \\\n  statefulset/${STATEFULSET_NAME}\
-    \ \\\n  --context=${CONTEXT} \\\n  -n ${NAMESPACE} \\\n  -- curl -s localhost:8080/queue/api/json\
-    \ \\\n  --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key} \\\n| jq -r\
+    - [Using curl command](https://curl.se/docs/manpage.html){:target="_blank"}'
+  explanation: "This command is used to execute a command within a specific stateful\
+    \ set in Kubernetes. \n\nHere's what each part of the command is doing:\n\n- `kubectl\
+    \ exec statefulset/${STATEFULSET_NAME}`: This part tells Kubernetes to run the\
+    \ command on a specific stateful set, where `${STATEFULSET_NAME}` is the name\
+    \ of the stateful set you want to operate on.\n\n- `--context=${CONTEXT}`: This\
+    \ specifies the context in which you want to run the command. The context determines\
+    \ which cluster and namespace the command will be executed in.\n\n- `-n ${NAMESPACE}`:\
+    \ This specifies the namespace in which you want to run the command. Namespaces\
+    \ are a way to divide cluster resources between multiple users.\n\n- `-- curl\
+    \ -s localhost:8080/queue/api/json --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}`:\
+    \ This is the actual command being executed on the stateful set. It's using `curl`\
+    \ to make an HTTP request to `localhost:8080/queue/api/json`, and it's passing\
+    \ in credentials using the username and token stored in environment variables\
+    \ `$${JENKINS_SA_USERNAME.key}` and `$${JENKINS_SA_TOKEN.key}`.\n\n- `| jq -r\
     \ '.items[] | select((.stuck == true) or (.blocked == true)) | \"Why: \" + .why\
-    \ + \"\\nBlocked: \" + (.blocked|tostring) + \"\\nStuck: \" + (.stuck|tostring)'"
+    \ + \"\\nBlocked: \" + (.blocked|tostring) + \"\\nStuck: \" + (.stuck|tostring)'`:\
+    \ After the `curl` command is executed, the output is then piped into `jq`, a\
+    \ command-line tool for parsing JSON. In this case, it's filtering the JSON output\
+    \ to only include items where either the `stuck` or `blocked` fields are true,\
+    \ and then formatting the output to display the reason why, whether it's blocked,\
+    \ and whether it's stuck.\n\nAs an engineer, running this command would give you\
+    \ insight into any tasks that are experiencing issues within the specified stateful\
+    \ set in your Kubernetes cluster."
+  multi_line_details: "```bash\n# Set the context of the Kubernetes cluster you want\
+    \ to interact with\nkubectl config use-context ${CONTEXT}\n# Execute a command\
+    \ in a running container within a StatefulSet pod\nkubectl exec statefulset/${STATEFULSET_NAME}\
+    \ -n ${NAMESPACE} -- \\\n  # Use curl to make a request to the specified URL and\
+    \ pass Jenkins service account credentials for authentication\n  curl -s localhost:8080/queue/api/json\
+    \ --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key} | \\\n  # Use jq\
+    \ to parse the JSON response and filter out specific fields from the output\n\
+    \  jq -r '.items[] | select((.stuck == true) or (.blocked == true)) | \"Why: \"\
+    \ + .why + \"\\nBlocked: \" + (.blocked|tostring) + \"\\nStuck: \" + (.stuck|tostring)'\n\
+    ```"
   name: query_for_stuck_jenkins_jobs

@@ -3,74 +3,158 @@ commands:
     -n ${NAMESPACE}
   doc_links: '
 
-    - [Kubernetes Documentation for Kubectl Logs command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs){:target="_blank"}
+    - [kubectl logs command documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs){:target="_blank"}
 
-    - [Kubernetes Documentation for Daemonsets](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/){:target="_blank"}
+    - [DaemonSet in Kubernetes](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/){:target="_blank"}
 
-    - [Kubernetes Documentation for Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}'
-  explanation: '
+    - [Kubernetes Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}
+
+    - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}'
+  explanation: 'Sure! This command is used to view the logs for a specific daemon
+    set (a type of workload in Kubernetes that ensures that a specific set of pods
+    is running on each node in a cluster). Let me break down the command for you:
 
 
-    This command will display the logs from a daemonset with a given name, for the
-    specified context in the given namespace. A daemonset is a Kubernetes object which
-    helps to configure and manage pods as a group. The `kubectl logs` command allows
-    you to view the logs of static activities within the pod in order to monitor their
-    output and identify any errors. The `--tail=100` option ensures that only the
-    last 100 lines of the log are displayed, allowing for quicker analysis of recent
-    activity. The `--context` and `-n` flags determine the proper context and namespace
-    in which you wish to view the logs. '
-  multi_line_details: "\n\n# This command retrieves the logs of a given DaemonSet\
-    \ within the provided namespace.\n# The context parameter is used to determine\
-    \ which cluster should be used.\n\n# Step 1: Specify cluster context\nkubectl\
-    \ config use-context ${CONTEXT}\n\n# Step 2: Retrieve logs from the specified\
-    \ DaemonSet\nkubectl logs --tail=100 \\\n    daemonset/${DAEMONSET_NAME} \\\n\
-    \    -n ${NAMESPACE}"
+    - `kubectl logs`: This is the command-line tool used to interact with the Kubernetes
+    cluster.
+
+    - `--tail=100`: This option specifies that we want to see the last 100 lines of
+    the logs. You can adjust this number based on how much log output you want to
+    see.
+
+    - `daemonset/${DAEMONSET_NAME}`: This part of the command specifies the name of
+    the daemon set whose logs you want to view. You would replace `${DAEMONSET_NAME}`
+    with the actual name of the daemon set you''re interested in.
+
+    - `--context ${CONTEXT}`: This option specifies which Kubernetes context you want
+    to use. A context is a group of access parameters, including a cluster, user,
+    and namespace. You would replace `${CONTEXT}` with the name of the context you
+    want to use.
+
+    - `-n ${NAMESPACE}`: This option specifies the namespace in which the daemon set
+    is running. A namespace is a way to divide cluster resources between multiple
+    users. You would replace `${NAMESPACE}` with the name of the namespace where the
+    daemon set is deployed.
+
+
+    So, when you run this command, Kubernetes will retrieve the logs of the specified
+    daemon set from the specified namespace and display the last 100 lines of those
+    logs. It''s a useful way to troubleshoot any issues or monitor the behavior of
+    your daemon set.'
+  multi_line_details: '# This command retrieves the last 100 log lines from a specific
+    daemonset in a specified namespace and context
+
+
+    # Set the context for the command to run in a specific Kubernetes cluster
+
+    kubectl config use-context ${CONTEXT}
+
+
+    # Retrieve the last 100 logs from the specified daemonset within the specified
+    namespace
+
+    kubectl logs --tail=100 daemonset/${DAEMONSET_NAME} -n ${NAMESPACE}'
   name: get_daemonset_log_details_for_report
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "${DAEMONSET_NAME}" || true
   doc_links: '
 
-    - [Kubernetes Documentation for kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+    - [kubectl get events](https://kubernetes.io/docs/reference/kubectl/cheatsheet/#kubectl-get){:target="_blank"}
 
-    - [Kubernetes Documentation for field selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/){:target="_blank"}'
-  explanation: '
+    - [--field-selector type=Warning](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/){:target="_blank"}
+
+    - [--context](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/){:target="_blank"}
+
+    - [-n ${NAMESPACE}](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+
+    - [grep](https://www.gnu.org/software/grep/manual/grep.html){:target="_blank"}
+
+    - [|| true](https://www.gnu.org/software/bash/manual/html_node/Lists.html){:target="_blank"}'
+  explanation: 'This command is used to view events in a Kubernetes cluster that are
+    of the type "Warning" using the "kubectl" command line tool. Here''s what each
+    part of the command does:
 
 
-    This command (kubectl) will GET all the events related to a particular context,
-    namespace, and DaemonSet name. It will show any Warning type events existing for
-    that particular combination of context, namespace, and DaemonSet name and will
-    return true even if there are no Warning type events for the combination specified.'
-  multi_line_details: "\n\n#This command is intended to display warnings generated\
-    \ in Kubernetes nodes related to a given DaemonSet. \n#In order for this to work\
-    \ properly, you must first set the variables CONTEXT and NAMESPACE beforehand.\n\
-    \nCONTEXT=\"$CONTEXT\"\nNAMESPACE=\"$NAMESPACE\"\nDAEMONSET_NAME=\"$DAEMONSET_NAME\"\
-    \n\n#Get all events from the given context and namespace, selecting only those\
-    \ with type=Warning\nkubectl get events \\\n    --field-selector type=Warning\
-    \ \\\n    --context ${CONTEXT} \\\n    -n ${NAMESPACE} \n\n#Filter the returned\
-    \ results by searching for the name of the DaemonSet \n#We use '|| -- just in\
-    \ case nothing is found, it will return true so that the command does not fail.\n\
-    | grep -i \"${DAEMONSET_NAME}\" || true"
+    - "kubectl": This is the command line tool for interacting with Kubernetes clusters.
+
+
+    - "get events": This part of the command retrieves events from the cluster.
+
+
+    - "--field-selector type=Warning": This flag filters the events to only show those
+    of the type "Warning".
+
+
+    - "--context ${CONTEXT}": This specifies the context or the specific cluster you
+    want to interact with. In this case, you will replace `${CONTEXT}` with the name
+    of your specific cluster.
+
+
+    - "-n ${NAMESPACE}": This flag specifies the namespace within the cluster where
+    you want to retrieve events. You will replace `${NAMESPACE}` with the name of
+    the namespace you want to work with.
+
+
+    - "| grep -i "${DAEMONSET_NAME}" || true": This part of the command uses the "grep"
+    command to search for a specific term (${DAEMONSET_NAME}) within the events. If
+    the term is found, it will display the corresponding event. The `|| true` part
+    makes sure that the command returns a successful exit code even if there are no
+    matching events.
+
+
+    In summary, this command fetches warning events from a specific namespace in a
+    specified Kubernetes cluster and then searches for a specific term within those
+    events. This can help you monitor potential issues or problems within your cluster.'
+  multi_line_details: "```bash\n# Get events from a specific namespace using the Kubernetes\
+    \ context\n# The --field-selector is used to filter out events of type Warning\
+    \ only\n# We are also using the -n flag to specify the namespace and grep to filter\
+    \ out events related to a specific daemonset\n\nkubectl get events \\\n  --field-selector\
+    \ type=Warning \\\n  --context ${CONTEXT} \\\n  -n ${NAMESPACE} \\\n  | grep -i\
+    \ \"${DAEMONSET_NAME}\" || true\n```"
   name: get_related_daemonset_events
 - command: kubectl describe daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
   doc_links: '
 
-    - [GitHub kubernetes/community - Kubernetes documentation and website repo](https://github.com/kubernetes/website){:target="_blank"}'
-  explanation: "\n\nThe command kubectl describe daemonset/${DAEMONSET_NAME} --context\
-    \ ${CONTEXT} -n ${NAMESPACE} is used to view detailed information about the specified\
-    \ daemonset. A daemonset is a Kubernetes object that ensures that all nodes in\
-    \ the cluster are running a copy of a particular pod. The detailed information\
-    \ includes status, uptime, as well as the number of pods currently running and\
-    \ available for deployment on each node in the cluster. By specifying the context,\
-    \ namespace, and the daemonset\u2019s name, the command will only show information\
-    \ about the given daemonset. This is useful for troubleshooting or managing deployments\
-    \ by getting detailed information about the specified daemonset."
-  multi_line_details: "\n\n# This command describes the supplied daemon set, retrieves\
-    \ information about its spec and status, as defined in the Kubernetes API.\n#\
-    \ It must be issued from a command line shell with the necessary permissions to\
-    \ access the Kubernetes API.\nkubectl \\\n    # Invoke the kubectl command\n \
-    \   describe \\\n    # Request descriptive info \n    daemonset/${DAEMONSET_NAME}\
-    \ \\\n    # Provided as an argument is the name of the daemon set\n    --context\
-    \ ${CONTEXT} \\\n    # An optional flag providing additional context that allows\
-    \ integration with other tools\n    -n ${NAMESPACE} \\\n    # The namespace in\
-    \ which to search for the requested object (e.g., daemonset)"
+    - [Kubectl Describe Command Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#describe){:target="_blank"}
+
+    - [DaemonSet Documentation](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/){:target="_blank"}
+
+    - [Kubectl Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}'
+  explanation: 'This command is used to get detailed information about a DaemonSet
+    in Kubernetes. A DaemonSet ensures that all (or some) nodes run a copy of a specific
+    pod. This is similar to deployments, but it''s more suitable for system daemons
+    (like log collectors or monitoring agents) rather than user-facing applications.
+
+
+    Let me explain the individual parts of this command:
+
+    - `kubectl` is the command-line tool used to interact with Kubernetes clusters.
+
+    - `describe` is the specific command we''re using to get detailed information
+    about an object in Kubernetes. In this case, we want to describe a DaemonSet.
+
+    - `${DAEMONSET_NAME}` is a placeholder for the name of the DaemonSet you want
+    to describe. You would replace this with the actual name of the DaemonSet you''re
+    interested in.
+
+    - `--context ${CONTEXT}` specifies the context (or cluster) within your Kubernetes
+    configuration that you want to use. If you manage multiple clusters, this allows
+    you to specify which one you are targeting.
+
+    - `-n ${NAMESPACE}` specifies the namespace where the DaemonSet is located. Namespaces
+    are a way to divide cluster resources between multiple users (via resource quota).
+
+
+    So, if you were to run this command, you would replace `${DAEMONSET_NAME}` with
+    the actual name of the DaemonSet you want to describe, and `${CONTEXT}` and `${NAMESPACE}`
+    with the appropriate values for your environment. This will then provide you with
+    detailed information about the specified DaemonSet, such as its current status,
+    events, and configuration details.'
+  multi_line_details: "# Step 1: Get the details and configuration of a specific DaemonSet\n\
+    # Step 2: Use the kubectl command to describe the DaemonSet with name specified\
+    \ in the environment variable ${DAEMONSET_NAME}\n# Step 3: Specify the Kubernetes\
+    \ context to be used for the command using the value stored in the environment\
+    \ variable ${CONTEXT}\n# Step 4: Provide the namespace where the DaemonSet is\
+    \ located using the value stored in the environment variable ${NAMESPACE}\n\n\
+    kubectl describe daemonset/${DAEMONSET_NAME} \n  --context ${CONTEXT} \n  -n ${NAMESPACE}"
   name: check_daemonset_replicas

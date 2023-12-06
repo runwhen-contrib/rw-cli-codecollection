@@ -8,58 +8,64 @@ commands:
     + .status.notAfter'
   doc_links: '
 
-    - [Kubectl reference page](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
-
-    - [Cert-manager reference page](https://docs.cert-manager.io/en/latest/){:target="_blank"}
-
-    - [date command reference page](https://linux.die.net/man/1/date){:target="_blank"}
-
-    - [jq reference page](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: '
+    '
+  explanation: 'This command is used to retrieve information about certificates managed
+    by cert-manager in a Kubernetes cluster. Let me break it down for you:
 
 
-    This command uses the kubectl command line tool to list all of the certificates
-    in the given context and namespace. It then filters these certificates to only
-    include those with a status of "Ready" and that will expire before a given date.
-    Once it has filtered the certificates, it will print out their details including
-    the namespace they reside in, the domain name(s), when they will need to be renewed,
-    and when they will expire.'
-  multi_line_details: '
+    - `kubectl`: This is the command-line tool used to interact with Kubernetes clusters.
 
 
-    # This command is used to list cert-manager certificates (i.e., certificates requested
-    and managed using cert-manager) in a Kubernetes cluster.
-
-    # The --context option sets the specific cluster context that will be used to
-    list the certificates
-
-    CONTEXT="${CONTEXT}"
+    - `get certificates.cert-manager.io`: This part of the command tells kubectl to
+    retrieve information about resources of type `certificates.cert-manager.io` from
+    the Kubernetes cluster.
 
 
-    # The -n option sets the namespace in which the certificate are being requested
-
-    NAMESPACE="${NAMESPACE}"
-
-
-    # Get all the Certificates in JSON format from the specified namespace
-
-    CERTIFICATES_JSON=$(kubectl get certificates.cert-manager.io --context=${CONTEXT}
-    -n ${NAMESPACE} -ojson)
+    - `--context=${CONTEXT}`: This flag specifies the context (or the cluster) within
+    the kubeconfig file that the command should be executed against. The `${CONTEXT}`
+    variable needs to be replaced with the actual name of the context/cluster.
 
 
-    # Use jq to filter the output and select the right values for our needs
-
-    RESULT=$(echo "${CERTIFICATES_JSON}" | jq -r --arg now "$(date +%Y-%m-%dT%H:%M:%SZ)"
-    ''.items[] | select(.status.conditions[] | select(.type == "Ready" and .status
-    == "True")) | select(.status.renewalTime) | select((.status.notAfter | strptime("%Y-%m-%dT%H:%M:%SZ")
-    | mktime) <= ($now | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime)) | "Namespace:"
-    + .metadata.namespace + " URL:" + .spec.dnsNames[0] + " Renews:" + .status.renewalTime
-    + " Expires:" + .status.notAfter'')
+    - `-n ${NAMESPACE}`: This flag specifies the namespace within the Kubernetes cluster
+    from which the certificates should be retrieved. The `${NAMESPACE}` variable needs
+    to be replaced with the actual name of the namespace.
 
 
-    # Echo the final result
+    - `-ojson | jq -r --arg now "$(date +%Y-%m-%dT%H:%M:%SZ)" ''.items[] | select(.status.conditions[]
+    | select(.type == "Ready" and .status == "True")) | select(.status.renewalTime)
+    | select((.status.notAfter | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime) <= ($now
+    | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime)) | "Namespace:" + .metadata.namespace
+    + " URL:" + .spec.dnsNames[0] + " Renews:" + .status.renewalTime + " Expires:"
+    + .status.notAfter''`: This part of the command processes the retrieved JSON data
+    using the `jq` command-line JSON processor. It filters the certificates based
+    on their readiness, renewal time, and expiration time, and then formats the output
+    to display relevant information such as namespace, URL, renewal time, and expiration
+    time for each certificate.
 
-    echo "${RESULT}"'
+
+    In summary, this command is used to fetch and filter certificate information managed
+    by cert-manager in a Kubernetes cluster and format the output for easy consumption.'
+  multi_line_details: "```bash\n# Set the context for the kubectl command to a specific\
+    \ Kubernetes cluster\nCONTEXT=my-cluster-context\n\n# Set the namespace where\
+    \ the certificates are located\nNAMESPACE=my-namespace\n\n# Get the list of certificates\
+    \ from cert-manager in the specified namespace and format the output as JSON\n\
+    kubectl get certificates.cert-manager.io --context=${CONTEXT} -n ${NAMESPACE}\
+    \ -ojson \\\n    | jq -r --arg now \"$(date +%Y-%m-%dT%H:%M:%SZ)\" '.items[] \n\
+    \    | select(.status.conditions[] | select(.type == \"Ready\" and .status ==\
+    \ \"True\")) \n    | select(.status.renewalTime) \n    | select((.status.notAfter\
+    \ | strptime(\"%Y-%m-%dT%H:%M:%SZ\") | mktime) <= ($now | strptime(\"%Y-%m-%dT%H:%M:%SZ\"\
+    ) | mktime)) \n    | \"Namespace:\" + .metadata.namespace + \" URL:\" + .spec.dnsNames[0]\
+    \ + \" Renews:\" + .status.renewalTime + \" Expires:\" + .status.notAfter'\n```\n\
+    \nThis multi-line command provides a detailed breakdown of each step:\n\n1. Setting\
+    \ the `CONTEXT` variable to specify the Kubernetes cluster context.\n2. Setting\
+    \ the `NAMESPACE` variable to specify the namespace where the certificates are\
+    \ located.\n3. Using `kubectl` to get the list of certificates from cert-manager\
+    \ in the specified namespace and format the output as JSON.\n4. Piping the output\
+    \ to `jq` to filter and format the data based on certificate status, renewal time,\
+    \ expiration time, and namespace/URL information.\n\nBy using this multi-line\
+    \ command with verbose comments, it can help educate new users of Kubernetes and\
+    \ related CLI commands on how to interact with and query certificate information\
+    \ within a Kubernetes cluster."
   name: get_namespace_certificate_summary_for_namespace_namespace
 - command: 'kubectl get certificaterequests.cert-manager.io --context=${CONTEXT} -n
     ${NAMESPACE} -o json | jq -r ''.items[] | select(.status.conditions[] | select(.type
@@ -74,44 +80,59 @@ commands:
     \(.approvedMessage)\n------------"'''
   doc_links: '
 
-    - [Kubernetes Documentation for kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+    - [kubectl cert-manager.io documentation](https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client?tab=doc){:target="_blank"}
 
-    - [Kubernetes Documentation for Certificate Request](https://kubernetes.io/docs/tasks/tls/managing-tls-in-a-cluster/#create-a-certificate-signing-request-csr){:target="_blank"}
-
-    - [JSON description](https://www.json.org/){:target="_blank"}
-
-    - [jq website](https://stedolan.github.io/jq/){:target="_blank"}'
-  explanation: '
+    - [jq manual](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: 'This command is used to get information about certificate requests
+    in a Kubernetes cluster. Let me break it down for you.
 
 
-    This command is used to display all certificate requests associated with a specific
-    issuer in Kubernetes. It uses the kubectl command to get certificaterequests associated
-    with the context, namespace, and .json file, and then uses the jq tool to filter
-    those results according to precise criteria, such as type, status, and message
-    content. The output of the command will return detailed information about each
-    certificate request, including the name, associated certificate, issuer reference,
-    readiness and approval statuses, and any additional messages related to that status.'
-  multi_line_details: "\n\n# This command will print out a list of all CertificateRequests\
-    \ related to\n# Cert-Manager in the given context and namespace, as well as their\
-    \ associated\n# owners, issuers, and any statuses. \nkubectl get certificaterequests.cert-manager.io\
-    \ \\\n    --context=${CONTEXT} \\                 # The kubernetes context where\
-    \ this operation will happen\n    -n ${NAMESPACE} \\                      # The\
-    \ namespace within that context \n    -o json | jq -r '.items[] |            #\
-    \ Use the output from kubectl, pass it through jq \n                       select(.status.conditions[]\
-    \ | \n                              select(.type == \"Ready\" and .status != \"\
-    True\")) | \n                       {certRequest: .metadata.name, \n         \
-    \               certificate: (.metadata.ownerReferences[].name), \n          \
-    \              issuer: .spec.issuerRef.name, \n                        readyStatus:\
-    \ (.status.conditions[] | select(.type == \"Ready\")).status, \n             \
-    \           readyMessage: (.status.conditions[] | select(.type == \"Ready\")).message,\
-    \ \n                        approvedStatus: (.status.conditions[] | select(.type\
-    \ == \"Approved\")).status, \n                        approvedMessage: (.status.conditions[]\
-    \ | select(.type == \"Approved\")).message} |        # Extract relevant pieces\
-    \ of data\n                        \"\\nCertificateRequest: \\(.certRequest)\"\
-    , \n                        \"Certificate: \\(.certificate)\", \n            \
-    \            \"Issuer: \\(.issuer)\", \n                        \"Ready Status:\
-    \ \\(.readyStatus)\", \n                        \"Ready Message: \\(.readyMessage)\"\
-    , \n                        \"Approved Status: \\(.approvedStatus)\", \n     \
-    \                   \"Approved Message: \\(.approvedMessage)\\n------------\"\
-    ' # Output the data \n                        # in a human readable format"
+    - `kubectl`: This is the command-line tool used to interact with the Kubernetes
+    API.
+
+    - `get certificaterequests.cert-manager.io`: This part of the command tells Kubernetes
+    to retrieve information about certificate requests managed by cert-manager.io.
+
+    - `--context=${CONTEXT}`: This flag specifies the context for the operation, which
+    includes details about the cluster, user, and namespace to use for the request.
+
+    - `-n ${NAMESPACE}`: This flag specifies the namespace in which to perform the
+    operation. The namespace is a way to partition resources within a cluster.
+
+    - `-o json`: This flag tells Kubernetes to output the results in JSON format for
+    further processing.
+
+    - `| jq -r ''...'': After retrieving the information, this part of the command
+    pipes the JSON output to `jq`, a command-line JSON processor, to filter and format
+    the data for easier understanding.
+
+
+    The rest of the command inside the `jq` expression is a series of filters and
+    transformations applied to the JSON data retrieved from the Kubernetes API. It
+    selects specific fields from the certificate request objects, such as name, owner,
+    issuer reference, ready status, message, approved status, and message. Finally,
+    it formats this information into a human-readable output with new lines and separators.
+
+
+    In summary, this command is a powerful way to fetch and process information about
+    certificate requests in a Kubernetes cluster, especially when managing and troubleshooting
+    resources daily as an engineer. It allows you to gain insights into the readiness
+    and approval status of the certificate requests.'
+  multi_line_details: "```bash\n# Set the context and namespace to be used for the\
+    \ kubectl command\nCONTEXT=my-context\nNAMESPACE=my-namespace\n\n# Retrieve the\
+    \ certificate requests using cert-manager and output in JSON format\nkubectl get\
+    \ certificaterequests.cert-manager.io --context=${CONTEXT} -n ${NAMESPACE} -o\
+    \ json \\\n\n# Pipe the output to jq to filter and format the JSON data\n| jq\
+    \ -r '.items[] | select(.status.conditions[] | select(.type == \"Ready\" and .status\
+    \ != \"True\")) |\n\n# Select specific fields from the JSON data and format into\
+    \ a human-readable output\n{certRequest: .metadata.name, certificate: (.metadata.ownerReferences[].name),\
+    \ issuer: .spec.issuerRef.name,\n readyStatus: (.status.conditions[] | select(.type\
+    \ == \"Ready\")).status,\n readyMessage: (.status.conditions[] | select(.type\
+    \ == \"Ready\")).message,\n approvedStatus: (.status.conditions[] | select(.type\
+    \ == \"Approved\")).status,\n approvedMessage: (.status.conditions[] | select(.type\
+    \ == \"Approved\")).message} |\n\n# Format the selected fields into a readable\
+    \ output with line breaks\n\"\\nCertificateRequest: \\(.certRequest)\", \"Certificate:\
+    \ \\(.certificate)\", \"Issuer: \\(.issuer)\",\n \"Ready Status: \\(.readyStatus)\"\
+    , \"Ready Message: \\(.readyMessage)\",\n \"Approved Status: \\(.approvedStatus)\"\
+    , \"Approved Message: \\(.approvedMessage)\\n------------\"'\n```"
   name: find_failed_certificate_requests_and_identify_issues_for_namespace_namespace

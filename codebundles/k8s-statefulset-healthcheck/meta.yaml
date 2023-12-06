@@ -3,97 +3,177 @@ commands:
     -n ${NAMESPACE}
   doc_links: '
 
-    - [Kubernetes Documentation for kubectl logs](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs){:target="_blank"}
+    - [Kubectl Logs Overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs){:target="_blank"}
 
-    - [Kubernetes Documentation for StatefulSets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
+    - [Kubectl StatefulSet Documentation](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
 
-    - [Kubernetes Documentation for Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
+    - [Kubectl Contexts Documentation](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}
 
-    - [Kubernetes Documentation for Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}'
-  explanation: '
+    - [Kubernetes Namespaces Overview](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}'
+  explanation: 'This command is used to view the logs of a specific StatefulSet within
+    a Kubernetes cluster. A StatefulSet is a workload API object in Kubernetes that
+    is similar to a Deployment but is intended for stateful applications.
 
 
-    This command allows you to view the logs of a particular stateful set in a Kubernetes
-    cluster. The ''statefulset'' command identifies which stateful set whose logs
-    we''re viewing, and ''tail=100'' means that we will only view the last 100 lines
-    of logs. ''context'' specifies which context we want to view within the cluster,
-    and ''namespace'' specifies which namespace we''ll look at. By providing this
-    information, we can view the most recent log entries for the specified stateful
-    set.'
-  multi_line_details: "\n\n# Command to examine logs of a StatefulSet named ${STATEFULSET_NAME}\
-    \ in namespace ${NAMESPACE} with Kubernetes context set to ${CONTEXT}.   \n# This\
-    \ will display the last 100 lines of the log output.\nkubectl \\\n  logs \\  \
-    \ # Invoking Kubernetes CLI command `logs`\n  --tail=100 \\   # Limiting line\
-    \ output from the logs to the last 100\n  statefulset/${STATEFULSET_NAME} \\ \
-    \ # Targeting the specified StatefulSet by name\n  --context ${CONTEXT} \\  #\
-    \ Setting the context value (e.g., acme-cluster)\n  -n ${NAMESPACE}  # Setting\
-    \ the namespace value (e.g., AcmeCorpInc)"
+    Here''s a breakdown of the command:
+
+
+    - `kubectl logs`: This is the main part of the command and is used to retrieve
+    the logs of a specific pod or set of pods.
+
+    - `--tail=100`: This option specifies that you only want to see the last 100 lines
+    of the logs. You can change the number to see more or fewer lines.
+
+    - `statefulset/${STATEFULSET_NAME}`: This part of the command specifies the StatefulSet
+    for which you want to view the logs. You would replace `${STATEFULSET_NAME}` with
+    the actual name of the StatefulSet you are interested in.
+
+    - `--context ${CONTEXT}`: This flag allows you to specify the context, which is
+    a group of access parameters that describe a particular Kubernetes cluster, including
+    user information, cluster details, and more. Replace `${CONTEXT}` with the name
+    of the context you want to use.
+
+    - `-n ${NAMESPACE}`: This flag specifies the namespace in which the StatefulSet
+    is located. Replace `${NAMESPACE}` with the name of the namespace where the StatefulSet
+    is running.
+
+
+    So, when you run this command, it will show you the logs of the specified StatefulSet
+    within the chosen context and namespace, with the option to limit the number of
+    lines displayed.'
+  multi_line_details: "# Obtain the logs from a StatefulSet in a specific namespace\
+    \ using the specified context\nkubectl logs --tail=100  # Display the last 100\
+    \ lines of logs  \nstatefulset/${STATEFULSET_NAME}  # Specify the StatefulSet\
+    \ name as part of the command\n--context ${CONTEXT}  # Specify the Kubernetes\
+    \ context to use for this operation\n-n ${NAMESPACE}  # Specify the namespace\
+    \ where the StatefulSet is located"
   name: fetch_statefulset_statefulset_name_logs
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "${STATEFULSET_NAME}" || true
   doc_links: '
 
-    - [Kubectl Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+    - [kubectl get events command documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events){:target="_blank"}
 
-    - [Get Events Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events){:target="_blank"}
+    - [Kubectl field selector documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/){:target="_blank"}
 
-    - [Field Selectors Documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/){:target="_blank"}
+    - [Kubectl context documentation](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}
 
-    - [Context Concept Documentation](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
+    - [Kubectl namespaces documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [Grep Utility Manual](https://www.gnu.org/software/grep/manual/grep.html){:target="_blank"}'
-  explanation: '
+    - [Grep command in Linux documentation](https://www.geeksforgeeks.org/grep-command-in-unixlinux/){:target="_blank"}'
+  explanation: 'Sure! Let me break down this command for you as a new Kubernetes user.
 
 
-    This command is used to view Kubernetes events that have the type of ''Warning''
-    in the specific context and namespace provided. It will then filter the results
-    to include only those related to a named StatefulSet. The "|| true" at the end
-    ensures that the command does not fail if there are no matching results returned.'
-  multi_line_details: " \n# Retrieve any events in the Kubernetes cluster based on\
-    \ a specified context and namespace that have a type of warning \n# Context, namespace\
-    \ and stateful set name are passed into the command as environment variables \n\
-    kubectl \\\n    # Begin 'kubectl' command to interact with the Kubernetes API\n\
-    \    get \\\n    # Command to retrieve resources\n    events \\\n    # Resource\
-    \ to retrieve\n    --field-selector type=Warning \\\n    # Specify the type of\
-    \ events we want to retrieve should be warning\n    --context ${CONTEXT} \\\n\
-    \    # Specify the context of which the Kubernetes cluster this command is intended\
-    \ for. Passsed in as an environment variable \n    -n ${NAMESPACE} \\\n    # Specify\
-    \ the namespace within the Kubernetes cluster that the command will be running\
-    \ in. Passed in as an environment variable\n    | \\\n    # Use a pipe to get\
-    \ the input of one command (kubectl) as the output for another (grep)\n    grep\
-    \ \\\n    # Command to search through text\n    -i \"${STATEFULSET_NAME}\" \\\n\
-    \    # Search the returned event messages for occurrences of the specifed stateful\
-    \ set name. Passed in as an environment variable\n    || true\n    # Execute the\
-    \ command with a non-zero exit code regardless of the result. This is helpful\
-    \ when nested commands are being used (e.g., 0 exit code prevents further logic\
-    \ in the multi-line command from being excuted"
+    1. `kubectl`: This is the command-line tool for interacting with the Kubernetes
+    API server.
+
+
+    2. `get events`: This part of the command tells Kubernetes to fetch all the events
+    that have occurred within the cluster.
+
+
+    3. `--field-selector type=Warning`: With this field selector option, we are telling
+    Kubernetes to only return events of type "Warning". This helps filter and narrow
+    down the events we want to see.
+
+
+    4. `--context ${CONTEXT}`: The `--context` flag is used to specify the context
+    (or configuration) to use for interacting with the Kubernetes cluster. The `${CONTEXT}`
+    variable should be replaced with the actual context name you want to use.
+
+
+    5. `-n ${NAMESPACE}`: The `-n` flag is used to specify the namespace in which
+    to execute the command. The `${NAMESPACE}` variable should be replaced with the
+    actual namespace name you want to use.
+
+
+    6. `| grep -i "${STATEFULSET_NAME}" || true`: After fetching the events, we use
+    the `grep` command to search for a specific string (in this case, the value of
+    the `${STATEFULSET_NAME}` variable) within the events. The `-i` flag makes the
+    search case-insensitive. The `|| true` at the end ensures that the command will
+    return a success status even if the `grep` doesn''t find a match, preventing it
+    from failing the entire pipeline.
+
+
+    In summary, this command is used to retrieve Warning events related to a specific
+    StatefulSet within a specified namespace and context in a Kubernetes cluster.
+    It''s a helpful way to monitor and troubleshoot potential issues or warnings related
+    to the StatefulSet resources.'
+  multi_line_details: '```bash
+
+    # Get events for a specific context and namespace in Kubernetes
+
+    echo "Getting events for the ${CONTEXT} context and ${NAMESPACE} namespace"
+
+
+    # Use kubectl to get all events with type Warning
+
+    events=$(kubectl get events --field-selector type=Warning --context ${CONTEXT}
+    -n ${NAMESPACE})
+
+
+    # Use grep to filter events related to a specific statefulset name
+
+    filtered_events=$(echo "${events}" | grep -i "${STATEFULSET_NAME}")
+
+
+    # Print the filtered events or ignore errors if no events are found
+
+    echo "${filtered_events}" || true
+
+    ```'
   name: get_related_statefulset_statefulset_name_events
 - command: kubectl get statefulset ${LABELS} --context=${CONTEXT} -n ${NAMESPACE}
     -o yaml
   doc_links: '
 
-    - [Kubernetes docs - how to use kubectl in the command line](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+    - [kubectl get statefulset](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
-    - [Kubernetes docs - StatefulSets concepts and usage](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#why-use-a-statefulset){:target="_blank"}'
-  explanation: '
+    - [${LABELS}](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
+
+    - [--context=${CONTEXT}](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/){:target="_blank"}
+
+    - [-n ${NAMESPACE}](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+
+    - [-o yaml](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}'
+  explanation: "This command is used to retrieve information about a StatefulSet in\
+    \ a Kubernetes cluster. A StatefulSet is a controller that manages a set of closely\
+    \ related, stateful pods. \n\nHere's what each part of the command does:\n- `kubectl`:\
+    \ This is the command line tool for interacting with Kubernetes clusters.\n- `get\
+    \ statefulset`: This part of the command specifies that we want to retrieve information\
+    \ about a specific StatefulSet.\n- `${LABELS}`: This is where you would specify\
+    \ any labels that the StatefulSet might have. Labels are key-value pairs that\
+    \ can be attached to Kubernetes objects like StatefulSets for the purpose of identifying\
+    \ and grouping them.\n- `--context=${CONTEXT}`: This specifies the context or\
+    \ cluster you want to use. In a multi-cluster setup, this allows you to specify\
+    \ which cluster you want to interact with.\n- `-n ${NAMESPACE}`: This specifies\
+    \ the namespace in which the StatefulSet is located. Namespaces are used to organize\
+    \ and divide cluster resources.\n- `-o yaml`: This specifies the output format.\
+    \ In this case, it specifies that the information should be returned in YAML format,\
+    \ which is a human-readable serialization format.\n\nSo, when you run this command,\
+    \ it will retrieve information about the specified StatefulSet, based on the provided\
+    \ labels, within the specified namespace and cluster context, and return the information\
+    \ in YAML format. This can be useful for getting detailed information about a\
+    \ specific StatefulSet for troubleshooting or debugging purposes."
+  multi_line_details: '# Step 1: Retrieve the statefulset with specified labels
+
+    statefulset_labels="${LABELS}"
 
 
-    This command is used to get information about a StatefulSet object in Kubernetes.
-    A StatefulSet is used to manage the deployment and scaling of stateful applications.
-    The command uses several options to specify which StatefulSet should be viewed:
-    labels (for labeling resources for easy searching), context (to select the cluster
-    to query info from), and namespace (to specify the Namespace/Project the StatefulSet
-    lives in). It also includes an -o option to output in YAML format, which will
-    return all the details associated with the selected StatefulSet.'
-  multi_line_details: "\n# This command allows you to retrieve a YAML representation\
-    \ of a given statefulset, which is part of a Kubernetes resource for deploying\
-    \ and managing containers that can persist data.\n# The multi-line command looks\
-    \ like this:\nkubectl \\\n    # Run the kubectl command \n    get \\\n    # Retrieve\
-    \ a given resource\n    statefulset \\\n    # Specify the type of resource to\
-    \ be retrieved \n    ${LABELS} \\\n    # Use provided labels to identify the resource\n\
-    \    --context=${CONTEXT} \\\n    # Command should use the specified context \n\
-    \    -n ${NAMESPACE} \\\n    # Target the provided namespace\n    -o yaml \n \
-    \   # Represent information in a YAML format"
+    # Step 2: Set the Kubernetes context for the command
+
+    kubectl_context="${CONTEXT}"
+
+
+    # Step 3: Specify the namespace for the statefulset
+
+    namespace="${NAMESPACE}"
+
+
+    # Step 4: Get the statefulset in YAML format with verbose output
+
+    kubectl get statefulset $statefulset_labels --context=$kubectl_context -n $namespace
+    -o yaml'
   name: fetch_statefulset_statefulset_name_manifest_details
 - command: 'kubectl get statefulset -n ${NAMESPACE} -o json --context ${CONTEXT} |
     jq -r ''.items[] | select(.status.availableReplicas < .status.replicas) | "---\nStatefulSet
@@ -101,25 +181,38 @@ commands:
     + "\nAvailable Replicas: " + (.status.availableReplicas|tostring)'''
   doc_links: '
 
-    - [What is a StatefulSet?](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
+    - [Kubernetes kubectl Reference Documentation](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
-    - [Managing Resources Using the JSONPath Expression Syntax](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}
-
-    - [jq Manual](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: "\n\nThis command will retrieve the information about a StatefulSet\
-    \ in the Kubernetes cluster, which is a way of managing resources as a unit for\
-    \ persistent applications. \nIt looks at the context and namespace associated\
-    \ with it and returns the StatefulSet name, desired replicas, and available replicas.\
-    \ \nThis helps you see the overall health status of the persistent application\
-    \ and how close it is to achieving the desired state."
-  multi_line_details: "\n\n# This command will pull a list of statefulsets within\
-    \ a specific namespace and context, format the data using jq to output name, desired\
-    \ replicas, \n# and currently available replicas of statefulsets with less replicas\
-    \ than desired configed\n\n# Notice that variables such as NAMESPACE and CONTEXT\
-    \ must be properly set before this cmd is run\nNAMESPACE=<INSERT_PROPER_NAMESPACE_HERE>\n\
-    CONTEXT=<INSERT_PROPER_CONTEXT_HERE>\n\n# Now we can execute the command on multiple\
-    \ lines\nkubectl get statefulset -n ${NAMESPACE} \\\n--context ${CONTEXT} \\\n\
-    -o json \\\n| jq -r '.items[] | select(.status.availableReplicas < .status.replicas)\
-    \ | \"---\\nStatefulSet Name: \" + (.metadata.name|tostring) + \"\\nDesired Replicas:\
-    \ \" + (.status.replicas|tostring) + \"\\nAvailable Replicas: \" + (.status.availableReplicas|tostring)'"
+    - [Kubernetes API Concepts](https://kubernetes.io/docs/concepts/overview/kubernetes-api/){:target="_blank"}'
+  explanation: "This command is used to get information about the stateful sets in\
+    \ a specific Kubernetes namespace. A stateful set is a workload API object used\
+    \ to manage stateful applications, such as databases. \n\nLet me break down the\
+    \ command for you:\n\n- `kubectl` is the command-line tool for interacting with\
+    \ Kubernetes clusters.\n- `get statefulset` is the part of the command that specifies\
+    \ that we want to retrieve information about stateful sets.\n- `-n ${NAMESPACE}`\
+    \ specifies the namespace in which to look for the stateful sets. You would replace\
+    \ `${NAMESPACE}` with the actual name of the namespace you are interested in.\n\
+    - `-o json` sets the output format to JSON, so the data will be returned in a\
+    \ machine-readable format.\n- `--context ${CONTEXT}` specifies the context to\
+    \ use. A context is a group of access parameters, including cluster, user, and\
+    \ namespace. You would replace `${CONTEXT}` with the actual name of the context\
+    \ you want to use.\n- `| jq -r` is a pipe that passes the result to the `jq` command,\
+    \ which is a lightweight and flexible command-line JSON processor. The `-r` flag\
+    \ outputs raw strings instead of JSON-formatted strings.\n\nThe `jq` part of the\
+    \ command does a few things:\n- `.items[]` selects each individual stateful set.\n\
+    - `select(.status.availableReplicas < .status.replicas)` filters out only those\
+    \ stateful sets where the available replicas are less than the desired replicas.\n\
+    - Then it formats the output to display the StatefulSet name, desired replicas,\
+    \ and available replicas for each selected StatefulSet.\n\nOverall, this command\
+    \ is useful for monitoring the status of stateful sets in a specific namespace\
+    \ and identifying any stateful sets that may not have enough available replicas\
+    \ based on their desired configuration."
+  multi_line_details: "```yaml\n# Use kubectl command to get the statefulset details\
+    \ in the specified namespace and output it in JSON format\nkubectl get statefulset\
+    \ -n ${NAMESPACE} -o json --context ${CONTEXT} \n  # Pipe the output to jq command\
+    \ to filter and format the JSON data\n  | jq -r '.items[] | select(.status.availableReplicas\
+    \ < .status.replicas) \n    # For each filtered statefulset, print out its name,\
+    \ desired replicas, and available replicas\n    | \"---\\nStatefulSet Name: \"\
+    \ + (.metadata.name|tostring) + \"\\nDesired Replicas: \" + (.status.replicas|tostring)\
+    \ + \"\\nAvailable Replicas: \" + (.status.availableReplicas|tostring)'\n```"
   name: list_statefulsets_with_unhealthy_replica_counts_in_namespace_namespace

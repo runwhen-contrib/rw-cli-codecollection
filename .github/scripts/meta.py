@@ -10,6 +10,7 @@ Author: Shea Stewart
 """
 import sys
 import os
+import json
 import fnmatch
 import re
 import requests
@@ -201,7 +202,9 @@ def generate_metadata(directory_path):
     Returns:
         Object 
     """
-    explainUrl=f'https://papi.test.runwhen.com/bow/raw?prompt='
+    # explainUrl=f'https://papi.test.runwhen.com/bow/raw?prompt='
+    explainUrl=f'https://papi.kyle.dev.runwhen.com/bow/raw?'
+    headers = {'Content-Type': 'application/json'}
     search_list = ['render_in_commandlist=true', 'show_in_rwl_cheatsheet=true']
     runbook_files = find_files(directory_path, 'runbook.robot')
     for runbook in runbook_files:
@@ -220,7 +223,6 @@ def generate_metadata(directory_path):
             name_snake_case = re.sub(r'\W+', '_', name.lower())
 
             # Generate metadata depending if it's a one-liner command or bash script
-            print(command)
             if command.startswith('bash'):
                 script_name=command.split()[1].strip("'")
                 script_path_parts=runbook.split('/')
@@ -229,14 +231,16 @@ def generate_metadata(directory_path):
                 print(f'Generating metadata for script {full_script_path}')
                 with open(full_script_path, 'r') as script:
                     script_contents = script.read()
-                print(script_contents)
                 # What it does
                 query_what_it_does_prompt =f"Please explain this script as if I was new to Kubernetes, but am learning to use it daily as an engineer"
                 query_what_it_does_with_command = f'{query_what_it_does_prompt} \n{script_contents}'
                 print(f'generating explanation for {name_snake_case}')
-                explain_query_what_it_does = urlencode({'prompt': query_what_it_does_with_command})
-                url_what_it_does = f'{explainUrl}{explain_query_what_it_does}'   
-                response_what_it_does = requests.get(url_what_it_does)
+                # explain_query_what_it_does = f"{'prompt': '{query_what_it_does_with_command}'}"
+                # explain_query_what_it_does_post=f"{'prompt': query_what_it_does_with_command}"
+                # url_what_it_does = f'{explainUrl}{explain_query_what_it_does}' 
+                explain_query_what_it_does = {'prompt': query_what_it_does_with_command}
+                explain_query_json = json.dumps(explain_query_what_it_does)
+                response_what_it_does = requests.post(explainUrl, data=explain_query_json, headers=headers )
                 if ((response_what_it_does.status_code == 200)):
                     explanation = response_what_it_does.json()
                     explanation_content = explanation['explanation']
@@ -246,17 +250,20 @@ def generate_metadata(directory_path):
                 query_multi_line_with_comments_prompt = f"Read and add docstrings to the following script content, returned in shell script format. Script contents:"
                 query_multi_line_with_command = f'{query_multi_line_with_comments_prompt}\n{script_contents}'
                 #Generate external doc links 
-                query_doc_links_prompt = r"Given the following script explanation, generate some links that provide helpful documentation for a reader who want's to learn more about the topics used in the command. Format the output in a single YAML list with the keys of `description` and `url` for each link with the values in double quotes. Ensure each description and url are on separate lines, ensure an empty blank line separates each item. Ensure there are no other keys or text or extra characters other than the items. The script contents are:  "
+                query_doc_links_prompt = r"Given the following script, generate some links that provide helpful documentation for a reader who want's to learn more about the topics used in the command. Format the output in a single YAML list with the keys of `description` and `url` for each link with the values in double quotes. Ensure each description and url are on separate lines, ensure an empty blank line separates each item. Ensure there are no other keys or text or extra characters other than the items. The script contents are:  "
                 # query_doc_links_with_command = f'{query_doc_links_prompt}\n{multi_line_content}'
-                query_doc_links_with_command = f'{query_doc_links_prompt}\n{explanation_content}'
+                query_doc_links_with_command = f'{query_doc_links_prompt}\n{script_contents}'
             else: 
                 # What it does
                 query_what_it_does_prompt =f"Please explain this command as if I was new to Kubernetes, but am learning to use it daily as an engineer"
                 query_what_it_does_with_command = f'{query_what_it_does_prompt} \n{command}'
                 print(f'generating explanation for {name_snake_case}')
-                explain_query_what_it_does = urlencode({'prompt': query_what_it_does_with_command})
-                url_what_it_does = f'{explainUrl}{explain_query_what_it_does}'   
-                response_what_it_does = requests.get(url_what_it_does)
+                explain_query_what_it_does = {'prompt': query_what_it_does_with_command}
+                explain_query_json = json.dumps(explain_query_what_it_does)
+
+                # url_what_it_does = f'{explainUrl}{explain_query_what_it_does}'   
+                response_what_it_does = requests.post(explainUrl, data=explain_query_json, headers=headers )
+                # response_what_it_does = requests.get(url_what_it_does)
                 if ((response_what_it_does.status_code == 200)):
                     explanation = response_what_it_does.json()
                     explanation_content = explanation['explanation']
@@ -271,21 +278,22 @@ def generate_metadata(directory_path):
                 query_doc_links_with_command = f'{query_doc_links_prompt}\n{command}'
 
             print(f'generating multi-line code with comments for {name_snake_case}')
-            explain_query_multi_line_with_comments = urlencode({'prompt': query_multi_line_with_command})
-            url_multi_line_with_comments = f'{explainUrl}{explain_query_multi_line_with_comments}'   
-            response_multi_line_with_comments = requests.get(url_multi_line_with_comments)
+            # explain_query_multi_line_with_comments = urlencode({'prompt': query_multi_line_with_command})
+            # url_multi_line_with_comments = f'{explainUrl}{explain_query_multi_line_with_comments}'  
+            explain_query_multi_line_with_comments = {'prompt': query_multi_line_with_command}
+            explain_query_multi_line_json = json.dumps(explain_query_multi_line_with_comments)
+            response_multi_line_with_comments = requests.post(explainUrl, data=explain_query_multi_line_json, headers=headers )
             if ((response_multi_line_with_comments.status_code == 200)):
                 multi_line = response_multi_line_with_comments.json()
-                print("multi-line")
-                print(multi_line)
                 multi_line_content = multi_line['explanation']
 
                 print(f'generating doc-links for {name_snake_case}')
-                explain_query_doc_links = urlencode({'prompt': query_doc_links_with_command})
-                url_doc_links = f'{explainUrl}{explain_query_doc_links}'   
-                response_doc_links = requests.get(url_doc_links)
-                print("docs")
-                print(response_doc_links)
+                # explain_query_doc_links = f"{'prompt': query_doc_links_with_command}"
+                # url_doc_links = f'{explainUrl}{explain_query_doc_links}'   
+                # response_doc_links = requests.get(url_doc_links)
+                explain_query_doc_links = {'prompt': query_doc_links_with_command}
+                explain_query_doc_links_json = json.dumps(explain_query_doc_links)
+                response_doc_links = requests.post(explainUrl, data=explain_query_doc_links_json, headers=headers )
                 if ((response_doc_links.status_code == 200)):
                     doc_links = response_doc_links.json() 
                     doc_links_content = doc_links['explanation']
@@ -303,10 +311,11 @@ def generate_metadata(directory_path):
                     # Otherwise build a list of URLS that still exist (as openAI generates some links that are 404s)
                     try:
                         yaml_data = yaml.safe_load(output_string)
-                        for item in yaml_data: 
-                            if isinstance(item, dict) and isinstance(item.get('description'), str) and isinstance(item.get('url'), str):
-                                if check_url(item['url']):
-                                    non_404_urls.append(item)
+                        if yaml_data:  # Check if yaml_data is not None
+                            for item in yaml_data: 
+                                if isinstance(item, dict) and isinstance(item.get('description'), str) and isinstance(item.get('url'), str):
+                                    if check_url(item['url']):
+                                        non_404_urls.append(item)
                     except yaml.YAMLError:
                         pass
                     markdown_links = []

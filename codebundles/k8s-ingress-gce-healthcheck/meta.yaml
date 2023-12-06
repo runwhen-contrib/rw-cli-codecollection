@@ -7,29 +7,51 @@ commands:
     done
   doc_links: '
 
-    - [Kubernetes Documentation for ''kubectl get events'' command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events){:target="_blank"}
+    - [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
-    - [Kubernetes Documentation for ''kubectl get ingress'' command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-ingress){:target="_blank"}
+    - [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/){:target="_blank"}
 
-    - [Kubernetes Concepts: Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/){:target="_blank"}'
-  explanation: "\n\nThis command checks events for an Ingress and any related Services.\
-    \ It takes Ingress name, Namespace, and Context as parameters in order to better\
-    \ control the scope of what Kubernetes resources are being observed. \n\nThe first\
-    \ portion of the command uses the kubectl get events command to look up any non-normal\
-    \ events related to the specified Ingress. Then, it enumerates through each related\
-    \ Service using a jsonpath query and executes the same kubectl get events command\
-    \ on each service in order to check for any additional associated events."
-  multi_line_details: "\n\n#gather environment variables \nINGRESS_NAME=${INGRESS}\n\
-    NAMESPACE=${NAMESPACE}\nCONTEXT=${CONTEXT}\n\n#get the events related to the ingress\
-    \ object\nkubectl get events -n $NAMESPACE --context $CONTEXT \\\n    --field-selector\
-    \ \\\n        involvedObject.kind=Ingress,\\\n        involvedObject.name=$INGRESS_NAME,\\\
-    \n        type!=Normal\n\n#loop through the services associated with the ingress\n\
-    for SERVICE_NAME in $(kubectl get ingress $INGRESS_NAME -n $NAMESPACE --context\
-    \ $CONTEXT \\\n    -o=jsonpath='{.spec.rules[*].http.paths[*].backend.service.name}');\
-    \ \ndo \n\n    #for each service, get the events related to that service object\
-    \ \n    kubectl get events -n $NAMESPACE --context $CONTEXT \\\n        --field-selector\
-    \ \\\n            involvedObject.kind=Service,\\\n            involvedObject.name=$SERVICE_NAME,\\\
-    \n            type!=Normal\ndone"
+    - [Namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+
+    - [Context](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}'
+  explanation: 'This command is used in Kubernetes to retrieve events related to specific
+    objects such as Ingress and Service within a given namespace and context.
+
+
+    Let me break it down for you:
+
+
+    - The `INGRESS_NAME`, `NAMESPACE`, and `CONTEXT` variables are being set at the
+    beginning of the command using the values from the environment.
+
+    - After that, the `kubectl get events` command is being used to retrieve events
+    related to an Ingress object. It''s specifying the namespace using the `-n` flag,
+    and the context using the `--context` flag. Additionally, the `--field-selector`
+    flag is being used to filter events based on the involved object kind (Ingress),
+    name, and type (not Normal).
+
+    - Then, there''s a `for` loop that iterates over the services associated with
+    the Ingress object. Inside the loop, it retrieves events related to each service
+    using the same `kubectl get events` command with the field selector filtering
+    for Service objects this time.
+
+
+    So, in summary, this command essentially retrieves events related to the specified
+    Ingress and its associated services within a specific namespace and context in
+    the Kubernetes cluster. As an engineer, you might use this command to troubleshoot
+    issues or monitor the activity and health of these resources in your cluster.'
+  multi_line_details: "# Set the environment variables for INGRESS_NAME, NAMESPACE,\
+    \ and CONTEXT\nINGRESS_NAME=${INGRESS}; \nNAMESPACE=${NAMESPACE}; \nCONTEXT=${CONTEXT};\
+    \ \n\n# Use kubectl to get events in a specific namespace and context, filtering\
+    \ for events related to a specific Ingress resource\nkubectl get events -n $NAMESPACE\
+    \ --context $CONTEXT --field-selector involvedObject.kind=Ingress,involvedObject.name=$INGRESS_NAME,type!=Normal;\
+    \ \n\n# Iterate over each SERVICE_NAME extracted from the Ingress resource using\
+    \ jsonpath and use kubectl to get events related to each Service resource\nfor\
+    \ SERVICE_NAME in $(kubectl get ingress $INGRESS_NAME -n $NAMESPACE --context\
+    \ $CONTEXT -o=jsonpath='{.spec.rules[*].http.paths[*].backend.service.name}');\
+    \ do \n    kubectl get events -n $NAMESPACE --context $CONTEXT --field-selector\
+    \ involvedObject.kind=Service,involvedObject.name=$SERVICE_NAME,type!=Normal;\
+    \ \ndone"
   name: search_for_gce_ingress_warnings_in_gke
 - command: 'INGRESS_NAME=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT=${CONTEXT}; kubectl
     get ingress $INGRESS_NAME -n $NAMESPACE --context $CONTEXT -o=json | jq -r ''.metadata.annotations["ingress.kubernetes.io/backends"]
@@ -37,31 +59,66 @@ commands:
     " Status: " + .value'''
   doc_links: '
 
-    - [Kubernetes Ingress Documentation](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#ingress-v1-networking-k8s-io){:target="_blank"}
-
-    - [jq documentation for JSON manipulation](https://stedolan.github.io/jq/){:target="_blank"}
-
-    - [The official jq manual](https://www.manpagez.com/man/1/jq/){:target="_blank"}'
-  explanation: '
+    '
+  explanation: 'This command is using kubectl, which is a command-line tool for interacting
+    with Kubernetes clusters. The purpose of this command is to get the status of
+    the backend services defined in an Ingress object within a specific namespace.
 
 
-    This command is used to obtain the statuses of all backends associated with a
-    specific Kubernetes ingress. It uses kubectl, which is a command line tool to
-    work with Kubernetes objects, and passes in some variables such as $INGRESS, $NAMESPACE,
-    and $CONTEXT. The output is then further processed by jq, a command line JSON
-    processor, to obtain the backend key and status value. This can be useful to check
-    if any backend related to an Ingress is unhealthy or not.'
-  multi_line_details: "\n\n# First set up environment variables for the ingress name,\
-    \ namespace, and context\nINGRESS_NAME=${INGRESS}\nNAMESPACE=${NAMESPACE}\nCONTEXT=${CONTEXT}\n\
-    \n# Get all of the annotations from the ingress \n# This command uses kubectl\
-    \ to communicate with your kubernetes cluster. For more info see here:  https://kubernetes.io/docs/reference/kubectl/overview/\n\
-    ingressAnnotations=$(kubectl get ingress $INGRESS_NAME -n $NAMESPACE --context\
-    \ $CONTEXT -o=json) \n\n# Massage the output using json tools to figure out which\
-    \ backend status is not healthy\n# jq is a tool for processing json input (more\
-    \ info here: https://stedolan.github.io/jq/tutorial/)\nbackendStatus=$(echo $ingressAnnotations\
-    \ | jq -r '.metadata.annotations[\"ingress.kubernetes.io/backends\"] | fromjson\
+    Let''s break down the command:
+
+
+    - INGRESS_NAME=${INGRESS}: This sets a variable called INGRESS_NAME to the value
+    of the environment variable INGRESS.
+
+    - NAMESPACE=${NAMESPACE}: This sets a variable called NAMESPACE to the value of
+    the environment variable NAMESPACE.
+
+    - CONTEXT=${CONTEXT}: This sets a variable called CONTEXT to the value of the
+    environment variable CONTEXT.
+
+
+    Then the main part of the command is:
+
+
+    ```bash
+
+    kubectl get ingress $INGRESS_NAME -n $NAMESPACE --context $CONTEXT -o=json | jq
+    -r ''.metadata.annotations["ingress.kubernetes.io/backends"] | fromjson | to_entries[]
+    | select(.value != "HEALTHY") | "Backend: " + .key + " Status: " + .value''
+
+    ```
+
+
+    - kubectl get ingress $INGRESS_NAME -n $NAMESPACE --context $CONTEXT -o=json:
+    This part of the command uses kubectl to get the JSON representation of the Ingress
+    object specified by the INGRESS_NAME variable, within the NAMESPACE namespace
+    and using the CONTEXT as the connection context.
+
+
+    - | jq -r ''.metadata.annotations["ingress.kubernetes.io/backends"] | fromjson
+    | to_entries[] | select(.value != "HEALTHY") | "Backend: " + .key + " Status:
+    " + .value'': This part of the command pipes the JSON output of the previous kubectl
+    command into a program called jq. Jq is a command-line JSON processor. This part
+    of the command processes the JSON data and extracts the status of the backend
+    services that are not healthy, and formats the output as "Backend: <backend-name>
+    Status: <status>".
+
+
+    So, in summary, this command retrieves the status of the backends defined in an
+    Ingress object and displays only the ones that are not healthy. As you become
+    more familiar with Kubernetes and its command-line tools, you''ll get used to
+    manipulating and querying resources in this way.'
+  multi_line_details: "# Set the value of INGRESS_NAME environment variable to the\
+    \ value of INGRESS\nINGRESS_NAME=${INGRESS};\n\n# Set the value of NAMESPACE environment\
+    \ variable to the value of NAMESPACE\nNAMESPACE=${NAMESPACE};\n\n# Set the value\
+    \ of CONTEXT environment variable to the value of CONTEXT\nCONTEXT=${CONTEXT};\n\
+    \n# Use kubectl to get the details of the specified ingress in JSON format\nkubectl\
+    \ get ingress $INGRESS_NAME -n $NAMESPACE --context $CONTEXT -o=json | \n\n# Pipe\
+    \ the output to jq to parse the JSON and extract the annotations related to backend\
+    \ status\njq -r '.metadata.annotations[\"ingress.kubernetes.io/backends\"] | fromjson\
     \ | to_entries[] | select(.value != \"HEALTHY\") | \"Backend: \" + .key + \" Status:\
-    \ \" + .value') \n\necho ${backendStatus}"
+    \ \" + .value'"
   name: identify_unhealthy_gce_http_ingress_backends
 - command: 'INGRESS_NAME=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT=${CONTEXT}; GCP_PROJECT_ID=${GCP_PROJECT_ID};for
     backend in $(kubectl get ingress $INGRESS_NAME -n $NAMESPACE --context $CONTEXT
@@ -78,38 +135,66 @@ commands:
     (.ip // "N/A") + " | Error: " + .message) else "No results found" end''; done'
   doc_links: '
 
-    - [Kubernetes Ingress - Managing Traffic to Your Services](https://kubernetes.io/docs/concepts/services-networking/ingress/){:target="_blank"}
+    '
+  explanation: 'This command is a bit complex, but I''ll break it down into more understandable
+    parts.
 
-    - [Google Cloud Monitor Reading Logs for GCE_NETWORK Errors](https://cloud.google.com/error-reporting/docs/setup/index#logging){:target="_blank"}'
-  explanation: '
+
+    First, let''s look at the variables being set:
+
+    - INGRESS_NAME: This variable is being set to a value stored in the INGRESS variable.
+
+    - NAMESPACE: This variable is being set to a value stored in the NAMESPACE variable.
+
+    - CONTEXT: This variable is being set to a value stored in the CONTEXT variable.
+
+    - GCP_PROJECT_ID: This variable is being set to a value stored in the GCP_PROJECT_ID
+    variable.
 
 
-    This command is used to debug an Ingress in Kubernetes. It retrieves errors from
-    GCP''s log streaming and prints out the timestamp, IP address, and error message
-    associated with it. The command first retrieves the backend values of the Ingress
-    indicated by the INGRESS_NAME variable and its corresponding NAMESPACE and CONTEXT.
-    It then uses GCP authentication tokens (GOOGLE_APPLICATION_CREDENTIALS) to access
-    the GCP logging system. A query is run for each backend which fetches the resourceName
-    that matches and limits to errors returned in the last 24 hours. Finally, the
-    information is formatted into a readable output containing the details of the
-    errors as required.'
-  multi_line_details: "\n\n# Variable declarations \nINGRESS_NAME=${INGRESS};\nNAMESPACE=${NAMESPACE};\n\
-    CONTEXT=${CONTEXT};\nGCP_PROJECT_ID=${GCP_PROJECT_ID};\n\n# Get information from\
-    \ resource\nfor backend in $(kubectl get ingress $INGRESS_NAME -n $NAMESPACE --context\
-    \ $CONTEXT -o=json | jq -r '.metadata.annotations[\"ingress.kubernetes.io/backends\"\
-    ] | fromjson | to_entries[] | select(.value != \"HEALTHY\") | .key'); do\n  #\
-    \ Print resource name\n  echo \"Backend: \\${backend}\"\n\n  # Authenticate with\
-    \ Google Application credentials\n  gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS\n\
-    \n  # Use the Google Cloud Logging command to read errors from resource\n  gcloud\
-    \ logging read 'severity=\"ERROR\" AND resource.type=\"gce_network\" AND protoPayload.resourceName=~\"\
-    '\\${backend}'\"' --freshness=1d --limit=50 --project \"$GCP_PROJECT_ID\" --format=json\
-    \ | jq 'if length > 0 then [ .[] | select(.protoPayload.response.error.message?\
-    \ or.protoPayload.status.message?) | { timestamp: .timestamp, ip: (if .protoPayload.request.networkEndpoints?\
+    Next, we have a for loop that iterates over the backends of an ingress. Here''s
+    what''s happening inside the loop:
+
+    - The `kubectl` command is fetching the details of the specified ingress from
+    the specified namespace and context, and then using the `jq` command to filter
+    out the backends that are not healthy.
+
+    - For each unhealthy backend, the command prints out "Backend: [backend name]"
+    and then uses the `gcloud` command to read error logs from GCP logging for that
+    specific backend within the last day and in the specified project. This part of
+    the command is filtering logs for errors related to a specific backend in GCP''s
+    logging service.
+
+
+    This command is likely used to troubleshoot and identify errors or issues with
+    specific backends in a Kubernetes cluster, possibly related to networking or service
+    availability.
+
+
+    As a new engineer learning to use Kubernetes, understanding this command may require
+    some knowledge of Kubernetes concepts such as ingresses, namespaces, contexts,
+    and GCP-specific components like the GCP_PROJECT_ID and the gcloud command line
+    tool. It requires familiarity with tools like `kubectl` for interacting with the
+    Kubernetes cluster and `jq` for parsing JSON output, as well as Google Cloud Platform
+    (GCP) tools like `gcloud` for managing GCP resources.'
+  multi_line_details: "```bash\n# Set variables for ingress, namespace, context and\
+    \ GCP project ID\nINGRESS_NAME=${INGRESS}\nNAMESPACE=${NAMESPACE}\nCONTEXT=${CONTEXT}\n\
+    GCP_PROJECT_ID=${GCP_PROJECT_ID}\n\n# Get list of unhealthy backends in the specified\
+    \ ingress\nfor backend in $(\n  kubectl get ingress $INGRESS_NAME -n $NAMESPACE\
+    \ --context $CONTEXT -o=json | \n  jq -r '.metadata.annotations[\"ingress.kubernetes.io/backends\"\
+    ] | fromjson | to_entries[] | select(.value != \"HEALTHY\") | .key'\n); do\n \
+    \ # Output the name of backend\n  echo \"Backend: ${backend}\" \n\n  # Activate\
+    \ the service account using key file\n  gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS\n\
+    \n  # Read logs for errors in the specific backend\n  gcloud logging read 'severity=\"\
+    ERROR\" AND resource.type=\"gce_network\" AND protoPayload.resourceName=~\"'${backend}'\"\
+    ' --freshness=1d --limit=50 --project \"$GCP_PROJECT_ID\" --format=json | \n \
+    \ jq 'if length > 0 then [ .[] | select(.protoPayload.response.error.message?\
+    \ or .protoPayload.status.message?) | { timestamp: .timestamp, ip: (if .protoPayload.request.networkEndpoints?\
     \ then .protoPayload.request.networkEndpoints[].ipAddress else null end), message:\
     \ (.protoPayload.response.error.message? // .protoPayload.status.message?) } ]\
     \ | group_by(.message) | map(max_by(.timestamp)) | .[] | (.timestamp + \" | IP:\
     \ \" + (.ip // \"N/A\") + \" | Error: \" + .message) else \"No results found\"\
-    \ end'; done"
+    \ end'\ndone\n```"
   name: fetch_network_error_logs_from_gcp_operations_manager_for_ingress_backends
 - command: INGRESS=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT=${CONTEXT}; FORWARDING_RULE=$(kubectl
     get ingress $INGRESS -n $NAMESPACE --context $CONTEXT -o=jsonpath='{.metadata.annotations.ingress\.kubernetes\.io/forwarding-rule}')
@@ -123,45 +208,93 @@ commands:
     && echo $GCP_LOGS_URL
   doc_links: '
 
-    - [Documentation for Kubernetes ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/){:target="_blank"}
+    '
+  explanation: 'This command is a sequence of steps that use the `kubectl` command-line
+    tool to retrieve information about an Ingress resource in a Kubernetes cluster.
+    An Ingress resource defines how HTTP(s) traffic should be routed to services in
+    the cluster. To break down the command:
 
-    - [Documentation for jsonpath query language](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}
 
-    - [Documentation for Google Cloud Platform Logs Viewer](https://cloud.google.com/logging/docs/view/overview){:target="_blank"}'
-  explanation: "\n\nThe command above allows you to get the GCP logging URL for a\
-    \ specific Kubernetes Ingress resource. It retrieves the associated Forwarding\
-    \ Rule, URL Map and Target Proxy annotations to build the query string that will\
-    \ point to the GCP Logging URL. The command can be simplified as follows:\n\n\
-    1. Retrieve the Ingress name, namespace, and context from environment variables.\
-    \ \n2. Use `kubectl` to extract the references to the associated Forwarding Rule,\
-    \ URL Map, and Target Proxy annotations.\n3. Prepare the log query by encoding\
-    \ it and replacing spaces (\u201C \u201D), double quotes (\u201C\"\u2019), parentheses\
-    \ (\"(\" and \")\"), and certain symbols such as equal sign (\"=\") and slash\
-    \ (\"/\") with the corresponding encoded characters (%20, %22, %28, %29, %3D,\
-    \ and %2F respectively).\n4. Construct the GCP Logging URL by combining the encoded\
-    \ query with the project ID.\n5. Output the GCP Logging URL."
-  multi_line_details: "\n\n#This command is to retrieve and output the Google Cloud\
-    \ Logs URL of a Kubernetes Ingress. It has been split into several lines for enhanced\
-    \ readability.\n#We first store the variables for the namespace, context and ingress\
-    \ in seperate variables:\nINGRESS=${INGRESS}\nNAMESPACE=${NAMESPACE}\nCONTEXT=${CONTEXT}\n\
-    \n#We use the kubectl command to retrieve the forwarding-rule, url-map and target-proxy\
-    \ of the ingress defined by the variables from above\nFORWARDING_RULE=$(kubectl\
-    \ get ingress $INGRESS -n $NAMESPACE --context $CONTEXT -o=jsonpath='{.metadata.annotations.ingress\\\
-    .kubernetes\\.io/forwarding-rule}')\nURL_MAP=$(kubectl get ingress $INGRESS -n\
-    \ $NAMESPACE --context $CONTEXT -o=jsonpath='{.metadata.annotations.ingress\\\
-    .kubernetes\\.io/url-map}')\nTARGET_PROXY=$(kubectl get ingress $INGRESS -n $NAMESPACE\
-    \ --context $CONTEXT -o=jsonpath='{.metadata.annotations.ingress\\.kubernetes\\\
-    .io/target-proxy}')\n\n#We then assemble a string which contains the log query\
-    \ we want to execute against Google Cloud Logs.\nLOG_QUERY=\"resource.type=\\\"\
-    http_load_balancer\\\" AND resource.labels.forwarding_rule_name=\\\"$FORWARDING_RULE\\\
-    \" AND resource.labels.target_proxy_name=\\\"$TARGET_PROXY\\\" AND resource.labels.url_map_name=\\\
-    \"$URL_MAP\\\"\"\n\n#Google Cloud logs requires certain characters in its URL\
-    \ strings to be URL encoded, so that it can correctly decode and interpret them.\
-    \ As such, we encode our query string as an URL. \nENCODED_LOG_QUERY=$(echo $LOG_QUERY\
-    \ | sed -e 's| |%20|g' -e 's|\"|%22|g' -e 's|(|%28|g' -e 's|)|%29|g' -e 's|=|%3D|g'\
-    \ -e 's|/|%2F|g')\n\n#We assemble the complete URL for the log query.\nGCP_LOGS_URL=\"\
-    https://console.cloud.google.com/logs/query;query=$ENCODED_LOG_QUERY?project=$GCP_PROJECT_ID\"\
-    \n\n#Finally, we output the URL\necho $GCP_LOGS_URL"
+    1. The command begins by setting environment variables for INGRESS, NAMESPACE,
+    and CONTEXT. These variables are placeholders for the actual Ingress name, namespace,
+    and context (i.e., the cluster itself) that you will supply when running the command.
+
+
+    2. Next, it uses `kubectl get ingress` to fetch specific details about the defined
+    Ingress resource. It retrieves the forwarding rule, URL map, and target proxy
+    information associated with the Ingress using `jsonpath` formatting to extract
+    these pieces of data from the full output.
+
+
+    3. After obtaining this information, it constructs a query string for Google Cloud''s
+    logging service based on the retrieved details. This query string is used to filter
+    log entries related to the Ingress resource within Google Cloud''s infrastructure.
+
+
+    4. The constructed query string is then encoded using `sed` to replace spaces
+    and certain characters with URL-encoded equivalents. This ensures that the query
+    can be properly included as part of a URL.
+
+
+    5. Finally, the script builds a link to Google Cloud''s Logs Viewer with the encoded
+    log query and the associated project ID, and then prints the generated URL to
+    the console.
+
+
+    In summary, this command is a complex sequence that extracts specific details
+    about a Kubernetes Ingress resource using `kubectl`, constructs a query string
+    based on that data, encodes the query string, and generates a URL for viewing
+    the related logs in Google Cloud Platform''s Logs Viewer.'
+  multi_line_details: '```plaintext
+
+    # Store the Ingress, Namespace, and Context as local environment variables for
+    readability
+
+    INGRESS=${INGRESS}
+
+    NAMESPACE=${NAMESPACE}
+
+    CONTEXT=${CONTEXT}
+
+
+    # Get the forwarding rule annotation from the Kubernetes Ingress resource
+
+    FORWARDING_RULE=$(kubectl get ingress $INGRESS -n $NAMESPACE --context $CONTEXT
+    -o=jsonpath=''{.metadata.annotations.ingress\.kubernetes\.io/forwarding-rule}'')
+
+
+    # Get the URL map annotation from the Kubernetes Ingress resource
+
+    URL_MAP=$(kubectl get ingress $INGRESS -n $NAMESPACE --context $CONTEXT -o=jsonpath=''{.metadata.annotations.ingress\.kubernetes\.io/url-map}'')
+
+
+    # Get the target proxy annotation from the Kubernetes Ingress resource
+
+    TARGET_PROXY=$(kubectl get ingress $INGRESS -n $NAMESPACE --context $CONTEXT -o=jsonpath=''{.metadata.annotations.ingress\.kubernetes\.io/target-proxy}'')
+
+
+    # Define a log query based on the obtained annotations
+
+    LOG_QUERY="resource.type=\"http_load_balancer\" AND resource.labels.forwarding_rule_name=\"$FORWARDING_RULE\"
+    AND resource.labels.target_proxy_name=\"$TARGET_PROXY\" AND resource.labels.url_map_name=\"$URL_MAP\""
+
+
+    # Encode the log query to be used in the GCP logs URL
+
+    ENCODED_LOG_QUERY=$(echo $LOG_QUERY | sed -e ''s| |%20|g'' -e ''s|"|%22|g'' -e
+    ''s|(|%28|g'' -e ''s|)|%29|g'' -e ''s|=|%3D|g'' -e ''s|/|%2F|g'')
+
+
+    # Create a Google Cloud Platform (GCP) logs URL using the encoded log query
+
+    GCP_LOGS_URL="https://console.cloud.google.com/logs/query;query=$ENCODED_LOG_QUERY?project=$GCP_PROJECT_ID"
+
+
+    # Print the GCP logs URL to the terminal
+
+    echo $GCP_LOGS_URL
+
+    ```'
   name: review_gcp_operations_logging_dashboard
 - command: INGRESS=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT=${CONTEXT}; QUERY="resource.type=\"gce_network\""
     && for backend in $(kubectl get ingress $INGRESS -n $NAMESPACE --context $CONTEXT
@@ -171,37 +304,54 @@ commands:
     && echo $DASHBOARD_URL
   doc_links: '
 
-    - [Kubectl documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+    - [Documentation for Google Cloud Ingress resource](https://cloud.google.com/kubernetes-engine/docs/concepts/ingress){:target="_blank"}
 
-    - [Google Cloud Platform logs documentation](https://cloud.google.com/logging/docs/){:target="_blank"}
+    - [Documentation for Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [JSON manipulation with jq](https://stedolan.github.io/jq/){:target="_blank"}'
-  explanation: '
+    - [Documentation for Kubernetes Contexts](https://kubernetes.io/docs/reference/kubectl/cheatsheet/#kubectl-context-and-configuration){:target="_blank"}
+
+    - [Documentation for Kubectl Query Commands](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+
+    - [Documentation for Jq JSON Processor](https://stedolan.github.io/jq/manual/){:target="_blank"}
+
+    - [Documentation for GCP Project ID](https://cloud.google.com/resource-manager/docs/creating-managing-projects#identifying_projects){:target="_blank"}'
+  explanation: 'This command is a bit complex, but I can break it down for you. Essentially,
+    it''s trying to construct a URL that will take you to the logs dashboard in the
+    Google Cloud Console.
 
 
-    This command allows you to get the URL of a logs dashboard on the Google Cloud
-    Platform (GCP). It is used to view Kubernetes Ingress logs for a specific namespace
-    in a given context. The first part checks the annotations field of an Ingress
-    object and collects all the resources (typically GCE Networks) associated with
-    it. This set of resource names is then added to a query which is then encoded
-    and appended to the dashboard URL, including the GCP project ID. Finally, the
-    URL is printed to the console.'
-  multi_line_details: "\n\n# Define environmental variables for ease of use and for\
-    \ more clarity\nINGRESS=\"${INGRESS}\"\nNAMESPACE=\"${NAMESPACE}\" \nCONTEXT=\"\
-    ${CONTEXT}\"\nQUERY=\"resource.type=\\\"gce_network\\\"\"\n\n# Use kubectl to\
-    \ get the ingress that was specified through the environmental variable $INGRESS\n\
-    # Add a namespace to this appendant (set through environmental variable $KUBERNETES)\n\
-    # Use the context that is set through the environmental variable $CONTEXT\n# Create\
-    \ an output as json\nbackend=$(kubectl get ingress ${INGRESS} -n ${NAMESPACE}\
-    \ --context ${CONTEXT} -o=json)\n\n# Use jq to query the data inside backend,\
-    \ so we create a list of backends that have value different than 'HEALTHY'\nfor\
-    \ backend in $(echo ${backend} | jq -r '.metadata.annotations[\"ingress.kubernetes.io/backends\"\
-    ] | fromjson | to_entries[] | select(.value != \"HEALTHY\") | .key'); do\n   #\
-    \ Append the new fetched backend to the initial created query\n   QUERY=\"$QUERY\
-    \ AND protoPayload.resourceName=~\\\"$backend\\\"\";\ndone\n\n# Echo out the final\
-    \ query in a URI encoded format\nENCODED_QUERY=$(echo $QUERY | jq -sRr @uri)\n\
-    \n# Get the GCP project ID from the existing environmental variable $GCP_PROJECT_ID\n\
-    # Create a Dashboard URL that can be used to search query logs in the Google Cloud\
-    \ Platform Console\nDASHBOARD_URL=\"https://console.cloud.google.com/logs/query;query=${ENCODED_QUERY}?project=${GCP_PROJECT_ID}\"\
-    \n\n# Echo out the final URL that can be used in the browser\necho ${DASHBOARD_URL}"
+    The variables at the beginning, INGRESS, NAMESPACE, and CONTEXT, are used to specify
+    which resources we''re interested in.
+
+
+    The QUERY variable is being constructed to filter the logs shown in the dashboard.
+    It''s looking for any resources of type "gce_network" that aren''t healthy.
+
+
+    The `for` loop is going through each backend defined in the specified INGRESS
+    resource and adding it to the query string if it''s not healthy.
+
+
+    The ENCODED_QUERY variable then takes this constructed query and URL-encodes it
+    so that it can be used in a web address.
+
+
+    Finally, the DASHBOARD_URL is created by combining the encoded query with the
+    project ID and a predefined URL for the Google Cloud logs dashboard.
+
+
+    So, in summary, this command is generating a URL that will take you to the logs
+    dashboard for a specific set of resources in the Google Cloud Console.'
+  multi_line_details: "# Store the value of INGRESS, NAMESPACE and CONTEXT variables\
+    \ to be used later in the command\nINGRESS=${INGRESS}\nNAMESPACE=${NAMESPACE}\n\
+    CONTEXT=${CONTEXT}\n\n# The gce_network query is used to search for all GCE network\
+    \ ingresses\nQUERY=\"resource.type=\\\"gce_network\\\"\"\n\n# Loop through each\
+    \ backend of the specified ingress to build the complete query\nfor backend in\
+    \ $(kubectl get ingress $INGRESS -n $NAMESPACE --context $CONTEXT -o=json | jq\
+    \ -r '.metadata.annotations[\"ingress.kubernetes.io/backends\"] | fromjson | to_entries[]\
+    \ | select(.value != \"HEALTHY\") | .key'); do \n  QUERY=\"$QUERY AND protoPayload.resourceName=~\\\
+    \"$backend\\\"\"\ndone\n\n# Encode the constructed query for use in the dashboard\
+    \ URL\nENCODED_QUERY=$(echo $QUERY | jq -sRr @uri)\n\n# Construct the final DASHBOARD_URL\
+    \ using the encoded query and the GCP_PROJECT_ID\nDASHBOARD_URL=\"https://console.cloud.google.com/logs/query;query=$ENCODED_QUERY?project=$GCP_PROJECT_ID\"\
+    \n\n# Print the DASHBOARD_URL\necho $DASHBOARD_URL"
   name: review_gcp_operations_logging_dashboard
