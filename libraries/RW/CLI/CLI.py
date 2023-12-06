@@ -245,6 +245,7 @@ def run_cli(
     optional_context: str = "",
     include_in_history: bool = True,
     timeout_seconds: int = 60,
+    debug: bool = True,
     **kwargs,
 ) -> platform.ShellServiceResponse:
     """Executes a string of shell commands either locally or remotely on a shellservice.
@@ -329,11 +330,12 @@ def run_cli(
         )
         if include_in_history:
             SHELL_HISTORY.append(cmd)
-    logger.info(f"shell stdout: {rsp.stdout}")
-    logger.info(f"shell stderr: {rsp.stderr}")
-    logger.info(f"shell status: {rsp.status}")
-    logger.info(f"shell returncode: {rsp.returncode}")
-    logger.info(f"shell rsp: {rsp}")
+    if debug:
+        logger.info(f"shell stdout: {rsp.stdout}")
+        logger.info(f"shell stderr: {rsp.stderr}")
+        logger.info(f"shell status: {rsp.status}")
+        logger.info(f"shell returncode: {rsp.returncode}")
+        logger.info(f"shell rsp: {rsp}")
     return rsp
 
 

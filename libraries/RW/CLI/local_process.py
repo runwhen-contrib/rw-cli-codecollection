@@ -12,9 +12,12 @@ logger = logging.getLogger(__name__)
 PWD = "."
 
 
-def _deserialize_secrets(request_secrets: list[platform.ShellServiceRequestSecret] = []) -> list:
+def _deserialize_secrets(
+    request_secrets: list[platform.ShellServiceRequestSecret] = [],
+) -> list:
     ds_secrets = [
-        {"key": ssrs.secret.key, "value": ssrs.secret.value, "file": ssrs.as_file} for ssrs in request_secrets
+        {"key": ssrs.secret.key, "value": ssrs.secret.value, "file": ssrs.as_file}
+        for ssrs in request_secrets
     ]
     return ds_secrets
 
@@ -58,7 +61,9 @@ def execute_local_command(
                 run_with_env[secret_key] = secret_file_path
             else:
                 if run_with_env.get(s["key"], None):
-                    errors.append(f"Secret given attempted to over-write an existing env var {s.name}")
+                    errors.append(
+                        f"Secret given attempted to over-write an existing env var {s.name}"
+                    )
                     break
                 run_with_env[s["key"]] = s["value"]
         file_paths = []
