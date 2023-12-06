@@ -15,9 +15,9 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Get Workload Logs
+Get `${WORKLOAD_NAME}` Application Logs
     [Documentation]    Collects the last approximately 300 lines of logs from the workload before restarting it.
-    [Tags]    resource    application    workload    logs    state    ${container_name}
+    [Tags]    resource    application    workload    logs    state    ${container_name}    ${workload_name}
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get deployment,statefulset -l ${LABELS} -oname | head -n 1) --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     ...    render_in_commandlist=true
@@ -27,9 +27,9 @@ Get Workload Logs
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Scan For Misconfigured Environment
+Scan `${WORKLOAD_NAME}` For Misconfigured Environment
     [Documentation]    Compares codebase to configured infra environment variables and attempts to report missing environment variables in the app
-    [Tags]    environment    variables    env    infra    ${container_name}
+    [Tags]    environment    variables    env    infra    ${container_name}    ${workload_name}
     ${script_run}=    RW.CLI.Run Bash File
     ...    bash_file=env_check.sh
     ...    include_in_history=False
@@ -39,9 +39,19 @@ Scan For Misconfigured Environment
     RW.Core.Add Pre To Report    Stdout:\n\n${script_run.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Troubleshoot Application Logs
+Troubleshoot `${WORKLOAD_NAME}` Application Logs
     [Documentation]    Performs an inspection on container logs for exceptions/stacktraces, parsing them and attempts to find relevant source code information
-    [Tags]    application    debug    app    errors    troubleshoot    workload    api    logs    ${container_name}
+    [Tags]
+    ...    application
+    ...    debug
+    ...    app
+    ...    errors
+    ...    troubleshoot
+    ...    workload
+    ...    api
+    ...    logs
+    ...    ${container_name}
+    ...    ${workload_name}
     ${cmd}=    Set Variable
     ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get deployment,statefulset -l ${LABELS} -oname | head -n 1) --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     IF    $EXCLUDE_PATTERN != ""
@@ -182,6 +192,12 @@ Suite Initialization
     ...    description=The name of the container within the selected pod that represents the application to troubleshoot.
     ...    pattern=\w*
     ...    example=myapp
+    ${WORKLOAD_NAME}=    RW.Core.Import User Variable
+    ...    WORKLOAD_NAME
+    ...    type=string
+    ...    description=The name of the workload, used for search quality.
+    ...    pattern=\w*
+    ...    example=Deployment/my-app
     ${MAX_LOG_LINES}=    RW.Core.Import User Variable
     ...    MAX_LOG_LINES
     ...    type=string
@@ -202,6 +218,7 @@ Suite Initialization
     Set Suite Variable    ${CONTAINER_NAME}    ${CONTAINER_NAME}
     Set Suite Variable    ${NUM_OF_COMMITS}    ${NUM_OF_COMMITS}
     Set Suite Variable    ${MAX_LOG_LINES}    ${MAX_LOG_LINES}
+    Set Suite Variable    ${WORKLOAD_NAME}    ${WORKLOAD_NAME}
     Set Suite Variable
     ...    ${env}
     ...    {"NUM_OF_COMMITS":"${NUM_OF_COMMITS}", "REPO_URI":"${REPO_URI}", "LABELS":"${LABELS}", "KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}"}
