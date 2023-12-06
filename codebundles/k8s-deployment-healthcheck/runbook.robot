@@ -35,7 +35,6 @@ Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=180
     ...    include_in_history=false
-    ...    show_in_rwl_cheatsheet=true
     ${recommendations}=    RW.CLI.Run Cli
     ...    cmd=echo '''${logs.stdout}''' | awk "/Recommended Next Steps:/ {start=1; getline} start"
     ...    env=${env}
