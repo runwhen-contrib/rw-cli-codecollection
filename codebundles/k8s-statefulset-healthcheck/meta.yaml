@@ -1,4 +1,117 @@
 commands:
+- command: 'kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq ''(now
+    - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind
+    == "StatefulSet" or .involvedObject.kind == "Pod") and (.involvedObject.name |
+    tostring | contains("${STATEFULSET_NAME}")) and (.lastTimestamp | fromdateiso8601)
+    >= $time_limit) | {kind: .involvedObject.kind, name: .involvedObject.name, reason:
+    .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp}
+    ] | group_by([.kind, .name]) | map({kind: .[0].kind, name: .[0].name, count: length,
+    reasons: map(.reason) | unique, messages: map(.message) | unique, firstTimestamp:
+    map(.firstTimestamp | fromdateiso8601) | sort | .[0] | todateiso8601, lastTimestamp:
+    map(.lastTimestamp | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'''
+  doc_links: '
+
+    - [Kubectl Get guide](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+
+    - [Context CLI Overview](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}
+
+    - [JSON Path Syntax](https://goessner.net/articles/JsonPath/){:target="_blank"}
+
+    - [jq Manual](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: '
+
+
+    This command is used in Kubernetes to get all the events for a specific context,
+    namespace and statefulset name that are warnings within the last hour. Specifically,
+    it will print out information about the kind of object (like Pod or StatefulSet),
+    the name of the object, how many events there are, the different reasons for the
+    warnings, the associated messages, and the first and last timestamp for when the
+    warnings occurred.'
+  multi_line_details: "\n\n# This multi-line command checks for events of type \"\
+    Warning\", that have occurred in the last hour for any StatefulSet or Pod with\
+    \ a name containing the STATEFULSET_NAME, and converts this data into a JSON array\
+    \ of the involvedObjects, containing counts, reasons, messages, firstTimestamps\
+    \ and lastTimestamps of the events. \n\nkubectl get events \\\n    --context ${CONTEXT}\
+    \ \\\n    -n ${NAMESPACE} \\\n    -o json | \n    jq '(now - (60*60)) as $time_limit\
+    \ |             # Set a time limit of one hour ago\n       [ .items[] |      \
+    \                            # For items in this list... \n            select(.type\
+    \ == \"Warning\" and            # Select those with type \"Warning\" and\n   \
+    \             (.involvedObject.kind == \"StatefulSet\" or .involvedObject.kind\
+    \ == \"Pod\") and                        # involvedObjects which are of kind \"\
+    StatefulSet\" or \"Pod\" and\n                (.involvedObject.name | tostring\
+    \ | contains(\"${STATEFULSET_NAME}\")) and        # have names containing a certain\
+    \ value \n                (.lastTimestamp | fromdateiso8601) >= $time_limit) |\
+    \                         # which occurred after our set time limit\n       {kind:\
+    \ .involvedObject.kind,                  # Output the result as an object\n  \
+    \      name: .involvedObject.name, \n        reason: .reason, \n        message:\
+    \ .message, \n        firstTimestamp: .firstTimestamp, \n        lastTimestamp:\
+    \ .lastTimestamp} ] |            # ...and store it in an array\n     group_by([.kind,\
+    \ .name]) |                      # Group by kind and name\n     map({        \
+    \                                   # Map values\n         kind: .[0].kind, \n\
+    \         name: .[0].name, \n         count: length, \n         reasons: map(.reason)\
+    \ | unique, \n         messages: map(.message) | unique, \n         firstTimestamp:\
+    \ map(.firstTimestamp | fromdateiso8601) | sort | .[0] | todateiso8601, \n   \
+    \      lastTimestamp: map(.lastTimestamp | fromdateiso8601) | sort | reverse |\
+    \ .[0] | todateiso8601})'"
+  name: troubleshoot_statefulset_warning_events_for_statefulset_name
+- command: 'kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq ''(now
+    - (60*60)) as $time_limit | [ .items[] | select(.type != "Warning" and (.involvedObject.kind
+    == "StatefulSet" or .involvedObject.kind == "Pod") and (.involvedObject.name |
+    tostring | contains("${STATEFULSET_NAME}"))) | {kind: .involvedObject.kind, count:
+    .count, name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp:
+    .firstTimestamp, lastTimestamp: .lastTimestamp, duration: (if (((.lastTimestamp
+    | fromdateiso8601) - (.firstTimestamp | fromdateiso8601)) == 0) then 1 else (((.lastTimestamp
+    | fromdateiso8601) - (.firstTimestamp | fromdateiso8601))/60) end) } ] | group_by([.kind,
+    .name]) | map({kind: .[0].kind, name: .[0].name, count: (map(.count) | add), reasons:
+    map(.reason) | unique, messages: map(.message) | unique, average_events_per_minute:
+    (if .[0].duration == 1 then 1 else ((map(.count) | add)/.[0].duration ) end),firstTimestamp:
+    map(.firstTimestamp | fromdateiso8601) | sort | .[0] | todateiso8601, lastTimestamp:
+    map(.lastTimestamp | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'''
+  doc_links: '
+
+    - [Kubectl documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+
+    - [StatefulSets reference](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
+
+    - [Pod commands](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-pods){:target="_blank"}
+
+    - [JSONPath expressions](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}
+
+    - [JQ examples](https://stedolan.github.io/jq/tutorial/){:target="_blank"}'
+  explanation: '
+
+
+    This command uses the kubectl tool to get events from a specific namespace within
+    the Kubernetes cluster for a specified context. The events are in json format
+    and are then passed to jq, which is used to process the events to provide a summary
+    of the data. The summary includes the event kind, count, name, reasons, messages,
+    average events per minute, first timestamp, and last timestamp. This information
+    can help an engineer investigate issues within the cluster related to StatefulSets
+    and Pods with the specified name.'
+  multi_line_details: "\n\n# This command retrieves events from a Kubernetes cluster,\
+    \ given some conditionals. It then groups the output and provides summary data,\
+    \ such as counts, first and last timestamps, and average number of events per\
+    \ minute. \n\n# Below is a multi-line version of the command\nkubectl get events\
+    \ \\ \n    --context ${CONTEXT} \\ # Context defines which part of the cluster\
+    \ to act on, such as a namespace or node.\n    -n ${NAMESPACE} \\ # Namespace\
+    \ defines context for resource objects that have namespaces in the cluster.\n\
+    \    -o json | jq '(now - (60*60)) as $time_limit | \n        [ .items[] | select(.type\
+    \ != \"Warning\" and \n            (.involvedObject.kind == \"StatefulSet\" or\
+    \ .involvedObject.kind == \"Pod\") and \n            (.involvedObject.name | tostring\
+    \ | contains(\"${STATEFULSET_NAME}\"))) | \n            {kind: .involvedObject.kind,\
+    \ count: .count, name: .involvedObject.name, reason: .reason, message: .message,\
+    \ \n            firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp,\n\
+    \            duration: (if (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp\
+    \ | fromdateiso8601)) == 0) then 1 else (((.lastTimestamp | fromdateiso8601) -\
+    \ (.firstTimestamp | fromdateiso8601))/60) end) } ] | \n        group_by([.kind,\
+    \ .name]) | \n        map({kind: .[0].kind, name: .[0].name, count: (map(.count)\
+    \ | add), reasons: map(.reason) | unique, messages: map(.message) | unique, \n\
+    \            average_events_per_minute: (if .[0].duration == 1 then 1 else ((map(.count)\
+    \ | add)/.[0].duration ) end),\n            firstTimestamp: map(.firstTimestamp\
+    \ | fromdateiso8601) | sort | .[0] | todateiso8601, \n            lastTimestamp:\
+    \ map(.lastTimestamp | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'\
+    \ # The output is provided in JSON format."
+  name: check_statefulset_event_anomalies_for_statefulset_name
 - command: kubectl logs --tail=100 statefulset/${STATEFULSET_NAME} --context ${CONTEXT}
     -n ${NAMESPACE}
   doc_links: '

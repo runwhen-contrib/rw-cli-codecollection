@@ -96,6 +96,7 @@ def run_cli(cmd: str,
             optional_context: str = "",
             include_in_history: bool = True,
             timeout_seconds: int = 60,
+            debug: bool = True,
             **kwargs) -> platform.ShellServiceResponse
 ```
 
