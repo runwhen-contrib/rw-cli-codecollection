@@ -43,3 +43,4 @@
 * [repository](libraries/.docs/repository.md)
 * [cli_utils](libraries/.docs/cli_utils.md)
 * [parsers](libraries/.docs/parsers.md)
+* [postgres_helper](libraries/.docs/postgres_helper.md)

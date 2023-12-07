@@ -34,7 +34,7 @@ commands:
     CONTAINER_NAME=\"web-container\"\n\n#Multi-line command\nkubectl --context=${CONTEXT}\
     \ \\\n  -n ${NAMESPACE} \\\n  logs -l ${LABELS} \\\n  --tail=${MAX_LOG_LINES}\
     \ \\\n  --limit-bytes=256000 \\\n  --since=${LOGS_SINCE} \\\n  --container=${CONTAINER_NAME}"
-  name: get_workload_logs
+  name: get_workload_name_application_logs
 - command: ${cmd}
   doc_links: '
 
@@ -60,7 +60,7 @@ commands:
     \ \"generic\"\n  --from-literal=key1=value1 \\                     # Setting key\
     \ 'key1' to value 'value1'\n  --from-literal=key2=value2                     \
     \  # Setting key 'key2' to value 'value2'"
-  name: troubleshoot_application_logs
+  name: troubleshoot_workload_name_application_logs
 - command: kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head
     -n 1) --container=${CONTAINER_NAME} -- printenv
@@ -120,7 +120,7 @@ commands:
 
     kubectl --context=${CONTEXT} -n ${NAMESPACE} exec ${CONTAINER_NAME} --container=${CONTAINER_NAME}
     -- printenv'
-  name: troubleshoot_application_logs
+  name: troubleshoot_workload_name_application_logs
 - command: kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head
     -n 1) --container=${CONTAINER_NAME} -- ps -eo command --no-header | grep -v "ps
@@ -160,4 +160,4 @@ commands:
     \ 1) \n\n# Executes the container to retrieve the process status command output\n\
     kubectl --context=${CONTEXT} -n ${NAMESPACE} exec ${FIRST_POD_NAME} --container=${CONTAINER_NAME}\
     \ -- ps -eo command --no-header | grep -v \"ps -eo\""
-  name: troubleshoot_application_logs
+  name: troubleshoot_workload_name_application_logs
