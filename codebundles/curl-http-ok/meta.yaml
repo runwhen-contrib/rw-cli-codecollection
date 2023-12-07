@@ -11,12 +11,26 @@ commands:
   explanation: This command uses the curl tool to send a request to a specific URL
     and outputs the HTTP response code and the total time of the request in JSON format.
     The output is directed to /dev/null, meaning it won't be displayed on the terminal.
-  multi_line_details: "# Perform a GET request on the provided URL using curl\n# -o\
-    \ /dev/null: output response body to /dev/null (discard it)\n# -w '{\"http_code\"\
-    : %{http_code}, \"time_total\": %{time_total}}': write custom output format with\
-    \ HTTP code and total time\n# -s: silent mode, don't show progress or error messages\n\
-    # ${URL}: replace variable with the actual URL to request\n\ncurl \\\n  -o /dev/null\
-    \ \\    # Discard response body\n  -w '{\"http_code\": %{http_code}, \"time_total\"\
-    : %{time_total}}' \\  # Custom output format\n  -s \\  # Silent mode\n  ${URL}\
-    \  # Replace with actual URL for request"
+  multi_line_details: '```bash
+
+    #!/bin/bash
+
+
+    # Set the URL to make the HTTP request to
+
+    URL="http://example.com"
+
+
+    # Use curl to make an HTTP request to the specified URL, sending the output to
+    /dev/null
+
+    # The -w flag is used to define the output format, including HTTP status code
+    and total time taken for the request
+
+    # The -s flag is used to silence curl''s progress output
+
+    curl -o /dev/null -w ''{"http_code": %{http_code}, "time_total": %{time_total}}''
+    -s ${URL}
+
+    ```'
   name: checking_http_url_is_available_and_timely

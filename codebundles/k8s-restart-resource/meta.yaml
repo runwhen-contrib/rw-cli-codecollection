@@ -17,14 +17,22 @@ commands:
   explanation: This command is using the kubectl tool to retrieve YAML configurations
     for daemon sets, deployments, and stateful sets in a specific namespace and with
     certain labels, using a specific context.
-  multi_line_details: "```bash\n# Set the context to specify the Kubernetes cluster\
-    \ to interact with\nkubectl config use-context ${CONTEXT}\n\n# Set the namespace\
-    \ to limit the scope of operations to a specific namespace\nkubectl config set-context\
-    \ --current --namespace=${NAMESPACE}\n\n# Use 'kubectl get' command to retrieve\
-    \ the desired resources (daemonset, deployment, statefulset) based on the specified\
-    \ labels\nkubectl get daemonset,deployment,statefulset -l ${LABELS} \n\n# Output\
-    \ the results in yaml format for easier readability and understanding of the configurations\n\
-    kubectl get daemonset,deployment,statefulset -l ${LABELS} -oyaml\n```"
+  multi_line_details: '```sh
+
+    #!/bin/bash
+
+
+    # Set the context for kubectl
+
+    kubectl config use-context ${CONTEXT}
+
+
+    # Get resources (daemonset, deployment, statefulset) in a specific namespace with
+    certain labels in YAML format
+
+    kubectl -n ${NAMESPACE} get daemonset,deployment,statefulset -l ${LABELS} -o yaml
+
+    ```'
   name: get_current_resource_state
 - command: kubectl --context=${CONTEXT} -n ${NAMESPACE} logs daemonset,deployment,statefulset
     -l ${LABELS} --tail=200 --limit-bytes=256000
@@ -49,30 +57,40 @@ commands:
     cluster context to use for the operation.
   multi_line_details: '```bash
 
-    # Set the context for the kubectl command to the specified Kubernetes cluster
-
-    kubectl config use-context ${CONTEXT}
+    #!/bin/bash
 
 
-    # Set the namespace in which to perform the operation
+    # Set the Kubernetes context to be used
 
-    kubectl config set-context --current --namespace=${NAMESPACE}
-
-
-    # Retrieve logs from all daemonset, deployment, and statefulset resources with
-    the specified labels
-
-    kubectl logs -l ${LABELS}
+    CONTEXT=my-context
 
 
-    # Display the last 200 lines of the log for each resource
+    # Set the namespace for the logs
 
-    kubectl logs --tail=200
+    NAMESPACE=my-namespace
 
 
-    # Limit the total size of the logs to 256000 bytes
+    # Set the label selector for the resources
 
-    kubectl logs --limit-bytes=256000
+    LABELS=my-labels
+
+
+    # Export the Kubernetes context environment variable
+
+    export CONTEXT
+
+
+    # Use kubectl to retrieve logs from daemonset, deployment, and statefulset resources
+
+    kubectl --context=${CONTEXT} \
+
+    -n ${NAMESPACE} \
+
+    logs daemonset,deployment,statefulset -l ${LABELS} \
+
+    --tail=200 \
+
+    --limit-bytes=256000
 
     ```'
   name: get_resource_logs
@@ -93,31 +111,13 @@ commands:
     daemonset, deployment, and statefulset in the specified namespace and with the
     specified labels, using JSONPath output formatting. The context and namespace
     are specified by the variables ${CONTEXT} and ${NAMESPACE} and the labels by ${LABELS}.
-  multi_line_details: '```bash
-
-    # Set the context to use for the Kubernetes cluster
-
-    kubectl config use-context ${CONTEXT}
-
-
-    # Select the specific namespace to operate within
-
-    kubectl config set-context --current --namespace=${NAMESPACE}
-
-
-    # Get the daemonset, deployment, and statefulset resources that match the specified
-    labels
-
-    kubectl get daemonset,deployment,statefulset -l ${LABELS} -o=jsonpath=''{.items[0].kind}/{.items[0].metadata.name}''
-
-    ```
-
-
-    In this multi-line command, we first set the context to specify which Kubernetes
-    cluster we want to work with. Then, we set the namespace to limit our operations
-    to a specific logical subset of the cluster. Finally, we use the `kubectl get`
-    command to retrieve the desired resources based on the specified labels, and format
-    the output using JSONPath to extract the information we need.'
+  multi_line_details: "```bash\n#!/bin/bash\n\n# Set the kubectl context to the specified\
+    \ context\nkubectl config use-context ${CONTEXT}\n\n# Use kubectl to get resources\
+    \ (daemonset, deployment, statefulset) in the specified namespace with certain\
+    \ labels\nkubectl -n ${NAMESPACE} get daemonset,deployment,statefulset -l ${LABELS}\
+    \ \n\n# Output the kind and metadata name of the first resource using jsonpath\n\
+    kubectl -n ${NAMESPACE} get daemonset,deployment,statefulset -l ${LABELS} -o=jsonpath='{.items[0].kind}/{.items[0].metadata.name}'\n\
+    ```"
   name: restart_resource
 - command: kubectl rollout restart ${resource_name.stdout} --context=${CONTEXT} -n
     ${NAMESPACE}
@@ -131,25 +131,14 @@ commands:
     a specific component within a Kubernetes cluster.
   multi_line_details: '```bash
 
-    # Get the name of the resource using kubectl and store it in a variable
+    # Get the current state of the specified resource and store it in a variable
 
-    resource_name=$(kubectl get <resource_type> -n ${NAMESPACE} -o jsonpath=''{.items[0].metadata.name}'')
-
-
-    # Restart the specified resource using kubectl rollout restart command, passing
-    in the resource name, context, and namespace
-
-    kubectl rollout restart ${resource_name.stdout} --context=${CONTEXT} -n ${NAMESPACE}
-
-    ```
+    resource_name=$(kubectl get <resource_type> -o jsonpath=''{.items[0].metadata.name}'')
 
 
-    In this multi-line command:
+    # Restart the specified resource using the context and namespace provided
 
-    - We first use `kubectl get` to fetch the name of the resource based on the resource_type
-    and namespace, and store it in a variable called `resource_name`.
+    kubectl rollout restart $resource_name --context=$CONTEXT -n $NAMESPACE
 
-    - Then, we use `kubectl rollout restart` command with the retrieved resource name,
-    as well as the context and namespace provided. This will trigger a rolling restart
-    for the specified resource.'
+    ```'
   name: restart_resource

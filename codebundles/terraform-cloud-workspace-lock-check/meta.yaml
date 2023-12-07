@@ -8,17 +8,19 @@ commands:
   explanation: This command sets a variable TERRAFORM_API_TOKEN_VALUE to the value
     of the TERRAFORM_API_TOKEN file, then uses curl to make a request to a specified
     API URL with the token for authorization and specific content type.
-  multi_line_details: '# Read the value from the TERRAFORM_API_TOKEN file and store
-    it in the TERRAFORM_API_TOKEN_VALUE variable
+  multi_line_details: '```shell
+
+    # Read the value of the TERRAFORM_API_TOKEN file and store it in the TERRAFORM_API_TOKEN_VALUE
+    variable
 
     TERRAFORM_API_TOKEN_VALUE=$(cat $TERRAFORM_API_TOKEN)
 
 
-    # Make a HTTP request to the TERRAFORM_API_URL using the obtained token
+    # Use the stored API token value to make a curl request with authorization headers
+    and specific content type
 
-    curl --header "Authorization: Bearer $TERRAFORM_API_TOKEN_VALUE" \
+    curl --header "Authorization: Bearer $TERRAFORM_API_TOKEN_VALUE" --header "Content-Type:
+    application/vnd.api+json" -s ''${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}''
 
-    --header "Content-Type: application/vnd.api+json" \
-
-    -s ''${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}'''
+    ```'
   name: checking_whether_the_terraform_cloud_workspace_is_in_a_locked_state

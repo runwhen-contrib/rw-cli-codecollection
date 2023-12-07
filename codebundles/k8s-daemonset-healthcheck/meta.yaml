@@ -11,19 +11,29 @@ commands:
   explanation: This command retrieves the last 100 lines of logs from a specific daemon
     set within a designated namespace and context in a Kubernetes cluster, allowing
     you to troubleshoot any issues or monitor its activity.
-  multi_line_details: '# This command retrieves the last 100 log lines from a specific
-    daemonset in a specified namespace and context
+  multi_line_details: '```bash
 
+    # Set the number of lines to display from the log file to 100
 
-    # Set the context for the command to run in a specific Kubernetes cluster
+    TAIL=100
 
-    kubectl config use-context ${CONTEXT}
+    # Access the logs for the specified daemonset using kubectl command
 
+    kubectl logs --tail=$TAIL \
 
-    # Retrieve the last 100 logs from the specified daemonset within the specified
-    namespace
+    # Specify the daemonset name
 
-    kubectl logs --tail=100 daemonset/${DAEMONSET_NAME} -n ${NAMESPACE}'
+    daemonset/${DAEMONSET_NAME} \
+
+    # Specify the context in which the command should be executed
+
+    --context ${CONTEXT} \
+
+    # Specify the namespace where the daemonset is located
+
+    -n ${NAMESPACE}
+
+    ```'
   name: get_daemonset_log_details_for_report
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "${DAEMONSET_NAME}" || true
@@ -38,12 +48,28 @@ commands:
     a specific context and namespace, then filters the output to display only those
     related to a specific daemon set. The command also includes "|| true" to ensure
     that it returns a successful exit code even if no matching events are found.
-  multi_line_details: "```bash\n# Get events from a specific namespace using the Kubernetes\
-    \ context\n# The --field-selector is used to filter out events of type Warning\
-    \ only\n# We are also using the -n flag to specify the namespace and grep to filter\
-    \ out events related to a specific daemonset\n\nkubectl get events \\\n  --field-selector\
-    \ type=Warning \\\n  --context ${CONTEXT} \\\n  -n ${NAMESPACE} \\\n  | grep -i\
-    \ \"${DAEMONSET_NAME}\" || true\n```"
+  multi_line_details: '```bash
+
+    # Set the context of the kubectl command with the specified CONTEXT
+
+    # Set the namespace to be searched to the specified NAMESPACE
+
+    # Get all events of type Warning in the specified namespace, using the specified
+    context
+
+    kubectl get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE}
+    \
+
+    # Use grep to filter the events that contain the specified DAEMONSET_NAME (case
+    insensitive)
+
+    | grep -i "${DAEMONSET_NAME}" \
+
+    # Ensure that the command does not fail even if no matches are found
+
+    || true
+
+    ```'
   name: get_related_daemonset_events
 - command: kubectl describe daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
   doc_links: '
@@ -56,11 +82,16 @@ commands:
   explanation: This command is used to provide detailed information about a specific
     daemon set in Kubernetes, including its current status and events, within a specific
     context (such as a different Kubernetes cluster) and namespace.
-  multi_line_details: "# Step 1: Get the details and configuration of a specific DaemonSet\n\
-    # Step 2: Use the kubectl command to describe the DaemonSet with name specified\
-    \ in the environment variable ${DAEMONSET_NAME}\n# Step 3: Specify the Kubernetes\
-    \ context to be used for the command using the value stored in the environment\
-    \ variable ${CONTEXT}\n# Step 4: Provide the namespace where the DaemonSet is\
-    \ located using the value stored in the environment variable ${NAMESPACE}\n\n\
-    kubectl describe daemonset/${DAEMONSET_NAME} \n  --context ${CONTEXT} \n  -n ${NAMESPACE}"
+  multi_line_details: '```bash
+
+    # Set the context for the Kubernetes cluster
+
+    kubectl config use-context ${CONTEXT}
+
+
+    # Describe the daemon set with the specified name and in the specified namespace
+
+    kubectl describe daemonset/${DAEMONSET_NAME} -n ${NAMESPACE}
+
+    ```'
   name: check_daemonset_replicas
