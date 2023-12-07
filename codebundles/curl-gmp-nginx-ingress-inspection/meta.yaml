@@ -8,37 +8,18 @@ commands:
     + " Service:" + .data.result[0].metric.service else "" end'''
   doc_links: '
 
-    - [gcloud auth activate-service-account](https://cloud.google.com/sdk/gcloud/reference/auth/activate-service-account){:target="_blank"}
+    - [Activating a service account](https://cloud.google.com/iam/docs/creating-managing-service-account-keys){:target="_blank"}
 
-    - [curl](https://curl.se/docs/manpage.html){:target="_blank"}
+    - [cURL command usage](https://linux.die.net/man/1/curl){:target="_blank"}
 
-    - [Prometheus Querying and API Usage](https://prometheus.io/docs/prometheus/latest/querying/api/){:target="_blank"}
+    - [Querying with cURL in Google Cloud Platform](https://cloud.google.com/apis/design/custom_methods){:target="_blank"}
 
-    - [jq Manual](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: "This command is used to query Prometheus metrics for the nginx_ingress_controller_requests\
-    \ in a Kubernetes cluster. It first authenticates the service account using gcloud\
-    \ and then sends a request to the Google Cloud Monitoring API to retrieve the\
-    \ desired metrics.\n\nHere's a breakdown of the command:\n- `gcloud auth activate-service-account\
-    \ --key-file=$GOOGLE_APPLICATION_CREDENTIALS`: This part of the command uses the\
-    \ `gcloud` tool to activate the service account by providing the key file which\
-    \ contains the necessary credentials for authentication.\n\n- `curl -d \"query=rate(nginx_ingress_controller_requests{host='${INGRESS_HOST}',\
-    \ service='${INGRESS_SERVICE}', status=~'${ERROR_CODES}'}[${TIME_SLICE}]) > 0\"\
-    \ -H \"Authorization: Bearer $(gcloud auth print-access-token)\" 'https://monitoring.googleapis.com/v1/projects/${GCP_PROJECT_ID}/location/global/prometheus/api/v1/query'`:\
-    \ \n  - This part is a `curl` command that makes an HTTP POST request to the Google\
-    \ Cloud Monitoring API endpoint for querying Prometheus metrics.\n  - It specifies\
-    \ the query as a rate of nginx_ingress_controller_requests with specific host,\
-    \ service, and status codes over a defined time slice.\n  - It includes the Authorization\
-    \ header with a Bearer token obtained from `gcloud auth print-access-token`.\n\
-    \n- `| jq -r 'if .data.result[0] then \"Host:\" + .data.result[0].metric.host\
-    \ + \" Ingress:\" + .data.result[0].metric.ingress + \" Namespace:\" + .data.result[0].metric.exported_namespace\
-    \ + \" Service:\" + .data.result[0].metric.service else \"\" end'`:\n  - This\
-    \ part pipes the output of the previous command into `jq`, a command-line JSON\
-    \ processor, to parse and format the response.\n  - It extracts specific information\
-    \ from the JSON response related to the queried metrics, such as host, ingress,\
-    \ namespace, and service.\n\nIn summary, this command handles authentication,\
-    \ sends a request to the monitoring API to query Prometheus metrics, and then\
-    \ processes the response to extract and display relevant information about the\
-    \ nginx Ingress controller requests in the Kubernetes cluster."
+    - [Using jq to format JSON output](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command activates a service account and then uses cURL to make
+    a query to Google Cloud Monitoring's Prometheus API, checking for errors in the
+    nginx ingress controller within a specific time frame. It then uses jq to format
+    the output showing the host, ingress, namespace, and service if any errors are
+    found.
   multi_line_details: "```bash\n# Activate the service account using gcloud auth command\
     \ with the key file specified by the environment variable GOOGLE_APPLICATION_CREDENTIALS\n\
     gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS\
@@ -90,53 +71,15 @@ commands:
     fi; echo "------------"'
   doc_links: '
 
-    - [Kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
+    - [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/){:target="_blank"}
 
-    - [Understanding Kubernetes Network Policies](https://www.stackrox.com/post/2019/01/understanding-kubernetes-network-policies/){:target="_blank"}'
-  explanation: 'This is a complex command that is used to check the health status
-    of a Kubernetes Ingress and its associated services. Let''s break it down step
-    by step.
+    - [Kubernetes backend services](https://kubernetes.io/docs/concepts/services-networking/service/){:target="_blank"}
 
-
-    1. First, three variables are being defined: `namespace`, `context`, and `ingress`.
-    These variables will be used throughout the command to specify the Kubernetes
-    namespace, context, and name of the Ingress object.
-
-
-    2. The command then prints the name of the Ingress using `echo`.
-
-
-    3. A variable called `health_status` is initialized with the value "NA". This
-    will be used to track the health status of the services associated with the Ingress.
-
-
-    4. An empty array called `services` is created, where we will store the names
-    of the backend services associated with the Ingress.
-
-
-    5. The command then retrieves information about the backend services associated
-    with the Ingress using `kubectl get ingress ... -ojsonpath=...`. This information
-    includes the name and port number of each backend service.
-
-
-    6. It then loops through each line of the backend services information and checks
-    for the existence of each service. If the service exists, it retrieves additional
-    information including the associated endpoint pods, owner details, and sets the
-    health status accordingly.
-
-
-    7. After processing all backend services, it iterates through the list of services
-    again to perform additional validation checks on each service and its endpoint
-    existence.
-
-
-    8. Finally, based on the `health_status` value, it prints out the overall health
-    status of the Ingress and its associated services.
-
-
-    This command is quite complex and does a lot of work in a single line. As you
-    continue learning and working with Kubernetes, you''ll become more comfortable
-    understanding and writing similar commands.'
+    - [Owner references in Kubernetes](https://kubernetes.io/docs/concepts/workloads/controllers/garbage-collection/){:target="_blank"}'
+  explanation: This command is a script that checks the health status of a specified
+    Ingress object in Kubernetes, including validating the existence and connectivity
+    of backend services and their pods, as well as checking if they are healthy or
+    unhealthy. It also provides detailed information about the owner of each pod.
   multi_line_details: "```bash\n# Set the namespace, context, and ingress object name\
     \ from environment variables\nnamespace=\"${NAMESPACE}\"\ncontext=\"${CONTEXT}\"\
     \ningress=\"${INGRESS_OBJECT_NAME}\"\n\n# Output the name of the Ingress object\n\

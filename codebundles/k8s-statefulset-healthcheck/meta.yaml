@@ -11,48 +11,42 @@ commands:
     map(.lastTimestamp | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'''
   doc_links: '
 
-    - [Kubectl Get guide](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+    - [Retrieve events from a Kubernetes cluster](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
-    - [Context CLI Overview](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}
+    - [Filtering events in Kubernetes](https://kubernetes.io/docs/concepts/cluster-administration/logging/#kubectl-logs-and-kubectl-events){:target="_blank"}
 
-    - [JSON Path Syntax](https://goessner.net/articles/JsonPath/){:target="_blank"}
+    - [Understanding StatefulSets in Kubernetes](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
 
-    - [jq Manual](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: '
-
-
-    This command is used in Kubernetes to get all the events for a specific context,
-    namespace and statefulset name that are warnings within the last hour. Specifically,
-    it will print out information about the kind of object (like Pod or StatefulSet),
-    the name of the object, how many events there are, the different reasons for the
-    warnings, the associated messages, and the first and last timestamp for when the
-    warnings occurred.'
-  multi_line_details: "\n\n# This multi-line command checks for events of type \"\
-    Warning\", that have occurred in the last hour for any StatefulSet or Pod with\
-    \ a name containing the STATEFULSET_NAME, and converts this data into a JSON array\
-    \ of the involvedObjects, containing counts, reasons, messages, firstTimestamps\
-    \ and lastTimestamps of the events. \n\nkubectl get events \\\n    --context ${CONTEXT}\
-    \ \\\n    -n ${NAMESPACE} \\\n    -o json | \n    jq '(now - (60*60)) as $time_limit\
-    \ |             # Set a time limit of one hour ago\n       [ .items[] |      \
-    \                            # For items in this list... \n            select(.type\
-    \ == \"Warning\" and            # Select those with type \"Warning\" and\n   \
-    \             (.involvedObject.kind == \"StatefulSet\" or .involvedObject.kind\
-    \ == \"Pod\") and                        # involvedObjects which are of kind \"\
-    StatefulSet\" or \"Pod\" and\n                (.involvedObject.name | tostring\
-    \ | contains(\"${STATEFULSET_NAME}\")) and        # have names containing a certain\
-    \ value \n                (.lastTimestamp | fromdateiso8601) >= $time_limit) |\
-    \                         # which occurred after our set time limit\n       {kind:\
-    \ .involvedObject.kind,                  # Output the result as an object\n  \
-    \      name: .involvedObject.name, \n        reason: .reason, \n        message:\
-    \ .message, \n        firstTimestamp: .firstTimestamp, \n        lastTimestamp:\
-    \ .lastTimestamp} ] |            # ...and store it in an array\n     group_by([.kind,\
-    \ .name]) |                      # Group by kind and name\n     map({        \
-    \                                   # Map values\n         kind: .[0].kind, \n\
-    \         name: .[0].name, \n         count: length, \n         reasons: map(.reason)\
-    \ | unique, \n         messages: map(.message) | unique, \n         firstTimestamp:\
-    \ map(.firstTimestamp | fromdateiso8601) | sort | .[0] | todateiso8601, \n   \
-    \      lastTimestamp: map(.lastTimestamp | fromdateiso8601) | sort | reverse |\
-    \ .[0] | todateiso8601})'"
+    - [Using kubectl to filter events](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events){:target="_blank"}'
+  explanation: This command retrieves events from a Kubernetes cluster and filters
+    them to show only warning events related to a specific StatefulSet or Pod within
+    the last hour, displaying relevant information such as the kind, name, reason,
+    message, and timestamps of the events.
+  multi_line_details: "```bash\n# Use kubectl get events to fetch the events logs\
+    \ for a given namespace specified by -n flag\n# Also, use json format to output\
+    \ the data making it more suitable for jq refiner\nkubectl get events --context\
+    \ ${CONTEXT} -n ${NAMESPACE} -o json \\\n\n# Pipe the result of the above command\
+    \ to a jq refinements which takes current system time,\n# subtracts an hour of\
+    \ time from the system time and sets this new calculated time as $time_limit \n\
+    | jq '(now - (60*60)) as $time_limit |\n\n# Filter only the warning events for\
+    \ StatefulSet or Pod kind and name containing ${STATEFULSET_NAME}\n# Select only\
+    \ the event that has happened after the new $time_limit\n[ .items[] | \n    select(.type\
+    \ == \"Warning\" \n        and (.involvedObject.kind == \"StatefulSet\" or .involvedObject.kind\
+    \ == \"Pod\") \n        and (.involvedObject.name | tostring | contains(\"${STATEFULSET_NAME}\"\
+    )) \n        and (.lastTimestamp | fromdateiso8601) >= $time_limit) |\n\n# Only\
+    \ display certain details of the selected events such as kind, name, reason, message,\
+    \ first timestamp, last timestamp  \n    {kind: .involvedObject.kind,\n     name:\
+    \ .involvedObject.name, \n     reason: .reason, \n     message: .message, \n \
+    \    firstTimestamp: .firstTimestamp, \n     lastTimestamp: .lastTimestamp} ]\
+    \ |\n\n# group selected events by kind and name and display count, reasons, messages,\
+    \ first and last timestamps\ngroup_by([.kind, .name]) |\nmap({kind: .[0].kind,\n\
+    \     name: .[0].name, \n     count: length, \n     reasons: map(.reason) | unique,\
+    \ \n     messages: map(.message) | unique, \n     firstTimestamp: map(.firstTimestamp\
+    \ | fromdateiso8601) | sort | .[0] | todateiso8601, \n     lastTimestamp: map(.lastTimestamp\
+    \ | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})\n```\nThis multi-line\
+    \ version of the command includes verbose comments to help new Kubernetes users\
+    \ understand each part of the original one-line command and how it processes the\
+    \ events."
   name: troubleshoot_statefulset_warning_events_for_statefulset_name
 - command: 'kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq ''(now
     - (60*60)) as $time_limit | [ .items[] | select(.type != "Warning" and (.involvedObject.kind
@@ -69,91 +63,50 @@ commands:
     map(.lastTimestamp | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'''
   doc_links: '
 
-    - [Kubectl documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+    - [Kubernetes Event API](https://kubernetes.io/docs/reference/using-api/api-concepts/#events){:target="_blank"}
 
-    - [StatefulSets reference](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
+    - [Kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
 
-    - [Pod commands](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-pods){:target="_blank"}
-
-    - [JSONPath expressions](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}
-
-    - [JQ examples](https://stedolan.github.io/jq/tutorial/){:target="_blank"}'
-  explanation: '
-
-
-    This command uses the kubectl tool to get events from a specific namespace within
-    the Kubernetes cluster for a specified context. The events are in json format
-    and are then passed to jq, which is used to process the events to provide a summary
-    of the data. The summary includes the event kind, count, name, reasons, messages,
-    average events per minute, first timestamp, and last timestamp. This information
-    can help an engineer investigate issues within the cluster related to StatefulSets
-    and Pods with the specified name.'
-  multi_line_details: "\n\n# This command retrieves events from a Kubernetes cluster,\
-    \ given some conditionals. It then groups the output and provides summary data,\
-    \ such as counts, first and last timestamps, and average number of events per\
-    \ minute. \n\n# Below is a multi-line version of the command\nkubectl get events\
-    \ \\ \n    --context ${CONTEXT} \\ # Context defines which part of the cluster\
-    \ to act on, such as a namespace or node.\n    -n ${NAMESPACE} \\ # Namespace\
-    \ defines context for resource objects that have namespaces in the cluster.\n\
-    \    -o json | jq '(now - (60*60)) as $time_limit | \n        [ .items[] | select(.type\
-    \ != \"Warning\" and \n            (.involvedObject.kind == \"StatefulSet\" or\
-    \ .involvedObject.kind == \"Pod\") and \n            (.involvedObject.name | tostring\
-    \ | contains(\"${STATEFULSET_NAME}\"))) | \n            {kind: .involvedObject.kind,\
-    \ count: .count, name: .involvedObject.name, reason: .reason, message: .message,\
-    \ \n            firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp,\n\
-    \            duration: (if (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp\
-    \ | fromdateiso8601)) == 0) then 1 else (((.lastTimestamp | fromdateiso8601) -\
-    \ (.firstTimestamp | fromdateiso8601))/60) end) } ] | \n        group_by([.kind,\
-    \ .name]) | \n        map({kind: .[0].kind, name: .[0].name, count: (map(.count)\
-    \ | add), reasons: map(.reason) | unique, messages: map(.message) | unique, \n\
-    \            average_events_per_minute: (if .[0].duration == 1 then 1 else ((map(.count)\
-    \ | add)/.[0].duration ) end),\n            firstTimestamp: map(.firstTimestamp\
-    \ | fromdateiso8601) | sort | .[0] | todateiso8601, \n            lastTimestamp:\
-    \ map(.lastTimestamp | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'\
-    \ # The output is provided in JSON format."
+    - [JSON formatting in bash](https://linuxize.com/post/bash-json-processing-with-jq/){:target="_blank"}'
+  explanation: This command retrieves events from a Kubernetes cluster, filters out
+    certain types of events within a specific time range, and then formats the output
+    into a JSON structure that provides information about the count, timing, and other
+    details of those events at the StatefulSet or Pod level.
+  multi_line_details: "```bash\n# Set the context to the specified Kubernetes cluster\n\
+    kubectl config use-context ${CONTEXT}\n\n# Get events from the specified namespace\
+    \ in JSON format\nkubectl get events -n ${NAMESPACE} -o json | \n\n# Use jq to\
+    \ process and format the output\njq '\n  # Calculate a time limit (one hour ago)\
+    \ for filtering events\n  (now - (60*60)) as $time_limit |\n\n  # Filter and transform\
+    \ the JSON data\n  [\n    .items[] |\n    select(\n      .type != \"Warning\"\
+    \ and \n      (.involvedObject.kind == \"StatefulSet\" or .involvedObject.kind\
+    \ == \"Pod\") and \n      (.involvedObject.name | tostring | contains(\"${STATEFULSET_NAME}\"\
+    ))\n    ) |\n    {\n      kind: .involvedObject.kind,\n      count: .count,\n\
+    \      name: .involvedObject.name,\n      reason: .reason,\n      message: .message,\n\
+    \      firstTimestamp: .firstTimestamp,\n      lastTimestamp: .lastTimestamp,\n\
+    \      duration: (if (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp |\
+    \ fromdateiso8601)) == 0)\n        then 1 else (((.lastTimestamp | fromdateiso8601)\
+    \ - (.firstTimestamp | fromdateiso8601))/60) end)\n    }\n  ] |\n\n  # Group the\
+    \ filtered data by kind and name\n  group_by([.kind, .name]) |\n\n  # Map and\
+    \ calculate aggregated event details\n  map({\n    kind: .[0].kind, \n    name:\
+    \ .[0].name, \n    count: (map(.count) | add), \n    reasons: map(.reason) | unique,\
+    \ \n    messages: map(.message) | unique, \n    average_events_per_minute: (if\
+    \ .[0].duration == 1 \n      then 1 else ((map(.count) | add)/.[0].duration )\
+    \ end),\n    firstTimestamp: map(.firstTimestamp | fromdateiso8601) | sort | .[0]\
+    \ | todateiso8601,\n    lastTimestamp: map(.lastTimestamp | fromdateiso8601) |\
+    \ sort | reverse | .[0] | todateiso8601\n  })'\n```"
   name: check_statefulset_event_anomalies_for_statefulset_name
 - command: kubectl logs --tail=100 statefulset/${STATEFULSET_NAME} --context ${CONTEXT}
     -n ${NAMESPACE}
   doc_links: '
 
-    - [Kubectl Logs Overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs){:target="_blank"}
+    - [Viewing Pods and Node Logs](https://kubernetes.io/docs/concepts/cluster-administration/logging/){:target="_blank"}
 
-    - [Kubectl StatefulSet Documentation](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
+    - [Kubectl Command Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs){:target="_blank"}
 
-    - [Kubectl Contexts Documentation](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}
-
-    - [Kubernetes Namespaces Overview](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}'
-  explanation: 'This command is used to view the logs of a specific StatefulSet within
-    a Kubernetes cluster. A StatefulSet is a workload API object in Kubernetes that
-    is similar to a Deployment but is intended for stateful applications.
-
-
-    Here''s a breakdown of the command:
-
-
-    - `kubectl logs`: This is the main part of the command and is used to retrieve
-    the logs of a specific pod or set of pods.
-
-    - `--tail=100`: This option specifies that you only want to see the last 100 lines
-    of the logs. You can change the number to see more or fewer lines.
-
-    - `statefulset/${STATEFULSET_NAME}`: This part of the command specifies the StatefulSet
-    for which you want to view the logs. You would replace `${STATEFULSET_NAME}` with
-    the actual name of the StatefulSet you are interested in.
-
-    - `--context ${CONTEXT}`: This flag allows you to specify the context, which is
-    a group of access parameters that describe a particular Kubernetes cluster, including
-    user information, cluster details, and more. Replace `${CONTEXT}` with the name
-    of the context you want to use.
-
-    - `-n ${NAMESPACE}`: This flag specifies the namespace in which the StatefulSet
-    is located. Replace `${NAMESPACE}` with the name of the namespace where the StatefulSet
-    is running.
-
-
-    So, when you run this command, it will show you the logs of the specified StatefulSet
-    within the chosen context and namespace, with the option to limit the number of
-    lines displayed.'
+    - [Kubernetes StatefulSets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}'
+  explanation: This command allows you to view the logs of the pods within a statefulset
+    in Kubernetes, displaying the last 100 lines of each pod's log. You can specify
+    the context and namespace for the logs you want to view.
   multi_line_details: "# Obtain the logs from a StatefulSet in a specific namespace\
     \ using the specified context\nkubectl logs --tail=100  # Display the last 100\
     \ lines of logs  \nstatefulset/${STATEFULSET_NAME}  # Specify the StatefulSet\
@@ -165,53 +118,13 @@ commands:
     ${NAMESPACE} | grep -i "${STATEFULSET_NAME}" || true
   doc_links: '
 
-    - [kubectl get events command documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events){:target="_blank"}
+    - [Grep Command Documentation](https://www.gnu.org/software/grep/manual/grep.html){:target="_blank"}
 
-    - [Kubectl field selector documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/){:target="_blank"}
-
-    - [Kubectl context documentation](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}
-
-    - [Kubectl namespaces documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [Grep command in Linux documentation](https://www.geeksforgeeks.org/grep-command-in-unixlinux/){:target="_blank"}'
-  explanation: 'Sure! Let me break down this command for you as a new Kubernetes user.
-
-
-    1. `kubectl`: This is the command-line tool for interacting with the Kubernetes
-    API server.
-
-
-    2. `get events`: This part of the command tells Kubernetes to fetch all the events
-    that have occurred within the cluster.
-
-
-    3. `--field-selector type=Warning`: With this field selector option, we are telling
-    Kubernetes to only return events of type "Warning". This helps filter and narrow
-    down the events we want to see.
-
-
-    4. `--context ${CONTEXT}`: The `--context` flag is used to specify the context
-    (or configuration) to use for interacting with the Kubernetes cluster. The `${CONTEXT}`
-    variable should be replaced with the actual context name you want to use.
-
-
-    5. `-n ${NAMESPACE}`: The `-n` flag is used to specify the namespace in which
-    to execute the command. The `${NAMESPACE}` variable should be replaced with the
-    actual namespace name you want to use.
-
-
-    6. `| grep -i "${STATEFULSET_NAME}" || true`: After fetching the events, we use
-    the `grep` command to search for a specific string (in this case, the value of
-    the `${STATEFULSET_NAME}` variable) within the events. The `-i` flag makes the
-    search case-insensitive. The `|| true` at the end ensures that the command will
-    return a success status even if the `grep` doesn''t find a match, preventing it
-    from failing the entire pipeline.
-
-
-    In summary, this command is used to retrieve Warning events related to a specific
-    StatefulSet within a specified namespace and context in a Kubernetes cluster.
-    It''s a helpful way to monitor and troubleshoot potential issues or warnings related
-    to the StatefulSet resources.'
+    - [Bash Exit Status Codes](https://tldp.org/LDP/abs/html/exitcodes.html){:target="_blank"}'
+  explanation: This command retrieves all events with a warning type for a specified
+    namespace and context, then filters the output to only include lines containing
+    the statefulset name, and finally the "|| true" at the end ensures that the command
+    exits with a success status code even if the grep doesn't find any matches.
   multi_line_details: '```bash
 
     # Get events for a specific context and namespace in Kubernetes
@@ -240,34 +153,13 @@ commands:
     -o yaml
   doc_links: '
 
-    - [kubectl get statefulset](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+    - [Retrieving a StatefulSet YAML configuration](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
 
-    - [${LABELS}](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
+    - [Namespaces in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [--context=${CONTEXT}](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/){:target="_blank"}
-
-    - [-n ${NAMESPACE}](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [-o yaml](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}'
-  explanation: "This command is used to retrieve information about a StatefulSet in\
-    \ a Kubernetes cluster. A StatefulSet is a controller that manages a set of closely\
-    \ related, stateful pods. \n\nHere's what each part of the command does:\n- `kubectl`:\
-    \ This is the command line tool for interacting with Kubernetes clusters.\n- `get\
-    \ statefulset`: This part of the command specifies that we want to retrieve information\
-    \ about a specific StatefulSet.\n- `${LABELS}`: This is where you would specify\
-    \ any labels that the StatefulSet might have. Labels are key-value pairs that\
-    \ can be attached to Kubernetes objects like StatefulSets for the purpose of identifying\
-    \ and grouping them.\n- `--context=${CONTEXT}`: This specifies the context or\
-    \ cluster you want to use. In a multi-cluster setup, this allows you to specify\
-    \ which cluster you want to interact with.\n- `-n ${NAMESPACE}`: This specifies\
-    \ the namespace in which the StatefulSet is located. Namespaces are used to organize\
-    \ and divide cluster resources.\n- `-o yaml`: This specifies the output format.\
-    \ In this case, it specifies that the information should be returned in YAML format,\
-    \ which is a human-readable serialization format.\n\nSo, when you run this command,\
-    \ it will retrieve information about the specified StatefulSet, based on the provided\
-    \ labels, within the specified namespace and cluster context, and return the information\
-    \ in YAML format. This can be useful for getting detailed information about a\
-    \ specific StatefulSet for troubleshooting or debugging purposes."
+    - [Contexts in Kubernetes](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}'
+  explanation: This command retrieves the YAML configuration of a stateful set in
+    a specific namespace and context, using specified labels for filtering.
   multi_line_details: '# Step 1: Retrieve the statefulset with specified labels
 
     statefulset_labels="${LABELS}"
@@ -294,32 +186,11 @@ commands:
     + "\nAvailable Replicas: " + (.status.availableReplicas|tostring)'''
   doc_links: '
 
-    - [Kubernetes kubectl Reference Documentation](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
-
-    - [Kubernetes API Concepts](https://kubernetes.io/docs/concepts/overview/kubernetes-api/){:target="_blank"}'
-  explanation: "This command is used to get information about the stateful sets in\
-    \ a specific Kubernetes namespace. A stateful set is a workload API object used\
-    \ to manage stateful applications, such as databases. \n\nLet me break down the\
-    \ command for you:\n\n- `kubectl` is the command-line tool for interacting with\
-    \ Kubernetes clusters.\n- `get statefulset` is the part of the command that specifies\
-    \ that we want to retrieve information about stateful sets.\n- `-n ${NAMESPACE}`\
-    \ specifies the namespace in which to look for the stateful sets. You would replace\
-    \ `${NAMESPACE}` with the actual name of the namespace you are interested in.\n\
-    - `-o json` sets the output format to JSON, so the data will be returned in a\
-    \ machine-readable format.\n- `--context ${CONTEXT}` specifies the context to\
-    \ use. A context is a group of access parameters, including cluster, user, and\
-    \ namespace. You would replace `${CONTEXT}` with the actual name of the context\
-    \ you want to use.\n- `| jq -r` is a pipe that passes the result to the `jq` command,\
-    \ which is a lightweight and flexible command-line JSON processor. The `-r` flag\
-    \ outputs raw strings instead of JSON-formatted strings.\n\nThe `jq` part of the\
-    \ command does a few things:\n- `.items[]` selects each individual stateful set.\n\
-    - `select(.status.availableReplicas < .status.replicas)` filters out only those\
-    \ stateful sets where the available replicas are less than the desired replicas.\n\
-    - Then it formats the output to display the StatefulSet name, desired replicas,\
-    \ and available replicas for each selected StatefulSet.\n\nOverall, this command\
-    \ is useful for monitoring the status of stateful sets in a specific namespace\
-    \ and identifying any stateful sets that may not have enough available replicas\
-    \ based on their desired configuration."
+    '
+  explanation: This command uses kubectl to get the stateful sets in a specific namespace
+    and context, then uses jq to filter and format the output to show the StatefulSet
+    name, desired replicas, and available replicas for any stateful sets that have
+    less available replicas than desired.
   multi_line_details: "```yaml\n# Use kubectl command to get the statefulset details\
     \ in the specified namespace and output it in JSON format\nkubectl get statefulset\
     \ -n ${NAMESPACE} -o json --context ${CONTEXT} \n  # Pipe the output to jq command\

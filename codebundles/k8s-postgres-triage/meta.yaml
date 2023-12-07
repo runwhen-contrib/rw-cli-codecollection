@@ -2,28 +2,15 @@ commands:
 - command: kubectl get all -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
   doc_links: '
 
-    - [kubectl get command documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+    - [kubectl official documentation](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
-    - [Kubernetes Labels and Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
+    - [Understanding Kubernetes resource labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
 
-    - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+    - [Namespaces in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [Kubernetes Contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/){:target="_blank"}'
-  explanation: "This command is used in Kubernetes to list all the resources matching\
-    \ certain labels within a specific namespace and context. \n\n- `kubectl` is the\
-    \ command-line tool used to interact with Kubernetes clusters.\n- `get all` is\
-    \ the command to retrieve all resources of different types (pods, services, deployments,\
-    \ etc.) that match the specified labels.\n- `-l ${RESOURCE_LABELS}` specifies\
-    \ the labels to filter the resources by. The `${RESOURCE_LABELS}` should be replaced\
-    \ with the actual labels you want to use for filtering.\n- `-n ${NAMESPACE}` is\
-    \ used to specify the namespace in which to look for the resources. The `${NAMESPACE}`\
-    \ should be replaced with the actual namespace name you want to use.\n- `--context\
-    \ ${CONTEXT}` is used to specify the context to use when interacting with the\
-    \ Kubernetes cluster. The `${CONTEXT}` should be replaced with the name of the\
-    \ context you want to use.\n\nAs an engineer working with Kubernetes, this command\
-    \ can help you quickly retrieve information about the resources running in a specific\
-    \ namespace and context, allowing you to manage and troubleshoot your applications\
-    \ more effectively."
+    - [Kubernetes contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/){:target="_blank"}'
+  explanation: This command uses kubectl to retrieve all resources labeled with ${RESOURCE_LABELS}
+    in the specified ${NAMESPACE} and ${CONTEXT}.
   multi_line_details: "```bash\n# Use kubectl to get all resources that match the\
     \ specified label selector \n# in the specified namespace and context\n\n# Set\
     \ the label selector for filtering resources\nRESOURCE_LABELS=\"app=myapp\"\n\n\
@@ -37,29 +24,10 @@ commands:
 - command: kubectl get crd -n ${NAMESPACE} --context ${CONTEXT} -o=jsonpath='{.items[*].metadata.name}'
   doc_links: '
 
-    - [Kubernetes Custom Resource Definitions (CRDs) documentation](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/){:target="_blank"}
-
-    - [Kubectl get command documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
-
-    - [Jsonpath output formatting in kubernetes](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}'
-  explanation: "Sure! Let's break down the command step by step:\n\n`kubectl` is the\
-    \ command-line tool for interacting with Kubernetes clusters. \n\n`get crd` is\
-    \ telling Kubernetes to retrieve information about custom resource definitions\
-    \ (CRDs) which are used to extend the basic functionality of Kubernetes.\n\n`-n\
-    \ ${NAMESPACE}` specifies the namespace in which you want to run the command.\
-    \ Namespaces are virtual clusters within a Kubernetes cluster that allow for multiple\
-    \ users and teams to share and manage resources. Replace `${NAMESPACE}` with the\
-    \ actual namespace name you want to use.\n\n`--context ${CONTEXT}` specifies the\
-    \ context in which you want to run the command. A context is a group of access\
-    \ parameters, including clusters, users, and namespaces, so this option tells\
-    \ kubectl which context configuration to use when running the command. Replace\
-    \ `${CONTEXT}` with the actual context name you want to use.\n\n`-o=jsonpath='{.items[*].metadata.name}'`\
-    \ specifies the output format using JSONPath. JSONPath is a way to extract specific\
-    \ fields from JSON data. In this case, it is asking for the names of all the CRDs\
-    \ in the specified namespace and context.\n\nSo, when you run this command, you\
-    \ will get a list of all the CRD names in the specified namespace and context\
-    \ in the desired output format. This can be helpful for understanding the available\
-    \ custom resources in a Kubernetes environment."
+    '
+  explanation: This command retrieves the custom resource definitions (CRDs) in a
+    specific Kubernetes namespace and context, and then outputs only the names of
+    those CRDs using the JSONPath format.
   multi_line_details: "```bash\n# Set the namespace where the custom resource definitions\
     \ (CRD) are located\nNAMESPACE=\"your-namespace\"\n\n# Set the context for the\
     \ Kubernetes cluster\nCONTEXT=\"your-context\"\n\n# Use kubectl to get the custom\
@@ -72,66 +40,9 @@ commands:
     -o=name --field-selector=status.phase=Running
   doc_links: '
 
-    - [kubectl get](https://kubernetes.io/docs/reference/kubectl/kubectl/){:target="_blank"}
-
-    - [pods -l](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
-
-    - [NAMESPACE](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [CONTEXT](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/){:target="_blank"}
-
-    - [--field-selector](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/){:target="_blank"}
-
-    - [status.phase=Running](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase){:target="_blank"}'
-  explanation: 'This command is used to retrieve the names of all pods in a specific
-    namespace that have certain labels and are currently running. Let''s break down
-    the parts of the command:
-
-
-    - `kubectl`: This is the command-line interface for running commands against Kubernetes
-    clusters. It is how we interact with the Kubernetes cluster.
-
-
-    - `get pods`: This part of the command instructs Kubernetes to retrieve information
-    about pods. Pods are the basic building blocks of a Kubernetes application. They
-    are a group of one or more containers that share the same network and storage
-    resources.
-
-
-    - `-l ${RESOURCE_LABELS}`: This part of the command filters the pods based on
-    their labels. Labels are key/value pairs attached to objects in Kubernetes and
-    can be used to identify and select objects. In this case, `${RESOURCE_LABELS}`
-    is a placeholder for the specific labels you want to filter by. For example, if
-    you wanted to filter pods by the label "app=web", you would replace `${RESOURCE_LABELS}`
-    with `app=web`.
-
-
-    - `-n ${NAMESPACE}`: This part of the command specifies the namespace in which
-    to look for the pods. Namespaces are a way to divide cluster resources between
-    multiple users or teams.
-
-
-    - `--context ${CONTEXT}`: This part of the command specifies the context, which
-    is a group of access parameters for a Kubernetes cluster, including the cluster
-    name, authentication information, and location of the cluster. You can think of
-    it as specifying which Kubernetes cluster you want to perform the operation on.
-
-
-    - `-o=name`: This part of the command specifies the output format. In this case,
-    we want to output only the names of the pods.
-
-
-    - `--field-selector=status.phase=Running`: This part of the command filters the
-    pods further based on their status. In this case, we are only interested in pods
-    that are currently running.
-
-
-    So, putting it all together, the `kubectl get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE}
-    --context ${CONTEXT} -o=name --field-selector=status.phase=Running` command retrieves
-    the names of all pods in a specific namespace that have certain labels and are
-    currently running. By using this command, you can easily view which pods are running
-    based on specific criteria and use that information for further troubleshooting
-    or management of your Kubernetes application.'
+    '
+  explanation: This command retrieves the names of all running pods in a specific
+    namespace and context, based on certain resource labels.
   multi_line_details: "```bash\n# Set the resource labels for filtering pods\nRESOURCE_LABELS=\"\
     app=myapp,env=prod\"\n# Set the namespace where the pods are located\nNAMESPACE=\"\
     my-namespace\"\n# Set the context to specify which Kubernetes cluster to interact\
@@ -147,66 +58,9 @@ commands:
     -o=name --field-selector=status.phase=Running
   doc_links: '
 
-    - [kubectl get](https://kubernetes.io/docs/reference/kubectl/kubectl/){:target="_blank"}
-
-    - [pods -l](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
-
-    - [NAMESPACE](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [CONTEXT](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/){:target="_blank"}
-
-    - [--field-selector](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/){:target="_blank"}
-
-    - [status.phase=Running](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase){:target="_blank"}'
-  explanation: 'This command is used to retrieve the names of all pods in a specific
-    namespace that have certain labels and are currently running. Let''s break down
-    the parts of the command:
-
-
-    - `kubectl`: This is the command-line interface for running commands against Kubernetes
-    clusters. It is how we interact with the Kubernetes cluster.
-
-
-    - `get pods`: This part of the command instructs Kubernetes to retrieve information
-    about pods. Pods are the basic building blocks of a Kubernetes application. They
-    are a group of one or more containers that share the same network and storage
-    resources.
-
-
-    - `-l ${RESOURCE_LABELS}`: This part of the command filters the pods based on
-    their labels. Labels are key/value pairs attached to objects in Kubernetes and
-    can be used to identify and select objects. In this case, `${RESOURCE_LABELS}`
-    is a placeholder for the specific labels you want to filter by. For example, if
-    you wanted to filter pods by the label "app=web", you would replace `${RESOURCE_LABELS}`
-    with `app=web`.
-
-
-    - `-n ${NAMESPACE}`: This part of the command specifies the namespace in which
-    to look for the pods. Namespaces are a way to divide cluster resources between
-    multiple users or teams.
-
-
-    - `--context ${CONTEXT}`: This part of the command specifies the context, which
-    is a group of access parameters for a Kubernetes cluster, including the cluster
-    name, authentication information, and location of the cluster. You can think of
-    it as specifying which Kubernetes cluster you want to perform the operation on.
-
-
-    - `-o=name`: This part of the command specifies the output format. In this case,
-    we want to output only the names of the pods.
-
-
-    - `--field-selector=status.phase=Running`: This part of the command filters the
-    pods further based on their status. In this case, we are only interested in pods
-    that are currently running.
-
-
-    So, putting it all together, the `kubectl get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE}
-    --context ${CONTEXT} -o=name --field-selector=status.phase=Running` command retrieves
-    the names of all pods in a specific namespace that have certain labels and are
-    currently running. By using this command, you can easily view which pods are running
-    based on specific criteria and use that information for further troubleshooting
-    or management of your Kubernetes application.'
+    '
+  explanation: This command retrieves the names of all running pods in a specific
+    namespace and context, based on certain resource labels.
   multi_line_details: "```bash\n# Set the resource labels for filtering pods\nRESOURCE_LABELS=\"\
     app=myapp,env=prod\"\n# Set the namespace where the pods are located\nNAMESPACE=\"\
     my-namespace\"\n# Set the context to specify which Kubernetes cluster to interact\
@@ -221,17 +75,12 @@ commands:
 - command: patronictl list
   doc_links: '
 
-    - [Official Documentation for Patroni](https://patroni.readthedocs.io/en/latest/){:target="_blank"}
+    - [patronictl command reference](https://patroni.readthedocs.io/en/latest/patronictl.html){:target="_blank"}
 
-    - [Patroni GitHub Repository](https://github.com/zalando/patroni){:target="_blank"}'
-  explanation: '"patronictl list" is a command used in Kubernetes to view a list of
-    Patroni clusters. Patroni is a high availability solution for PostgreSQL, and
-    it helps manage the lifecycle of PostgreSQL instances. When you run this command,
-    you will see a list of all the Patroni clusters that are currently running in
-    your Kubernetes environment. This can be helpful for monitoring the status of
-    your database clusters and ensuring they are running smoothly. As you continue
-    to work with Kubernetes as an engineer, you may find yourself using this command
-    frequently to keep an eye on your database infrastructure.'
+    - [Understanding PostgreSQL clusters](https://www.postgresql.org/docs/current/creating-cluster.html){:target="_blank"}'
+  explanation: The "patronictl list" command is used to display a list of all the
+    PostgreSQL clusters managed by Patroni, which is a high availability solution
+    for PostgreSQL. It shows the status and information about each cluster.
   multi_line_details: '```bash
 
     # This command is used to list all the Patroni clusters managed by Patroni.

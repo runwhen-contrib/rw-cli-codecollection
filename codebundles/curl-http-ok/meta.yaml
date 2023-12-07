@@ -5,40 +5,12 @@ commands:
 
     - [curl man page](https://linux.die.net/man/1/curl){:target="_blank"}
 
-    - [Understanding HTTP status codes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status){:target="_blank"}'
-  explanation: 'Sure! This is a command using the `curl` tool to make an HTTP request
-    to a specified URL. Let''s break it down step by step:
+    - [Understanding HTTP status codes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status){:target="_blank"}
 
-
-    1. `curl`: This is the name of the command-line tool that allows us to transfer
-    data to or from a server. In this case, we''re using it to make an HTTP request.
-
-
-    2. `-o /dev/null`: The `-o` option is used to specify the file where the output
-    will be written. In this case, `/dev/null` is a special device file on Unix-like
-    operating systems that discards all data written to it. So, this part of the command
-    effectively tells `curl` not to save the output anywhere.
-
-
-    3. `-w ''{"http_code": %{http_code}, "time_total": %{time_total}}''`: The `-w`
-    option is used to specify a custom output format. In this case, we''re formatting
-    the output as a JSON object with two fields: `http_code` and `time_total`. The
-    `%{http_code}` and `%{time_total}` are placeholders that will be replaced with
-    the actual HTTP status code and total time taken for the request, respectively.
-
-
-    4. `-s`: The `-s` option is used to make `curl` operate in silent mode. This means
-    that it will not show progress or error messages.
-
-
-    5. `${URL}`: This is a placeholder for the actual URL to which the HTTP request
-    will be made. You should replace `${URL}` with the specific URL you want to request.
-
-
-    Overall, this command is making an HTTP request to a specified URL, measuring
-    the response time and status code, and formatting the output as a JSON object.
-    This could be useful for monitoring and analyzing the performance of web services
-    running on Kubernetes or any other platform.'
+    - [curl command tutorial](https://www.baeldung.com/linux/curl-command-tutorial){:target="_blank"}'
+  explanation: This command uses the curl tool to send a request to a specific URL
+    and outputs the HTTP response code and the total time of the request in JSON format.
+    The output is directed to /dev/null, meaning it won't be displayed on the terminal.
   multi_line_details: "# Perform a GET request on the provided URL using curl\n# -o\
     \ /dev/null: output response body to /dev/null (discard it)\n# -w '{\"http_code\"\
     : %{http_code}, \"time_total\": %{time_total}}': write custom output format with\

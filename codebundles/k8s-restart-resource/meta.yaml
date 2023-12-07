@@ -3,30 +3,20 @@ commands:
     -l ${LABELS} -oyaml
   doc_links: '
 
-    - [kubectl Reference Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+    - [kubectl command reference](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
-    - [Kubernetes Namespace Documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+    - [YAML configurations for Kubernetes DaemonSets](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/){:target="_blank"}
 
-    - [Kubernetes Labels and Selectors Documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}'
-  explanation: "Sure! So `kubectl` is the command-line tool for interacting with Kubernetes\
-    \ clusters. \n\nLet's break down the command:\n\n1. `--context=${CONTEXT}`: This\
-    \ part of the command specifies the context in which you want to run the command.\
-    \ A context is a group of access parameters (such as cluster, user, and namespace)\
-    \ for accessing a Kubernetes API server.\n\n2. `-n ${NAMESPACE}`: This part specifies\
-    \ the namespace in which you want to run the command. A namespace is like a virtual\
-    \ cluster inside a physical cluster. It's used to divide cluster resources between\
-    \ multiple users or teams.\n\n3. `get daemonset,deployment,statefulset`: This\
-    \ part of the command tells Kubernetes to return information about daemon sets,\
-    \ deployments, and stateful sets. These are different types of controllers that\
-    \ manage groups of pods in a Kubernetes cluster.\n\n4. `-l ${LABELS}`: This part\
-    \ specifies a set of labels to filter the results by. Labels are key-value pairs\
-    \ that are attached to objects in Kubernetes and can be used to organize and select\
-    \ subsets of those objects.\n\n5. `-oyaml`: This part tells Kubernetes to output\
-    \ the results in YAML format, which is a human-readable data serialization format\
-    \ used for configuration files in Kubernetes.\n\nSo when you put it all together,\
-    \ this command is saying \"Get the YAML representation of all daemon sets, deployments,\
-    \ and stateful sets in a specific namespace and matching specific labels within\
-    \ a specific context.\""
+    - [Kubernetes Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
+
+    - [Kubernetes StatefulSets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
+
+    - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+
+    - [Kubernetes Labels and Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}'
+  explanation: This command is using the kubectl tool to retrieve YAML configurations
+    for daemon sets, deployments, and stateful sets in a specific namespace and with
+    certain labels, using a specific context.
   multi_line_details: "```bash\n# Set the context to specify the Kubernetes cluster\
     \ to interact with\nkubectl config use-context ${CONTEXT}\n\n# Set the namespace\
     \ to limit the scope of operations to a specific namespace\nkubectl config set-context\
@@ -40,54 +30,23 @@ commands:
     -l ${LABELS} --tail=200 --limit-bytes=256000
   doc_links: '
 
-    - [kubectl documentation](https://kubernetes.io/docs/reference/kubectl/kubectl/){:target="_blank"}
+    - [Retrieving logs for Kubernetes DaemonSets, Deployments, and StatefulSets](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/){:target="_blank"}
 
-    - [kubectl logs command usage](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs){:target="_blank"}
+    - [Kubernetes Deployments overview](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
 
-    - [Kubernetes DaemonSet documentation](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/){:target="_blank"}
+    - [Understanding Kubernetes StatefulSets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
 
-    - [Kubernetes Deployment documentation](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
+    - [Managing Kubernetes namespaces](https://kubernetes.io/docs/tasks/administer-cluster/namespaces/){:target="_blank"}
 
-    - [Kubernetes StatefulSet documentation](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}'
-  explanation: 'This command is used to retrieve logs from the resources running in
-    a Kubernetes cluster. Let''s break down the parts of the command:
+    - [Kubernetes labels and selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
 
+    - [Kubectl logs documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs){:target="_blank"}
 
-    - `kubectl`: This is the command-line tool used to interact with Kubernetes clusters.
-
-
-    - `--context=${CONTEXT}`: This part of the command specifies which context or
-    cluster you want to run the command against. In Kubernetes, a context is a group
-    of access parameters for a cluster, including user information and cluster information.
-
-
-    - `-n ${NAMESPACE}`: Here, we specify the namespace from which we want to retrieve
-    the logs. A namespace is a way to divide cluster resources between multiple users.
-
-
-    - `logs`: This is the sub-command used to specify that we want to retrieve logs.
-
-
-    - `daemonset,deployment,statefulset`: This part denotes that we want to retrieve
-    logs from resources with specific types, namely daemonsets, deployments, and statefulsets.
-
-
-    - `-l ${LABELS}`: Here, we specify the labels of the resources from which we want
-    to retrieve logs. Labels are key/value pairs that are attached to objects, such
-    as pods, to help organize and select them.
-
-
-    - `--tail=200`: This flag specifies that we only want to retrieve the last 200
-    lines of each log.
-
-
-    - `--limit-bytes=256000`: This flag sets a limit on the total number of bytes
-    returned for all logs. In this case, it sets the limit to 256,000 bytes.
-
-
-    When you run this command, it will return the logs from the specified resources
-    in the specified namespace, filtered by the provided labels, tailing the last
-    200 lines, and limiting the total size of the logs.'
+    - [Kubectl context documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#config-context){:target="_blank"}'
+  explanation: This command retrieves the logs for daemon sets, deployments, and stateful
+    sets within a specific namespace and with certain labels, displaying the last
+    200 lines of logs limited to 256,000 bytes. The --context flag specifies the Kubernetes
+    cluster context to use for the operation.
   multi_line_details: '```bash
 
     # Set the context for the kubectl command to the specified Kubernetes cluster
@@ -121,47 +80,19 @@ commands:
     -l ${LABELS} -o=jsonpath='{.items[0].kind}/{.items[0].metadata.name}'
   doc_links: '
 
-    '
-  explanation: 'Sure! Let''s break down the command step by step.
+    - [Kubectl Documentation](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
+    - [DaemonSet Documentation](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/){:target="_blank"}
 
-    1. `kubectl`: This is the command line tool used to interact with Kubernetes clusters.
+    - [Deployment Documentation](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
 
+    - [StatefulSet Documentation](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
 
-    2. `--context=${CONTEXT}`: This specifies which context, or cluster configuration,
-    to use for the command. The `${CONTEXT}` will be replaced with the specific context
-    name you want to use.
-
-
-    3. `-n ${NAMESPACE}`: This flag specifies the namespace in which to operate. A
-    namespace is a way to partition resources within a cluster. The `${NAMESPACE}`
-    will be replaced with the specific namespace you want to work with.
-
-
-    4. `get`: This is the action being performed, which retrieves information about
-    resources in the cluster.
-
-
-    5. `daemonset,deployment,statefulset`: These are the types of resources to retrieve
-    information about. In this case, it''s retrieving information about daemonsets,
-    deployments, and statefulsets.
-
-
-    6. `-l ${LABELS}`: This flag filters the resources based on their labels. Labels
-    are key-value pairs attached to resources in Kubernetes used to identify and select
-    objects.
-
-
-    7. `-o=jsonpath=''{.items[0].kind}/{.items[0].metadata.name}''`: This flag specifies
-    the output format as JSONPath. JSONPath is a way to extract specific data from
-    JSON structures. In this case, it''s extracting the kind and name of the first
-    item returned by the previous filters.
-
-
-    So, in summary, this command is using kubectl to retrieve specific information
-    about daemonsets, deployments, and statefulsets in a particular namespace and
-    context, filtered by certain labels, and then formatting the output to display
-    the kind and name of the first matching resource.'
+    - [JSONPath Output Formatting](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}'
+  explanation: This command uses kubectl to retrieve the names of the first-created
+    daemonset, deployment, and statefulset in the specified namespace and with the
+    specified labels, using JSONPath output formatting. The context and namespace
+    are specified by the variables ${CONTEXT} and ${NAMESPACE} and the labels by ${LABELS}.
   multi_line_details: '```bash
 
     # Set the context to use for the Kubernetes cluster
@@ -192,48 +123,12 @@ commands:
     ${NAMESPACE}
   doc_links: '
 
-    - [kubectl rollout restart documentation](https://kubernetes.io/docs/reference/kubectl/cheatsheet/#rollout-restart){:target="_blank"}
+    - [Kubernetes Deployment Documentation](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
 
-    - [kubectl context documentation](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
-
-    - [Namespace in Kubernetes documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}'
-  explanation: 'Alright, let''s break down this command step by step.
-
-
-    1. kubectl: This is the command-line interface for running commands against Kubernetes
-    clusters. It allows you to interact with your Kubernetes cluster and perform various
-    operations like deploying applications, inspecting and managing cluster resources,
-    and debugging applications.
-
-
-    2. rollout restart: This is the subcommand being used here. It initiates a rolling
-    restart of the specified deployment, replicaset, or daemonset. A rolling restart
-    means that new pods will be created before old ones are terminated, ensuring that
-    your application remains available throughout the update.
-
-
-    3. ${resource_name.stdout}: This is a placeholder for the name of the resource
-    (e.g., deployment, replicaset, daemonset) that you want to restart. When the command
-    is executed, this placeholder will be replaced with the actual name of the resource.
-
-
-    4. --context=${CONTEXT}: In Kubernetes, a context is a group of access parameters.
-    This flag specifies the context to use (i.e., which cluster and user should be
-    used for the operation). It allows you to interact with different Kubernetes clusters
-    from the same command-line interface.
-
-
-    5. -n ${NAMESPACE}: This flag specifies the namespace in which the resource is
-    located. Namespaces provide a way to divide cluster resources between multiple
-    users or teams. By specifying the namespace, you can target resources within a
-    specific scope.
-
-
-    So, putting it all together, the command is saying: "Restart the specified Kubernetes
-    resource using the given context and within the specified namespace." As an engineer
-    working with Kubernetes daily, you might use this command to initiate a controlled
-    restart of a specific deployment or other resource within your cluster without
-    affecting the availability of your application.'
+    - [Updating Components in Kubernetes](https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/){:target="_blank"}'
+  explanation: This command restarts the deployment of a resource in Kubernetes, using
+    the specified context and namespace. It is used to help update or troubleshoot
+    a specific component within a Kubernetes cluster.
   multi_line_details: '```bash
 
     # Get the name of the resource using kubectl and store it in a variable

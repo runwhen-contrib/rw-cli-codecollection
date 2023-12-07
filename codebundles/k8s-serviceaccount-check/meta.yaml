@@ -12,52 +12,16 @@ commands:
     $namespace --context=$context && echo "Done"'
   doc_links: '
 
-    - [Kubernetes Service Accounts](https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/){:target="_blank"}
+    - [Create a pod in Kubernetes](https://kubernetes.io/docs/concepts/workloads/pods/){:target="_blank"}
 
-    - [Kubernetes kubectl run command](https://kubernetes.io/docs/reference/kubectl/cheatsheet/#kubectl-run){:target="_blank"}
+    - [Service accounts in Kubernetes](https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/){:target="_blank"}
 
-    - [Kubernetes kubectl wait command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#wait){:target="_blank"}
+    - [Interacting with Kubernetes API](https://kubernetes.io/docs/reference/using-api/api-concepts/){:target="_blank"}
 
-    - [Performing a curl request to the Kubernetes API](https://kubernetes.io/docs/reference/using-api/api-concepts/#curl-requests-to-the-kubernetes-api){:target="_blank"}'
-  explanation: 'This command is used to run a curl request against the Kubernetes
-    API from within a pod. Let''s break it down step by step:
-
-
-    - apiserver=https://kubernetes.default.svc: This sets the Kubernetes API server
-    endpoint.
-
-    - namespace=${NAMESPACE}: This sets the namespace in which the pod will be created
-    and executed.
-
-    - context=${CONTEXT}: This sets the context for the operation, which includes
-    cluster, user, and namespace information.
-
-    - resource="": This doesn''t specify a particular resource for the curl request.
-
-    - serviceaccount=${SERVICE_ACCOUNT}: This sets the service account to be used
-    by the pod.
-
-
-    Then the `kubectl run` command is used to create a pod named `curl-pod` with the
-    image `curlimages/curl:latest`. The `--restart=Never` flag ensures that the pod
-    does not restart automatically if it fails. The `--overrides` flag is used to
-    set the service account for the pod.
-
-
-    The rest of the command is used to perform a series of actions within the pod:
-
-    - Wait for the `curl-pod` to be in a running state.
-
-    - Retrieve an authentication token from the pod''s service account.
-
-    - Perform a curl request to the Kubernetes API using the retrieved token.
-
-    - Clean up by deleting the `curl-pod` once the request is completed.
-
-
-    This command can be used to test and interact with the Kubernetes API from within
-    a pod environment, and it demonstrates how to perform an authenticated request
-    using a service account token.'
+    - [Cleaning up resources in Kubernetes](https://kubernetes.io/docs/concepts/cluster-administration/manage-deployment/#cleanup-command){:target="_blank"}'
+  explanation: This command creates a pod in Kubernetes using the specified service
+    account and executes a series of commands to interact with the Kubernetes API,
+    including performing a curl request and cleaning up after completion.
   multi_line_details: '# Set the variables for the API server, namespace, context,
     resource, and service account
 

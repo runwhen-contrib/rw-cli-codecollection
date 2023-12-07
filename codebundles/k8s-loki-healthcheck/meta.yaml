@@ -5,53 +5,14 @@ commands:
     | jq -r ''.shards[] | select(.state != "ACTIVE") | {name: .id, state: .state}'''
   doc_links: '
 
-    - [Kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+    - [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
-    - [Kubernetes Namepaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+    - [wget command](https://www.gnu.org/software/wget/manual/wget.html){:target="_blank"}
 
-    - [Kubectl Exec](https://kubernetes.io/docs/tasks/debug-application-cluster/get-shell-running-container/#running-individual-commands-in-a-container-using-kubectl-exec){:target="_blank"}
-
-    - [JSONPath](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}
-
-    - [JQ Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: 'This command is used to retrieve information about the state of shards
-    in a Kubernetes cluster. Let''s break down the command step by step:
-
-
-    1. `kubectl --context=${CONTEXT}`: This part specifies that we want to use a specific
-    Kubernetes context for this command. The context is essentially a way to manage
-    different Kubernetes clusters and authentication details.
-
-
-    2. `-n ${NAMESPACE}`: This flag specifies the namespace within the Kubernetes
-    cluster where we want to execute the command. Namespaces are used to divide cluster
-    resources amongst multiple users.
-
-
-    3. `exec`: This is the main action we want to perform. It tells Kubernetes to
-    execute a command inside a container running in a pod.
-
-
-    4. `$(kubectl --context=${CONTEXT} -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary
-    -o=jsonpath=''{.items[0].metadata.name}'')`: This complex part is getting the
-    name of a specific pod based on certain labels. It''s finding a pod labeled with
-    `app.kubernetes.io/component=single-binary` and extracting its name using `jsonpath`.
-
-
-    5. `-- wget -q --header="Accept: application/json" -O - http://localhost:3100/ring
-    | jq -r ''.shards[] | select(.state != "ACTIVE") | {name: .id, state: .state}''`:
-    This is the actual command that we want to run inside the specified pod. It''s
-    using `wget` to make an HTTP request to `http://localhost:3100/ring`, and then
-    piping the response into `jq` to process the JSON output and filter it for shards
-    whose state is not "ACTIVE". It then selects the ID and state of those shards
-    and prints them out.
-
-
-    In summary, this command is a sophisticated way of querying shard state information
-    within a Kubernetes cluster by executing a specific HTTP request inside a pod
-    and processing the JSON response. Understanding and mastering commands like this
-    will help you effectively manage and troubleshoot your applications running in
-    Kubernetes.'
+    - [JSON format](https://www.json.org/json-en.html){:target="_blank"}'
+  explanation: This command uses kubectl to execute a `wget` request on a specific
+    pod within a Kubernetes context and namespace, returning the shards that are not
+    in an "ACTIVE" state in JSON format.
   multi_line_details: '```bash
 
     # Set the context to be used for the kubectl command
@@ -82,59 +43,19 @@ commands:
     -- wget -q --header="Accept: application/json" -O - http://localhost:3100/ready'
   doc_links: '
 
-    - [Kubectl Documentation](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+    - [kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
-    - [Kubernetes Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
+    - [Kubernetes Contexts and Namespaces](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
 
-    - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+    - [Labels and Selectors in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
 
-    - [Kubectl Exec Command Overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
+    - [wget Command Documentation](https://www.gnu.org/software/wget/manual/wget.html){:target="_blank"}
 
-    - [Kubectl JSONPath Output](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}
-
-    - [Wget Command Documentation](https://www.gnu.org/software/wget/manual/wget.html){:target="_blank"}
-
-    - [HTTP Headers](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Accept){:target="_blank"}'
-  explanation: 'This command is using kubectl, the command-line tool for interacting
-    with Kubernetes clusters. Here''s a breakdown of what each part of the command
-    does:
-
-
-    --context=${CONTEXT}: This flag specifies which Kubernetes cluster you want to
-    run the command against. The value of ${CONTEXT} refers to a specific cluster
-    configuration in your local environment.
-
-
-    -n ${NAMESPACE}: This flag specifies the namespace within the cluster where you
-    want to run the command. The value of ${NAMESPACE} refers to a specific namespace
-    within the cluster.
-
-
-    exec: This command allows you to execute a command inside a container running
-    in a pod. In this case, we''re going to run a `wget` command inside a pod.
-
-
-    $(kubectl --context=${CONTEXT} -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary
-    -o=jsonpath=''{.items[0].metadata.name}''): This part of the command is running
-    another `kubectl` command to get the name of a specific pod. It uses the `jsonpath`
-    output format to extract the name of the pod with the label `app.kubernetes.io/component=single-binary`.
-
-
-    -- wget -q --header="Accept: application/json" -O -: This part of the command
-    defines the `wget` command that will be executed inside the chosen pod. It''s
-    retrieving data from a specific URL and specifying certain headers, like "Accept:
-    application/json".
-
-
-    http://localhost:3100/ready: This is the URL from which the `wget` command will
-    retrieve data. It looks like the command is checking if a service in the cluster
-    is ready by making an HTTP request to this URL.
-
-
-    So, in summary, this command is selecting a specific pod based on its label, then
-    executing a `wget` command inside that pod to check the readiness of a service
-    running on localhost port 3100. As an engineer working with Kubernetes, you''ll
-    often use `kubectl exec` to interact with containers running in your cluster.'
+    - [JSON Data Retrieval in wget](https://www.journaldev.com/35201/wget-command-guide#5-retrieve-json-data){:target="_blank"}'
+  explanation: This command is using kubectl to execute a command within a specific
+    Kubernetes context and namespace, targeting a pod labeled with the specified component.
+    The command being executed uses wget to make a request to a local endpoint and
+    retrieve JSON data from the specified URL.
   multi_line_details: '# Set the context to use the specific Kubernetes cluster
 
     kubectl config use-context ${CONTEXT}

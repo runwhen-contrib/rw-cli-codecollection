@@ -3,47 +3,19 @@ commands:
     -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/liveness
   doc_links: '
 
-    - [kubectl exec](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
+    - [kubectl Reference Documentation](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
-    - [${STATEFULSET_NAME}](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
+    - [Kubernetes StatefulSets Documentation](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
 
-    - [${CONTEXT}](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
+    - [curl Manual](https://curl.se/docs/manual.html){:target="_blank"}
 
-    - [${NAMESPACE}](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+    - [kubectl Contexts Documentation](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
 
-    - [curl](https://curl.se/docs/manpage.html){:target="_blank"}
-
-    - [http://localhost:8091/artifactory/api/v1/system/liveness](https://restfulapi.net/http-methods/){:target="_blank"}'
-  explanation: 'This command is used to execute a specific statefulset in a Kubernetes
-    cluster. A statefulset is used to manage the deployment and scaling of a set of
-    Pods, so this command essentially allows you to interact with one of those Pods.
-
-
-    Let''s break down the command:
-
-
-    - `kubectl exec` is the command to execute commands in a container.
-
-    - `statefulset/${STATEFULSET_NAME}` specifies the StatefulSet you want to execute
-    the command in.
-
-    - `--context=${CONTEXT}` specifies the context to use (which cluster to run the
-    command in).
-
-    - `-n ${NAMESPACE}` specifies the namespace where the StatefulSet is located.
-
-    - `-- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/liveness`
-    is the actual command that will be executed inside the container.
-
-
-    So, when you run this command, it will essentially execute the `curl` command
-    inside the specified StatefulSet to check the liveness of an API endpoint.
-
-
-    As an engineer learning to use Kubernetes daily, understanding how to interact
-    with different components within the cluster like StatefulSets is important for
-    managing the infrastructure effectively. This command can be useful for troubleshooting
-    and checking the health of applications running in Kubernetes.'
+    - [curl man page](https://linux.die.net/man/1/curl){:target="_blank"}'
+  explanation: This command uses kubectl to execute a command within the specified
+    statefulset in the given namespace, sending a curl request to check the liveness
+    of a service running on localhost. It also includes parameters such as --context
+    and --max-time to specify the context and maximum time for the request.
   multi_line_details: "```plaintext\n# Set the context within which to run the command,\
     \ in case multiple clusters are being managed\nkubectl config use-context ${CONTEXT}\n\
     \n# Execute a command within a specific statefulset, providing the name and namespace\n\
@@ -55,29 +27,21 @@ commands:
     -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/readiness
   doc_links: '
 
-    - [Kubectl Exec Command Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
+    - [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
-    - [Kubectl Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}
+    - [statefulset](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
 
-    - [Curl Manual](https://curl.se/docs/manpage.html){:target="_blank"}
+    - [namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [Artifactory API Documentation](https://www.jfrog.com/confluence/display/JFROG/Artifactory+REST+API){:target="_blank"}'
-  explanation: "This command is using kubectl, which is a command-line tool for Kubernetes,\
-    \ to execute a command inside a stateful set pod. The \"${STATEFULSET_NAME}\"\
-    \ will be replaced with the actual name of the stateful set you want to execute\
-    \ the command in, and the \"${CONTEXT}\" variable contains information about the\
-    \ Kubernetes cluster you want to target. The \"-n\" flag specifies the namespace\
-    \ where the stateful set is located. \n\nIn this case, the command being executed\
-    \ inside the pod is a curl command that is checking the readiness of an Artifactory\
-    \ server running on localhost at port 8091. The \"-k\" option tells curl to allow\
-    \ connections to SSL sites without certificates. The \"--max-time 10\" option\
-    \ sets a maximum time for the entire operation.\n\nAs an engineer learning to\
-    \ use Kubernetes, it's important to understand how to use kubectl to interact\
-    \ with pods and other resources within your Kubernetes clusters. This command\
-    \ demonstrates how kubectl can be used to access and run commands within specific\
-    \ pods, allowing you to troubleshoot and monitor the health of applications running\
-    \ within your Kubernetes environment. Keep practicing and exploring different\
-    \ kubectl commands to become more proficient in managing your Kubernetes clusters."
+    - [context](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/){:target="_blank"}
+
+    - [curl command](https://curl.se/docs/manpage.html){:target="_blank"}
+
+    - [Artifactory API](https://www.jfrog.com/confluence/display/JFROG/Artifactory+REST+API){:target="_blank"}'
+  explanation: This command uses kubectl to execute a command within a specific statefulset
+    in a given namespace, using a specific context. In this case, it is running a
+    curl command to check the readiness of an Artifactory API within the specified
+    statefulset.
   multi_line_details: '```bash
 
     # Use kubectl to execute a command directly into a container running in a StatefulSet

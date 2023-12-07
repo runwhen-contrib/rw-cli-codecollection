@@ -5,33 +5,13 @@ commands:
     | {startTime,targetLink, statusMessage, progress, zone, selfLink}]'
   doc_links: '
 
-    - [gcloud auth activate-service-account documentation](https://cloud.google.com/sdk/gcloud/reference/auth/activate-service-account){:target="_blank"}
+    - [Service accounts on GCP](https://cloud.google.com/iam/docs/service-accounts){:target="_blank"}
 
-    - [gcloud compute operations list documentation](https://cloud.google.com/sdk/gcloud/reference/compute/operations/list){:target="_blank"}
-
-    - [Google Cloud SDK Filter and Format Flags documentation](https://cloud.google.com/sdk/gcloud/reference/topic/filters){:target="_blank"}
-
-    - [jq documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: 'This command does two things. The first part, "gcloud auth activate-service-account
-    --key-file=$GOOGLE_APPLICATION_CREDENTIALS", is used to authenticate and authorize
-    a service account to access resources on Google Cloud Platform (GCP). This is
-    important because it allows you to interact with GCP resources using the privileges
-    and permissions associated with the specific service account.
-
-
-    The second part of the command, "gcloud compute operations list --filter="operationType:(
-    compute.instances.preempted ) AND NOT status:( DONE )" --format=json --project=${GCP_PROJECT_ID}
-    | jq ''[.[] | {startTime,targetLink, statusMessage, progress, zone, selfLink}]''",
-    is used to list all the compute instances that have been preempted (meaning they
-    were shut down by GCP) but are not yet in a "DONE" status. This information is
-    then formatted into JSON format using the "jq" tool.
-
-
-    As an engineer learning to use Kubernetes daily, understanding and running commands
-    like these will help you manage and monitor your GCP resources, specifically computing
-    instances, which are important components in a Kubernetes cluster. You''ll be
-    able to keep track of preempted instances and gather important details about their
-    status and the progress of any ongoing operations.'
+    - [Preemptible VM instances on GCP](https://cloud.google.com/compute/docs/instances/preemptible){:target="_blank"}'
+  explanation: This command activates a service account for authentication and then
+    lists all preempted compute instances that are not yet completed in a Google Cloud
+    Platform project, displaying specific information about each instance in JSON
+    format. The jq filter is used to select and format the specific fields of interest.
   multi_line_details: "# Step 1: Authenticate using the service account key file\n\
     gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS\n\
     \n# Step 2: List compute operations with specific filters\ngcloud compute operations\

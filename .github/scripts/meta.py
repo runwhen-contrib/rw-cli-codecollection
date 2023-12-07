@@ -202,8 +202,8 @@ def generate_metadata(directory_path):
     Returns:
         Object 
     """
-    # explainUrl=f'https://papi.test.runwhen.com/bow/raw?prompt='
-    explainUrl=f'https://papi.kyle.dev.runwhen.com/bow/raw?'
+    explainUrl=f'https://papi.test.runwhen.com/bow/raw?'
+    # explainUrl=f'https://papi.kyle.dev.runwhen.com/bow/raw?'
     headers = {'Content-Type': 'application/json'}
     search_list = ['render_in_commandlist=true', 'show_in_rwl_cheatsheet=true']
     runbook_files = find_files(directory_path, 'runbook.robot')
@@ -232,7 +232,7 @@ def generate_metadata(directory_path):
                 with open(full_script_path, 'r') as script:
                     script_contents = script.read()
                 # What it does
-                query_what_it_does_prompt =f"Please explain this script as if I was new to Kubernetes, but am learning to use it daily as an engineer"
+                query_what_it_does_prompt =f"Provide a one or two sentence explanation of this script as if I was loosely familiar with the concepts but it wasn't part of my daily job."
                 query_what_it_does_with_command = f'{query_what_it_does_prompt} \n{script_contents}'
                 print(f'generating explanation for {name_snake_case}')
                 # explain_query_what_it_does = f"{'prompt': '{query_what_it_does_with_command}'}"
@@ -250,20 +250,21 @@ def generate_metadata(directory_path):
                 query_multi_line_with_comments_prompt = f"Read and add docstrings to the following script content, returned in shell script format. Script contents:"
                 query_multi_line_with_command = f'{query_multi_line_with_comments_prompt}\n{script_contents}'
                 #Generate external doc links 
-                query_doc_links_prompt = r"Given the following script, generate some links that provide helpful documentation for a reader who want's to learn more about the topics used in the command. Format the output in a single YAML list with the keys of `description` and `url` for each link with the values in double quotes. Ensure each description and url are on separate lines, ensure an empty blank line separates each item. Ensure there are no other keys or text or extra characters other than the items. The script contents are:  "
+                query_doc_links_prompt = r"Given the following explanation, generate some links that provide helpful documentation for a reader who want's to learn more about the topics used in the command. Format the output in a single YAML list with the keys of `description` and `url` for each link with the values in double quotes. Ensure each description and url are on separate lines, ensure an empty blank line separates each item. Ensure there are no other keys or text or extra characters other than the items. The script contents are:  "
                 # query_doc_links_with_command = f'{query_doc_links_prompt}\n{multi_line_content}'
-                query_doc_links_with_command = f'{query_doc_links_prompt}\n{script_contents}'
+                query_doc_links_with_command = f'{query_doc_links_prompt}\n{explanation_content}'
             else: 
                 # What it does
-                query_what_it_does_prompt =f"Please explain this command as if I was new to Kubernetes, but am learning to use it daily as an engineer"
+                query_what_it_does_prompt =f"Provide a one or two sentence explanation of this command as if I was loosely familiar with the concepts but it wasn't part of my daily job."
                 query_what_it_does_with_command = f'{query_what_it_does_prompt} \n{command}'
                 print(f'generating explanation for {name_snake_case}')
                 explain_query_what_it_does = {'prompt': query_what_it_does_with_command}
                 explain_query_json = json.dumps(explain_query_what_it_does)
-
+                print(explain_query_json)
                 # url_what_it_does = f'{explainUrl}{explain_query_what_it_does}'   
                 response_what_it_does = requests.post(explainUrl, data=explain_query_json, headers=headers )
                 # response_what_it_does = requests.get(url_what_it_does)
+                print(response_what_it_does)
                 if ((response_what_it_does.status_code == 200)):
                     explanation = response_what_it_does.json()
                     explanation_content = explanation['explanation']
@@ -273,9 +274,9 @@ def generate_metadata(directory_path):
                 query_multi_line_with_comments_prompt = f"Convert this one-line command into a multi-line command, adding verbose comments to educate new users of Kubernetes and related cli commands"
                 query_multi_line_with_command = f'{query_multi_line_with_comments_prompt}\n{command}'
                 #Generate external doc links 
-                query_doc_links_prompt = r"Given the following command, generate some links that provide helpful documentation for a reader who want's to learn more about the topics used in the command. Format the output in a single YAML list with the keys of `description` and `url` for each link with the values in double quotes. Ensure each description and url are on separate lines, ensure an empty blank line separates each item. Ensure there are no other keys or text or extra characters other than the items. The command is:  "
+                query_doc_links_prompt = r"Given the following command explanation, generate some links that provide helpful documentation for a reader who want's to learn more about the topics used in the command. Format the output in a single YAML list with the keys of `description` and `url` for each link with the values in double quotes. Ensure each description and url are on separate lines, ensure an empty blank line separates each item. Ensure there are no other keys or text or extra characters other than the items. The command is:  "
                 # query_doc_links_with_command = f'{query_doc_links_prompt}\n{multi_line_content}'
-                query_doc_links_with_command = f'{query_doc_links_prompt}\n{command}'
+                query_doc_links_with_command = f'{query_doc_links_prompt}\n{explanation_content}'
 
             print(f'generating multi-line code with comments for {name_snake_case}')
             # explain_query_multi_line_with_comments = urlencode({'prompt': query_multi_line_with_command})

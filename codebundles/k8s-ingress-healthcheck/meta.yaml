@@ -37,56 +37,15 @@ commands:
     "Health Status: $health_status";echo "------------";done'
   doc_links: '
 
-    '
-  explanation: 'This is a command that is used in Kubernetes to retrieve and analyze
-    the health status of ingresses and their associated backend services in a specified
-    namespace and context.
+    - [Kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
+    - [Kubectl Ingress Resources](https://kubernetes.io/docs/concepts/services-networking/ingress/){:target="_blank"}
 
-    Let''s break down the command step by step:
-
-    1. The first few lines are setting up variables for the namespace and context
-    to be used in subsequent commands.
-
-
-    2. Then, the script uses the `kubectl get ingress` command to retrieve a list
-    of all ingresses in the specified namespace and context, storing the names in
-    the `ingresses` variable.
-
-
-    3. Next, the script loops through each ingress in the `ingresses` list and retrieves
-    information about the backend services associated with each ingress.
-
-
-    4. For each backend service, it checks if the service exists in the specified
-    namespace, and if not, it sets the `health_status` variable to "Unhealthy" and
-    provides an error message.
-
-
-    5. If the service exists, the script retrieves the labels associated with the
-    service and searches for matching deployments, statefulsets, or daemonsets within
-    the namespace. If a matching owner is found, it prints out the owner kind and
-    name.
-
-
-    6. It then checks if the target ports of the backend service match any container
-    ports of the associated pods. If not, it sets the `health_status` variable to
-    "Unhealthy" and provides a warning message.
-
-
-    7. The script also checks if the endpoint for the service has running pods, and
-    if not, it sets the `health_status` variable to "Unhealthy" and provides troubleshooting
-    steps.
-
-
-    8. Finally, the script prints out the health status of the backend service and
-    moves on to the next one.
-
-
-    Overall, this command is useful for analyzing the health and status of ingresses
-    and their associated backend services within a Kubernetes environment. It provides
-    detailed information and troubleshooting steps to ensure that everything is functioning
-    properly.'
+    - [Kubernetes Service Health Checks](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#support-for-health-checks){:target="_blank"}'
+  explanation: This script uses kubectl to gather information about ingresses and
+    their associated backend services, then checks the health status by verifying
+    the existence of the services, finding matching owners (like deployments), and
+    ensuring that the port is found in the associated pods.
   multi_line_details: "```bash\n# Set the NAMESPACE and CONTEXT variables\nNAMESPACE=\"\
     ${NAMESPACE}\"\nCONTEXT=\"${CONTEXT}\"\n\n# Get all the ingresses in a namespace\
     \ and iterate through the list\ningresses=$(kubectl get ingress -n \"$NAMESPACE\"\
@@ -172,48 +131,15 @@ commands:
     end''; done'
   doc_links: '
 
-    - [Kubectl Get Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/){:target="_blank"}
+    - [kubectl Command Documentation](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
-    - [Json Output for Kubectl Get](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}
+    - [Understanding Kubernetes Ingresses](https://kubernetes.io/docs/concepts/services-networking/ingress/){:target="_blank"}
 
-    - [JQ Command Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: 'This command is used to retrieve information about ingresses and services
-    in a Kubernetes cluster. Let''s break it down step by step.
-
-
-    First, the variables CONTEXT and NAMESPACE are being set based on some external
-    configuration. These variables will be used to specify the context and namespace
-    for all subsequent kubectl commands.
-
-
-    The main part of the command uses the kubectl tool to retrieve a list of ingresses
-    in the specified context and namespace, and then formats the output as JSON using
-    the ''-o json'' option. The ''jq'' command-line JSON processor is then used to
-    filter and manipulate this JSON data.
-
-
-    The jq command selects specific fields from the JSON output, such as the name
-    of the ingress, its IP address, and the backend service name and port. It then
-    pipes this information into a while loop, which reads each line of the filtered
-    output and assigns the values to variables (ingress_name, ingress_ip, service_name,
-    service_port).
-
-
-    Within the while loop, another kubectl command is used to retrieve information
-    about the specified service. The output of this command is also processed using
-    jq to check if the service type is "LoadBalancer" and compare the IP addresses
-    of the service and the ingress. Depending on the comparison, a different message
-    is generated to indicate whether the configuration is correct or if there''s a
-    potential issue.
-
-
-    Overall, this command is quite complex and involves multiple levels of filtering
-    and processing of Kubernetes resources to validate the configuration of ingresses
-    and services in a given context and namespace. As an engineer learning to use
-    Kubernetes daily, you would typically encounter commands like these when troubleshooting
-    or validating the configuration of resources in your cluster. It''s important
-    to familiarize yourself with tools like kubectl and jq, as well as the various
-    Kubernetes resource types and their configurations.'
+    - [jq Manual](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command is using kubectl to get information about ingresses in
+    a specified context and namespace, then checking for any inconsistencies in the
+    IP addresses between the ingress and the corresponding service. It uses jq to
+    parse the JSON output and outputs warnings or ok messages based on the results.
   multi_line_details: "```bash\n# Defining the variables for Context and Namespace\n\
     CONTEXT=\"${CONTEXT}\"\nNAMESPACE=\"${NAMESPACE}\"\n\n# Retrieving the ingress\
     \ resources in JSON format from the specified context and namespace\nkubectl --context\

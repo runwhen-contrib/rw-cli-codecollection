@@ -2,33 +2,12 @@ commands:
 - command: bash 'validate_probes.sh' livenessProbe
   doc_links: '
 
-    '
-  explanation: 'This script is designed to extract and validate probe information
-    for each container in a Kubernetes deployment. It is useful when troubleshooting
-    issues related to liveness or readiness probes.
+    - [Kubernetes Probes documentation](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/){:target="_blank"}
 
-
-    The script retrieves the JSON manifest of a specific deployment and then goes
-    through each container listed in that manifest. For each container, it identifies
-    the specified probe type (either readiness or liveness) and then checks if it
-    is defined. If it is, the script further validates the probe port and the exec
-    command if it''s an exec type probe.
-
-
-    If the port used in the probe is not exposed by the container, the script suggests
-    updating the probe settings with one of the valid ports. For exec type probes,
-    it also executes the command inside the container if exec permissions are available.
-
-
-    At the end of the script, it provides a list of unique recommendations that can
-    be considered as next steps based on the validation outcomes.
-
-
-    In summary, this script automates the process of extracting and validating probe
-    configuration for containers in a Kubernetes deployment and provides actionable
-    recommendations for resolving any issues found during the validation. As an engineer
-    using Kubernetes daily, this script can save time and effort when troubleshooting
-    and fixing probe-related problems within a deployment.'
+    - [Understanding Container Ports in Kubernetes](https://kubernetes.io/docs/concepts/services-networking/service/#multi-port-services){:target="_blank"}'
+  explanation: This script is used to check the probes (livenessProbe or readinessProbe)
+    of containers in a Kubernetes deployment. It also looks at port numbers in these
+    probes and provides recommendations based on what it finds.
   multi_line_details: "```shell\n#!/bin/bash\n\n# Set deployment name and namespace\n\
     PROBE_TYPE=\"${1:-readinessProbe}\"  # Default to livenessProbe, can be set to\
     \ readinessProbe\n\n# Function to extract data using jq\nextract_data() {\n  \
@@ -85,33 +64,12 @@ commands:
 - command: bash 'validate_probes.sh' readinessProbe
   doc_links: '
 
-    '
-  explanation: 'This script is designed to extract and validate probe information
-    for each container in a Kubernetes deployment. It is useful when troubleshooting
-    issues related to liveness or readiness probes.
+    - [Kubernetes Probes documentation](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/){:target="_blank"}
 
-
-    The script retrieves the JSON manifest of a specific deployment and then goes
-    through each container listed in that manifest. For each container, it identifies
-    the specified probe type (either readiness or liveness) and then checks if it
-    is defined. If it is, the script further validates the probe port and the exec
-    command if it''s an exec type probe.
-
-
-    If the port used in the probe is not exposed by the container, the script suggests
-    updating the probe settings with one of the valid ports. For exec type probes,
-    it also executes the command inside the container if exec permissions are available.
-
-
-    At the end of the script, it provides a list of unique recommendations that can
-    be considered as next steps based on the validation outcomes.
-
-
-    In summary, this script automates the process of extracting and validating probe
-    configuration for containers in a Kubernetes deployment and provides actionable
-    recommendations for resolving any issues found during the validation. As an engineer
-    using Kubernetes daily, this script can save time and effort when troubleshooting
-    and fixing probe-related problems within a deployment.'
+    - [Understanding Container Ports in Kubernetes](https://kubernetes.io/docs/concepts/services-networking/service/#multi-port-services){:target="_blank"}'
+  explanation: This script is used to check the probes (livenessProbe or readinessProbe)
+    of containers in a Kubernetes deployment. It also looks at port numbers in these
+    probes and provides recommendations based on what it finds.
   multi_line_details: "```shell\n#!/bin/bash\n\n# Set deployment name and namespace\n\
     PROBE_TYPE=\"${1:-readinessProbe}\"  # Default to livenessProbe, can be set to\
     \ readinessProbe\n\n# Function to extract data using jq\nextract_data() {\n  \
@@ -178,40 +136,20 @@ commands:
     | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'''
   doc_links: '
 
-    - [kubectl get events Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events){:target="_blank"}
+    - [kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
-    - [Kubernetes Contexts Documentation](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
+    - [kubectl get events](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events){:target="_blank"}
 
-    - [Kubernetes Namespaces Documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+    - [kubectl context](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}
 
-    - [Kubernetes JSON Output Documentation](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}
+    - [kubectl namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [jq Command Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: "This command is used to get events from a specific context and namespace\
-    \ in a Kubernetes cluster. Let me break it down for you:\n\n1. `kubectl` is the\
-    \ command-line tool that we use to interact with Kubernetes clusters.\n2. `get\
-    \ events` is the command to retrieve events that have occurred within the cluster.\n\
-    3. `--context ${CONTEXT}` specifies the context within the Kubernetes configuration\
-    \ file that should be used. \n   - A context in Kubernetes is used to define which\
-    \ cluster, namespace, and user credentials should be used for a particular operation.\n\
-    4. `-n ${NAMESPACE}` specifies the namespace where the events should be retrieved\
-    \ from.\n   - Namespaces are used to group resources within a cluster, and this\
-    \ option allows us to focus on events within a specific namespace.\n5. `-o json`\
-    \ tells kubectl to output the events in JSON format.\n   - This allows us to easily\
-    \ manipulate and process the event data using other tools.\n6. `| jq '<query>'`\
-    \ pipes the JSON output to the `jq` tool, which is then used to filter, transform,\
-    \ or aggregate the data.\n\nThe `<query>` inside `jq` does quite a bit of complex\
-    \ filtering by:\n\n1. Calculating a time limit as 1 hour ago from the current\
-    \ time.\n2. Selecting only warning events that are related to Deployments, ReplicaSets,\
-    \ or Pods, and occurred after the time limit.\n3. Formatting the selected event\
-    \ data to include its kind, name, reason, message, first timestamp, and last timestamp.\n\
-    4. Grouping the events by their kind and name.\n5. Creating a new set of data\
-    \ for each group that includes the kind, name, count, unique reasons, unique messages,\
-    \ and the earliest and latest timestamps of the events.\n\nThis command is handy\
-    \ for monitoring and analyzing warning events related to specific deployments,\
-    \ replica sets, or pods within a Kubernetes cluster. It provides a way to extract\
-    \ and organize relevant information about recent warning events in a structured\
-    \ and readable format."
+    - [jq Manual (Official GitHub Repository)](https://stedolan.github.io/jq/manual/){:target="_blank"}
+
+    - [Filtering and mapping using jq](https://learnxinyminutes.com/docs/jq/){:target="_blank"}'
+  explanation: This command uses kubectl to get events from a specific context and
+    namespace, then uses jq to filter out and format the events related to a specific
+    deployment name that have occurred in the last hour.
   multi_line_details: "```bash\n# Set the context to use for the kubectl command\n\
     CONTEXT=${CONTEXT}\n# Set the namespace to use for the kubectl command\nNAMESPACE=${NAMESPACE}\n\
     # Set the time limit for events to filter based on their timestamp\nTIME_LIMIT=$(now\
@@ -238,50 +176,16 @@ commands:
     -o yaml
   doc_links: '
 
-    - [kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+    - [Kubernetes kubectl explain command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#explain){:target="_blank"}
 
-    - [deployment resource](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
+    - [Kubernetes Contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters){:target="_blank"}
 
-    - [Kubernetes contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}
+    - [Kubernetes Namespaces](https://kubernetes.io/docs/tasks/administer-cluster/namespaces/){:target="_blank"}
 
-    - [Kubernetes namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [output formats for kubectl](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}'
-  explanation: 'Sure! This command is used to get information about a specific deployment
-    in Kubernetes. Let me break it down for you:
-
-
-    - `kubectl`: This is the command-line tool for interacting with Kubernetes clusters.
-
-
-    - `get`: This is the action we want to perform - in this case, we want to retrieve
-    information.
-
-
-    - `deployment/${DEPLOYMENT_NAME}`: We are specifying the type of resource we want
-    to retrieve, which is a deployment. `${DEPLOYMENT_NAME}` is a placeholder that
-    you would replace with the actual name of the deployment you want to get information
-    about.
-
-
-    - `--context ${CONTEXT}`: This flag allows us to specify the context or the cluster
-    we want to work with. `${CONTEXT}` is a placeholder for the actual context name.
-
-
-    - `-n ${NAMESPACE}`: This flag specifies the namespace in which the deployment
-    resides. Namespaces are used to group resources in a multi-tenant environment.
-    `${NAMESPACE}` is a placeholder for the actual namespace name.
-
-
-    - `-o yaml`: This flag tells Kubernetes that we want the output in YAML format,
-    which is a human-readable data serialization format. The output will include detailed
-    information about the deployment, such as its configuration and current status.
-
-
-    So, when you run this command with the appropriate values filled in for `${DEPLOYMENT_NAME}`,
-    `${CONTEXT}`, and `${NAMESPACE}`, you will get a YAML representation of the deployment''s
-    details in the specified namespace. This can be useful for troubleshooting or
-    understanding the current state of the deployment.'
+    - [YAML Format](https://learnxinyminutes.com/docs/yaml/){:target="_blank"}'
+  explanation: This command is used to retrieve detailed information about a specific
+    deployment within a specified Kubernetes context and namespace, and the output
+    will be in YAML format.
   multi_line_details: '```bash
 
     # Set the variable DEPLOYMENT_NAME to the name of the deployment you want to get
@@ -322,42 +226,17 @@ commands:
     end)}'''
   doc_links: '
 
-    - [kubectl get deployment](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+    - [Kubernetes kubectl explain Deployment](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#explain){:target="_blank"}
 
-    - [jq documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: 'This command is used to get detailed information about a specific
-    deployment in Kubernetes. Let me break it down for you.
+    - [Kubernetes kubectl scale Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#scale){:target="_blank"}
 
+    - [Kubernetes JSON Path Support](https://kubernetes.io/docs/reference/kubectl/jsonpath){:target="_blank"}
 
-    1. `kubectl` is the command-line tool for interacting with Kubernetes.
-
-    2. `get deployment/${DEPLOYMENT_NAME}` retrieves information about the specified
-    deployment.
-
-    3. `--context ${CONTEXT}` specifies the context to use for the operation. A context
-    is a group of access parameters, including clusters, authentication information,
-    and namespaces.
-
-    4. `-n ${NAMESPACE}` specifies the namespace in which the deployment is located.
-    Namespaces are a way to divide cluster resources between multiple users.
-
-    5. `-o json` formats the output in JSON format.
-
-    6. `| jq` is used to process and filter the JSON output.
-
-
-    The `jq` command is a powerful tool for parsing JSON output. In this case, it
-    is used to extract specific information from the deployment''s status. The extracted
-    information includes the desired number of replicas, the number of ready replicas,
-    the number of missing replicas, the number of unavailable replicas, and the available
-    and progressing conditions of the deployment.
-
-
-    This command can be helpful for monitoring the health and status of deployments
-    within your Kubernetes cluster, and for troubleshooting any issues that may arise.
-    As an engineer learning Kubernetes, it''s important to familiarize yourself with
-    these kinds of commands to effectively manage and maintain your applications running
-    on Kubernetes.'
+    - [jq Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command retrieves information about a specific deployment in Kubernetes,
+    including the number of desired replicas, ready replicas, missing replicas, unavailable
+    replicas, and the availability and progression conditions. It uses JSON output
+    and the jq tool to format the data.
   multi_line_details: "```bash\n# Set the variables for deployment name, context and\
     \ namespace\nDEPLOYMENT_NAME=\"example-deployment\"\nCONTEXT=\"example-context\"\
     \nNAMESPACE=\"example-namespace\"\n\n# Get the deployment information in JSON\
@@ -393,50 +272,12 @@ commands:
     | sort | reverse | .[0] | todateiso8601})'''
   doc_links: '
 
-    '
-  explanation: 'This command is designed to retrieve events from your Kubernetes cluster
-    and then filter and group them based on certain criteria. Let''s break it down
-    step by step.
+    - [Kubernetes Events documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
-
-    1. `kubectl get events`: This part of the command tells Kubernetes to retrieve
-    the events that have occurred within the cluster.
-
-    2. `--context ${CONTEXT}`: This specifies the context in which the events should
-    be retrieved. A context defines a set of access parameters, such as the cluster,
-    user, and namespace.
-
-    3. `-n ${NAMESPACE}`: This flag filters the events based on the specified namespace,
-    which helps narrow down the search to specific parts of the cluster.
-
-    4. `-o json`: This flag tells Kubernetes to output the events in JSON format,
-    making it easier to work with the data programmatically.
-
-    5. `| jq ...`: This part of the command pipes the JSON output into a tool called
-    `jq`, which is used for processing and querying JSON data.
-
-
-    The `jq` command that follows performs several operations on the JSON data:
-
-
-    - It filters out events of type "Warning" and only keeps those that are related
-    to Deployments, ReplicaSets, or Pods, and specifically to the deployment with
-    the name stored in the variable `${DEPLOYMENT_NAME}`.
-
-    - It then extracts various attributes for each event, such as the kind, count,
-    name, reason, message, firstTimestamp, lastTimestamp, and duration.
-
-    - It groups the events by kind and name.
-
-    - It calculates the total count, unique reasons, unique messages, and average
-    events per minute for each group.
-
-
-    In summary, this complex command essentially retrieves, filters, and processes
-    events from the Kubernetes cluster, ultimately providing a summarized view of
-    the events that meet the specified criteria. This can be useful for monitoring
-    and troubleshooting the health and performance of your applications running in
-    the cluster.'
+    - [Kubernetes Statistics calculation documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#top_deployment_object){:target="_blank"}'
+  explanation: This command retrieves events from a Kubernetes cluster, filters them
+    based on certain criteria, and then organizes and calculates statistics about
+    the events for specific deployment objects.
   multi_line_details: "```shell\n# Set the context for the kubectl command to the\
     \ value of the CONTEXT variable\nkubectl config use-context ${CONTEXT}\n\n# Get\
     \ events from the namespace specified in the NAMESPACE variable in JSON format\

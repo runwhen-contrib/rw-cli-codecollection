@@ -4,35 +4,10 @@ commands:
     -s ''${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}'''
   doc_links: '
 
-    - [Terraform API Tokens](https://www.terraform.io/docs/cloud/users-teams-organizations/api-tokens.html){:target="_blank"}
-
-    - [cURL Documentation](https://curl.se/docs/){:target="_blank"}'
-  explanation: 'First, this command is using the tool `curl` which is a command-line
-    tool for transferring data with URL syntax. In this specific context, it is being
-    used to make an HTTP request.
-
-
-    The command is also using environment variables like $TERRAFORM_API_TOKEN, $TERRAFORM_API_URL,
-    $TERRAFORM_ORGANIZATION_NAME, and $TERRAFORM_WORKSPACE_NAME. These are set elsewhere
-    in the Kubernetes environment and contain values needed to perform certain operations.
-
-
-    The first part of the command `TERRAFORM_API_TOKEN_VALUE=$(cat $TERRAFORM_API_TOKEN)`
-    is reading the value of the environment variable TERRAFORM_API_TOKEN and storing
-    it in another environment variable TERRAFORM_API_TOKEN_VALUE.
-
-
-    The second part of the command `curl --header "Authorization: Bearer $TERRAFORM_API_TOKEN_VALUE"
-    --header "Content-Type: application/vnd.api+json" -s ''${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}''`
-    is using `curl` to make an HTTP request. It sets the Authorization header using
-    the value stored in TERRAFORM_API_TOKEN_VALUE, as well as the Content-Type header.
-    The URL for the request is constructed using the values in the other environment
-    variables mentioned earlier.
-
-
-    In summary, this command essentially makes an HTTP request to a specific URL,
-    setting the Authorization and Content-Type headers based on the values of environment
-    variables, which are specific to the Terraform infrastructure management tool.'
+    '
+  explanation: This command sets a variable TERRAFORM_API_TOKEN_VALUE to the value
+    of the TERRAFORM_API_TOKEN file, then uses curl to make a request to a specified
+    API URL with the token for authorization and specific content type.
   multi_line_details: '# Read the value from the TERRAFORM_API_TOKEN file and store
     it in the TERRAFORM_API_TOKEN_VALUE variable
 
