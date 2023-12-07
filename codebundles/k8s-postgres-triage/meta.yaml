@@ -11,29 +11,16 @@ commands:
     - [Kubernetes contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/){:target="_blank"}'
   explanation: This command uses kubectl to retrieve all resources labeled with ${RESOURCE_LABELS}
     in the specified ${NAMESPACE} and ${CONTEXT}.
-  multi_line_details: '```bash
-
-    # Set the resource labels to filter the resources by
-
-    RESOURCE_LABELS="key=value"
-
-
-    # Set the namespace to search within
-
-    NAMESPACE="example-namespace"
-
-
-    # Set the context for the specific Kubernetes cluster
-
-    CONTEXT="example-context"
-
-
-    # Use kubectl to list all resources with the specified labels in the specified
-    namespace and context
-
-    kubectl get all -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
-
-    ```'
+  multi_line_details: "```bash\n#!/bin/bash\n\n# Description: \n# This script runs\
+    \ the kubectl command to get all resources labeled with the specified labels in\
+    \ the given namespace and context.\n\n# Set the resource labels, namespace, and\
+    \ context\nRESOURCE_LABELS=\"app=example\"\nNAMESPACE=\"my-namespace\"\nCONTEXT=\"\
+    my-context\"\n\n# Run the kubectl command to get all resources with the specified\
+    \ labels in the specified namespace and context\nkubectl get all -l ${RESOURCE_LABELS}\
+    \ -n ${NAMESPACE} --context ${CONTEXT}\n```\nThis multi-line command is also a\
+    \ bash script that can be run in a shell environment. It adds comments and docstrings\
+    \ for better understanding of the purpose of the script and the individual steps\
+    \ within it."
   name: get_standard_postgres_resource_information
 - command: kubectl get crd -n ${NAMESPACE} --context ${CONTEXT} -o=jsonpath='{.items[*].metadata.name}'
   doc_links: '
@@ -44,16 +31,21 @@ commands:
     those CRDs using the JSONPath format.
   multi_line_details: '```bash
 
-    # Set the Kubernetes namespace variable
+    # This command retrieves the names of custom resource definitions (CRDs) in a
+    specified namespace using a specific context
 
-    NAMESPACE="your_namespace_here"
 
-    # Set the Kubernetes context variable
+    # Assign the namespace to a variable
 
-    CONTEXT="your_context_here"
+    NAMESPACE=example-namespace
 
-    # Use kubectl to get custom resource definitions in the specified namespace and
-    context, then output the names in JSON format
+
+    # Assign the context to a variable
+
+    CONTEXT=example-context
+
+
+    # Use kubectl to get all CRDs in a specific namespace and context
 
     kubectl get crd -n ${NAMESPACE} --context ${CONTEXT} -o=jsonpath=''{.items[*].metadata.name}''
 
@@ -66,29 +58,13 @@ commands:
     '
   explanation: This command retrieves the names of all running pods in a specific
     namespace and context, based on certain resource labels.
-  multi_line_details: '```shell
-
-    # Set the resource labels variable
-
-    RESOURCE_LABELS="app=k8s-app,env=prod"
-
-    # Set the namespace variable
-
-    NAMESPACE="my-namespace"
-
-    # Set the context variable
-
-    CONTEXT="my-context"
-
-    # Use kubectl to get pods with specific resource labels in a specific namespace
-    and context,
-
-    # outputting only the names of pods whose status.phase is Running
-
-    kubectl get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT} -o=name
-    --field-selector=status.phase=Running
-
-    ```'
+  multi_line_details: "```bash\n# The following command retrieves pods with specific\
+    \ resource labels and running status in a specific namespace using the given context\n\
+    \nkubectl get pods \\\n  -l ${RESOURCE_LABELS} \\ # select pods with specified\
+    \ resource labels\n  -n ${NAMESPACE} \\       # specify the namespace\n  --context\
+    \ ${CONTEXT} \\  # use the specified context\n  -o=name \\               # output\
+    \ only the name of the pods\n  --field-selector=status.phase=Running # filter\
+    \ pods that are in the running phase\n```"
   name: get_postgres_pod_logs_events
 - command: kubectl get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
     -o=name --field-selector=status.phase=Running
@@ -97,29 +73,13 @@ commands:
     '
   explanation: This command retrieves the names of all running pods in a specific
     namespace and context, based on certain resource labels.
-  multi_line_details: '```shell
-
-    # Set the resource labels variable
-
-    RESOURCE_LABELS="app=k8s-app,env=prod"
-
-    # Set the namespace variable
-
-    NAMESPACE="my-namespace"
-
-    # Set the context variable
-
-    CONTEXT="my-context"
-
-    # Use kubectl to get pods with specific resource labels in a specific namespace
-    and context,
-
-    # outputting only the names of pods whose status.phase is Running
-
-    kubectl get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT} -o=name
-    --field-selector=status.phase=Running
-
-    ```'
+  multi_line_details: "```bash\n# The following command retrieves pods with specific\
+    \ resource labels and running status in a specific namespace using the given context\n\
+    \nkubectl get pods \\\n  -l ${RESOURCE_LABELS} \\ # select pods with specified\
+    \ resource labels\n  -n ${NAMESPACE} \\       # specify the namespace\n  --context\
+    \ ${CONTEXT} \\  # use the specified context\n  -o=name \\               # output\
+    \ only the name of the pods\n  --field-selector=status.phase=Running # filter\
+    \ pods that are in the running phase\n```"
   name: get_postgres_pod_resource_utilization
 - command: patronictl list
   doc_links: '
@@ -130,15 +90,19 @@ commands:
   explanation: The "patronictl list" command is used to display a list of all the
     PostgreSQL clusters managed by Patroni, which is a high availability solution
     for PostgreSQL. It shows the status and information about each cluster.
-  multi_line_details: '```sh
+  multi_line_details: '```python
 
-    # Set the command to list all clusters managed by Patroni
+    # The following command is used to list all clusters managed by Patroni
 
-    command="patronictl list"
 
-    # Execute the command
+    # Import the necessary module
 
-    $command
+    import patronictl
+
+
+    # List all clusters
+
+    patronictl.list()
 
     ```'
   name: get_patroni_output

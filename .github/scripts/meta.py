@@ -247,7 +247,7 @@ def generate_metadata(directory_path):
                 else: 
                     explanation_content = "Explanation not available"
                 #Generate multi-line explanation 
-                query_multi_line_with_comments_prompt = f"Read and add docstrings to the following script content, returned in shell script format as if to be copied and pasted. Script contents:"
+                query_multi_line_with_comments_prompt = f"Add docstrings/comments to the following script:"
                 query_multi_line_with_command = f'{query_multi_line_with_comments_prompt}\n{script_contents}'
                 #Generate external doc links 
                 query_doc_links_prompt = r"Given the following explanation, generate some links that provide helpful documentation for a reader who want's to learn more about the topics used in the command. Format the output in a single YAML list with the keys of `description` and `url` for each link with the values in double quotes. Ensure each description and url are on separate lines, ensure an empty blank line separates each item. Ensure there are no other keys or text or extra characters other than the items. The script contents are:  "
@@ -271,7 +271,7 @@ def generate_metadata(directory_path):
                 else: 
                     explanation_content = "Explanation not available"
                 #Generate multi-line explanation 
-                query_multi_line_with_comments_prompt = f"Convert this one-line command into a multi-line command, adding comments so that generalists can understand what the command is doing, returned in shell script format as if to be copied and pasted. Command contents: "
+                query_multi_line_with_comments_prompt = f"Convert this command to a multi-line command and add docstrings/comments: "
                 query_multi_line_with_command = f'{query_multi_line_with_comments_prompt}\n{command}'
                 #Generate external doc links 
                 query_doc_links_prompt = r"Given the following command explanation, generate some links that provide helpful documentation for a reader who want's to learn more about the topics used in the command. Format the output in a single YAML list with the keys of `description` and `url` for each link with the values in double quotes. Ensure each description and url are on separate lines, ensure an empty blank line separates each item. Ensure there are no other keys or text or extra characters other than the items. The command is:  "

@@ -22,60 +22,20 @@ commands:
   explanation: This command creates a pod in Kubernetes using the specified service
     account and executes a series of commands to interact with the Kubernetes API,
     including performing a curl request and cleaning up after completion.
-  multi_line_details: '```bash
-
-    # Set the variables for the Kubernetes API server URL, namespace, context, resource,
-    and service account
-
-    apiserver=https://kubernetes.default.svc
-
-    namespace=${NAMESPACE}
-
-    context=${CONTEXT}
-
-    resource=""
-
-    serviceaccount=${SERVICE_ACCOUNT}
-
-
-    # Create a pod using the `curlimages/curl` image, specifying the service account,
-    namespace, and context
-
-    kubectl run curl-pod --image=curlimages/curl:latest --restart=Never --overrides="{
-    \"spec\": { \"serviceAccountName\": \"$serviceaccount\" } }" -n $namespace --context=$context
-    --command -- sleep infinity
-
-
-    # Wait for the curl-pod to be in a running state
-
-    echo "Waiting for the curl-pod to be running..."
-
-    kubectl wait --for=condition=Ready pod/curl-pod --timeout=20s -n $namespace --context=$context
-
-
-    # Retrieve the token from the Kubernetes API server to authenticate the request
-
-    TOKEN=$(kubectl exec curl-pod -n $namespace --context=$context -- cat /var/run/secrets/kubernetes.io/serviceaccount/token)
-
-
-    # Perform a curl request to the Kubernetes API using the retrieved token
-
-    echo "Performing a curl request to the Kubernetes API..."
-
-    kubectl exec curl-pod -n $namespace --context=$context -- curl -s -k -H "Authorization:
-    Bearer $TOKEN" $apiserver$resource
-
-
-    # Clean up by deleting the curl-pod
-
-    echo "Cleaning up..."
-
-    kubectl delete pod curl-pod -n $namespace --context=$context
-
-
-    # Output a message indicating that the execution is done
-
-    echo "Done"
-
-    ```'
+  multi_line_details: "```bash\n# Set variables for the Kubernetes API server, namespace,\
+    \ context, resource, and service account\napiserver=https://kubernetes.default.svc\n\
+    namespace=${NAMESPACE}\ncontext=${CONTEXT}\nresource=\"\"\nserviceaccount=${SERVICE_ACCOUNT}\n\
+    \n# Create a curl-pod using the specified image and service account\nkubectl run\
+    \ curl-pod --image=curlimages/curl:latest --restart=Never \\\n--overrides=\"{\
+    \ \\\"spec\\\": { \\\"serviceAccountName\\\": \\\"$serviceaccount\\\" } }\" \\\
+    \n-n $namespace --context=$context --command -- sleep infinity && \n\n# Wait for\
+    \ the curl-pod to be running\necho \"Waiting for the curl-pod to be running...\"\
+    \ && \nkubectl wait --for=condition=Ready pod/curl-pod --timeout=20s -n $namespace\
+    \ --context=$context && \n\n# Execute a curl request to the Kubernetes API with\
+    \ the token from the curl-pod\nTOKEN=$(kubectl exec curl-pod -n $namespace --context=$context\
+    \ -- cat /var/run/secrets/kubernetes.io/serviceaccount/token) && \necho \"Performing\
+    \ a curl request to the Kubernetes API...\" && \nkubectl exec curl-pod -n $namespace\
+    \ --context=$context -- curl -s -k -H \"Authorization: Bearer $TOKEN\" $apiserver$resource\
+    \ && \n\n# Clean up by deleting the curl-pod\necho \"Cleaning up...\" && \nkubectl\
+    \ delete pod curl-pod -n $namespace --context=$context && \necho \"Done\"\n```"
   name: test_service_account_access_to_kubernetes_api_server_in_namespace_namespace

@@ -15,41 +15,13 @@ commands:
     by ArgoCD, including its name, synchronization status, health status, and any
     associated messages, using the specified context and namespace. The output will
     be formatted in JSONPath format.
-  multi_line_details: '```bash
-
-    #!/bin/bash
-
-
-    # Set variable for application name
-
-    APPLICATION_NAME=$(kubectl get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
-    --context ${CONTEXT} -o jsonpath=''{.metadata.name}'')
-
-
-    # Set variable for sync status
-
-    SYNC_STATUS=$(kubectl get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
-    --context ${CONTEXT} -o jsonpath=''{.status.sync.status}'')
-
-
-    # Set variable for health status
-
-    HEALTH_STATUS=$(kubectl get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
-    --context ${CONTEXT} -o jsonpath=''{.status.health.status}'')
-
-
-    # Set variable for message
-
-    MESSAGE=$(kubectl get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
-    --context ${CONTEXT} -o jsonpath=''{.status.conditions[].message}'')
-
-
-    # Print the values of the variables
-
-    echo "Application Name: ${APPLICATION_NAME}, Sync Status: ${SYNC_STATUS}, Health
-    Status: ${HEALTH_STATUS}, Message: ${MESSAGE}"
-
-    ```'
+  multi_line_details: "```bash\n# Retrieve information about a specific application\
+    \ using kubectl and output as JSON\n# Usage: get-application-info <APPLICATION>\
+    \ <APPLICATION_APP_NAMESPACE> <CONTEXT>\nget-application-info() {\n  # Get applications.argoproj.io\
+    \ of a specific application in the provided namespace and context, and output\
+    \ as JSON\n  kubectl get applications.argoproj.io $1 -n $2 --context $3 -o jsonpath='Application\
+    \ Name: {.metadata.name}, Sync Status: {.status.sync.status}, Health Status: {.status.health.status},\
+    \ Message: {.status.conditions[].message}'\n}\n```"
   name: fetch_argocd_application_sync_status_health
 - command: 'kubectl get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
     --context ${CONTEXT} -o json | jq -r ''"Application Name: " + .metadata.name +
@@ -69,14 +41,14 @@ commands:
   explanation: This command retrieves information about a specific application in
     a Kubernetes cluster, like its name, namespace, and the last time it was synchronized,
     along with its status and any associated messages.
-  multi_line_details: "```bash\n# Get the application details in JSON format and parse\
-    \ using jq to display specific fields\nkubectl get applications.argoproj.io ${APPLICATION}\
-    \ -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT} -o json | \\\n  jq -r '\"\
-    Application Name: \" + .metadata.name + \"\\nApplication Namespace: \"+ .metadata.namespace\
-    \ + \\\n  \"\\nLast Sync Start Time: \" + .status.operationState.finishedAt +\
-    \ \"\\nLast Sync Finish Time: \" + \\\n  .status.operationState.startedAt + \"\
-    \\nLast Sync Status: \" + .status.operationState.phase + \\\n  \"\\nLast Sync\
-    \ Message: \" + .status.operationState.message'\n```"
+  multi_line_details: "```bash\n# This command fetches the specified Argo CD application\
+    \ information in JSON format and uses jq to extract specific fields.\n\nkubectl\
+    \ get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}\
+    \ --context ${CONTEXT} -o json | \njq -r '\"Application Name: \" + .metadata.name\
+    \ + \"\\nApplication Namespace: \"+ .metadata.namespace + \n\"\\nLast Sync Start\
+    \ Time: \" + .status.operationState.finishedAt + \n\"\\nLast Sync Finish Time:\
+    \ \" + .status.operationState.startedAt + \n\"\\nLast Sync Status: \" + .status.operationState.phase\
+    \ + \n\"\\nLast Sync Message: \" + .status.operationState.message'\"\n```"
   name: fetch_argocd_application_last_sync_operation_details
 - command: kubectl get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
     --context ${CONTEXT} -o json | jq -r '[.status.resources[] | select(.health.status
@@ -87,13 +59,17 @@ commands:
   explanation: This command retrieves the status of a specific application using Argo
     Project, filters for resources with non-healthy status, and outputs the results
     in JSON format.
-  multi_line_details: "```bash\n# Get the details of a specific application from Argo\
-    \ CD by its name and namespace\n# Set the output format to JSON\nkubectl get applications.argoproj.io\
+  multi_line_details: "```bash\n# Get the application from the specified namespace\
+    \ using kubectl and output the result in JSON format\nkubectl get applications.argoproj.io\
     \ ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT} -o json\
-    \ \\ \n  # Pipe the output to jq and filter for resources with non-healthy status,\
-    \ selecting specific attributes\n  | jq -r '[.status.resources[] | select(.health.status\
-    \ != null) | select(.health.status != \"Healthy\") | {name,kind,namespace,health}]'\n\
-    ```"
+    \ \\\n  # Pipe the JSON output to jq and filter the resources based on health\
+    \ status\n  | jq -r '[.status.resources[] \n  # Select resources that have a non-null\
+    \ and non-healthy health status\n  | select(.health.status != null) \n  | select(.health.status\
+    \ != \"Healthy\") \n  # Create an object containing name, kind, namespace, and\
+    \ health properties\n  | {name,kind,namespace,health}]'\n```\n\nThe above multi-line\
+    \ command consists of a kubectl command to get an application from a specific\
+    \ namespace and uses `jq` to parse the JSON output and filter the resources based\
+    \ on their health status."
   name: fetch_unhealthy_argocd_application_resources
 - command: 'for deployment_name in $(kubectl get deployments -l argocd.argoproj.io/instance=${APPLICATION_TARGET_NAMESPACE}_${APPLICATION}
     -o=custom-columns=NAME:.metadata.name --no-headers -n ${APPLICATION_TARGET_NAMESPACE});
@@ -107,14 +83,15 @@ commands:
   explanation: This command retrieves the names of deployments associated with a specific
     instance and application, then prints out the deployment name and 50 lines of
     logs for each deployment that contain a specified error pattern.
-  multi_line_details: "```bash\n# Get a list of deployments where the label matches\
-    \ the specified pattern\nfor deployment_name in $(kubectl get deployments -l argocd.argoproj.io/instance=${APPLICATION_TARGET_NAMESPACE}_${APPLICATION}\
+  multi_line_details: "```bash\n#!/bin/bash\n\n# This script retrieves deployment\
+    \ names based on a specific label, \n# and then outputs the logs for each deployment\
+    \ while filtering for a specific error pattern.\n\n# Retrieve deployment names\
+    \ based on label\nfor deployment_name in $(kubectl get deployments -l argocd.argoproj.io/instance=${APPLICATION_TARGET_NAMESPACE}_${APPLICATION}\
     \ -o=custom-columns=NAME:.metadata.name --no-headers -n ${APPLICATION_TARGET_NAMESPACE});\
-    \ do\n    # Output the name of the deployment\n    echo \"\\nDEPLOYMENT NAME:\
-    \ $deployment_name \\n\"\n    # Show the last 50 lines of logs for the deployment\
-    \ and filter for lines matching the error pattern\n    kubectl logs deployment/$deployment_name\
-    \ --tail=50 -n ${APPLICATION_TARGET_NAMESPACE} | grep -E '${ERROR_PATTERN}'\n\
-    done\n```"
+    \ do \n    # Output the deployment name\n    echo \"\\nDEPLOYMENT NAME: $deployment_name\
+    \ \\n\" \n    # Output the logs for the deployment and filter for specific error\
+    \ pattern\n    kubectl logs deployment/$deployment_name --tail=50 -n ${APPLICATION_TARGET_NAMESPACE}\
+    \ | grep -E '${ERROR_PATTERN}'\ndone\n```"
   name: scan_for_errors_in_pod_logs_related_to_argocd_application_deployments
 - command: kubectl describe applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
     --context ${CONTEXT}
@@ -127,28 +104,9 @@ commands:
     project application, including its configuration and status, within a specific
     namespace and context. It's a way to inspect the details of an Argo project application
     from the command line.
-  multi_line_details: '```bash
-
-    # Set the namespace where the application is located
-
-    APPLICATION_APP_NAMESPACE="your_namespace_here"
-
-
-    # Set the name of the application
-
-    APPLICATION="your_application_name_here"
-
-
-    # Set the context for the Kubernetes cluster
-
-    CONTEXT="your_context_here"
-
-
-    # Use kubectl to describe the Argo application in the specified namespace and
-    context
-
-    kubectl describe applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
-    --context ${CONTEXT}
-
-    ```'
+  multi_line_details: "```bash\n# This command describes an Argo application using\
+    \ the kubectl command\n\n# Describe the Argo application with the specified name\
+    \ in a specific namespace and context\nkubectl describe applications.argoproj.io\
+    \ ${APPLICATION} \\\n    -n ${APPLICATION_APP_NAMESPACE} \\\n    --context ${CONTEXT}\n\
+    ```"
   name: fully_describe_argocd_application
