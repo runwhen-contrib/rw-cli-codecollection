@@ -22,27 +22,22 @@ commands:
     them to show only warning events related to a specific StatefulSet or Pod within
     the last hour, displaying relevant information such as the kind, name, reason,
     message, and timestamps of the events.
-  multi_line_details: "```bash\n#!/bin/bash\n\n# This script retrieves events from\
-    \ a Kubernetes cluster, filters them based on certain criteria, and formats the\
-    \ output in JSON using the 'jq' command.\n\n# Set the context for the kubectl\
-    \ command\nCONTEXT=${CONTEXT}\n# Set the namespace for the kubectl command\nNAMESPACE=${NAMESPACE}\n\
-    # Set the statefulset name filter for the jq command\nSTATEFULSET_NAME=${STATEFULSET_NAME}\n\
-    \n# Get events from the specified context and namespace, and format the output\
-    \ as JSON\nkubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | \\\
-    \n  # Filter the events based on specific criteria and format the output\n  jq\
-    \ '(now - (60*60)) as $time_limit |\n    [ .items[] |\n      select(.type == \"\
-    Warning\" and\n        (.involvedObject.kind == \"StatefulSet\" or .involvedObject.kind\
-    \ == \"Pod\") and\n        (.involvedObject.name | tostring | contains(\"${STATEFULSET_NAME}\"\
-    )) and\n        (.lastTimestamp | fromdateiso8601) >= $time_limit) |\n       \
-    \   {kind: .involvedObject.kind,\n            name: .involvedObject.name,\n  \
-    \          reason: .reason,\n            message: .message,\n            firstTimestamp:\
-    \ .firstTimestamp,\n            lastTimestamp: .lastTimestamp} ] |\n         \
-    \     group_by([.kind, .name]) |\n                map({kind: .[0].kind,\n    \
-    \              name: .[0].name,\n                  count: length,\n          \
-    \        reasons: map(.reason) | unique,\n                  messages: map(.message)\
-    \ | unique,\n                  firstTimestamp: map(.firstTimestamp | fromdateiso8601)\
-    \ | sort | .[0] | todateiso8601,\n                  lastTimestamp: map(.lastTimestamp\
-    \ | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'\n```"
+  multi_line_details: "#!/bin/bash\n\n# Use kubectl to get events in json format\n\
+    kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | \\\n\n# Pipe\
+    \ the output to jq to filter and transform the data\njq '(now - (60*60)) as $time_limit\
+    \ | \n\n# Select events that are warnings and are related to StatefulSet or Pod\n\
+    [ .items[] | \nselect(\n  .type == \"Warning\" and \n  (.involvedObject.kind ==\
+    \ \"StatefulSet\" or .involvedObject.kind == \"Pod\") and \n  (.involvedObject.name\
+    \ | tostring | contains(\"${STATEFULSET_NAME}\")) and \n  (.lastTimestamp | fromdateiso8601)\
+    \ >= $time_limit) | \n\n# Format the selected data into a more organized structure\n\
+    {\n  kind: .involvedObject.kind, \n  name: .involvedObject.name, \n  reason: .reason,\
+    \ \n  message: .message, \n  firstTimestamp: .firstTimestamp, \n  lastTimestamp:\
+    \ .lastTimestamp\n}\n] | \n\n# Group the data by kind and name, then format it\
+    \ further\ngroup_by([.kind, .name]) | \nmap(\n  {\n    kind: .[0].kind, \n   \
+    \ name: .[0].name, \n    count: length, \n    reasons: map(.reason) | unique,\
+    \ \n    messages: map(.message) | unique, \n    firstTimestamp: map(.firstTimestamp\
+    \ | fromdateiso8601) | sort | .[0] | todateiso8601, \n    lastTimestamp: map(.lastTimestamp\
+    \ | fromdateiso8601) | sort | reverse | .[0] | todateiso8601\n  }\n)'"
   name: troubleshoot_statefulset_warning_events_for_statefulset_name
 - command: 'kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq ''(now
     - (60*60)) as $time_limit | [ .items[] | select(.type != "Warning" and (.involvedObject.kind
@@ -68,29 +63,28 @@ commands:
     certain types of events within a specific time range, and then formats the output
     into a JSON structure that provides information about the count, timing, and other
     details of those events at the StatefulSet or Pod level.
-  multi_line_details: "```bash\n# The following is a multi-line command to retrieve\
-    \ events with specific criteria using kubectl and jq\n\nkubectl get events --context\
-    \ ${CONTEXT} -n ${NAMESPACE} -o json | \\\n  jq '(now - (60*60)) as $time_limit\
-    \ |\n  [ .items[] | select(\n          .type != \"Warning\" and \n          (.involvedObject.kind\
-    \ == \"StatefulSet\" or .involvedObject.kind == \"Pod\") and \n          (.involvedObject.name\
-    \ | tostring | contains(\"${STATEFULSET_NAME}\"))\n      ) | {\n        kind:\
-    \ .involvedObject.kind, \n        count: .count, \n        name: .involvedObject.name,\
-    \ \n        reason: .reason, \n        message: .message, \n        firstTimestamp:\
-    \ .firstTimestamp, \n        lastTimestamp: .lastTimestamp, \n        duration:\
-    \ (\n            if (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp |\
-    \ fromdateiso8601)) == 0) \n            then 1 \n            else (((.lastTimestamp\
-    \ | fromdateiso8601) - (.firstTimestamp | fromdateiso8601))/60) \n           \
-    \ end\n        )\n    } ] | group_by([.kind, .name]) | map({\n      kind: .[0].kind,\
-    \ \n      name: .[0].name, \n      count: (map(.count) | add), \n      reasons:\
-    \ map(.reason) | unique, \n      messages: map(.message) | unique, \n      average_events_per_minute:\
-    \ (\n          if .[0].duration == 1 \n          then 1 \n          else ((map(.count)\
-    \ | add)/.[0].duration ) \n          end\n      ),\n      firstTimestamp: map(.firstTimestamp\
+  multi_line_details: "#!/bin/bash\n\n# Set a time limit equal to 1 hour ago\ntime_limit=$(now\
+    \ - (60*60))\n\n# Retrieve events in JSON format filtered by context and namespace\n\
+    events=$(kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json)\n\n\
+    # Parse the events using jq, grouping and formatting them\nparsed_events=$(echo\
+    \ $events | jq '\n    (now - (60*60)) as $time_limit |\n    [ .items[] |\n   \
+    \   select(\n        .type != \"Warning\" and\n        (.involvedObject.kind ==\
+    \ \"StatefulSet\" or .involvedObject.kind == \"Pod\") and\n        (.involvedObject.name\
+    \ | tostring | contains(\"${STATEFULSET_NAME}\"))\n      ) |\n      {\n      \
+    \  kind: .involvedObject.kind,\n        count: .count,\n        name: .involvedObject.name,\n\
+    \        reason: .reason,\n        message: .message,\n        firstTimestamp:\
+    \ .firstTimestamp,\n        lastTimestamp: .lastTimestamp,\n        duration:\
+    \ (\n          if (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp | fromdateiso8601))\
+    \ == 0)\n          then 1\n          else (((.lastTimestamp | fromdateiso8601)\
+    \ - (.firstTimestamp | fromdateiso8601))/60)\n          end\n        )\n     \
+    \ }\n    ] |\n    group_by([.kind, .name]) |\n    map({\n      kind: .[0].kind,\n\
+    \      name: .[0].name,\n      count: (map(.count) | add),\n      reasons: map(.reason)\
+    \ | unique,\n      messages: map(.message) | unique,\n      average_events_per_minute:\
+    \ (\n        if .[0].duration == 1\n        then 1\n        else ((map(.count)\
+    \ | add)/.[0].duration)\n        end\n      ),\n      firstTimestamp: map(.firstTimestamp\
     \ | fromdateiso8601) | sort | .[0] | todateiso8601,\n      lastTimestamp: map(.lastTimestamp\
-    \ | fromdateiso8601) | sort | reverse | .[0] | todateiso8601\n    })'\n```\n\n\
-    The above script retrieves events with specific filtering criteria using kubectl\
-    \ and the jq utility. It filters based on time, type, involved object type, and\
-    \ name before structuring the output into grouped records. This multi-line script\
-    \ enhances readability and maintainability of the original command."
+    \ | fromdateiso8601) | sort | reverse | .[0] | todateiso8601\n    })\n  ')\n\n\
+    # Output the parsed events\necho $parsed_events"
   name: check_statefulset_event_anomalies_for_statefulset_name
 - command: kubectl logs --tail=100 statefulset/${STATEFULSET_NAME} --context ${CONTEXT}
     -n ${NAMESPACE}
@@ -104,26 +98,10 @@ commands:
   explanation: This command allows you to view the logs of the pods within a statefulset
     in Kubernetes, displaying the last 100 lines of each pod's log. You can specify
     the context and namespace for the logs you want to view.
-  multi_line_details: '```bash
-
-    # This command retrieves the last 100 log lines from the specified StatefulSet
-    in a Kubernetes cluster
-
-
-    kubectl logs \
-
-    --tail=100 \             # limits the output to the last 100 log lines
-
-    statefulset/${STATEFULSET_NAME} \   # specifies the StatefulSet to retrieve logs
-    from
-
-    --context ${CONTEXT} \   # specifies the context of the Kubernetes cluster
-
-    -n ${NAMESPACE}          # specifies the namespace where the StatefulSet is located
-
-    ```
-
-    '
+  multi_line_details: "# Set the kubectl context to the specified context and\n# retrieve\
+    \ the logs for the specified statefulset in the specified namespace\nkubectl logs\
+    \ \\\n  --tail=100 \\\n  statefulset/${STATEFULSET_NAME} \\\n  --context ${CONTEXT}\
+    \ \\\n  -n ${NAMESPACE}"
   name: fetch_statefulset_statefulset_name_logs
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "${STATEFULSET_NAME}" || true
@@ -136,15 +114,15 @@ commands:
     namespace and context, then filters the output to only include lines containing
     the statefulset name, and finally the "|| true" at the end ensures that the command
     exits with a success status code even if the grep doesn't find any matches.
-  multi_line_details: "```bash\n# This command retrieves events for a specific context\
-    \ and namespace, then searches for the statefulset name in the events.\n# If the\
-    \ statefulset name is not found, it will return true.\n\nkubectl get events \\\
-    \                # Get events from the Kubernetes cluster\n  --field-selector\
-    \ type=Warning \\   # Filter events by type Warning\n  --context ${CONTEXT} \\\
-    \            # Specify the context (cluster) to use\n  -n ${NAMESPACE} \\    \
-    \             # Specify the namespace to search for events\n  | grep -i \"${STATEFULSET_NAME}\"\
-    \ \\ # Search for the statefulset name case-insensitively\n  || true         \
-    \                  # If statefulset name not found, return true\n```"
+  multi_line_details: "```bash\n# This command retrieves events related to a specific\
+    \ StatefulSet in a Kubernetes cluster\n# The '--field-selector' flag filters the\
+    \ events based on type=Warning\n# The '--context' flag specifies which Kubernetes\
+    \ context to use\n# The '-n' flag specifies the namespace to look for the StatefulSet\n\
+    # The 'grep' command then filters the events for the specified StatefulSet name\
+    \ and ignores case\n# The '|| true' ensures that the command returns a successful\
+    \ exit status even if 'grep' does not find a match\n\nkubectl get events \\\n\
+    \  --field-selector type=Warning \\\n  --context ${CONTEXT} \\\n  -n ${NAMESPACE}\
+    \ \\\n  | grep -i \"${STATEFULSET_NAME}\" || true\n```"
   name: get_related_statefulset_statefulset_name_events
 - command: kubectl get statefulset ${LABELS} --context=${CONTEXT} -n ${NAMESPACE}
     -o yaml
@@ -157,14 +135,9 @@ commands:
     - [Contexts in Kubernetes](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}'
   explanation: This command retrieves the YAML configuration of a stateful set in
     a specific namespace and context, using specified labels for filtering.
-  multi_line_details: "```bash\n# Get the statefulset with specified labels in yaml\
-    \ format\n\nkubectl get statefulset ${LABELS} \\\n  --context=${CONTEXT} \\\n\
-    \  -n ${NAMESPACE} \\\n  -o yaml\n```\n\nThis multi-line command is used to retrieve\
-    \ a statefulset from a Kubernetes cluster. The `${LABELS}` variable is used to\
-    \ specify the labels for filtering the statefulset, the `${CONTEXT}` variable\
-    \ specifies the context of the cluster, and the `${NAMESPACE}` variable specifies\
-    \ the namespace where the statefulset exists. The `-o yaml` flag is used to output\
-    \ the data in YAML format."
+  multi_line_details: "#!/bin/bash\n# This script retrieves the statefulset with the\
+    \ specified labels and context in YAML format\n\nkubectl get statefulset ${LABELS}\
+    \ \\\n  --context=${CONTEXT} \\\n  -n ${NAMESPACE} \\\n  -o yaml"
   name: fetch_statefulset_statefulset_name_manifest_details
 - command: 'kubectl get statefulset -n ${NAMESPACE} -o json --context ${CONTEXT} |
     jq -r ''.items[] | select(.status.availableReplicas < .status.replicas) | "---\nStatefulSet
@@ -177,13 +150,10 @@ commands:
     and context, then uses jq to filter and format the output to show the StatefulSet
     name, desired replicas, and available replicas for any stateful sets that have
     less available replicas than desired.
-  multi_line_details: "```bash\n#!/bin/bash\n\n# This script retrieves the statefulsets\
-    \ in a specified namespace and context\n# It then uses jq to filter out the statefulsets\
-    \ whose available replicas are less than the desired replicas\n# Finally, it formats\
-    \ the information and prints the statefulset name, desired replicas, and available\
-    \ replicas\n\nkubectl get statefulset -n ${NAMESPACE} -o json --context ${CONTEXT}\
-    \ \\\n| jq -r '.items[] | select(.status.availableReplicas < .status.replicas)\
-    \ | \n\"---\\nStatefulSet Name: \" + (.metadata.name|tostring) + \n\"\\nDesired\
-    \ Replicas: \" + (.status.replicas|tostring) + \n\"\\nAvailable Replicas: \" +\
-    \ (.status.availableReplicas|tostring)'\n```"
+  multi_line_details: "```bash\n# Retrieve stateful set information in JSON format\
+    \ and filter for those with fewer available replicas than desired replicas\nkubectl\
+    \ get statefulset -n ${NAMESPACE} -o json --context ${CONTEXT} | \\\n  jq -r '.items[]\
+    \ | select(.status.availableReplicas < .status.replicas) | \"---\\nStatefulSet\
+    \ Name: \" + (.metadata.name|tostring) + \"\\nDesired Replicas: \" + (.status.replicas|tostring)\
+    \ + \"\\nAvailable Replicas: \" + (.status.availableReplicas|tostring)'\n```"
   name: list_statefulsets_with_unhealthy_replica_counts_in_namespace_namespace

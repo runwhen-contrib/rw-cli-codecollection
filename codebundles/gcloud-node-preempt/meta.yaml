@@ -12,12 +12,17 @@ commands:
     lists all preempted compute instances that are not yet completed in a Google Cloud
     Platform project, displaying specific information about each instance in JSON
     format. The jq filter is used to select and format the specific fields of interest.
-  multi_line_details: "'''\nThis multi-line command activates the service account\
-    \ and then lists compute operations with a specified filter, format, and project\
-    \ ID.\n'''\n\n# Activate the service account\ngcloud auth activate-service-account\
-    \ --key-file=$GOOGLE_APPLICATION_CREDENTIALS && \n\n# List compute operations\
-    \ with a specified filter, format, and project ID\ngcloud compute operations list\
-    \ --filter=\"operationType:( compute.instances.preempted ) AND NOT status:( DONE\
-    \ )\" \\\n--format=json --project=${GCP_PROJECT_ID} | jq '[.[] | {startTime,targetLink,\
-    \ statusMessage, progress, zone, selfLink}]'\n'''"
+  multi_line_details: '# Activate the service account using the key file
+
+    gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+    && \
+
+    # List compute operations with specific filters and format as JSON
+
+    gcloud compute operations list --filter="operationType:( compute.instances.preempted
+    ) AND NOT status:( DONE )" --format=json --project=${GCP_PROJECT_ID} | \
+
+    # Use jq to filter and format the desired fields
+
+    jq ''[.[] | {startTime,targetLink, statusMessage, progress, zone, selfLink}]'''
   name: list_all_nodes_in_an_active_prempt_operation

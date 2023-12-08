@@ -16,13 +16,13 @@ commands:
     pod, using the specified context, namespace, and labels, and limiting the output
     to a certain number of lines and bytes, as well as filtering based on a specified
     timestamp.
-  multi_line_details: "```bash\n# Set the context, namespace, and labels for identifying\
-    \ the specific pod\n# and its logs. Also specify the maximum number of log lines\
-    \ to retrieve,\n# limit the log output by bytes, set the time frame for log retrieval,\n\
-    # and specify the container name from which to retrieve logs.\nkubectl --context=${CONTEXT}\
-    \ \\\n    -n ${NAMESPACE} \\\n    logs -l ${LABELS} \\\n    --tail=${MAX_LOG_LINES}\
-    \ \\\n    --limit-bytes=256000 \\\n    --since=${LOGS_SINCE} \\\n    --container=${CONTAINER_NAME}\n\
-    ```"
+  multi_line_details: "```bash\n# Set the kubectl context and namespace, then retrieve\
+    \ logs from a specific set of labels\nkubectl --context=${CONTEXT} \\\n      \
+    \  -n ${NAMESPACE} \\\n        logs -l ${LABELS} \\    # Select logs with specified\
+    \ labels\n        --tail=${MAX_LOG_LINES} \\  # Show last N lines of logs\n  \
+    \      --limit-bytes=256000 \\   # Limit log output to 256KB\n        --since=${LOGS_SINCE}\
+    \ \\  # Show logs since a specific timestamp\n        --container=${CONTAINER_NAME}\
+    \   # Select logs from a specific container\n```"
   name: get_workload_name_application_logs
 - command: ${cmd}
   doc_links: '
@@ -33,26 +33,22 @@ commands:
   explanation: This command is a placeholder for a specific command that needs to
     be executed, but the actual command will depend on the context in which it's being
     used.
-  multi_line_details: '```python
+  multi_line_details: '```bash
 
-    # This is a multi-line command with docstrings
+    #!/bin/bash
 
 
-    # Set the value of the cmd variable to the following string
+    # This script runs a multi-line command and returns the result
 
-    cmd = """
 
-    # This command does the following:
+    cmd="ls -l"
 
-    # - Step 1: Update the software packages using the apt-get package manager
+    $cmd
 
-    # - Step 2: Upgrade the installed software packages to the latest version
+    ```
 
-    sudo apt-get update && sudo apt-get upgrade
-
-    """
-
-    ```'
+    In this bash script, we declare a variable `cmd` with the value "ls -l". Then
+    we execute the command stored in the `cmd` variable using the `$cmd` syntax.'
   name: troubleshoot_workload_name_application_logs
 - command: kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head
@@ -67,32 +63,13 @@ commands:
   explanation: This command allows you to execute a shell command in a specific container
     within a Kubernetes cluster, using the specified context and namespace, and targeting
     a resource based on certain labels.
-  multi_line_details: '```bash
-
-    # Set the context and namespace for kubectl
-
-    CONTEXT="context_name"
-
-    NAMESPACE="namespace"
-
-
-    # Get the name of the first deployment or stateful set with the specified labels
-
-    RESOURCE_NAME=$(kubectl --context=${CONTEXT} -n ${NAMESPACE} get all -l ${LABELS}
-    -oname | grep -iE "deploy|stateful" | head -n 1)
-
-
-    # Execute the command to print environment variables in the specified container
-
-    kubectl --context=${CONTEXT} -n ${NAMESPACE} exec ${RESOURCE_NAME} --container=${CONTAINER_NAME}
-    -- printenv
-
-    ```
-
-
-    This multi-line command sets the context and namespace, fetches the name of the
-    resource based on specified labels, and then executes a command to print environment
-    variables within a specific container.'
+  multi_line_details: "#!/bin/bash\n# Executes a command in a specific context and\
+    \ namespace with a specific label \n\n# Get the name of the resource based on\
+    \ labels and select deploy or stateful \nresource_name=$(kubectl --context=${CONTEXT}\
+    \ -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE \"deploy|stateful\" |\
+    \ head -n 1)\n\n# Execute the command using the obtained resource name\nkubectl\
+    \ --context=${CONTEXT} -n ${NAMESPACE} exec ${resource_name} --container=${CONTAINER_NAME}\
+    \ -- printenv"
   name: troubleshoot_workload_name_application_logs
 - command: kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head
@@ -111,15 +88,12 @@ commands:
     or stateful set within a given namespace and context. It retrieves the pods based
     on specified labels, selects the first result, and runs a specific container's
     process command while filtering out any non-relevant results.
-  multi_line_details: "'''\nThis command is too complex to be converted to a multi-line\
-    \ command with docstrings. However, I'll break it down and provide comments for\
-    \ each part of the command.\n\n# Use kubectl to execute a command on a specific\
-    \ context and namespace\nkubectl --context=${CONTEXT} -n ${NAMESPACE} exec \n\n\
-    # Get the name of the first deployment or statefulset matching certain labels\
-    \ within the specified context and namespace\n$(kubectl --context=${CONTEXT} -n\
-    \ ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE \"deploy|stateful\" | head\
-    \ -n 1) \n\n# Specify the container in which the command should be executed\n\
-    --container=${CONTAINER_NAME} \n\n# Execute the 'ps' command and format the output\
-    \ to only display the command column\n-- ps -eo command --no-header \n\n# Remove\
-    \ any lines that contain the string \"ps -eo\"\n| grep -v \"ps -eo\"\n'''"
+  multi_line_details: "```bash\n# Set the Kubernetes context to the specified context\
+    \ and namespace\nkubectl --context=${CONTEXT} -n ${NAMESPACE} exec \\ \n    #\
+    \ Get the name of the first deployment or statefulset with the specified labels\n\
+    \    $(kubectl --context=${CONTEXT} -n ${NAMESPACE} get all -l ${LABELS} -oname\
+    \ | grep -iE \"deploy|stateful\" | head -n 1) \\ \n    # Specify the container\
+    \ to execute the command in\n    --container=${CONTAINER_NAME} -- \\\n    # Run\
+    \ 'ps' command in the specified pod/container and filter out the 'ps' command\
+    \ itself\n    ps -eo command --no-header | grep -v \"ps -eo\"\n```"
   name: troubleshoot_workload_name_application_logs
