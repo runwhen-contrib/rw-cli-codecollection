@@ -217,8 +217,7 @@ def generate_metadata(directory_path):
     Returns:
         Object
     """
-    # explainUrl=f'https://papi.test.runwhen.com/bow/raw?'
-    explainUrl = f"https://papi.kyle.dev.runwhen.com/bow/raw?"
+    explainUrl=f'https://papi.test.runwhen.com/bow/raw?'
     headers = {"Content-Type": "application/json"}
     search_list = ["render_in_commandlist=true", "show_in_rwl_cheatsheet=true"]
     runbook_files = find_files(directory_path, "runbook.robot")
