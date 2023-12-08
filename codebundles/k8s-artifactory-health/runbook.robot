@@ -80,7 +80,7 @@ Check Artifactory Liveness and Readiness Endpoints
     ...    env=${env}
     ...    run_in_workload_with_name=
     ...    secret_file__kubeconfig=${KUBECONFIG}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${liveness}
     ...    set_severity_level=2
@@ -91,7 +91,7 @@ Check Artifactory Liveness and Readiness Endpoints
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/readiness
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${readiness}
     ...    set_severity_level=2
@@ -107,7 +107,7 @@ Check Artifactory Liveness and Readiness Endpoints
     # ...    optional_namespace=${NAMESPACE}
     # ...    optional_context=${CONTEXT}
     # ...    secret_file__kubeconfig=${KUBECONFIG}
-    # ...    render_in_commandlist=true
+    # ...    show_in_rwl_cheatsheet=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${liveness.stdout}
     RW.Core.Add Pre To Report    ${readiness.stdout}

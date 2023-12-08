@@ -25,7 +25,7 @@ Fetch Events for Unhealthy Kubernetes PersistentVolumeClaims in Namespace `${NAM
     ...    cmd=for pvc in $(${KUBERNETES_DISTRIBUTION_BINARY} get pvc -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.status.phase != "Bound") | .metadata.name'); do ${KUBERNETES_DISTRIBUTION_BINARY} get events -n ${NAMESPACE} --context ${CONTEXT} --field-selector involvedObject.name=$pvc -o json | jq '.items[]| "Last Timestamp: " + .lastTimestamp + ", Name: " + .involvedObject.name + ", Message: " + .message'; done
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ${unbound_pvc_event_list}=    Split String  ${unbound_pvc_events.stdout}    \n
     @{next_steps}=     Create List
     IF    len($unbound_pvc_event_list) > 0
@@ -79,7 +79,7 @@ List PersistentVolumeClaims in Terminating State in Namespace `${NAMESPACE}`
     ...    cmd=namespace=${NAMESPACE}; context=${CONTEXT}; ${KUBERNETES_DISTRIBUTION_BINARY} get pvc -n $namespace --context=$context -o json | jq -r '.items[] | select(.metadata.deletionTimestamp != null) | .metadata.name as $name | .metadata.deletionTimestamp as $deletion_time | .metadata.finalizers as $finalizers | "\\($name) is in Terminating state (Deletion started at: \\($deletion_time)). Finalizers: \\($finalizers)"'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${terminating_pvcs}
     ...    set_severity_level=4
@@ -103,7 +103,7 @@ List PersistentVolumes in Terminating State in Namespace `${NAMESPACE}`
     ...    cmd=for pv in $(${KUBERNETES_DISTRIBUTION_BINARY} get pv --context ${CONTEXT} -o json | jq -r '.items[] | select(.status.phase == "Terminating") | .metadata.name'); do ${KUBERNETES_DISTRIBUTION_BINARY} get events --all-namespaces --field-selector involvedObject.name=$pv --context ${CONTEXT} -o json | jq '.items[]| "Last Timestamp: " + .lastTimestamp + " Name: " + .involvedObject.name + " Message: " + .message'; done
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${dangling_pvs}
     ...    set_severity_level=4
@@ -125,7 +125,7 @@ List Pods with Attached Volumes and Related PersistentVolume Details in Namespac
     ...    cmd=for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} --field-selector=status.phase=Running --context ${CONTEXT} -o jsonpath='{range .items[*]}{.metadata.name}{"\\n"}{end}'); do for pvc in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods $pod -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{range .spec.volumes[*]}{.persistentVolumeClaim.claimName}{"\\n"}{end}'); do pv=$(${KUBERNETES_DISTRIBUTION_BINARY} get pvc $pvc -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.volumeName}') && status=$(${KUBERNETES_DISTRIBUTION_BINARY} get pv $pv --context ${CONTEXT} -o jsonpath='{.status.phase}') && node=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.nodeName}') && zone=$(${KUBERNETES_DISTRIBUTION_BINARY} get nodes $node --context ${CONTEXT} -o jsonpath='{.metadata.labels.topology\\.kubernetes\\.io/zone}') && ingressclass=$(${KUBERNETES_DISTRIBUTION_BINARY} get pvc $pvc -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.storageClassName}') && accessmode=$(${KUBERNETES_DISTRIBUTION_BINARY} get pvc $pvc -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.status.accessModes[0]}') && reclaimpolicy=$(${KUBERNETES_DISTRIBUTION_BINARY} get pv $pv --context ${CONTEXT} -o jsonpath='{.spec.persistentVolumeReclaimPolicy}') && csidriver=$(${KUBERNETES_DISTRIBUTION_BINARY} get pv $pv --context ${CONTEXT} -o jsonpath='{.spec.csi.driver}')&& echo -e "\\n------------\\nPod: $pod\\nPVC: $pvc\\nPV: $pv\\nStatus: $status\\nNode: $node\\nZone: $zone\\nIngressClass: $ingressclass\\nAccessModes: $accessmode\\nReclaimPolicy: $reclaimpolicy\\nCSIDriver: $csidriver\\n"; done; done
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of configured persistent volumes in ${NAMESPACE}:
     RW.Core.Add Pre To Report    ${pod_storage_report.stdout}
@@ -138,7 +138,7 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
     ...    cmd=for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} --field-selector=status.phase=Running --context ${CONTEXT} -o jsonpath='{range .items[*]}{.metadata.name}{"\\n"}{end}'); do for pvc in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods $pod -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{range .spec.volumes[*]}{.persistentVolumeClaim.claimName}{"\\n"}{end}'); do for volumeName in $(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.spec.volumes[] | select(has("persistentVolumeClaim")) | .name'); do mountPath=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r --arg vol "$volumeName" '.spec.containers[].volumeMounts[] | select(.name == $vol) | .mountPath'); containerName=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r --arg vol "$volumeName" '.spec.containers[] | select(.volumeMounts[].name == $vol) | .name'); echo -e "\\n------------\\nPod: $pod, PVC: $pvc, volumeName: $volumeName, containerName: $containerName, mountPath: $mountPath"; ${KUBERNETES_DISTRIBUTION_BINARY} exec $pod -n ${NAMESPACE} --context ${CONTEXT} -c $containerName -- df -h $mountPath; done; done; done;
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ${unhealthy_volume_capacity}=    RW.CLI.Run Cli
     ...    cmd=echo "${pod_pvc_utilization.stdout}" | awk '/------------/ { if (flag) { print record "\\n" $0; } record = ""; flag = 0; next; } $5 ~ /[9][5-9]%/ || $5 == "100%" { flag = 1; } { if (record == "") { record = $0; } else { record = record "\\n" $0; } } END { if (flag) { print record; } }'
     ...    env=${env}
@@ -185,7 +185,7 @@ Check for RWO Persistent Volume Node Attachment Issues in Namespace `${NAMESPACE
     ...    cmd=NAMESPACE="${NAMESPACE}"; CONTEXT="${CONTEXT}"; PODS=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n $NAMESPACE --context=$CONTEXT -o json); for pod in $(jq -r '.items[] | @base64' <<< "$PODS"); do _jq() { jq -r \${1} <<< "$(base64 --decode <<< \${pod})"; }; POD_NAME=$(_jq '.metadata.name'); POD_NODE_NAME=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o custom-columns=:.spec.nodeName --no-headers); PVC_NAMES=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o jsonpath='{.spec.volumes[*].persistentVolumeClaim.claimName}'); for pvc_name in $PVC_NAMES; do PVC=$(${KUBERNETES_DISTRIBUTION_BINARY} get pvc $pvc_name -n $NAMESPACE --context=$CONTEXT -o json); ACCESS_MODE=$(jq -r '.spec.accessModes[0]' <<< "$PVC"); if [[ "$ACCESS_MODE" == "ReadWriteOnce" ]]; then PV_NAME=$(jq -r '.spec.volumeName' <<< "$PVC"); STORAGE_NODE_NAME=$(jq -r --arg pv "$PV_NAME" '.items[] | select(.status.volumesAttached != null) | select(.status.volumesInUse[] | contains($pv)) | .metadata.name' <<< "$(${KUBERNETES_DISTRIBUTION_BINARY} get nodes --context=$CONTEXT -o json)"); echo "------------"; if [[ "$POD_NODE_NAME" == "$STORAGE_NODE_NAME" ]]; then echo "OK: Pod and Storage Node Matched"; else echo "Error: Pod and Storage Node Mismatched - If the issue persists, the node requires attention."; fi; echo "Pod: $POD_NAME"; echo "PVC: $pvc_name"; echo "PV: $PV_NAME"; echo "Node with Pod: $POD_NODE_NAME"; echo "Node with Storage: $STORAGE_NODE_NAME"; echo; fi; done; done
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${pod_rwo_node_and_pod_attachment}
     ...    set_severity_level=2

@@ -75,7 +75,7 @@ Fetch ArgoCD Application Sync Status & Health
     ...    cmd=${binary_name} get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT} -o jsonpath='Application Name: {.metadata.name}, Sync Status: {.status.sync.status}, Health Status: {.status.health.status}, Message: {.status.conditions[].message}'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of application sync status in namespace: ${APPLICATION_APP_NAMESPACE}
     RW.Core.Add Pre To Report    ${app_sync_status.stdout}
@@ -88,7 +88,7 @@ Fetch ArgoCD Application Last Sync Operation Details
     ...    cmd=${binary_name} get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT} -o json | jq -r '"Application Name: " + .metadata.name + "\\nApplication Namespace: "+ .metadata.namespace + "\\nLast Sync Start Time: " + .status.operationState.finishedAt + "\\nLast Sync Finish Time: " + .status.operationState.startedAt + "\\nLast Sync Status: " + .status.operationState.phase + "\\nLast Sync Message: " + .status.operationState.message'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of application sync status in namespace: ${APPLICATION_APP_NAMESPACE}
     RW.Core.Add Pre To Report    ${last_sync_status.stdout}
@@ -102,7 +102,7 @@ Fetch Unhealthy ArgoCD Application Resources
     ...    cmd=${binary_name} get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT} -o json | jq -r '[.status.resources[] | select(.health.status != null) | select(.health.status != "Healthy") | {name,kind,namespace,health}]'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ${resource_issues}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${unhealthy_resources}
     ...    extract_path_to_var__unhealthy_resource_count=length(@)
@@ -124,7 +124,7 @@ Scan For Errors in Pod Logs Related to ArgoCD Application Deployments
     ...    cmd=for deployment_name in $(${binary_name} get deployments -l argocd.argoproj.io/instance=${APPLICATION_TARGET_NAMESPACE}_${APPLICATION} -o=custom-columns=NAME:.metadata.name --no-headers -n ${APPLICATION_TARGET_NAMESPACE}); do echo "\\nDEPLOYMENT NAME: $deployment_name \\n" && kubectl logs deployment/$deployment_name --tail=50 -n ${APPLICATION_TARGET_NAMESPACE} | grep -E '${ERROR_PATTERN}'; done
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Errors found in pods logs for: ${APPLICATION}
     RW.Core.Add Pre To Report    ${log_errors.stdout}
@@ -137,7 +137,7 @@ Fully Describe ArgoCD Application
     ...    cmd=${binary_name} describe applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Full description of ArgoCD application: ${APPLICATION}
     RW.Core.Add Pre To Report    ${application_describe.stdout}

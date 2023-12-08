@@ -21,7 +21,7 @@ Get DaemonSet Log Details For Report
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs --tail=100 daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${logs.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -33,7 +33,7 @@ Get Related Daemonset Events
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} | grep -i "${DAEMONSET_NAME}" || true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${events.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -57,7 +57,7 @@ Check Daemonset Replicas
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} describe daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ${daemonset}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json
     ...    env=${env}

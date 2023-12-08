@@ -77,7 +77,7 @@ Query The Jenkins Kubernetes Workload HTTP Endpoint
     [Tags]    HTTP    Curl    Web    Code    OK    Available    Jenkins    HTTP    Endpoint    API
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- curl -s -o /dev/null -w "\%{http_code}" localhost:8080/login
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.CLI.Parse Cli Output By Line
@@ -94,7 +94,7 @@ Query The Jenkins Kubernetes Workload HTTP Endpoint
     ...    secret__jenkins_sa_token=${JENKINS_SA_TOKEN}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    Remote API Info:\n${rsp.stdout}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -109,7 +109,7 @@ Query For Stuck Jenkins Jobs
     ...    secret__jenkins_sa_token=${JENKINS_SA_TOKEN}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${rsp}
     ...    set_severity_level=2

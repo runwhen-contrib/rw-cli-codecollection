@@ -27,7 +27,7 @@ Measure Application Exceptions
 
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${cmd}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${parsed_exceptions}=    RW.K8sApplications.Parse Exceptions    ${logs.stdout}
