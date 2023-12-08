@@ -262,7 +262,7 @@ def generate_metadata(directory_path):
                 else:
                     explanation_content = "Explanation not available"
                 # Generate multi-line explanation
-                query_multi_line_with_comments_prompt = f"Augment this script with code comments for newer or less experienced devops engineers:"
+                query_multi_line_with_comments_prompt = f"Augment this script with comments (written it it's language) for newer or less experienced devops engineers:"
                 query_multi_line_with_command = (
                     f"{query_multi_line_with_comments_prompt}\n{script_contents}"
                 )

@@ -32,7 +32,7 @@ fi
 for ((i=0; i<NUM_CONTAINERS; i++)); do
     PROBE=$(extract_data "$MANIFEST" ".spec.template.spec.containers[$i].${PROBE_TYPE}")
     CONTAINER_NAME=$(extract_data "$MANIFEST" ".spec.template.spec.containers[$i].name")
-    printf "-- $CONTAINER_NAME $PROBE_TYPE START--\n"
+    echo "-- $CONTAINER_NAME $PROBE_TYPE START--"
     echo "Container: \`$CONTAINER_NAME\`"
     echo "$PROBE_TYPE: $PROBE"
 
@@ -88,13 +88,13 @@ for ((i=0; i<NUM_CONTAINERS; i++)); do
             fi
 
             # Execute command
-            printf "\n--- START Exec Test as configured----\n"
+            echo "--- START Exec Test as configured----"
             echo "Executing command in pod $POD_NAME: ${EXEC_COMMAND_ARRAY[*]}"
             EXEC_OUTPUT=$(${KUBERNETES_DISTRIBUTION_BINARY} exec "$POD_NAME" -n "$NAMESPACE" -- ${EXEC_COMMAND_ARRAY[*]} 2>&1)
             EXEC_EXIT_CODE=$?
             echo "Command Output: $EXEC_OUTPUT"
             echo "Exit Code: $EXEC_EXIT_CODE"
-            printf "---- END Exec Test----\n"
+            echo "---- END Exec Test----"
 
             # Simple exec test to try substituting ports found in manifest
             if [[ -n "$CONTAINER_PORTS" && "$EXEC_EXIT_CODE" != 0 ]]; then
@@ -105,7 +105,7 @@ for ((i=0; i<NUM_CONTAINERS; i++)); do
                         MODIFIED_EXEC_COMMAND_ARRAY[$j]=$(echo "${MODIFIED_EXEC_COMMAND_ARRAY[$j]}" | sed -r "s/:[0-9]+/:$PORT/")
                     done
                 # Execute modified command
-                    printf "\n--- START Exec Test with port $PORT\n"
+                    echo "--- START Exec Test with port $PORT"
                     echo "Executing modified command in pod $POD_NAME with port $PORT: ${MODIFIED_EXEC_COMMAND_ARRAY[*]}"
                     EXEC_OUTPUT=$(kubectl exec "$POD_NAME" -n "$NAMESPACE" -- "${MODIFIED_EXEC_COMMAND_ARRAY[@]}" 2>&1)
                     EXEC_EXIT_CODE=$?
@@ -114,14 +114,14 @@ for ((i=0; i<NUM_CONTAINERS; i++)); do
                     if [ $EXEC_EXIT_CODE == 0 ]; then
                         next_steps+=("Update $PROBE_TYPE For \`${DEPLOYMENT_NAME}\` to use port $PORT")
                     fi
-                    printf "--- END Exec Test----\n"
+                    echo "--- END Exec Test----"
                 done
             fi
         else
             echo "Exec permission is not available."
         fi
     fi
-    printf "-- $CONTAINER_NAME $PROBE_TYPE END--\n"
+    echo "-- $CONTAINER_NAME $PROBE_TYPE END--"
 done
 
 # Display all unique recommendations that can be shown as Next Steps
