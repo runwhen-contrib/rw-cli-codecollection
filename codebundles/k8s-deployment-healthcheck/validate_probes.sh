@@ -35,7 +35,7 @@ fi
 for ((i=0; i<NUM_CONTAINERS; i++)); do
     PROBE=$(extract_data "$MANIFEST" ".spec.template.spec.containers[$i].${PROBE_TYPE}")
     CONTAINER_NAME=$(extract_data "$MANIFEST" ".spec.template.spec.containers[$i].name")
-    echo "-- $CONTAINER_NAME $PROBE_TYPE START--"
+    echo "-------- START Validation - Container Name: $CONTAINER_NAME Probe Type: $PROBE_TYPE -------"
     echo "Container: \`$CONTAINER_NAME\`"
     echo "$PROBE_TYPE: $PROBE"
 
@@ -124,7 +124,7 @@ for ((i=0; i<NUM_CONTAINERS; i++)); do
             echo "Exec permission is not available."
         fi
     fi
-    echo "-- $CONTAINER_NAME $PROBE_TYPE END--"
+    echo "------- END Validation - Container Name: $CONTAINER_NAME Probe Type: $PROBE_TYPE -------"
 done
 
 # Display all unique recommendations that can be shown as Next Steps
