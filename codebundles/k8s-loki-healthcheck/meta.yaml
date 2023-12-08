@@ -15,27 +15,34 @@ commands:
     in an "ACTIVE" state in JSON format.
   multi_line_details: '#!/bin/bash
 
-
-    # Set the context and namespace for the kubectl commands
-
-    CONTEXT=${CONTEXT}
-
-    NAMESPACE=${NAMESPACE}
+    # This script executes a command in a Kubernetes pod and retrieves information
+    using wget and jq.
 
 
-    # Get the name of the pod that has the label app.kubernetes.io/component=single-binary
+    # Set the context and namespace for kubectl
+
+    CONTEXT="example-context"
+
+    NAMESPACE="example-namespace"
+
+
+    # Get the name of the first pod with label app.kubernetes.io/component=single-binary
 
     POD_NAME=$(kubectl --context=${CONTEXT} -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary
     -o=jsonpath=''{.items[0].metadata.name}'')
 
 
-    # Execute the command inside the specified pod to retrieve the JSON data
+    # Use kubectl exec to execute a wget command in the specified pod
 
-    kubectl --context=${CONTEXT} -n ${NAMESPACE} exec ${POD_NAME} -- wget -q --header="Accept:
+    # The wget command retrieves data from http://localhost:3100/ring and pipes it
+    to jq
+
+    # The jq command selects shards with state not equal to "ACTIVE" and gets their
+    name and state
+
+    kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $POD_NAME -- wget -q --header="Accept:
     application/json" -O - http://localhost:3100/ring | jq -r ''.shards[] | select(.state
-    != "ACTIVE") | {name: .id, state: .state}''
-
-    '
+    != "ACTIVE") | {name: .id, state: .state}'''
   name: check_loki_ring_api
 - command: 'kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath=''{.items[0].metadata.name}'')
@@ -55,18 +62,17 @@ commands:
     Kubernetes context and namespace, targeting a pod labeled with the specified component.
     The command being executed uses wget to make a request to a local endpoint and
     retrieve JSON data from the specified URL.
-  multi_line_details: '# Set the kubectl context and namespace
+  multi_line_details: '# Set the context and namespace for kubectl command
 
-    # Get the pod name with label app.kubernetes.io/component=single-binary
+    CONTEXT="my-context"
 
-    # Execute wget command on the pod to fetch data from http://localhost:3100/ready
+    NAMESPACE="my-namespace"
 
 
-    kubectl --context=${CONTEXT} \
+    # Get the name of the pod with label app.kubernetes.io/component=single-binary
+    and execute a wget command on it
 
-    -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT} -n ${NAMESPACE} get pods -l
-    app.kubernetes.io/component=single-binary -o=jsonpath=''{.items[0].metadata.name}'')
-    \
-
+    kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
+    -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath=''{.items[0].metadata.name}'')
     -- wget -q --header="Accept: application/json" -O - http://localhost:3100/ready'
   name: check_loki_api_ready

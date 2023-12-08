@@ -11,11 +11,11 @@ commands:
   explanation: This command uses the curl tool to send a request to a specific URL
     and outputs the HTTP response code and the total time of the request in JSON format.
     The output is directed to /dev/null, meaning it won't be displayed on the terminal.
-  multi_line_details: "#!/bin/bash\n# This script uses curl to send a GET request\
-    \ to the specified URL and output the HTTP code and total time taken in JSON format.\n\
-    # -o /dev/null: discards the output of the GET request\n# -w '{\"http_code\":\
-    \ %{http_code}, \"time_total\": %{time_total}}': formats the output to JSON with\
-    \ HTTP code and total time\n# -s: silent mode, so no progress or error messages\
-    \ are shown\n\ncurl -o /dev/null \\\n     -w '{\"http_code\": %{http_code}, \"\
-    time_total\": %{time_total}}' \\\n     -s ${URL}"
+  multi_line_details: "# This is a multi-line command in bash to make a cURL request\
+    \ and output only the HTTP code and total time taken\n# The -o flag is used to\
+    \ redirect the output to /dev/null, so it doesn't print anything to the console\n\
+    # The -w flag is used to format the output as a JSON object containing the http_code\
+    \ and time_total\n# The -s flag is used to silence any progress or error message\
+    \ \ncurl \\\n  -o /dev/null \\\n  -w '{\"http_code\": %{http_code}, \"time_total\"\
+    : %{time_total}}' \\\n  -s ${URL}"
   name: checking_http_url_is_available_and_timely

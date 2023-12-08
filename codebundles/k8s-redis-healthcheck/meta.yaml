@@ -16,10 +16,33 @@ commands:
     in the specified Kubernetes deployment, using the given context and namespace.
     The specific command being executed in this case is the "PING" command, which
     checks if the Redis server is running.
-  multi_line_details: "#!/bin/bash\n# Set the DEPLOYMENT_NAME, CONTEXT, and NAMESPACE\
-    \ variables beforehand\n\n# Execute the redis-cli PING command on the specified\
-    \ deployment\nkubectl exec deployment/${DEPLOYMENT_NAME} \\\n  --context=${CONTEXT}\
-    \ \\\n  -n ${NAMESPACE} \\\n  -- redis-cli PING"
+  multi_line_details: '#!/bin/bash
+
+
+    # Set the deployment name
+
+    DEPLOYMENT_NAME="your_deployment_name"
+
+
+    # Set the context
+
+    CONTEXT="your_context_name"
+
+
+    # Set the namespace
+
+    NAMESPACE="your_namespace"
+
+
+    # Execute the redis-cli PING command on the specified deployment
+
+    kubectl exec deployment/${DEPLOYMENT_NAME} \
+
+    --context=${CONTEXT} \
+
+    -n ${NAMESPACE} \
+
+    -- redis-cli PING'
   name: ping_deployment_name_redis_workload
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli SET ${REDIS_HEALTHCHECK_KEY} 0
@@ -36,10 +59,40 @@ commands:
     in a Kubernetes cluster, setting a key in a Redis database to 0 for health checking
     purposes. The variables DEPLOYMENT_NAME, CONTEXT, and NAMESPACE need to be replaced
     with specific values.
-  multi_line_details: "# Set the healthcheck key in Redis to 0 using kubectl exec\n\
-    # Set variables for deployment name, context, and namespace\nkubectl exec deployment/${DEPLOYMENT_NAME}\
-    \ --context=${CONTEXT} \\\n  -n ${NAMESPACE} -- redis-cli SET ${REDIS_HEALTHCHECK_KEY}\
-    \ 0"
+  multi_line_details: '#!/bin/bash
+
+    # This script is used to set the value of a Redis health check key to 0
+
+
+    # Set the deployment name
+
+    DEPLOYMENT_NAME="example-deployment"
+
+
+    # Set the context
+
+    CONTEXT="example-context"
+
+
+    # Set the namespace
+
+    NAMESPACE="example-namespace"
+
+
+    # Set the Redis health check key
+
+    REDIS_HEALTHCHECK_KEY="healthcheck"
+
+
+    # Execute the kubectl command
+
+    kubectl exec deployment/${DEPLOYMENT_NAME} \
+
+    --context=${CONTEXT} \
+
+    -n ${NAMESPACE} \
+
+    -- redis-cli SET ${REDIS_HEALTHCHECK_KEY} 0'
   name: verify_deployment_name_redis_read_write_operation
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli INCR ${REDIS_HEALTHCHECK_KEY}
@@ -53,33 +106,12 @@ commands:
   explanation: This command allows you to execute the redis-cli INCR command within
     a specific deployment, context, and namespace, in order to increment the value
     of a key used for health checking in Redis.
-  multi_line_details: '```bash
-
-    #!/bin/bash
-
-
-    # This script executes a command using kubectl to increment a key in the Redis
-    database.
-
-
-    DEPLOYMENT_NAME="example-deployment"
-
-    CONTEXT="example-context"
-
-    NAMESPACE="example-namespace"
-
-    REDIS_HEALTHCHECK_KEY="example-healthcheck-key"
-
-
-    # Execute kubectl command to increment a key in the Redis database.
-
-    kubectl exec deployment/${DEPLOYMENT_NAME} \
-
-    --context=${CONTEXT} \
-
-    -n ${NAMESPACE} -- redis-cli INCR ${REDIS_HEALTHCHECK_KEY}
-
-    ```'
+  multi_line_details: "# Set the deployment name\nDEPLOYMENT_NAME=\"example-deployment\"\
+    \n\n# Set the context\nCONTEXT=\"example-context\"\n\n# Set the namespace\nNAMESPACE=\"\
+    example-namespace\"\n\n# Set the Redis healthcheck key\nREDIS_HEALTHCHECK_KEY=\"\
+    example-key\"\n\n# Execute the command to increment the Redis healthcheck key\
+    \ using kubectl exec\nkubectl exec deployment/${DEPLOYMENT_NAME} \\\n  --context=${CONTEXT}\
+    \ \\\n  -n ${NAMESPACE} \\\n  -- redis-cli INCR ${REDIS_HEALTHCHECK_KEY}"
   name: verify_deployment_name_redis_read_write_operation
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli GET ${REDIS_HEALTHCHECK_KEY}
@@ -93,27 +125,18 @@ commands:
   explanation: This command allows you to execute a Redis CLI command to retrieve
     the value of a specified key in a specific deployment and namespace within your
     Kubernetes cluster.
-  multi_line_details: '#!/bin/bash
+  multi_line_details: '# Set the deployment name, context and namespace as variables
 
-    # This script executes a command within a specific Kubernetes deployment
+    DEPLOYMENT_NAME="your_deployment_name"
 
+    CONTEXT="your_context"
 
-    # Set the variables for deployment name, context, and namespace
-
-    DEPLOYMENT_NAME=my-deployment
-
-    CONTEXT=my-context
-
-    NAMESPACE=my-namespace
+    NAMESPACE="your_namespace"
 
 
-    # Use kubectl to execute the redis-cli GET command on the specified deployment
+    # Use kubectl exec to run the redis-cli command in the specified deployment and
+    namespace
 
-    kubectl exec deployment/${DEPLOYMENT_NAME} \
-
-    --context=${CONTEXT} \
-
-    -n ${NAMESPACE} \
-
+    kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli GET ${REDIS_HEALTHCHECK_KEY}'
   name: verify_deployment_name_redis_read_write_operation
