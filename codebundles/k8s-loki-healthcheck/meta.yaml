@@ -13,36 +13,28 @@ commands:
   explanation: This command uses kubectl to execute a `wget` request on a specific
     pod within a Kubernetes context and namespace, returning the shards that are not
     in an "ACTIVE" state in JSON format.
-  multi_line_details: '#!/bin/bash
+  multi_line_details: '# Start by setting the context and namespace to work within
 
-    # This script executes a command in a Kubernetes pod and retrieves information
-    using wget and jq.
+    CONTEXT=my-context
 
-
-    # Set the context and namespace for kubectl
-
-    CONTEXT="example-context"
-
-    NAMESPACE="example-namespace"
+    NAMESPACE=my-namespace
 
 
-    # Get the name of the first pod with label app.kubernetes.io/component=single-binary
+    # Get the name of the pod running the single-binary component
 
-    POD_NAME=$(kubectl --context=${CONTEXT} -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary
+    SINGLE_BINARY_POD=$(kubectl --context=${CONTEXT} -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary
     -o=jsonpath=''{.items[0].metadata.name}'')
 
 
-    # Use kubectl exec to execute a wget command in the specified pod
+    # Use kubectl exec to run a command on the single-binary pod
 
-    # The wget command retrieves data from http://localhost:3100/ring and pipes it
-    to jq
+    # This command uses wget to make an HTTP request to the localhost in the container
 
-    # The jq command selects shards with state not equal to "ACTIVE" and gets their
-    name and state
+    # Then it pipes the output to jq to filter and format the JSON response
 
-    kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $POD_NAME -- wget -q --header="Accept:
-    application/json" -O - http://localhost:3100/ring | jq -r ''.shards[] | select(.state
-    != "ACTIVE") | {name: .id, state: .state}'''
+    kubectl --context=${CONTEXT} -n ${NAMESPACE} exec ${SINGLE_BINARY_POD} -- wget
+    -q --header="Accept: application/json" -O - http://localhost:3100/ring | jq -r
+    ''.shards[] | select(.state != "ACTIVE") | {name: .id, state: .state}'''
   name: check_loki_ring_api
 - command: 'kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath=''{.items[0].metadata.name}'')
@@ -62,17 +54,30 @@ commands:
     Kubernetes context and namespace, targeting a pod labeled with the specified component.
     The command being executed uses wget to make a request to a local endpoint and
     retrieve JSON data from the specified URL.
-  multi_line_details: '# Set the context and namespace for kubectl command
+  multi_line_details: '# Set the kubectl context and namespace for the command
 
-    CONTEXT="my-context"
+    # Assign the context and namespace to variables for easier reading and maintenance
 
-    NAMESPACE="my-namespace"
+    CONTEXT=my-context
+
+    NAMESPACE=my-namespace
 
 
-    # Get the name of the pod with label app.kubernetes.io/component=single-binary
-    and execute a wget command on it
+    # Get the name of the pod labeled with app.kubernetes.io/component=single-binary
 
-    kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
-    -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath=''{.items[0].metadata.name}'')
-    -- wget -q --header="Accept: application/json" -O - http://localhost:3100/ready'
+    # Use jsonpath to extract the name of the first pod found
+
+    POD_NAME=$(kubectl --context=${CONTEXT} -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary
+    -o=jsonpath=''{.items[0].metadata.name}'')
+
+
+    # Execute a command within the specified pod
+
+    # Use wget to make an HTTP request to http://localhost:3100/ready and output the
+    response to the terminal
+
+    # The command is executed in the specified kubectl context and namespace
+
+    kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $POD_NAME -- wget -q --header="Accept:
+    application/json" -O - http://localhost:3100/ready'
   name: check_loki_api_ready

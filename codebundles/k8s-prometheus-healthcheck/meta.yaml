@@ -12,23 +12,25 @@ commands:
   explanation: This command retrieves the logs from a specific pod running in a Kubernetes
     cluster and searches for any lines containing the phrase "load failure", ignoring
     case. If no matches are found, it returns a status of true.
-  multi_line_details: '# Set the context and namespace for kubectl
+  multi_line_details: '# Assign the context and namespace to variables for easier
+    readability
 
-    CONTEXT=your_context
+    CONTEXT=my-context
 
-    PROM_NAMESPACE=your_prom_namespace
-
-
-    # Get the name of the pod running prometheus
-
-    PROM_POD_NAME=$(kubectl --context=${CONTEXT} -n ${PROM_NAMESPACE} get pods -l
-    app.kubernetes.io/name=prometheus -o=jsonpath=''{.items[0].metadata.name}'')
+    PROM_NAMESPACE=my-prom-namespace
 
 
-    # Get the logs from the prometheus container in the specified pod and filter for
-    lines containing "load" and "fail"
+    # Get the pod name of the Prometheus application using label selector and store
+    it in a variable
 
-    kubectl --context=${CONTEXT} -n ${PROM_NAMESPACE} logs ${PROM_POD_NAME} -c prometheus
+    PROM_POD=$(kubectl --context=${CONTEXT} -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/name=prometheus
+    -o=jsonpath=''{.items[0].metadata.name}'')
+
+
+    # Use kubectl logs command to retrieve logs from the specified pod and container,
+    then filter them using grep for any lines containing "load" and "fail"
+
+    kubectl --context=${CONTEXT} -n ${PROM_NAMESPACE} logs $PROM_POD -c prometheus
     | grep -iP "(load.*.fail)" || true'
   name: check_for_successful_rule_setup
 - command: kubectl get clusterrole/kube-prometheus-stack-operator -ojson
@@ -43,15 +45,19 @@ commands:
     role named kube-prometheus-stack-operator in JSON format. It's a way to inspect
     the permissions and access control settings for this specific role in a Kubernetes
     cluster.
-  multi_line_details: '# This is a multi-line bash command to get the clusterrole/kube-prometheus-stack-operator
-    in JSON format
-
-    # Using kubectl command
+  multi_line_details: '# This is a command to get the clusterrole "kube-prometheus-stack-operator"
+    in JSON format using kubectl
 
 
-    kubectl get clusterrole/kube-prometheus-stack-operator \
+    # First, use the ''kubectl get'' command to retrieve information about the specified
+    resource
 
-    -ojson'
+    # Use the resource type ''clusterrole'' followed by the specific name ''kube-prometheus-stack-operator''
+
+    # Use the output flag ''-o'' to specify the desired format, in this case ''json''
+
+
+    kubectl get clusterrole/kube-prometheus-stack-operator -o json'
   name: verify_prometheus_rbac_can_access_servicemonitors
 - command: kubectl --context=${CONTEXT} -n ${PROM_NAMESPACE} logs $(kubectl --context=${CONTEXT}
     -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/name=prometheus -o=jsonpath='{.items[0].metadata.name}')
@@ -67,13 +73,15 @@ commands:
     Kubernetes cluster, and then uses grep to search for any lines containing the
     phrase "scrape error," ignoring case. If no errors are found, the command returns
     a status of "true."
-  multi_line_details: "# This multi-line command retrieves the logs from the Prometheus\
-    \ pod in a specific context and namespace,\n# extracts the logs for the 'prometheus'\
-    \ container, and then filters for lines that contain the string '(scrape.*.error)'\n\
-    \nkubectl --context=${CONTEXT} \\ \n  -n ${PROM_NAMESPACE} \\\n  logs $(kubectl\
-    \ --context=${CONTEXT} \\\n  -n ${PROM_NAMESPACE} \\\n  get pods -l app.kubernetes.io/name=prometheus\
-    \ \\\n  -o=jsonpath='{.items[0].metadata.name}') \\\n  -c prometheus | grep -iP\
-    \ \"(scrape.*.error)\" || true"
+  multi_line_details: "# Set the kubectl context to the specified value\n# Set the\
+    \ namespace variable to the given PROM_NAMESPACE\n# Get the logs for the Prometheus\
+    \ pod by selecting the first item from the pods with the label app.kubernetes.io/name=prometheus\n\
+    # Then specify the container name as prometheus\n# Pipe the logs to a grep command\
+    \ to search for any lines containing \"scrape.*.error\" case insensitively\n#\
+    \ If no matching lines are found, return a true statement\n\nkubectl --context=${CONTEXT}\
+    \ \\\n  -n ${PROM_NAMESPACE} \\\n  logs $(kubectl --context=${CONTEXT} \\\n  -n\
+    \ ${PROM_NAMESPACE} \\\n  get pods -l app.kubernetes.io/name=prometheus -o=jsonpath='{.items[0].metadata.name}')\
+    \ \\\n  -c prometheus | grep -iP \"(scrape.*.error)\" || true"
   name: identify_endpoint_scraping_errors
 - command: kubectl --context=${CONTEXT} -n ${PROM_NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/name=prometheus -o=jsonpath='{.items[0].metadata.name}')
@@ -92,30 +100,16 @@ commands:
     context and namespace, specifically targeting the Prometheus pod. It then uses
     wget to check the health status of the local Prometheus server and outputs the
     HTTP status code.
-  multi_line_details: '#!/bin/bash
-
-    # This script executes a command inside the prometheus pod to check the health
-    status of the prometheus server
-
-
-    # Set the kubernetes context and namespace
-
-    CONTEXT="${CONTEXT}"
-
-    PROM_NAMESPACE="${PROM_NAMESPACE}"
-
-
-    # Get the name of the prometheus pod
-
-    PROM_POD=$(kubectl --context=${CONTEXT} -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/name=prometheus
-    -o=jsonpath=''{.items[0].metadata.name}'')
-
-
-    # Execute the command inside the prometheus pod to check the health status
-
-    kubectl --context=${CONTEXT} -n ${PROM_NAMESPACE} exec ${PROM_POD} --container
-    prometheus -- wget -qO- -S 127.0.0.1:9090/-/healthy 2>&1 | grep "HTTP/" | awk
-    ''{print $2}''
-
-    '
+  multi_line_details: "# First, we need to use kubectl to execute a command in a pod\n\
+    # We specify the context using --context=${CONTEXT} and namespace using -n ${PROM_NAMESPACE}\n\
+    # We use kubectl get pods to find the pod with label app.kubernetes.io/name=prometheus\n\
+    # Then we use jsonpath to extract the name of the pod and pass it to the exec\
+    \ command\n# We want to execute the command in the container named prometheus\
+    \ inside that pod\n# The command itself is using wget to make a request to 127.0.0.1:9090/-/healthy\
+    \ \n# We then use grep and awk to extract the HTTP status code from the output\n\
+    \nkubectl --context=${CONTEXT} \\\n  -n ${PROM_NAMESPACE} \\\n  exec $(kubectl\
+    \ --context=${CONTEXT} -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/name=prometheus\
+    \ -o=jsonpath='{.items[0].metadata.name}') \\\n  --container prometheus \\\n \
+    \ -- wget -qO- -S 127.0.0.1:9090/-/healthy 2>&1 | grep \"HTTP/\" | awk '{print\
+    \ $2}'"
   name: check_prometheus_api_healthy

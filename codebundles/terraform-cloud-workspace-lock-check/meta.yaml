@@ -8,9 +8,13 @@ commands:
   explanation: This command sets a variable TERRAFORM_API_TOKEN_VALUE to the value
     of the TERRAFORM_API_TOKEN file, then uses curl to make a request to a specified
     API URL with the token for authorization and specific content type.
-  multi_line_details: "# Read the value of TERRAFORM_API_TOKEN\nTERRAFORM_API_TOKEN_VALUE=$(cat\
-    \ $TERRAFORM_API_TOKEN)\n\n# Use the API token value to make a curl request and\
-    \ fetch workspace information\ncurl --header \"Authorization: Bearer $TERRAFORM_API_TOKEN_VALUE\"\
-    \ \\\n     --header \"Content-Type: application/vnd.api+json\" \\\n     -s \"\
-    ${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}\""
+  multi_line_details: "# The following command retrieves the value of the TERRAFORM_API_TOKEN\
+    \ environment variable and assigns it to TERRAFORM_API_TOKEN_VALUE\nTERRAFORM_API_TOKEN_VALUE=$(cat\
+    \ $TERRAFORM_API_TOKEN) \n\n# It then uses the retrieved token value in a curl\
+    \ command to make an API request to a Terraform endpoint\n# The Authorization\
+    \ header is set with the Bearer token obtained from TERRAFORM_API_TOKEN_VALUE\n\
+    # The Content-Type header is set to specify that the request body is in JSON format\n\
+    # The -s flag is used to silence any progress or error messages from the curl\
+    \ command\ncurl --header \"Authorization: Bearer $TERRAFORM_API_TOKEN_VALUE\"\
+    \ --header \"Content-Type: application/vnd.api+json\" -s '${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}'"
   name: checking_whether_the_terraform_cloud_workspace_is_in_a_locked_state

@@ -11,23 +11,11 @@ commands:
   explanation: This command executes a curl operation on a specific stateful set in
     a Kubernetes cluster, which sends a request to the server at localhost:8080/login
     and returns the HTTP response code.
-  multi_line_details: '#!/bin/bash
-
-
-    # This command is used to execute a command inside a running container on a Kubernetes
-    pod
-
-    # It sends an HTTP request to the localhost of the pod and prints the HTTP status
-    code returned
-
-
-    kubectl exec statefulset/${STATEFULSET_NAME} \
-
-    --context=${CONTEXT} \
-
-    -n ${NAMESPACE} -- \
-
-    curl -s -o /dev/null -w "%{http_code}" localhost:8080/login'
+  multi_line_details: "#!/bin/bash\n\n# Set the variables\nSTATEFULSET_NAME=\"yourStatefulSetName\"\
+    \nCONTEXT=\"yourContext\"\nNAMESPACE=\"yourNamespace\"\n\n# Use kubectl exec to\
+    \ execute a command in a pod within a statefulset\nkubectl exec statefulset/${STATEFULSET_NAME}\
+    \ \\\n  --context=${CONTEXT} \\\n  -n ${NAMESPACE} \\\n  -- curl -s -o /dev/null\
+    \ -w \"%{http_code}\" localhost:8080/login"
   name: query_the_jenkins_kubernetes_workload_http_endpoint
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -s localhost:8080/api/json?pretty=true --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}
@@ -49,37 +37,13 @@ commands:
   explanation: This command uses kubectl to execute a command in a specific statefulset,
     within a specific context and namespace. It then runs a curl command to retrieve
     JSON data from localhost using credentials stored in environment variables.
-  multi_line_details: '# This script executes a command within a Kubernetes pod using
-    kubectl
-
-    # It runs the ''curl'' command as the specified service account against a local
-    API endpoint
-
-
-    # Store the base kubectl exec command in a variable
-
-    exec_command="kubectl exec statefulset/${STATEFULSET_NAME}"
-
-
-    # Add context flag to specify which Kubernetes cluster to use
-
-    exec_command+=" --context=${CONTEXT}"
-
-
-    # Add namespace flag to specify which Kubernetes namespace to use
-
-    exec_command+=" -n ${NAMESPACE}"
-
-
-    # Finally, add the command to be executed within the pod, including the necessary
-    authentication credentials for the Jenkins service account
-
-    exec_command+=" -- curl -s localhost:8080/api/json?pretty=true --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}"
-
-
-    # Run the final, modified kubectl exec command
-
-    $exec_command'
+  multi_line_details: "# First, we are using the kubectl exec command to execute a\
+    \ command in a container of a certain pod within the statefulset\n# We are specifying\
+    \ the context and namespace where the pod is located\n# Then we are running the\
+    \ 'curl' command within the pod to send a GET request to the localhost on port\
+    \ 8080 and print the JSON response in a pretty format\n\nkubectl exec statefulset/${STATEFULSET_NAME}\
+    \ \\\n  --context=${CONTEXT} \\\n  -n ${NAMESPACE} \\\n  -- curl -s localhost:8080/api/json?pretty=true\
+    \ \\\n  --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}"
   name: query_the_jenkins_kubernetes_workload_http_endpoint
 - command: 'kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -s localhost:8080/queue/api/json --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}
@@ -91,12 +55,18 @@ commands:
   explanation: This command uses kubectl to execute a curl command on a specific statefulset
     in a given namespace, which then queries a Jenkins API and filters the response
     to show only jobs that are stuck or blocked.
-  multi_line_details: "# This multi-line bash command runs a `curl` command inside\
-    \ a Kubernetes pod and then uses `jq` to parse the JSON response.\n# Set the environment\
-    \ variables for STATEFULSET_NAME, CONTEXT, NAMESPACE, JENKINS_SA_USERNAME.key,\
-    \ and JENKINS_SA_TOKEN.key before running this command.\n\nkubectl exec statefulset/${STATEFULSET_NAME}\
-    \ \\ \n  --context=${CONTEXT} \\\n  -n ${NAMESPACE} \\\n  -- curl -s localhost:8080/queue/api/json\
-    \ \\\n  --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key} \\\n  | jq\
-    \ -r '.items[] | select((.stuck == true) or (.blocked == true)) | \"Why: \" +\
-    \ .why + \"\\nBlocked: \" + (.blocked|tostring) + \"\\nStuck: \" + (.stuck|tostring)'"
+  multi_line_details: '# Set the kubectl context to the given context and namespace
+
+    kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
+    -- \
+
+    # Use curl to make a GET request to the Jenkins queue API endpoint
+
+    curl -s localhost:8080/queue/api/json --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}
+    | \
+
+    # Process the JSON response using jq to filter out specific information
+
+    jq -r ''.items[] | select((.stuck == true) or (.blocked == true)) | "Why: " +
+    .why + "\nBlocked: " + (.blocked|tostring) + "\nStuck: " + (.stuck|tostring)'''
   name: query_for_stuck_jenkins_jobs
