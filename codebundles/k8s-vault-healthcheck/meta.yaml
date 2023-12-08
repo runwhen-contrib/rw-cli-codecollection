@@ -12,26 +12,43 @@ commands:
     - [Retrieving Logs in Kubernetes](https://kubernetes.io/docs/reference/kubectl/cheatsheet/#interacting-with-running-pods){:target="_blank"}'
   explanation: This command retrieves the last 100 lines of logs for the Vault CSI
     Provider daemon set in a specific Kubernetes context and namespace.
-  multi_line_details: '# Set the context and namespace variables for the kubectl command
+  multi_line_details: '
 
-    CONTEXT=my-context
+    # The following command is used to retrieve the logs for a specific Kubernetes
+    daemonset.
 
-    NAMESPACE=my-namespace
+
+    # Start by specifying the command "kubectl logs"
+
+    kubectl logs
 
 
-    # Use kubectl logs to retrieve the last 100 lines of logs from the vault-csi-provider
-    daemonset
+    # Use the "--tail" option to only show the last 100 lines of the logs
 
-    # --tail=100 specifies the number of lines to retrieve
+    --tail=100
 
-    # daemonset.apps/vault-csi-provider is the name of the daemonset
 
-    # --context ${CONTEXT} specifies the Kubernetes cluster context to use
+    # Specify the daemonset object whose logs you want to retrieve, in this case "vault-csi-provider"
 
-    # -n ${NAMESPACE} specifies the Kubernetes namespace to use
+    daemonset.apps/vault-csi-provider
 
-    kubectl logs --tail=100 daemonset.apps/vault-csi-provider --context ${CONTEXT}
-    -n ${NAMESPACE}'
+
+    # Use the "--context" option to specify the context (cluster) in which the daemonset
+    is running, using the value of the ${CONTEXT} variable
+
+    --context ${CONTEXT}
+
+
+    # Use the "-n" option to specify the namespace in which the daemonset is running,
+    using the value of the ${NAMESPACE} variable
+
+    -n ${NAMESPACE}
+
+
+
+    By breaking down the command and adding comments, newer or less experienced devops
+    engineers can better understand its components and purpose. This makes it easier
+    for them to learn and apply similar commands in their work.'
   name: fetch_vault_csi_driver_logs
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "vault-csi-provider" || true
@@ -46,12 +63,14 @@ commands:
     filtering for warnings related to the "vault-csi-provider" component in the specified
     context and namespace. If no matching events are found, it will still return a
     successful exit code.
-  multi_line_details: "# Set the context and namespace for kubectl\nCONTEXT=my-context\n\
-    NAMESPACE=my-namespace\n\n# Use kubectl to get events with type Warning filtered\
-    \ by context and namespace,\n# then use grep to filter for \"vault-csi-provider\"\
-    \n# If no results are found, return true\nkubectl get events --field-selector\
-    \ type=Warning --context $CONTEXT -n $NAMESPACE |\n    grep -i \"vault-csi-provider\"\
-    \ || true"
+  multi_line_details: "\n# Use kubectl to get events from a specific context and namespace\n\
+    kubectl get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE}\
+    \ \\\n\n# Filter the events for those related to \"vault-csi-provider\"\n| grep\
+    \ -i \"vault-csi-provider\" \\\n\n# If no events are found, prevent the pipeline\
+    \ from failing with \"|| true\"\n|| true\n \n\nThis multi-line command provides\
+    \ a clear breakdown of each step, making it easier for newer or less experienced\
+    \ devops engineers to understand the purpose and functionality of each part of\
+    \ the command."
   name: get_vault_csi_driver_warning_events
 - command: kubectl describe daemonset.apps/vault-csi-provider --context ${CONTEXT}
     -n ${NAMESPACE}
@@ -62,10 +81,10 @@ commands:
     specific daemonset called "vault-csi-provider" in a particular Kubernetes context
     and namespace. It is helpful for troubleshooting and getting an overview of the
     configuration and status of the daemonset.
-  multi_line_details: "# Set the context and namespace for the kubectl command\nCONTEXT=\"\
-    your_context_here\"\nNAMESPACE=\"your_namespace_here\"\n\n# Use kubectl to describe\
-    \ the daemonset named 'vault-csi-provider' \n# in the specified context and namespace\n\
-    kubectl describe daemonset.apps/vault-csi-provider --context ${CONTEXT} -n ${NAMESPACE}"
+  multi_line_details: "\n# Use kubectl to describe the daemonset named \"vault-csi-provider\"\
+    \n# Set the context to the value of the ${CONTEXT} variable\n# Set the namespace\
+    \ to the value of the ${NAMESPACE} variable\n\nkubectl describe daemonset.apps/vault-csi-provider\
+    \ \\\n  --context ${CONTEXT} \\\n  -n ${NAMESPACE}\n"
   name: check_vault_csi_driver_replicas
 - command: kubectl logs --tail=100 statefulset.apps/vault --context ${CONTEXT} -n
     ${NAMESPACE}
@@ -78,17 +97,36 @@ commands:
     - [Kubernetes contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}'
   explanation: This command retrieves the last 100 lines of logs from a specific statefulset
     called 'vault' in a Kubernetes cluster, using the specified context and namespace.
-  multi_line_details: '# Set the context and namespace variables for kubectl command
+  multi_line_details: '
 
-    CONTEXT="my-context"
+    # This command is used to view the logs of a statefulset named "vault" in a Kubernetes
+    cluster.
 
-    NAMESPACE="my-namespace"
+    # It retrieves the last 100 lines of logs and requires the specification of a
+    context and namespace.
 
 
-    # Use kubectl to retrieve the last 100 logs from the statefulset "vault" in the
-    specified context and namespace
+    # Start by setting the context and namespace from environment variables or directly
+    specifying them
 
-    kubectl logs --tail=100 statefulset.apps/vault --context ${CONTEXT} -n ${NAMESPACE}'
+    CONTEXT=my-context
+
+    NAMESPACE=my-namespace
+
+
+    # Then, use the kubectl logs command to retrieve the logs of the statefulset named
+    "vault"
+
+    # Use the --tail flag to specify the number of lines to retrieve (in this case,
+    100)
+
+    # Pass the --context flag to specify the context for the Kubernetes cluster
+
+    # Pass the -n flag to specify the namespace where the statefulset "vault" is located
+
+    kubectl logs --tail=100 statefulset.apps/vault --context ${CONTEXT} -n ${NAMESPACE}
+
+    '
   name: fetch_vault_logs
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "vault" || true
@@ -105,21 +143,43 @@ commands:
     from a specific Kubernetes context and namespace, and then filters the output
     for the term "vault". If there are no matching events, it returns a successful
     status.
-  multi_line_details: '```bash
+  multi_line_details: '
 
-    # Set the kubectl context to the specified ${CONTEXT} and namespace to ${NAMESPACE}
+    # First, let''s explain the purpose of this command:
 
-    # Get all events with type Warning from the specified namespace
+    # We are using kubectl to get all events with a type of Warning in a specific
+    namespace,
 
-    # Pipe the output to grep to search for "vault" case insensitively
+    # filtering for any events related to "vault" and ignoring any errors if no events
+    are found.
 
-    # Use the || true operator to ensure that the command returns a successful exit
-    status even if grep doesn''t find a matching line
+
+    # Here''s the multi-line command:
+
+
+    # Set the variables for the Kubernetes context and namespace
+
+    CONTEXT="your_kubernetes_context"
+
+    NAMESPACE="your_namespace"
+
+
+    # Use kubectl to get events with type Warning in the specified namespace and context
 
     kubectl get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE}
-    | grep -i "vault" || true
+    \
 
-    ```'
+
+    # Use grep to filter for any events related to "vault"
+
+    | grep -i "vault" \
+
+
+    # Use || true to ignore any errors if no events are found
+
+    || true
+
+    '
   name: get_related_vault_events
 - command: kubectl get statefulset.apps/vault --context=${CONTEXT} -n ${NAMESPACE}
     -o yaml
@@ -133,27 +193,11 @@ commands:
   explanation: This command retrieves the configuration of the stateful set named
     "vault" within a specific Kubernetes context and namespace, and outputs it in
     YAML format.
-  multi_line_details: '# This multi-line command retrieves the statefulset configuration
-    for the Vault application in a specific Kubernetes context and namespace.
-
-
-    # Set the context and namespace variables to make the command reusable and more
-    readable
-
-    CONTEXT=my-context
-
-    NAMESPACE=my-namespace
-
-
-    # Use the kubectl command to get the statefulset configuration for the Vault application
-
-    kubectl get statefulset.apps/vault \
-
-    --context=${CONTEXT} \
-
-    -n ${NAMESPACE} \
-
-    -o yaml'
+  multi_line_details: "\n# Use kubectl command to get information about a StatefulSet\
+    \ object in YAML format\nkubectl get statefulset.apps/vault \n  # Provide the\
+    \ context for the Kubernetes cluster\n  --context=${CONTEXT} \n  # Specify the\
+    \ namespace where the StatefulSet is located\n  -n ${NAMESPACE} \n  # Output the\
+    \ information in YAML format for easier reading and manipulation\n  -o yaml\n"
   name: fetch_vault_statefulset_manifest_details
 - command: kubectl get daemonset.apps/vault-csi-provider --context=${CONTEXT} -n ${NAMESPACE}
     -o yaml
@@ -167,22 +211,13 @@ commands:
   explanation: This command uses kubectl to retrieve information about the DaemonSet
     called "vault-csi-provider" in the specified namespace and context, and outputs
     the details in YAML format.
-  multi_line_details: '# Set the context and namespace variables for kubectl command
-
-    CONTEXT=my-context
-
-    NAMESPACE=my-namespace
-
-
-    # Use kubectl to get the DaemonSet resource in YAML format
-
-    kubectl get daemonset.vault-csi-provider \
-
-    --context=${CONTEXT} \
-
-    -n ${NAMESPACE} \
-
-    -o yaml'
+  multi_line_details: "# This command uses kubectl to get the details of a specific\
+    \ DaemonSet in YAML format\n# The \"--context\" flag specifies the context to\
+    \ use for the operation\n# The \"-n\" flag specifies the namespace where the DaemonSet\
+    \ is located\n\nkubectl get daemonset.apps/vault-csi-provider \\\n  --context=${CONTEXT}\
+    \ \\    # replace ${CONTEXT} with the actual context name\n  -n ${NAMESPACE} \\\
+    \         # replace ${NAMESPACE} with the actual namespace name\n  -o yaml   \
+    \                # output the details in YAML format"
   name: fetch_vault_daemonset_manifest_details
 - command: curl ${VAULT_URL}
   doc_links: '
@@ -193,20 +228,11 @@ commands:
   explanation: This command is using the 'curl' program to make a request to a specific
     URL, represented by the variable ${VAULT_URL}. It's commonly used for interacting
     with web services and APIs.
-  multi_line_details: '# Here we are using the curl command to make an HTTP request
-    to the VAULT_URL variable
-
-    # The VAULT_URL environment variable should be set with the URL of the Vault server
-    we want to interact with
-
-    # The curl command will issue a GET request by default, and will print the output
-    to the console
-
-    # It''s important to handle any authentication or authorization needed for accessing
-    the Vault server
-
-
-    curl ${VAULT_URL}'
+  multi_line_details: "# This command is using curl to make a request to the specified\
+    \ VAULT_URL\n# The ${VAULT_URL} variable should be set to the specific URL of\
+    \ your Vault instance\n\ncurl ${VAULT_URL} \n# This will send a GET request to\
+    \ the Vault API and return the response to the terminal\n# If successful, it will\
+    \ display the data stored in the Vault or any other relevant information."
   name: verify_vault_availability
 - command: kubectl get statefulset.apps/vault --context=${CONTEXT} -n ${NAMESPACE}
     -o json
@@ -217,15 +243,16 @@ commands:
     - [Kubectl Reference Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#-kubectl-get){:target="_blank"}'
   explanation: This command retrieves the statefulset named "vault" from a specific
     Kubernetes context and namespace, displaying the results in json format.
-  multi_line_details: '# Set the variables for context and namespace
-
-    CONTEXT=my-context
-
-    NAMESPACE=my-namespace
-
-
-    # Use kubectl to get the statefulset with the name "vault" in the specified context
-    and namespace, and output the result in JSON format
-
-    kubectl get statefulset.apps/vault --context=${CONTEXT} -n ${NAMESPACE} -o json'
+  multi_line_details: "\n# The following command retrieves information about a specific\
+    \ statefulset called 'vault' using the Kubernetes API.\n# We use the 'kubectl\
+    \ get' command with the resource type 'statefulset.apps' and specify the name\
+    \ of the statefulset as 'vault'.\n\n# We also use the '--context' flag to specify\
+    \ the context to be used for this operation. Contexts in Kubernetes are used to\
+    \ manage multiple clusters.\n\n# The '-n' flag is used to specify the namespace\
+    \ where the statefulset 'vault' is located.\n\n# Finally, the '-o json' flag is\
+    \ used to output the result in JSON format, which can then be further processed\
+    \ or analyzed programmatically.\n\n# Please note that ${CONTEXT} and ${NAMESPACE}\
+    \ are environment variables that should be replaced with the actual values before\
+    \ running the command.\n\nkubectl get statefulset.apps/vault --context=${CONTEXT}\
+    \ \\\n  -n ${NAMESPACE} -o json\n"
   name: check_vault_statefulset_replicas

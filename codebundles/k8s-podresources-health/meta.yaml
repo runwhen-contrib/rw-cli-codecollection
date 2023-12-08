@@ -9,14 +9,38 @@ commands:
     a specified namespace and context, filtering by specific labels and only including
     those that do not have resource limits defined for their containers. It then formats
     the output in JSON using jq.
-  multi_line_details: "# We are using kubectl command to get information about pods\n\
-    # First, we specify the context with --context flag\n# Then, we specify the namespace\
-    \ with -n flag\n# Next, we use ${LABELS} variable to specify any labels we want\
-    \ to filter by\n# We also specify a field selector to only get pods with status.phase=Running\n\
-    kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running\
-    \ -ojson |\n  # We are using jq to parse and filter the output in json format\n\
-    \  jq -r '[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.limits\
-    \ == null) | {pod: $pod.metadata.name, container_without_limits: .name}]'"
+  multi_line_details: '
+
+    # Retrieve information about all running pods in the specified namespace and with
+    the specified labels
+
+    # Store the context, namespace, and labels in environment variables for ease of
+    use
+
+    CONTEXT=my-context
+
+    NAMESPACE=my-namespace
+
+    LABELS=''app=my-app,tier=frontend''
+
+
+    # Use the kubectl command to get information about the pods
+
+    # Include the specified context and namespace, as well as a field selector to
+    only show running pods
+
+    # Output the result in JSON format
+
+    kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running
+    -ojson |
+
+
+    # Pipe the output to jq for processing and filtering
+
+    jq -r ''[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.limits
+    == null) | {pod: $pod.metadata.name, container_without_limits: .name}]''
+
+    '
   name: show_pods_without_resource_limit_or_resource_requests_set_in_namespace_namespace
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running
     -ojson | jq -r ''[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.requests
@@ -32,32 +56,14 @@ commands:
     and context, filtering by labels and only showing those that are currently running.
     It then uses the jq tool to parse the JSON output and list the pods and containers
     that do not have resource requests specified.
-  multi_line_details: '# Set the context to be used for the kubectl command
-
-    CONTEXT=${CONTEXT}
-
-
-    # Set the namespace in which to look for pods
-
-    NAMESPACE=${NAMESPACE}
-
-
-    # Set any labels to filter the pods by
-
-    LABELS=${LABELS}
-
-
-    # Get the pods that are running in the specified context, namespace, and with
-    the specified label using the kubectl command
-
-    # Then convert the output to JSON format and pipe it to the ''jq'' tool
-
-    # Use ''jq'' to parse the JSON output and extract the pod names and container
-    names that have no resource requests specified
-
-    kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running
-    -ojson | jq -r ''[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.requests
-    == null) | {pod: $pod.metadata.name, container_without_requests: .name}]'''
+  multi_line_details: "\n# This command retrieves information about pods in a specific\
+    \ context, namespace, and with certain labels\n\nkubectl get pods --context=${CONTEXT}\
+    \ -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running -ojson | \n\n\
+    # This part of the command uses jq to process the JSON output and extract specific\
+    \ information about pods and containers\n\njq -r '[.items[] as $pod | ($pod.spec.containers\
+    \ // [][])[] | \n\n# This part filters out containers that do not have resource\
+    \ requests defined\n\nselect(.resources.requests == null) | {pod: $pod.metadata.name,\
+    \ container_without_requests: .name}]'\n"
   name: show_pods_without_resource_limit_or_resource_requests_set_in_namespace_namespace
 - command: for pod in $(kubectl get pods ${LABELS} -n ${NAMESPACE} --context ${CONTEXT}
     -o custom-columns=":metadata.name" --field-selector=status.phase=Running); do
@@ -74,12 +80,14 @@ commands:
   explanation: This command uses kubectl to retrieve the names of running pods with
     specific labels in a specific namespace and context, and then gathers resource
     usage data for each pod and its containers.
-  multi_line_details: "# Set the LABELS, NAMESPACE, and CONTEXT variables for easier\
-    \ reuse\nLABELS=\"app=myapp\"\nNAMESPACE=\"my-namespace\"\nCONTEXT=\"my-context\"\
-    \n\n# Get the list of pods based on the specified labels and namespace, then loop\
-    \ through each pod\nfor pod in $(kubectl get pods ${LABELS} -n ${NAMESPACE} --context\
+  multi_line_details: "\n# Retrieve a list of running pods in the specified namespace\
+    \ and context\nfor pod in $(kubectl get pods ${LABELS} -n ${NAMESPACE} --context\
     \ ${CONTEXT} -o custom-columns=\":metadata.name\" --field-selector=status.phase=Running);\
-    \ do \n  # For each pod, use kubectl top to get resource usage for all containers\
-    \ within the pod\n  kubectl top pod $pod -n ${NAMESPACE} --context ${CONTEXT}\
-    \ --containers; \ndone"
+    \ do \n    # For each running pod, use kubectl top command to view resource usage\
+    \ for each container within the pod\n    kubectl top pod $pod -n ${NAMESPACE}\
+    \ --context ${CONTEXT} --containers; \ndone\n\n\nThis multi-line command breaks\
+    \ down the original one-liner and provides comments to explain what each part\
+    \ of the command is doing. This can be especially helpful for newer or less experienced\
+    \ devops engineers who may not be familiar with all the intricacies of working\
+    \ with Kubernetes."
   name: get_pod_resource_utilization_with_top_in_namespace_namespace

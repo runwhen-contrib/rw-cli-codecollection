@@ -190,6 +190,13 @@ def check_url(url):
     except requests.RequestException:
         return False
 
+def strip_md_codeblock_formatting(string):
+    string = string.replace("```bash", "")
+    string = string.replace("```shell", "")
+    string = string.replace("```sh", "")
+    string = string.replace("```", "")
+    return string
+
 def generate_metadata(directory_path):
     """
     Gets passed in a directory to scan for robot files. 
@@ -235,9 +242,6 @@ def generate_metadata(directory_path):
                 query_what_it_does_prompt =f"Provide a one or two sentence explanation of this script as if I was loosely familiar with the concepts but it wasn't part of my daily job."
                 query_what_it_does_with_command = f'{query_what_it_does_prompt} \n{script_contents}'
                 print(f'generating explanation for {name_snake_case}')
-                # explain_query_what_it_does = f"{'prompt': '{query_what_it_does_with_command}'}"
-                # explain_query_what_it_does_post=f"{'prompt': query_what_it_does_with_command}"
-                # url_what_it_does = f'{explainUrl}{explain_query_what_it_does}' 
                 explain_query_what_it_does = {'prompt': query_what_it_does_with_command}
                 explain_query_json = json.dumps(explain_query_what_it_does)
                 response_what_it_does = requests.post(explainUrl, data=explain_query_json, headers=headers )
@@ -247,7 +251,7 @@ def generate_metadata(directory_path):
                 else: 
                     explanation_content = "Explanation not available"
                 #Generate multi-line explanation 
-                query_multi_line_with_comments_prompt = f"Add helpful and educational comments for newer or less experienced devops engineers to the following script. Return it in bash format without adding markdown codeblock formatting like ```bash```."
+                query_multi_line_with_comments_prompt = f"Augment this script with code comments for newer or less experienced devops engineers:"
                 query_multi_line_with_command = f'{query_multi_line_with_comments_prompt}\n{script_contents}'
                 #Generate external doc links 
                 query_doc_links_prompt = r"Given the following explanation, generate some links that provide helpful documentation for a reader who want's to learn more about the topics used in the command. Format the output in a single YAML list with the keys of `description` and `url` for each link with the values in double quotes. Ensure each description and url are on separate lines, ensure an empty blank line separates each item. Ensure there are no other keys or text or extra characters other than the items. The script contents are:  "
@@ -260,18 +264,14 @@ def generate_metadata(directory_path):
                 print(f'generating explanation for {name_snake_case}')
                 explain_query_what_it_does = {'prompt': query_what_it_does_with_command}
                 explain_query_json = json.dumps(explain_query_what_it_does)
-                print(explain_query_json)
-                # url_what_it_does = f'{explainUrl}{explain_query_what_it_does}'   
                 response_what_it_does = requests.post(explainUrl, data=explain_query_json, headers=headers )
-                # response_what_it_does = requests.get(url_what_it_does)
-                print(response_what_it_does)
                 if ((response_what_it_does.status_code == 200)):
                     explanation = response_what_it_does.json()
                     explanation_content = explanation['explanation']
                 else: 
                     explanation_content = "Explanation not available"
                 #Generate multi-line explanation 
-                query_multi_line_with_comments_prompt = f"Convert this command to a multi-line command with helpful and educational comments for newer or less experienced devops engineers. Return it in bash format without adding markdown codeblock formatting like ```bash```: "
+                query_multi_line_with_comments_prompt = f"Convert this command to a multi-line command with helpful and educational comments for newer or less experienced devops engineers: "
                 query_multi_line_with_command = f'{query_multi_line_with_comments_prompt}\n{command}'
                 #Generate external doc links 
                 query_doc_links_prompt = r"Given the following command explanation, generate some links that provide helpful documentation for a reader who want's to learn more about the topics used in the command. Format the output in a single YAML list with the keys of `description` and `url` for each link with the values in double quotes. Ensure each description and url are on separate lines, ensure an empty blank line separates each item. Ensure there are no other keys or text or extra characters other than the items. The command is:  "
@@ -341,8 +341,8 @@ def generate_metadata(directory_path):
             command_meta = {
                 'name': name_snake_case,
                 'command': command,
-                'explanation': explanation_content,
-                'multi_line_details': multi_line_content,
+                'explanation': strip_md_codeblock_formatting(explanation_content),
+                'multi_line_details': strip_md_codeblock_formatting(multi_line_content),
                 'doc_links':  f'\n{doc_links_content}'
             }
             # Add the command meta to the list of commands

@@ -16,18 +16,36 @@ commands:
     statefulset in the given namespace, sending a curl request to check the liveness
     of a service running on localhost. It also includes parameters such as --context
     and --max-time to specify the context and maximum time for the request.
-  multi_line_details: '# Set the kubectl context to the specified CONTEXT and execute
-    a command inside a pod
+  multi_line_details: '
 
-    # belonging to the STATEFULSET_NAME in the NAMESPACE
+    # Set the namespace variable for the kubectl command
 
-    kubectl exec statefulset/${STATEFULSET_NAME} \
+    NAMESPACE="your-namespace"
 
-    --context=${CONTEXT} \
 
-    -n ${NAMESPACE} \
+    # Set the statefulset name variable for the kubectl command
 
-    -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/liveness'
+    STATEFULSET_NAME="your-statefulset-name"
+
+
+    # Set the context variable for the kubectl command
+
+    CONTEXT="your-kube-context"
+
+
+    # Use kubectl to execute a command in a statefulset pod with the provided namespace
+    and context
+
+    kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
+    --  \
+
+
+    # Within the pod, use curl to make an HTTP GET request to check the liveness of
+    artifactory API
+
+    curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/liveness
+
+    '
   name: check_artifactory_liveness_and_readiness_endpoints
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/readiness
@@ -48,11 +66,12 @@ commands:
     in a given namespace, using a specific context. In this case, it is running a
     curl command to check the readiness of an Artifactory API within the specified
     statefulset.
-  multi_line_details: "# Store the statefulset name, context, and namespace in respective\
-    \ variables for better readability\nSTATEFULSET_NAME=\"my-statefulset\"\nCONTEXT=\"\
-    my-context\"\nNAMESPACE=\"my-namespace\"\n\n# Use kubectl exec to run a curl command\
-    \ inside the specified statefulset\n# Use the stored variables to specify the\
-    \ statefulset, context, and namespace\n# The curl command checks the readiness\
-    \ of an artifactory API endpoint\nkubectl exec statefulset/${STATEFULSET_NAME}\
-    \ --context=${CONTEXT} -n ${NAMESPACE} -- \\\n  curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/readiness"
+  multi_line_details: "\n# Use the kubectl command to execute a command in a running\
+    \ container within a stateful set\nkubectl exec statefulset/${STATEFULSET_NAME}\
+    \ \n  # Specify the Kubernetes context to use for this command\n  --context=${CONTEXT}\
+    \ \n  # Specify the namespace where the stateful set is running\n  -n ${NAMESPACE}\
+    \ \n  # Execute the curl command inside the container\n  -- curl \n    # Allow\
+    \ insecure connections with SSL\n    -k \n    # Set the maximum time in seconds\
+    \ that you allow the whole operation to take\n    --max-time 10 \n    # The URL\
+    \ to request readiness status from your service running on port 8091\n    http://localhost:8091/artifactory/api/v1/system/readiness\n"
   name: check_artifactory_liveness_and_readiness_endpoints

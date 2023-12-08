@@ -15,21 +15,21 @@ commands:
     a certain threshold using Prometheus and outputs the results in a specific format.
     If there are no threshold violations found, it will display a message indicating
     so.
-  multi_line_details: "# Use `gcloud auth activate-service-account` to authenticate\
-    \ with Google Cloud using a service account key file\ngcloud auth activate-service-account\
-    \ --key-file=$GOOGLE_APPLICATION_CREDENTIALS && \n\n# Use `curl` command to send\
-    \ a POST request to the Prometheus API endpoint to query for specific monitoring\
-    \ data\nresponse=$(curl -s -d \"query=rate(kong_http_requests_total{service='${INGRESS_SERVICE}',code=~'${HTTP_ERROR_CODES}'}[${TIME_SLICE}])\
+  multi_line_details: "\n# Activate the service account using the key file provided\
+    \ in the GOOGLE_APPLICATION_CREDENTIALS environment variable\ngcloud auth activate-service-account\
+    \ --key-file=$GOOGLE_APPLICATION_CREDENTIALS && \n\n# Send a POST request to the\
+    \ Prometheus API with a query to check for HTTP error rate exceeding a certain\
+    \ threshold\nresponse=$(curl -s -d \"query=rate(kong_http_requests_total{service='${INGRESS_SERVICE}',code=~'${HTTP_ERROR_CODES}'}[${TIME_SLICE}])\
     \ > ${HTTP_ERROR_RATE_THRESHOLD}\" -H \"Authorization: Bearer $(gcloud auth print-access-token)\"\
     \ 'https://monitoring.googleapis.com/v1/projects/runwhen-nonprod-sandbox/location/global/prometheus/api/v1/query')\
-    \ &&\n\n# Check if the response from the previous command contains any data results\
-    \ using `jq`\necho \"$response\" | jq -e '.data.result | length > 0' && \n\n#\
-    \ If there are results, extract and display relevant information using `jq`\n\
-    echo \"$response\" | jq -r '.data.result[] | \"Route:\" + .metric.route + \" Service:\"\
-    \ + .metric.service + \" Kong Instance:\" + .metric.instance + \" HTTP Error Count:\"\
-    \ + .value[1]' || \n\n# If no results were found, indicate that no HTTP error\
-    \ threshold violations were found for the specified ingress service\necho \"No\
-    \ HTTP Error threshold violations found for ${INGRESS_SERVICE}.\""
+    \ && \n\n# Check if the response contains any results using jq and conditionally\
+    \ execute subsequent commands\necho \"$response\" | jq -e '.data.result | length\
+    \ > 0' && \n\n# Parse the response and display information about any HTTP error\
+    \ threshold violations found\necho \"$response\" | jq -r '.data.result[] | \"\
+    Route:\" + .metric.route + \" Service:\" + .metric.service + \" Kong Instance:\"\
+    \ + .metric.instance + \" HTTP Error Count:\" + .value[1]' || \n\n# If no violations\
+    \ are found, display a message indicating so for the specified INGRESS_SERVICE\n\
+    echo \"No HTTP Error threshold violations found for ${INGRESS_SERVICE}.\"\n"
   name: check_if_kong_ingress_http_error_rate_violates_http_error_threshold
 - command: 'gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
     && response=$(curl -s -d "query=histogram_quantile(0.99, sum(rate(kong_request_latency_ms_bucket{service=''${INGRESS_SERVICE}''}[${TIME_SLICE}]))
@@ -46,35 +46,36 @@ commands:
     and then uses a curl command to send a query to a Prometheus monitoring system,
     checking if the request latency of a specific service exceeds a certain threshold,
     and then outputs the results.
-  multi_line_details: 'gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+  multi_line_details: '
 
-    # Use gcloud to authenticate the service account for access
+    # Activate service account using a key file
 
+    gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+
+
+    # Send a query to the Prometheus API for monitoring HTTP request latency
+
+    # The result is stored in the ''response'' variable
 
     response=$(curl -s -d "query=histogram_quantile(0.99, sum(rate(kong_request_latency_ms_bucket{service=''${INGRESS_SERVICE}''}[${TIME_SLICE}]))
     by (le)) > ${REQUEST_LATENCY_THRESHOLD}" -H "Authorization: Bearer $(gcloud auth
     print-access-token)" ''https://monitoring.googleapis.com/v1/projects/runwhen-nonprod-sandbox/location/global/prometheus/api/v1/query'')
 
-    # Make a POST request to the Google Cloud Monitoring API using curl, passing in
-    the required query parameters and authorization token
+
+    # Check if the query result contains any data using jq
+
+    # If there are results, output service name and associated HTTP request latency
+
+    echo "$response" | jq -e ''.data.result | length > 0'' && echo "$response" | jq
+    -r ''.data.result[] | "Service: ${INGRESS_SERVICE}" + " HTTP Request Latency(ms):"
+    + .value[1]'' || echo "No HTTP request latency threshold violations found for
+    ${INGRESS_SERVICE}."
 
 
-    echo "$response" | jq -e ''.data.result | length > 0''
-
-    # Use jq to check if the response data has any results based on its length
-
-
-    echo "$response" | jq -r ''.data.result[] | "Service: ${INGRESS_SERVICE}" + "
-    HTTP Request Latency(ms):" + .value[1]''
-
-    # Use jq to format and display the response data by looping through each result
-    and fetching necessary details
-
-
-    || echo "No HTTP request latency threshold violations found for ${INGRESS_SERVICE}."
-
-    # If no thresholds are violated, output a helpful message with monitored service
-    name'
+    In this multi-line command, we''ve broken down the original command into separate
+    steps with comments provided to explain each action. This should make it easier
+    for newer or less experienced devops engineers to understand what the command
+    is doing.'
   name: check_if_kong_ingress_http_request_latency_violates_threshold
 - command: 'gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
     && response=$(curl -s -d "query=kong_upstream_target_health{upstream=''${INGRESS_UPSTREAM}'',state=''healthchecks_off''}
@@ -95,34 +96,19 @@ commands:
     it to make a query to the Google Cloud Monitoring API to check if a particular
     upstream target has health checks enabled or disabled, and then provides a response
     based on the result.
-  multi_line_details: '# activate the service account using the key file defined in
-    the environment variable GOOGLE_APPLICATION_CREDENTIALS
-
-    gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
-
-
-    # make a HTTP POST request to the Prometheus API and save the response as variable
-    ''response''
-
-    response=$(curl -s -d "query=kong_upstream_target_health{upstream=''${INGRESS_UPSTREAM}'',state=''healthchecks_off''}
-    > 0" -H "Authorization: Bearer $(gcloud auth print-access-token)" ''https://monitoring.googleapis.com/v1/projects/runwhen-nonprod-sandbox/location/global/prometheus/api/v1/query'')
-
-
-    # check if the length of the result array in the response is greater than 0 using
-    jq
-
-    echo "$response" | jq -e ''.data.result | length > 0''
-
-
-    # if the length is greater than 0, then print the healthchecks disabled message
-    for each result
-
-    # otherwise, print the healthchecks enabled message for the INGRESS_UPSTREAM
-
-    echo "$response" | jq -r ''.data.result[] | "Service: ${INGRESS_UPSTREAM}" + "
-    Healthchecks Disabled!'' || echo "${INGRESS_UPSTREAM} has healthchecks enabled."
-
-    '
+  multi_line_details: "\n# Activate the service account using the key file in the\
+    \ Google Application credentials variable\ngcloud auth activate-service-account\
+    \ --key-file=$GOOGLE_APPLICATION_CREDENTIALS && \n\n# Make a POST request to the\
+    \ monitoring API to query for the health status of a specific upstream target\n\
+    response=$(curl -s -d \"query=kong_upstream_target_health{upstream='${INGRESS_UPSTREAM}',state='healthchecks_off'}\
+    \ > 0\" -H \"Authorization: Bearer $(gcloud auth print-access-token)\" 'https://monitoring.googleapis.com/v1/projects/runwhen-nonprod-sandbox/location/global/prometheus/api/v1/query')\
+    \ &&\n\n# Check if there are any results in the response data\necho \"$response\"\
+    \ | jq -e '.data.result | length > 0' &&\n\n# Extract and display the health status\
+    \ of the upstream target based on the response data\necho \"$response\" | jq -r\
+    \ '.data.result[] | \"Service: ${INGRESS_UPSTREAM}\" + \" Healthchecks Disabled!'\
+    \ || \n\n# If no results were found, display that the healthchecks are enabled\
+    \ for the upstream target\necho \"${INGRESS_UPSTREAM} has healthchecks enabled.\"\
+    \n"
   name: check_if_kong_ingress_controller_reports_upstream_errors
 - command: 'gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
     && response=$(curl -s -d "query=kong_upstream_target_health{upstream=''${INGRESS_UPSTREAM}'',state=~''dns_error|unhealthy''}
@@ -144,35 +130,39 @@ commands:
     of a specific upstream target in an application. If any issues are found, it will
     display information about the issue, otherwise it will report that the upstream
     is healthy.
-  multi_line_details: '#!/bin/bash
+  multi_line_details: '
 
-
-    # Authenticate using a service account and key file
+    # Activate the service account using the key file specified in the GOOGLE_APPLICATION_CREDENTIALS
+    environment variable
 
     gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+    &&
 
 
-    # Make a request to the Google Cloud Monitoring API to query for the health status
-    of a specific upstream target
+    # Query the monitoring API to check for unhealthy or DNS error states in the Kong
+    upstream target health
 
     response=$(curl -s -d "query=kong_upstream_target_health{upstream=''${INGRESS_UPSTREAM}'',state=~''dns_error|unhealthy''}
     > 0" -H "Authorization: Bearer $(gcloud auth print-access-token)" ''https://monitoring.googleapis.com/v1/projects/runwhen-nonprod-sandbox/location/global/prometheus/api/v1/query'')
+    &&
 
 
-    # Check if the response contains any data results
+    # Check if there are any results in the response data
 
-    echo "$response" | jq -e ''.data.result | length > 0''
+    echo "$response" | jq -e ''.data.result | length > 0'' &&
 
 
-    # If there are data results, extract relevant information from the response using
-    `jq` and display it
+    # If there are results, format and display the issues detected with the service
 
     echo "$response" | jq -r ''.data.result[] | "Issue detected with Service: ${INGRESS_UPSTREAM}"
     + " Healthcheck subsystem-state: " + .metric.subsystem + "-" + .metric.state +
-    " Target: " + .metric.target''
+    " Target: " + .metric.target'' ||
 
 
-    # If there are no data results, indicate that the upstream target is healthy
+    # If there are no issues, display a message indicating that the ingress controller
+    has reported the upstream as healthy
 
-    echo "${INGRESS_UPSTREAM} is reported as healthy from the Kong ingress controller."'
+    echo "${INGRESS_UPSTREAM} is reported as healthy from the Kong ingress controller."
+
+    '
   name: check_if_kong_ingress_controller_reports_upstream_errors

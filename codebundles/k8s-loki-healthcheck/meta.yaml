@@ -13,28 +13,15 @@ commands:
   explanation: This command uses kubectl to execute a `wget` request on a specific
     pod within a Kubernetes context and namespace, returning the shards that are not
     in an "ACTIVE" state in JSON format.
-  multi_line_details: '# Start by setting the context and namespace to work within
-
-    CONTEXT=my-context
-
-    NAMESPACE=my-namespace
-
-
-    # Get the name of the pod running the single-binary component
-
-    SINGLE_BINARY_POD=$(kubectl --context=${CONTEXT} -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary
-    -o=jsonpath=''{.items[0].metadata.name}'')
-
-
-    # Use kubectl exec to run a command on the single-binary pod
-
-    # This command uses wget to make an HTTP request to the localhost in the container
-
-    # Then it pipes the output to jq to filter and format the JSON response
-
-    kubectl --context=${CONTEXT} -n ${NAMESPACE} exec ${SINGLE_BINARY_POD} -- wget
-    -q --header="Accept: application/json" -O - http://localhost:3100/ring | jq -r
-    ''.shards[] | select(.state != "ACTIVE") | {name: .id, state: .state}'''
+  multi_line_details: "\n# Set the kubectl context and namespace for executing commands\n\
+    CONTEXT=my-context\nNAMESPACE=my-namespace\n\n# Get the name of the pod with label\
+    \ app.kubernetes.io/component=single-binary \nPOD=$(kubectl --context=${CONTEXT}\
+    \ -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath='{.items[0].metadata.name}')\n\
+    \n# Use kubectl to exec into the selected pod and run a wget command to fetch\
+    \ JSON data\n# Then use jq to filter and format the output\nkubectl --context=${CONTEXT}\
+    \ -n ${NAMESPACE} exec ${POD} -- wget -q --header=\"Accept: application/json\"\
+    \ -O - http://localhost:3100/ring | jq -r '.shards[] | select(.state != \"ACTIVE\"\
+    ) | {name: .id, state: .state}'\n"
   name: check_loki_ring_api
 - command: 'kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath=''{.items[0].metadata.name}'')
@@ -54,30 +41,38 @@ commands:
     Kubernetes context and namespace, targeting a pod labeled with the specified component.
     The command being executed uses wget to make a request to a local endpoint and
     retrieve JSON data from the specified URL.
-  multi_line_details: '# Set the kubectl context and namespace for the command
+  multi_line_details: '
 
-    # Assign the context and namespace to variables for easier reading and maintenance
+    # Set the kubectl context and namespace for the following commands
 
     CONTEXT=my-context
 
     NAMESPACE=my-namespace
 
 
-    # Get the name of the pod labeled with app.kubernetes.io/component=single-binary
-
-    # Use jsonpath to extract the name of the first pod found
+    # Find the pod with label app.kubernetes.io/component=single-binary and get its
+    name
 
     POD_NAME=$(kubectl --context=${CONTEXT} -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary
     -o=jsonpath=''{.items[0].metadata.name}'')
 
 
-    # Execute a command within the specified pod
-
-    # Use wget to make an HTTP request to http://localhost:3100/ready and output the
-    response to the terminal
-
-    # The command is executed in the specified kubectl context and namespace
+    # Execute a command within the specified pod to make a GET request to a local
+    endpoint
 
     kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $POD_NAME -- wget -q --header="Accept:
-    application/json" -O - http://localhost:3100/ready'
+    application/json" -O - http://localhost:3100/ready
+
+
+
+    Explanation:
+
+    1. We first set the context and namespace variables for the kubectl command.
+
+    2. Then we use the `kubectl get pods` command to find a specific pod with the
+    label `app.kubernetes.io/component=single-binary` and extract its name using `jsonpath`.
+
+    3. Finally, we use the extracted pod name to execute a `wget` command inside the
+    pod, making a GET request to `http://localhost:3100/ready` and outputting the
+    response to the terminal.'
   name: check_loki_api_ready
