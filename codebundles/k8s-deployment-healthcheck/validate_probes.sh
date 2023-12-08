@@ -8,9 +8,12 @@ extract_data() {
     echo "$1" | jq -r "$2" 2>/dev/null
 }
 
-# Function to extract port from command
+# # Function to extract port from command
+# extract_port_from_command() {
+#     echo "$1" | grep -oP '(?<=:)\d+' | head -n 1
+# }
 extract_port_from_command() {
-    echo "$1" | grep -oP '(?<=:)\d+' | head -n 1
+    echo "$1" | grep -o ':.*' | sed 's/[^0-9]*//g' | head -n 1
 }
 
 # Get deployment manifest in JSON format
