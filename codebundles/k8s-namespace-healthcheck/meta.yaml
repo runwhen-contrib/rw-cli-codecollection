@@ -96,28 +96,38 @@ commands:
     \(.status.conditions[0].reason // "N/A")\ncontainerStatus: \((.status.containerStatuses[0].state
     // "N/A"))\ncontainerMessage: \(.status.containerStatuses[0].state.waiting?.message
     // "N/A")\ncontainerReason: \(.status.containerStatuses[0].state.waiting?.reason
-    // "N/A")\n------------"'''
+    // "N/A")\n_______-"'''
   doc_links: '
 
-    - [Kubernetes Official Documentation](https://kubernetes.io/docs/home/){:target="_blank"}
+    - [Retrieving data about pods](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#getting-information){:target="_blank"}
 
-    - [Kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
+    - [Filtering pods by status](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase){:target="_blank"}
 
-    - [Jq Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command retrieves information about pods in a specific context
-    and namespace that are in a pending state, and formats the output using jq to
-    display details about each pod's name, status, message, reason, container status,
+    - [Formatting data to display specific fields](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#output-options){:target="_blank"}'
+  explanation: This command retrieves information about pods in a specific Kubernetes
+    context and namespace, filtering for those with a pending status. It then formats
+    this data to display the pod name, status, message, reason, container status,
     container message, and container reason.
-  multi_line_details: "\n# Get pods in a specific context and namespace that are in\
-    \ pending status\nkubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending\
-    \ --no-headers -o json |\n  # Use jq to parse the json output and format it for\
-    \ human-readable display\n  jq -r '.items[] |\n    \"pod_name: \\(.metadata.name)\\\
-    n\n    status: \\(.status.phase // \"N/A\")\\n\n    message: \\(.status.conditions[0].message\
-    \ // \"N/A\")\\n\n    reason: \\(.status.conditions[0].reason // \"N/A\")\\n\n\
-    \    containerStatus: \\((.status.containerStatuses[0].state // \"N/A\"))\\n\n\
-    \    containerMessage: \\(.status.containerStatuses[0].state.waiting?.message\
-    \ // \"N/A\")\\n\n    containerReason: \\(.status.containerStatuses[0].state.waiting?.reason\
-    \ // \"N/A\")\\n\n    ------------\"'\n"
+  multi_line_details: "\n# Set the current context and namespace to use for the kubectl\
+    \ command\n# This is important as it ensures we are targeting the correct environment\n\
+    CONTEXT=my-context\nNAMESPACE=my-namespace\n\n# Use kubectl to get pods from the\
+    \ specified context and namespace with a pending status\n# We use --no-headers\
+    \ to exclude the column headers and -o json to output the results in JSON format\n\
+    kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending\
+    \ --no-headers -o json | \n\n# Use jq to parse the JSON output and extract specific\
+    \ information about each pod\n# The | symbol is used to pipe the results of the\
+    \ previous command into jq for further processing\njq -r '.items[] | \n\"pod_name:\
+    \ \\(.metadata.name)\\n\nstatus: \\(.status.phase // \"N/A\")\\n\nmessage: \\\
+    (.status.conditions[0].message // \"N/A\")\\n\nreason: \\(.status.conditions[0].reason\
+    \ // \"N/A\")\\n\ncontainerStatus: \\((.status.containerStatuses[0].state // \"\
+    N/A\"))\\n\ncontainerMessage: \\(.status.containerStatuses[0].state.waiting?.message\
+    \ // \"N/A\")\\n\ncontainerReason: \\(.status.containerStatuses[0].state.waiting?.reason\
+    \ // \"N/A\")\\n\n_______-\"'\n\n\nThis multiline command breaks down each step\
+    \ of the original one-liner and provides explanations for each part. It includes\
+    \ setting the context and namespace, using kubectl to get pods with a pending\
+    \ status, and then using jq to extract specific information about each pod from\
+    \ the JSON output. This can help newer or less experienced devops engineers understand\
+    \ and learn from the command."
   name: troubleshoot_pending_pods_in_namespace_namespace
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed
     --no-headers -o json | jq -r --argjson exit_code_explanations ''{"0": "Success",
@@ -128,42 +138,54 @@ commands:
     // "N/A")\nterminated_finishedAt: \(.status.containerStatuses[0].state.terminated.finishedAt
     // "N/A")\nexit_code: \(.status.containerStatuses[0].state.terminated.exitCode
     // "N/A")\nexit_code_explanation: \($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode
-    | tostring] // "Unknown exit code")\n------------"'''
+    | tostring] // "Unknown exit code")\n_______-"'''
   doc_links: '
 
-    - [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+    - [Retrieving pod information in Kubernetes](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#describe){:target="_blank"}
 
-    - [pods](https://kubernetes.io/docs/concepts/workloads/pods/){:target="_blank"}
+    - [Understanding pod restart count and termination message](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy){:target="_blank"}
 
-    - [specific context and namespace](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context-and-namespace){:target="_blank"}
+    - [Exit codes in Linux](https://linux.die.net/man/7/signal){:target="_blank"}
 
-    - [failed pods](https://kubernetes.io/docs/tasks/debug-application-cluster/determine-reason-pod-failure/){:target="_blank"}
+    - [Kubernetes namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}'
+  explanation: This command is used to retrieve information about failed pods within
+    a specific namespace, including their name, restart count, termination message,
+    finish time, and exit code explanation. The exit code explanations are based on
+    the specific exit codes returned by the failed pods.
+  multi_line_details: '
 
-    - [jq](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command uses kubectl to get information about pods in a specific
-    context and namespace that have failed. It then formats the output using "jq"
-    to provide details about each failed pod, including its name, restart count, message,
-    termination time, exit code, and an explanation of the exit code.
-  multi_line_details: "\n# Set the context for the Kubernetes cluster and the namespace\
-    \ to search for pods\nCONTEXT=my-cluster-context\nNAMESPACE=my-namespace\n\n#\
-    \ Use kubectl to get the pods from the specified context and namespace that have\
-    \ failed\nkubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed\
-    \ --no-headers -o json | \n\n# Parse the output as JSON and use jq to format it\
-    \ with helpful information\njq -r --argjson exit_code_explanations '{\"0\": \"\
-    Success\", \"1\": \"Error\", \"2\": \"Misconfiguration\", \"130\": \"Pod terminated\
-    \ by SIGINT\", \"134\": \"Abnormal Termination SIGABRT\", \"137\": \"Pod terminated\
-    \ by SIGKILL - Possible OOM\", \"143\":\"Graceful Termination SIGTERM\"}' '.items[]\
-    \ | \n    \"pod_name: \\(.metadata.name)\\nrestart_count: \\(.status.containerStatuses[0].restartCount\
-    \ // \"N/A\")\\nmessage: \\(.status.message // \"N/A\")\\nterminated_finishedAt:\
-    \ \\(.status.containerStatuses[0].state.terminated.finishedAt // \"N/A\")\\nexit_code:\
-    \ \\(.status.containerStatuses[0].state.terminated.exitCode // \"N/A\")\\nexit_code_explanation:\
-    \ \\($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode\
-    \ | tostring] // \"Unknown exit code\")\\n------------\"'\n\nIn this script, we\
-    \ set the context and namespace for the Kubernetes cluster, then retrieve the\
-    \ pods that have failed. We then parse the data returned to give more detailed\
-    \ information about each failed pod, including its name, restart count, message,\
-    \ termination time, exit code, and an explanation for the exit code. This can\
-    \ help in diagnosing and troubleshooting issues with failed pods."
+    # Use the "kubectl" command to get information about pods that have failed in
+    a specific context and namespace
+
+    kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed
+    --no-headers -o json \
+
+
+    # Pipe the output to the "jq" command to process and format the JSON output for
+    better readability
+
+    | jq -r --argjson exit_code_explanations ''{"0": "Success", "1": "Error", "2":
+    "Misconfiguration", "130": "Pod terminated by SIGINT", "134": "Abnormal Termination
+    SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination
+    SIGTERM"}'' ''.items[] |
+
+
+    # Extract and display relevant information about each pod in a structured format
+    with additional explanations
+
+    "pod_name: \(.metadata.name)\nrestart_count: \(.status.containerStatuses[0].restartCount
+    // "N/A")\nmessage: \(.status.message // "N/A")\nterminated_finishedAt: \(.status.containerStatuses[0].state.terminated.finishedAt
+    // "N/A")\nexit_code: \(.status.containerStatuses[0].state.terminated.exitCode
+    // "N/A")\nexit_code_explanation: \($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode
+    | tostring] // "Unknown exit code")\n_______-"''
+
+
+    In the above multi-line command, we use the `kubectl` command to retrieve information
+    about failed pods within a specific context and namespace. We then use the `jq`
+    tool to process and format the JSON output to extract and display relevant information
+    about each pod, such as its name, restart count, message, finished timestamp,
+    exit code, and an explanation for the exit code. This helps provide insights into
+    the reasons for pod failures and aids in troubleshooting.'
   name: troubleshoot_failed_pods_in_namespace_namespace
 - command: 'kubectl get pods --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r
     ''.items[] | select(.status.conditions[]? | select(.type == "Ready" and .status
@@ -368,58 +390,61 @@ commands:
     %-30s %-10s\n" "$type/$name" "$pdbName" "Risky"; elif [[ $replicas -gt 1 && ("$minAvailable"
     != "100%" || "$maxUnavailable" != "0" || "$maxUnavailable" != "0%") ]]; then printf
     "%-30s %-30s %-10s\n" "$type/$name" "$pdbName" "OK"; fi; done; fi; }; echo "Deployments:";
-    echo "-----------"; printf "%-30s %-30s %-10s\n" "NAME" "PDB" "STATUS"; kubectl
-    --context "$context" --namespace "$namespace" get deployments -o json | jq -c
-    '.items[] | "\(.metadata.name) \(.spec.replicas) \(.spec.selector.matchLabels
-    | to_entries[] | .key + "=" + .value)"' | while read -r line; do check_health
-    "Deployment" $(echo $line | tr -d '"'); done; echo ""; echo "Statefulsets:"; echo
-    "-------------"; printf "%-30s %-30s %-10s\n" "NAME" "PDB" "STATUS"; kubectl --context
-    "$context" --namespace "$namespace" get statefulsets -o json | jq -c '.items[]
+    echo "_______"; printf "%-30s %-30s %-10s\n" "NAME" "PDB" "STATUS"; kubectl --context
+    "$context" --namespace "$namespace" get deployments -o json | jq -c '.items[]
     | "\(.metadata.name) \(.spec.replicas) \(.spec.selector.matchLabels | to_entries[]
-    | .key + "=" + .value)"' | while read -r line; do check_health "StatefulSet" $(echo
-    $line | tr -d '"'); done
+    | .key + "=" + .value)"' | while read -r line; do check_health "Deployment" $(echo
+    $line | tr -d '"'); done; echo ""; echo "Statefulsets:"; echo "_______"; printf
+    "%-30s %-30s %-10s\n" "NAME" "PDB" "STATUS"; kubectl --context "$context" --namespace
+    "$namespace" get statefulsets -o json | jq -c '.items[] | "\(.metadata.name) \(.spec.replicas)
+    \(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value)"' | while read
+    -r line; do check_health "StatefulSet" $(echo $line | tr -d '"'); done
   doc_links: '
 
-    - [Kubernetes official documentation for deploying applications](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
+    - [Kubernetes Documentation: Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
 
-    - [Understanding StatefulSets in Kubernetes](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
+    - [Kubernetes Documentation: StatefulSets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
 
-    - [Managing Pod Disruption Budgets](https://kubernetes.io/docs/tasks/run-application/configure-pdb/){:target="_blank"}'
-  explanation: This command checks the health status of deployments and statefulsets
-    in a Kubernetes cluster by looking at their corresponding Pod Disruption Budgets
-    (PDBs) and prints the status of each one as OK, Risky, or Missing. It does this
-    by querying the PDBs for each deployment and statefulset and comparing their minimum
-    availability and maximum unavailability settings with the number of replicas specified
-    in the deployment/statefulset.
-  multi_line_details: "\n# Set the context and namespace variables based on input\
-    \ or environment variables\ncontext=\"${CONTEXT}\"\nnamespace=\"${NAMESPACE}\"\
-    \n\n# Define a function to check the health of a resource\ncheck_health() {\n\
-    \  local type=$1\n  local name=$2\n  local replicas=$3\n  local selector=$4\n\
-    \  # Use kubectl and jq to retrieve Pod Disruption Budgets (PDBs) for the given\
-    \ selector\n  local pdbs=$(kubectl --context \"$context\" --namespace \"$namespace\"\
-    \ get pdb -o json | jq -c --arg selector \"$selector\" '.items[] | select(.spec.selector.matchLabels\
-    \ | to_entries[] | .key + \"=\" + .value == $selector)')\n  \n  # Logic to determine\
-    \ the health status of the resource based on PDBs and replica count\n  if [[ $replicas\
-    \ -gt 1 && -z \"$pdbs\" ]]; then\n    printf \"%-30s %-30s %-10s\\n\" \"$type/$name\"\
-    \ \"\" \"Missing\"\n  else\n    echo \"$pdbs\" | jq -c . | while IFS= read -r\
-    \ pdb; do\n      local pdbName=$(echo \"$pdb\" | jq -r '.metadata.name')\n   \
-    \   local minAvailable=$(echo \"$pdb\" | jq -r '.spec.minAvailable // \"\"')\n\
-    \      local maxUnavailable=$(echo \"$pdb\" | jq -r '.spec.maxUnavailable // \"\
-    \"')\n\n      if [[ \"$minAvailable\" == \"100%\" || \"$maxUnavailable\" == \"\
-    0\" || \"$maxUnavailable\" == \"0%\" ]]; then\n        printf \"%-30s %-30s %-10s\\\
-    n\" \"$type/$name\" \"$pdbName\" \"Risky\"\n      elif [[ $replicas -gt 1 && (\"\
-    $minAvailable\" != \"100%\" || \"$maxUnavailable\" != \"0\" || \"$maxUnavailable\"\
-    \ != \"0%\") ]]; then\n        printf \"%-30s %-30s %-10s\\n\" \"$type/$name\"\
-    \ \"$pdbName\" \"OK\"\n      fi\n    done\n  fi\n}\n\n# Check the health of deployments\n\
-    echo \"Deployments:\"\necho \"-----------\"\nprintf \"%-30s %-30s %-10s\\n\" \"\
-    NAME\" \"PDB\" \"STATUS\"\nkubectl --context \"$context\" --namespace \"$namespace\"\
-    \ get deployments -o json | jq -c '.items[] | \"\\(.metadata.name) \\(.spec.replicas)\
+    - [Kubernetes Documentation: Pod Disruption Budgets (PDBs)](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/){:target="_blank"}'
+  explanation: This script checks the health of deployments and statefulsets in a
+    Kubernetes cluster by verifying if the corresponding Pod Disruption Budgets (PDBs)
+    are risky, missing, or okay based on their configuration. It then prints out the
+    status of each deployment and statefulset along with their PDB status.
+  multi_line_details: "\n# Set the context and namespace variables by replacing placeholders\
+    \ with actual values\ncontext=\"${CONTEXT}\"; \nnamespace=\"${NAMESPACE}\"; \n\
+    \n# Define a function to check the health of a resource based on certain conditions\n\
+    check_health() { \n  local type=$1; \n  local name=$2; \n  local replicas=$3;\
+    \ \n  local selector=$4; \n  # Retrieve the matching PodDisruptionBudgets (PDBs)\
+    \ for the specified resource\n  local pdbs=$(kubectl --context \"$context\" --namespace\
+    \ \"$namespace\" get pdb -o json | jq -c --arg selector \"$selector\" '.items[]\
+    \ | select(.spec.selector.matchLabels | to_entries[] | .key + \"=\" + .value ==\
+    \ $selector)');\n  if [[ $replicas -gt 1 && -z \"$pdbs\" ]]; then \n    # If the\
+    \ resource has more than 1 replica and no matching PDB is found, print \"Missing\"\
+    \n    printf \"%-30s %-30s %-10s\\n\" \"$type/$name\" \"\" \"Missing\"; \n  else\
+    \ \n    # If matching PDBs are found, evaluate their minAvailable and maxUnavailable\
+    \ values\n    echo \"$pdbs\" | jq -c . | while IFS= read -r pdb; do \n      local\
+    \ pdbName=$(echo \"$pdb\" | jq -r '.metadata.name'); \n      local minAvailable=$(echo\
+    \ \"$pdb\" | jq -r '.spec.minAvailable // \"\"'); \n      local maxUnavailable=$(echo\
+    \ \"$pdb\" | jq -r '.spec.maxUnavailable // \"\"'); \n      # Determine the status\
+    \ of the PDB based on minAvailable and maxUnavailable values\n      if [[ \"$minAvailable\"\
+    \ == \"100%\" || \"$maxUnavailable\" == \"0\" || \"$maxUnavailable\" == \"0%\"\
+    \ ]]; then \n        printf \"%-30s %-30s %-10s\\n\" \"$type/$name\" \"$pdbName\"\
+    \ \"Risky\"; \n      elif [[ $replicas -gt 1 && (\"$minAvailable\" != \"100%\"\
+    \ || \"$maxUnavailable\" != \"0\" || \"$maxUnavailable\" != \"0%\") ]]; then \n\
+    \        printf \"%-30s %-30s %-10s\\n\" \"$type/$name\" \"$pdbName\" \"OK\";\
+    \ \n      fi; \n    done; \n  fi; \n}; \n\n# Output the headers for the Deployments\
+    \ section\necho \"Deployments:\"; \necho \"_______\"; \nprintf \"%-30s %-30s %-10s\\\
+    n\" \"NAME\" \"PDB\" \"STATUS\"; \n\n# Retrieve and process the deployments, checking\
+    \ their health\nkubectl --context \"$context\" --namespace \"$namespace\" get\
+    \ deployments -o json | jq -c '.items[] | \"\\(.metadata.name) \\(.spec.replicas)\
     \ \\(.spec.selector.matchLabels | to_entries[] | .key + \"=\" + .value)\"' | while\
-    \ read -r line; do\n  check_health \"Deployment\" $(echo $line | tr -d '\"')\n\
-    done\necho \"\"\n\n# Check the health of stateful sets\necho \"Statefulsets:\"\
-    \necho \"-------------\"\nprintf \"%-30s %-30s %-10s\\n\" \"NAME\" \"PDB\" \"\
-    STATUS\"\nkubectl --context \"$context\" --namespace \"$namespace\" get statefulsets\
-    \ -o json | jq -c '.items[] | \"\\(.metadata.name) \\(.spec.replicas) \\(.spec.selector.matchLabels\
-    \ | to_entries[] | .key + \"=\" + .value)\"' | while read -r line; do\n  check_health\
-    \ \"StatefulSet\" $(echo $line | tr -d '\"')\ndone\n"
+    \ read -r line; do \n  check_health \"Deployment\" $(echo $line | tr -d '\"');\
+    \ \ndone; \n\n# Output a blank line for clearer separation\necho \"\"; \n\n# Output\
+    \ the headers for the Statefulsets section\necho \"Statefulsets:\"; \necho \"\
+    _______\"; \nprintf \"%-30s %-30s %-10s\\n\" \"NAME\" \"PDB\" \"STATUS\"; \n\n\
+    # Retrieve and process the statefulsets, checking their health\nkubectl --context\
+    \ \"$context\" --namespace \"$namespace\" get statefulsets -o json | jq -c '.items[]\
+    \ | \"\\(.metadata.name) \\(.spec.replicas) \\(.spec.selector.matchLabels | to_entries[]\
+    \ | .key + \"=\" + .value)\"' | while read -r line; do \n  check_health \"StatefulSet\"\
+    \ $(echo $line | tr -d '\"'); \ndone\n"
   name: check_missing_or_risky_poddisruptionbudget_policies_in_namepace_namespace

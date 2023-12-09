@@ -113,7 +113,7 @@ commands:
     \ namespace in which the StatefulSet exists\n# Replace ${NAMESPACE} with the actual\
     \ namespace where your StatefulSet is located\n\nkubectl logs \\\n  --tail=100\
     \ \\\n  statefulset/${STATEFULSET_NAME} \\\n  --context ${CONTEXT} \\\n  -n ${NAMESPACE}\n"
-  name: fetch_statefulset_statefulset_name_logs
+  name: fetch_statefulset_logs_for_statefulset_name
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "${STATEFULSET_NAME}" || true
   doc_links: '
@@ -160,7 +160,7 @@ commands:
     \ to use\n--context=${CONTEXT}\n\n# Replace ${NAMESPACE} with the namespace where\
     \ the statefulset is located\n-n ${NAMESPACE}\n\n# Output the data in YAML format\
     \ for easy reading and parsing\n-o yaml\n"
-  name: fetch_statefulset_statefulset_name_manifest_details
+  name: fetch_manifest_details_for_statefulset_statefulset_name
 - command: 'kubectl get statefulset -n ${NAMESPACE} -o json --context ${CONTEXT} |
     jq -r ''.items[] | select(.status.availableReplicas < .status.replicas) | "---\nStatefulSet
     Name: " + (.metadata.name|tostring) + "\nDesired Replicas: " + (.status.replicas|tostring)
