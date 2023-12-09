@@ -21,7 +21,7 @@ Get Current Resource State
     [Tags]    resource    application    restart    state    yaml
     ${resource}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get daemonset,deployment,statefulset -l ${LABELS} -oyaml
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    Current Resource State:\n\n${resource.stdout}
@@ -33,7 +33,7 @@ Get Resource Logs
     [Tags]    resource    application    workload    logs    state
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs daemonset,deployment,statefulset -l ${LABELS} --tail=200 --limit-bytes=256000
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    Resource Logs:\n\n${logs.stdout}
@@ -45,12 +45,12 @@ Restart Resource
     [Tags]    resource    application    restart    pod    kill    rollout    revision
     ${resource_name}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get daemonset,deployment,statefulset -l ${LABELS} -o=jsonpath='{.items[0].kind}/{.items[0].metadata.name}'
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} rollout restart ${resource_name.stdout} --context=${CONTEXT} -n ${NAMESPACE}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    Restarted the following workload: ${resource_name.stdout}

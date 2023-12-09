@@ -21,7 +21,7 @@ Search For GCE Ingress Warnings in GKE
     ...    cmd=INGRESS_NAME=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT=${CONTEXT}; ${KUBERNETES_DISTRIBUTION_BINARY} get events -n $NAMESPACE --context $CONTEXT --field-selector involvedObject.kind=Ingress,involvedObject.name=$INGRESS_NAME,type!=Normal; for SERVICE_NAME in $(${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS_NAME -n $NAMESPACE --context $CONTEXT -o=jsonpath='{.spec.rules[*].http.paths[*].backend.service.name}'); do ${KUBERNETES_DISTRIBUTION_BINARY} get events -n $NAMESPACE --context $CONTEXT --field-selector involvedObject.kind=Service,involvedObject.name=$SERVICE_NAME,type!=Normal; done
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
 
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${event_warnings}
@@ -43,7 +43,7 @@ Identify Unhealthy GCE HTTP Ingress Backends
     ...    cmd=INGRESS_NAME=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT=${CONTEXT}; ${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS_NAME -n $NAMESPACE --context $CONTEXT -o=json | jq -r '.metadata.annotations["ingress.kubernetes.io/backends"] | fromjson | to_entries[] | select(.value != "HEALTHY") | "Backend: " + .key + " Status: " + .value'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
 
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${unhealthy_backends}
@@ -96,7 +96,7 @@ Fetch Network Error Logs from GCP Operations Manager for Ingress Backends
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
    
    RW.CLI.Parse Cli Output By Line
    ...    rsp=${network_error_logs}
@@ -120,12 +120,12 @@ Review GCP Operations Logging Dashboard
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    env=${env}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
    ${backend_log_url}=   RW.CLI.Run Cli
     ...    cmd=INGRESS=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT=${CONTEXT}; QUERY="resource.type=\\"gce_network\\"" && for backend in $(${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS -n $NAMESPACE --context $CONTEXT -o=json | jq -r '.metadata.annotations["ingress.kubernetes.io/backends"] | fromjson | to_entries[] | select(.value != "HEALTHY") | .key'); do QUERY="$QUERY AND protoPayload.resourceName=~\\"$backend\\""; done && ENCODED_QUERY=$(echo $QUERY | jq -sRr @uri) && DASHBOARD_URL="https://console.cloud.google.com/logs/query;query=$ENCODED_QUERY?project=$GCP_PROJECT_ID" && echo $DASHBOARD_URL
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    env=${env}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
    ${history}=    RW.CLI.Pop Shell History
    RW.Core.Add Pre To Report    GCP Ops Logs for HTTP Load Balancer ${INGRESS}:\n\n${loadbalancer_log_url.stdout}
    RW.Core.Add Pre To Report    GCP Ops Logs for ${INGRESS} backends:\n\n${backend_log_url.stdout}

@@ -4,31 +4,30 @@ commands:
     -s ''${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}'''
   doc_links: '
 
-    - [How to Use Variables in Bash](https://www.lifewire.com/passing-variables-in-bash-script-2200571){:target="_blank"}
+    '
+  explanation: This command sets a variable TERRAFORM_API_TOKEN_VALUE to the value
+    of the TERRAFORM_API_TOKEN file, then uses curl to make a request to a specified
+    API URL with the token for authorization and specific content type.
+  multi_line_details: '# The following command is used to make a call to the Terraform
+    API using an API token for authentication
 
-    - [Linux Curl Command Tutorial with Examples](https://linuxize.com/post/curl-command-examples/){:target="_blank"}
+    # First, we are assigning the value of the Terraform API token file to a variable
+    called TERRAFORM_API_TOKEN_VALUE
 
-    - [API Documentation for Terraform Cloud API](https://www.terraform.io/docs/cloud/api/index.html){:target="_blank"}
-
-    - [Request Header Field Authorization - MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Authorization){:target="_blank"}'
-  explanation: ' | jq -r .data.id
+    TERRAFORM_API_TOKEN_VALUE=$(cat $TERRAFORM_API_TOKEN)
 
 
-    Kubernetes is an open source platform for managing containerized applications.
-    This command will allow you to access the Kubernetes API with a token in order
-    to get the ID of a workspace in your organization. It stores the token in the
-    TERRAFORM_API_TOKEN environment variable and then uses curl and jq (a command-line
-    JSON processor) to make an HTTP request and retrieve the workspace ID.'
-  multi_line_details: " | jq '.data | {id, workspace_id}' | tr -d '\\n\"'\n\n# First,\
-    \ we'll grab the contents of $TERRAFORM_API_TOKEN and save it to a new environment\
-    \ variable called TERRAFORM_API_TOKEN_VALUE:\nTERRAFORM_API_TOKEN_VALUE=$(cat\
-    \ $TERRAFORM_API_TOKEN) \n\n# Next, we'll use curl to set appropriate headers\
-    \ containing the saved auth token in the Environment variable.\n# The --header\
-    \ flag is used to add custom headers to the request.\ncurl \\\n  --header \"Authorization:\
-    \ Bearer $TERRAFORM_API_TOKEN_VALUE\" \\\n  --header \"Content-Type: application/vnd.api+json\"\
-    \ \\\n  -s \\ # Unused here. Switches curl to silent mode.\n  '$TERRAFORM_API_URL/organizations/$TERRAFORM_ORGANIZATION_NAME/workspaces/$TERRAFORM_WORKSPACE_NAME'\
-    \ \\\n\n# Then, pipe the output to jq, which will filter out only the parts we\
-    \ care about for the following step.\n| jq '.data | {id, workspace_id}'\n\n# Finally,\
-    \ we can remove trailing newlines using tr and enclose the command in double quotes:\n\
-    | tr -d '\\n\"'"
+    # Next, we use the curl command to make a request to the Terraform API
+
+    # We include the API token in the Authorization header and specify the Content-Type
+    as application/vnd.api+json
+
+    # We also include the variables for the organization name and workspace name in
+    the URL
+
+    curl --header "Authorization: Bearer $TERRAFORM_API_TOKEN_VALUE" --header "Content-Type:
+    application/vnd.api+json" -s ''${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}''
+
+    # Note that the variables within the URL are enclosed in curly braces and prefixed
+    with a dollar sign ($) to reference their values from the environment.'
   name: checking_whether_the_terraform_cloud_workspace_is_in_a_locked_state

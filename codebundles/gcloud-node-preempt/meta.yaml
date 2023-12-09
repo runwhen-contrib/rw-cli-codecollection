@@ -3,40 +3,20 @@ commands:
     && gcloud compute operations list --filter="operationType:( compute.instances.preempted
     ) AND NOT status:( DONE )" --format=json --project=${GCP_PROJECT_ID} | jq '[.[]
     | {startTime,targetLink, statusMessage, progress, zone, selfLink}]'
-  doc_links: "\n- [Cloud SDK Documentation \u2013 gcloud auth activate-service-account](https://cloud.google.com/sdk/gcloud/reference/auth/activate-service-account){:target=\"\
-    _blank\"}\n- [Cloud SDK Documentation \u2013 gcloud compute operations list](https://cloud.google.com/sdk/gcloud/reference/compute/operations/list){:target=\"\
-    _blank\"}\n- [Filter Syntax - Compute Engine | Google Cloud](https://cloud.google.com/sdk/gcloud/reference/topic/filters#supported_format_args){:target=\"\
-    _blank\"}\n- [JSONPath - XPath for JSON - GossPara Software](http://goessner.net/articles/JsonPath/){:target=\"\
-    _blank\"}\n- [jq Manual (development version)](https://stedolan.github.io/jq/manual/){:target=\"\
-    _blank\"}"
-  explanation: '
+  doc_links: '
 
+    - [Service accounts on GCP](https://cloud.google.com/iam/docs/service-accounts){:target="_blank"}
 
-    This command is used to list preemptible Compute Engine operations on a Google
-    Cloud Platform project. Preemptible instances are short-lived Google Compute Engine
-    virtual machines that have an automatically-discounted price in exchange for flexibility.
-    This command uses Google Cloud''s authentication service to authorize the request
-    with your credentials which are passed as an environment variable (GOOGLE_APPLICATION_CREDENTIALS).
-
-
-    The command also specifies the operation type, status, and format in order to
-    get the desired information in json format. Additionally it filters based on target
-    project which is passed in as another environment variable (GCP_PROJECT_ID). The
-    output is then piped to the jq program in order to extract specific fields from
-    the list of preemptible operations retrieved from Google Cloud Platform. The fields
-    extracted include startTime, targetLink, statusMessage, progress, zone and selfLink.'
-  multi_line_details: "\n\n# This command will establish authorization with a Service\
-    \ Account defined in \n# the environment variable $GOOGLE_APPLICATION_CREDENTIALS\
-    \ and then list all \n# operations concerning preempted Google Compute instances\
-    \ that are still in \n# progress, along with some metadata. Note that the jq output\
-    \ filter will \n# determine exactly which fields of the operation objects are\
-    \ returned in \n# the final output.\n\n# First, authorize to the GCP project with\
-    \ credentials from the environment\ngcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS\
-    \ \n\n# Then, construct a query string including the GCP project ID, for use as\
-    \ a filter when working with Compute Operations\nQUERY_STRING=\"operationType:(\
-    \ compute.instances.preempted ) AND NOT status:( DONE )\"\n\n# List filtered Compute\
-    \ Operations\ngcloud compute operations list --filter=\"${QUERY_STRING}\" \\\n\
-    \t--format=json \\\n    --project=${GCP_PROJECT_ID}\n\n# Pipe results through\
-    \ jq to get desired output format\n| jq '[.[] | {startTime,targetLink, statusMessage,\
-    \ progress, zone, selfLink}]'"
+    - [Preemptible VM instances on GCP](https://cloud.google.com/compute/docs/instances/preemptible){:target="_blank"}'
+  explanation: This command activates a service account for authentication and then
+    lists all preempted compute instances that are not yet completed in a Google Cloud
+    Platform project, displaying specific information about each instance in JSON
+    format. The jq filter is used to select and format the specific fields of interest.
+  multi_line_details: "# Activate the service account using the key file from the\
+    \ Google Application Credentials\ngcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS\
+    \ && \n\n# List all compute operations with specific filters and output in JSON\
+    \ format\ngcloud compute operations list --filter=\"operationType:( compute.instances.preempted\
+    \ ) AND NOT status:( DONE )\" --format=json --project=${GCP_PROJECT_ID} |\n\n\
+    # Use jq to filter and customize the output to display only certain fields\njq\
+    \ '[.[] | {startTime,targetLink, statusMessage, progress, zone, selfLink}]'"
   name: list_all_nodes_in_an_active_prempt_operation

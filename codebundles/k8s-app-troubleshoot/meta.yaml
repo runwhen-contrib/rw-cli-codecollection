@@ -3,123 +3,83 @@ commands:
     --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
   doc_links: '
 
-    - [Kubernetes Documentation on kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+    - [Kubernetes Documentation: Kubernetes Logs](https://kubernetes.io/docs/reference/kubectl/cheatsheet/#logs){:target="_blank"}
 
-    - [Kubernetes Contexts and Configurations page](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
+    - [Kubernetes Documentation: Labels and Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
 
-    - [Kubernetes Pods page](https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/){:target="_blank"}
+    - [Kubernetes Documentation: Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}
 
-    - [Kubernetes Logging page](https://kubernetes.io/docs/concepts/cluster-administration/logging/){:target="_blank"}'
-  explanation: '
+    - [Kubernetes Documentation: Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-
-    This command allows you to view the logs for a particular container in Kubernetes.
-    The CONTEXT, NAMESPACE, LABELS, MAX_LOG_LINES, LOGS_SINCE, and CONTAINER_NAME
-    are all parameters that you must specify in order to get the desired result. The
-    --context parameter is what type of cluster you wish to view the logs on, while
-    the -n --namespace parameter allows you to specify what namespace the container
-    is in (similar to a folder in a file system). The --labels parameter is used to
-    filter out specific container labels that may be associated with the particular
-    container. The --tail option allows you to specify how many log lines you would
-    like to view at once. --limit-bytes means that you can limit the size of the output
-    in bytes when viewing logs. And finally, the --since parameter allows you to view
-    logs based on how long they have been since they have been generated.'
-  multi_line_details: "\n\n# Set the context for this command. \nCONTEXT=\"production-cluster\"\
-    \n\n#The namespace within which to search for logs. \nNAMESPACE=\"my-app-namespace\"\
-    \n\n# Key-value pairs that are used to select pods from the cluster (i.e. match\
-    \ label values for pods that match key=value)\nLABELS=\"key1=value1,key2=value2\"\
-    \n\n# Maximum number of lines of logs to show from each container\nMAX_LOG_LINES=\"\
-    5000\"\n\n#Maximum bytes to return from each container.\n256000\n\n# Logs returned\
-    \ would not be older than timestamp\nLOGS_SINCE=\"3h\"\n\n#The name of the container\n\
-    CONTAINER_NAME=\"web-container\"\n\n#Multi-line command\nkubectl --context=${CONTEXT}\
-    \ \\\n  -n ${NAMESPACE} \\\n  logs -l ${LABELS} \\\n  --tail=${MAX_LOG_LINES}\
-    \ \\\n  --limit-bytes=256000 \\\n  --since=${LOGS_SINCE} \\\n  --container=${CONTAINER_NAME}"
+    - [Kubernetes Documentation: Logging and Monitoring](https://kubernetes.io/docs/concepts/cluster-administration/logging/){:target="_blank"}'
+  explanation: This command retrieves the logs of a specific container within a Kubernetes
+    pod, using the specified context, namespace, and labels, and limiting the output
+    to a certain number of lines and bytes, as well as filtering based on a specified
+    timestamp.
+  multi_line_details: "\n# Set the Kubernetes context to use for the command\nCONTEXT=\"\
+    your_context_name\"\n# Set the namespace in which the pod is running\nNAMESPACE=\"\
+    your_namespace\"\n# Specify the labels to filter the logs by\nLABELS=\"app=your_app,name=your_pod\"\
+    \n# Specify the maximum number of log lines to display\nMAX_LOG_LINES=100\n# Set\
+    \ the time duration since when to display the logs\nLOGS_SINCE=1h\n# Specify the\
+    \ container name for which to fetch the logs\nCONTAINER_NAME=\"your_container_name\"\
+    \n\n# Use kubectl to fetch the logs from a specific pod and container based on\
+    \ the given criteria\nkubectl --context=${CONTEXT} \\\n  -n ${NAMESPACE} \\\n\
+    \  logs -l ${LABELS} \\\n  --tail=${MAX_LOG_LINES} \\\n  --limit-bytes=256000\
+    \ \\\n  --since=${LOGS_SINCE} \\\n  --container=${CONTAINER_NAME}\n\nIn this multi-line\
+    \ command, we have added comments to explain each part of the original command.\
+    \ This will help newer or less experienced devops engineers understand what each\
+    \ parameter does and how they can customize it for their specific use case."
   name: get_workload_name_application_logs
 - command: ${cmd}
   doc_links: '
 
-    - [UNIX.com''s tutorial on crontab](https://www.unix.com/man-page/osx/1/crontab/){:target="_blank"}
+    - [Linux command line documentation](https://linuxcommand.org/){:target="_blank"}
 
-    - [Wikipedia article on Cron job scheduling](https://en.wikipedia.org/wiki/Cron){:target="_blank"}'
-  explanation: '
+    - [Bash scripting tutorial](https://ryanstutorials.net/bash-scripting-tutorial/){:target="_blank"}'
+  explanation: This command is a placeholder for a specific command that needs to
+    be executed, but the actual command will depend on the context in which it's being
+    used.
+  multi_line_details: '
+
+    # This command uses the variable $cmd to execute a complex operation
 
 
-    ${cmd} is a Kubernetes command that you can use to create a new deployment. A
-    deployment describes how to deploy your application in the cluster, and it consists
-    of several resources such as pods, services, and deployments. This command allows
-    you to define what images should be used for the pod, which containers should
-    be started up, and other settings needed to run your application in the Kubernetes
-    cluster. It also allows you to manage the entire deployment process from creation
-    to running the application. This ensures that you have a consistent way of deploying
-    applications across different environments and can keep track of changes made
-    to the system.'
-  multi_line_details: "\n\n# Convert this one-line command into a multi-line command,\
-    \ adding verbose comments to educate new users of Kubernetes and related cli commands\n\
-    kubectl create --save-config secret my-secret \\  # Create a secret called \"\
-    my-secret\"\n  generic \\                                        # Using type\
-    \ \"generic\"\n  --from-literal=key1=value1 \\                     # Setting key\
-    \ 'key1' to value 'value1'\n  --from-literal=key2=value2                     \
-    \  # Setting key 'key2' to value 'value2'"
+    # First, extract the data from the remote server using ssh
+
+    ssh user@remote_server "tar -cf - /path/to/directory" | \
+
+
+    # Then, pass the tarred data through gzip to compress it
+
+    gzip -c > backup.tar.gz
+
+
+    This multi-line command breaks down the steps involved in performing the operation
+    and provides explanations for each step, making it easier for newer or less experienced
+    devops engineers to understand and learn from.'
   name: troubleshoot_workload_name_application_logs
 - command: kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head
     -n 1) --container=${CONTAINER_NAME} -- printenv
   doc_links: '
 
-    - [Kubectl Overview](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+    - [Kubernetes Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
 
-    - [Contexts (kubectl) for multiple cluster and user management](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/#set-the-current-context){:target="_blank"}
+    - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [Get Resources by Label Selector (kubectl)](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
-
-    - [Exec Command (kubectl)](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
-
-    - [Kubernetes Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
-
-    - [Kubernetes StatefulSets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}'
-  explanation: "\n\nThis command allows you to run a command inside an existing Kubernetes\
-    \ container. It is using the kubectl command, which is a tool that helps manage\
-    \ multiple aspects of your Kubernetes cluster (on the context specified). \n\n\
-    The --context option is for identifying which namespace and cluster your command\
-    \ will apply to. The -n flag also indicates a specific namespace you'd like to\
-    \ target. Essentially these two flags let you configure what Kubernetes environment\
-    \ this command will be running in. \n\nThe $(kubectl --context=${CONTEXT} -n ${NAMESPACE}\
-    \ get all -l ${LABELS} -oname | grep -iE \"deploy|stateful\" ) part finds the\
-    \ name of the resource that matches the specific labels provided in the command.\
-    \ \n\nLastly, the command ends with --container=${CONTAINER_NAME} -- printenv.\
-    \ This means that the previous command has determined which container you'd like\
-    \ to run the command in (specified by CONTAINER_NAME) and will execute the command:\
-    \ printenv. Printenv will display all of the environmental variables available\
-    \ for the container."
-  multi_line_details: '
-
-
-    # This command uses kubectl to get environment variables for a particular container
-
-
-    # Get the context and namespace from external sources:
-
-    CONTEXT=${CONTEXT}
-
-    NAMESPACE=${NAMESPACE}
-
-
-    # Get the name of the deploy/stateful set by executing another kubectl command,
-    which gets all resources with the label specified in the variable:
-
-    LABELS=${LABELS}
-
-
-    # Execute the previous command and store the result in a variable
-
-    CONTAINER_NAME=$(kubectl --context=${CONTEXT} -n ${NAMESPACE} get all -l ${LABELS}
-    -oname | grep -iE "deploy|stateful" | head -n 1)
-
-
-    # Finally execute the requested command to get environment variables
-
-    kubectl --context=${CONTEXT} -n ${NAMESPACE} exec ${CONTAINER_NAME} --container=${CONTAINER_NAME}
-    -- printenv'
+    - [Kubernetes Labels and Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}'
+  explanation: This command allows you to execute a shell command in a specific container
+    within a Kubernetes cluster, using the specified context and namespace, and targeting
+    a resource based on certain labels.
+  multi_line_details: "\n# Set the kubectl context to the specified value\nkubectl\
+    \ config use-context ${CONTEXT}\n\n# Get all resources in the specified namespace\
+    \ with the given labels, and filter for deployments or statefulsets. \n# Then,\
+    \ take the first result and extract the name of the resource.\nresource_name=$(kubectl\
+    \ get all -n ${NAMESPACE} -l ${LABELS} -o name | grep -iE \"deploy|stateful\"\
+    \ | head -n 1)\n\n# Execute a command inside a specific container within the selected\
+    \ resource (deployment or statefulset) in the specified namespace\n# The command\
+    \ in this case is 'printenv', which prints the environment variables.\nkubectl\
+    \ exec -n ${NAMESPACE} ${resource_name} --container=${CONTAINER_NAME} -- printenv\n"
   name: troubleshoot_workload_name_application_logs
 - command: kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head
@@ -127,37 +87,52 @@ commands:
     -eo"
   doc_links: '
 
-    - [Kubernetes context](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
+    - [Kubectl Command Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
 
-    - [Namespace in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+    - [Kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
-    - [Labels in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
+    - [Kubectl Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
 
-    - [kubectl exec command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#exec){:target="_blank"}
+    - [Kubectl Advanced Pod Usage](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#run){:target="_blank"}'
+  explanation: This command uses kubectl to execute a command in a specific deployment
+    or stateful set within a given namespace and context. It retrieves the pods based
+    on specified labels, selects the first result, and runs a specific container's
+    process command while filtering out any non-relevant results.
+  multi_line_details: '
 
-    - [ps command](https://linuxize.com/post/linux-ps-command/){:target="_blank"}'
-  explanation: '
+    # Set the context and namespace for the kubectl command
+
+    CONTEXT=${CONTEXT}
+
+    NAMESPACE=${NAMESPACE}
 
 
-    This command enables you to view information about a particular Kubernetes deployment
-    by using the Kubernetes Command Line Interface (kubectl). It allows you to execute
-    a command inside of a running container in a Kubernetes cluster, providing context
-    with the variables CONTEXT, NAMESPACE, LABELS, and CONTAINER_NAME. The command
-    then performs a ps (process status) command to get detailed information on the
-    particular deployment. It filters out the header row from the output for tidiness
-    and/or filtering purposes.'
-  multi_line_details: "\n\n# This command will fetch the Pod's name which matches\
-    \ the labels value, and execute the container to run the ps (process status) command.\
-    \ \n# The output from the process status command will be used to determine the\
-    \ running processes in the container.\nCONTEXT=<context name> #Sets the Kubernetes\
-    \ context\nNAMESPACE=<namespace name> #Name of the namespace to target\nLABELS=<label\
-    \ name> #Name of label used for searching\nCONTAINER_NAME=<container name> #Name\
-    \ of container \n\n# Gets all resources with the given label name\nRESOURCES=$(kubectl\
-    \ --context=${CONTEXT} -n ${NAMESPACE} get all -l ${LABELS} -oname) \n\n# Filters\
-    \ the result list to return only deployments and stateful sets\nDEPLOYMENTS_STATEFULSET=$(echo\
-    \ ${RESOURCES} | grep -iE \"deploy|stateful\") \n\n# Retrieves the first Pod in\
-    \ the result list\nFIRST_POD_NAME=$(echo ${DEPLOYMENTS_STATEFULSET} | head -n\
-    \ 1) \n\n# Executes the container to retrieve the process status command output\n\
-    kubectl --context=${CONTEXT} -n ${NAMESPACE} exec ${FIRST_POD_NAME} --container=${CONTAINER_NAME}\
-    \ -- ps -eo command --no-header | grep -v \"ps -eo\""
+    # Get the name of the first resource with specified labels that is either a deployment
+    or statefulset
+
+    RESOURCE_NAME=$(kubectl --context=${CONTEXT} -n ${NAMESPACE} get all -l ${LABELS}
+    -oname | grep -iE "deploy|stateful" | head -n 1)
+
+
+    # Set the container name to execute the command in
+
+    CONTAINER_NAME=${CONTAINER_NAME}
+
+
+    # Execute the command inside the specified container and get the running processes
+
+    COMMAND_OUTPUT=$(kubectl --context=${CONTEXT} -n ${NAMESPACE} exec ${RESOURCE_NAME}
+    --container=${CONTAINER_NAME} -- ps -eo command --no-header)
+
+
+    # Filter out the ''ps'' command itself from the output
+
+    FILTERED_COMMAND_OUTPUT=$(echo ${COMMAND_OUTPUT} | grep -v "ps -eo")
+
+
+    # Print the filtered command output
+
+    echo ${FILTERED_COMMAND_OUTPUT}
+
+    '
   name: troubleshoot_workload_name_application_logs

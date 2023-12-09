@@ -149,7 +149,7 @@ def run_bash_file(
     target_service: platform.Service = None,
     env: dict = None,
     include_in_history: bool = True,
-    cmd_overide: str = "",
+    cmd_override: str = "",
     timeout_seconds: int = 60,
     **kwargs,
 ) -> platform.ShellServiceResponse:
@@ -160,7 +160,7 @@ def run_bash_file(
         target_service (platform.Service, optional): the shellservice to use if provided. Defaults to None.
         env (dict, optional): a mapping of environment variables to set for the environment. Defaults to None.
         include_in_history (bool, optional): whether to include in the shell history or not. Defaults to True.
-        cmd_overide (str, optional): the entrypoint command to use, similar to a dockerfile. Defaults to "./<bash_file" internally.
+        cmd_override (str, optional): the entrypoint command to use, similar to a dockerfile. Defaults to "./<bash_file" internally.
 
     Returns:
         platform.ShellServiceResponse: the structured response from running the file.
@@ -188,12 +188,12 @@ def run_bash_file(
                             logger.info(
                                 f"File '{bash_file}' found at derived path: {new_path}."
                             )
-                            if cmd_overide:
-                                cmd_overide = cmd_overide.replace(
+                            if cmd_override:
+                                cmd_override = cmd_override.replace(
                                     f"{local_bash_file}", f"{bash_file}"
                                 )
                             else:
-                                cmd_overide = f"{bash_file}"
+                                cmd_override = f"{bash_file}"
                             break
                         else:
                             logger.warning(
@@ -208,8 +208,8 @@ def run_bash_file(
                 f"File '{bash_file}' not found in the current directory and current directory is not root."
             )
 
-    if not cmd_overide:
-        cmd_overide = f"./{bash_file}"
+    if not cmd_override:
+        cmd_override = f"./{bash_file}"
     logger.info(f"Received kwargs: {kwargs}")
     request_secrets = _create_secrets_from_kwargs(**kwargs)
     file_contents: str = ""
@@ -217,7 +217,7 @@ def run_bash_file(
         file_contents = fh.read()
     logger.info(f"Script file contents:\n\n{file_contents}")
     rsp = execute_command(
-        cmd=cmd_overide,
+        cmd=cmd_override,
         files={f"{bash_file}": file_contents},
         service=target_service,
         request_secrets=request_secrets,

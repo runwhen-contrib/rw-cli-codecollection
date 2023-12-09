@@ -21,7 +21,7 @@ Ping `${DEPLOYMENT_NAME}` Redis Workload
     [Tags]    redis    cli    ping    pong    alive    probe    ready
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- redis-cli PING
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.CLI.Parse Cli Output By Line
@@ -42,17 +42,17 @@ Verify `${DEPLOYMENT_NAME}` Redis Read Write Operation
     [Tags]    redis    cli    increment    health    check    read    write
     ${set_op}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- redis-cli SET ${REDIS_HEALTHCHECK_KEY} 0
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${incr_op}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- redis-cli INCR ${REDIS_HEALTHCHECK_KEY}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${get_op}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- redis-cli GET ${REDIS_HEALTHCHECK_KEY}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.CLI.Parse Cli Output By Line

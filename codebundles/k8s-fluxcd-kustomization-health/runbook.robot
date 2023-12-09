@@ -18,7 +18,7 @@ List all available Kustomization objects in Namespace `${NAMESPACE}`
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Kustomizations available: \n ${kustomizations.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
@@ -30,7 +30,7 @@ Get details for unready Kustomizations in Namespace `${NAMESPACE}`
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select (.status.conditions[] | select(.type == "Ready" and .status == "False")) | "---\\nKustomization Name: \\(.metadata.name)\\n\\nReady Status: \\(.status.conditions[] | select(.type == "Ready") | "\\n ready: \\(.status)\\n message: \\(.message)\\n reason: \\(.reason)\\n last_transition_time: \\(.lastTransitionTime)")\\n\\nReconcile Status:\\(.status.conditions[] | select(.type == "Reconciling") |"\\n reconciling: \\(.status)\\n message: \\(.message)")\\n---\\n"'
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${kustomizations_not_ready}
     ...    set_severity_level=2
