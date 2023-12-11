@@ -12,7 +12,7 @@ spec:
     slxs:
       - baseName: postgres-health
         qualifiers: ["namespace", "cluster"]
-        baseTemplateName: k8s-postgres-triage-health
+        baseTemplateName: k8s-postgres-triage
         levelOfDetail: detailed
         outputItems:
           - type: slx
