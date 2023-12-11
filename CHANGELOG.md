@@ -1,3 +1,6 @@
+## 0.0.10 2023-12-11
+- Add issues to statefulset and new postgres keywords (#272) be8f65f
+
 ## 0.0.8 2023-11-19
 - Add Application Troubleshooting V2 (#242) 5100487
 - Add K8s Prometheus Triage and Loki Triage (#224) 46e6dba
