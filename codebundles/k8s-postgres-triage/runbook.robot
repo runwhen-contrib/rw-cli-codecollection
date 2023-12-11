@@ -234,6 +234,7 @@ Suite Initialization
     ...    type=string
     ...    description=A csv of CRD names to use for triaging and collecting information.
     ...    pattern=\w*
+    ...    default=
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
@@ -255,6 +256,3 @@ Suite Initialization
         ${HOSTNAME}=    Set Variable    -h ${HOSTNAME}
     END
     Set Suite Variable    ${HOSTNAME}    ${HOSTNAME}
-    # Set Suite Variable
-    # ...    ${PSQL_RUN_PASSTHROUGH}
-    # ...    PGPASSWORD\="$${psql_password.key}" psql -qAt -U $${psql_username.key} -d $${psql_database.key} ${HOSTNAME} -e -f '/tmp/rw-tmp-queries.sql'
