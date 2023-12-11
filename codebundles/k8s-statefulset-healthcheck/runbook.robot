@@ -95,6 +95,7 @@ Troubleshoot StatefulSet Warning Events for `${STATEFULSET_NAME}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${object_list}=    Evaluate    json.loads(r'''${events.stdout}''')    json
     IF    len(@{object_list}) > 0
         FOR    ${item}    IN    @{object_list}
@@ -127,6 +128,7 @@ Check StatefulSet Event Anomalies for `${STATEFULSET_NAME}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${anomaly_list}=    Evaluate    json.loads(r'''${recent_anomalies.stdout}''')    json
     IF    len($anomaly_list) > 0
         FOR    ${item}    IN    @{anomaly_list}
@@ -164,6 +166,7 @@ Fetch StatefulSet Logs for `${STATEFULSET_NAME}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${logs.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -176,6 +179,7 @@ Get Related StatefulSet `${STATEFULSET_NAME}` Events
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${events.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -188,6 +192,7 @@ Fetch Manifest Details for StatefulSet `${STATEFULSET_NAME}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${statefulset.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -212,6 +217,7 @@ List StatefulSets with Unhealthy Replica Counts In Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${statefulset}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${LABELS} --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r 'if (.items | length) > 0 then .items[0] else {} end'
     ...    env=${env}

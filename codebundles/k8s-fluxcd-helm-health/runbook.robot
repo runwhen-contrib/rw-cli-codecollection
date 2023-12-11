@@ -19,6 +19,7 @@ List all available FluxCD Helmreleases in Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Helmreleases available: \n ${helmreleases.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
@@ -31,6 +32,7 @@ Fetch Installed FluxCD Helmrelease Versions in Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Helmreleases status errors: \n ${helmrelease_versions.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
@@ -43,6 +45,7 @@ Fetch Mismatched FluxCD HelmRelease Version in Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${regexp}=    Catenate
     ...    (?m)(?P<line>.+)
     RW.CLI.Parse Cli Output By Line
@@ -67,6 +70,7 @@ Fetch FluxCD HelmRelease Error Messages in Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
    ${regexp}=    Catenate
     ...    (?m)(?P<line>.+)
     RW.CLI.Parse Cli Output By Line
@@ -91,6 +95,7 @@ Check for Available Helm Chart Updates in Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    HelmChart Version Update Details: \n ${helmchart_updates_available.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}

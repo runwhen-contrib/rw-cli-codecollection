@@ -26,6 +26,7 @@ Fetch Events for Unhealthy Kubernetes PersistentVolumeClaims in Namespace `${NAM
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${unbound_pvc_event_list}=    Split String  ${unbound_pvc_events.stdout}    \n
     @{next_steps}=     Create List
     IF    len($unbound_pvc_event_list) > 0
@@ -80,6 +81,7 @@ List PersistentVolumeClaims in Terminating State in Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${terminating_pvcs}
     ...    set_severity_level=4
@@ -104,6 +106,7 @@ List PersistentVolumes in Terminating State in Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${dangling_pvs}
     ...    set_severity_level=4
@@ -126,6 +129,7 @@ List Pods with Attached Volumes and Related PersistentVolume Details in Namespac
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of configured persistent volumes in ${NAMESPACE}:
     RW.Core.Add Pre To Report    ${pod_storage_report.stdout}
@@ -139,6 +143,7 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${unhealthy_volume_capacity}=    RW.CLI.Run Cli
     ...    cmd=echo "${pod_pvc_utilization.stdout}" | awk '/------------/ { if (flag) { print record "\\n" $0; } record = ""; flag = 0; next; } $5 ~ /[9][5-9]%/ || $5 == "100%" { flag = 1; } { if (record == "") { record = $0; } else { record = record "\\n" $0; } } END { if (flag) { print record; } }'
     ...    env=${env}
@@ -186,6 +191,7 @@ Check for RWO Persistent Volume Node Attachment Issues in Namespace `${NAMESPACE
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${pod_rwo_node_and_pod_attachment}
     ...    set_severity_level=2

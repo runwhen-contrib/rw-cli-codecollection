@@ -22,6 +22,7 @@ Get Standard Postgres Resource Information
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${results.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
@@ -36,6 +37,7 @@ Describe Postgres Custom Resources
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${crd_list}=    Split String    ${crd_list.stdout}
     ${crd_names_to_keep}=    Split String    ${CRD_FILTER}    seperator=,
     ${crd_list}=    Evaluate    [crd_name for crd_name in ${crd_list} if crd_name in ${crd_names_to_keep}]
@@ -69,6 +71,7 @@ Get Postgres Pod Logs & Events
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${labeled_pod_names}=    Split String    ${labeled_pods.stdout}
     ${found_pod_logs}=    Set Variable    No logs found!
     ${found_pod_events}=    Set Variable    No events found!
@@ -107,6 +110,7 @@ Get Postgres Pod Resource Utilization
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${labeled_pods}=    Split String    ${labeled_pods.stdout}
     ${labeled_pods}=    Evaluate    [full_name.split("/")[-1] for full_name in ${labeled_pods}]
     ${resource_util_info}=    Set Variable    No resource utilization information could be found!
@@ -158,6 +162,7 @@ Get Patroni Output
     ...    optional_context=${CONTEXT}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${rsp.stdout}
 

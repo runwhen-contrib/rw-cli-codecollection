@@ -22,6 +22,7 @@ Fetch Nginx HTTP Errors From GMP for Ingress `${INGRESS_OBJECT_NAME}`
     ${gmp_rsp}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && curl -d "query=rate(nginx_ingress_controller_requests{host='${INGRESS_HOST}', service='${INGRESS_SERVICE}', status=~'${ERROR_CODES}'}[${TIME_SLICE}]) > 0" -H "Authorization: Bearer $(gcloud auth print-access-token)" 'https://monitoring.googleapis.com/v1/projects/${GCP_PROJECT_ID}/location/global/prometheus/api/v1/query' | jq -r 'if .data.result[0] then "Host:" + .data.result[0].metric.host + " Ingress:" + .data.result[0].metric.ingress + " Namespace:" + .data.result[0].metric.exported_namespace + " Service:" + .data.result[0].metric.service else "" end'
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ${gmp_json}=    RW.CLI.Run Cli
@@ -69,6 +70,7 @@ Find Owner and Service Health for Ingress `${INGRESS_OBJECT_NAME}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
     RW.Core.Add Pre To Report    Ingress Info:\n${k8s_ingress_details.stdout}

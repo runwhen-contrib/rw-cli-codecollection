@@ -24,6 +24,7 @@ Fetch Ingress Object Health in Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${unhealthy_objects}=    RW.CLI.Run Cli
     ...    cmd=echo '${ingress_object_summary.stdout}' | awk '/^Ingress:/ {rec=$0; next} {rec=rec ORS $0} /^Health Status: Unhealthy$/ {print rec ORS "------------"}'
     ...    env=${env}
@@ -73,6 +74,7 @@ Check for Ingress and Service Conflicts in Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${matches}=    Get Lines Matching Regexp    ${ingress_object_conflict.stdout}    ^WARNING: Ingress [\\w-]+.*
     IF    len($matches) > 0
         @{lines}=    Create List    ${matches}

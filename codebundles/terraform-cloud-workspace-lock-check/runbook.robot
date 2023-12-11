@@ -21,6 +21,7 @@ Checking whether the Terraform Cloud Workspace is in a locked state
     ...    cmd=TERRAFORM_API_TOKEN_VALUE=$(cat $TERRAFORM_API_TOKEN) && curl --header "Authorization: Bearer $TERRAFORM_API_TOKEN_VALUE" --header "Content-Type: application/vnd.api+json" -s '${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}'
     ...    target_service=${CURL_SERVICE}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__TERRAFORM_API_TOKEN=${TERRAFORM_API_TOKEN}
     ${locked}=    RW.CLI.Parse Cli Json Output

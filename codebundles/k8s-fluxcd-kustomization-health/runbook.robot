@@ -19,6 +19,7 @@ List all available Kustomization objects in Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Kustomizations available: \n ${kustomizations.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
@@ -31,6 +32,7 @@ Get details for unready Kustomizations in Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${kustomizations_not_ready}
     ...    set_severity_level=2

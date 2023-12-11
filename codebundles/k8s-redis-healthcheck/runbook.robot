@@ -22,6 +22,7 @@ Ping `${DEPLOYMENT_NAME}` Redis Workload
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- redis-cli PING
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.CLI.Parse Cli Output By Line
@@ -43,16 +44,19 @@ Verify `${DEPLOYMENT_NAME}` Redis Read Write Operation
     ${set_op}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- redis-cli SET ${REDIS_HEALTHCHECK_KEY} 0
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${incr_op}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- redis-cli INCR ${REDIS_HEALTHCHECK_KEY}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${get_op}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- redis-cli GET ${REDIS_HEALTHCHECK_KEY}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.CLI.Parse Cli Output By Line
