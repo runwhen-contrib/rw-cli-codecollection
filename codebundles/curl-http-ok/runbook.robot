@@ -19,6 +19,7 @@ Checking HTTP URL Is Available And Timely
     ${curl_rsp}=    RW.CLI.Run Cli
     ...    cmd=curl -o /dev/null -w '{"http_code": \%{http_code}, "time_total": \%{time_total}}' -s ${URL}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${owner_kind}=    RW.CLI.Run Cli
                 ...    cmd=echo '${OWNER_DETAILS}' | jq -r .kind | sed 's/ *$//' | tr -d '\n'
                 ...    include_in_history=False

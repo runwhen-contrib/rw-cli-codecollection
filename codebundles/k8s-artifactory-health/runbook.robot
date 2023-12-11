@@ -81,6 +81,7 @@ Check Artifactory Liveness and Readiness Endpoints
     ...    run_in_workload_with_name=
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${liveness}
     ...    set_severity_level=2
@@ -92,6 +93,7 @@ Check Artifactory Liveness and Readiness Endpoints
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${readiness}
     ...    set_severity_level=2

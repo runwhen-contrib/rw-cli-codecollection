@@ -35,6 +35,7 @@ Show Pods Without Resource Limit or Resource Requests Set in Namespace `${NAMESP
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${no_limits_count}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${pods_without_limits}
     ...    extract_path_to_var__no_limits_count=length(@)
@@ -48,6 +49,7 @@ Show Pods Without Resource Limit or Resource Requests Set in Namespace `${NAMESP
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${no_requests_count}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${pods_without_requests}
     ...    extract_path_to_var__no_requests_count=length(@)
@@ -76,6 +78,7 @@ Get Pod Resource Utilization with Top in Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${resource_util_info}=    Set Variable    No resource utilization information could be found!
     IF    """${pods_top.stdout}""" != ""
         ${resource_util_info}=    Set Variable    ${pods_top.stdout}

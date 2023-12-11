@@ -28,6 +28,7 @@ Troubleshoot Warning Events in Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${object_list}=    Evaluate    json.loads(r'''${warning_events_by_object.stdout}''')    json
     IF    len(@{object_list}) > 0
         FOR    ${item}    IN    @{object_list}
@@ -88,6 +89,7 @@ Troubleshoot Container Restarts In Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${container_restart_analysis}=    RW.CLI.Run Bash File
     ...    bash_file=container_restarts.sh
     ...    env=${env}
@@ -124,6 +126,7 @@ Troubleshoot Pending Pods In Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${pendind_pod_list}=    Split String    ${pending_pods.stdout}    _______-
     IF    len($pendind_pod_list) > 0
         FOR    ${item}    IN    @{pendind_pod_list}
@@ -192,6 +195,7 @@ Troubleshoot Failed Pods In Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${unready_pods_list}=    Split String    ${unreadypods_details.stdout}    _______-
     IF    len($unready_pods_list) > 0
         FOR    ${item}    IN    @{unready_pods_list}
@@ -266,6 +270,7 @@ Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${object_list}=    Evaluate    json.loads(r'''${workload_info.stdout}''')    json
     IF    len(@{object_list}) > 0
         FOR    ${item}    IN    @{object_list}
@@ -333,6 +338,7 @@ Get Listing Of Resources In Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ...    timeout_seconds=180
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Informational Get All for Namespace: ${NAMESPACE}
@@ -348,6 +354,7 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${object_list}=    Evaluate    json.loads(r'''${recent_events_by_object.stdout}''')    json
     IF    len(@{object_list}) > 0
         FOR    ${item}    IN    @{object_list}
@@ -421,6 +428,7 @@ Troubleshoot Services And Application Workloads in Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${services_with_errors}=    RW.CLI.Run Cli
     ...    cmd=jq -r '[ .[].service ] | unique[]' $HOME/output
     ...    env=${env}
@@ -477,6 +485,7 @@ Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${risky_pdbs}=    RW.CLI.Run Cli
     ...    cmd=echo "${pdb_check.stdout}" | grep 'Risky' | cut -f 1 -d ' ' | sed 's/^ *//; s/ *$//' | awk -F'/' '{ gsub(/^ *| *$/, "", $1); gsub(/^ *| *$/, "", $2); print $1 "/" $2 }' | sed 's/ *$//' | tr -d '\n'
     ...    include_in_history=False

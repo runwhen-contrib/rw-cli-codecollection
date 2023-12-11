@@ -22,6 +22,7 @@ Search For GCE Ingress Warnings in GKE
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
 
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${event_warnings}
@@ -44,6 +45,7 @@ Identify Unhealthy GCE HTTP Ingress Backends
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
 
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${unhealthy_backends}
@@ -97,6 +99,7 @@ Fetch Network Error Logs from GCP Operations Manager for Ingress Backends
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
    
    RW.CLI.Parse Cli Output By Line
    ...    rsp=${network_error_logs}
@@ -121,11 +124,13 @@ Review GCP Operations Logging Dashboard
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    env=${env}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
    ${backend_log_url}=   RW.CLI.Run Cli
     ...    cmd=INGRESS=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT=${CONTEXT}; QUERY="resource.type=\\"gce_network\\"" && for backend in $(${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS -n $NAMESPACE --context $CONTEXT -o=json | jq -r '.metadata.annotations["ingress.kubernetes.io/backends"] | fromjson | to_entries[] | select(.value != "HEALTHY") | .key'); do QUERY="$QUERY AND protoPayload.resourceName=~\\"$backend\\""; done && ENCODED_QUERY=$(echo $QUERY | jq -sRr @uri) && DASHBOARD_URL="https://console.cloud.google.com/logs/query;query=$ENCODED_QUERY?project=$GCP_PROJECT_ID" && echo $DASHBOARD_URL
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    env=${env}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
    ${history}=    RW.CLI.Pop Shell History
    RW.Core.Add Pre To Report    GCP Ops Logs for HTTP Load Balancer ${INGRESS}:\n\n${loadbalancer_log_url.stdout}
    RW.Core.Add Pre To Report    GCP Ops Logs for ${INGRESS} backends:\n\n${backend_log_url.stdout}

@@ -76,6 +76,7 @@ Fetch ArgoCD Application Sync Status & Health
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of application sync status in namespace: ${APPLICATION_APP_NAMESPACE}
     RW.Core.Add Pre To Report    ${app_sync_status.stdout}
@@ -89,6 +90,7 @@ Fetch ArgoCD Application Last Sync Operation Details
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of application sync status in namespace: ${APPLICATION_APP_NAMESPACE}
     RW.Core.Add Pre To Report    ${last_sync_status.stdout}
@@ -103,6 +105,7 @@ Fetch Unhealthy ArgoCD Application Resources
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${resource_issues}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${unhealthy_resources}
     ...    extract_path_to_var__unhealthy_resource_count=length(@)
@@ -125,6 +128,7 @@ Scan For Errors in Pod Logs Related to ArgoCD Application Deployments
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Errors found in pods logs for: ${APPLICATION}
     RW.Core.Add Pre To Report    ${log_errors.stdout}
@@ -138,6 +142,7 @@ Fully Describe ArgoCD Application
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Full description of ArgoCD application: ${APPLICATION}
     RW.Core.Add Pre To Report    ${application_describe.stdout}

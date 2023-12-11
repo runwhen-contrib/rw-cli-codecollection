@@ -78,7 +78,6 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     ...    env=${env}
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    display_in_runwhen_local_cheatsheet=true
     ...    show_in_rwl_cheatsheet=true
    ${recommendations}=    RW.CLI.Run Cli
     ...    cmd=echo '${liveness_probe_health.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
@@ -141,6 +140,7 @@ Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${object_list}=    Evaluate    json.loads(r'''${events.stdout}''')    json
     IF    len(@{object_list}) > 0
         FOR    ${item}    IN    @{object_list}
@@ -174,6 +174,7 @@ Get Deployment Workload Details For `${DEPLOYMENT_NAME}` and Add to Report
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Snapshot of deployment state:\n\n${deployment.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -199,6 +200,7 @@ Troubleshoot Deployment Replicas for `${DEPLOYMENT_NAME}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    env=${env}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${deployment_status}=    Evaluate    json.loads(r'''${deployment_replicas.stdout}''')    json
     IF    $deployment_status["available_condition"]["status"] == "False" and $deployment_status["progressing_condition"]["status"] == "False"
         ${item_next_steps}=    RW.CLI.Run Bash File
@@ -257,6 +259,7 @@ Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${anomaly_list}=    Evaluate    json.loads(r'''${recent_anomalies.stdout}''')    json
     IF    len($anomaly_list) > 0
         FOR    ${item}    IN    @{anomaly_list}

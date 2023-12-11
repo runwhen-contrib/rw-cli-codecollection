@@ -22,6 +22,7 @@ Get Current Resource State
     ${resource}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get daemonset,deployment,statefulset -l ${LABELS} -oyaml
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    Current Resource State:\n\n${resource.stdout}
@@ -34,6 +35,7 @@ Get Resource Logs
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs daemonset,deployment,statefulset -l ${LABELS} --tail=200 --limit-bytes=256000
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    Resource Logs:\n\n${logs.stdout}
@@ -46,11 +48,13 @@ Restart Resource
     ${resource_name}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get daemonset,deployment,statefulset -l ${LABELS} -o=jsonpath='{.items[0].kind}/{.items[0].metadata.name}'
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} rollout restart ${resource_name.stdout} --context=${CONTEXT} -n ${NAMESPACE}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    Restarted the following workload: ${resource_name.stdout}

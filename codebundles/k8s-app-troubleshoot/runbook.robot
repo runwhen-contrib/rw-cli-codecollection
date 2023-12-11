@@ -22,6 +22,7 @@ Get `${WORKLOAD_NAME}` Application Logs
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    Workload Logs:\n\n${logs.stdout}
@@ -62,17 +63,20 @@ Troubleshoot `${WORKLOAD_NAME}` Application Logs
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${cmd}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${printenv}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} exec $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head -n 1) --container=${CONTAINER_NAME} -- printenv
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ...    include_in_history=False
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${proc_list}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} exec $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head -n 1) --container=${CONTAINER_NAME} -- ps -eo command --no-header | grep -v "ps -eo"
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ...    include_in_history=False
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}

@@ -21,6 +21,7 @@ Fetch all available ArgoCD Helm releases
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    \n\nArgoCD Helm releases available: \n${helmreleases.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
@@ -34,6 +35,7 @@ Fetch Installed ArgoCD Helm release versions
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    \n\nArgoCD Helm release Status: \n${argocd_helm_status.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
