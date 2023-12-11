@@ -27,3 +27,31 @@ commands:
     \ the output format\n  -s \\ # Operate in silent mode\n  ${URL} # The URL to which\
     \ the request is being sent"
   name: checking_http_url_is_available_and_timely
+- command: 'curl -o /dev/null -w ''{"http_code": %{http_code}, "time_total": %{time_total}}''
+    -s ${URL}'
+  doc_links: '
+
+    - [curl man page](https://linux.die.net/man/1/curl){:target="_blank"}
+
+    - [Understanding HTTP status codes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status){:target="_blank"}
+
+    - [curl command tutorial](https://www.baeldung.com/linux/curl-command-tutorial){:target="_blank"}'
+  explanation: This command uses the curl tool to send a request to a specific URL
+    and outputs the HTTP response code and the total time of the request in JSON format.
+    The output is directed to /dev/null, meaning it won't be displayed on the terminal.
+  multi_line_details: "# The curl command is widely used to transfer data to or from\
+    \ a server, and in this case, we are using it to send a request to the specified\
+    \ URL.\n\n# -o /dev/null: This option is used to redirect the output of the request\
+    \ to /dev/null, which discards the actual content that is returned from the server.\n\
+    \n# -w '{\"http_code\": %{http_code}, \"time_total\": %{time_total}}': This option\
+    \ is used to define the output format for the request. It specifies that we want\
+    \ to output the HTTP response code and the total time taken for the request in\
+    \ a JSON format.\n\n# -s: This option is used to make the curl command operate\
+    \ in silent mode, which means it will not show progress or error messages.\n\n\
+    # ${URL}: This is the variable that contains the URL to which the request is being\
+    \ sent.\n\n# Putting it all together, the multi-line command with comments would\
+    \ look like this:\n\ncurl \\\n  -o /dev/null \\ # Redirect the output to /dev/null\n\
+    \  -w '{\"http_code\": %{http_code}, \"time_total\": %{time_total}}' \\ # Define\
+    \ the output format\n  -s \\ # Operate in silent mode\n  ${URL} # The URL to which\
+    \ the request is being sent"
+  name: checking_http_url_is_available_and_timely

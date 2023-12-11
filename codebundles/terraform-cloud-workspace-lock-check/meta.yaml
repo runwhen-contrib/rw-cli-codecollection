@@ -31,3 +31,35 @@ commands:
     # Note that the variables within the URL are enclosed in curly braces and prefixed
     with a dollar sign ($) to reference their values from the environment.'
   name: checking_whether_the_terraform_cloud_workspace_is_in_a_locked_state
+- command: 'TERRAFORM_API_TOKEN_VALUE=$(cat $TERRAFORM_API_TOKEN) && curl --header
+    "Authorization: Bearer $TERRAFORM_API_TOKEN_VALUE" --header "Content-Type: application/vnd.api+json"
+    -s ''${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}'''
+  doc_links: '
+
+    '
+  explanation: This command sets a variable TERRAFORM_API_TOKEN_VALUE to the value
+    of the TERRAFORM_API_TOKEN file, then uses curl to make a request to a specified
+    API URL with the token for authorization and specific content type.
+  multi_line_details: '# The following command is used to make a call to the Terraform
+    API using an API token for authentication
+
+    # First, we are assigning the value of the Terraform API token file to a variable
+    called TERRAFORM_API_TOKEN_VALUE
+
+    TERRAFORM_API_TOKEN_VALUE=$(cat $TERRAFORM_API_TOKEN)
+
+
+    # Next, we use the curl command to make a request to the Terraform API
+
+    # We include the API token in the Authorization header and specify the Content-Type
+    as application/vnd.api+json
+
+    # We also include the variables for the organization name and workspace name in
+    the URL
+
+    curl --header "Authorization: Bearer $TERRAFORM_API_TOKEN_VALUE" --header "Content-Type:
+    application/vnd.api+json" -s ''${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}''
+
+    # Note that the variables within the URL are enclosed in curly braces and prefixed
+    with a dollar sign ($) to reference their values from the environment.'
+  name: checking_whether_the_terraform_cloud_workspace_is_in_a_locked_state
