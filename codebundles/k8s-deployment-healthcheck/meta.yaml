@@ -251,6 +251,79 @@ commands:
     \ | sort | .[0] | todateiso8601, \n      lastTimestamp: map(.lastTimestamp | fromdateiso8601)\
     \ | sort | reverse | .[0] | todateiso8601\n    })' \n"
   name: troubleshoot_deployment_warning_events_for_deployment_name
+- command: 'kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq ''(now
+    - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind
+    == "Deployment" or .involvedObject.kind == "ReplicaSet" or .involvedObject.kind
+    == "Pod") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}"))
+    and (.lastTimestamp | fromdateiso8601) >= $time_limit) | {kind: .involvedObject.kind,
+    name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp:
+    .firstTimestamp, lastTimestamp: .lastTimestamp} ] | group_by([.kind, .name]) |
+    map({kind: .[0].kind, name: .[0].name, count: length, reasons: map(.reason) |
+    unique, messages: map(.message) | unique, firstTimestamp: map(.firstTimestamp
+    | fromdateiso8601) | sort | .[0] | todateiso8601, lastTimestamp: map(.lastTimestamp
+    | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'''
+  doc_links: '
+
+    - [kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+
+    - [kubectl get events](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events){:target="_blank"}
+
+    - [kubectl context](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}
+
+    - [kubectl namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+
+    - [jq Manual (Official GitHub Repository)](https://stedolan.github.io/jq/manual/){:target="_blank"}
+
+    - [Filtering and mapping using jq](https://learnxinyminutes.com/docs/jq/){:target="_blank"}'
+  explanation: This command uses kubectl to get events from a specific context and
+    namespace, then uses jq to filter out and format the events related to a specific
+    deployment name that have occurred in the last hour.
+  multi_line_details: "\n# Set the context to the specified one\nCONTEXT=${CONTEXT}\n\
+    \n# Set the namespace to the specified one\nNAMESPACE=${NAMESPACE}\n\n# Save the\
+    \ time limit of an hour ago in seconds\n(time - (60*60)) as $time_limit\n\n# Get\
+    \ all events in json format and filter with jq\nkubectl get events --context ${CONTEXT}\
+    \ -n ${NAMESPACE} -o json | jq '\n  # Filter all warnings related to deployments,\
+    \ replica sets, or pods for a specific deployment within the last hour\n  [ .items[]\
+    \ \n    | select(\n      .type == \"Warning\" and \n      (.involvedObject.kind\
+    \ == \"Deployment\" or \n      .involvedObject.kind == \"ReplicaSet\" or \n  \
+    \    .involvedObject.kind == \"Pod\") and \n      (.involvedObject.name | tostring\
+    \ | contains(\"${DEPLOYMENT_NAME}\")) and \n      (.lastTimestamp | fromdateiso8601)\
+    \ >= $time_limit) \n    | {\n        kind: .involvedObject.kind, \n        name:\
+    \ .involvedObject.name, \n        reason: .reason, \n        message: .message,\
+    \ \n        firstTimestamp: .firstTimestamp, \n        lastTimestamp: .lastTimestamp\n\
+    \      } \n  ] \n  # Group the results by kind and name\n  | group_by([.kind,\
+    \ .name]) \n  # Map the result to get kind, name, count, reasons, messages, and\
+    \ timestamps\n  | map({\n      kind: .[0].kind, \n      name: .[0].name, \n  \
+    \    count: length, \n      reasons: map(.reason) | unique, \n      messages:\
+    \ map(.message) | unique, \n      firstTimestamp: map(.firstTimestamp | fromdateiso8601)\
+    \ | sort | .[0] | todateiso8601, \n      lastTimestamp: map(.lastTimestamp | fromdateiso8601)\
+    \ | sort | reverse | .[0] | todateiso8601\n    })' \n"
+  name: troubleshoot_deployment_warning_events_for_deployment_name
+- command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
+    -o yaml
+  doc_links: '
+
+    - [Kubernetes kubectl explain command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#explain){:target="_blank"}
+
+    - [Kubernetes Contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters){:target="_blank"}
+
+    - [Kubernetes Namespaces](https://kubernetes.io/docs/tasks/administer-cluster/namespaces/){:target="_blank"}
+
+    - [YAML Format](https://learnxinyminutes.com/docs/yaml/){:target="_blank"}'
+  explanation: This command is used to retrieve detailed information about a specific
+    deployment within a specified Kubernetes context and namespace, and the output
+    will be in YAML format.
+  multi_line_details: "\n# This command is used to get the YAML configuration for\
+    \ a specific deployment in a given namespace and context using Kubernetes\n\n\
+    # Set the environment variables for the deployment name, context, and namespace\n\
+    DEPLOYMENT_NAME=my-deployment\nCONTEXT=my-context\nNAMESPACE=my-namespace\n\n\
+    # Use kubectl to get the deployment details in YAML format\nkubectl get deployment/${DEPLOYMENT_NAME}\
+    \ \\    # Use backslash for multi-line commands\n  --context ${CONTEXT} \\   \
+    \                    # Specify the context where the deployment is located\n \
+    \ -n ${NAMESPACE} \\                            # Specify the namespace where\
+    \ the deployment is running\n  -o yaml                                      #\
+    \ Output the details in YAML format\n"
+  name: get_deployment_workload_details_for_deployment_name_and_add_to_report
 - command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o yaml
   doc_links: '
@@ -311,6 +384,85 @@ commands:
     ) then (.conditions[] | select(.type == \"Progressing\")) else \"Condition not\
     \ available\" end)\n}'\n"
   name: troubleshoot_deployment_replicas_for_deployment_name
+- command: 'kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
+    -o json | jq ''.status | {desired_replicas: .replicas, ready_replicas: (.readyReplicas
+    // 0), missing_replicas: ((.replicas // 0) - (.readyReplicas // 0)), unavailable_replicas:
+    (.unavailableReplicas // 0), available_condition: (if any(.conditions[]; .type
+    == "Available") then (.conditions[] | select(.type == "Available")) else "Condition
+    not available" end), progressing_condition: (if any(.conditions[]; .type == "Progressing")
+    then (.conditions[] | select(.type == "Progressing")) else "Condition not available"
+    end)}'''
+  doc_links: '
+
+    - [Kubernetes kubectl explain Deployment](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#explain){:target="_blank"}
+
+    - [Kubernetes kubectl scale Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#scale){:target="_blank"}
+
+    - [Kubernetes JSON Path Support](https://kubernetes.io/docs/reference/kubectl/jsonpath){:target="_blank"}
+
+    - [jq Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command retrieves information about a specific deployment in Kubernetes,
+    including the number of desired replicas, ready replicas, missing replicas, unavailable
+    replicas, and the availability and progression conditions. It uses JSON output
+    and the jq tool to format the data.
+  multi_line_details: "\n# Set the variables for the deployment name, context, and\
+    \ namespace\nDEPLOYMENT_NAME=my-deployment\nCONTEXT=development\nNAMESPACE=default\n\
+    \n# Use kubectl to get information about the specified deployment \n# in the specified\
+    \ context and namespace, and output the results as JSON\nkubectl get deployment/${DEPLOYMENT_NAME}\
+    \ --context ${CONTEXT} -n ${NAMESPACE} -o json | \n\n# Use jq to parse the JSON\
+    \ output and extract specific status information\njq '.status | {\n  desired_replicas:\
+    \ .replicas, \n  ready_replicas: (.readyReplicas // 0), \n  missing_replicas:\
+    \ ((.replicas // 0) - (.readyReplicas // 0)), \n  unavailable_replicas: (.unavailableReplicas\
+    \ // 0), \n  available_condition: (if any(.conditions[]; .type == \"Available\"\
+    ) then (.conditions[] | select(.type == \"Available\")) else \"Condition not available\"\
+    \ end), \n  progressing_condition: (if any(.conditions[]; .type == \"Progressing\"\
+    ) then (.conditions[] | select(.type == \"Progressing\")) else \"Condition not\
+    \ available\" end)\n}'\n"
+  name: troubleshoot_deployment_replicas_for_deployment_name
+- command: 'kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq ''(now
+    - (60*60)) as $time_limit | [ .items[] | select(.type != "Warning" and (.involvedObject.kind
+    == "Deployment" or .involvedObject.kind == "ReplicaSet" or .involvedObject.kind
+    == "Pod") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}")))
+    | {kind: .involvedObject.kind, count: .count, name: .involvedObject.name, reason:
+    .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp,
+    duration: (if (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp | fromdateiso8601))
+    == 0) then 1 else (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp | fromdateiso8601))/60)
+    end) } ] | group_by([.kind, .name]) | map({kind: .[0].kind, name: .[0].name, count:
+    (map(.count) | add), reasons: map(.reason) | unique, messages: map(.message) |
+    unique, average_events_per_minute: (if .[0].duration == 1 then 1 else ((map(.count)
+    | add)/.[0].duration ) end),firstTimestamp: map(.firstTimestamp | fromdateiso8601)
+    | sort | .[0] | todateiso8601, lastTimestamp: map(.lastTimestamp | fromdateiso8601)
+    | sort | reverse | .[0] | todateiso8601})'''
+  doc_links: '
+
+    - [Kubernetes Events documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+
+    - [Kubernetes Statistics calculation documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#top_deployment_object){:target="_blank"}'
+  explanation: This command retrieves events from a Kubernetes cluster, filters them
+    based on certain criteria, and then organizes and calculates statistics about
+    the events for specific deployment objects.
+  multi_line_details: "\n# Save the result of kubectl get events command in a variable\
+    \ using the given context and namespace\nevents_data=$(kubectl get events --context\
+    \ ${CONTEXT} -n ${NAMESPACE} -o json)\n\n# Use jq to filter and transform the\
+    \ events data based on specific criteria\nfiltered_events=$(echo $events_data\
+    \ | jq '(now - (60*60)) as $time_limit | [ .items[] \n    | select(.type != \"\
+    Warning\" \n    and (.involvedObject.kind == \"Deployment\" or .involvedObject.kind\
+    \ == \"ReplicaSet\" or .involvedObject.kind == \"Pod\") \n    and (.involvedObject.name\
+    \ | tostring | contains(\"${DEPLOYMENT_NAME}\"))) \n    | {kind: .involvedObject.kind,\
+    \ count: .count, name: .involvedObject.name, reason: .reason, message: .message,\
+    \ firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, duration: (if\
+    \ (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp | fromdateiso8601))\
+    \ == 0) then 1 else (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp |\
+    \ fromdateiso8601))/60) end) } ]')\n\n# Group the filtered events by kind and\
+    \ name, then calculate additional metrics for each group\ngrouped_data=$(echo\
+    \ $filtered_events | jq 'group_by([.kind, .name]) \n    | map({kind: .[0].kind,\
+    \ name: .[0].name, count: (map(.count) | add), reasons: map(.reason) | unique,\
+    \ messages: map(.message) | unique, average_events_per_minute: (if .[0].duration\
+    \ == 1 then 1 else ((map(.count) | add)/.[0].duration ) end),firstTimestamp: map(.firstTimestamp\
+    \ | fromdateiso8601) | sort | .[0] | todateiso8601, lastTimestamp: map(.lastTimestamp\
+    \ | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})')\n\n# The resulting\
+    \ grouped_data can be used for further analysis or reporting\necho $grouped_data\n"
+  name: check_deployment_event_anomalies_for_deployment_name
 - command: 'kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq ''(now
     - (60*60)) as $time_limit | [ .items[] | select(.type != "Warning" and (.involvedObject.kind
     == "Deployment" or .involvedObject.kind == "ReplicaSet" or .involvedObject.kind
