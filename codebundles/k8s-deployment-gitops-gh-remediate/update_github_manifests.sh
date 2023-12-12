@@ -27,12 +27,6 @@ find_gitops_info() {
         echo "No label containing '$flux_label' found in $objectType $objectName"
     fi
 
-    # flux_label_match=$(echo "$object_json" | jq -r ".metadata.labels" | grep )
-    # if [[ -n $flux_label_match ]]; then
-    #     fetch_flux_owner_details(object=$object_json)
-    # else
-    #     echo "Label $flux_label does not exist in the $objectType $objectName"
-    # fi
 }
 
 fetch_flux_owner_details() {
