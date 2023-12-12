@@ -72,8 +72,8 @@ Suite Initialization
     ...    description=The kubernetes kubeconfig yaml containing connection configuration used to connect to cluster(s).
     ...    pattern=\w*
     ...    example=For examples, start here https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
-    ${github_pat}=    RW.Core.Import Secret
-    ...    github_pat
+    ${github_token}=    RW.Core.Import Secret
+    ...    github_token
     ...    type=string
     ...    description=The GitHub Personal Access token used to create commits and open PRs against the GitOps repo.
     ...    pattern=\w*
@@ -106,4 +106,4 @@ Suite Initialization
     Set Suite Variable    ${HOME}    ${HOME}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "HOME":"${HOME}", "GITHUB_PAT":"${GITHUB_PAT}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "HOME":"${HOME}", "GITHUB_TOKEN":"${github_token.value}"}

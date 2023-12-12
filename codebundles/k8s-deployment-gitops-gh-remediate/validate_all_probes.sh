@@ -82,7 +82,7 @@ for ((o=0; o<NUM_OBJECTS; o++)); do
                 if [[ ! " $CONTAINER_PORTS " == *"$PROBE_PORT"* ]]; then
                     echo "Container \`$CONTAINER_NAME\`: Port $PROBE_PORT used in $PROBE_TYPE is not exposed by the container."
                     next_steps+=("Update $PROBE_TYPE For ${OBJECT_TYPE}\`${OBJECT_NAME}\` to use one of the following ports: $CONTAINER_PORTS")
-                    remediation_steps+=("{\"object\": \"$OBJECT_TYPE}\\$OBJECT_NAME\", \"probeType\": \"$PROBE_TYPE\", \"exec\":\"false\", \"invalidPort\":\"$PROBE_PORT\",\"validPorts\":\"$CONTAINER_PORTS\"}")
+                    remediation_steps+=("{\"object\": \"$OBJECT_TYPE}\\$OBJECT_NAME\", \"probe_type\": \"$PROBE_TYPE\", \"exec\":\"false\", \"invalidPort\":\"$PROBE_PORT\",\"validPorts\":\"$CONTAINER_PORTS\"}")
                 else
                     echo "Container \`$CONTAINER_NAME\`: ${PROBE_TYPE} port $PROBE_PORT is valid."
                 fi
@@ -99,7 +99,7 @@ for ((o=0; o<NUM_OBJECTS; o++)); do
                     if [[ ! " $CONTAINER_PORTS " == *"$PORT_IN_COMMAND"* ]]; then
                         echo "Container \`$CONTAINER_NAME\`: Port $PORT_IN_COMMAND used in ${PROBE_TYPE} exec command is not exposed by the container. The following ports are exposed: $CONTAINER_PORTS"
                         next_steps+=("Get $OBJECT_TYPE Details For $OBJECT_TYPE \`${OBJECT_NAME}\`")
-                        remediation_steps+=("{\"objectType\":\"$OBJECT_TYPE\",\"objectName\":\"$OBJECT_NAME\",\"probeType\": \"$PROBE_TYPE\", \"exec\":\"true\", \"invalidPorts\":\"$PORT_IN_COMMAND\",\"validPorts\":\"$CONTAINER_PORTS\"}")
+                        remediation_steps+=("{\"object_type\":\"$OBJECT_TYPE\",\"object_name\":\"$OBJECT_NAME\",\"probe_type\": \"$PROBE_TYPE\", \"exec\":\"true\", \"invalid_ports\":\"$PORT_IN_COMMAND\",\"validPorts\":\"$CONTAINER_PORTS\"}")
                     else
                         echo "Container \`$CONTAINER_NAME\`: Port $PORT_IN_COMMAND in ${PROBE_TYPE} exec command appears valid."
                     fi
@@ -135,7 +135,7 @@ for ((o=0; o<NUM_OBJECTS; o++)); do
                             echo "Exit Code: $EXEC_EXIT_CODE"
                             if [ $EXEC_EXIT_CODE == 0 ]; then
                                 next_steps+=("Update $PROBE_TYPE For $OBJECT_TYPE \`${OBJECT_NAME}\` to use port $PORT")
-                                remediation_steps+=("{\"objectType\":\"$OBJECT_TYPE\",\"objectName\":\"$OBJECT_NAME\",\"probeType\": \"$PROBE_TYPE\", \"exec\":\"true\", \"invalidCommand\":\"${EXEC_COMMAND_ARRAY[*]}\",\"validCommand\":\"${MODIFIED_EXEC_COMMAND_ARRAY[*]}\"}")
+                                remediation_steps+=("{\"object_type\":\"$OBJECT_TYPE\",\"object_name\":\"$OBJECT_NAME\",\"probe_type\": \"$PROBE_TYPE\", \"exec\":\"true\", \"invalid_command\":\"${EXEC_COMMAND_ARRAY[*]}\",\"valid_command\":\"${MODIFIED_EXEC_COMMAND_ARRAY[*]}\"}")
                             fi
                             echo "+++ END Exec Test+++"
                             echo ""
