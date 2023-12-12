@@ -67,10 +67,14 @@ update_github_manifests () {
     git branch
     # Search for YAML files and process them
     find $git_path -type f -name '*.yaml' -o -name '*.yml' | while read yaml_file; do
-        echo "Processing $yaml_file..."
-        yq eval --inplace "
-            select(.kind == \"Deployment\" and .metadata.name == \"$object_name\")
-            | (.. | select(tag == \"!!str\")).style=\"\" | sub(\"$old_string\"; \"$new_string\")
+        echo "object name: $object_name"
+        echo "old string: $old_string"
+        echo "new string: $new_string"
+        yq eval --inplace --no-format"
+        (select(.kind == \"Deployment\" and .metadata.name == \"$object_name\").spec.template.spec.containers[] | select(.name == \"server\").livenessProbe.exec.command[] | select(. == \"$old_string\")) |= \"$new_string\"
+        " "$yaml_file"
+        yq eval --inplace --no-format"
+        (select(.kind == \"Deployment\" and .metadata.name == \"$object_name\").spec.template.spec.containers[] | select(.name == \"server\").readinessProbe.exec.command[] | select(. == \"$old_string\")) |= \"$new_string\"
         " "$yaml_file"
     done
 
@@ -91,10 +95,10 @@ update_github_manifests () {
             --arg head "runwhen/manifest-update-$DATETIME" \
             --arg base "main" \
             '{title: $title, body: $body, head: $head, base: $base}')
-        curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/$git_owner/$git_repo/pulls" \
-            -d "$PR_DATA"
+        # curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
+        #     -H "Accept: application/vnd.github.v3+json" \
+        #     "https://api.github.com/repos/$git_owner/$git_repo/pulls" \
+        #     -d "$PR_DATA"
     fi 
 }
 
@@ -114,6 +118,7 @@ jq -c '.[]' <<< "$json_input" | while read -r json_object; do
     probe_type=$(jq -r '.probe_type' <<< "$json_object")
     exec=$(jq -r '.exec' <<< "$json_object")
     invalid_command=$(jq -r '.invalid_command // empty' <<< "$json_object")
+    valid_command=$(jq -r '.valid_command // empty' <<< "$json_object")
     invalid_ports=$(jq -r '.invalid_ports // empty' <<< "$json_object")
 
     # Logic to prefer invalid_command over invalid_oorts
