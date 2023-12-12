@@ -36,6 +36,16 @@ Check Readiness and Liveness Probe Configuration for Deployments in Namespace `$
     ...    env=${env}
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
+    ${remediation_list}=    RW.CLI.Run Cli
+    ...    cmd=echo '''${probe_health.stdout}''' | awk "/Remediation Steps:/ {start=1; getline} start"
+    ...    env=${env}
+    ...    include_in_history=false
+    ${gh_updates}=    RW.CLI.Run Bash File
+    ...    bash_file=update_github_manifests.sh
+    ...    cmd_override=./update_github_manifests.sh '${remediation_list.stdout}'
+    ...    env=${env}
+    ...    include_in_history=False
+    ...    secret_file__kubeconfig=${kubeconfig}
 #    ${recommendations}=    RW.CLI.Run Cli
 #     ...    cmd=echo '${readiness_probe_health.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
 #     ...    env=${env}

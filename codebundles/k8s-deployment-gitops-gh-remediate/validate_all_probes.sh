@@ -1,4 +1,12 @@
 #!/bin/bash
+# -----------------------------------------------------------------------------
+# Script Information and Metadata
+# -----------------------------------------------------------------------------
+# Author: @stewartshea
+# Description: This script takes in a namespace and object type, and tries to determine  
+# if readiness and liveness probes are accurate.
+# -----------------------------------------------------------------------------
+
 
 # Set the type of Kubernetes object (e.g., deployment) and namespace
 OBJECT_TYPE="${1:-deployment}"
