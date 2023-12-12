@@ -62,27 +62,26 @@ update_github_manifests () {
     local git_url_no_suffix="${git_url%.git}"
     local git_owner=$(echo "$git_url_no_suffix" | awk -F '[/:]' '{print $(NF-1)}')
     local git_repo=$(echo "$git_url_no_suffix" | awk -F '[/:]' '{print $NF}')
-    workdir=$(pwd)
-    git clone $git_url 2>&1
     git config --global user.email "runsessions@runwhen.com" 2>&1
     git config --global user.name "RunWhen Runsession Bot" 2>&1
     git config --global pull.rebase false 2>&1
+
+    workdir=$(pwd)
+    git clone $git_url 2>&1
+    cd $workdir/$git_repo
     git checkout -b "runwhen/manifest-update-$DATETIME"  2>&1
     git branch
-    cd "$git_repo"
-    # cd "$git_path"
     # Search for YAML files and process them
     find $git_path -type f -name '*.yaml' -o -name '*.yml' | while read yaml_file; do
         echo "Processing $yaml_file..."
         yq eval --inplace "
-            select(.kind == \"Deployment\" and .metadata.name == \"$deployment_name\")
+            select(.kind == \"Deployment\" and .metadata.name == \"$object_name\")
             | (.. | select(tag == \"!!str\")).style=\"\" | sub(\"$old_string\"; \"$new_string\")
         " "$yaml_file"
     done
+
+    # Test if any git changes are made. If not, bail out and send instruction. If so, commit and PR.  
     cd $workdir/$git_repo
-    git branch
-    pwd
-    # Test if any git changes are made. If not, bail out and send instruction. 
     if git diff-index --quiet HEAD --; then 
         echo "No git changes detected"
         exit 0
@@ -92,16 +91,16 @@ update_github_manifests () {
         git commit -m "Manifest updates" 2>&1
         git status 2>&1 
         git push --set-upstream origin "runwhen/manifest-update-$DATETIME" 2>&1
-        # PR_DATA=$(jq -n \
-        #     --arg title "[runwhen] - Manifest update" \
-        #     --arg body "check this out" \
-        #     --arg head "runwhen/manifest-update-$DATETIME" \
-        #     --arg base "main" \
-        #     '{title: $title, body: $body, head: $head, base: $base}')
-        # curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
-        #     -H "Accept: application/vnd.github.v3+json" \
-        #     "https://api.github.com/repos/$git_owner/$git_repo/pulls" \
-        #     -d "$PR_DATA"
+        PR_DATA=$(jq -n \
+            --arg title "[runwhen] - Manifest update" \
+            --arg body "check this out" \
+            --arg head "runwhen/manifest-update-$DATETIME" \
+            --arg base "main" \
+            '{title: $title, body: $body, head: $head, base: $base}')
+        curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/$git_owner/$git_repo/pulls" \
+            -d "$PR_DATA"
     fi 
 }
 
