@@ -8,12 +8,8 @@ extract_data() {
     echo "$1" | jq -r "$2" 2>/dev/null
 }
 
-# # Function to extract port from command
-# extract_port_from_command() {
-#     echo "$1" | grep -oP '(?<=:)\d+' | head -n 1
-# }
 extract_port_from_command() {
-    echo "$1" | grep -o ':.*' | sed 's/[^0-9]*//g' | head -n 1
+    echo "$1" | grep -oE ':[0-9]+' | grep -oE '[0-9]+' | head -n 1
 }
 
 # Get deployment manifest in JSON format
@@ -84,16 +80,11 @@ for ((i=0; i<NUM_CONTAINERS; i++)); do
 
         # Check exec permission and execute command
         if ${KUBERNETES_DISTRIBUTION_BINARY} auth can-i create pods/exec -n "$NAMESPACE" >/dev/null 2>&1; then
-            POD_NAME=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n "$NAMESPACE" -l "app=$DEPLOYMENT_NAME" -o jsonpath="{.items[0].metadata.name}")
-            if [ -z "$POD_NAME" ]; then
-                echo "No pods found for deployment $DEPLOYMENT_NAME."
-                continue
-            fi
 
             # Execute command
             echo "--- START Exec Test as configured----"
-            echo "Executing command in pod $POD_NAME: ${EXEC_COMMAND_ARRAY[*]}"
-            EXEC_OUTPUT=$(${KUBERNETES_DISTRIBUTION_BINARY} exec "$POD_NAME" -n "$NAMESPACE" -- ${EXEC_COMMAND_ARRAY[*]} 2>&1)
+            echo "Executing command for deployment $DEPLOYMENT_NAME: ${EXEC_COMMAND_ARRAY[*]}"
+            EXEC_OUTPUT=$(${KUBERNETES_DISTRIBUTION_BINARY} exec deployment/$DEPLOYMENT_NAME -n "$NAMESPACE" -- ${EXEC_COMMAND_ARRAY[*]} 2>&1)
             EXEC_EXIT_CODE=$?
             echo "Command Output: $EXEC_OUTPUT"
             echo "Exit Code: $EXEC_EXIT_CODE"
@@ -109,8 +100,8 @@ for ((i=0; i<NUM_CONTAINERS; i++)); do
                     done
                 # Execute modified command
                     echo "--- START Exec Test with port $PORT"
-                    echo "Executing modified command in pod $POD_NAME with port $PORT: ${MODIFIED_EXEC_COMMAND_ARRAY[*]}"
-                    EXEC_OUTPUT=$(kubectl exec "$POD_NAME" -n "$NAMESPACE" -- "${MODIFIED_EXEC_COMMAND_ARRAY[@]}" 2>&1)
+                    echo "Executing modified command in deployment/$DEPLOYMENT_NAME with port $PORT: ${MODIFIED_EXEC_COMMAND_ARRAY[*]}"
+                    EXEC_OUTPUT=$(kubectl exec deployment/$DEPLOYMENT_NAME -n "$NAMESPACE" -- "${MODIFIED_EXEC_COMMAND_ARRAY[@]}" 2>&1)
                     EXEC_EXIT_CODE=$?
                     echo "Command Output: $EXEC_OUTPUT"
                     echo "Exit Code: $EXEC_EXIT_CODE"

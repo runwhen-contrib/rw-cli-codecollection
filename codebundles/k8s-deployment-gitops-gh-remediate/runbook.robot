@@ -30,29 +30,28 @@ Check Readiness and Liveness Probe Configuration for Deployments in Namespace `$
     ...    get
     ...    deployment
     ...    ${NAMESPACE}
-    ${readiness_probe_health}=    RW.CLI.Run Bash File
-    ...    bash_file=validate_probes.sh
-    ...    cmd_override=./validate_probes.sh readinessProbe
+    ${probe_health}=    RW.CLI.Run Bash File
+    ...    bash_file=validate_all_probes.sh
+    ...    cmd_override=./validate_all_probes.sh deployment ${NAMESPACE}
     ...    env=${env}
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    show_in_rwl_cheatsheet=true
-   ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=echo '${readiness_probe_health.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
-    ...    env=${env}
-    ...    include_in_history=false
-    IF     len($recommendations.stdout) > 0 
-        RW.Core.Add Issue
-        ...    severity=2
-        ...    expected=Readiness probes should be configured and functional for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-        ...    actual=Issues found with readiness probe configuration for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-        ...    title=Readiness Probe Configuration Issues with Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-        ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=${readiness_probe_health.stdout}
-        ...    next_steps=${recommendations.stdout}
-    END
+#    ${recommendations}=    RW.CLI.Run Cli
+#     ...    cmd=echo '${readiness_probe_health.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+#     ...    env=${env}
+#     ...    include_in_history=false
+#     IF     len($recommendations.stdout) > 0 
+#         RW.Core.Add Issue
+#         ...    severity=2
+#         ...    expected=Readiness probes should be configured and functional for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+#         ...    actual=Issues found with readiness probe configuration for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+#         ...    title=Readiness Probe Configuration Issues with Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+#         ...    reproduce_hint=View Commands Used in Report Output
+#         ...    details=${readiness_probe_health.stdout}
+#         ...    next_steps=${recommendations.stdout}
+#     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${readiness_probe_health.stdout}
+    RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${probe_health.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
 *** Keywords ***
