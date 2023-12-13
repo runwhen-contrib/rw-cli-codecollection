@@ -122,9 +122,8 @@ A RunSession (started by $RW_USERNAME) with the following tasks has produced thi
 To view the RunSession, click [this link]($runsession_url)
 
 This patch was influenced from the following task output:
-\`\`\`
+
 $json_object
-\`\`\`
 
 [RunWhen Workspace]($RW_FRONTEND_URL/map/$RW_WORKSPACE)
 EOF
