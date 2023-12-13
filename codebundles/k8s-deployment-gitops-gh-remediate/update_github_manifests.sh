@@ -86,6 +86,7 @@ update_github_manifests () {
         git push --set-upstream origin "runwhen/manifest-update-$DATETIME" 2>&1
         pull_request_body_content
         pwd
+        echo "$workdir"
         PR_DATA=$(jq -n \
             --arg title "[RunWhen] - GitOps Manifest Updates from RunSession $RW_SESSION_ID" \
             --arg body "$PR_BODY" \
