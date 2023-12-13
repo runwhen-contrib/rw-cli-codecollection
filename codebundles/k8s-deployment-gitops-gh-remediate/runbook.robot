@@ -100,6 +100,8 @@ Suite Initialization
     ${RW_FRONTEND_URL}=    Get Environment Variable     RW_FRONTEND_URL    none
     ${RW_SESSION_ID}=    Get Environment Variable     RW_SESSION_ID    none
     ${RW_USERNAME}=    Get Environment Variable     RW_USERNAME    none
+    ${RW_WORKSPACE}=    Get Environment Variable     RW_WORKSPACE    none
+
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
@@ -107,4 +109,4 @@ Suite Initialization
     Set Suite Variable    ${HOME}    ${HOME}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "HOME":"${HOME}", "GITHUB_TOKEN":"${github_token.value}", "RW_TASK_TITLES":"${RW_TASK_STRING}", "RW_FRONTEND_URL":"${RW_FRONTEND_URL}", "RW_SESSION_ID":"${RW_SESSION_ID}", "RW_USERNAME": "${RW_USERNAME}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "HOME":"${HOME}", "GITHUB_TOKEN":"${github_token.value}", "RW_TASK_TITLES":"${RW_TASK_STRING}", "RW_FRONTEND_URL":"${RW_FRONTEND_URL}", "RW_SESSION_ID":"${RW_SESSION_ID}", "RW_USERNAME": "${RW_USERNAME}", "RW_WORKSPACE":"${RW_WORKSPACE}"}
