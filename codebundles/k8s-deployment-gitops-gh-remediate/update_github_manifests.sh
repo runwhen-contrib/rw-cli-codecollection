@@ -70,12 +70,7 @@ update_github_manifests () {
         echo "object name: $object_name"
         echo "old string: $old_string"
         echo "new string: $new_string"
-        yq eval --inplace --no-format"
-        (select(.kind == \"Deployment\" and .metadata.name == \"$object_name\").spec.template.spec.containers[] | select(.name == \"server\").livenessProbe.exec.command[] | select(. == \"$old_string\")) |= \"$new_string\"
-        " "$yaml_file"
-        yq eval --inplace --no-format"
-        (select(.kind == \"Deployment\" and .metadata.name == \"$object_name\").spec.template.spec.containers[] | select(.name == \"server\").readinessProbe.exec.command[] | select(. == \"$old_string\")) |= \"$new_string\"
-        " "$yaml_file"
+        $substitution_function
     done
 
     # Test if any git changes are made. If not, bail out and send instruction. If so, commit and PR.  
@@ -89,18 +84,51 @@ update_github_manifests () {
         git commit -m "Manifest updates" 2>&1
         git status 2>&1 
         git push --set-upstream origin "runwhen/manifest-update-$DATETIME" 2>&1
+        pull_request_body_content
         PR_DATA=$(jq -n \
-            --arg title "[runwhen] - Manifest update" \
-            --arg body "check this out" \
+            --arg title "[RunWhen] - GitOps Manifest Updates from RunSession $RW_SESSION_ID" \
+            --arg body "$PR_BODY" \
             --arg head "runwhen/manifest-update-$DATETIME" \
             --arg base "main" \
             '{title: $title, body: $body, head: $head, base: $base}')
-        # curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
-        #     -H "Accept: application/vnd.github.v3+json" \
-        #     "https://api.github.com/repos/$git_owner/$git_repo/pulls" \
-        #     -d "$PR_DATA"
+        curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/$git_owner/$git_repo/pulls" \
+            -d "$PR_DATA"
     fi 
 }
+
+probe_exec_substitution () {
+    # Convert the old and new strings into array elements
+    IFS=' ' read -ra old_string_array <<< "$old_string"
+    IFS=' ' read -ra new_string_array <<< "$new_string"
+
+    # Use yq to iterate over each element in the command array and replace it if it matches
+    for i in "${!old_string_array[@]}"; do
+        yq e "(select(.kind == \"Deployment\" and .metadata.name == \"$object_name\").spec.template.spec.containers[] | select(.name == \"$container\").$probe_type.exec.command[] | select(. == \"${old_string_array[$i]}\") ) |= \"${new_string_array[$i]}\"" -i "$yaml_file"
+    done
+
+}
+
+pull_request_body_content () {
+
+runsession_url=$RW_FRONTEND_URL/map/$RW_WORKSPACE#selectedRunSessions=$RW_SESSION_ID
+
+read -r -d '' PR_BODY << EOF
+A RunSession (started by $RW_USERNAME) with the following tasks has produced this Pull Request: 
+- $RW_TASK_TITLES
+
+To view the RunSession, click [this link]($runsession_url)
+
+This patch was influenced from the following task output:
+\`\`\`
+$json_object
+\`\`\`
+
+[RunWhen Workspace]($RW_FRONTEND_URL/map/$RW_WORKSPACE)
+EOF
+}
+
 
 # Main script starts here
 json_input="$1"
@@ -120,6 +148,8 @@ jq -c '.[]' <<< "$json_input" | while read -r json_object; do
     invalid_command=$(jq -r '.invalid_command // empty' <<< "$json_object")
     valid_command=$(jq -r '.valid_command // empty' <<< "$json_object")
     invalid_ports=$(jq -r '.invalid_ports // empty' <<< "$json_object")
+    valid_ports=$(jq -r '.valid_ports // empty' <<< "$json_object")
+    container=$(jq -r '.container // empty' <<< "$json_object")
 
     # Logic to prefer invalid_command over invalid_oorts
     if [[ "$exec" == "true" && -n "$invalid_command" ]]; then
@@ -127,6 +157,7 @@ jq -c '.[]' <<< "$json_input" | while read -r json_object; do
         find_gitops_info "$object_type" "$object_name"
         old_string=$invalid_command
         new_string=$valid_command
+        substitution_function=probe_exec_substitution
         update_github_manifests 
 
     elif [[ "$exec" == "true" && -n "$invalid_ports" ]]; then
