@@ -94,6 +94,8 @@ update_github_manifests () {
             --arg base "main" \
             '{title: $title, body: $body, head: $head, base: $base}')
         echo "$PR_DATA"
+        echo "TOKEN=$GITHUB_TOKEN"
+        echo "URL: https://api.github.com/repos/$git_owner/$git_repo/pulls"
         curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/$git_owner/$git_repo/pulls" \
