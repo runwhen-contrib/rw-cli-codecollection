@@ -91,6 +91,7 @@ update_github_manifests () {
             --arg head "runwhen/manifest-update-$DATETIME" \
             --arg base "main" \
             '{title: $title, body: $body, head: $head, base: $base}')
+        echo "$PR_DATA"
         curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/$git_owner/$git_repo/pulls" \
@@ -111,10 +112,10 @@ probe_exec_substitution () {
 }
 
 pull_request_body_content () {
-
 runsession_url=$RW_FRONTEND_URL/map/$RW_WORKSPACE#selectedRunSessions=$RW_SESSION_ID
 
 read -r -d '' PR_BODY << EOF
+
 A RunSession (started by $RW_USERNAME) with the following tasks has produced this Pull Request: 
 - $RW_TASK_TITLES
 
@@ -127,6 +128,7 @@ $json_object
 
 [RunWhen Workspace]($RW_FRONTEND_URL/map/$RW_WORKSPACE)
 EOF
+
 }
 
 
