@@ -94,6 +94,10 @@ Suite Initialization
     ...    example=kubectl
     ...    default=kubectl
     ${HOME}=    RW.Core.Import User Variable    HOME
+    ${RW_TASK_TITLES}=    Get Environment Variable     RW_TASK_TITLES    none
+    ${RW_FRONTEND_URL}=    Get Environment Variable     RW_FRONTEND_URL    none
+    ${RW_SESSION_ID}=    Get Environment Variable     RW_SESSION_ID    none
+
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
@@ -101,4 +105,4 @@ Suite Initialization
     Set Suite Variable    ${HOME}    ${HOME}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "HOME":"${HOME}", "GITHUB_TOKEN":"${github_token.value}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "HOME":"${HOME}", "GITHUB_TOKEN":"${github_token.value}", "RW_TASK_TITLES":"${RW_TASK_TITLES}", "RW_FRONTEND_URL":"${RW_FRONTEND_URL}", "RW_SESSION_ID":"${RW_SESSION_ID}"}

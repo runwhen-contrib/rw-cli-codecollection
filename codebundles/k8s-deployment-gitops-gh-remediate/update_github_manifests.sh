@@ -81,8 +81,6 @@ update_github_manifests () {
         exit 0
     else
         echo "Changes detected. Pushing..."
-        cat .git/config
-        git show
         git add . 2>&1
         git commit -m "Manifest updates" 2>&1
         git status 2>&1 
