@@ -72,7 +72,7 @@ for ((i=0; i<NUM_CONTAINERS; i++)); do
             if [[ ! " $CONTAINER_PORTS " == *"$PORT_IN_COMMAND"* ]]; then
                 echo "Container \`$CONTAINER_NAME\`: Port $PORT_IN_COMMAND used in ${PROBE_TYPE} exec command is not exposed by the container. The following ports are exposed: $CONTAINER_PORTS"
                 next_steps+=("Get Deployment Workload Details For \`${DEPLOYMENT_NAME}\`")
-                next_steps+=("Verify and Reconfigure Manifest $PROBE_TYPE with Valid Ports For \`${DEPLOYMENT_NAME}\`")
+                next_steps+=("Remediate Readiness and Liveness Probes for Deployments in Namespace `${NAMESPACE}`")
             else
                 echo "Container \`$CONTAINER_NAME\`: Port $PORT_IN_COMMAND in ${PROBE_TYPE} exec command is valid."
             fi

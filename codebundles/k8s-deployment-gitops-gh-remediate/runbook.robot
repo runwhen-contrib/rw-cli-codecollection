@@ -17,7 +17,7 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 
-Check Readiness and Liveness Probe Configuration for Deployments in Namespace `${NAMESPACE}`
+Remediate Readiness and Liveness Probe GitOps Manifests for Deployments in Namespace `${NAMESPACE}`
     [Documentation]    Fixes misconfigured readiness or liveness probe configurations for deployments in a namespace
     [Tags]
     ...    readiness
