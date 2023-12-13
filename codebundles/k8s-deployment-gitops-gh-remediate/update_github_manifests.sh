@@ -80,13 +80,13 @@ update_github_manifests () {
         exit 0
     else
         echo "Changes detected. Pushing..."
+        cat .git/config
+        git show
         git add . 2>&1
         git commit -m "Manifest updates" 2>&1
         git status 2>&1 
         git push --set-upstream origin "runwhen/manifest-update-$DATETIME" 2>&1
-        pull_request_body_content
-        pwd
-        echo "workdir: $workdir"
+        generate_pull_request_body_content
         PR_DATA=$(jq -n \
             --arg title "[RunWhen] - GitOps Manifest Updates from RunSession $RW_SESSION_ID" \
             --arg body "$PR_BODY" \
@@ -113,7 +113,7 @@ probe_exec_substitution () {
 
 }
 
-pull_request_body_content () {
+generate_pull_request_body_content () {
 runsession_url=$RW_FRONTEND_URL/map/$RW_WORKSPACE#selectedRunSessions=$RW_SESSION_ID
 
 read -r -d '' PR_BODY << EOF
@@ -125,7 +125,7 @@ To view the RunSession, click [this link]($runsession_url)
 
 This patch was influenced from the following task output:
 \`\`\`
-$json_output
+$json_object
 \`\`\`
 
 [RunWhen Workspace]($RW_FRONTEND_URL/map/$RW_WORKSPACE)
