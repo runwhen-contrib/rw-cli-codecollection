@@ -99,7 +99,7 @@ Suite Initialization
     ${RW_TASK_STRING}=    Evaluate    ', '.join(${RW_TASK_STRING})    json
     ${RW_FRONTEND_URL}=    Get Environment Variable     RW_FRONTEND_URL    none
     ${RW_SESSION_ID}=    Get Environment Variable     RW_SESSION_ID    none
-    ${RW_USERNAME}=    Get Environment Variable     RW_SESSION_ID    none
+    ${RW_USERNAME}=    Get Environment Variable     RW_USERNAME    none
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
