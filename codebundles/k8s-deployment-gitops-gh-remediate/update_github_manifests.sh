@@ -86,7 +86,8 @@ update_github_manifests () {
         git add . 2>&1
         git commit -m "Manifest updates" 2>&1
         git status 2>&1 
-        git push -f -v --set-upstream origin "runwhen/manifest-update-$DATETIME"
+        env
+        # git push -f -v --set-upstream origin "runwhen/manifest-update-$DATETIME"
         # generate_pull_request_body_content
         # PR_DATA=$(jq -n \
         #     --arg title "[RunWhen] - GitOps Manifest Updates from RunSession $RW_SESSION_ID" \
