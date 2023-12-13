@@ -88,7 +88,7 @@ update_github_manifests () {
         generate_pull_request_body_content
         PR_DATA=$(jq -n \
             --arg title "[RunWhen] - GitOps Manifest Updates from RunSession $RW_SESSION_ID" \
-            --arg body "BOOOO" \
+            --arg body "$PR_BODY" \
             --arg head "runwhen/manifest-update-$DATETIME" \
             --arg base "main" \
             '{title: $title, body: $body, head: $head, base: $base}')
