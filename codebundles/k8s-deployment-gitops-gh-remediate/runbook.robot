@@ -77,10 +77,6 @@ Suite Initialization
     ...    type=string
     ...    description=The GitHub Personal Access token used to create commits and open PRs against the GitOps repo.
     ...    pattern=\w*
-    ${kubectl}=    RW.Core.Import Service    kubectl
-    ...    description=The location service used to interpret shell commands.
-    ...    default=kubectl-service.shared
-    ...    example=kubectl-service.shared
     ${NAMESPACE}=    RW.Core.Import User Variable    NAMESPACE
     ...    type=string
     ...    description=The name of the Kubernetes namespace to scope actions and searching to.
@@ -99,7 +95,6 @@ Suite Initialization
     ...    default=kubectl
     ${HOME}=    RW.Core.Import User Variable    HOME
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
-    Set Suite Variable    ${kubectl}    ${kubectl}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
