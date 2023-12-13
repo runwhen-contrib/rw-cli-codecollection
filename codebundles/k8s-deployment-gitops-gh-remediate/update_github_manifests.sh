@@ -63,6 +63,7 @@ update_github_manifests () {
     workdir=$(pwd)
     git clone $git_url 2>&1
     cd $workdir/$git_repo
+    git remote set-url origin https://x-access-token:$GITHUB_TOKEN@github.com/$git_owner/$git_repo
     git checkout -b "runwhen/manifest-update-$DATETIME"  2>&1
     git branch
     # Search for YAML files and process them
