@@ -23,12 +23,9 @@ Remediate Readiness and Liveness Probe GitOps Manifests for Deployments in Names
     ...    readiness
     ...    liveness
     ...    probe
-    ...    workloads
-    ...    errors
-    ...    failure
-    ...    restart
-    ...    get
     ...    deployment
+    ...    remediate
+    ...    gitops
     ...    ${NAMESPACE}
     ${probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_all_probes.sh
