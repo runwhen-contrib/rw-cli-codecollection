@@ -5,7 +5,7 @@ spec:
     - resourceTypes:
         - deployment
       matchRules:
-      - type: and
+        - type: and
           matches:
             - type: pattern
               pattern: ".+"
