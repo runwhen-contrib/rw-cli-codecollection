@@ -11,10 +11,10 @@ spec:
               pattern: ".+"
               properties: [name]
               mode: substring
-            - type: pattern
-              pattern: "kustomize.toolkit.fluxcd.io/name"
-              properties: [metadata/labels]
-              mode: substring
+            # - type: pattern
+            #   pattern: "kustomize.toolkit.fluxcd.io/name"
+            #   properties: [metadata/labels]
+            #   mode: substring
             # - resourceType: variables
             #   type: pattern
             #   pattern: "github"
