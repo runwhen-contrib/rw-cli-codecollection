@@ -15,11 +15,11 @@ spec:
               pattern: "kustomize.toolkit.fluxcd.io/name"
               properties: [labels]
               mode: substring
-            # - resourceType: variables
-            #   type: pattern
-            #   pattern: "github"
-            #   properties: [custom/gitops_provider]
-            #   mode: substring
+            - resourceType: variables
+              type: pattern
+              pattern: "github"
+              properties: [custom/gitops_provider]
+              mode: substring
       slxs:
         - baseName: depl-gh-fix
           levelOfDetail: detailed

@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/github-mark.svg
-  alias: Namespace {{match_resource.resource.metadata.namespace}} Deployment GitOps Remediations
+  alias: {{match_resource.resource.metadata.namespace}} Deployment GitOps Configuration Remediations
   asMeasuredBy: "" 
   configProvided:
   - name: OBJECT_NAME
