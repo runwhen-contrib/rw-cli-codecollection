@@ -94,7 +94,7 @@ Suite Initialization
     ...    example=kubectl
     ...    default=kubectl
     ${HOME}=    RW.Core.Import User Variable    HOME
-    ${RW_TASK_TITLES}=    Get Environment Variable     RW_TASK_TITLES    none
+    ${RW_TASK_TITLES}=    Get Environment Variable     RW_TASK_TITLES    "[]"
     ${RW_TASK_STRING}=    Evaluate    ${RW_TASK_TITLES}    json
     ${RW_TASK_STRING}=    Evaluate    ', '.join(${RW_TASK_STRING})    json
     ${RW_FRONTEND_URL}=    Get Environment Variable     RW_FRONTEND_URL    none

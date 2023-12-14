@@ -87,7 +87,7 @@ update_github_manifests () {
         git push -f -v --set-upstream origin "runwhen/manifest-update-$DATETIME"
         generate_pull_request_body_content
         PR_DATA=$(jq -n \
-            --arg title "[RunWhen] - GitOps Manifest Updates from RunSession $RW_SESSION_ID" \
+            --arg title "[RunWhen] - GitOps Manifest Updates for $object_type $object_name" \
             --arg body "$PR_BODY" \
             --arg head "runwhen/manifest-update-$DATETIME" \
             --arg base "main" \
@@ -116,17 +116,23 @@ generate_pull_request_body_content () {
 runsession_url=$RW_FRONTEND_URL/map/$RW_WORKSPACE#selectedRunSessions=$RW_SESSION_ID
 
 read -r -d '' PR_BODY << EOF
+### RunSession Details
 
 A RunSession (started by $RW_USERNAME) with the following tasks has produced this Pull Request: 
+
 - $RW_TASK_TITLES
 
 To view the RunSession, click [this link]($runsession_url)
 
-This patch was influenced from the following task output:
+### Change Details
+$change_summary
+
+The following details prompted this change: 
 \`\`\`
-$json_object
+$json_pretty
 \`\`\`
 
+---
 [RunWhen Workspace]($RW_FRONTEND_URL/map/$RW_WORKSPACE)
 EOF
 
@@ -144,8 +150,10 @@ fi
 
 # Process the JSON
 jq -c '.[]' <<< "$json_input" | while read -r json_object; do
+    json_pretty=$(echo $json_object | jq .)
     object_type=$(jq -r '.object_type' <<< "$json_object")
     object_name=$(jq -r '.object_name' <<< "$json_object")
+    remediation_type=$(jq -r '.remediation_type' <<< "$json_object")
     probe_type=$(jq -r '.probe_type' <<< "$json_object")
     exec=$(jq -r '.exec' <<< "$json_object")
     invalid_command=$(jq -r '.invalid_command // empty' <<< "$json_object")
@@ -155,16 +163,19 @@ jq -c '.[]' <<< "$json_input" | while read -r json_object; do
     container=$(jq -r '.container // empty' <<< "$json_object")
 
     # Logic to prefer invalid_command over invalid_oorts
-    if [[ "$exec" == "true" && -n "$invalid_command" ]]; then
-        echo "Processing $object_type $object_name with invalidCommand"
-        find_gitops_info "$object_type" "$object_name"
-        old_string=$invalid_command
-        new_string=$valid_command
-        substitution_function=probe_exec_substitution
-        update_github_manifests 
+    if [[ "$remediation_type" == "probe_update" ]]; then
+        if [[ "$exec" == "true" && -n "$invalid_command" ]]; then
+            echo "Processing $object_type $object_name with invalidCommand"
+            find_gitops_info "$object_type" "$object_name"
+            old_string=$invalid_command
+            new_string=$valid_command
+            substitution_function=probe_exec_substitution
+            change_summary="Container \`$container\` in $object_type \`$object_name\` had an invalid exec command for $probe_type. The updated command is \`$valid_command\`"
+            update_github_manifests 
 
-    elif [[ "$exec" == "true" && -n "$invalid_ports" ]]; then
-        echo "Processing $object_type $object_name with invalidPorts"
-        find_gitops_info "$object_type" "$object_name"
+        elif [[ "$exec" == "true" && -n "$invalid_ports" ]]; then
+            echo "Processing $object_type $object_name with invalidPorts"
+            find_gitops_info "$object_type" "$object_name"
+        fi
     fi
 done
