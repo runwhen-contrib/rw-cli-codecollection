@@ -20,7 +20,9 @@ spec:
     ref: main
     {% endif %}
     pathToRobot: codebundles/k8s-deployment-healthcheck/runbook.robot
-  servicesProvided: []
+  servicesProvided:
+    - name: {{custom.kubernetes_distribution_binary}}
+      locationServiceName: {{custom.kubernetes_distribution_binary}}-service.shared
   configProvided:
     - name: NAMESPACE
       value: {{match_resource.resource.metadata.namespace}}
