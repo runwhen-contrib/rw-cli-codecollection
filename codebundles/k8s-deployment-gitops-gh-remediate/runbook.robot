@@ -1,8 +1,8 @@
 *** Settings ***
-Documentation       Provides a list of tasks that can remediate configuraiton issues with deployment manifests in gitops repositories. 
+Documentation       Provides a list of tasks that can remediate configuraiton issues with deployment manifests in GitHub based gitops repositories. 
 Metadata            Author    stewartshea
 Metadata            Display Name    Kubernetes Deployment Triage
-Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
+Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,FluxCD,ArgoCD
 
 Library             BuiltIn
 Library             RW.Core
