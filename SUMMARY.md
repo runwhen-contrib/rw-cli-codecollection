@@ -14,6 +14,7 @@
 * [k8s-fluxcd-kustomization-health](codebundles/k8s-fluxcd-kustomization-health/README.md)
 * [k8s-serviceaccount-check](codebundles/k8s-serviceaccount-check/README.md)
 * [gcloud-log-inspection](codebundles/gcloud-log-inspection/README.md)
+* [k8s-deployment-gitops-gh-remediate](codebundles/k8s-deployment-gitops-gh-remediate/README.md)
 * [azure-loadbalancer-triage](codebundles/azure-loadbalancer-triage/README.md)
 * [curl-gmp-kong-ingress-inspection](codebundles/curl-gmp-kong-ingress-inspection/README.md)
 * [k8s-restart-resource](codebundles/k8s-restart-resource/README.md)
