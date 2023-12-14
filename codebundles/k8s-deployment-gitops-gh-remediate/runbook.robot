@@ -46,20 +46,20 @@ Remediate Readiness and Liveness Probe GitOps Manifests for Deployments in Names
     ...    env=${env}
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
-#    ${recommendations}=    RW.CLI.Run Cli
-#     ...    cmd=echo '${readiness_probe_health.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
-#     ...    env=${env}
-#     ...    include_in_history=false
-#     IF     len($recommendations.stdout) > 0 
-#         RW.Core.Add Issue
-#         ...    severity=2
-#         ...    expected=Readiness probes should be configured and functional for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-#         ...    actual=Issues found with readiness probe configuration for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-#         ...    title=Readiness Probe Configuration Issues with Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-#         ...    reproduce_hint=View Commands Used in Report Output
-#         ...    details=${readiness_probe_health.stdout}
-#         ...    next_steps=${recommendations.stdout}
-#     END
+   ${recommendations}=    RW.CLI.Run Cli
+    ...    cmd=echo '${gh_updates.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+    ...    env=${env}
+    ...    include_in_history=false
+    IF     len($recommendations.stdout) > 0 
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=Pull Requests for manifest changes are reviewed for namespace `${NAMESPACE}`
+        ...    actual=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
+        ...    title=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
+        ...    reproduce_hint=Check Pull Request details for more information.
+        ...    details=${remediation_list.stdout}
+        ...    next_steps=${recommendations.stdout}
+    END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${probe_health.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}

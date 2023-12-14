@@ -1,25 +1,26 @@
 #!/bin/bash
 
 
+declare -a next_steps=()
+
 
 # Define labels or annotations for identifying gitops resources
-
 # Flux
 declare -A flux_type_map
+# TODO - add additional flux resource types like helmrelease
 flux_type_map["kustomize"]="kustomization"
 flux_label="toolkit.fluxcd.io"
 
-
+# Argo (placeholder)
 
 # Function to find GitOps owner and Git manifest location
 find_gitops_info() {
     local objectType="$1"
     local objectName="$2"
-    # Replace the following line with the actual command or logic to find the GitOps owner and manifest
     echo "Finding GitOps info for $objectType $objectName..."
-    # Dummy values for demonstration
     object_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get "$objectType" "$objectName" -n "$NAMESPACE" --context "$CONTEXT" -o json)
     
+    # Check if the object is from Flux
     flux_match=$(echo "$object_json" | grep "$flux_label")
     if [[ -n $flux_match ]]; then
         fetch_flux_owner_details "$object_json"
@@ -50,6 +51,11 @@ fetch_flux_owner_details() {
     git_url=$(echo "$flux_source_object" | jq -r .spec.url )
     git_path=$(echo "$flux_object_json" | jq -r .spec.path)
 }
+
+## Argo placeholder
+# fetch_argo_owner_details() {
+
+# }
 
 update_github_manifests () {
     DATETIME=$(date '+%Y%m%d-%H%M%S')
@@ -92,11 +98,12 @@ update_github_manifests () {
             --arg head "runwhen/manifest-update-$DATETIME" \
             --arg base "main" \
             '{title: $title, body: $body, head: $head, base: $base}')
-        echo "$PR_DATA"
-        curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
+        pr_output=$(curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/$git_owner/$git_repo/pulls" \
-            -d "$PR_DATA"
+            -d "$PR_DATA")
+        pr_html_url=$(jq -r '.html_url // empty' <<< "$pr_output")
+        next_steps+=("View proposed Github changes in [Pull Request]($pr_html_url)")
     fi 
 }
 
@@ -149,7 +156,7 @@ if [[ -z "$json_input" ]]; then
 fi
 
 # Process the JSON
-jq -c '.[]' <<< "$json_input" | while read -r json_object; do
+while read -r json_object; do
     json_pretty=$(echo $json_object | jq .)
     object_type=$(jq -r '.object_type' <<< "$json_object")
     object_name=$(jq -r '.object_name' <<< "$json_object")
@@ -178,4 +185,11 @@ jq -c '.[]' <<< "$json_input" | while read -r json_object; do
             find_gitops_info "$object_type" "$object_name"
         fi
     fi
-done
+done < <(jq -c '.[]' <<< "$json_input")
+
+
+# Display all unique recommendations that can be shown as Next Steps
+if [[ ${#next_steps[@]} -ne 0 ]]; then
+    printf "\nRecommended Next Steps: \n"
+    printf "%s\n" "${next_steps[@]}" | sort -u
+fi
