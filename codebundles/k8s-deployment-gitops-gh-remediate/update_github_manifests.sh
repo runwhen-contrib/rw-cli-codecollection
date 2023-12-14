@@ -183,6 +183,7 @@ while read -r json_object; do
         elif [[ "$exec" == "true" && -n "$invalid_ports" ]]; then
             echo "Processing $object_type $object_name with invalidPorts"
             find_gitops_info "$object_type" "$object_name"
+            ## Placeholder for GitOps Update Details
         fi
     fi
 done < <(jq -c '.[]' <<< "$json_input")
