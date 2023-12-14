@@ -13,7 +13,7 @@ spec:
               mode: substring
             - type: pattern
               pattern: "kustomize.toolkit.fluxcd.io/name"
-              properties: [metadata/labels]
+              properties: [labels]
               mode: substring
             # - resourceType: variables
             #   type: pattern
