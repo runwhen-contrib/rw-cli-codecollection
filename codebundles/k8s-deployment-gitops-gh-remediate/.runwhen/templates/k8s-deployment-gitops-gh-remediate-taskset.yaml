@@ -20,6 +20,7 @@ spec:
     ref: main
     {% endif %}
     pathToRobot: codebundles/k8s-deployment-healthcheck/runbook.robot
+  servicesProvided: []
   configProvided:
     - name: NAMESPACE
       value: {{match_resource.resource.metadata.namespace}}
