@@ -1,3 +1,5 @@
+## 0.0.11 2023-12-15
+
 ## 0.0.10 2023-12-11
 - Add issues to statefulset and new postgres keywords (#272) be8f65f
 
