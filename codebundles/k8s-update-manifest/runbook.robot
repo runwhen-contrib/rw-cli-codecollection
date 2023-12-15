@@ -17,11 +17,11 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Scale Up HorizontalPodAutoscaler
     ${infra_repo}=    RW.K8sApplications.Clone Repo    ${REPO_URI}    ${REPO_AUTH_TOKEN}    1
-    RW.K8sApplications.Scale Up Hpa
+    ${report}=    RW.K8sApplications.Scale Up Hpa
     ...    infra_repo=${infra_repo}
     ...    manifest_file_path=${REPO_MANIFEST_PATH}
     ...    increase_value=1
-    # ${result}=    RW.K8sApplication.Create PR    ${infra_repo}
+    RW.Core.Add Pre To Report    ${report}
 
 
 *** Keywords ***
