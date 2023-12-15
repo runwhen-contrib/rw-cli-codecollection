@@ -21,6 +21,7 @@ Scale Up HorizontalPodAutoscaler
     ...    infra_repo=${infra_repo}
     ...    manifest_file_path=${REPO_MANIFEST_PATH}
     ...    increase_value=1
+    ...    max_allowed_replicas=${REPLICA_MAX}
     RW.Core.Add Pre To Report    ${report}
 
 

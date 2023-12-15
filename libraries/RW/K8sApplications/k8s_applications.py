@@ -218,6 +218,7 @@ def scale_up_hpa(
     manifest_file_path: str,
     increase_value: int = 1,
     set_value: int = -1,
+    max_allowed_replicas: int = 10,
 ) -> dict:
     working_branch = "infra-scale-hpa"
     manifest_file: RepositoryFile = infra_repo.files.files[manifest_file_path]
@@ -229,6 +230,7 @@ def scale_up_hpa(
     max_replicas += increase_value
     if set_value > 0:
         max_replicas = set_value
+    max_replicas = min(max_allowed_replicas, max_replicas)
     manifest_object["spec"]["maxReplicas"] = max_replicas
     manifest_file.content = yaml.safe_dump(manifest_object)
     manifest_file.write_content()
