@@ -15,7 +15,18 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Scale Up HorizontalPodAutoscaler
+Scale Up `${WORKLOAD_NAME}` HorizontalPodAutoscaler
+    [Documentation]    Creates a PR against a manifest file in a repo with a suggested replica count change.
+    [Tags]
+    ...    gitops
+    ...    change request
+    ...    replicas
+    ...    horizontalpodautoscaler
+    ...    scaling
+    ...    increase
+    ...    pods
+    ...    containers
+    ...    resources
     ${infra_repo}=    RW.K8sApplications.Clone Repo    ${REPO_URI}    ${REPO_AUTH_TOKEN}    1
     ${report}=    RW.K8sApplications.Scale Up Hpa
     ...    infra_repo=${infra_repo}
