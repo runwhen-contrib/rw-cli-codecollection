@@ -213,15 +213,6 @@ def create_github_issue(repo: Repository, content: str) -> str:
         return "No related GitHub issue could be found."
 
 
-# def update_workload_cpu(
-#     infra_repo: Repository,
-#     manifest_file_path: str,
-#     set_value: str = "",
-#     factor_increase: float = 1.0,
-# ) -> None:
-#     pass
-
-
 def scale_up_hpa(
     infra_repo: Repository,
     manifest_file_path: str,
@@ -240,6 +231,7 @@ def scale_up_hpa(
         max_replicas = set_value
     manifest_object["spec"]["maxReplicas"] = max_replicas
     manifest_file.content = yaml.safe_dump(manifest_object)
+    manifest_file.write_content()
     manifest_file.git_add()
     infra_repo.git_commit(
         branch_name=working_branch,
@@ -252,8 +244,24 @@ Due to insufficient scaling, we've recommended the following change:
 - Updates maxReplicas to {max_replicas} in {manifest_file.basename}
 """
     rsp = infra_repo.git_pr(
-        title=f"Update maxReplicas in {manifest_file.basename}",
+        title=f"{RUNWHEN_ISSUE_KEYWORD} Update maxReplicas in {manifest_file.basename}",
         branch=working_branch,
         body=pr_body,
     )
-    return rsp
+    pr_url = None
+    if "html_url" in rsp:
+        pr_url = rsp["html_url"]
+    report = f"""
+A change request could not be generated for this manifest. Consider running additional troubleshooting or contacting the service owner.
+"""
+    if pr_url:
+        report = f"""
+The following change request was made in the repository {infra_repo.repo_name}
+
+{pr_url}
+
+Next Steps:
+- Review and merge the change request at {pr_url} 
+"""
+
+    return report

@@ -16,6 +16,7 @@ from RW import platform
 from RW.Core import Core
 
 logger = logging.getLogger(__name__)
+RUNWHEN_PR_KEYWORD: str = "[RunWhen]"
 
 
 @dataclass
@@ -137,18 +138,20 @@ class RepositoryFile:
 
     def git_add(self):
         try:
-            # Adding the file to staging
-            subprocess.run(["git", "add", self.absolute_file_path], check=True)
             add_stdout = subprocess.run(
-                ["git", "add", self.absolute_file_path],
+                ["git", "add", self.relative_file_path],
                 text=True,
                 capture_output=True,
                 check=True,
-                cwd=self._clone_directory,
+                cwd=self.filesystem_basepath,
             ).stdout
-            logger.info(f"File {file_path} has been added to staging.")
+            logger.info(f"File {self.relative_file_path} has been added to staging.")
         except subprocess.CalledProcessError as e:
             logger.error(f"An error occurred: {e}")
+
+    def write_content(self) -> None:
+        with open(self.absolute_file_path, "w") as fp:
+            fp.write(self.content)
 
 
 @dataclass
@@ -287,7 +290,7 @@ class Repository:
         comment: str,
     ) -> None:
         current_datetime = datetime.now()
-        timestamp = current_datetime.timestamp()
+        timestamp = int(current_datetime.timestamp())
         unique_branch_name = f"{branch_name}-{timestamp}"
         self.local_branch_lookup[branch_name] = unique_branch_name
         checkout_b = subprocess.run(
@@ -298,7 +301,7 @@ class Repository:
                 f"{unique_branch_name}",
             ],
             check=True,
-            cwd=self._clone_directory,
+            cwd=self.clone_directory,
             capture_output=True,
         )
         logger.info(f"Checked out branch {unique_branch_name}")
@@ -310,7 +313,7 @@ class Repository:
                 f"{comment}",
             ],
             check=True,
-            cwd=self._clone_directory,
+            cwd=self.clone_directory,
             capture_output=True,
         )
         logger.info(f"Comitting... {commitcmd.stdout}")
@@ -321,7 +324,8 @@ class Repository:
                 f"{self.branch}",
             ],
             check=True,
-            cwd=self._clone_directory,
+            cwd=self.clone_directory,
+            capture_output=True,
         )
         logger.info(f"Returning to default branch {checkout_default.stdout}")
 
@@ -336,7 +340,7 @@ class Repository:
             ],
             check=True,
             capture_output=True,
-            cwd=self._clone_directory,
+            cwd=self.clone_directory,
         )
 
     def git_pr(
@@ -344,13 +348,29 @@ class Repository:
         title: str,
         branch: str,
         body: str,
+        check_open: bool = True,
     ) -> dict:
+        is_already_open: bool = False
         true_branch_name = self.local_branch_lookup[branch]
         url = f"https://api.github.com/repos/{self.repo_owner}/{self.repo_name}/pulls"
         headers = {
             "Authorization": f"token {self.auth_token}",
             "Accept": "application/vnd.github.v3+json",
         }
+        if check_open:
+            rsp = requests.get(url, headers=headers)
+            if rsp.status_code < 200 or rsp.status_code >= 300:
+                logger.warning(f"Error: {rsp.status_code}, {rsp.text}")
+                return {}
+            rsp = rsp.json()
+            for pr in rsp:
+                title = pr["title"]
+                state = pr["state"]
+                if state == "open" and RUNWHEN_PR_KEYWORD in title:
+                    is_already_open = True
+
+        if is_already_open:
+            return {}
         data = {
             "title": title,
             "head": branch,
