@@ -128,6 +128,15 @@ class BaseStackTraceParse:
         return results
 
 
+class CSharpStackTraceParse(BaseStackTraceParse):
+    @staticmethod
+    def parse_log(log) -> StackTraceData:
+        if ".Exception" in log:
+            return BaseStackTraceParse.parse_log(log)
+        else:
+            return None
+
+
 class PythonStackTraceParse(BaseStackTraceParse):
     @staticmethod
     def parse_log(log) -> StackTraceData:

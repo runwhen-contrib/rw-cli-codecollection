@@ -101,6 +101,7 @@ class RepositoryFile:
     git_file_url: str
     relative_file_path: str
     absolute_file_path: str
+    basename: str
     line_count: int
     git_url_base: str
     filesystem_basepath: str
@@ -111,6 +112,7 @@ class RepositoryFile:
         self, absolute_filepath, filesystem_basepath, repo_base_url, branch="main"
     ) -> None:
         self.absolute_file_path = str(absolute_filepath)
+        self.basename = os.path.basename(self.absolute_file_path)
         self.filesystem_basepath = filesystem_basepath
         self.git_url_base = str(repo_base_url)
         self.branch = branch
@@ -133,6 +135,21 @@ class RepositoryFile:
         # skip_regex = r"^[ \t\n\r#*,(){}\[\]\"\'\':]*$"
         return None
 
+    def git_add(self):
+        try:
+            # Adding the file to staging
+            subprocess.run(["git", "add", self.absolute_file_path], check=True)
+            add_stdout = subprocess.run(
+                ["git", "add", self.absolute_file_path],
+                text=True,
+                capture_output=True,
+                check=True,
+                cwd=self._clone_directory,
+            ).stdout
+            logger.info(f"File {file_path} has been added to staging.")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"An error occurred: {e}")
+
 
 @dataclass
 class RepositoryFiles:
@@ -147,6 +164,18 @@ class RepositoryFiles:
     @property
     def file_paths(self) -> list[str]:
         return self.files.keys()
+
+    @property
+    def all_files(self) -> list[RepositoryFile]:
+        return self.files.values()
+
+    @property
+    def all_basenames(self) -> list[str]:
+        basenames: list[str] = []
+        all_files = self.all_files
+        for repo_file in all_files:
+            basenames.append(repo_file.basename)
+        return basenames
 
 
 class Repository:
@@ -164,6 +193,7 @@ class Repository:
     clone_directory: str
     branch: str
     commit_history: list[GitCommit] = []
+    local_branch_lookup: dict = {}
 
     def __str__(self):
         repo_summary = f"Repository: {self.repo_owner}/{self.repo_name}\nRepository URI: {self.source_uri}"
@@ -251,6 +281,90 @@ class Repository:
         )
         return self.clone_directory
 
+    def git_commit(
+        self,
+        branch_name: str,
+        comment: str,
+    ) -> None:
+        current_datetime = datetime.now()
+        timestamp = current_datetime.timestamp()
+        unique_branch_name = f"{branch_name}-{timestamp}"
+        self.local_branch_lookup[branch_name] = unique_branch_name
+        checkout_b = subprocess.run(
+            [
+                "git",
+                "checkout",
+                "-b",
+                f"{unique_branch_name}",
+            ],
+            check=True,
+            cwd=self._clone_directory,
+            capture_output=True,
+        )
+        logger.info(f"Checked out branch {unique_branch_name}")
+        commitcmd = subprocess.run(
+            [
+                "git",
+                "commit",
+                "-m",
+                f"{comment}",
+            ],
+            check=True,
+            cwd=self._clone_directory,
+            capture_output=True,
+        )
+        logger.info(f"Comitting... {commitcmd.stdout}")
+        checkout_default = subprocess.run(
+            [
+                "git",
+                "checkout",
+                f"{self.branch}",
+            ],
+            check=True,
+            cwd=self._clone_directory,
+        )
+        logger.info(f"Returning to default branch {checkout_default.stdout}")
+
+    def git_push_branch(self, branch: str, remote: str = "origin") -> None:
+        true_branch_name = self.local_branch_lookup[branch]
+        gitpushcmd = subprocess.run(
+            [
+                "git",
+                "push",
+                f"{remote}",
+                f"{true_branch_name}",
+            ],
+            check=True,
+            capture_output=True,
+            cwd=self._clone_directory,
+        )
+
+    def git_pr(
+        self,
+        title: str,
+        branch: str,
+        body: str,
+    ) -> dict:
+        true_branch_name = self.local_branch_lookup[branch]
+        url = f"https://api.github.com/repos/{self.repo_owner}/{self.repo_name}/pulls"
+        headers = {
+            "Authorization": f"token {self.auth_token}",
+            "Accept": "application/vnd.github.v3+json",
+        }
+        data = {
+            "title": title,
+            "head": branch,
+            "body": body,
+            "base": "main",
+        }
+        response = requests.post(url, headers=headers, json=data)
+
+        if response.status_code >= 300:
+            logger.warning(f"Error: {response.status_code}, {response.text}")
+            return {}
+
+        return response.json()
+
     def get_repo_base_url(self) -> str:
         remote_url = self.source_uri
         if remote_url.startswith("git@"):
@@ -290,27 +404,52 @@ class Repository:
 
     def search(
         self,
-        search_words: list[str],
-        search_files: list[str],
+        search_words: list[str] = [],
+        search_files: list[str] = [],
         # max_results_per_word: int = 5,
         # search_match_score_min: int = 90,
     ) -> [RepositorySearchResult]:
+        if not search_files and not search_words:
+            logger.warning(f"You must provide files and/or words to search with")
+            return []
         logger.info(f"Performing search with words: {search_words}")
+        logger.info(f"Performing search with files: {search_files}")
         # check both paths starting with / and without - this is a bit of hackery but
         # needed to get around a weakness in regex parsing
         file_paths: list[str] = self.files.file_paths
+        # add any basename matches, for case when build paths differ from source paths
+        # potentially causes false positives but should mostly work for now
+        # TODO: revisit build vs src paths
+        repo_file_bases: list[str] = self.files.all_basenames
+        search_files_bases: list[str] = [os.path.basename(sfp) for sfp in search_files]
+        repo_basename_mapping = {}
+        for sfb in search_files_bases:
+            if sfb in self.files.all_basenames:
+                for repo_file in self.files.all_files:
+                    if sfb == repo_file.basename:
+                        repo_basename_mapping[
+                            repo_file.basename
+                        ] = repo_file.relative_file_path
+
+        search_files_bases = set([fp for fp in repo_basename_mapping.values()])
+
         slashed_file_paths: list[str] = [f"/{fp}" for fp in file_paths]
         logger.info(search_files)
         files_to_examine: list[str] = set(search_files).intersection(file_paths)
         slashed_files_to_examine: list[str] = set(search_files).intersection(
             slashed_file_paths
         )
+
         logger.info(
-            f"Searching files: {files_to_examine} and {slashed_files_to_examine}"
+            f"Searching files: {files_to_examine}, {search_files_bases} and {slashed_files_to_examine}"
         )
         # recombine, remove slashes and unique entries
         search_in: list[str] = list(
-            set(list(files_to_examine) + [fp[1:] for fp in slashed_files_to_examine])
+            set(
+                list(files_to_examine)
+                + list(search_files_bases)
+                + [fp[1:] for fp in slashed_files_to_examine]
+            )
         )
         logger.info(f"SEARCH FILES: {search_in}")
         results: list[RepositorySearchResult] = []
