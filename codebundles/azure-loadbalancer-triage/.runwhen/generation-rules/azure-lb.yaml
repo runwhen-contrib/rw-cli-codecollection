@@ -4,7 +4,7 @@ spec:
   platform: azure
   generationRules:
     - resourceTypes:
-        - azure_network_load_balancers
+        - virtual_machine
       matchRules:
         - type: pattern
           pattern: ".+"
@@ -15,7 +15,7 @@ spec:
           levelOfDetail: basic
           qualifiers: [resource_group]
           baseTemplateName: az-lb-health
-          outputItems: []
-            # - type: slx
+          outputItems:
+            - type: slx
             # - type: runbook
             #   templateName: az-lb-health-taskset.yaml
