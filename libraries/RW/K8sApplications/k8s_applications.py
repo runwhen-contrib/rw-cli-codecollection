@@ -1,4 +1,4 @@
-import logging, hashlib
+import logging, hashlib, yaml
 from dataclasses import dataclass, field
 from thefuzz import process as fuzzprocessor
 from datetime import datetime
@@ -9,6 +9,7 @@ from .parsers import (
     PythonStackTraceParse,
     DRFStackTraceParse,
     GoogleDRFStackTraceParse,
+    CSharpStackTraceParse,
 )
 from .repository import (
     Repository,
@@ -57,6 +58,15 @@ def test(git_uri, git_token, k8s_env, process_list, *args, **kwargs):
     return report
 
 
+def test_search(
+    repo: Repository, exceptions: list[StackTraceData]
+) -> list[RepositorySearchResult]:
+    rr = []
+    for excep in exceptions:
+        rr += repo.search(search_files=excep.files)
+    return rr
+
+
 def get_test_data():
     data = ""
     with open(f"{THIS_DIR}/test_logs.txt", "r") as fh:
@@ -78,6 +88,7 @@ def parse_exceptions(
     parsers: list[BaseStackTraceParse] = [
         GoogleDRFStackTraceParse,
         PythonStackTraceParse,
+        CSharpStackTraceParse,
     ]
     # TODO: support multiline parsing
     for log in logs:
@@ -95,7 +106,7 @@ def parse_exceptions(
 
 def clone_repo(git_uri, git_token, number_of_commits_history: int = 10) -> Repository:
     repo = Repository(source_uri=git_uri, auth_token=git_token)
-    repo.clone_repo(number_of_commits_history)
+    repo.clone_repo(number_of_commits_history, cache=True)
     return repo
 
 
@@ -200,3 +211,59 @@ def create_github_issue(repo: Repository, content: str) -> str:
         return f"Here's a link to an open GitHub issue for application exceptions: {report_url}"
     else:
         return "No related GitHub issue could be found."
+
+
+def scale_up_hpa(
+    infra_repo: Repository,
+    manifest_file_path: str,
+    increase_value: int = 1,
+    set_value: int = -1,
+    max_allowed_replicas: int = 10,
+) -> dict:
+    working_branch = "infra-scale-hpa"
+    manifest_file: RepositoryFile = infra_repo.files.files[manifest_file_path]
+    logger.info(manifest_file.content)
+    manifest_object = yaml.safe_load(manifest_file.content)
+    max_replicas = manifest_object.get("spec", {}).get("maxReplicas", None)
+    if not max_replicas:
+        raise Exception(f"manifest does not contain a maxReplicas {manifest_object}")
+    max_replicas += increase_value
+    if set_value > 0:
+        max_replicas = set_value
+    max_replicas = min(max_allowed_replicas, max_replicas)
+    manifest_object["spec"]["maxReplicas"] = max_replicas
+    manifest_file.content = yaml.safe_dump(manifest_object)
+    manifest_file.write_content()
+    manifest_file.git_add()
+    infra_repo.git_commit(
+        branch_name=working_branch,
+        comment=f"Update maxReplicas in {manifest_file.basename}",
+    )
+    infra_repo.git_push_branch(working_branch)
+    pr_body = f"""
+# HorizontalPodAutoscaler Update
+Due to insufficient scaling, we've recommended the following change:
+- Updates maxReplicas to {max_replicas} in {manifest_file.basename}
+"""
+    rsp = infra_repo.git_pr(
+        title=f"{RUNWHEN_ISSUE_KEYWORD} Update maxReplicas in {manifest_file.basename}",
+        branch=working_branch,
+        body=pr_body,
+    )
+    pr_url = None
+    if "html_url" in rsp:
+        pr_url = rsp["html_url"]
+    report = f"""
+A change request could not be generated for this manifest. Consider running additional troubleshooting or contacting the service owner.
+"""
+    if pr_url:
+        report = f"""
+The following change request was made in the repository {infra_repo.repo_name}
+
+{pr_url}
+
+Next Steps:
+- Review and merge the change request at {pr_url} 
+"""
+
+    return report
