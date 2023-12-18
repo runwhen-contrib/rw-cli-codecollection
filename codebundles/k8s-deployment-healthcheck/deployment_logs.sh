@@ -93,7 +93,7 @@ while read POD; do
         echo "Fetching logs for Pod: $POD, Container: $CONTAINER. Saving to $FILENAME."
         echo "$LOGS" > $FILENAME
     done
-done < <(${KUBERNETES_DISTRIBUTION_BINARY} get pods --selector=$SELECTOR -n ${NAMESPACE} --context=${CONTEXT}-o=jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+done < <(${KUBERNETES_DISTRIBUTION_BINARY} get pods --selector=$SELECTOR -n ${NAMESPACE} --context=${CONTEXT} -o=jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
 
 # Initialize an issue description array
 issue_descriptions=()
