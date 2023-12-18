@@ -33,6 +33,7 @@ Remediate Readiness and Liveness Probe GitOps Manifests for Deployments in Names
     ...    env=${env}
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=180
     ${remediation_list}=    RW.CLI.Run Cli
     ...    cmd=echo \'\'\'${probe_health.stdout}\'\'\' | awk "/Remediation Steps:/ {start=1; getline} start"
     ...    env=${env}

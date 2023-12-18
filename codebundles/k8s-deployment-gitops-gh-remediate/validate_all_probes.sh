@@ -81,7 +81,7 @@ for ((o=0; o<NUM_OBJECTS; o++)); do
 
                 if [[ ! " $CONTAINER_PORTS " == *"$PROBE_PORT"* ]]; then
                     echo "Container \`$CONTAINER_NAME\`: Port $PROBE_PORT used in $PROBE_TYPE is not exposed by the container."
-                    next_steps+=("Update $PROBE_TYPE For ${OBJECT_TYPE}\`${OBJECT_NAME}\` to use one of the following ports: $CONTAINER_PORTS")
+                    next_steps+=("Update $PROBE_TYPE For ${OBJECT_TYPE} \`${OBJECT_NAME}\` to use one of the following ports: $CONTAINER_PORTS")
                     remediation_steps+=("{\"remediation_type\":\"probe_update\", \"object\": \"$OBJECT_TYPE}\\$OBJECT_NAME\", \"probe_type\": \"$PROBE_TYPE\", \"exec\":\"false\", \"invalid_port\":\"$PROBE_PORT\",\"valid_ports\":\"$CONTAINER_PORTS\", \"container\":\"$CONTAINER_NAME\"}")
                 else
                     echo "Container \`$CONTAINER_NAME\`: ${PROBE_TYPE} port $PROBE_PORT is valid."
