@@ -4,7 +4,7 @@ spec:
   platform: azure
   generationRules:
     - resourceTypes:
-        - network_load_balancers
+        - load_balancers
       matchRules:
         - type: pattern
           pattern: ".+"
