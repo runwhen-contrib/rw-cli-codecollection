@@ -13,40 +13,9 @@ commands:
     <= 30))'''
   doc_links: '
 
-    - [Kubernetes warning events](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#-kubectl-get-events){:target="_blank"}
-
-    - [Understanding Kubernetes contexts and namespaces](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
-
-    - [Formatting output in JSON file with kubectl](https://kubernetes.io/docs/reference/kubectl/cheatsheet/#formatting-output){:target="_blank"}
-
-    - [Filtering and organizing data with kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#-kubectl-get){:target="_blank"}'
-  explanation: This command gets warning events from a specific context and namespace
-    in Kubernetes, then formats the output into a JSON file. It also filters and organizes
-    the data to generate a summary of the events within the last 30 minutes.
-  multi_line_details: "\n# Set the context variable to define the Kubernetes cluster\
-    \ to operate on\nCONTEXT=\"your_context_name\"\n\n# Set the namespace variable\
-    \ to specify a specific namespace within the Kubernetes cluster\nNAMESPACE=\"\
-    your_namespace\"\n\n# Use kubectl to get events of type Warning from the specified\
-    \ context and namespace, then store the output in a JSON file\nkubectl get events\
-    \ --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json >\
-    \ $HOME/warning_events.json \n\n# Use the `cat` command to read the content of\
-    \ the generated JSON file and pipe it to `jq` for parsing and formatting\ncat\
-    \ $HOME/warning_events.json | jq -r '[.items[] \n  # Extract and transform relevant\
-    \ event fields into a custom structure\n  | {namespace: .involvedObject.namespace,\
-    \ \n     kind: .involvedObject.kind, \n     baseName: ((if .involvedObject.kind\
-    \ == \"Pod\" \n                 then (.involvedObject.name | split(\"-\")[:-1]\
-    \ | join(\"-\")) \n                 else .involvedObject.name end) // \"\"), \n\
-    \     count: .count, \n     firstTimestamp: .firstTimestamp, \n     lastTimestamp:\
-    \ .lastTimestamp, \n     reason: .reason, \n     message: .message}] \n  # Group\
-    \ the events based on namespace, kind, and baseName\n  | group_by(.namespace,\
-    \ .kind, .baseName) \n  # Compute aggregate information for each group\n  | map({\n\
-    \      object: (.[0].namespace + \"/\" + .[0].kind + \"/\" + .[0].baseName), \n\
-    \      total_events: (reduce .[] as $event (0; . + $event.count)), \n      summary_messages:\
-    \ (map(.message) | unique | join(\"; \")), \n      oldest_timestamp: (map(.firstTimestamp)\
-    \ | sort | first), \n      most_recent_timestamp: (map(.lastTimestamp) | sort\
-    \ | last)\n    }) \n  # Filter and select only the relevant events that occurred\
-    \ within the last 30 minutes\n  | map(select((now - ((.most_recent_timestamp |\
-    \ fromdateiso8601)))/60 <= 30))'\n"
+    Documentation links not available'
+  explanation: Explanation not available
+  multi_line_details: Multi-line script not available
   name: troubleshoot_warning_events_in_namespace_namespace
 - command: 'kubectl get events --field-selector type=Warning --context ${CONTEXT}
     -n ${NAMESPACE} -o json > $HOME/warning_events.json && cat $HOME/warning_events.json
@@ -62,40 +31,9 @@ commands:
     <= 30))'''
   doc_links: '
 
-    - [Kubernetes warning events](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#-kubectl-get-events){:target="_blank"}
-
-    - [Understanding Kubernetes contexts and namespaces](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
-
-    - [Formatting output in JSON file with kubectl](https://kubernetes.io/docs/reference/kubectl/cheatsheet/#formatting-output){:target="_blank"}
-
-    - [Filtering and organizing data with kubectl](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#-kubectl-get){:target="_blank"}'
-  explanation: This command gets warning events from a specific context and namespace
-    in Kubernetes, then formats the output into a JSON file. It also filters and organizes
-    the data to generate a summary of the events within the last 30 minutes.
-  multi_line_details: "\n# Set the context variable to define the Kubernetes cluster\
-    \ to operate on\nCONTEXT=\"your_context_name\"\n\n# Set the namespace variable\
-    \ to specify a specific namespace within the Kubernetes cluster\nNAMESPACE=\"\
-    your_namespace\"\n\n# Use kubectl to get events of type Warning from the specified\
-    \ context and namespace, then store the output in a JSON file\nkubectl get events\
-    \ --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json >\
-    \ $HOME/warning_events.json \n\n# Use the `cat` command to read the content of\
-    \ the generated JSON file and pipe it to `jq` for parsing and formatting\ncat\
-    \ $HOME/warning_events.json | jq -r '[.items[] \n  # Extract and transform relevant\
-    \ event fields into a custom structure\n  | {namespace: .involvedObject.namespace,\
-    \ \n     kind: .involvedObject.kind, \n     baseName: ((if .involvedObject.kind\
-    \ == \"Pod\" \n                 then (.involvedObject.name | split(\"-\")[:-1]\
-    \ | join(\"-\")) \n                 else .involvedObject.name end) // \"\"), \n\
-    \     count: .count, \n     firstTimestamp: .firstTimestamp, \n     lastTimestamp:\
-    \ .lastTimestamp, \n     reason: .reason, \n     message: .message}] \n  # Group\
-    \ the events based on namespace, kind, and baseName\n  | group_by(.namespace,\
-    \ .kind, .baseName) \n  # Compute aggregate information for each group\n  | map({\n\
-    \      object: (.[0].namespace + \"/\" + .[0].kind + \"/\" + .[0].baseName), \n\
-    \      total_events: (reduce .[] as $event (0; . + $event.count)), \n      summary_messages:\
-    \ (map(.message) | unique | join(\"; \")), \n      oldest_timestamp: (map(.firstTimestamp)\
-    \ | sort | first), \n      most_recent_timestamp: (map(.lastTimestamp) | sort\
-    \ | last)\n    }) \n  # Filter and select only the relevant events that occurred\
-    \ within the last 30 minutes\n  | map(select((now - ((.most_recent_timestamp |\
-    \ fromdateiso8601)))/60 <= 30))'\n"
+    Documentation links not available'
+  explanation: Explanation not available
+  multi_line_details: Multi-line script not available
   name: troubleshoot_warning_events_in_namespace_namespace
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r
     --argjson exit_code_explanations ''{"0": "Success", "1": "Error", "2": "Misconfiguration",
@@ -110,34 +48,9 @@ commands:
     | tostring] // "Unknown exit code")") + "\n---\n"'''
   doc_links: '
 
-    - [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
-
-    - [JSON output format in kubectl](https://kubernetes.io/docs/reference/kubectl/cheatsheet/#formatting-output-using-jsonpath){:target="_blank"}
-
-    - [jq tool documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command uses kubectl to get information about pods in a specific
-    context and namespace in JSON format, then uses jq to format the output to include
-    details about any containers that have been restarted, including the exit code
-    and an explanation for each exit code based on a predefined set of codes.
-  multi_line_details: "\n# Use kubectl to get information about pods in a specific\
-    \ namespace with a given context\nkubectl get pods --context=${CONTEXT} -n ${NAMESPACE}\
-    \ -o json \\\n    # Pipe the output into jq for JSON processing\n    | jq -r --argjson\
-    \ exit_code_explanations '{\"0\": \"Success\", \"1\": \"Error\", \"2\": \"Misconfiguration\"\
-    , \"130\": \"Pod terminated by SIGINT\", \"134\": \"Abnormal Termination SIGABRT\"\
-    , \"137\": \"Pod terminated by SIGKILL - Possible OOM\", \"143\":\"Graceful Termination\
-    \ SIGTERM\"}' \\\n    # Select specific fields from the JSON output\n    '.items[]\
-    \ | select(.status.containerStatuses != null) | select(any(.status.containerStatuses[];\
-    \ .restartCount > 0)) |\n        # Format the selected fields for better human\
-    \ readability\n        \"---\\npod_name: \\(.metadata.name)\\n\" +\n        (.status.containerStatuses[]\
-    \ | \"containers: \\(.name)\\nrestart_count: \\(.restartCount)\\nmessage: \\(.state.waiting.message\
-    \ // \"N/A\")\\nterminated_reason: \\(.lastState.terminated.reason // \"N/A\"\
-    )\\nterminated_finishedAt: \\(.lastState.terminated.finishedAt // \"N/A\")\\nterminated_exitCode:\
-    \ \\(.lastState.terminated.exitCode // \"N/A\")\\nexit_code_explanation: \\($exit_code_explanations[.lastState.terminated.exitCode\
-    \ | tostring] // \"Unknown exit code\")\") + \"\\n---\\n\"'\n\nExplanation:\n\
-    This multi-line command uses kubectl to retrieve information about pods within\
-    \ a specific namespace and context. The output is then processed using jq for\
-    \ better human readability. The individual components of the jq command are explained\
-    \ via inline comments for clarity."
+    Documentation links not available'
+  explanation: Explanation not available
+  multi_line_details: Multi-line script not available
   name: troubleshoot_container_restarts_in_namespace_namespace
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r
     --argjson exit_code_explanations ''{"0": "Success", "1": "Error", "2": "Misconfiguration",
@@ -152,34 +65,9 @@ commands:
     | tostring] // "Unknown exit code")") + "\n---\n"'''
   doc_links: '
 
-    - [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
-
-    - [JSON output format in kubectl](https://kubernetes.io/docs/reference/kubectl/cheatsheet/#formatting-output-using-jsonpath){:target="_blank"}
-
-    - [jq tool documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command uses kubectl to get information about pods in a specific
-    context and namespace in JSON format, then uses jq to format the output to include
-    details about any containers that have been restarted, including the exit code
-    and an explanation for each exit code based on a predefined set of codes.
-  multi_line_details: "\n# Use kubectl to get information about pods in a specific\
-    \ namespace with a given context\nkubectl get pods --context=${CONTEXT} -n ${NAMESPACE}\
-    \ -o json \\\n    # Pipe the output into jq for JSON processing\n    | jq -r --argjson\
-    \ exit_code_explanations '{\"0\": \"Success\", \"1\": \"Error\", \"2\": \"Misconfiguration\"\
-    , \"130\": \"Pod terminated by SIGINT\", \"134\": \"Abnormal Termination SIGABRT\"\
-    , \"137\": \"Pod terminated by SIGKILL - Possible OOM\", \"143\":\"Graceful Termination\
-    \ SIGTERM\"}' \\\n    # Select specific fields from the JSON output\n    '.items[]\
-    \ | select(.status.containerStatuses != null) | select(any(.status.containerStatuses[];\
-    \ .restartCount > 0)) |\n        # Format the selected fields for better human\
-    \ readability\n        \"---\\npod_name: \\(.metadata.name)\\n\" +\n        (.status.containerStatuses[]\
-    \ | \"containers: \\(.name)\\nrestart_count: \\(.restartCount)\\nmessage: \\(.state.waiting.message\
-    \ // \"N/A\")\\nterminated_reason: \\(.lastState.terminated.reason // \"N/A\"\
-    )\\nterminated_finishedAt: \\(.lastState.terminated.finishedAt // \"N/A\")\\nterminated_exitCode:\
-    \ \\(.lastState.terminated.exitCode // \"N/A\")\\nexit_code_explanation: \\($exit_code_explanations[.lastState.terminated.exitCode\
-    \ | tostring] // \"Unknown exit code\")\") + \"\\n---\\n\"'\n\nExplanation:\n\
-    This multi-line command uses kubectl to retrieve information about pods within\
-    \ a specific namespace and context. The output is then processed using jq for\
-    \ better human readability. The individual components of the jq command are explained\
-    \ via inline comments for clarity."
+    Documentation links not available'
+  explanation: Explanation not available
+  multi_line_details: Multi-line script not available
   name: troubleshoot_container_restarts_in_namespace_namespace
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending
     --no-headers -o json | jq -r ''.items[] | "pod_name: \(.metadata.name)\nstatus:
@@ -190,35 +78,9 @@ commands:
     // "N/A")\n_______-"'''
   doc_links: '
 
-    - [Retrieving data about pods](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#getting-information){:target="_blank"}
-
-    - [Filtering pods by status](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase){:target="_blank"}
-
-    - [Formatting data to display specific fields](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#output-options){:target="_blank"}'
-  explanation: This command retrieves information about pods in a specific Kubernetes
-    context and namespace, filtering for those with a pending status. It then formats
-    this data to display the pod name, status, message, reason, container status,
-    container message, and container reason.
-  multi_line_details: "\n# Set the current context and namespace to use for the kubectl\
-    \ command\n# This is important as it ensures we are targeting the correct environment\n\
-    CONTEXT=my-context\nNAMESPACE=my-namespace\n\n# Use kubectl to get pods from the\
-    \ specified context and namespace with a pending status\n# We use --no-headers\
-    \ to exclude the column headers and -o json to output the results in JSON format\n\
-    kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending\
-    \ --no-headers -o json | \n\n# Use jq to parse the JSON output and extract specific\
-    \ information about each pod\n# The | symbol is used to pipe the results of the\
-    \ previous command into jq for further processing\njq -r '.items[] | \n\"pod_name:\
-    \ \\(.metadata.name)\\n\nstatus: \\(.status.phase // \"N/A\")\\n\nmessage: \\\
-    (.status.conditions[0].message // \"N/A\")\\n\nreason: \\(.status.conditions[0].reason\
-    \ // \"N/A\")\\n\ncontainerStatus: \\((.status.containerStatuses[0].state // \"\
-    N/A\"))\\n\ncontainerMessage: \\(.status.containerStatuses[0].state.waiting?.message\
-    \ // \"N/A\")\\n\ncontainerReason: \\(.status.containerStatuses[0].state.waiting?.reason\
-    \ // \"N/A\")\\n\n_______-\"'\n\n\nThis multiline command breaks down each step\
-    \ of the original one-liner and provides explanations for each part. It includes\
-    \ setting the context and namespace, using kubectl to get pods with a pending\
-    \ status, and then using jq to extract specific information about each pod from\
-    \ the JSON output. This can help newer or less experienced devops engineers understand\
-    \ and learn from the command."
+    Documentation links not available'
+  explanation: Explanation not available
+  multi_line_details: Multi-line script not available
   name: troubleshoot_pending_pods_in_namespace_namespace
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending
     --no-headers -o json | jq -r ''.items[] | "pod_name: \(.metadata.name)\nstatus:
@@ -229,35 +91,9 @@ commands:
     // "N/A")\n_______-"'''
   doc_links: '
 
-    - [Retrieving data about pods](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#getting-information){:target="_blank"}
-
-    - [Filtering pods by status](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase){:target="_blank"}
-
-    - [Formatting data to display specific fields](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#output-options){:target="_blank"}'
-  explanation: This command retrieves information about pods in a specific Kubernetes
-    context and namespace, filtering for those with a pending status. It then formats
-    this data to display the pod name, status, message, reason, container status,
-    container message, and container reason.
-  multi_line_details: "\n# Set the current context and namespace to use for the kubectl\
-    \ command\n# This is important as it ensures we are targeting the correct environment\n\
-    CONTEXT=my-context\nNAMESPACE=my-namespace\n\n# Use kubectl to get pods from the\
-    \ specified context and namespace with a pending status\n# We use --no-headers\
-    \ to exclude the column headers and -o json to output the results in JSON format\n\
-    kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending\
-    \ --no-headers -o json | \n\n# Use jq to parse the JSON output and extract specific\
-    \ information about each pod\n# The | symbol is used to pipe the results of the\
-    \ previous command into jq for further processing\njq -r '.items[] | \n\"pod_name:\
-    \ \\(.metadata.name)\\n\nstatus: \\(.status.phase // \"N/A\")\\n\nmessage: \\\
-    (.status.conditions[0].message // \"N/A\")\\n\nreason: \\(.status.conditions[0].reason\
-    \ // \"N/A\")\\n\ncontainerStatus: \\((.status.containerStatuses[0].state // \"\
-    N/A\"))\\n\ncontainerMessage: \\(.status.containerStatuses[0].state.waiting?.message\
-    \ // \"N/A\")\\n\ncontainerReason: \\(.status.containerStatuses[0].state.waiting?.reason\
-    \ // \"N/A\")\\n\n_______-\"'\n\n\nThis multiline command breaks down each step\
-    \ of the original one-liner and provides explanations for each part. It includes\
-    \ setting the context and namespace, using kubectl to get pods with a pending\
-    \ status, and then using jq to extract specific information about each pod from\
-    \ the JSON output. This can help newer or less experienced devops engineers understand\
-    \ and learn from the command."
+    Documentation links not available'
+  explanation: Explanation not available
+  multi_line_details: Multi-line script not available
   name: troubleshoot_pending_pods_in_namespace_namespace
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed
     --no-headers -o json | jq -r --argjson exit_code_explanations ''{"0": "Success",
@@ -271,51 +107,9 @@ commands:
     | tostring] // "Unknown exit code")\n_______-"'''
   doc_links: '
 
-    - [Retrieving pod information in Kubernetes](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#describe){:target="_blank"}
-
-    - [Understanding pod restart count and termination message](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy){:target="_blank"}
-
-    - [Exit codes in Linux](https://linux.die.net/man/7/signal){:target="_blank"}
-
-    - [Kubernetes namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}'
-  explanation: This command is used to retrieve information about failed pods within
-    a specific namespace, including their name, restart count, termination message,
-    finish time, and exit code explanation. The exit code explanations are based on
-    the specific exit codes returned by the failed pods.
-  multi_line_details: '
-
-    # Use the "kubectl" command to get information about pods that have failed in
-    a specific context and namespace
-
-    kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed
-    --no-headers -o json \
-
-
-    # Pipe the output to the "jq" command to process and format the JSON output for
-    better readability
-
-    | jq -r --argjson exit_code_explanations ''{"0": "Success", "1": "Error", "2":
-    "Misconfiguration", "130": "Pod terminated by SIGINT", "134": "Abnormal Termination
-    SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination
-    SIGTERM"}'' ''.items[] |
-
-
-    # Extract and display relevant information about each pod in a structured format
-    with additional explanations
-
-    "pod_name: \(.metadata.name)\nrestart_count: \(.status.containerStatuses[0].restartCount
-    // "N/A")\nmessage: \(.status.message // "N/A")\nterminated_finishedAt: \(.status.containerStatuses[0].state.terminated.finishedAt
-    // "N/A")\nexit_code: \(.status.containerStatuses[0].state.terminated.exitCode
-    // "N/A")\nexit_code_explanation: \($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode
-    | tostring] // "Unknown exit code")\n_______-"''
-
-
-    In the above multi-line command, we use the `kubectl` command to retrieve information
-    about failed pods within a specific context and namespace. We then use the `jq`
-    tool to process and format the JSON output to extract and display relevant information
-    about each pod, such as its name, restart count, message, finished timestamp,
-    exit code, and an explanation for the exit code. This helps provide insights into
-    the reasons for pod failures and aids in troubleshooting.'
+    Documentation links not available'
+  explanation: Explanation not available
+  multi_line_details: Multi-line script not available
   name: troubleshoot_failed_pods_in_namespace_namespace
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed
     --no-headers -o json | jq -r --argjson exit_code_explanations ''{"0": "Success",
@@ -329,51 +123,9 @@ commands:
     | tostring] // "Unknown exit code")\n_______-"'''
   doc_links: '
 
-    - [Retrieving pod information in Kubernetes](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#describe){:target="_blank"}
-
-    - [Understanding pod restart count and termination message](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy){:target="_blank"}
-
-    - [Exit codes in Linux](https://linux.die.net/man/7/signal){:target="_blank"}
-
-    - [Kubernetes namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}'
-  explanation: This command is used to retrieve information about failed pods within
-    a specific namespace, including their name, restart count, termination message,
-    finish time, and exit code explanation. The exit code explanations are based on
-    the specific exit codes returned by the failed pods.
-  multi_line_details: '
-
-    # Use the "kubectl" command to get information about pods that have failed in
-    a specific context and namespace
-
-    kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed
-    --no-headers -o json \
-
-
-    # Pipe the output to the "jq" command to process and format the JSON output for
-    better readability
-
-    | jq -r --argjson exit_code_explanations ''{"0": "Success", "1": "Error", "2":
-    "Misconfiguration", "130": "Pod terminated by SIGINT", "134": "Abnormal Termination
-    SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination
-    SIGTERM"}'' ''.items[] |
-
-
-    # Extract and display relevant information about each pod in a structured format
-    with additional explanations
-
-    "pod_name: \(.metadata.name)\nrestart_count: \(.status.containerStatuses[0].restartCount
-    // "N/A")\nmessage: \(.status.message // "N/A")\nterminated_finishedAt: \(.status.containerStatuses[0].state.terminated.finishedAt
-    // "N/A")\nexit_code: \(.status.containerStatuses[0].state.terminated.exitCode
-    // "N/A")\nexit_code_explanation: \($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode
-    | tostring] // "Unknown exit code")\n_______-"''
-
-
-    In the above multi-line command, we use the `kubectl` command to retrieve information
-    about failed pods within a specific context and namespace. We then use the `jq`
-    tool to process and format the JSON output to extract and display relevant information
-    about each pod, such as its name, restart count, message, finished timestamp,
-    exit code, and an explanation for the exit code. This helps provide insights into
-    the reasons for pod failures and aids in troubleshooting.'
+    Documentation links not available'
+  explanation: Explanation not available
+  multi_line_details: Multi-line script not available
   name: troubleshoot_failed_pods_in_namespace_namespace
 - command: 'kubectl get pods --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r
     ''.items[] | select(.status.conditions[]? | select(.type == "Ready" and .status
@@ -381,29 +133,9 @@ commands:
     conditions: .status.conditions}'' | jq -s ''.'''
   doc_links: '
 
-    - [Kubernetes Concepts](https://kubernetes.io/docs/concepts/){:target="_blank"}
-
-    - [Kubectl Command Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
-
-    - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [jq Tool Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command retrieves information about pods in a Kubernetes cluster,
-    within a specific context and namespace, and displays it in JSON format. It uses
-    the `jq` tool to filter out specific conditions of the pods such as status not
-    being ready or completed.
-  multi_line_details: "\n# This command retrieves a list of pods in the specified\
-    \ namespace using the provided kubectl context and outputs the results as JSON.\n\
-    kubectl get pods --context ${CONTEXT} -n ${NAMESPACE} -o json | \\\n\n# This part\
-    \ of the command uses jq to filter and format the JSON output. It selects only\
-    \ the pods that are not ready or have an incomplete status.\njq -r '.items[] |\
-    \ \n\n  # After selecting the pods, this portion filters the status conditions\
-    \ to check for readiness and completeness, and then formats the output to include\
-    \ the kind, name, and conditions.\n  select(.status.conditions[]? | \n    select(.type\
-    \ == \"Ready\" and .status == \"False\" and .reason != \"PodCompleted\")) | \n\
-    \    {kind: .kind, name: .metadata.name, conditions: .status.conditions}' | \\\
-    \n\n# This pipe combines the selected JSON objects into an array before printing\
-    \ the final output.\njq -s '.'  \n"
+    Documentation links not available'
+  explanation: Explanation not available
+  multi_line_details: Multi-line script not available
   name: troubleshoot_workload_status_conditions_in_namespace_namespace
 - command: 'kubectl get pods --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r
     ''.items[] | select(.status.conditions[]? | select(.type == "Ready" and .status
@@ -411,139 +143,25 @@ commands:
     conditions: .status.conditions}'' | jq -s ''.'''
   doc_links: '
 
-    - [Kubernetes Concepts](https://kubernetes.io/docs/concepts/){:target="_blank"}
-
-    - [Kubectl Command Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
-
-    - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [jq Tool Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command retrieves information about pods in a Kubernetes cluster,
-    within a specific context and namespace, and displays it in JSON format. It uses
-    the `jq` tool to filter out specific conditions of the pods such as status not
-    being ready or completed.
-  multi_line_details: "\n# This command retrieves a list of pods in the specified\
-    \ namespace using the provided kubectl context and outputs the results as JSON.\n\
-    kubectl get pods --context ${CONTEXT} -n ${NAMESPACE} -o json | \\\n\n# This part\
-    \ of the command uses jq to filter and format the JSON output. It selects only\
-    \ the pods that are not ready or have an incomplete status.\njq -r '.items[] |\
-    \ \n\n  # After selecting the pods, this portion filters the status conditions\
-    \ to check for readiness and completeness, and then formats the output to include\
-    \ the kind, name, and conditions.\n  select(.status.conditions[]? | \n    select(.type\
-    \ == \"Ready\" and .status == \"False\" and .reason != \"PodCompleted\")) | \n\
-    \    {kind: .kind, name: .metadata.name, conditions: .status.conditions}' | \\\
-    \n\n# This pipe combines the selected JSON objects into an array before printing\
-    \ the final output.\njq -s '.'  \n"
+    Documentation links not available'
+  explanation: Explanation not available
+  multi_line_details: Multi-line script not available
   name: troubleshoot_workload_status_conditions_in_namespace_namespace
 - command: kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT}
     | xargs -n 1 kubectl get --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}
   doc_links: '
 
-    - [kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
-
-    - [API Resources in Kubernetes](https://kubernetes.io/docs/reference/using-api/api-overview/){:target="_blank"}
-
-    - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}'
-  explanation: This command uses kubectl to list all the API resources available in
-    a given Kubernetes context, and then retrieves detailed information for each resource
-    within a specific namespace. It is useful for quickly querying and understanding
-    the resources available within a Kubernetes cluster.
-  multi_line_details: '# This command lists all the available API resources in a Kubernetes
-    cluster
-
-    # It then performs a list operation on each resource in the specified namespace
-
-
-    # First, we use `kubectl api-resources` to list all available API resources
-
-    # We specify the verbs as "list" and the resources as "namespaced" using the flags
-    --verbs=list and --namespaced
-
-    # We also specify the output format as just the name of each resource with the
-    flag -o name
-
-    # We use the context flag to specify the Kubernetes context we want to operate
-    in
-
-
-    kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT} |
-
-
-    # Next, we use xargs to iterate over each listed resource and perform a get operation
-    on it
-
-    # We use the flag -n 1 to limit each iteration to one item from the input
-
-    # Within the xargs command, we use kubectl get to perform a get operation on each
-    resource
-
-    # We use the flag --show-kind to display the kind of each resource in the output
-
-    # The flag --ignore-not-found is used to ignore resources that are not found in
-    the specified namespace
-
-    # We use the flag -n ${NAMESPACE} to specify the namespace for the get operation
-
-    # Finally, we use the context flag again to specify the Kubernetes context we
-    want to operate in
-
-
-    xargs -n 1 kubectl get --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}'
+    Documentation links not available'
+  explanation: Explanation not available
+  multi_line_details: Multi-line script not available
   name: get_listing_of_resources_in_namespace_namespace
 - command: kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT}
     | xargs -n 1 kubectl get --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}
   doc_links: '
 
-    - [kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
-
-    - [API Resources in Kubernetes](https://kubernetes.io/docs/reference/using-api/api-overview/){:target="_blank"}
-
-    - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}'
-  explanation: This command uses kubectl to list all the API resources available in
-    a given Kubernetes context, and then retrieves detailed information for each resource
-    within a specific namespace. It is useful for quickly querying and understanding
-    the resources available within a Kubernetes cluster.
-  multi_line_details: '# This command lists all the available API resources in a Kubernetes
-    cluster
-
-    # It then performs a list operation on each resource in the specified namespace
-
-
-    # First, we use `kubectl api-resources` to list all available API resources
-
-    # We specify the verbs as "list" and the resources as "namespaced" using the flags
-    --verbs=list and --namespaced
-
-    # We also specify the output format as just the name of each resource with the
-    flag -o name
-
-    # We use the context flag to specify the Kubernetes context we want to operate
-    in
-
-
-    kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT} |
-
-
-    # Next, we use xargs to iterate over each listed resource and perform a get operation
-    on it
-
-    # We use the flag -n 1 to limit each iteration to one item from the input
-
-    # Within the xargs command, we use kubectl get to perform a get operation on each
-    resource
-
-    # We use the flag --show-kind to display the kind of each resource in the output
-
-    # The flag --ignore-not-found is used to ignore resources that are not found in
-    the specified namespace
-
-    # We use the flag -n ${NAMESPACE} to specify the namespace for the get operation
-
-    # Finally, we use the context flag again to specify the Kubernetes context we
-    want to operate in
-
-
-    xargs -n 1 kubectl get --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}'
+    Documentation links not available'
+  explanation: Explanation not available
+  multi_line_details: Multi-line script not available
   name: get_listing_of_resources_in_namespace_namespace
 - command: 'kubectl get events --field-selector type!=Warning --context ${CONTEXT}
     -n ${NAMESPACE} -o json > $HOME/events.json && cat $HOME/events.json | jq -r ''[.items[]
@@ -563,40 +181,9 @@ commands:
     | unique | join("; ")} | select(.events_per_minute > $threshold)'' | jq -s ''.'''
   doc_links: '
 
-    - [Using JQ to process JSON](https://stedolan.github.io/jq/manual/){:target="_blank"}
-
-    - [Formatting Data with JQ](https://programminghistorian.org/en/lessons/json-and-jq){:target="_blank"}'
-  explanation: This command retrieves events from a Kubernetes cluster that are not
-    warnings, and then filters and formats the data using jq to extract specific information
-    about the events and present it in a structured JSON format.
-  multi_line_details: "\n# Use kubectl to get the events from a specific Kubernetes\
-    \ context and namespace, and output the result as JSON into a file called events.json\
-    \ in the home directory.\nkubectl get events --field-selector type!=Warning --context\
-    \ ${CONTEXT} -n ${NAMESPACE} -o json > $HOME/events.json && \n\n# Then, use jq\
-    \ to extract and process relevant information from the JSON file:\n# 1. Extract\
-    \ the necessary fields such as namespace, kind, name, count, timestamps, reason,\
-    \ and message for each event item.\n# 2. Group the events by namespace, kind,\
-    \ and name.\n# 3. Reduce the events and calculate the events per minute, total\
-    \ events, and unique summary messages for each group.\n# 4. Filter out the results\
-    \ based on an anomaly threshold.\n\ncat $HOME/events.json | jq -r '[.items[] |\
-    \ {namespace: .involvedObject.namespace, kind: .involvedObject.kind, name: ((if\
-    \ .involvedObject and .involvedObject.kind == \"Pod\" then (.involvedObject.name\
-    \ | split(\"-\")[:-1] | join(\"-\")) else .involvedObject.name end) // \"\"),\
-    \ count: .count, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp,\
-    \ reason: .reason, message: .message}] | \ngroup_by(.namespace, .kind, .name)\
-    \ | \n.[] | \n{(.[0].namespace + \"/\" + .[0].kind + \"/\" + .[0].name): {events:\
-    \ .}}' |\n\n# Further processing using jq to calculate events per minute, total\
-    \ events, and filter based on an anomaly threshold.\njq -r --argjson threshold\
-    \ \"${ANOMALY_THRESHOLD}\" 'to_entries[] | \n{object: .key, \noldest_timestamp:\
-    \ ([.value.events[] | .firstTimestamp] | min), \nmost_recent_timestamp: (reduce\
-    \ .value.events[] as $event (.value.firstTimestamp; if ($event.lastTimestamp >\
-    \ .) then $event.lastTimestamp else . end)), \nevents_per_minute: (reduce .value.events[]\
-    \ as $event (0; . + ($event.count / (((($event.lastTimestamp | fromdateiso8601)\
-    \ - ($event.firstTimestamp | fromdateiso8601)) / 60) | if . == 0 then 1 else .\
-    \ end))) | floor), \ntotal_events: (reduce .value.events[] as $event (0; . + $event.count)),\
-    \ \nsummary_messages: [.value.events[] | .message] | unique | join(\"; \")} |\
-    \ \nselect(.events_per_minute > $threshold)' |\n\n# Convert the result into a\
-    \ single JSON array\njq -s '.'\n"
+    Documentation links not available'
+  explanation: Explanation not available
+  multi_line_details: Multi-line script not available
   name: check_event_anomalies_in_namespace_namespace
 - command: 'kubectl get events --field-selector type!=Warning --context ${CONTEXT}
     -n ${NAMESPACE} -o json > $HOME/events.json && cat $HOME/events.json | jq -r ''[.items[]
@@ -616,40 +203,9 @@ commands:
     | unique | join("; ")} | select(.events_per_minute > $threshold)'' | jq -s ''.'''
   doc_links: '
 
-    - [Using JQ to process JSON](https://stedolan.github.io/jq/manual/){:target="_blank"}
-
-    - [Formatting Data with JQ](https://programminghistorian.org/en/lessons/json-and-jq){:target="_blank"}'
-  explanation: This command retrieves events from a Kubernetes cluster that are not
-    warnings, and then filters and formats the data using jq to extract specific information
-    about the events and present it in a structured JSON format.
-  multi_line_details: "\n# Use kubectl to get the events from a specific Kubernetes\
-    \ context and namespace, and output the result as JSON into a file called events.json\
-    \ in the home directory.\nkubectl get events --field-selector type!=Warning --context\
-    \ ${CONTEXT} -n ${NAMESPACE} -o json > $HOME/events.json && \n\n# Then, use jq\
-    \ to extract and process relevant information from the JSON file:\n# 1. Extract\
-    \ the necessary fields such as namespace, kind, name, count, timestamps, reason,\
-    \ and message for each event item.\n# 2. Group the events by namespace, kind,\
-    \ and name.\n# 3. Reduce the events and calculate the events per minute, total\
-    \ events, and unique summary messages for each group.\n# 4. Filter out the results\
-    \ based on an anomaly threshold.\n\ncat $HOME/events.json | jq -r '[.items[] |\
-    \ {namespace: .involvedObject.namespace, kind: .involvedObject.kind, name: ((if\
-    \ .involvedObject and .involvedObject.kind == \"Pod\" then (.involvedObject.name\
-    \ | split(\"-\")[:-1] | join(\"-\")) else .involvedObject.name end) // \"\"),\
-    \ count: .count, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp,\
-    \ reason: .reason, message: .message}] | \ngroup_by(.namespace, .kind, .name)\
-    \ | \n.[] | \n{(.[0].namespace + \"/\" + .[0].kind + \"/\" + .[0].name): {events:\
-    \ .}}' |\n\n# Further processing using jq to calculate events per minute, total\
-    \ events, and filter based on an anomaly threshold.\njq -r --argjson threshold\
-    \ \"${ANOMALY_THRESHOLD}\" 'to_entries[] | \n{object: .key, \noldest_timestamp:\
-    \ ([.value.events[] | .firstTimestamp] | min), \nmost_recent_timestamp: (reduce\
-    \ .value.events[] as $event (.value.firstTimestamp; if ($event.lastTimestamp >\
-    \ .) then $event.lastTimestamp else . end)), \nevents_per_minute: (reduce .value.events[]\
-    \ as $event (0; . + ($event.count / (((($event.lastTimestamp | fromdateiso8601)\
-    \ - ($event.firstTimestamp | fromdateiso8601)) / 60) | if . == 0 then 1 else .\
-    \ end))) | floor), \ntotal_events: (reduce .value.events[] as $event (0; . + $event.count)),\
-    \ \nsummary_messages: [.value.events[] | .message] | unique | join(\"; \")} |\
-    \ \nselect(.events_per_minute > $threshold)' |\n\n# Convert the result into a\
-    \ single JSON array\njq -s '.'\n"
+    Documentation links not available'
+  explanation: Explanation not available
+  multi_line_details: Multi-line script not available
   name: check_event_anomalies_in_namespace_namespace
 - command: 'services=($(kubectl get svc -o=name --context=${CONTEXT} -n ${NAMESPACE}))
     && [ \${#services[@]} -eq 0 ] && echo "No services found." || { > "logs.json";
@@ -665,43 +221,9 @@ commands:
     cat $HOME/output'
   doc_links: '
 
-    - [Kubernetes - Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
-
-    - [Kubernetes - Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [Kubernetes - Logging](https://kubernetes.io/docs/concepts/cluster-administration/logging/){:target="_blank"}
-
-    - [Regular Expressions Overview](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions){:target="_blank"}
-
-    - [JSON File Format](https://www.json.org/json-en.html){:target="_blank"}'
-  explanation: This command retrieves the logs for all services in a specified Kubernetes
-    context and namespace, filters them based on error and exclude patterns, then
-    outputs the results to a JSON file. If no logs are found for any service, it will
-    return a message indicating so.
-  multi_line_details: "\n# Set the 'services' variable to the result of the kubectl\
-    \ command\nservices=($(kubectl get svc -o=name --context=${CONTEXT} -n ${NAMESPACE}))\n\
-    \n# If there are no services found, output a message and exit\nif [ \\${#services[@]}\
-    \ -eq 0 ]; then\n    echo \"No services found.\"\nelse\n    # Otherwise, create\
-    \ a new file called logs.json and populate it with relevant log data for each\
-    \ service\n    > \"logs.json\"\n    for service in \"\\${services[@]}\"; do \n\
-    \        kubectl logs $service --limit-bytes=256000 --since=2h --context=${CONTEXT}\
-    \ -n ${NAMESPACE} 2>/dev/null | \n        grep -Ei \"${SERVICE_ERROR_PATTERN}\"\
-    \ | \n        grep -Ev \"${SERVICE_EXCLUDE_PATTERN}\" | \n        while read -r\
-    \ line; do \n            service_name=\"\\${service#*/}\"\n            message=$(echo\
-    \ \"$line\" | jq -aRs .)\n            printf '{\"service\": \"%s\", \"message\"\
-    : %s}\\n' \"\\${service_name}\" \"$message\" >> \"logs.json\"\n        done\n\
-    \    done\n    \n    # If no log entries are found, output a message. Otherwise,\
-    \ process the logs and generate JSON output\n    [ ! -s \"logs.json\" ] && echo\
-    \ \"No log entries found.\" || cat \"logs.json\" | \n    jq -s '[ (group_by(.service)\
-    \ | map({service: .[0].service, total_logs: length})), \n           (group_by(.service)\
-    \ | map({service: .[0].service, top_logs: \n           (group_by(.message[0:200])\
-    \ | map({message_start: .[0].message[0:200], count: length}) | sort_by(.count)\
-    \ | reverse | .[0:3])})) ] | add'\nfi\n\n# Redirect the output into a file in\
-    \ the home directory and then display the contents of the file\n> $HOME/output;\
-    \ cat $HOME/output\n\nIn this multi-line command, each section is broken down\
-    \ with comments to explain the purpose and functionality of that part. This helps\
-    \ newer or less experienced devops engineers to understand what each step does\
-    \ and how the whole command works."
+    Documentation links not available'
+  explanation: Explanation not available
+  multi_line_details: Multi-line script not available
   name: troubleshoot_services_and_application_workloads_in_namespace_namespace
 - command: 'services=($(kubectl get svc -o=name --context=${CONTEXT} -n ${NAMESPACE}))
     && [ \${#services[@]} -eq 0 ] && echo "No services found." || { > "logs.json";
@@ -717,43 +239,9 @@ commands:
     cat $HOME/output'
   doc_links: '
 
-    - [Kubernetes - Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
-
-    - [Kubernetes - Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [Kubernetes - Logging](https://kubernetes.io/docs/concepts/cluster-administration/logging/){:target="_blank"}
-
-    - [Regular Expressions Overview](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions){:target="_blank"}
-
-    - [JSON File Format](https://www.json.org/json-en.html){:target="_blank"}'
-  explanation: This command retrieves the logs for all services in a specified Kubernetes
-    context and namespace, filters them based on error and exclude patterns, then
-    outputs the results to a JSON file. If no logs are found for any service, it will
-    return a message indicating so.
-  multi_line_details: "\n# Set the 'services' variable to the result of the kubectl\
-    \ command\nservices=($(kubectl get svc -o=name --context=${CONTEXT} -n ${NAMESPACE}))\n\
-    \n# If there are no services found, output a message and exit\nif [ \\${#services[@]}\
-    \ -eq 0 ]; then\n    echo \"No services found.\"\nelse\n    # Otherwise, create\
-    \ a new file called logs.json and populate it with relevant log data for each\
-    \ service\n    > \"logs.json\"\n    for service in \"\\${services[@]}\"; do \n\
-    \        kubectl logs $service --limit-bytes=256000 --since=2h --context=${CONTEXT}\
-    \ -n ${NAMESPACE} 2>/dev/null | \n        grep -Ei \"${SERVICE_ERROR_PATTERN}\"\
-    \ | \n        grep -Ev \"${SERVICE_EXCLUDE_PATTERN}\" | \n        while read -r\
-    \ line; do \n            service_name=\"\\${service#*/}\"\n            message=$(echo\
-    \ \"$line\" | jq -aRs .)\n            printf '{\"service\": \"%s\", \"message\"\
-    : %s}\\n' \"\\${service_name}\" \"$message\" >> \"logs.json\"\n        done\n\
-    \    done\n    \n    # If no log entries are found, output a message. Otherwise,\
-    \ process the logs and generate JSON output\n    [ ! -s \"logs.json\" ] && echo\
-    \ \"No log entries found.\" || cat \"logs.json\" | \n    jq -s '[ (group_by(.service)\
-    \ | map({service: .[0].service, total_logs: length})), \n           (group_by(.service)\
-    \ | map({service: .[0].service, top_logs: \n           (group_by(.message[0:200])\
-    \ | map({message_start: .[0].message[0:200], count: length}) | sort_by(.count)\
-    \ | reverse | .[0:3])})) ] | add'\nfi\n\n# Redirect the output into a file in\
-    \ the home directory and then display the contents of the file\n> $HOME/output;\
-    \ cat $HOME/output\n\nIn this multi-line command, each section is broken down\
-    \ with comments to explain the purpose and functionality of that part. This helps\
-    \ newer or less experienced devops engineers to understand what each step does\
-    \ and how the whole command works."
+    Documentation links not available'
+  explanation: Explanation not available
+  multi_line_details: Multi-line script not available
   name: troubleshoot_services_and_application_workloads_in_namespace_namespace
 - command: context="${CONTEXT}"; namespace="${NAMESPACE}"; check_health() { local
     type=$1; local name=$2; local replicas=$3; local selector=$4; local pdbs=$(kubectl
@@ -779,52 +267,9 @@ commands:
     -r line; do check_health "StatefulSet" $(echo $line | tr -d '"'); done
   doc_links: '
 
-    - [Kubernetes Documentation: Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
-
-    - [Kubernetes Documentation: StatefulSets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
-
-    - [Kubernetes Documentation: Pod Disruption Budgets (PDBs)](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/){:target="_blank"}'
-  explanation: This script checks the health of deployments and statefulsets in a
-    Kubernetes cluster by verifying if the corresponding Pod Disruption Budgets (PDBs)
-    are risky, missing, or okay based on their configuration. It then prints out the
-    status of each deployment and statefulset along with their PDB status.
-  multi_line_details: "\n# Set the context and namespace variables by replacing placeholders\
-    \ with actual values\ncontext=\"${CONTEXT}\"; \nnamespace=\"${NAMESPACE}\"; \n\
-    \n# Define a function to check the health of a resource based on certain conditions\n\
-    check_health() { \n  local type=$1; \n  local name=$2; \n  local replicas=$3;\
-    \ \n  local selector=$4; \n  # Retrieve the matching PodDisruptionBudgets (PDBs)\
-    \ for the specified resource\n  local pdbs=$(kubectl --context \"$context\" --namespace\
-    \ \"$namespace\" get pdb -o json | jq -c --arg selector \"$selector\" '.items[]\
-    \ | select(.spec.selector.matchLabels | to_entries[] | .key + \"=\" + .value ==\
-    \ $selector)');\n  if [[ $replicas -gt 1 && -z \"$pdbs\" ]]; then \n    # If the\
-    \ resource has more than 1 replica and no matching PDB is found, print \"Missing\"\
-    \n    printf \"%-30s %-30s %-10s\\n\" \"$type/$name\" \"\" \"Missing\"; \n  else\
-    \ \n    # If matching PDBs are found, evaluate their minAvailable and maxUnavailable\
-    \ values\n    echo \"$pdbs\" | jq -c . | while IFS= read -r pdb; do \n      local\
-    \ pdbName=$(echo \"$pdb\" | jq -r '.metadata.name'); \n      local minAvailable=$(echo\
-    \ \"$pdb\" | jq -r '.spec.minAvailable // \"\"'); \n      local maxUnavailable=$(echo\
-    \ \"$pdb\" | jq -r '.spec.maxUnavailable // \"\"'); \n      # Determine the status\
-    \ of the PDB based on minAvailable and maxUnavailable values\n      if [[ \"$minAvailable\"\
-    \ == \"100%\" || \"$maxUnavailable\" == \"0\" || \"$maxUnavailable\" == \"0%\"\
-    \ ]]; then \n        printf \"%-30s %-30s %-10s\\n\" \"$type/$name\" \"$pdbName\"\
-    \ \"Risky\"; \n      elif [[ $replicas -gt 1 && (\"$minAvailable\" != \"100%\"\
-    \ || \"$maxUnavailable\" != \"0\" || \"$maxUnavailable\" != \"0%\") ]]; then \n\
-    \        printf \"%-30s %-30s %-10s\\n\" \"$type/$name\" \"$pdbName\" \"OK\";\
-    \ \n      fi; \n    done; \n  fi; \n}; \n\n# Output the headers for the Deployments\
-    \ section\necho \"Deployments:\"; \necho \"_______\"; \nprintf \"%-30s %-30s %-10s\\\
-    n\" \"NAME\" \"PDB\" \"STATUS\"; \n\n# Retrieve and process the deployments, checking\
-    \ their health\nkubectl --context \"$context\" --namespace \"$namespace\" get\
-    \ deployments -o json | jq -c '.items[] | \"\\(.metadata.name) \\(.spec.replicas)\
-    \ \\(.spec.selector.matchLabels | to_entries[] | .key + \"=\" + .value)\"' | while\
-    \ read -r line; do \n  check_health \"Deployment\" $(echo $line | tr -d '\"');\
-    \ \ndone; \n\n# Output a blank line for clearer separation\necho \"\"; \n\n# Output\
-    \ the headers for the Statefulsets section\necho \"Statefulsets:\"; \necho \"\
-    _______\"; \nprintf \"%-30s %-30s %-10s\\n\" \"NAME\" \"PDB\" \"STATUS\"; \n\n\
-    # Retrieve and process the statefulsets, checking their health\nkubectl --context\
-    \ \"$context\" --namespace \"$namespace\" get statefulsets -o json | jq -c '.items[]\
-    \ | \"\\(.metadata.name) \\(.spec.replicas) \\(.spec.selector.matchLabels | to_entries[]\
-    \ | .key + \"=\" + .value)\"' | while read -r line; do \n  check_health \"StatefulSet\"\
-    \ $(echo $line | tr -d '\"'); \ndone\n"
+    Documentation links not available'
+  explanation: Explanation not available
+  multi_line_details: Multi-line script not available
   name: check_missing_or_risky_poddisruptionbudget_policies_in_namepace_namespace
 - command: context="${CONTEXT}"; namespace="${NAMESPACE}"; check_health() { local
     type=$1; local name=$2; local replicas=$3; local selector=$4; local pdbs=$(kubectl
@@ -850,50 +295,7 @@ commands:
     -r line; do check_health "StatefulSet" $(echo $line | tr -d '"'); done
   doc_links: '
 
-    - [Kubernetes Documentation: Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
-
-    - [Kubernetes Documentation: StatefulSets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
-
-    - [Kubernetes Documentation: Pod Disruption Budgets (PDBs)](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/){:target="_blank"}'
-  explanation: This script checks the health of deployments and statefulsets in a
-    Kubernetes cluster by verifying if the corresponding Pod Disruption Budgets (PDBs)
-    are risky, missing, or okay based on their configuration. It then prints out the
-    status of each deployment and statefulset along with their PDB status.
-  multi_line_details: "\n# Set the context and namespace variables by replacing placeholders\
-    \ with actual values\ncontext=\"${CONTEXT}\"; \nnamespace=\"${NAMESPACE}\"; \n\
-    \n# Define a function to check the health of a resource based on certain conditions\n\
-    check_health() { \n  local type=$1; \n  local name=$2; \n  local replicas=$3;\
-    \ \n  local selector=$4; \n  # Retrieve the matching PodDisruptionBudgets (PDBs)\
-    \ for the specified resource\n  local pdbs=$(kubectl --context \"$context\" --namespace\
-    \ \"$namespace\" get pdb -o json | jq -c --arg selector \"$selector\" '.items[]\
-    \ | select(.spec.selector.matchLabels | to_entries[] | .key + \"=\" + .value ==\
-    \ $selector)');\n  if [[ $replicas -gt 1 && -z \"$pdbs\" ]]; then \n    # If the\
-    \ resource has more than 1 replica and no matching PDB is found, print \"Missing\"\
-    \n    printf \"%-30s %-30s %-10s\\n\" \"$type/$name\" \"\" \"Missing\"; \n  else\
-    \ \n    # If matching PDBs are found, evaluate their minAvailable and maxUnavailable\
-    \ values\n    echo \"$pdbs\" | jq -c . | while IFS= read -r pdb; do \n      local\
-    \ pdbName=$(echo \"$pdb\" | jq -r '.metadata.name'); \n      local minAvailable=$(echo\
-    \ \"$pdb\" | jq -r '.spec.minAvailable // \"\"'); \n      local maxUnavailable=$(echo\
-    \ \"$pdb\" | jq -r '.spec.maxUnavailable // \"\"'); \n      # Determine the status\
-    \ of the PDB based on minAvailable and maxUnavailable values\n      if [[ \"$minAvailable\"\
-    \ == \"100%\" || \"$maxUnavailable\" == \"0\" || \"$maxUnavailable\" == \"0%\"\
-    \ ]]; then \n        printf \"%-30s %-30s %-10s\\n\" \"$type/$name\" \"$pdbName\"\
-    \ \"Risky\"; \n      elif [[ $replicas -gt 1 && (\"$minAvailable\" != \"100%\"\
-    \ || \"$maxUnavailable\" != \"0\" || \"$maxUnavailable\" != \"0%\") ]]; then \n\
-    \        printf \"%-30s %-30s %-10s\\n\" \"$type/$name\" \"$pdbName\" \"OK\";\
-    \ \n      fi; \n    done; \n  fi; \n}; \n\n# Output the headers for the Deployments\
-    \ section\necho \"Deployments:\"; \necho \"_______\"; \nprintf \"%-30s %-30s %-10s\\\
-    n\" \"NAME\" \"PDB\" \"STATUS\"; \n\n# Retrieve and process the deployments, checking\
-    \ their health\nkubectl --context \"$context\" --namespace \"$namespace\" get\
-    \ deployments -o json | jq -c '.items[] | \"\\(.metadata.name) \\(.spec.replicas)\
-    \ \\(.spec.selector.matchLabels | to_entries[] | .key + \"=\" + .value)\"' | while\
-    \ read -r line; do \n  check_health \"Deployment\" $(echo $line | tr -d '\"');\
-    \ \ndone; \n\n# Output a blank line for clearer separation\necho \"\"; \n\n# Output\
-    \ the headers for the Statefulsets section\necho \"Statefulsets:\"; \necho \"\
-    _______\"; \nprintf \"%-30s %-30s %-10s\\n\" \"NAME\" \"PDB\" \"STATUS\"; \n\n\
-    # Retrieve and process the statefulsets, checking their health\nkubectl --context\
-    \ \"$context\" --namespace \"$namespace\" get statefulsets -o json | jq -c '.items[]\
-    \ | \"\\(.metadata.name) \\(.spec.replicas) \\(.spec.selector.matchLabels | to_entries[]\
-    \ | .key + \"=\" + .value)\"' | while read -r line; do \n  check_health \"StatefulSet\"\
-    \ $(echo $line | tr -d '\"'); \ndone\n"
+    Documentation links not available'
+  explanation: Explanation not available
+  multi_line_details: Multi-line script not available
   name: check_missing_or_risky_poddisruptionbudget_policies_in_namepace_namespace
