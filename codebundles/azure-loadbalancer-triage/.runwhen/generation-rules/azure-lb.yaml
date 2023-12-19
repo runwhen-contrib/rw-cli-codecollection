@@ -7,7 +7,7 @@ spec:
         - azure_network_load_balancers
       matchRules:
         - type: pattern
-          pattern: ".+"
+          pattern: "kubernetes"
           properties: [name]
           mode: substring
       slxs:
