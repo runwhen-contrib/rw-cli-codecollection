@@ -110,13 +110,13 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     ...    ${DEPLOYMENT_NAME}
     ${readiness_probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_probes.sh
-    ...    cmd_override=./validate_probes.sh readinessProbe > readiness_probe_output.txt && cat readiness_probe_output.txt
+    ...    cmd_override=./validate_probes.sh readinessProbe
     ...    env=${env}
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
    ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' readiness_probe_output.txt
+    ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' <<< "${readiness_probe_health.stdout}"
     ...    env=${env}
     ...    include_in_history=false
     IF     len($recommendations.stdout) > 0 
