@@ -4,7 +4,7 @@ spec:
   platform: azure
   generationRules:
     - resourceTypes:
-        - azure_compute_virtual_machine_scale_set_vms
+        - azure_network_load_balancers
       matchRules:
         - type: pattern
           pattern: ".+"
