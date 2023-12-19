@@ -36,11 +36,11 @@ Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=echo '''${logs.stdout}''' | awk "/Recommended Next Steps:/ {start=1; getline} start"
+    ...    cmd=awk "/Recommended Next Steps:/ {start=1; getline} start" <<< "${logs.stdout}"
     ...    env=${env}
     ...    include_in_history=false
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=echo '''${logs.stdout}''' | awk '/Issues Identified:/ {start=1; next} /The namespace online-boutique has produced the following interesting events:/ {start=0} start'
+    ...    cmd=awk '/Issues Identified:/ {start=1; next} /The namespace online-boutique has produced the following interesting events:/ {start=0} start' <<< "${logs.stdout}"
     ...    env=${env}
     ...    include_in_history=false
     # FIXME: Refactor this to a loop of 1 issue per line of issue output - better alinging next steps with specific issues
