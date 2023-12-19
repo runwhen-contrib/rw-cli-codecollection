@@ -52,7 +52,7 @@ Remediate Readiness and Liveness Probe GitOps Manifests Namespace `${NAMESPACE}`
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${probe_health.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${probe_health.cmd_override}
+    RW.Core.Add Pre To Report    Commands Used: ${probe_health.cmd}
 
 
 *** Keywords ***
