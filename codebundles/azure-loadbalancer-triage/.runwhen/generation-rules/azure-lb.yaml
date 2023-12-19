@@ -4,14 +4,14 @@ spec:
   platform: azure
   generationRules:
     - resourceTypes:
-        - azure_compute_virtual_machine_scale_sets
+        - azure_compute_virtual_machine_scale_set_vms
       matchRules:
         - type: pattern
           pattern: ".+"
           properties: [name]
           mode: substring
       slxs:
-        - baseName: az-lb-health
+        - baseName: azure
           levelOfDetail: basic
           qualifiers: [resource_group]
           baseTemplateName: az-lb-health
