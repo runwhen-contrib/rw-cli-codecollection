@@ -11,7 +11,7 @@ spec:
           properties: [tags]
           mode: substring
       slxs:
-        - baseName: azure
+        - baseName: az-lb-health
           levelOfDetail: basic
           qualifiers: [resource, resource_group]
           baseTemplateName: az-lb-health
