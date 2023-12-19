@@ -21,13 +21,13 @@ Remediate Readiness and Liveness Probe GitOps Manifests Namespace `${NAMESPACE}`
     [Tags]    readiness    liveness    probe    deployment    remediate    gitops    ${namespace}
     ${probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_all_probes.sh
-    ...    cmd_override=./validate_all_probes.sh deployment ${NAMESPACE} > probe_output.txt && cat probe_output.txt
+    ...    cmd_override=./validate_all_probes.sh deployment ${NAMESPACE}
     ...    env=${env}
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=180
     ${remediation_list}=    RW.CLI.Run Cli
-    ...    cmd=awk "/Remediation Steps:/ {start=1; getline} start" probe_output.txt
+    ...    cmd=awk "/Remediation Steps:/ {start=1; getline} start" <<< "${probe_health.stdout}"
     ...    env=${env}
     ...    include_in_history=false
     ${gh_updates}=    RW.CLI.Run Bash File
