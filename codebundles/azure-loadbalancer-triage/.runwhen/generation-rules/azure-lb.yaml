@@ -7,8 +7,8 @@ spec:
         - azure_network_load_balancers
       matchRules:
         - type: pattern
-          pattern: "kubernetes"
-          properties: [name]
+          pattern: "aks-managed-cluster-rg"
+          properties: [tags]
           mode: substring
       slxs:
         - baseName: azure
