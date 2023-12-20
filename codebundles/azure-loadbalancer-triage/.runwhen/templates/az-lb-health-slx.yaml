@@ -6,7 +6,7 @@ metadata:
   annotations: { % include "common-annotations.yaml" % }
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/networking/10062-icon-service-Load-Balancers.svg
-  # alias: {{match_resource.properties.provisioningState}} Azure Load Balancer Health
+  alias: Azure Load Balancer Health
   # asMeasuredBy: ""
   # configProvided:
   # - name: OBJECT_NAME
