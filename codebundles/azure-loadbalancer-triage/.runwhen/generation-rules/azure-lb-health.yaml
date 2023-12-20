@@ -13,7 +13,7 @@ spec:
       slxs:
         - baseName: az-lb-health
           levelOfDetail: basic
-          qualifiers: [resource, resource_group]
+          qualifiers: [resource_group]
           baseTemplateName: az-lb-health
           outputItems:
             - type: slx
