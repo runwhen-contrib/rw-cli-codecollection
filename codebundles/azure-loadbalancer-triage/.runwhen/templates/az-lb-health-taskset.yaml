@@ -20,7 +20,7 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/az-lb-health/runbook.robot
+    pathToRobot: codebundles/azure-loadbalancer-triage/runbook.robot
   configProvided:
     - name: AZ_HISTORY_RANGE
       value: '24'
