@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/networking/10062-icon-service-Load-Balancers.svg
-  # alias: {{match_resource.resouce.get("name")}} Azure Load Balancer Health
+  alias: {{match_resource.properties.provisioningState}} Azure Load Balancer Health
   # asMeasuredBy: "" 
   # configProvided:
   # - name: OBJECT_NAME
@@ -19,9 +19,3 @@ spec:
   # additionalContext:  
   #   resource_group: "{{match_resource.resource.resource_group}}"
   #   tags: "{{match_resource.resource.tags}}"
-{% set ns = namespace(all_vars={}) %}
-{% for key, value in vars().items() if not key.startswith('__') %}
-    {% set _ = ns.all_vars.update({key: value}) %}
-{% endfor %}
-
-{{ ns.all_vars | tojson }}
