@@ -8,7 +8,7 @@ spec:
       matchRules:
         - type: pattern
           pattern: ".+"
-          properties: [tags]
+          properties: [name]
           mode: substring
       slxs:
         - baseName: az-lb-health
