@@ -71,7 +71,7 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     ...    restart
     ...    get
     ...    deployment
-    ...    ${deployment_name}
+    ...    ${DEPLOYMENT_NAME}
     ${liveness_probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_probes.sh
     ...    cmd_override=./validate_probes.sh livenessProbe
@@ -108,7 +108,7 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     ...    restart
     ...    get
     ...    deployment
-    ...    ${deployment_name}
+    ...    ${DEPLOYMENT_NAME}
     ${readiness_probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_probes.sh
     ...    cmd_override=./validate_probes.sh readinessProbe
@@ -136,7 +136,7 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
 
 Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
     [Documentation]    Fetches warning events related to the deployment workload in the namespace and triages any issues found in the events.
-    [Tags]    events    workloads    errors    warnings    get    deployment    ${deployment_name}
+    [Tags]    events    workloads    errors    warnings    get    deployment    ${DEPLOYMENT_NAME}
     ${events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '(now - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind == "Deployment" or .involvedObject.kind == "ReplicaSet" or .involvedObject.kind == "Pod") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}")) and (.lastTimestamp | fromdateiso8601) >= $time_limit) | {kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp} ] | group_by([.kind, .name]) | map({kind: .[0].kind, name: .[0].name, count: length, reasons: map(.reason) | unique, messages: map(.message) | unique, firstTimestamp: map(.firstTimestamp | fromdateiso8601) | sort | .[0] | todateiso8601, lastTimestamp: map(.lastTimestamp | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'
     ...    env=${env}
@@ -170,7 +170,7 @@ Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
 
 Get Deployment Workload Details For `${DEPLOYMENT_NAME}` and Add to Report
     [Documentation]    Fetches the current state of the deployment for future review in the report.
-    [Tags]    deployment    details    manifest    info    ${deployment_name}
+    [Tags]    deployment    details    manifest    info    ${DEPLOYMENT_NAME}
     ${deployment}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o yaml
     ...    env=${env}
@@ -196,7 +196,7 @@ Troubleshoot Deployment Replicas for `${DEPLOYMENT_NAME}`
     ...    rollout
     ...    stuck
     ...    pods
-    ...    ${deployment_name}
+    ...    ${DEPLOYMENT_NAME}
     ${deployment_replicas}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '.status | {desired_replicas: .replicas, ready_replicas: (.readyReplicas // 0), missing_replicas: ((.replicas // 0) - (.readyReplicas // 0)), unavailable_replicas: (.unavailableReplicas // 0), available_condition: (if any(.conditions[]; .type == "Available") then (.conditions[] | select(.type == "Available")) else "Condition not available" end), progressing_condition: (if any(.conditions[]; .type == "Progressing") then (.conditions[] | select(.type == "Progressing")) else "Condition not available" end)}'
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -255,7 +255,7 @@ Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`
     ...    <service_name>
     ...    we found the following distinctly counted errors in the service workloads of namespace
     ...    connection error
-    ...    ${deployment_name}
+    ...    ${DEPLOYMENT_NAME}
     ${recent_anomalies}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '(now - (60*60)) as $time_limit | [ .items[] | select(.type != "Warning" and (.involvedObject.kind == "Deployment" or .involvedObject.kind == "ReplicaSet" or .involvedObject.kind == "Pod") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}"))) | {kind: .involvedObject.kind, count: .count, name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, duration: (if (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp | fromdateiso8601)) == 0) then 1 else (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp | fromdateiso8601))/60) end) } ] | group_by([.kind, .name]) | map({kind: .[0].kind, name: .[0].name, count: (map(.count) | add), reasons: map(.reason) | unique, messages: map(.message) | unique, average_events_per_minute: (if .[0].duration == 1 then 1 else ((map(.count) | add)/.[0].duration ) end),firstTimestamp: map(.firstTimestamp | fromdateiso8601) | sort | .[0] | todateiso8601, lastTimestamp: map(.lastTimestamp | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'
     ...    env=${env}
