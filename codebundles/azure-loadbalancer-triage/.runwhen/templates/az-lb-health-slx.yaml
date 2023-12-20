@@ -19,4 +19,4 @@ spec:
   additionalContext:  
     tags: "{{match_resource.tags}}"
     qualified_name: "{{ match_resource.qualified_name }}"
-    resource_group: "{{ match_resource.resource_group }}"
+    resource_group: "{{ match_resource.resource_group.name }}"
