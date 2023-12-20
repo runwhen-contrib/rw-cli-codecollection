@@ -9,4 +9,14 @@ metadata:
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/networking/10062-icon-service-Load-Balancers.svg
   alias: {{match_resource.name}} Azure Load Balancer Health
-
+  asMeasuredBy: "Querying the Azure Load Balancer health for incidents or critical events." 
+  configProvided:
+  - name: OBJECT_NAME
+    value: {{match_resource.name}}
+  owners:
+  - {{workspace.owner_email}}
+  statement: Ensure Azure Loadbalancer are healthy. 
+  additionalContext:  
+    tags: "{{match_resource.tags}}"
+    qualified_name: "{{ match_resource.qualified_name }}"
+    resource_group: "{{ match_resource.resourece_group }}"
