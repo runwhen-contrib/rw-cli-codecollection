@@ -14,9 +14,9 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Health Check Internal Azure Load Balancer
+Check Activity Logs for Azure Load Balancer `${AZ_LB_NAME}`
     [Documentation]    Queries a Azure Loadbalancer's health probe to determine if it's in a healthy state.
-    [Tags]    load    balancer    azure
+    [Tags]    loadbalancer    network    azure    ${AZ_LB_NAME}
     ${lb_id}=    RW.CLI.Run Cli
     ...    cmd=source $AZURE_CREDENTIALS && az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET --tenant $AZURE_TENANT_ID > /dev/null 2>&1 && az network lb list --query "[?name=='${AZ_LB_NAME}']" | jq -r '.[0].id'
     ...    secret_file__azure_credentials=${azure_credentials}
