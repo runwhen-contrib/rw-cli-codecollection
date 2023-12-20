@@ -6,10 +6,17 @@ spec:
     - resourceTypes:
         - azure_network_load_balancers
       matchRules:
-        - type: pattern
-          pattern: ".+"
-          properties: [name]
-          mode: substring
+        - type: and
+          matches: 
+          - type: pattern
+            pattern: ".+"
+            properties: [name]
+            mode: substring
+          - resourceType: variables
+            type: pattern
+            pattern: "true"
+            properties: [custom/azure_credentials_secret_name]
+            mode: exact
       slxs:
         - baseName: az-lb-health
           levelOfDetail: basic
@@ -17,5 +24,5 @@ spec:
           baseTemplateName: az-lb-health
           outputItems:
             - type: slx
-            # - type: runbook
-            #   templateName: az-lb-health-taskset.yaml
+            - type: runbook
+              templateName: az-lb-health-taskset.yaml
