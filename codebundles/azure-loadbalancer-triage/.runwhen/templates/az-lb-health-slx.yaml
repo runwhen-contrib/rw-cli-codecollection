@@ -15,7 +15,7 @@ spec:
     value: {{match_resource.name}}
   owners:
   - {{workspace.owner_email}}
-  statement: Ensure Azure Loadbalancer are healthy. 
+  statement: Ensure Azure Loadbalancers are healthy. 
   additionalContext:  
     tags: "{{match_resource.tags}}"
     qualified_name: "{{ match_resource.qualified_name }}"
