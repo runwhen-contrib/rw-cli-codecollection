@@ -26,6 +26,8 @@ spec:
       value: '24'
     - name: AZ_LB_NAME
       value: {{match_resource.name}}
+    - name: AZ_LB_ID
+      value: {{match_resource.id}}
   secretsProvided:
     - name: azure_credentials
       workspaceKey: {{custom.azure_credentials_secret_name}}
