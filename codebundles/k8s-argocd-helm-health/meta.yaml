@@ -4,60 +4,18 @@ commands:
     + "\nSync Status:\t\t" + .status.sync.status + "\nHealth Status:\t\t" + .status.health.status'
   doc_links: '
 
-    - [Kubernetes Documentation on kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
-
-    - [Kubernetes Documentation on Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [Kubernetes Documentation on Configuring kubectl](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
-
-    - [jq Manual](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command retrieves information about a specific Kubernetes resource
-    in the specified namespace and context, then uses the 'jq' tool to format the
-    output in a human-readable way, including the resource name, sync status, and
-    health status.
-  multi_line_details: "\n# Assign the resource name to a variable\nRESOURCE_NAME=pods\n\
-    \n# Assign the namespace to a variable\nNAMESPACE=default\n\n# Assign the context\
-    \ to a variable\nCONTEXT=my-context\n\n# Use kubectl to get the specified resource\
-    \ in the specified namespace and context, then return the output in JSON format\n\
-    kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json |\n\n\
-    # Use jq to filter the JSON output for items that have a spec.source.helm property,\
-    \ and print specific information about them\njq -r '.items[] | select(.spec.source.helm\
-    \ != null) |\n  \"\\nName:\\t\\t\\t\" + .metadata.name +\n  \"\\nSync Status:\\\
-    t\\t\" + .status.sync.status +\n  \"\\nHealth Status:\\t\\t\" + .status.health.status'\n\
-    \ \n\nThis multi-line command is broken down into smaller steps with explanatory\
-    \ comments to help new or less experienced devops engineers understand what each\
-    \ part of the command does. This can help them learn about using kubectl and jq\
-    \ to manage Kubernetes resources more effectively."
+    Documentation links not available'
+  explanation: Explanation not available
+  multi_line_details: Multi-line script not available
   name: fetch_all_available_argocd_helm_releases
 - command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json
     | jq -r '.items[] | select(.spec.source.helm != null) | "\nName:\t\t\t" + .metadata.name
     + "\nSync Status:\t\t" + .status.sync.status + "\nHealth Status:\t\t" + .status.health.status'
   doc_links: '
 
-    - [Kubernetes Documentation on kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
-
-    - [Kubernetes Documentation on Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [Kubernetes Documentation on Configuring kubectl](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
-
-    - [jq Manual](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command retrieves information about a specific Kubernetes resource
-    in the specified namespace and context, then uses the 'jq' tool to format the
-    output in a human-readable way, including the resource name, sync status, and
-    health status.
-  multi_line_details: "\n# Assign the resource name to a variable\nRESOURCE_NAME=pods\n\
-    \n# Assign the namespace to a variable\nNAMESPACE=default\n\n# Assign the context\
-    \ to a variable\nCONTEXT=my-context\n\n# Use kubectl to get the specified resource\
-    \ in the specified namespace and context, then return the output in JSON format\n\
-    kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json |\n\n\
-    # Use jq to filter the JSON output for items that have a spec.source.helm property,\
-    \ and print specific information about them\njq -r '.items[] | select(.spec.source.helm\
-    \ != null) |\n  \"\\nName:\\t\\t\\t\" + .metadata.name +\n  \"\\nSync Status:\\\
-    t\\t\" + .status.sync.status +\n  \"\\nHealth Status:\\t\\t\" + .status.health.status'\n\
-    \ \n\nThis multi-line command is broken down into smaller steps with explanatory\
-    \ comments to help new or less experienced devops engineers understand what each\
-    \ part of the command does. This can help them learn about using kubectl and jq\
-    \ to manage Kubernetes resources more effectively."
+    Documentation links not available'
+  explanation: Explanation not available
+  multi_line_details: Multi-line script not available
   name: fetch_all_available_argocd_helm_releases
 - command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json
     | jq -r '.items[] | select(.spec.source.helm != null) | "\nName:\t\t\t" + .metadata.name
@@ -66,22 +24,9 @@ commands:
     State:\t" + .status.operationState.message'
   doc_links: '
 
-    '
-  explanation: This command retrieves information about a specific Kubernetes resource
-    in a specific namespace and context, filtering for resources related to Helm charts
-    and displaying their name, target revision, attempted revision, sync status, and
-    operational state using a JSON output format.
-  multi_line_details: "\n# This command retrieves information about a specific Kubernetes\
-    \ resource in a specified namespace and context, and then formats the output using\
-    \ jq.\n\n# First, we use kubectl to get the resource with the specified name in\
-    \ the specified namespace and context.\nkubectl get ${RESOURCE_NAME} -n ${NAMESPACE}\
-    \ --context ${CONTEXT} -o=json |\n\n# Next, we use jq to filter and format the\
-    \ JSON output to display only the relevant information we're interested in.\n\
-    jq -r '.items[] | \n    # Select resources that have a helm source\n    select(.spec.source.helm\
-    \ != null) | \n    \"\\nName:\\t\\t\\t\" + .metadata.name + \n    \"\\nTarget\
-    \ Revision:\\t\" + .spec.source.targetRevision + \n    \"\\nAttempted Revision:\\\
-    t\" + .status.sync.revision + \n    \"\\nSync Status:\\t\\t\" + .status.sync.status\
-    \ + \n    \"\\nOperational State:\\t\" + .status.operationState.message'\n"
+    Documentation links not available'
+  explanation: Explanation not available
+  multi_line_details: Multi-line script not available
   name: fetch_installed_argocd_helm_release_versions
 - command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json
     | jq -r '.items[] | select(.spec.source.helm != null) | "\nName:\t\t\t" + .metadata.name
@@ -90,20 +35,7 @@ commands:
     State:\t" + .status.operationState.message'
   doc_links: '
 
-    '
-  explanation: This command retrieves information about a specific Kubernetes resource
-    in a specific namespace and context, filtering for resources related to Helm charts
-    and displaying their name, target revision, attempted revision, sync status, and
-    operational state using a JSON output format.
-  multi_line_details: "\n# This command retrieves information about a specific Kubernetes\
-    \ resource in a specified namespace and context, and then formats the output using\
-    \ jq.\n\n# First, we use kubectl to get the resource with the specified name in\
-    \ the specified namespace and context.\nkubectl get ${RESOURCE_NAME} -n ${NAMESPACE}\
-    \ --context ${CONTEXT} -o=json |\n\n# Next, we use jq to filter and format the\
-    \ JSON output to display only the relevant information we're interested in.\n\
-    jq -r '.items[] | \n    # Select resources that have a helm source\n    select(.spec.source.helm\
-    \ != null) | \n    \"\\nName:\\t\\t\\t\" + .metadata.name + \n    \"\\nTarget\
-    \ Revision:\\t\" + .spec.source.targetRevision + \n    \"\\nAttempted Revision:\\\
-    t\" + .status.sync.revision + \n    \"\\nSync Status:\\t\\t\" + .status.sync.status\
-    \ + \n    \"\\nOperational State:\\t\" + .status.operationState.message'\n"
+    Documentation links not available'
+  explanation: Explanation not available
+  multi_line_details: Multi-line script not available
   name: fetch_installed_argocd_helm_release_versions
