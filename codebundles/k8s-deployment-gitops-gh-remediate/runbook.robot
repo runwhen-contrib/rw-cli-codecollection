@@ -1,7 +1,7 @@
 *** Settings ***
-Documentation       Provides a list of tasks that can remediate configuraiton issues with deployment manifests in GitHub based gitops repositories. 
+Documentation       Provides a list of tasks that can remediate configuraiton issues with deployment manifests in GitHub based gitops repositories.
 Metadata            Author    stewartshea
-Metadata            Display Name    Kubernetes Deployment Triage
+Metadata            Display Name    Kubernetes GitOps GitHub Remediation
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,FluxCD,ArgoCD
 
 Library             BuiltIn
@@ -16,17 +16,9 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-
-Remediate Readiness and Liveness Probe GitOps Manifests for Deployments in Namespace `${NAMESPACE}`
+Remediate Readiness and Liveness Probe GitOps Manifests Namespace `${NAMESPACE}`
     [Documentation]    Fixes misconfigured readiness or liveness probe configurations for deployments in a namespace
-    [Tags]
-    ...    readiness
-    ...    liveness
-    ...    probe
-    ...    deployment
-    ...    remediate
-    ...    gitops
-    ...    ${NAMESPACE}
+    [Tags]    readiness    liveness    probe    deployment    remediate    gitops    ${NAMESPACE}
     ${probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_all_probes.sh
     ...    cmd_override=./validate_all_probes.sh deployment ${NAMESPACE}
@@ -35,7 +27,7 @@ Remediate Readiness and Liveness Probe GitOps Manifests for Deployments in Names
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=180
     ${remediation_list}=    RW.CLI.Run Cli
-    ...    cmd=echo \'\'\'${probe_health.stdout}\'\'\' | awk "/Remediation Steps:/ {start=1; getline} start"
+    ...    cmd=awk "/Remediation Steps:/ {start=1; getline} start" <<< "${probe_health.stdout}"
     ...    env=${env}
     ...    include_in_history=false
     ${gh_updates}=    RW.CLI.Run Bash File
@@ -44,11 +36,11 @@ Remediate Readiness and Liveness Probe GitOps Manifests for Deployments in Names
     ...    env=${env}
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
-   ${recommendations}=    RW.CLI.Run Cli
+    ${recommendations}=    RW.CLI.Run Cli
     ...    cmd=echo '${gh_updates.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
     ...    env=${env}
     ...    include_in_history=false
-    IF     len($recommendations.stdout) > 0 
+    IF    len($recommendations.stdout) > 0
         RW.Core.Add Issue
         ...    severity=4
         ...    expected=Pull Requests for manifest changes are reviewed for namespace `${NAMESPACE}`
@@ -60,7 +52,8 @@ Remediate Readiness and Liveness Probe GitOps Manifests for Deployments in Names
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${probe_health.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
+    RW.Core.Add Pre To Report    Commands Used: ${probe_health.cmd}
+
 
 *** Keywords ***
 Suite Initialization
@@ -92,13 +85,13 @@ Suite Initialization
     ...    example=kubectl
     ...    default=kubectl
     ${HOME}=    RW.Core.Import User Variable    HOME
-    ${RW_TASK_TITLES}=    Get Environment Variable     RW_TASK_TITLES    "[]"
+    ${RW_TASK_TITLES}=    Get Environment Variable    RW_TASK_TITLES    "[]"
     ${RW_TASK_STRING}=    Evaluate    ${RW_TASK_TITLES}    json
     ${RW_TASK_STRING}=    Evaluate    ', '.join(${RW_TASK_STRING})    json
-    ${RW_FRONTEND_URL}=    Get Environment Variable     RW_FRONTEND_URL    none
-    ${RW_SESSION_ID}=    Get Environment Variable     RW_SESSION_ID    none
-    ${RW_USERNAME}=    Get Environment Variable     RW_USERNAME    none
-    ${RW_WORKSPACE}=    Get Environment Variable     RW_WORKSPACE    none
+    ${RW_FRONTEND_URL}=    Get Environment Variable    RW_FRONTEND_URL    none
+    ${RW_SESSION_ID}=    Get Environment Variable    RW_SESSION_ID    none
+    ${RW_USERNAME}=    Get Environment Variable    RW_USERNAME    none
+    ${RW_WORKSPACE}=    Get Environment Variable    RW_WORKSPACE    none
 
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}

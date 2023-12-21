@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: ServiceLevelX
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/networking/10062-icon-service-Load-Balancers.svg
+  alias: {{match_resource.name}} Azure Load Balancer Health
+  asMeasuredBy: "Querying the Azure Load Balancer health for incidents or critical events." 
+  configProvided:
+  - name: OBJECT_NAME
+    value: {{match_resource.name}}
+  owners:
+  - {{workspace.owner_email}}
+  statement: Ensure Azure Network Load Balancers are healthy.
+  additionalContext:  
+    tags: "{{match_resource.tags}}"
+    qualified_name: "{{ match_resource.qualified_name }}"
+    resource_group: "{{ match_resource.resource_group.name }}"

@@ -36,14 +36,14 @@ Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=echo '''${logs.stdout}''' | awk "/Recommended Next Steps:/ {start=1; getline} start"
+    ...    cmd=awk "/Recommended Next Steps:/ {start=1; getline} start" <<< "${logs.stdout}"
     ...    env=${env}
     ...    include_in_history=false
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=echo '''${logs.stdout}''' | awk '/Issues Identified:/ {start=1; next} /The namespace online-boutique has produced the following interesting events:/ {start=0} start'
+    ...    cmd=awk '/Issues Identified:/ {start=1; next} /The namespace online-boutique has produced the following interesting events:/ {start=0} start' <<< "${logs.stdout}"
     ...    env=${env}
     ...    include_in_history=false
-    #FIXME: Refactor this to a loop of 1 issue per line of issue output - better alinging next steps with specific issues
+    # FIXME: Refactor this to a loop of 1 issue per line of issue output - better alinging next steps with specific issues
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${logs}
     ...    set_severity_level=2
@@ -79,11 +79,11 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
-   ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=echo '''${liveness_probe_health.stdout}''' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+    ${recommendations}=    RW.CLI.Run Cli
+    ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' <<< "${liveness_probe_health.stdout}"
     ...    env=${env}
     ...    include_in_history=false
-    IF     len($recommendations.stdout) > 0 
+    IF    len($recommendations.stdout) > 0
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=Liveness probes should be configured and functional for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
@@ -95,7 +95,8 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Liveness probe testing results:\n\n${liveness_probe_health.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
+    RW.Core.Add Pre To Report    Commands Used: ${liveness_probe_health.cmd}
+
 Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     [Documentation]    Validates if a readiness probe has possible misconfigurations
     [Tags]
@@ -115,11 +116,11 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
-   ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=echo '''${readiness_probe_health.stdout}''' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+    ${recommendations}=    RW.CLI.Run Cli
+    ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' <<< "${readiness_probe_health.stdout}"
     ...    env=${env}
     ...    include_in_history=false
-    IF     len($recommendations.stdout) > 0 
+    IF    len($recommendations.stdout) > 0
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=Readiness probes should be configured and functional for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
@@ -131,10 +132,11 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${readiness_probe_health.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
+    RW.Core.Add Pre To Report    Commands Used: ${readiness_probe_health.cmd}
+
 Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
     [Documentation]    Fetches warning events related to the deployment workload in the namespace and triages any issues found in the events.
-    [Tags]    events    workloads    errors    warnings    get    deployment    ${deployment_name}
+    [Tags]    events    workloads    errors    warnings    get    deployment    ${DEPLOYMENT_NAME}
     ${events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '(now - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind == "Deployment" or .involvedObject.kind == "ReplicaSet" or .involvedObject.kind == "Pod") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}")) and (.lastTimestamp | fromdateiso8601) >= $time_limit) | {kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp} ] | group_by([.kind, .name]) | map({kind: .[0].kind, name: .[0].name, count: length, reasons: map(.reason) | unique, messages: map(.message) | unique, firstTimestamp: map(.firstTimestamp | fromdateiso8601) | sort | .[0] | todateiso8601, lastTimestamp: map(.lastTimestamp | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'
     ...    env=${env}
@@ -144,7 +146,7 @@ Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
     ${object_list}=    Evaluate    json.loads(r'''${events.stdout}''')    json
     IF    len(@{object_list}) > 0
         FOR    ${item}    IN    @{object_list}
-            ${message_string}=    Catenate    SEPARATOR;    @{item["messages"]}   
+            ${message_string}=    Catenate    SEPARATOR;    @{item["messages"]}
             ${messages}=    Replace String    ${message_string}    "    ${EMPTY}
             ${item_next_steps}=    RW.CLI.Run Bash File
             ...    bash_file=workload_next_steps.sh
@@ -181,8 +183,8 @@ Get Deployment Workload Details For `${DEPLOYMENT_NAME}` and Add to Report
 
 Troubleshoot Deployment Replicas for `${DEPLOYMENT_NAME}`
     [Documentation]    Pulls the replica information for a given deployment and checks if it's highly available
-    ...    , if the replica counts are the expected / healthy values, and raises issues if it is not progressing 
-    ...    and is missing pods. 
+    ...    , if the replica counts are the expected / healthy values, and raises issues if it is not progressing
+    ...    and is missing pods.
     [Tags]
     ...    deployment
     ...    replicas
