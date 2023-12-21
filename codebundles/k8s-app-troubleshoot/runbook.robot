@@ -92,6 +92,7 @@ Troubleshoot `${WORKLOAD_NAME}` Application Logs
     ...    exceptions=${parsed_exceptions}
     ...    env=${serialized_env}
     ...    process_list=${proc_list}
+    ...    app_name=${WORKLOAD_NAME}
     ${history}=    RW.CLI.Pop Shell History
     ${full_report}=    Evaluate    $ts_results.get("report")
     ${found_exceptions}=    Evaluate    $ts_results.get("found_exceptions")

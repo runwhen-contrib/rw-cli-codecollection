@@ -119,12 +119,14 @@ def troubleshoot_application(
     exceptions: list[StackTraceData],
     env: dict = {},
     process_list: list[str] = [],
+    app_name: str = "",
 ) -> dict:
     logger.info(f"Received following repo(s) to troubleshoot: {repos}")
     logger.info(f"Received following parsed exceptions to troubleshoot: {exceptions}")
     search_words: list[str] = []
     exception_occurences: dict = {}
     most_common_exception: str = ""
+    error_summary: str = ""
     report: str = ""
     for repo in repos:
         results: list[RepositorySearchResult] = []
@@ -142,6 +144,7 @@ def troubleshoot_application(
                     exception_occurences[hashed_exception] = {
                         "count": 1,
                         "content": excep.raw,
+                        "errors_summary": excep.errors_summary,
                     }
                 elif hashed_exception in exception_occurences:
                     exception_occurences[hashed_exception]["count"] += 1
@@ -150,23 +153,17 @@ def troubleshoot_application(
         for rsr in results:
             if rsr.source_file.git_file_url in files_already_added:
                 continue
-            rsr_report += f"\n{rsr.source_file.git_file_url}\n"
+            rsr_report += f"\n{rsr.source_file.git_file_url}\nRecent commited changes to this file:\n"
             for commit in rsr.related_commits:
-                rsr_report += f"\t{repo.repo_url}/commit/{commit.sha}\n"
+                rsr_report += f"\t - {repo.repo_url}/commit/{commit.sha}\n"
             files_already_added.append(rsr.source_file.git_file_url)
 
         src_files_title = (
-            "## Found associated files in exception stacktrace data:"
+            "Found associated files in exception stacktrace data:"
             if rsr_report
-            else "## No relevant source code or diffs could be found in the exception data."
+            else "No relevant source code or diffs could be found in the exception data."
         )
-        report += f"""
-# Repository URL(s): {repo.source_uri}
 
-{src_files_title}
-{rsr_report}
-
-"""
     # get most common exception
     max_count = -1
     for hashed_exception in exception_occurences:
@@ -174,23 +171,39 @@ def troubleshoot_application(
         if count > max_count:
             max_count = count
             most_common_exception = exception_occurences[hashed_exception]["content"]
+            errors_summary = exception_occurences[hashed_exception]["errors_summary"]
+    err_msg_line = f"There are some error(s) with the {app_name} application: {errors_summary}\nThis was the most common exception found:"
+    if not errors_summary:
+        err_msg_line = "We couldn't find any notable error messages in the most common exception, but it's detailed below:"
     report += (
         f"""
-## This is the most common exception found:
+{err_msg_line}
+
 ```
 {most_common_exception}
 ```
 """
         if most_common_exception
-        else "## No common exceptions could be parsed. Try running the log command provided."
+        else "No common exceptions could be parsed. Try running the log command provided."
     )
+    report += f"""
+Repository URL(s): {repo.source_uri}
+
+{src_files_title}
+{rsr_report}
+
+"""
     return {
         "report": report,
         "found_exceptions": (True if most_common_exception else False),
     }
 
 
-def create_github_issue(repo: Repository, content: str) -> str:
+def create_github_issue(
+    repo: Repository,
+    content: str,
+    app_name: str = "",
+) -> str:
     already_open: bool = False
     issues = repo.list_issues()
     report_url = None
@@ -202,7 +215,7 @@ def create_github_issue(repo: Repository, content: str) -> str:
             report_url = url
     if not already_open:
         data = repo.create_issue(
-            title=f"{RUNWHEN_ISSUE_KEYWORD} Application Issue",
+            title=f"{RUNWHEN_ISSUE_KEYWORD} {app_name} Application Issue",
             body=content,
         )
         if "html_url" in data:

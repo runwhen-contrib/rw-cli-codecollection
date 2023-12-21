@@ -27,6 +27,10 @@ class StackTraceData:
             or len(self.raw) > 0
         )
 
+    @property
+    def errors_summary(self) -> str:
+        return ", ".join(self.error_messages)
+
 
 class BaseStackTraceParse:
     # TODO: pull from a chatgpt generated path list instead?
