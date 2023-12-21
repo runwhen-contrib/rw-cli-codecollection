@@ -126,7 +126,7 @@ def troubleshoot_application(
     search_words: list[str] = []
     exception_occurences: dict = {}
     most_common_exception: str = ""
-    error_summary: str = ""
+    errors_summary: str = ""
     report: str = ""
     for repo in repos:
         results: list[RepositorySearchResult] = []
