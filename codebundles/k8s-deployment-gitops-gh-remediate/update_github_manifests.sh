@@ -168,6 +168,8 @@ while read -r json_object; do
     invalid_ports=$(jq -r '.invalid_ports // empty' <<< "$json_object")
     valid_ports=$(jq -r '.valid_ports // empty' <<< "$json_object")
     container=$(jq -r '.container // empty' <<< "$json_object")
+    max_replicas=$(jq -r '.max_replicas // empty' <<< "$json_object")
+    new_max_replicas=$(jq -r '.new_max_replicas // empty' <<< "$json_object")
 
     # Logic to prefer invalid_command over invalid_oorts
     if [[ "$remediation_type" == "probe_update" ]]; then
@@ -185,6 +187,10 @@ while read -r json_object; do
             find_gitops_info "$object_type" "$object_name"
             ## Placeholder for GitOps Update Details
         fi
+    elif [[ "$remediation_type" == "increase_hpa_replicas" ]]; then
+        find_gitops_info "HorizontalPodAutoscaler" "$object_name"
+        change_summary="Increasing the maxReplicas for ${object_name} from ${max_replicas} to ${new_max_replicas}"
+        update_github_manifests
     fi
 done < <(jq -c '.[]' <<< "$json_input")
 

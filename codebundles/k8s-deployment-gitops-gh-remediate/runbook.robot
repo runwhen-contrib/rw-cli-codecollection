@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Remediate Readiness and Liveness Probe GitOps Manifests Namespace `${NAMESPACE}`
     [Documentation]    Fixes misconfigured readiness or liveness probe configurations for deployments in a namespace
-    [Tags]    readiness    liveness    probe    deployment    remediate    gitops    ${NAMESPACE}
+    [Tags]    readiness    liveness    probe    deployment    remediate    gitops    ${namespace}
     ${probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_all_probes.sh
     ...    cmd_override=./validate_all_probes.sh deployment ${NAMESPACE}
@@ -53,6 +53,42 @@ Remediate Readiness and Liveness Probe GitOps Manifests Namespace `${NAMESPACE}`
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${probe_health.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${probe_health.cmd}
+
+Remediate HorizontalPodAutoscaler GitOps Manifests in Namespace
+    ${hpa_health}=    RW.CLI.Run Bash File
+    ...    bash_file=validate_all_hpas.sh
+    ...    cmd_override=./validate_all_hpas.sh ${NAMESPACE}
+    ...    env=${env}
+    ...    include_in_history=False
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=180
+    ${remediation_list}=    RW.CLI.Run Cli
+    ...    cmd=awk "/Remediation Steps:/ {start=1; getline} start" <<< "${hpa_health.stdout}"
+    ...    env=${env}
+    ...    include_in_history=false
+    ${gh_updates}=    RW.CLI.Run Bash File
+    ...    bash_file=update_github_manifests.sh
+    ...    cmd_override=./update_github_manifests.sh '${remediation_list.stdout}'
+    ...    env=${env}
+    ...    include_in_history=False
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ${recommendations}=    RW.CLI.Run Cli
+    ...    cmd=echo '${gh_updates.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+    ...    env=${env}
+    ...    include_in_history=false
+    IF    len($recommendations.stdout) > 0
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=Pull Requests for manifest changes are reviewed for namespace `${NAMESPACE}`
+        ...    actual=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
+        ...    title=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
+        ...    reproduce_hint=Check Pull Request details for more information.
+        ...    details=${remediation_list.stdout}
+        ...    next_steps=${recommendations.stdout}
+    END
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${hpa_health.stdout}
+    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
 *** Keywords ***
