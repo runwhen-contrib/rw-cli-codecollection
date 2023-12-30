@@ -16,6 +16,4 @@ spec:
   owners:
   - {{workspace.owner_email}}
   statement: Nodes in an active preempt event should trigger RunWhen workflows.    
-  additionalContext:  
-    # cluster: "{{ cluster.name }}"
-    # context: "{{ cluster.context }}"
+  additionalContext: []
