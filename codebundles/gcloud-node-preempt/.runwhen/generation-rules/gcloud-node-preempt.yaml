@@ -13,9 +13,9 @@ spec:
               properties: [name]
               mode: substring
             - type: pattern
-              pattern: "true"
+              pattern: ".+"
               properties: [scheduling/preemptible]
-              mode: exact
+              mode: substring
             # - resourceType: variables
             #   type: pattern
             #   pattern: "gcp"
