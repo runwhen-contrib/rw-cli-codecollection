@@ -30,7 +30,7 @@ spec:
             #   mode: exact
       slxs:
         - baseName: node-preempt
-          qualifiers: ["resource", "project"]
+          qualifiers: ["project"]
           baseTemplateName: gcloud-node-preempt
           levelOfDetail: basic
           outputItems:
