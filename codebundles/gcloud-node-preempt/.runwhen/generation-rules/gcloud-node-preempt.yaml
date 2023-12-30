@@ -13,9 +13,13 @@ spec:
               properties: [name]
               mode: substring
             - type: pattern
-              pattern: ".+"
-              properties: [scheduling/preemptible]
+              pattern: "RUNNING"
+              properties: [status]
               mode: substring
+            # - type: pattern
+            #   pattern: ".+"
+            #   properties: [scheduling/preemptible]
+            #   mode: substring
             # - resourceType: variables
             #   type: pattern
             #   pattern: "gcp"
