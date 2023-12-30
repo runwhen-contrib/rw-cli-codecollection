@@ -4,7 +4,7 @@ spec:
   platform: gcp
   generationRules:
     - resourceTypes:
-        -  gcp_compute_instance_groups
+        -  gcp_compute_instances
       matchRules:
         - type: and
           matches:
