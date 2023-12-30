@@ -12,6 +12,10 @@ spec:
               pattern: ".+"
               properties: [name]
               mode: substring
+            - type: pattern
+              pattern: "true"
+              properties: [scheduling/preemptible]
+              mode: exact
             # - resourceType: variables
             #   type: pattern
             #   pattern: "gcp"
@@ -28,7 +32,7 @@ spec:
         - baseName: node-preempt
           qualifiers: ["resource", "project"]
           baseTemplateName: gcloud-node-preempt
-          levelOfDetail: detailed
+          levelOfDetail: basic
           outputItems:
             - type: slx
             # - type: sli
