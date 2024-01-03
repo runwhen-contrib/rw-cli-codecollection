@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       This taskset runs a user provided kubectl command andadds the output to the report. Command line tools like jq are available. 
+Documentation       This taskset runs a user provided kubectl command andadds the output to the report. Command line tools like jq are available.
 Metadata            Author    stewartshea
 
 Library             BuiltIn
@@ -24,6 +24,7 @@ Run User Provided Kubectl Command
     RW.Core.Add Pre To Report    Command stderr: ${rsp.stderr}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
+
 *** Keywords ***
 Suite Initialization
     ${kubeconfig}=    RW.Core.Import Secret
@@ -34,6 +35,6 @@ Suite Initialization
     ...    example=For examples, start here https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
     ${KUBECTL_COMMAND}=    RW.Core.Import User Variable    KUBECTL_COMMAND
     ...    type=string
-    ...    description=The kubectl command to run. Must produce a single value that can be pushed as a metric. Can use tools like jq. 
+    ...    description=The kubectl command to run. Can use tools like jq.
     ...    pattern=\w*
     ...    example="kubectl describe pods -n online-boutique"
