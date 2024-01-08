@@ -9,7 +9,7 @@ metadata:
 spec:
   locations:
     - {{default_location}}
-  description: Measures ____
+  description: Counts the total number of nodes undergoing a preempt event. 
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
