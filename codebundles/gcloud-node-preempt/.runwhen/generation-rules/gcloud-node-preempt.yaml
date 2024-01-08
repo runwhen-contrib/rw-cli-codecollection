@@ -6,32 +6,10 @@ spec:
     - resourceTypes:
         -  gcp_compute_instances
       matchRules:
-        - type: and
-          matches:
-            - type: pattern
-              pattern: ".+"
-              properties: [name]
-              mode: substring
-            # - type: pattern
-            #   pattern: "RUNNING"
-            #   properties: [status]
-            #   mode: substring
-            - type: pattern
-              pattern: ".+"
-              properties: [scheduling/preemptible]
-              mode: substring
-            # - resourceType: variables
-            #   type: pattern
-            #   pattern: "gcp"
-            #   properties: [custom/cloud_provider]
-            #   mode: substring
-            ## TODO
-            ## See if we can match on cloud.google.com/gke-preemptible=true labels on nodes
-            # - resourceType: variables
-            #   type: pattern
-            #   pattern: "true"
-            #   properties: [custom/gcp_preempt_nodes]
-            #   mode: exact
+        - type: pattern
+          pattern: ".+"
+          properties: [scheduling/preemptible]
+          mode: substring
       slxs:
         - baseName: node-preempt
           qualifiers: ["project"]
