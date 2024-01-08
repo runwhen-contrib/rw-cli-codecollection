@@ -17,4 +17,4 @@ spec:
   - {{workspace.owner_email}}
   statement: Nodes in an active preempt event should trigger RunWhen workflows.    
   additionalContext:
-    project: "{{project}}"
+    project: "{{match_resource.resource.project_id}}"
