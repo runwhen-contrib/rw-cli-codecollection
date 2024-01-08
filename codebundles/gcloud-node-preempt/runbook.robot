@@ -14,11 +14,11 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-List all nodes in an active prempt operation for Project `${GCP_PROJECT_ID}`
+List all nodes in an active prempt operation for GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Fetches all nodes that have an active preempt operation at a global scope in the GCP Project
     [Tags]    stdout    gcloud    node    preempt    gcp    ${GCP_PROJECT_ID}
     ${preempt_node_list}=    RW.CLI.Run Cli
-    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud compute operations list --filter="operationType:( compute.instances.preempted ) AND NOT status:( DONE )" --format=json --project=${GCP_PROJECT_ID} | jq '[.[] | {startTime,targetLink, statusMessage, progress, zone, selfLink}]'
+    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud compute operations list --filter="operationType:(compute.instances.preempted) AND progress<100" --format=json --project=${GCP_PROJECT_ID} | jq '[.[] | {startTime,targetLink, statusMessage, progress, zone, selfLink}]'
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    show_in_rwl_cheatsheet=true

@@ -31,7 +31,7 @@ Count the number of nodes in active prempt operation
     [Documentation]    Fetches all nodes that have an active preempt operation at a global scope in the GCP Project
     [Tags]    Stdout    gcloud    node    preempt    gcp
     ${preempt_node_list}=    RW.CLI.Run Cli
-    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud compute operations list --filter="operationType:( compute.instances.preempted ) AND NOT status:( DONE )" --format=json --project=${GCP_PROJECT_ID}
+    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud compute operations list --filter="operationType:(compute.instances.preempted) AND progress<100" --format=json --project=${GCP_PROJECT_ID}
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ${no_requests_count}=    RW.CLI.Parse Cli Json Output
