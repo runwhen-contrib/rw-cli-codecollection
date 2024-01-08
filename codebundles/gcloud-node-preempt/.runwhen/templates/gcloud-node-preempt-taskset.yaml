@@ -26,10 +26,7 @@ spec:
   intervalSeconds: 300
   configProvided:
     - name: GCP_PROJECT_ID
-      value: {{custom.gcp_project_id}}
+      value: {{match_resource.resource.project_id}}
   secretsProvided:
     - name: gcp_credentials_json
       workspaceKey: {{custom.gcp_ops_suite_sa}}
-  servicesProvided:
-    - name: gcloud
-      locationServiceName: gcloud-service.shared
