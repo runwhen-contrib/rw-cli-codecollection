@@ -19,5 +19,5 @@ spec:
             - type: slx
             - type: sli
             # - type: slo
-            # - type: runbook
-            #   templateName: gcloud-node-preempt-taskset.yaml
+            - type: runbook
+              templateName: gcloud-node-preempt-taskset.yaml

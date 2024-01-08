@@ -22,7 +22,6 @@ List all nodes in an active prempt operation for Project `${GCP_PROJECT_ID}`
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
     ${no_requests_count}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${preempt_node_list}
     ...    extract_path_to_var__preempt_node_count=length(@)
