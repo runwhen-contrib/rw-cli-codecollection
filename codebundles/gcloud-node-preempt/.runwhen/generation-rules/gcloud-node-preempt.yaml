@@ -18,6 +18,6 @@ spec:
           outputItems:
             - type: slx
             - type: sli
-            # - type: slo
+            - type: slo
             - type: runbook
               templateName: gcloud-node-preempt-taskset.yaml
