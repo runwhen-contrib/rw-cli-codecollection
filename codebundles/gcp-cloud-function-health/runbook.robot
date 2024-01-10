@@ -31,9 +31,11 @@ List all failed GCP Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
     IF    len(@{cloud_function_json}) > 0
         FOR    ${item}    IN    @{cloud_function_json}   
             ${location}=    RW.CLI.Run Cli
-            ...    cmd=echo "${item["name"]}" | awk -F'/' '{print $4}'
+            ...    cmd=echo "${item["name"]}" | awk -F'/' '{print $4}' | tr -d '\n'| sed 's/\"//g'
+            ...    include_in_history=False
             ${name}=    RW.CLI.Run Cli
-            ...    cmd=echo "${item["name"]}" | awk -F'/' '{print $6}'        
+            ...    cmd=echo "${item["name"]}" | awk -F'/' '{print $6}' | tr -d '\n'| sed 's/\"//g'
+            ...    include_in_history=False
             ${item_next_steps}=    RW.CLI.Run Bash File
             ...    bash_file=cloud_functions_next_steps.sh
             ...    cmd_override=./cloud_functions_next_steps.sh "${item["stateMessages"][0]["type"]}" "${GCP_PROJECT_ID}"
@@ -50,7 +52,7 @@ List all failed GCP Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
         END
     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Failed GCP Functions Table: ${unhealthy_cloud_function_list_simple_output.stdout}
+    RW.Core.Add Pre To Report    Failed GCP Functions Table:\n${unhealthy_cloud_function_list_simple_output.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 *** Keywords ***
