@@ -62,7 +62,7 @@ fi
 # Fetch label selectors for the provided deployment
 SELECTOR=$(${KUBERNETES_DISTRIBUTION_BINARY} get deployment $DEPLOYMENT_NAME -n ${NAMESPACE} --context=${CONTEXT} -o=jsonpath='{.spec.selector.matchLabels}' | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' | tr '\n' ',' | sed 's/,$//')
 if [ -z "$SELECTOR" ]; then
-    echo "No label selectors found for Deployment $DEPLOYMENT_NAME."
+    echo "No label selectors found for Deployment \`$DEPLOYMENT_NAME\`."
     exit 1
 fi
 
@@ -157,37 +157,6 @@ fi
 
 
 
-# # Fuzzy match env vars in deployments with ERROR_FUZZY_STRING
-# declare -a FUZZY_ENV_VAR_RESOURCE_MATCHES
-# if [[ -n "$SEARCH_RESOURCES" && -n "$ERROR_FUZZY_STRING" ]]; then
-#     # Filter out common words from ERROR_FUZZY_STRING
-#     FILTERED_ERROR_STRING=$(filter_common_words "$ERROR_FUZZY_STRING")
-
-#     # Convert FILTERED_ERROR_STRING into an array
-#     mapfile -t PATTERNS <<< "$FILTERED_ERROR_STRING"
-
-#     for resource_type in "deployments" "statefulsets"; do
-#         for pattern in "${PATTERNS[@]}"; do
-#             while read -r resource_name; do
-#                 FUZZY_ENV_VAR_RESOURCE_MATCHES+=("$resource_type/$resource_name")
-#             done < <(${KUBERNETES_DISTRIBUTION_BINARY} get "$resource_type" -n "$NAMESPACE" -o=json | jq --arg pattern "$pattern" -r \
-#             ".items[] |
-#                 select(
-#                     .spec.template.spec.containers[]? |
-#                     .env[]? |
-#                     select(
-#                         (.name? // empty | ascii_downcase | contains(\$pattern)) or 
-#                         (.value? // empty | ascii_downcase | contains(\$pattern))
-#                     )
-#                 ) |
-#                 .metadata.name")
-#         done
-#     done
-# else
-#     echo "No search queries or fuzzy matches to perform."
-#     exit
-# fi
-
 # Fuzzy match env vars in deployments with ERROR_FUZZY_STRING
 declare -a FUZZY_ENV_VAR_RESOURCE_MATCHES
 if [[ -n "$SEARCH_RESOURCES" && -n "$ERROR_FUZZY_STRING" ]]; then
@@ -233,7 +202,7 @@ done
 
 # Fetch namespace events for searching through
 EVENT_SEARCH_LIST=$(${KUBERNETES_DISTRIBUTION_BINARY}  get events --context=${CONTEXT} -n ${NAMESPACE})
-event_details="\nThe namespace ${NAMESPACE} has produced the following interesting events:"
+event_details="\nThe namespace `${NAMESPACE}` has produced the following interesting events:"
 event_details+="\n"
 
 # For each value, search the namespace for applicable resources and events

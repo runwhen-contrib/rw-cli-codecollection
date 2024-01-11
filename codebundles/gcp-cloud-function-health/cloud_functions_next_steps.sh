@@ -12,24 +12,38 @@
 message="$1"
 project_id="$2"
 
-
 # Initialize an empty array to store recommendations
 next_steps=()
 
+# Split the message into an array of lines
+IFS=$'\n' read -r -d '' -a lines <<< "$message"
 
-if [[ $message =~ "CloudRunServiceNotFound" ]]; then
-    next_steps+=("Get Logs for Failed Cloud Functions in GCP Project \`$project_id\`")
-fi
+# Function to process each line
+process_line() {
+    local line=$1
 
+    if [[ $line =~ "CloudRunServiceNotFound" ]]; then
+        next_steps+=("Get Error Logs for Unhealthy Cloud Functions in GCP Project \`$project_id\`")
+    fi
 
-if [[ $message =~ "Build failed" ]]; then
-    if [[ $message =~ "For more details see the logs" ]]; then
-        log_url=$(echo $message | grep -oP 'https?://[^\s]+' | sed 's/\.$//' )
-        next_steps+=("Review the build logs at the [GCP Console URL]($log_url)")
-    else
-        next_steps+=("Get Build Logs for Failed Cloud Functions in GCP Project \`$project_id\`")
-    fi 
-fi
+    if [[ $line =~ "Unknown version or error. No message provided." ]]; then
+        next_steps+=("Get Error Logs for Unhealthy Cloud Functions in GCP Project \`$project_id\`")
+    fi
+
+    if [[ $line =~ "Build failed" ]]; then
+        if [[ $line =~ "For more details see the logs" ]]; then
+            log_url=$(echo $line | grep -oP 'https?://[^\s]+' | sed 's/\.$//' )
+            next_steps+=("Review the build logs at the [GCP Console URL]($log_url)")
+        else
+            next_steps+=("Get Build Logs for Failed Cloud Functions in GCP Project \`$project_id\`")
+        fi 
+    fi
+}
+
+# Process each line in the message
+for line in "${lines[@]}"; do
+    process_line "$line"
+done
 
 # Display the list of recommendations
 printf "%s\n" "${next_steps[@]}" | sort | uniq
