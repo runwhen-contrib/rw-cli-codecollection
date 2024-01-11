@@ -101,10 +101,10 @@ Get Error Logs for Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
             IF    len(@{error_logs_json}) > 0
                 
                 # Create a newline list of errors
-                @{error_message_list}=    Create List
+                ${error_message_list}=    Set Variable    ${EMPTY}
                 FOR    ${log}    IN    @{error_logs_json}
                     ${message_contents}=    Evaluate    $log['protoPayload']['status']['message']
-                    Append To List    ${error_message_list}    ${message_contents}
+                    ${error_message_list}=    Catenate    SEPARATOR=\n    ${error_message_list}    ${message_contents}
                 END  
                 
                 # Send list of messages to next_steps script for recommendations
