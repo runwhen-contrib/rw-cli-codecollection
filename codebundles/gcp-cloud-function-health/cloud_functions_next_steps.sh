@@ -24,7 +24,7 @@ fi
 
 if [[ $message =~ "Build failed" ]]; then
     if [[ $message =~ "For more details see the logs" ]]; then
-        log_url=$(echo $message | grep -oP 'https?://[^\s]+' )
+        log_url=$(echo $message | grep -oP 'https?://[^\s]+' | sed 's/\.$//' )
         next_steps+=("Review the build logs at the [GCP Console URL]($log_url)")
     else
         next_steps+=("Get Build Logs for Failed Cloud Functions in GCP Project \`$project_id\`")
