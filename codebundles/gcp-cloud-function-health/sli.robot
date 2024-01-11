@@ -17,7 +17,7 @@ Count unhealthy GCP Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Counts all GCP Functions that are not in a Healthy state
     [Tags]    gcloud    function    gcp    ${GCP_PROJECT_ID}
     ${unhealthy_cloud_function_list}=    RW.CLI.Run Cli
-    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud functions list --filter="state!=ACTIVE or STATUS!=ACTIVE" --format=json --project=${GCP_PROJECT_ID}
+    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud functions list --filter="state!=ACTIVE OR STATUS!=ACTIVE" --format=json --project=${GCP_PROJECT_ID}
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    show_in_rwl_cheatsheet=false
