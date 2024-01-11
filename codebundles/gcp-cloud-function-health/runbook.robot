@@ -48,7 +48,7 @@ List failed Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
             ...    expected=GCP Cloud Functions should be in a healthy state in GCP Project `${GCP_PROJECT_ID}`.
             ...    actual=Cloud Function `${name.stdout}` in GCP Project `${GCP_PROJECT_ID}` is in an unhealthy state.
             ...    title=Cloud Function `${name.stdout}` in GCP Project `${GCP_PROJECT_ID}` is unhealthy.
-            ...    reproduce_hint=View Commands Used in Report Output
+            ...    reproduce_hint=${unhealthy_cloud_function_list_simple_output.cmd}
             ...    details=Cloud Function `${name.stdout}` in location `${location.stdout}` in GCP Project `${GCP_PROJECT_ID}` is unhealthy with the following details:\n${item}
             ...    next_steps=${item_next_steps.stdout}
         END
@@ -92,7 +92,7 @@ Get Error Logs for Failed Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
             ...    expected=Cloud Function `${name.stdout}` should have no error logs in GCP Project `${GCP_PROJECT_ID}`.
             ...    actual=Cloud Function `${name.stdout}` in GCP Project `${GCP_PROJECT_ID}` has error logs.
             ...    title=Cloud Function `${name.stdout}` in GCP Project `${GCP_PROJECT_ID}` has error logs.
-            ...    reproduce_hint=View Commands Used in Report Output
+            ...    reproduce_hint=${error_logs_simple_output.cmd}
             ...    details=Cloud Function `${name.stdout}` in location `${location.stdout}` in GCP Project `${GCP_PROJECT_ID}` has the following error log:\n${item}
             ...    next_steps=${item_next_steps.stdout}
         END
