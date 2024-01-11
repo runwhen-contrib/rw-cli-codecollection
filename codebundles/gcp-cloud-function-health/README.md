@@ -1,6 +1,7 @@
 # GCP Cloud Function Health
 This code checks if any GCP (Google Cloud Platform) cloud functions are unhealthy. It uses the gcloud command-line tool to interact with GCP APIs and retrieve the necessary information.
 
+> Note: Only cloud functions v1 is supported at this time for automatic discovery with the RunWhen Local Discovery Process. 
 
 ## SLI
 The SLI counts the number of cloud functions that are "FAILED" state and pushes the metric. 

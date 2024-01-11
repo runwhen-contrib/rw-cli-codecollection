@@ -18,14 +18,14 @@ List failed Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
     [Tags]    gcloud    function    gcp    ${GCP_PROJECT_ID}
     # This command is cheat-sheet friendly
     ${unhealthy_cloud_function_list_simple_output}=    RW.CLI.Run Cli
-    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud functions list --filter="state:(FAILED)" --format="table[box](name, state, stateMessages.severity, stateMessages.type, stateMessages.message:wrap=30)" --project=${GCP_PROJECT_ID} && echo "Run 'gcloud functions describe [name]' for full details."
+    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud functions list --filter="state!=ACTIVE" --format="table[box](name, state, stateMessages.severity, stateMessages.type, stateMessages.message:wrap=30)" --project=${GCP_PROJECT_ID} && echo "Run 'gcloud functions describe [name]' for full details."
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    show_in_rwl_cheatsheet=true
 
     # Generate JSON List for additional processing
     ${unhealthy_cloud_function_list}=    RW.CLI.Run Cli
-    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud functions list --filter="state:(FAILED)" --format=json --project=${GCP_PROJECT_ID}
+    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud functions list --filter="state!=ACTIVE" --format=json --project=${GCP_PROJECT_ID}
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    show_in_rwl_cheatsheet=false
@@ -58,18 +58,18 @@ List failed Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Get Error Logs for Failed Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
-   [Documentation]    Fetches GCP logs related to failed Cloud Functions within the last 14 days
+   [Documentation]    Fetches GCP logs related to unhealthy Cloud Functions within the last 14 days
     [Tags]    gcloud    function    gcp    ${GCP_PROJECT_ID}
     # This command is cheat-sheet friendly
     ${error_logs_simple_output}=    RW.CLI.Run Cli
-    ...    cmd=gcloud functions list --filter="state:(FAILED)" --format="value(name)" --project=${GCP_PROJECT_ID} | xargs -I {} gcloud logging read "severity=ERROR AND resource.type=cloud_function AND resource.labels.function_name={}" --limit 50 --freshness=14d
+    ...    cmd=gcloud functions list --filter="state!=ACTIVE" --format="value(name)" --project=${GCP_PROJECT_ID} | xargs -I {} gcloud logging read "severity=ERROR AND resource.type=cloud_function AND resource.labels.function_name={}" --limit 50 --freshness=14d
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    show_in_rwl_cheatsheet=true
 
     # Generate JSON List for additional processing    
     ${error_logs_list}=    RW.CLI.Run Cli
-    ...    cmd=gcloud functions list --filter="state:(FAILED)" --format="value(name)" --project=${GCP_PROJECT_ID} | xargs -I {} gcloud logging read "severity=ERROR AND resource.type=cloud_function AND resource.labels.function_name={}" --limit 50 --freshness=14d --format="json"
+    ...    cmd=gcloud functions list --filter="state!=ACTIVE" --format="value(name)" --project=${GCP_PROJECT_ID} | xargs -I {} gcloud logging read "severity=ERROR AND resource.type=cloud_function AND resource.labels.function_name={}" --limit 50 --freshness=14d --format="json"
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    show_in_rwl_cheatsheet=false
