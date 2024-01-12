@@ -1,0 +1,28 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: azure
+  generationRules:
+    - resourceTypes:
+        - azure_network_load_balancers
+      matchRules:
+        - type: and
+          matches:
+            - type: pattern
+              pattern: ".+"
+              properties: [name]
+              mode: substring
+            - resourceType: variables
+              type: pattern
+              pattern: ".+"
+              properties: [custom/azure_credentials_secret_name]
+              mode: exact
+      slxs:
+        - baseName: az-lb-health
+          levelOfDetail: basic
+          qualifiers: [resource, resource_group]
+          baseTemplateName: az-lb-health
+          outputItems:
+            - type: slx
+            - type: runbook
+              templateName: az-lb-health-taskset.yaml

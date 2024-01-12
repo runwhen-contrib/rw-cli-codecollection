@@ -14,15 +14,14 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-List all nodes in an active prempt operation
+List all nodes in an active prempt operation for GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Fetches all nodes that have an active preempt operation at a global scope in the GCP Project
-    [Tags]    stdout    gcloud    node    preempt    gcp
+    [Tags]    stdout    gcloud    node    preempt    gcp    ${GCP_PROJECT_ID}
     ${preempt_node_list}=    RW.CLI.Run Cli
-    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud compute operations list --filter="operationType:( compute.instances.preempted ) AND NOT status:( DONE )" --format=json --project=${GCP_PROJECT_ID} | jq '[.[] | {startTime,targetLink, statusMessage, progress, zone, selfLink}]'
+    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud compute operations list --filter="operationType:(compute.instances.preempted) AND progress<100" --format=json --project=${GCP_PROJECT_ID} | jq '[.[] | {startTime,targetLink, statusMessage, progress, zone, selfLink}]'
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
     ${no_requests_count}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${preempt_node_list}
     ...    extract_path_to_var__preempt_node_count=length(@)
@@ -39,12 +38,6 @@ List all nodes in an active prempt operation
 
 *** Keywords ***
 Suite Initialization
-    ${GCLOUD_SERVICE}=    RW.Core.Import Service    gcloud
-    ...    type=string
-    ...    description=The selected RunWhen Service to use for accessing services within a network.
-    ...    pattern=\w*
-    ...    example=gcloud-service.shared
-    ...    default=gcloud-service.shared
     ${gcp_credentials_json}=    RW.Core.Import Secret    gcp_credentials_json
     ...    type=string
     ...    description=GCP service account json used to authenticate with GCP APIs.
@@ -57,7 +50,6 @@ Suite Initialization
     ...    example=myproject-ID
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
-    Set Suite Variable    ${GCLOUD_SERVICE}    ${GCLOUD_SERVICE}
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
     Set Suite Variable
     ...    ${env}

@@ -44,7 +44,7 @@ Checking HTTP URL Is Available And Timely
     ...    set_issue_title=Actual HTTP latency exceeded target latency for ${owner_kind.stdout} `${owner_name.stdout}`
     ...    set_severity_level=4
     ...    time_total__raise_issue_if_gt=${TARGET_LATENCY}
-    ...    set_issue_next_steps=Check ${owner_kind} Log for Issues with `${owner_name}`
+    ...    set_issue_next_steps=Check ${owner_kind.stdout} Log for Issues with `${owner_name.stdout}`
     ...    set_issue_details=${URL} responded with a latency of $time_total. Check services, pods, load balanacers, and virtual machines for unexpected saturation.
     ...    assign_stdout_from_var=time_total
     ${history}=    RW.CLI.Pop Shell History

@@ -8,14 +8,13 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/google-cloud.svg
-  alias: GCP Node Preempt Events
-  asMeasuredBy: The number of GCP nodes active in a preempt operation. 
+  alias: GCP Node Preempt Events for Project {{match_resource.resource.project_id}}
+  asMeasuredBy: The number of GCP nodes active in a preempt operation in project {{match_resource.resource.project_id}}.
   configProvided:
   - name: SLX_PLACEHOLDER
     value: SLX_PLACEHOLDER
   owners:
   - {{workspace.owner_email}}
   statement: Nodes in an active preempt event should trigger RunWhen workflows.    
-  additionalContext:  
-    cluster: "{{ cluster.name }}"
-    context: "{{ cluster.context }}"
+  additionalContext:
+    project: "{{match_resource.resource.project_id}}"

@@ -4,20 +4,20 @@ spec:
   platform: gcp
   generationRules:
     - resourceTypes:
-        -  gcp_compute_instances
+        -  gcp_functions_functions
       matchRules:
         - type: pattern
           pattern: ".+"
-          properties: [scheduling/preemptible]
+          properties: [name]
           mode: substring
       slxs:
-        - baseName: node-preempt
+        - baseName: gcp-function-health
           qualifiers: ["project"]
-          baseTemplateName: gcloud-node-preempt
+          baseTemplateName: gcp-cloud-function-health
           levelOfDetail: basic
           outputItems:
             - type: slx
             - type: sli
             - type: slo
             - type: runbook
-              templateName: gcloud-node-preempt-taskset.yaml
+              templateName: gcp-cloud-function-health-taskset.yaml

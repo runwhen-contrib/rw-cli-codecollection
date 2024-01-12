@@ -36,7 +36,7 @@ jobs:
           python3 .github/scripts/index.py .github/scripts/index-config.yaml
           git add README.md
 
-          # Run the index update script
+          # Run the metadata generation script
           python3 .github/scripts/meta.py codebundles/
           git add codebundles/**/meta.yaml
 

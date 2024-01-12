@@ -1,3 +1,4 @@
+## Needs tuning as soon as we can match on application resource
 apiVersion: runwhen.com/v1
 kind: Runbook
 metadata:
@@ -7,9 +8,7 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  locations:
-    - {{default_location}}
-  description: Counts the total number of nodes undergoing a preempt event. 
+  location: {{default_location}}
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -21,12 +20,15 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/gcloud-node-preempt/runbook.robot
-  intervalStrategy: intermezzo
-  intervalSeconds: 300
+    pathToRobot: codebundles/azure-loadbalancer-triage/runbook.robot
   configProvided:
-    - name: GCP_PROJECT_ID
-      value: {{match_resource.resource.project_id}}
+    - name: AZ_HISTORY_RANGE
+      value: '24'
+    - name: AZ_LB_NAME
+      value: {{match_resource.name}}
+    - name: AZ_LB_ID
+      value: {{match_resource.id}}
   secretsProvided:
-    - name: gcp_credentials_json
-      workspaceKey: {{custom.gcp_ops_suite_sa}}
+    - name: azure_credentials
+      workspaceKey: {{custom.azure_credentials_secret_name}}
+  servicesProvided: []

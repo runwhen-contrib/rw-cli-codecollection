@@ -9,7 +9,7 @@ metadata:
 spec:
   locations:
     - {{default_location}}
-  description: Counts the total number of nodes undergoing a preempt event. 
+  description: Runs tasks to triage unhealthy GCP Cloud Functions 
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -21,7 +21,7 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/gcloud-node-preempt/runbook.robot
+    pathToRobot: codebundles/gcp-cloud-function-health/runbook.robot
   intervalStrategy: intermezzo
   intervalSeconds: 300
   configProvided:

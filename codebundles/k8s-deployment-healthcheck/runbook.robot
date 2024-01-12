@@ -36,26 +36,26 @@ Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=awk "/Recommended Next Steps:/ {start=1; getline} start" <<< "${logs.stdout}"
+    ...    cmd=awk "/Recommended Next Steps:/ {start=1; getline} start" <<< '''${logs.stdout}'''
     ...    env=${env}
     ...    include_in_history=false
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=awk '/Issues Identified:/ {start=1; next} /The namespace online-boutique has produced the following interesting events:/ {start=0} start' <<< "${logs.stdout}"
+    ...    cmd=awk '/Issues Identified:/ {start=1; next} /The namespace `${NAMESPACE}` has produced the following interesting events:/ {start=0} start' <<< '''${logs.stdout}'''
     ...    env=${env}
     ...    include_in_history=false
     # FIXME: Refactor this to a loop of 1 issue per line of issue output - better alinging next steps with specific issues
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${logs}
-    ...    set_severity_level=2
-    ...    set_issue_expected=No logs matching error patterns found in deployment ${DEPLOYMENT_NAME} in namespace: ${NAMESPACE}
-    ...    set_issue_actual=Error logs found in deployment ${DEPLOYMENT_NAME} in namespace: ${NAMESPACE}
-    ...    set_issue_title=Deployment ${DEPLOYMENT_NAME} in ${NAMESPACE} has: \n${issues.stdout}
-    ...    set_issue_details=Deployment ${DEPLOYMENT_NAME} has error logs:\n\n$_stdout
-    ...    set_issue_next_steps=${recommendations.stdout}
-    ...    _line__raise_issue_if_contains=Recommended
+    RW.Core.Add Issue
+    ...    severity=2
+    ...    expected=No logs matching error patterns found in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+    ...    actual=Error logs found in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+    ...    title=Deployment `${DEPLOYMENT_NAME}` in `${NAMESPACE}` has error logs.
+    ...    reproduce_hint=View Commands Used in Report Output
+    ...    details=Deployment `${DEPLOYMENT_NAME}` in `${NAMESPACE}` generated the following log analysis: \n${logs.stdout}
+    ...    next_steps=${recommendations.stdout}
+
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report
-    ...    Recent logs from deployment/${DEPLOYMENT_NAME} in ${NAMESPACE}:\n\n${logs.stdout}
+    ...    Recent logs from deployment/`${DEPLOYMENT_NAME}` in `${NAMESPACE}`:\n\n${logs.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
 # Fetch Previous Logs for Deployment `${DEPLOYMENT_NAME}`

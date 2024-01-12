@@ -1,5 +1,5 @@
 apiVersion: runwhen.com/v1
-kind: Runbook
+kind: ServiceLevelIndicator
 metadata:
   name: {{slx_name}}
   labels:
@@ -7,9 +7,11 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
+  displayUnitsLong: Number
+  displayUnitsShort: '#'
   locations:
     - {{default_location}}
-  description: Counts the total number of nodes undergoing a preempt event. 
+  description: Measures ____
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -21,7 +23,7 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/gcloud-node-preempt/runbook.robot
+    pathToRobot: codebundles/gcp-cloud-function-health/sli.robot
   intervalStrategy: intermezzo
   intervalSeconds: 300
   configProvided:
