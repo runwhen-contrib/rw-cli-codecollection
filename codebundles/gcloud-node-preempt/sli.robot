@@ -39,5 +39,6 @@ Count the number of nodes in active prempt operation
     ...    rsp=${preempt_node_list}
     ...    extract_path_to_var__preempt_node_count=length(@)
     ...    assign_stdout_from_var=preempt_node_count
+    ...    timeout_seconds=180
     ${metric}=     Convert To Number    ${no_requests_count.stdout}
     RW.Core.Push Metric    ${metric}

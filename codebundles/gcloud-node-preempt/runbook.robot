@@ -22,10 +22,11 @@ List all nodes in an active prempt operation for GCP Project `${GCP_PROJECT_ID}`
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    show_in_rwl_cheatsheet=true
+    ...    timeout_seconds=180
     ${no_requests_count}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${preempt_node_list}
     ...    extract_path_to_var__preempt_node_count=length(@)
-    ...    set_issue_title=Found nodes in an active preempt operation
+    ...    set_issue_title=Found nodes in an active preempt operation for Project `${GCP_PROJECT_ID}`
     ...    set_severity_level=3
     ...    preempt_node_count__raise_issue_if_gt=0
     ...    set_issue_details=Preempt operations are active on GCP nodes in this project ${GCP_PROJECT_ID}. We found $preempt_node_count nodes in preempt. If services are degraded, modify the node pool or deployment replica configurations, otherwise grab a coffee or take a walk.
