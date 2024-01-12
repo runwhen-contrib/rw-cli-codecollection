@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Remediate Readiness and Liveness Probe GitOps Manifests Namespace `${NAMESPACE}`
     [Documentation]    Fixes misconfigured readiness or liveness probe configurations for deployments in a namespace
-    [Tags]    readiness    liveness    probe    deployment    remediate    gitops    ${NAMESPACE}
+    [Tags]    readiness    liveness    probe    deployment    remediate    gitops    ${namespace}
     ${probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_all_probes.sh
     ...    cmd_override=./validate_all_probes.sh deployment ${NAMESPACE}
@@ -42,7 +42,7 @@ Remediate Readiness and Liveness Probe GitOps Manifests Namespace `${NAMESPACE}`
     ...    include_in_history=false
     IF    len($recommendations.stdout) > 0
         RW.Core.Add Issue
-        ...    severity=4
+        ...    severity=3
         ...    expected=Pull Requests for manifest changes are reviewed for namespace `${NAMESPACE}`
         ...    actual=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
         ...    title=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
