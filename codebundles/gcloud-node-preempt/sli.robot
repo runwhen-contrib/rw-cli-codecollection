@@ -22,8 +22,9 @@ Suite Initialization
     ...    description=The GCP Project ID to scope the API to.
     ...    pattern=\w*
     ...    example=myproject-ID
+    ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}   
-    Set Suite Variable    ${env}    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}"}
+    Set Suite Variable    ${env}    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}", "PATH":"$PATH:${OS_PATH}"}
 
 
 *** Tasks ***
