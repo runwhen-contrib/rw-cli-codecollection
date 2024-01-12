@@ -406,67 +406,6 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
     RW.Core.Add To Report    ${recent_events_by_object.stdout}\n
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Troubleshoot Services And Application Workloads in Namespace `${NAMESPACE}`
-    [Documentation]    Iterates through the services within a namespace for a given timeframe and byte length max, checking the resulting logs for distinct entries matching a given pattern, provide a summary of which services require additional investigation.
-    [Tags]
-    ...    namespace
-    ...    services
-    ...    applications
-    ...    workloads
-    ...    deployments
-    ...    apps
-    ...    ingress
-    ...    http
-    ...    networking
-    ...    endpoints
-    ...    logs
-    ...    aggregate
-    ...    filter
-    ...    ${namespace}
-    ${aggregate_service_logs}=    RW.CLI.Run Cli
-    ...    cmd=services=($(${KUBERNETES_DISTRIBUTION_BINARY} get svc -o=name --context=${CONTEXT} -n ${NAMESPACE})) && [ \${#services[@]} -eq 0 ] && echo "No services found." || { > "logs.json"; for service in "\${services[@]}"; do ${KUBERNETES_DISTRIBUTION_BINARY} logs $service --limit-bytes=256000 --since=2h --context=${CONTEXT} -n ${NAMESPACE} 2>/dev/null | grep -Ei "${SERVICE_ERROR_PATTERN}" | grep -Ev "${SERVICE_EXCLUDE_PATTERN}" | while read -r line; do service_name="\${service#*/}"; message=$(echo "$line" | jq -aRs .); printf '{"service": "%s", "message": %s}\\n' "\${service_name}" "$message" >> "logs.json"; done; done; [ ! -s "logs.json" ] && echo "No log entries found." || cat "logs.json" | jq -s '[ (group_by(.service) | map({service: .[0].service, total_logs: length})), (group_by(.service) | map({service: .[0].service, top_logs: (group_by(.message[0:200]) | map({message_start: .[0].message[0:200], count: length}) | sort_by(.count) | reverse | .[0:3])})) ] | add'; } > $HOME/output; cat $HOME/output
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${KUBECONFIG}
-    ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
-    ${services_with_errors}=    RW.CLI.Run Cli
-    ...    cmd=jq -r '[ .[].service ] | unique[]' $HOME/output
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${KUBECONFIG}
-    ...    show_in_rwl_cheatsheet=false
-    ...    include_in_history=false
-    @{service_list}=    Split String    ${services_with_errors.stdout}
-    FOR    ${service}    IN    @{service_list}
-        ${service}=    Strip String    ${service}
-        ${service}=    Replace String    ${service}    \n    ${EMPTY}
-        ${service_owner}=    RW.CLI.Run Cli
-        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get endpoints "${service}" -n "${NAMESPACE}" --context="${CONTEXT}" -o jsonpath='{range .subsets[*].addresses[*]}{.targetRef.name}{"\\n"}{end}' | xargs -I {} sh -c 'owner_kind=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod {} -n "${NAMESPACE}" --context="${CONTEXT}" -o=jsonpath="{.metadata.ownerReferences[0].kind}"); if [ "$owner_kind" = "ReplicaSet" ]; then replicaset=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod {} -n "${NAMESPACE}" --context="${CONTEXT}" -o=jsonpath="{.metadata.ownerReferences[0].name}"); deployment_name=$(${KUBERNETES_DISTRIBUTION_BINARY} get replicaset $replicaset -n "${NAMESPACE}" --context="${CONTEXT}" -o=jsonpath="{.metadata.ownerReferences[0].name}"); echo "Deployment $deployment_name"; else owner_info=$($owner_kind ${KUBERNETES_DISTRIBUTION_BINARY} get pod {} -n "${NAMESPACE}" --context="${CONTEXT}" -o=jsonpath="{.metadata.ownerReferences[0].name}"); echo "$owner_info"; fi' | sort | uniq
-        ...    secret_file__kubeconfig=${KUBECONFIG}
-        ...    env=${env}
-        ...    include_in_history=false
-        ${owner_kind}    ${owner_name}=    Split String    ${service_owner.stdout}    ${SPACE}
-        ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
-        ${total_logs}=    RW.CLI.Run Cli
-        ...    cmd=jq '.[] | select(.service == "${service}") | .total_logs' $HOME/output
-        ...    env=${env}
-        ...    include_in_history=false
-        ${logs_details}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '.[] | select(.service == "${service}") |.top_logs[]? | "\\(.message_start) \\(.count)"' $HOME/output
-        ...    env=${env}
-        ...    include_in_history=false
-        RW.Core.Add Issue
-        ...    severity=4
-        ...    expected=Service `${service}` should not have error logs in associated pods in namespace `${NAMESPACE}`.
-        ...    actual=Error logs were identified for service `${service}` in namespace `${NAMESPACE}`.
-        ...    title=Service `${service}` has error logs in namespace `${NAMESPACE}`.
-        ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=Total Logs: ${total_logs.stdout}\nTop Logs:\n${logs_details.stdout}
-        ...    next_steps=Check ${owner_kind} Logs for Issues with `${owner_name}`
-    END
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add To Report    Log Summary for Services in namespace `${NAMESPACE}`:\n
-    RW.Core.Add To Report    ${aggregate_service_logs.stdout}\n
-    RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`
     [Documentation]    Searches through deployemnts and statefulsets to determine if PodDistruptionBudgets are missing and/or are configured in a risky way that operational maintenance.
