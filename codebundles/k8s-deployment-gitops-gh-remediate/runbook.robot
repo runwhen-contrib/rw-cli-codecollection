@@ -27,7 +27,7 @@ Remediate Readiness and Liveness Probe GitOps Manifests Namespace `${NAMESPACE}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=180
     ${remediation_list}=    RW.CLI.Run Cli
-    ...    cmd=awk "/Remediation Steps:/ {start=1; getline} start" <<< "${probe_health.stdout}"
+    ...    cmd=awk "/Remediation Steps:/ {start=1; getline} start" <<< '''${probe_health.stdout}'''
     ...    env=${env}
     ...    include_in_history=false
     ${gh_updates}=    RW.CLI.Run Bash File
