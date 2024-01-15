@@ -71,7 +71,7 @@ for ((i=0; i<NUM_CONTAINERS; i++)); do
             CONTAINER_PORTS=$(extract_data "$MANIFEST" ".spec.template.spec.containers[$i].ports[].containerPort")
             if [[ ! " $CONTAINER_PORTS " == *"$PORT_IN_COMMAND"* ]]; then
                 echo "Container \`$CONTAINER_NAME\`: Port $PORT_IN_COMMAND used in ${PROBE_TYPE} exec command is not exposed by the container. The following ports are exposed: $CONTAINER_PORTS"
-                next_steps+=("Get Deployment Workload Details For \`${DEPLOYMENT_NAME}\`")
+                next_steps+=("Get Deployment Workload Details For \`$DEPLOYMENT_NAME\`")
                 next_steps+=("Remediate Readiness and Liveness Probes for Deployments in Namespace \`${NAMESPACE}\`")
             else
                 echo "Container \`$CONTAINER_NAME\`: Port $PORT_IN_COMMAND in ${PROBE_TYPE} exec command is valid."
@@ -106,7 +106,7 @@ for ((i=0; i<NUM_CONTAINERS; i++)); do
                     echo "Command Output: $EXEC_OUTPUT"
                     echo "Exit Code: $EXEC_EXIT_CODE"
                     if [ $EXEC_EXIT_CODE == 0 ]; then
-                        next_steps+=("Update $PROBE_TYPE For \`${DEPLOYMENT_NAME}\` to use port $PORT")
+                        next_steps+=("Update $PROBE_TYPE For \`$DEPLOYMENT_NAME\` to use port $PORT")
                     fi
                     echo "--- END Exec Test----"
                 done

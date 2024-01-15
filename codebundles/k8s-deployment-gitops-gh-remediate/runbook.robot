@@ -42,7 +42,7 @@ Remediate Readiness and Liveness Probe GitOps Manifests Namespace `${NAMESPACE}`
     ...    include_in_history=false
     IF    len($recommendations.stdout) > 0
         RW.Core.Add Issue
-        ...    severity=4
+        ...    severity=3
         ...    expected=Pull Requests for manifest changes are reviewed for namespace `${NAMESPACE}`
         ...    actual=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
         ...    title=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
