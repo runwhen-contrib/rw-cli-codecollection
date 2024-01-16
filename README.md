@@ -22,7 +22,7 @@ Please see the **[contributing](CONTRIBUTING.md)** and **[code of conduct](CODE_
 Documentation for each codebundle is maintained in the README.md alongside the robot code and is published at [https://docs.runwhen.com/public/v/codebundles/](https://docs.runwhen.com/public/v/codebundles/). Please see the [readme howto](README_HOWTO.md) for details on crafting a codebundle readme that can be indexed.
 
 ## Getting Started
-Head on over to our centralized documentation [here](https://docs.runwhen.com/public/runwhen-authors/getting-started-with-codecollection-development) for detailed information on getting started.
+Head on over to our centralized documentation [here](https://docs.runwhen.com/public/v/runwhen-authors/codecollection-development/getting-started/running-your-first-codebundle) for detailed information on getting started.
 
 File Structure overview of devcontainer:
 ```
