@@ -30,7 +30,6 @@ List all nodes in an active prempt operation for GCP Project `${GCP_PROJECT_ID}`
     ...    set_severity_level=4
     ...    preempt_node_count__raise_issue_if_gt=0
     ...    set_issue_details=Preempt operations are active on GCP nodes in this project ${GCP_PROJECT_ID}. We found $preempt_node_count nodes that preempted in the last ${AGE} minutes. If services are degraded, modify the node pool or deployment replica configurations. The following events occured: ${preempt_node_list.stdout}
-    ...    set_issue_next_steps=Grab a coffee, take a walk, or call your mom.
     ...    assign_stdout_from_var=preempt_node_count
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Total nodes in a preempt operation: ${no_requests_count.stdout}
