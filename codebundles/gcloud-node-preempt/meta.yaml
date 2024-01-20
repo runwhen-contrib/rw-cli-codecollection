@@ -1,24 +1,46 @@
 commands:
 - command: gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
-    && gcloud compute operations list --filter="operationType:(compute.instances.preempted)
-    AND progress<100" --format=json --project=${GCP_PROJECT_ID} | jq '[.[] | {startTime,targetLink,
-    statusMessage, progress, zone, selfLink}]'
+    && gcloud compute operations list --filter='operationType:(compute.instances.preempted)'
+    --format=json --project=${GCP_PROJECT_ID} | jq -r --arg now "$(date -u +%s)" '[.[]
+    | select((.startTime | sub("\\.[0-9]+"; "") | strptime("%Y-%m-%dT%H:%M:%S%z")
+    | mktime) > ($now | tonumber - (${AGE}*60)))] '
   doc_links: '
 
-    - [Google Cloud service accounts](https://cloud.google.com/iam/docs/creating-managing-service-accounts){:target="_blank"}
+    - [Google Cloud authentication](https://cloud.google.com/docs/authentication){:target="_blank"}
 
-    - [Preemptible VM instances in Google Cloud](https://cloud.google.com/preemptible-vms){:target="_blank"}
+    - [Compute Engine operations overview](https://cloud.google.com/compute/docs/overview){:target="_blank"}
 
-    - [jq documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command activates a service account for Google Cloud and then
-    lists all preempted compute instances in a specific project, outputting the results
-    in JSON format with specific attributes using jq.
-  multi_line_details: "\n# Authenticate using a service account key\ngcloud auth activate-service-account\
-    \ --key-file=$GOOGLE_APPLICATION_CREDENTIALS \n\n# List compute operations for\
-    \ preempted instances with less than 100% progress in JSON format\n# Filter by\
-    \ operationType and progress, and specify the project\ngcloud compute operations\
-    \ list --filter=\"operationType:(compute.instances.preempted) AND progress<100\"\
-    \ --format=json --project=${GCP_PROJECT_ID} \n\n# Pipe the output to 'jq' to format\
-    \ the JSON response with specific fields\n| jq '[.[] | {startTime,targetLink,\
-    \ statusMessage, progress, zone, selfLink}]'\n"
+    - [Filtering and formatting results in Google Cloud](https://cloud.google.com/sdk/gcloud/reference/topic/filters){:target="_blank"}
+
+    - [Working with time frame in Google Cloud](https://cloud.google.com/logging/docs/view/query-library){:target="_blank"}'
+  explanation: This command activates the service account using Google Cloud authentication
+    and then lists the compute operations for preempted instances in a specific project,
+    filtering and formatting the results in JSON with a specific time frame.
+  multi_line_details: '
+
+    # Start by activating the service account with the key file provided in the environment
+    variable $GOOGLE_APPLICATION_CREDENTIALS
+
+    gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+    &&
+
+
+    # Then, use gcloud compute to list operations that have the type ''compute.instances.preempted''
+    in JSON format and filter them based on project ID
+
+    gcloud compute operations list --filter=''operationType:(compute.instances.preempted)''
+    --format=json --project=${GCP_PROJECT_ID} |
+
+
+    # Use jq to parse the JSON output and filter out entries based on their start
+    time
+
+    jq -r --arg now "$(date -u +%s)" ''[.[] | select((.startTime | sub("\\.[0-9]+";
+    "") | strptime("%Y-%m-%dT%H:%M:%S%z") | mktime) > ($now | tonumber - (${AGE}*60)))]
+
+
+    # The command is finished. This multi-line structure helps to better understand
+    each step of the command and what it does.
+
+    '
   name: list_all_nodes_in_an_active_prempt_operation_for_gcp_project_gcp_project_id
