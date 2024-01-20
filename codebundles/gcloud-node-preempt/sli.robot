@@ -1,6 +1,6 @@
 *** Settings ***
 Metadata          Author    stewartshea
-Documentation     Check if any GCP nodes have an active preempt operation. 
+Documentation     Counts nodes that have been preempted within the defined time interval.  
 Metadata          Display Name    GCP Node Prempt List 
 Metadata          Supports    GCP,GKE
 Suite Setup       Suite Initialization
@@ -22,23 +22,26 @@ Suite Initialization
     ...    description=The GCP Project ID to scope the API to.
     ...    pattern=\w*
     ...    example=myproject-ID
+    ${AGE}=    RW.Core.Import User Variable    AGE
+    ...    type=string
+    ...    description=The age, in minutes, since the preempt event. 
+    ...    pattern=\d+
+    ...    default=15
+    ...    example=15
     ${OS_PATH}=    Get Environment Variable    PATH
-    Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}   
+    Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
+    Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
+    Set Suite Variable    ${AGE}    ${AGE}
     Set Suite Variable    ${env}    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}", "PATH":"$PATH:${OS_PATH}"}
 
 
 *** Tasks ***
 Count the number of nodes in active prempt operation
-    [Documentation]    Fetches all nodes that have an active preempt operation at a global scope in the GCP Project
+    [Documentation]    Counts all nodes that have been preempted within the defined time interval. 
     [Tags]    Stdout    gcloud    node    preempt    gcp
     ${preempt_node_list}=    RW.CLI.Run Cli
-    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud compute operations list --filter="operationType:(compute.instances.preempted) AND progress<100" --format=json --project=${GCP_PROJECT_ID}
+    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud compute operations list --filter='operationType:(compute.instances.preempted)' --format=json --project=${GCP_PROJECT_ID} | jq -r --arg now "$(date -u +%s)" '[.[] | select((.startTime | sub("\\\\.[0-9]+"; "") | strptime("%Y-%m-%dT%H:%M:%S%z") | mktime) > ($now | tonumber - (${AGE}*60)))] | length'
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
-    ${no_requests_count}=    RW.CLI.Parse Cli Json Output
-    ...    rsp=${preempt_node_list}
-    ...    extract_path_to_var__preempt_node_count=length(@)
-    ...    assign_stdout_from_var=preempt_node_count
-    ...    timeout_seconds=180
-    ${metric}=     Convert To Number    ${no_requests_count.stdout}
+    ${metric}=     Convert To Number    ${preempt_node_list.stdout}
     RW.Core.Push Metric    ${metric}
