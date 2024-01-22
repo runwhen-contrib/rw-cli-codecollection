@@ -444,7 +444,9 @@ commands:
 
     - [curl Documentation](https://curl.se/docs/){:target="_blank"}
 
-    - [HTTP Request Methods](https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods){:target="_blank"}'
+    - [HTTP Request Methods](https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods){:target="_blank"}
+
+    - [Web Services and APIs](https://www.redhat.com/en/topics/api/what-are-web-services){:target="_blank"}'
   explanation: This command is using the 'curl' program to make a request to a specific
     URL, represented by the variable ${VAULT_URL}. It's commonly used for interacting
     with web services and APIs.
@@ -459,7 +461,9 @@ commands:
 
     - [curl Documentation](https://curl.se/docs/){:target="_blank"}
 
-    - [HTTP Request Methods](https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods){:target="_blank"}'
+    - [HTTP Request Methods](https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods){:target="_blank"}
+
+    - [Web Services and APIs](https://www.redhat.com/en/topics/api/what-are-web-services){:target="_blank"}'
   explanation: This command is using the 'curl' program to make a request to a specific
     URL, represented by the variable ${VAULT_URL}. It's commonly used for interacting
     with web services and APIs.
