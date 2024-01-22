@@ -171,8 +171,8 @@ def run_bash_file(
     else:
         cwd = os.getcwd()
 
-        # Check if the current working directory is the root
-        if cwd == "/":
+        # Check if the current working directory is the root or the /app
+        if cwd == "/" or cwd == "/app":
             # Check if RW_PATH_TO_ROBOT environment variable exists
             rw_path_to_robot = os.environ.get("RW_PATH_TO_ROBOT", None)
             if rw_path_to_robot:
