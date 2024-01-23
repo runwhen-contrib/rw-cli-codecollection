@@ -53,6 +53,11 @@ if [[ $messages =~ "ImagePullBackOff" || $messages =~ "Back-off pulling image" |
     next_steps+=("List Images and Tags for Every Container in Failed Pods for Namespace \`$NAMESPACE\`")
 fi
 
+if [[ $messages =~ "forbidden: failed quota" ]]; then
+    next_steps+=("Check Resource Quota Utilization in Namepace `${NAMESPACE}`")
+fi
+
+
 
 # Display the list of recommendations
 printf "%s\n" "${next_steps[@]}" | sort | uniq
