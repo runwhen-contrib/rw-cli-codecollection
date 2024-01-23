@@ -97,12 +97,12 @@ Troubleshoot `${WORKLOAD_NAME}` Application Logs
     ${full_report}=    Evaluate    $ts_results.get("report")
     ${found_exceptions}=    Evaluate    $ts_results.get("found_exceptions")
     ${full_report}=    Set Variable
-    ...    ${full_report}\nHere's the command used to collect the exception data:\n```${history}```
+    ...    ${full_report}\n### Recreating:\nHere's the command used to collect the exception data:\n```${history}```
     RW.Core.Add Pre To Report    ${full_report}
 
     ${issue_link}=    Set Variable    None
     IF    "${CREATE_ISSUES}" == "YES" and (len($parsed_exceptions)) > 0
-        ${issue_link}=    RW.K8sApplications.Create Github Issue    ${repos[0]}    ${full_report}
+        ${issue_link}=    RW.K8sApplications.Create Github Issue    ${repos[0]}    ${full_report}    app_name=${WORKLOAD_NAME}
         RW.Core.Add Pre To Report    \n${issue_link}
     END
     ${nextsteps}=    Evaluate

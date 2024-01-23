@@ -192,7 +192,7 @@ def troubleshoot_application(
 {rsr_report}
 
 
-### Repository URL(s): {repo.source_uri}
+### Repository URL(s):\n- {repo.source_uri}
 """
     return {
         "report": report,
