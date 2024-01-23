@@ -500,10 +500,6 @@ Suite Initialization
     ...    description=The kubernetes kubeconfig yaml containing connection configuration used to connect to cluster(s).
     ...    pattern=\w*
     ...    example=For examples, start here https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
-    ${kubectl}=    RW.Core.Import Service    kubectl
-    ...    description=The location service used to interpret shell commands.
-    ...    default=kubectl-service.shared
-    ...    example=kubectl-service.shared
     ${NAMESPACE}=    RW.Core.Import User Variable    NAMESPACE
     ...    type=string
     ...    description=The name of the Kubernetes namespace to scope actions and searching to.
@@ -520,18 +516,6 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=(Error|Exception)
     ...    default=(Error|Exception)
-    ${SERVICE_ERROR_PATTERN}=    RW.Core.Import User Variable    SERVICE_ERROR_PATTERN
-    ...    type=string
-    ...    description=The error pattern to use when grep-ing logs for services.
-    ...    pattern=\w*
-    ...    example=(Error: 13|Error: 14)
-    ...    default=(Error:)
-    ${SERVICE_EXCLUDE_PATTERN}=    RW.Core.Import User Variable    SERVICE_EXCLUDE_PATTERN
-    ...    type=string
-    ...    description=Pattern used to exclude entries from log results when searching in service logs.
-    ...    pattern=\w*
-    ...    example=(node_modules|opentelemetry)
-    ...    default=(node_modules|opentelemetry)
     ${ANOMALY_THRESHOLD}=    RW.Core.Import User Variable
     ...    ANOMALY_THRESHOLD
     ...    type=string
@@ -547,14 +531,11 @@ Suite Initialization
     ...    default=kubectl
     ${HOME}=    RW.Core.Import User Variable    HOME
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
-    Set Suite Variable    ${kubectl}    ${kubectl}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${ERROR_PATTERN}    ${ERROR_PATTERN}
     Set Suite Variable    ${ANOMALY_THRESHOLD}    ${ANOMALY_THRESHOLD}
-    Set Suite Variable    ${SERVICE_ERROR_PATTERN}    ${SERVICE_ERROR_PATTERN}
-    Set Suite Variable    ${SERVICE_EXCLUDE_PATTERN}    ${SERVICE_EXCLUDE_PATTERN}
     Set Suite Variable    ${HOME}    ${HOME}
     Set Suite Variable
     ...    ${env}
