@@ -20,6 +20,11 @@ spec:
               pattern: "github"
               properties: [custom/gitops_provider]
               mode: substring
+            - resourceType: variables
+              type: pattern
+              pattern: ".+"
+              properties: [custom/github_token_secret_name]
+              mode: substring
       slxs:
         - baseName: depl-gh-fix
           levelOfDetail: detailed
