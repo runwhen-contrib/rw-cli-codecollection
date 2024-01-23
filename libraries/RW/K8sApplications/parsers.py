@@ -73,7 +73,6 @@ class BaseStackTraceParse:
     def extract_files(text, exclude_paths: list[str] = None) -> list[str]:
         if exclude_paths is None:
             exclude_paths = BaseStackTraceParse.exclude_file_paths
-        # regex = r"/[\w/._-]+"
         regex = r"/[\w./_-]+\.[a-zA-Z0-9]+"
         results = re.findall(regex, text)
         results = [
@@ -135,7 +134,7 @@ class BaseStackTraceParse:
 class CSharpStackTraceParse(BaseStackTraceParse):
     @staticmethod
     def parse_log(log) -> StackTraceData:
-        if ".Exception" in log:
+        if ".Exception" in log or bool(re.search(r"at.*in", log)):
             return BaseStackTraceParse.parse_log(log)
         else:
             return None
