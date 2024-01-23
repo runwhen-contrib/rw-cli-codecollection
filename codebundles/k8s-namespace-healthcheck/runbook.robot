@@ -462,8 +462,39 @@ Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add To Report    ${pdb_check.stdout}\n
     RW.Core.Add Pre To Report    Commands Used:\n${history}
-
-
+Check Resource Quota Utilization in Namepace `${NAMESPACE}`
+    [Documentation]    Lists any namespace resource quotas and 
+    [Tags]
+    ...    resourcequota
+    ...    quota
+    ...    availability
+    ...    unavailable
+    ...    policy
+    ...    ${NAMESPACE}
+    ${quota_usage}=    RW.CLI.Run Bash File
+    ...    bash_file=resource_quota_check.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    render_in_commandlist=true
+    ${recommendations}=    RW.CLI.Run Cli
+    ...    cmd=echo '${quota_usage.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+    ...    env=${env}
+    ...    include_in_history=false
+    ${recommendation_list}=    Evaluate    json.loads(r'''${recommendations.stdout}''')    json
+    IF    len(@{recommendation_list}) > 0
+        FOR    ${item}    IN    @{recommendation_list}
+            RW.Core.Add Issue
+            ...    severity=${item["severity"]}
+            ...    expected=Resource quota should not constrain deployment of resources. 
+            ...    actual=Resource quota is constrained and might affect deployments.
+            ...    title=Resource quota is ${item["usage"]} in namespace `${NAMESPACE}`
+            ...    reproduce_hint=kubectl describe resourcequota -n ${NAMESPACE}
+            ...    details=Resource quota ${item["quota_name"]} with ${item["resource"]} is ${item["usage"]} in namespace ${NAMESPACE}
+            ...    next_steps=${item["next_step"]}
+        END
+    END  
 *** Keywords ***
 Suite Initialization
     ${kubeconfig}=    RW.Core.Import Secret
