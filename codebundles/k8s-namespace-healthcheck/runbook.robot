@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       This taskset runs general troubleshooting checks against all applicable objects in a namespace. Looks for warning events, odd or frequent normal events, restarting containers and failed or pending pods. 
+Documentation       This taskset runs general troubleshooting checks against all applicable objects in a namespace. Looks for warning events, odd or frequent normal events, restarting containers and failed or pending pods.
 Metadata            Author    stewartshea
 Metadata            Display Name    Kubernetes Namespace Troubleshoot
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
@@ -40,7 +40,7 @@ Troubleshoot Warning Events in Namespace `${NAMESPACE}`
             ...    cmd=echo "${item["object"]}" | awk -F"/" '{print $3}' | sed 's/ *$//' | tr -d '\n'
             ...    env=${env}
             ...    include_in_history=False
-            #FIXME Theres a case where the object generating the event is gone. We need to figure out how 
+            # FIXME Theres a case where the object generating the event is gone. We need to figure out how
             # to best handle this case instead of "Unknown" "unknown"
             ${item_owner}=    RW.CLI.Run Bash File
             ...    bash_file=find_resource_owners.sh
@@ -283,7 +283,7 @@ Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
             ...    env=${env}
             ...    include_in_history=False
             ${object_status_string}=    RW.CLI.Run Cli
-            ...    cmd=echo "${item["conditions"]}" | sed 's/True/true/g; s/False/false/g; s/None/null/g; s/'\\''/\"/g' 
+            ...    cmd=echo "${item["conditions"]}" | sed 's/True/true/g; s/False/false/g; s/None/null/g; s/'\\''/\"/g'
             ...    env=${env}
             ...    include_in_history=False
             ${object_status}=    RW.CLI.Run Cli
@@ -406,7 +406,6 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
     RW.Core.Add To Report    ${recent_events_by_object.stdout}\n
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-
 Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`
     [Documentation]    Searches through deployemnts and statefulsets to determine if PodDistruptionBudgets are missing and/or are configured in a risky way that operational maintenance.
     [Tags]
@@ -462,15 +461,10 @@ Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add To Report    ${pdb_check.stdout}\n
     RW.Core.Add Pre To Report    Commands Used:\n${history}
+
 Check Resource Quota Utilization in Namepace `${NAMESPACE}`
-    [Documentation]    Lists any namespace resource quotas and 
-    [Tags]
-    ...    resourcequota
-    ...    quota
-    ...    availability
-    ...    unavailable
-    ...    policy
-    ...    ${NAMESPACE}
+    [Documentation]    Lists any namespace resource quotas and
+    [Tags]    resourcequota    quota    availability    unavailable    policy    ${namespace}
     ${quota_usage}=    RW.CLI.Run Bash File
     ...    bash_file=resource_quota_check.sh
     ...    env=${env}
@@ -487,14 +481,17 @@ Check Resource Quota Utilization in Namepace `${NAMESPACE}`
         FOR    ${item}    IN    @{recommendation_list}
             RW.Core.Add Issue
             ...    severity=${item["severity"]}
-            ...    expected=Resource quota should not constrain deployment of resources. 
+            ...    expected=Resource quota should not constrain deployment of resources.
             ...    actual=Resource quota is constrained and might affect deployments.
             ...    title=Resource quota is ${item["usage"]} in namespace `${NAMESPACE}`
             ...    reproduce_hint=kubectl describe resourcequota -n ${NAMESPACE}
             ...    details=Resource quota ${item["quota_name"]} with ${item["resource"]} is ${item["usage"]} in namespace ${NAMESPACE}
             ...    next_steps=${item["next_step"]}
         END
-    END  
+    END
+    RW.Core.Add To Report    ${quota_usage.stdout}\n
+
+
 *** Keywords ***
 Suite Initialization
     ${kubeconfig}=    RW.Core.Import Secret
