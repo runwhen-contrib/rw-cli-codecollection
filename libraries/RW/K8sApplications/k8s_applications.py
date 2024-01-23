@@ -187,11 +187,12 @@ def troubleshoot_application(
         else "No common exceptions could be parsed. Try running the log command provided."
     )
     report += f"""
-Repository URL(s): {repo.source_uri}
-
+### Source Code
 {src_files_title}
 {rsr_report}
 
+
+### Repository URL(s):\n- {repo.source_uri}
 """
     return {
         "report": report,
