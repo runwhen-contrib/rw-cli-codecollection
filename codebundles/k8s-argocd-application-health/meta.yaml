@@ -253,9 +253,7 @@ commands:
     --tail=50 -n ${APPLICATION_TARGET_NAMESPACE} | grep -E ''${ERROR_PATTERN}''; done'
   doc_links: '
 
-    - [Kubectl Command Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
-
-    - [Understanding Kubernetes Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}'
+    Documentation links not available'
   explanation: This command retrieves the names of deployments associated with a specific
     instance and application, then prints out the deployment name and 50 lines of
     logs for each deployment that contain a specified error pattern.
