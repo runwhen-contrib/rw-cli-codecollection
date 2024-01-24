@@ -29,7 +29,7 @@ commands:
     \ command, we have added comments to explain each part of the original command.\
     \ This will help newer or less experienced devops engineers understand what each\
     \ parameter does and how they can customize it for their specific use case."
-  name: get_workload_name_application_logs
+  name: get_container_name_application_logs
 - command: kubectl --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES}
     --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
   doc_links: '
@@ -60,7 +60,7 @@ commands:
     \ command, we have added comments to explain each part of the original command.\
     \ This will help newer or less experienced devops engineers understand what each\
     \ parameter does and how they can customize it for their specific use case."
-  name: get_workload_name_application_logs
+  name: get_container_name_application_logs
 - command: ${cmd}
   doc_links: '
 
@@ -88,7 +88,7 @@ commands:
     This multi-line command breaks down the steps involved in performing the operation
     and provides explanations for each step, making it easier for newer or less experienced
     devops engineers to understand and learn from.'
-  name: troubleshoot_workload_name_application_logs
+  name: troubleshoot_container_name_application_logs
 - command: ${cmd}
   doc_links: '
 
@@ -116,7 +116,7 @@ commands:
     This multi-line command breaks down the steps involved in performing the operation
     and provides explanations for each step, making it easier for newer or less experienced
     devops engineers to understand and learn from.'
-  name: troubleshoot_workload_name_application_logs
+  name: troubleshoot_container_name_application_logs
 - command: kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head
     -n 1) --container=${CONTAINER_NAME} -- printenv
@@ -139,7 +139,7 @@ commands:
     \ resource (deployment or statefulset) in the specified namespace\n# The command\
     \ in this case is 'printenv', which prints the environment variables.\nkubectl\
     \ exec -n ${NAMESPACE} ${resource_name} --container=${CONTAINER_NAME} -- printenv\n"
-  name: troubleshoot_workload_name_application_logs
+  name: troubleshoot_container_name_application_logs
 - command: kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head
     -n 1) --container=${CONTAINER_NAME} -- printenv
@@ -162,7 +162,7 @@ commands:
     \ resource (deployment or statefulset) in the specified namespace\n# The command\
     \ in this case is 'printenv', which prints the environment variables.\nkubectl\
     \ exec -n ${NAMESPACE} ${resource_name} --container=${CONTAINER_NAME} -- printenv\n"
-  name: troubleshoot_workload_name_application_logs
+  name: troubleshoot_container_name_application_logs
 - command: kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head
     -n 1) --container=${CONTAINER_NAME} -- ps -eo command --no-header | grep -v "ps
@@ -217,7 +217,7 @@ commands:
     echo ${FILTERED_COMMAND_OUTPUT}
 
     '
-  name: troubleshoot_workload_name_application_logs
+  name: troubleshoot_container_name_application_logs
 - command: kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head
     -n 1) --container=${CONTAINER_NAME} -- ps -eo command --no-header | grep -v "ps
@@ -272,4 +272,4 @@ commands:
     echo ${FILTERED_COMMAND_OUTPUT}
 
     '
-  name: troubleshoot_workload_name_application_logs
+  name: troubleshoot_container_name_application_logs
