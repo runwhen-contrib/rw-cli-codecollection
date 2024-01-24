@@ -166,6 +166,8 @@ def troubleshoot_application(
 
     # get most common exception
     max_count = -1
+    rw_username = os.getenv("RW_USERNAME", "Annonymous")
+    task_titles = os.getenv("RW_TASK_TITLES", "All")
     for hashed_exception in exception_occurences:
         count = exception_occurences[hashed_exception]["count"]
         if count > max_count:
@@ -177,13 +179,18 @@ def troubleshoot_application(
         err_msg_line = f"The following exception was found while parsing the application logs of {app_name}"
     report += (
         f"""
+### RunSession Details
+A RunSession (started by {rw_username}) with the following tasks has produced this GitHub Issue:
+
+- {task_titles}
+
+To view the RunSession, click [this link]({_get_runsession_url()})
+
 {err_msg_line}
 
 ```
 {most_common_exception}
 ```
-
-To view the RunSession, click [this link]({_get_runsession_url()})
 """
         if most_common_exception
         else "No common exceptions could be parsed. Try running the log command provided."
