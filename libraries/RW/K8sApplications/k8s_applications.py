@@ -1,4 +1,4 @@
-import logging, hashlib, yaml
+import logging, hashlib, yaml, os
 from dataclasses import dataclass, field
 from thefuzz import process as fuzzprocessor
 from datetime import datetime
@@ -174,7 +174,7 @@ def troubleshoot_application(
             errors_summary = exception_occurences[hashed_exception]["errors_summary"]
     err_msg_line = f"There are some error(s) with the {app_name} application: {errors_summary}\nThis was the most common exception found:"
     if not errors_summary:
-        err_msg_line = "We couldn't find any notable error messages in the most common exception, but it's detailed below:"
+        err_msg_line = f"The following exception was found while parsing the application logs of {app_name}"
     report += (
         f"""
 {err_msg_line}
@@ -182,23 +182,50 @@ def troubleshoot_application(
 ```
 {most_common_exception}
 ```
+
+To view the RunSession, click [this link]({_get_runsession_url()})
 """
         if most_common_exception
         else "No common exceptions could be parsed. Try running the log command provided."
     )
     report += f"""
+___
+
 ### Source Code
 {src_files_title}
 {rsr_report}
 
+___
 
 ### Repository URL(s):\n- {repo.source_uri}
+
+___
+
+[RunWhen Workspace]({_get_workspace_url()})
 """
     return {
         "report": report,
+        "most_common_exception": most_common_exception,
+        "associated_files": rsr_report,
         "found_exceptions": (True if most_common_exception else False),
     }
 
+def _get_workspace_url():
+    workspace: str = os.getenv("RW_WORKSPACE", "")
+    base_url: str = os.getenv("RW_FRONTEND_URL", "")
+    if base_url and workspace:
+        return f"{base_url}/map/{workspace}"
+    else:
+        return "https://app.beta.runwhen.com/"
+
+def _get_runsession_url():
+    base_url: str = os.getenv("RW_FRONTEND_URL", "")
+    workspace: str = os.getenv("RW_WORKSPACE", "")
+    session_id: str = os.getenv("RW_SESSION_ID", "")
+    if base_url and workspace and session_id:
+        return f"{base_url}/map/{workspace}#selectedRunSessions={session_id}"
+    else:
+        return "https://app.beta.runwhen.com/"
 
 def create_github_issue(
     repo: Repository,
@@ -222,7 +249,7 @@ def create_github_issue(
         if "html_url" in data:
             report_url = data["html_url"]
     if report_url:
-        return f"Here's a link to an open GitHub issue for application exceptions: {report_url}"
+        return f"Review [this GitHub issue]({report_url}) for more details related to the exception(s)"
     else:
         return "No related GitHub issue could be found."
 

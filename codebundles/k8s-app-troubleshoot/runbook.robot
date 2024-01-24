@@ -16,8 +16,8 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Get `${WORKLOAD_NAME}` Application Logs
-    [Documentation]    Collects the last approximately 300 lines of logs from the workload before restarting it.
+Get `${CONTAINER_NAME}` Application Logs
+    [Documentation]    Collects the last approximately 300 lines of logs from the workload
     [Tags]    resource    application    workload    logs    state    ${container_name}    ${workload_name}
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
@@ -29,7 +29,7 @@ Get `${WORKLOAD_NAME}` Application Logs
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Scan `${WORKLOAD_NAME}` For Misconfigured Environment
+Scan `${CONTAINER_NAME}` Application For Misconfigured Environment
     [Documentation]    Compares codebase to configured infra environment variables and attempts to report missing environment variables in the app
     [Tags]    environment    variables    env    infra    ${container_name}    ${workload_name}
     ${script_run}=    RW.CLI.Run Bash File
@@ -41,7 +41,7 @@ Scan `${WORKLOAD_NAME}` For Misconfigured Environment
     RW.Core.Add Pre To Report    Stdout:\n\n${script_run.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Troubleshoot `${WORKLOAD_NAME}` Application Logs
+Troubleshoot `${CONTAINER_NAME}` Application Logs
     [Documentation]    Performs an inspection on container logs for exceptions/stacktraces, parsing them and attempts to find relevant source code information
     [Tags]
     ...    application
@@ -92,9 +92,10 @@ Troubleshoot `${WORKLOAD_NAME}` Application Logs
     ...    exceptions=${parsed_exceptions}
     ...    env=${serialized_env}
     ...    process_list=${proc_list}
-    ...    app_name=${WORKLOAD_NAME}
+    ...    app_name=${CONTAINER_NAME}
     ${history}=    RW.CLI.Pop Shell History
     ${full_report}=    Evaluate    $ts_results.get("report")
+    ${most_common_exception}=    Evaluate    $ts_results.get("most_common_exception")
     ${found_exceptions}=    Evaluate    $ts_results.get("found_exceptions")
     ${full_report}=    Set Variable
     ...    ${full_report}\n### Recreating:\nHere's the command used to collect the exception data:\n```${history}```
@@ -102,19 +103,19 @@ Troubleshoot `${WORKLOAD_NAME}` Application Logs
 
     ${issue_link}=    Set Variable    None
     IF    "${CREATE_ISSUES}" == "YES" and (len($parsed_exceptions)) > 0
-        ${issue_link}=    RW.K8sApplications.Create Github Issue    ${repos[0]}    ${full_report}    app_name=${WORKLOAD_NAME}
+        ${issue_link}=    RW.K8sApplications.Create Github Issue    ${repos[0]}    ${full_report}    app_name=${CONTAINER_NAME}
         RW.Core.Add Pre To Report    \n${issue_link}
     END
     ${nextsteps}=    Evaluate
-    ...    "${issue_link}" if ("http" in """${issue_link}""") else "View the summary in details for possible links to the source code related to the exceptions found in the ${CONTAINER_NAME} application."
+    ...    "${issue_link}" if ("http" in """${issue_link}""") else "A GitHub issue link could not be found - please verify configuration is correct for the repo you'd like to connect to"
     IF    (len($parsed_exceptions)) > 0
         RW.Core.Add Issue
         ...    severity=3
-        ...    expected=No exceptions were found in the parsed logs of workload ${CONTAINER_NAME}
-        ...    actual=Found exceptions in the workload logs of ${CONTAINER_NAME}
+        ...    expected=No exceptions were found in the application logs of ${CONTAINER_NAME}
+        ...    actual=Found exceptions in the application logs of ${CONTAINER_NAME}
         ...    reproduce_hint=Run:\n${cmd}\n view logs results for exceptions.
-        ...    title=Found exception in ${CONTAINER_NAME} logs
-        ...    details=${full_report}
+        ...    title=A GitHub issue is open for review that contains information related to the exception(s) found in the application logs of ${CONTAINER_NAME}
+        ...    details=This exception prompted the creation of a GitHub issue: ${most_common_exception}
         ...    next_steps=${nextsteps}
     END
 
