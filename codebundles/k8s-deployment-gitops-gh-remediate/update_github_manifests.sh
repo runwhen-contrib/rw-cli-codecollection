@@ -175,13 +175,13 @@ fi
 # Process the JSON
 while read -r json_object; do
     json_pretty=$(echo $json_object | jq .)
-    object_type=$(jq -r '.object_type' <<< "$json_object")
-    object_name=$(jq -r '.object_name' <<< "$json_object")
     remediation_type=$(jq -r '.remediation_type' <<< "$json_object")
 
     # Handle projbe updates
     # Prefer invalid_command over invalid_ports
     if [[ "$remediation_type" == "probe_update" ]]; then
+        object_type=$(jq -r '.object_type' <<< "$json_object")
+        object_name=$(jq -r '.object_name' <<< "$json_object")
         probe_type=$(jq -r '.probe_type' <<< "$json_object")
         exec=$(jq -r '.exec' <<< "$json_object")
         invalid_command=$(jq -r '.invalid_command // empty' <<< "$json_object")
@@ -207,6 +207,8 @@ while read -r json_object; do
 
     # Handle resourcequota update
     if [[ "$remediation_type" == "resourcequota_update" ]]; then
+        object_type="ResourceQuota"
+        object_name=$(jq -r '.quota_name' <<< "$json_object")
         increase_percentage=$(jq -r '.increase_percentage // empty' <<< "$json_object")
         quota_name=$(jq -r '.quota_name // empty' <<< "$json_object")
         resource=$(jq -r '.resource // empty' <<< "$json_object")
