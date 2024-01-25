@@ -54,6 +54,46 @@ Remediate Readiness and Liveness Probe GitOps Manifests Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${probe_health.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${probe_health.cmd}
 
+Increase ResourceQuota for Namespace `${NAMESPACE}`
+    [Documentation]    Looks for a resourcequota object in the namespace and updates it if possible
+    [Tags]    resourcequota    quota    namespace    remediate    gitops    ${NAMESPACE}
+    ${quota_usage}=    RW.CLI.Run Bash File
+    ...    bash_file=resource_quota_check.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    render_in_commandlist=true
+    ${quota_recommendations}=    RW.CLI.Run Cli
+    ...    cmd=echo '${quota_usage.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+    ...    env=${env}
+    ...    include_in_history=false
+    ${quota_recommendation_list}=    Evaluate    json.loads(r'''${quota_recommendations.stdout}''')    json
+    IF    len(@{quota_recommendation_list}) > 0
+        ${gh_updates}=    RW.CLI.Run Bash File
+        ...    bash_file=update_github_manifests.sh
+        ...    cmd_override=./update_github_manifests.sh '${quota_recommendations.stdout}'
+        ...    env=${env}
+        ...    include_in_history=False
+        ...    secret_file__kubeconfig=${kubeconfig}
+    END
+    RW.Core.Add To Report    ${quota_usage.stdout}\n
+    ${recommendations}=    RW.CLI.Run Cli
+    ...    cmd=echo '${gh_updates.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+    ...    env=${env}
+    ...    include_in_history=false
+    IF    len($recommendations.stdout) > 0
+        RW.Core.Add Issue
+        ...    severity=3
+        ...    expected=Pull Requests for manifest changes are reviewed for namespace `${NAMESPACE}`
+        ...    actual=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
+        ...    title=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
+        ...    reproduce_hint=Check Pull Request details for more information.
+        ...    details=${quota_recommendations.stdout}
+        ...    next_steps=${recommendations.stdout}
+    END
+    ${history}=    RW.CLI.Pop Shell History
+
 
 *** Keywords ***
 Suite Initialization

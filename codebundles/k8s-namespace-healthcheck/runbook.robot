@@ -463,7 +463,7 @@ Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Check Resource Quota Utilization in Namepace `${NAMESPACE}`
-    [Documentation]    Lists any namespace resource quotas and
+    [Documentation]    Lists any namespace resource quotas and checks their utilization, raising issues if they are above 80%
     [Tags]    resourcequota    quota    availability    unavailable    policy    ${namespace}
     ${quota_usage}=    RW.CLI.Run Bash File
     ...    bash_file=resource_quota_check.sh

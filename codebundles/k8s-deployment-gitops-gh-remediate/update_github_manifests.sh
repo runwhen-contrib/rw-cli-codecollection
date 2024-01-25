@@ -42,14 +42,22 @@ fetch_flux_owner_details() {
     fi
     flux_name=$(echo "$object_json" | jq -r --arg flux_type "$flux_type" '.metadata.labels[$flux_type + ".toolkit.fluxcd.io/name"]')
     flux_namespace=$(echo "$object_json" | jq -r --arg flux_type "$flux_type" '.metadata.labels[$flux_type + ".toolkit.fluxcd.io/namespace"]')
-    flux_object_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get ${flux_type_map[$flux_type]} $flux_name -n $NAMESPACE --context $CONTEXT -o json)
+    echo "Command \`$KUBERNETES_DISTRIBUTION_BINARY get ${flux_type_map[$flux_type]} $flux_name -n $flux_namespace --context $CONTEXT -o json\`"
+    flux_object_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get ${flux_type_map[$flux_type]} $flux_name -n $flux_namespace --context $CONTEXT -o json)
     flux_source=$(echo "$flux_object_json" | jq -r .spec.sourceRef )
     flux_source_kind=$(echo "$flux_source" | jq -r .kind )
     flux_source_name=$(echo "$flux_source" | jq -r .name )
     flux_source_namespace=$(echo "$flux_source" | jq -r .namespace )
+    # Check if flux_source_namespace is empty, which likely means that it's
+    # referring to the same namespace as $flux_namespace
+    if [[ -n $flux_source_namespace ]]; then 
+        flux_source_namespace=$flux_namespace
+    fi
     flux_source_object=$(${KUBERNETES_DISTRIBUTION_BINARY} get $flux_source_kind $flux_source_name -n $flux_source_namespace --context $CONTEXT -o json)
     git_url=$(echo "$flux_source_object" | jq -r .spec.url )
     git_path=$(echo "$flux_object_json" | jq -r .spec.path)
+    git_branch=$(echo "$flux_source_object" | jq -r .spec.ref.branch)
+    echo "Found FluxCD resource name: $flux_name, type: $flux_type, namespace: $flux_namespace, source: $flux_source, source_kind: $flux_source_kind, source_name: $flux_source_name, source_namespace: $flux_source_namespace, source_object: $flux_source_object, git_url: $git_url, git_path: $git_path"
 }
 
 ## Argo placeholder
@@ -59,6 +67,7 @@ fetch_flux_owner_details() {
 
 update_github_manifests () {
     DATETIME=$(date '+%Y%m%d-%H%M%S')
+
     local git_url_no_suffix="${git_url%.git}"
     local git_owner=$(echo "$git_url_no_suffix" | awk -F '[/:]' '{print $(NF-1)}')
     local git_repo=$(echo "$git_url_no_suffix" | awk -F '[/:]' '{print $NF}')
@@ -66,7 +75,11 @@ update_github_manifests () {
     git config --global user.name "RunWhen Runsession Bot" 2>&1
     git config --global pull.rebase false 2>&1
 
-    workdir=$(pwd)
+    # Create a temporary directory in $HOME
+    tempdir=$(mktemp -d "$HOME/tempdir.XXXXXX")
+    trap 'rm -rf -- "$tempdir"' EXIT
+    workdir="$tempdir"
+    cd $workdir
     git clone $git_url 2>&1
     cd $workdir/$git_repo
     git remote set-url origin https://x-access-token:$GITHUB_TOKEN@github.com/$git_owner/$git_repo
@@ -74,9 +87,7 @@ update_github_manifests () {
     git branch
     # Search for YAML files and process them
     find $git_path -type f -name '*.yaml' -o -name '*.yml' | while read yaml_file; do
-        echo "object name: $object_name"
-        echo "old string: $old_string"
-        echo "new string: $new_string"
+        echo $yaml_file
         $substitution_function
     done
 
@@ -96,12 +107,14 @@ update_github_manifests () {
             --arg title "[RunWhen] - GitOps Manifest Updates for $object_type $object_name" \
             --arg body "$PR_BODY" \
             --arg head "runwhen/manifest-update-$DATETIME" \
-            --arg base "main" \
+            --arg base "$git_branch" \
             '{title: $title, body: $body, head: $head, base: $base}')
+        echo "PR_DATA:\n$PR_DATA"
         pr_output=$(curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/$git_owner/$git_repo/pulls" \
             -d "$PR_DATA")
+        echo "pr_output:\n$pr_output"
         pr_html_url=$(jq -r '.html_url // empty' <<< "$pr_output")
         next_steps+=("View proposed Github changes in [Pull Request]($pr_html_url)")
     fi 
@@ -117,6 +130,10 @@ probe_exec_substitution () {
         yq e "(select(.kind == \"Deployment\" and .metadata.name == \"$object_name\").spec.template.spec.containers[] | select(.name == \"$container\").$probe_type.exec.command[] | select(. == \"${old_string_array[$i]}\") ) |= \"${new_string_array[$i]}\"" -i "$yaml_file"
     done
 
+}
+
+resource_quota_substitution () {
+    yq e "(select(.kind == \"ResourceQuota\" and .metadata.name == \"$quota_name\").spec.hard.\"$resource\") |= sub(\"$current_value\"; \"$suggested_value\")" -i "$yaml_file"
 }
 
 generate_pull_request_body_content () {
@@ -161,16 +178,17 @@ while read -r json_object; do
     object_type=$(jq -r '.object_type' <<< "$json_object")
     object_name=$(jq -r '.object_name' <<< "$json_object")
     remediation_type=$(jq -r '.remediation_type' <<< "$json_object")
-    probe_type=$(jq -r '.probe_type' <<< "$json_object")
-    exec=$(jq -r '.exec' <<< "$json_object")
-    invalid_command=$(jq -r '.invalid_command // empty' <<< "$json_object")
-    valid_command=$(jq -r '.valid_command // empty' <<< "$json_object")
-    invalid_ports=$(jq -r '.invalid_ports // empty' <<< "$json_object")
-    valid_ports=$(jq -r '.valid_ports // empty' <<< "$json_object")
-    container=$(jq -r '.container // empty' <<< "$json_object")
 
-    # Logic to prefer invalid_command over invalid_oorts
+    # Handle projbe updates
+    # Prefer invalid_command over invalid_ports
     if [[ "$remediation_type" == "probe_update" ]]; then
+        probe_type=$(jq -r '.probe_type' <<< "$json_object")
+        exec=$(jq -r '.exec' <<< "$json_object")
+        invalid_command=$(jq -r '.invalid_command // empty' <<< "$json_object")
+        valid_command=$(jq -r '.valid_command // empty' <<< "$json_object")
+        invalid_ports=$(jq -r '.invalid_ports // empty' <<< "$json_object")
+        valid_ports=$(jq -r '.valid_ports // empty' <<< "$json_object")
+        container=$(jq -r '.container // empty' <<< "$json_object")
         if [[ "$exec" == "true" && -n "$invalid_command" ]]; then
             echo "Processing $object_type $object_name with invalidCommand"
             find_gitops_info "$object_type" "$object_name"
@@ -186,6 +204,23 @@ while read -r json_object; do
             ## Placeholder for GitOps Update Details
         fi
     fi
+
+    # Handle resourcequota update
+    if [[ "$remediation_type" == "resourcequota_update" ]]; then
+        increase_percentage=$(jq -r '.increase_percentage // empty' <<< "$json_object")
+        quota_name=$(jq -r '.quota_name // empty' <<< "$json_object")
+        resource=$(jq -r '.resource // empty' <<< "$json_object")
+        usage=$(jq -r '.usage // empty' <<< "$json_object")
+        current_value=$(jq -r '.current_value // empty' <<< "$json_object")
+        suggested_value=$(jq -r '.suggested_value // empty' <<< "$json_object")
+        echo "Increasing ResourceQuota $quota_name with usage $usage by $increase_percentage% to $suggested_value"
+        find_gitops_info "resourcequota" "$quota_name"
+        substitution_function=resource_quota_substitution
+        change_summary="Increasing ResourceQuota \`$quota_name\` for \`$resource\` to \`$suggested_value\` in namespace \`$NAMESPACE\`"
+        update_github_manifests
+
+    fi
+
 done < <(jq -c '.[]' <<< "$json_input")
 
 
