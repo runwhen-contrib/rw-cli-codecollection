@@ -107,7 +107,8 @@ check_usage() {
 quota_json=$(kubectl get quota -n "$NAMESPACE" --context "$CONTEXT" -o json)
 
 # Processing the quota JSON
-echo "--------Resource Quota and Usage for Namespace: $NAMESPACE in Context: $CONTEXT--------"
+echo "Resource Quota and Usage for Namespace: $NAMESPACE in Context: $CONTEXT"
+echo "==========================================="
 
 # Parsing quota JSON
 while IFS= read -r item; do
@@ -128,7 +129,7 @@ while IFS= read -r item; do
         check_usage "$quota_name" "$key" "${used:-0}" "$hard"
     done < "$hard_file"
 
-    echo "-----"
+    echo "-----------------------------------"
 
     # Clean up temporary files
     rm "$hard_file" "$used_file"

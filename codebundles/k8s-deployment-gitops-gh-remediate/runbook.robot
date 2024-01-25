@@ -63,7 +63,6 @@ Increase ResourceQuota for Namespace `${NAMESPACE}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=180
     ...    include_in_history=false
-    ...    render_in_commandlist=true
     ${quota_recommendations}=    RW.CLI.Run Cli
     ...    cmd=echo '${quota_usage.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
     ...    env=${env}
@@ -77,7 +76,6 @@ Increase ResourceQuota for Namespace `${NAMESPACE}`
         ...    include_in_history=False
         ...    secret_file__kubeconfig=${kubeconfig}
     END
-    RW.Core.Add To Report    ${quota_usage.stdout}\n
     ${recommendations}=    RW.CLI.Run Cli
     ...    cmd=echo '${gh_updates.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
     ...    env=${env}
@@ -93,6 +91,8 @@ Increase ResourceQuota for Namespace `${NAMESPACE}`
         ...    next_steps=${recommendations.stdout}
     END
     ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add To Report    ${quota_usage.stdout}\n
+    RW.Core.Add Pre To Report    Commands Used: ${quota_usage.cmd}
 
 
 *** Keywords ***
