@@ -61,15 +61,34 @@ check_usage() {
 
     # Generate recommendation based on usage
     local recommendation=""
+    local increase_percentage=0
+    local increased_value=0
     if [ $percentage -ge 100 ]; then
-        echo "$resource: AT LIMIT ($percentage%) - Immediately increase the resource quota for $resource in $NAMESPACE"
-        recommendation="{\"quota_name\": \"$quota_name\", \"resource\": \"$resource\", \"usage\": \"at 100%\", \"severity\": \"1\", \"next_step\": \"Increase the resource quota for $resource in \`$NAMESPACE\`\"}"
+        if [ $used -gt $hard ]; then
+            # If usage is over 100%, match the current usage
+            echo "$resource: OVER LIMIT ($percentage%) - Adjust resource quota to match current usage with some headroom for $resource in $NAMESPACE"
+            increase_percentage="${CRITICAL_INCREASE_LEVEL:-40}"
+            increased_value=$(( used * increase_percentage / 100 ))
+            suggested_value=$(( increased_value + used ))
+        else
+            echo "$resource: AT LIMIT ($percentage%) - Immediately increase the resource quota for $resource in $NAMESPACE"
+            increase_percentage="${CRITICAL_INCREASE_LEVEL:-40}"
+            increased_value=$(( hard * increase_percentage / 100 ))
+            suggested_value=$(( increased_value + hard ))
+        fi
+        recommendation="{\"remediation_type\":\"resourcequota_update\",\"increase_percentage\":\"$increase_percentage\",\"limit_type\":\"hard\",\"current_value\":\"$hard\",\"suggested_value\":\"$suggested_value\",\"quota_name\": \"$quota_name\", \"resource\": \"$resource\", \"usage\": \"at or above 100%\", \"severity\": \"1\", \"next_step\": \"Increase the resource quota for $resource in \`$NAMESPACE\`\"}"
     elif [ $percentage -ge 90 ]; then
-        echo "$resource: CRITICAL (90%+) - Consider increasing the resource quota for $resource in $NAMESPACE"
-        recommendation="{\"quota_name\": \"$quota_name\", \"resource\": \"$resource\", \"usage\": \"between 90-99%\", \"severity\": \"2\", \"next_step\": \"Consider increasing the resource quota for $resource in \`$NAMESPACE\`\"}"
+        echo "$resource: WARNING ($percentage%) - Consider increasing the resource quota for $resource in $NAMESPACE"
+        increase_percentage="${WARNING_INCREASE_LEVEL:-25}"
+        increased_value=$(( hard * increase_percentage / 100 ))
+        suggested_value=$(( increased_value + hard ))
+        recommendation="{\"remediation_type\":\"resourcequota_update\",\"increase_percentage\":\"$increase_percentage\",\"limit_type\":\"hard\",\"current_value\":\"$hard\",\"suggested_value\":\"$suggested_value\",\"quota_name\": \"$quota_name\", \"resource\": \"$resource\", \"usage\": \"between 90-99%\", \"severity\": \"2\", \"next_step\": \"Consider increasing the resource quota for $resource in \`$NAMESPACE\`\"}"
     elif [ $percentage -ge 80 ]; then
-        echo "$resource: WARNING (80%+) - Monitor the resource quota for $resource in $NAMESPACE"
-        recommendation="{\"quota_name\": \"$quota_name\", \"resource\": \"$resource\", \"usage\": \"between 80-90%\", \"severity\": \"3\", \"next_step\": \"Monitor the resource quota for $resource in \`$NAMESPACE\`\"}"
+        echo "$resource: INFO ($percentage%) - Monitor the resource quota for $resource in $NAMESPACE"
+        increase_percentage="${INFO_INCREASE_LEVEL:-10}"
+        increased_value=$(( hard * increase_percentage / 100 ))
+        suggested_value=$(( increased_value + hard ))
+        recommendation="{\"remediation_type\":\"resourcequota_update\",\"increase_percentage\":\"$increase_percentage\",\"limit_type\":\"hard\",\"current_value\":\"$hard\",\"suggested_value\":\"$suggested_value\",\"quota_name\": \"$quota_name\", \"resource\": \"$resource\", \"usage\": \"between 80-90%\", \"severity\": \"3\", \"next_step\": \"Monitor the resource quota for $resource in \`$NAMESPACE\`\"}"
     else
         echo "$resource: OK ($percentage%)"
     fi
@@ -85,7 +104,7 @@ check_usage() {
 }
 
 # Fetching resource quota details
-quota_json=$(kubectl get quota -n "$NAMESPACE" --context "$CONTEXT" -o json)
+quota_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get quota -n "$NAMESPACE" --context "$CONTEXT" -o json)
 
 # Processing the quota JSON
 echo "Resource Quota and Usage for Namespace: $NAMESPACE in Context: $CONTEXT"

@@ -22,7 +22,7 @@ Troubleshoot Warning Events in Namespace `${NAMESPACE}`
     [Documentation]    Queries all warning events in a given namespace within the last 30 minutes,
     ...    fetches the list of involved pod names, groups the events, collects event message details
     ...    and searches for a useful next step based on these details.
-    [Tags]    namespace    trace    error    pods    events    logs    grep    ${namespace}
+    [Tags]    namespace    trace    error    pods    events    logs    grep    ${NAMESPACE}
     ${warning_events_by_object}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json > $HOME/warning_events.json && cat $HOME/warning_events.json | jq -r '[.items[] | {namespace: .involvedObject.namespace, kind: .involvedObject.kind, baseName: ((if .involvedObject.kind == "Pod" then (.involvedObject.name | split("-")[:-1] | join("-")) else .involvedObject.name end) // ""), count: .count, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, reason: .reason, message: .message}] | group_by(.namespace, .kind, .baseName) | map({object: (.[0].namespace + "/" + .[0].kind + "/" + .[0].baseName), total_events: (reduce .[] as $event (0; . + $event.count)), summary_messages: (map(.message) | unique | join("; ")), oldest_timestamp: (map(.firstTimestamp) | sort | first), most_recent_timestamp: (map(.lastTimestamp) | sort | last)}) | map(select((now - ((.most_recent_timestamp | fromdateiso8601)))/60 <= 30))'
     ...    env=${env}
@@ -83,7 +83,7 @@ Troubleshoot Warning Events in Namespace `${NAMESPACE}`
 
 Troubleshoot Container Restarts In Namespace `${NAMESPACE}`
     [Documentation]    Fetches pods that have container restarts and provides a report of the restart issues.
-    [Tags]    namespace    containers    status    restarts    ${namespace}
+    [Tags]    namespace    containers    status    restarts    ${NAMESPACE}
     ${container_restart_details}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r --argjson exit_code_explanations '{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}' '.items[] | select(.status.containerStatuses != null) | select(any(.status.containerStatuses[]; .restartCount > 0)) | "---\\npod_name: \\(.metadata.name)\\n" + (.status.containerStatuses[] | "containers: \\(.name)\\nrestart_count: \\(.restartCount)\\nmessage: \\(.state.waiting.message // "N/A")\\nterminated_reason: \\(.lastState.terminated.reason // "N/A")\\nterminated_finishedAt: \\(.lastState.terminated.finishedAt // "N/A")\\nterminated_exitCode: \\(.lastState.terminated.exitCode // "N/A")\\nexit_code_explanation: \\($exit_code_explanations[.lastState.terminated.exitCode | tostring] // "Unknown exit code")") + "\\n---\\n"'
     ...    env=${env}
@@ -120,7 +120,7 @@ Troubleshoot Container Restarts In Namespace `${NAMESPACE}`
 
 Troubleshoot Pending Pods In Namespace `${NAMESPACE}`
     [Documentation]    Fetches pods that are pending and provides details.
-    [Tags]    namespace    pods    status    pending    ${namespace}
+    [Tags]    namespace    pods    status    pending    ${NAMESPACE}
     ${pending_pods}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending --no-headers -o json | jq -r '.items[] | "pod_name: \\(.metadata.name)\\nstatus: \\(.status.phase // "N/A")\\nmessage: \\(.status.conditions[0].message // "N/A")\\nreason: \\(.status.conditions[0].reason // "N/A")\\ncontainerStatus: \\((.status.containerStatuses[0].state // "N/A"))\\ncontainerMessage: \\(.status.containerStatuses[0].state.waiting?.message // "N/A")\\ncontainerReason: \\(.status.containerStatuses[0].state.waiting?.reason // "N/A")\\n_______-"'
     ...    env=${env}
@@ -189,7 +189,7 @@ Troubleshoot Pending Pods In Namespace `${NAMESPACE}`
 
 Troubleshoot Failed Pods In Namespace `${NAMESPACE}`
     [Documentation]    Fetches all pods which are not running (unready) in the namespace and adds them to a report for future review.
-    [Tags]    namespace    pods    status    unready    not starting    phase    failed    ${namespace}
+    [Tags]    namespace    pods    status    unready    not starting    phase    failed    ${NAMESPACE}
     ${unreadypods_details}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed --no-headers -o json | jq -r --argjson exit_code_explanations '{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}' '.items[] | "pod_name: \\(.metadata.name)\\nrestart_count: \\(.status.containerStatuses[0].restartCount // "N/A")\\nmessage: \\(.status.message // "N/A")\\nterminated_finishedAt: \\(.status.containerStatuses[0].state.terminated.finishedAt // "N/A")\\nexit_code: \\(.status.containerStatuses[0].state.terminated.exitCode // "N/A")\\nexit_code_explanation: \\($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode | tostring] // "Unknown exit code")\\n_______-"'
     ...    env=${env}
@@ -263,7 +263,7 @@ Troubleshoot Failed Pods In Namespace `${NAMESPACE}`
 
 Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
     [Documentation]    Parses all workloads in a namespace and inspects their status conditions for issues. Status conditions with a status value of False are considered an error.
-    [Tags]    namespace    status    conditions    pods    reasons    workloads    ${namespace}
+    [Tags]    namespace    status    conditions    pods    reasons    workloads    ${NAMESPACE}
     ${workload_info}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select(.status.conditions[]? | select(.type == "Ready" and .status == "False" and .reason != "PodCompleted")) | {kind: .kind, name: .metadata.name, conditions: .status.conditions}' | jq -s '.'
     ...    include_in_history=True
@@ -347,7 +347,7 @@ Get Listing Of Resources In Namespace `${NAMESPACE}`
 
 Check Event Anomalies in Namespace `${NAMESPACE}`
     [Documentation]    Fetches non warning events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
-    [Tags]    namespace    events    info    state    anomolies    count    occurences    ${namespace}
+    [Tags]    namespace    events    info    state    anomolies    count    occurences    ${NAMESPACE}
     ## FIXME - the calculation of events per minute is still wrong and needs deeper inspection, akin to something like a histogram
     ${recent_events_by_object}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json > $HOME/events.json && cat $HOME/events.json | jq -r '[.items[] | {namespace: .involvedObject.namespace, kind: .involvedObject.kind, name: ((if .involvedObject and .involvedObject.kind == "Pod" then (.involvedObject.name | split("-")[:-1] | join("-")) else .involvedObject.name end) // ""), count: .count, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, reason: .reason, message: .message}] | group_by(.namespace, .kind, .name) | .[] | {(.[0].namespace + "/" + .[0].kind + "/" + .[0].name): {events: .}}' | jq -r --argjson threshold "${ANOMALY_THRESHOLD}" 'to_entries[] | {object: .key, oldest_timestamp: ([.value.events[] | .firstTimestamp] | min), most_recent_timestamp: (reduce .value.events[] as $event (.value.firstTimestamp; if ($event.lastTimestamp > .) then $event.lastTimestamp else . end)), events_per_minute: (reduce .value.events[] as $event (0; . + ($event.count / (((($event.lastTimestamp | fromdateiso8601) - ($event.firstTimestamp | fromdateiso8601)) / 60) | if . == 0 then 1 else . end))) | floor), total_events: (reduce .value.events[] as $event (0; . + $event.count)), summary_messages: [.value.events[] | .message] | unique | join("; ")} | select(.events_per_minute > $threshold)' | jq -s '.'
@@ -417,7 +417,7 @@ Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`
     ...    risky
     ...    missing
     ...    policy
-    ...    ${namespace}
+    ...    ${NAMESPACE}
     ${pdb_check}=    RW.CLI.Run Cli
     ...    cmd=context="${CONTEXT}"; namespace="${NAMESPACE}"; check_health() { local type=$1; local name=$2; local replicas=$3; local selector=$4; local pdbs=$(${KUBERNETES_DISTRIBUTION_BINARY} --context "$context" --namespace "$namespace" get pdb -o json | jq -c --arg selector "$selector" '.items[] | select(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value == $selector)'); if [[ $replicas -gt 1 && -z "$pdbs" ]]; then printf "%-30s %-30s %-10s\\n" "$type/$name" "" "Missing"; else echo "$pdbs" | jq -c . | while IFS= read -r pdb; do local pdbName=$(echo "$pdb" | jq -r '.metadata.name'); local minAvailable=$(echo "$pdb" | jq -r '.spec.minAvailable // ""'); local maxUnavailable=$(echo "$pdb" | jq -r '.spec.maxUnavailable // ""'); if [[ "$minAvailable" == "100%" || "$maxUnavailable" == "0" || "$maxUnavailable" == "0%" ]]; then printf "%-30s %-30s %-10s\\n" "$type/$name" "$pdbName" "Risky"; elif [[ $replicas -gt 1 && ("$minAvailable" != "100%" || "$maxUnavailable" != "0" || "$maxUnavailable" != "0%") ]]; then printf "%-30s %-30s %-10s\\n" "$type/$name" "$pdbName" "OK"; fi; done; fi; }; echo "Deployments:"; echo "_______"; printf "%-30s %-30s %-10s\\n" "NAME" "PDB" "STATUS"; ${KUBERNETES_DISTRIBUTION_BINARY} --context "$context" --namespace "$namespace" get deployments -o json | jq -c '.items[] | "\\(.metadata.name) \\(.spec.replicas) \\(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value)"' | while read -r line; do check_health "Deployment" $(echo $line | tr -d '"'); done; echo ""; echo "Statefulsets:"; echo "_______"; printf "%-30s %-30s %-10s\\n" "NAME" "PDB" "STATUS"; ${KUBERNETES_DISTRIBUTION_BINARY} --context "$context" --namespace "$namespace" get statefulsets -o json | jq -c '.items[] | "\\(.metadata.name) \\(.spec.replicas) \\(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value)"' | while read -r line; do check_health "StatefulSet" $(echo $line | tr -d '"'); done
     ...    env=${env}
@@ -464,7 +464,7 @@ Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`
 
 Check Resource Quota Utilization in Namepace `${NAMESPACE}`
     [Documentation]    Lists any namespace resource quotas and checks their utilization, raising issues if they are above 80%
-    [Tags]    resourcequota    quota    availability    unavailable    policy    ${namespace}
+    [Tags]    resourcequota    quota    availability    unavailable    policy    ${NAMESPACE}
     ${quota_usage}=    RW.CLI.Run Bash File
     ...    bash_file=resource_quota_check.sh
     ...    env=${env}
@@ -485,7 +485,7 @@ Check Resource Quota Utilization in Namepace `${NAMESPACE}`
             ...    actual=Resource quota is constrained and might affect deployments.
             ...    title=Resource quota is ${item["usage"]} in namespace `${NAMESPACE}`
             ...    reproduce_hint=kubectl describe resourcequota -n ${NAMESPACE}
-            ...    details=Resource quota ${item["quota_name"]} with ${item["resource"]} is ${item["usage"]} in namespace ${NAMESPACE}
+            ...    details=${item}
             ...    next_steps=${item["next_step"]}
         END
     END

@@ -104,7 +104,7 @@ check_usage() {
 }
 
 # Fetching resource quota details
-quota_json=$(kubectl get quota -n "$NAMESPACE" --context "$CONTEXT" -o json)
+quota_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get quota -n "$NAMESPACE" --context "$CONTEXT" -o json)
 
 # Processing the quota JSON
 echo "Resource Quota and Usage for Namespace: $NAMESPACE in Context: $CONTEXT"

@@ -87,6 +87,34 @@ Get Pod Resource Utilization with Top in Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    Pod Resources:\n${resource_util_info}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
+Identify Pod Resource Recommendations in Namespace `${NAMESPACE}`
+    [Documentation]    Queries the namespace for any Vertical Pod Autoscaler resource recommendations. 
+    [Tags]    recommendation    resources    utilization    pods    cpu    memory    allocation   vpa
+    ${vpa_usage}=    RW.CLI.Run Bash File
+    ...    bash_file=vpa_recommendations.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    render_in_commandlist=true
+    ${recommendations}=    RW.CLI.Run Cli
+    ...    cmd=echo '${vpa_usage.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+    ...    env=${env}
+    ...    include_in_history=false
+    ${recommendation_list}=    Evaluate    json.loads(r'''${recommendations.stdout}''')    json
+    IF    len(@{recommendation_list}) > 0
+        FOR    ${item}    IN    @{recommendation_list}
+            RW.Core.Add Issue
+            ...    severity=${item["severity"]}
+            ...    expected=Resource requests should closely match VPA recommendations.
+            ...    actual=Resource requests are not aligned with VPA recommendations. 
+            ...    title=Resource requests for container `${item["container_name"]}` ${item["target_kind"]} `${item["target_name"]}` needs adjustment in namespace `${NAMESPACE}`
+            ...    reproduce_hint=kubectl describe vpa ${item["vpa_name"]} -n ${NAMESPACE}
+            ...    details=${item}
+            ...    next_steps=${item["next_step"]}
+        END
+    END
+    RW.Core.Add To Report    ${vpa_usage.stdout}\n
 
 *** Keywords ***
 Suite Initialization
@@ -111,23 +139,28 @@ Suite Initialization
     ...    description=Which Kubernetes context to operate within.
     ...    pattern=\w*
     ...    example=my-main-cluster
+    ...    default=''
     ${LABELS}=    RW.Core.Import User Variable    LABELS
     ...    type=string
     ...    description=The metadata labels to use when selecting the objects to measure as running.
     ...    pattern=\w*
     ...    example=app=myapp
+    ...    default=''
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
     ...    enum=[kubectl,oc]
     ...    example=kubectl
     ...    default=kubectl
+    ${HOME}=    RW.Core.Import User Variable    HOME
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${kubectl}    ${kubectl}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
-    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
+    Set Suite Variable    
+    ...    ${env}    
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "HOME":"${HOME}"}
     IF    "${LABELS}" != ""
         ${LABELS}=    Set Variable    -l ${LABELS}
     END
