@@ -94,6 +94,45 @@ Increase ResourceQuota for Namespace `${NAMESPACE}`
     RW.Core.Add To Report    ${quota_usage.stdout}\n
     RW.Core.Add Pre To Report    Commands Used: ${quota_usage.cmd}
 
+Adjust pod resources to match VPA recommendation in `${NAMESPACE}`
+    [Documentation]    Queries the namespace for any Vertical Pod Autoscaler resource recommendations and applies them to GitOps controlled manifests. 
+    [Tags]    recommendation    resources    utilization    pods    cpu    memory    allocation   vpa
+    ${vpa_usage}=    RW.CLI.Run Bash File
+    ...    bash_file=vpa_recommendations.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${vpa_recommendations}=    RW.CLI.Run Cli
+    ...    cmd=echo '${vpa_usage.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+    ...    env=${env}
+    ...    include_in_history=false
+    ${vpa_recommendation_list}=    Evaluate    json.loads(r'''${vpa_recommendations.stdout}''')    json
+    IF    len(@{vpa_recommendation_list}) > 0
+        ${gh_updates}=    RW.CLI.Run Bash File
+        ...    bash_file=update_github_manifests.sh
+        ...    cmd_override=./update_github_manifests.sh '${vpa_recommendations.stdout}'
+        ...    env=${env}
+        ...    include_in_history=False
+        ...    secret_file__kubeconfig=${kubeconfig}
+    END
+    ${recommendations}=    RW.CLI.Run Cli
+    ...    cmd=echo '${gh_updates.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+    ...    env=${env}
+    ...    include_in_history=false
+    IF    len($recommendations.stdout) > 0
+        RW.Core.Add Issue
+        ...    severity=3
+        ...    expected=Pull Requests for manifest changes are reviewed for namespace `${NAMESPACE}`
+        ...    actual=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
+        ...    title=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
+        ...    reproduce_hint=Check Pull Request details for more information.
+        ...    details=${vpa_recommendations.stdout}
+        ...    next_steps=${recommendations.stdout}
+    END
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add To Report    ${vpa_usage.stdout}\n
+    RW.Core.Add Pre To Report    Commands Used: ${vpa_usage.cmd}
 
 *** Keywords ***
 Suite Initialization

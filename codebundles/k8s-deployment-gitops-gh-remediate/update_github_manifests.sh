@@ -136,6 +136,10 @@ resource_quota_substitution () {
     yq e "(select(.kind == \"ResourceQuota\" and .metadata.name == \"$quota_name\").spec.hard.\"$resource\") |= sub(\"$current_value\"; \"$suggested_value\")" -i "$yaml_file"
 }
 
+resource_request_substitution () {
+    yq e "(select(.kind == \"$object_type\" and .metadata.name == \"$object_name\").spec.template.spec.containers[]) | select(.name == \"$container_name\").resources.requests.$resource |= sub(\"$current_value\"; \"$suggested_value\")" -i "$yaml_file"
+}
+
 generate_pull_request_body_content () {
 runsession_url=$RW_FRONTEND_URL/map/$RW_WORKSPACE#selectedRunSessions=$RW_SESSION_ID
 
@@ -220,7 +224,21 @@ while read -r json_object; do
         substitution_function=resource_quota_substitution
         change_summary="Increasing ResourceQuota \`$quota_name\` for \`$resource\` to \`$suggested_value\` in namespace \`$NAMESPACE\`"
         update_github_manifests
+    fi
 
+    # Handle resourcequota update
+    if [[ "$remediation_type" == "resource_request_update" ]]; then
+        object_type=$(jq -r '.target_kind' <<< "$json_object")
+        object_name=$(jq -r '.target_name' <<< "$json_object")
+        container_name=$(jq -r '.container_name // empty' <<< "$json_object")
+        resource=$(jq -r '.resource // empty' <<< "$json_object")
+        current_value=$(jq -r '.current_value // empty' <<< "$json_object")
+        suggested_value=$(jq -r '.suggested_value // empty' <<< "$json_object")
+        echo "Modifying resource request for container \`$container_name\` in $object_kind \`$object_name\` to \`$suggested_value\` in namespace \`$NAMESPACE\` based on VPA recommendation."
+        find_gitops_info "$object_type" "$object_name"
+        substitution_function=resource_request_substitution
+        change_summary="Modifying resource request for container \`$container_name\` in $object_kind \`$object_name\` to \`$suggested_value\` in namespace \`$NAMESPACE\` based on VPA recommendation."
+        update_github_manifests
     fi
 
 done < <(jq -c '.[]' <<< "$json_input")
