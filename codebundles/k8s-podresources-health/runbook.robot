@@ -108,7 +108,7 @@ Identify Pod Resource Recommendations in Namespace `${NAMESPACE}`
             ...    severity=${item["severity"]}
             ...    expected=Resource requests should closely match VPA recommendations.
             ...    actual=Resource requests are not aligned with VPA recommendations. 
-            ...    title=Resource requests for container `${item["container_name"]}` ${item["target_kind"]} `${item["target_name"]}` need adjustment in namespace `${NAMESPACE}`
+            ...    title=Resource requests for container `${item["container_name"]}` in ${item["target_kind"]} `${item["target_name"]}` should be adjusted in namespace `${NAMESPACE}`
             ...    reproduce_hint=kubectl describe vpa ${item["vpa_name"]} -n ${NAMESPACE}
             ...    details=${item}
             ...    next_steps=${item["next_step"]}
