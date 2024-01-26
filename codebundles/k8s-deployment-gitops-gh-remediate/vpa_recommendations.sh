@@ -88,7 +88,7 @@ analyze_vpa() {
 
     # Analyze and generate recommendations
     while IFS= read -r request; do
-        local container_name=$(echo "$request" | jq -r '.container')
+        local container=$(echo "$request" | jq -r '.container')
         local current_cpu_request=$(echo "$request" | jq -r '.cpu')
         local current_memory_request=$(echo "$request" | jq -r '.memory')
 
@@ -97,8 +97,8 @@ analyze_vpa() {
         current_memory_request=$(convert_memory_to_mib "$current_memory_request")
 
         # Fetch corresponding VPA target values
-        local vpa_cpu_target=$(echo "$vpa_recommendations" | jq -r --arg container "$container_name" 'select(.container == $container) | .targetCpu')
-        local vpa_memory_target=$(echo "$vpa_recommendations" | jq -r --arg container "$container_name" 'select(.container == $container) | .targetMemory')
+        local vpa_cpu_target=$(echo "$vpa_recommendations" | jq -r --arg container "$container" 'select(.container == $container) | .targetCpu')
+        local vpa_memory_target=$(echo "$vpa_recommendations" | jq -r --arg container "$container" 'select(.container == $container) | .targetMemory')
 
         vpa_cpu_target=$(convert_cpu_to_millicores "$vpa_cpu_target")
         vpa_memory_target=$(convert_memory_to_mib "$vpa_memory_target")
@@ -106,8 +106,8 @@ analyze_vpa() {
         # Generate CPU recommendation
         if [ $((100 * (current_cpu_request - vpa_cpu_target) / vpa_cpu_target)) -gt $threshold ] || [ $((100 * (current_cpu_request - vpa_cpu_target) / vpa_cpu_target)) -lt -$threshold ]; then
             local rounded_cpu_target=$(round_up "$vpa_cpu_target" 10) # Round to nearest 10 millicores
-            echo "Recommendation for $container_name in $target_kind $target_name: Adjust CPU request from $current_cpu_request to $rounded_cpu_target millicores"
-            recommendation="{\"remediation_type\":\"resource_request_update\",\"vpa_name\":\"$vpa_name\",\"resource\":\"cpu\", \"current_value\":\"$current_cpu_request\",\"suggested_value\":\"$rounded_cpu_target\",\"target_kind\": \"$target_kind\",\"target_name\": \"$target_name\", \"container_name\": \"$container_name\", \"severity\": \"4\", \"next_step\": \"Adjust pod resources to match VPA recommendation in \`$NAMESPACE\`\"}"
+            echo "Recommendation for $container in $target_kind $target_name: Adjust CPU request from $current_cpu_request to $rounded_cpu_target millicores"
+            recommendation="{\"remediation_type\":\"resource_request_update\",\"vpa_name\":\"$vpa_name\",\"resource\":\"cpu\", \"current_value\":\"$current_cpu_request\",\"suggested_value\":\"$rounded_cpu_target\",\"target_kind\": \"$target_kind\",\"target_name\": \"$target_name\", \"container\": \"$container\", \"severity\": \"4\", \"next_step\": \"Adjust pod resources to match VPA recommendation in \`$NAMESPACE\`\"}"
             # Concatenate recommendation to the string
             if [ -n "$recommendation" ]; then
                 if [ -z "$recommendations" ]; then
@@ -121,8 +121,8 @@ analyze_vpa() {
         # Generate Memory recommendation
         if [ $((100 * (current_memory_request - vpa_memory_target) / vpa_memory_target)) -gt $threshold ] || [ $((100 * (current_memory_request - vpa_memory_target) / vpa_memory_target)) -lt -$threshold ]; then
             local rounded_memory_target=$(round_up "$vpa_memory_target" 10) # Round to nearest 10 Mi
-            echo "Recommendation for $container_name in $target_kind $target_name: Adjust Memory request from $current_memory_request to $rounded_memory_target Mi"
-            recommendation="{\"remediation_type\":\"resource_request_update\",\"vpa_name\":\"$vpa_name\",\"resource\":\"memory\", \"current_value\":\" $current_memory_request\",\"suggested_value\":\"$rounded_memory_target\",\"target_kind\": \"$target_kind\",\"target_name\": \"$target_name\", \"container_name\": \"$container_name\", \"severity\": \"4\", \"next_step\": \"Adjust pod resources to match VPA recommendation in \`$NAMESPACE\`\"}"
+            echo "Recommendation for $container in $target_kind $target_name: Adjust Memory request from $current_memory_request to $rounded_memory_target Mi"
+            recommendation="{\"remediation_type\":\"resource_request_update\",\"vpa_name\":\"$vpa_name\",\"resource\":\"memory\", \"current_value\":\" $current_memory_request\",\"suggested_value\":\"$rounded_memory_target\",\"target_kind\": \"$target_kind\",\"target_name\": \"$target_name\", \"container\": \"$container\", \"severity\": \"4\", \"next_step\": \"Adjust pod resources to match VPA recommendation in \`$NAMESPACE\`\"}"
             # Concatenate recommendation to the string
             if [ -n "$recommendation" ]; then
                 if [ -z "$recommendations" ]; then

@@ -4,6 +4,9 @@
 declare -a next_steps=()
 
 
+
+## GitOps Owner Logic
+#########################
 # Define labels or annotations for identifying gitops resources
 # Flux
 declare -A flux_type_map
@@ -65,6 +68,64 @@ fetch_flux_owner_details() {
 
 # }
 
+
+## Substitution Functions
+#########################
+probe_exec_substitution () {
+    # Convert the old and new strings into array elements
+    IFS=' ' read -ra old_string_array <<< "$old_string"
+    IFS=' ' read -ra new_string_array <<< "$new_string"
+
+    # Use yq to iterate over each element in the command array and replace it if it matches
+    for i in "${!old_string_array[@]}"; do
+        yq e "(select(.kind == \"Deployment\" and .metadata.name == \"$object_name\").spec.template.spec.containers[] | select(.name == \"$container\").$probe_type.exec.command[] | select(. == \"${old_string_array[$i]}\") ) |= \"${new_string_array[$i]}\"" -i "$yaml_file"
+    done
+
+}
+
+resource_quota_substitution () {
+    yq e "(select(.kind == \"ResourceQuota\" and .metadata.name == \"$quota_name\").spec.hard.\"$resource\") |= sub(\"$current_value\"; \"$suggested_value\")" -i "$yaml_file"
+}
+
+resource_request_substitution () {
+    # yq e "(select(.kind == \"$object_type\" and .metadata.name == \"$object_name\").spec.template.spec.containers[]) | select(.name == \"$container\").resources.requests.$resource |= sub(\"$current_value\"; \"$suggested_value\")" -i "$yaml_file"
+    if yq e "select(.kind == \"$object_type\" and .metadata.name == \"$object_name\")" "$yaml_file" | grep -q "$container"; then
+        yq e ".spec.template.spec.containers |= map(select(.name == \"$container\").resources.requests.$resource |= sub(\"$current_value\"; \"$suggested_value\")) | select(.kind == \"$object_type\" and .metadata.name == \"$object_name\")" -i "$yaml_file"
+    else
+        echo "No matching path found in $yaml_file"
+    fi
+}
+
+
+## GitHub Pull Request Functions
+#########################
+
+generate_pull_request_body_content () {
+runsession_url=$RW_FRONTEND_URL/map/$RW_WORKSPACE#selectedRunSessions=$RW_SESSION_ID
+
+read -r -d '' PR_BODY << EOF
+### RunSession Details
+
+A RunSession (started by $RW_USERNAME) with the following tasks has produced this Pull Request: 
+
+- $RW_TASK_TITLES
+
+To view the RunSession, click [this link]($runsession_url)
+
+### Change Details
+$change_summary
+
+The following details prompted this change: 
+\`\`\`
+$json_pretty
+\`\`\`
+
+---
+[RunWhen Workspace]($RW_FRONTEND_URL/map/$RW_WORKSPACE)
+EOF
+
+}
+
 update_github_manifests () {
     DATETIME=$(date '+%Y%m%d-%H%M%S')
 
@@ -120,54 +181,8 @@ update_github_manifests () {
     fi 
 }
 
-probe_exec_substitution () {
-    # Convert the old and new strings into array elements
-    IFS=' ' read -ra old_string_array <<< "$old_string"
-    IFS=' ' read -ra new_string_array <<< "$new_string"
-
-    # Use yq to iterate over each element in the command array and replace it if it matches
-    for i in "${!old_string_array[@]}"; do
-        yq e "(select(.kind == \"Deployment\" and .metadata.name == \"$object_name\").spec.template.spec.containers[] | select(.name == \"$container\").$probe_type.exec.command[] | select(. == \"${old_string_array[$i]}\") ) |= \"${new_string_array[$i]}\"" -i "$yaml_file"
-    done
-
-}
-
-resource_quota_substitution () {
-    yq e "(select(.kind == \"ResourceQuota\" and .metadata.name == \"$quota_name\").spec.hard.\"$resource\") |= sub(\"$current_value\"; \"$suggested_value\")" -i "$yaml_file"
-}
-
-resource_request_substitution () {
-    yq e "(select(.kind == \"$object_type\" and .metadata.name == \"$object_name\").spec.template.spec.containers[]) | select(.name == \"$container_name\").resources.requests.$resource |= sub(\"$current_value\"; \"$suggested_value\")" -i "$yaml_file"
-}
-
-generate_pull_request_body_content () {
-runsession_url=$RW_FRONTEND_URL/map/$RW_WORKSPACE#selectedRunSessions=$RW_SESSION_ID
-
-read -r -d '' PR_BODY << EOF
-### RunSession Details
-
-A RunSession (started by $RW_USERNAME) with the following tasks has produced this Pull Request: 
-
-- $RW_TASK_TITLES
-
-To view the RunSession, click [this link]($runsession_url)
-
-### Change Details
-$change_summary
-
-The following details prompted this change: 
-\`\`\`
-$json_pretty
-\`\`\`
-
----
-[RunWhen Workspace]($RW_FRONTEND_URL/map/$RW_WORKSPACE)
-EOF
-
-}
-
-
-# Main script starts here
+## Main code
+#########################
 json_input="$1"
 
 # Check if input is provided
@@ -230,14 +245,14 @@ while read -r json_object; do
     if [[ "$remediation_type" == "resource_request_update" ]]; then
         object_type=$(jq -r '.target_kind' <<< "$json_object")
         object_name=$(jq -r '.target_name' <<< "$json_object")
-        container_name=$(jq -r '.container_name // empty' <<< "$json_object")
+        container=$(jq -r '.container // empty' <<< "$json_object")
         resource=$(jq -r '.resource // empty' <<< "$json_object")
         current_value=$(jq -r '.current_value // empty' <<< "$json_object")
         suggested_value=$(jq -r '.suggested_value // empty' <<< "$json_object")
-        echo "Modifying resource request for container \`$container_name\` in $object_kind \`$object_name\` to \`$suggested_value\` in namespace \`$NAMESPACE\` based on VPA recommendation."
+        echo "Modifying resource request for container \`$container\` in $object_kind \`$object_name\` to \`$suggested_value\` in namespace \`$NAMESPACE\` based on VPA recommendation."
         find_gitops_info "$object_type" "$object_name"
         substitution_function=resource_request_substitution
-        change_summary="Modifying resource request for container \`$container_name\` in $object_kind \`$object_name\` to \`$suggested_value\` in namespace \`$NAMESPACE\` based on VPA recommendation."
+        change_summary="Modifying resource request for container \`$container\` in $object_kind \`$object_name\` to \`$suggested_value\` in namespace \`$NAMESPACE\` based on VPA recommendation."
         update_github_manifests
     fi
 

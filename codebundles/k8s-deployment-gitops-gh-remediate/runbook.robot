@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Remediate Readiness and Liveness Probe GitOps Manifests Namespace `${NAMESPACE}`
+Remediate Readiness and Liveness Probe GitOps Manifests in Namespace `${NAMESPACE}`
     [Documentation]    Fixes misconfigured readiness or liveness probe configurations for deployments in a namespace
     [Tags]    readiness    liveness    probe    deployment    remediate    gitops    ${NAMESPACE}
     ${probe_health}=    RW.CLI.Run Bash File
@@ -67,28 +67,30 @@ Increase ResourceQuota for Namespace `${NAMESPACE}`
     ...    cmd=echo '${quota_usage.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
     ...    env=${env}
     ...    include_in_history=false
-    ${quota_recommendation_list}=    Evaluate    json.loads(r'''${quota_recommendations.stdout}''')    json
-    IF    len(@{quota_recommendation_list}) > 0
-        ${gh_updates}=    RW.CLI.Run Bash File
-        ...    bash_file=update_github_manifests.sh
-        ...    cmd_override=./update_github_manifests.sh '${quota_recommendations.stdout}'
-        ...    env=${env}
-        ...    include_in_history=False
-        ...    secret_file__kubeconfig=${kubeconfig}
-    END
-    ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=echo '${gh_updates.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
-    ...    env=${env}
-    ...    include_in_history=false
-    IF    len($recommendations.stdout) > 0
-        RW.Core.Add Issue
-        ...    severity=3
-        ...    expected=Pull Requests for manifest changes are reviewed for namespace `${NAMESPACE}`
-        ...    actual=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
-        ...    title=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
-        ...    reproduce_hint=Check Pull Request details for more information.
-        ...    details=${quota_recommendations.stdout}
-        ...    next_steps=${recommendations.stdout}
+    IF    $quota_recommendations.stdout != ""
+        ${quota_recommendation_list}=    Evaluate    json.loads(r'''${quota_recommendations.stdout}''')    json
+        IF    len(@{quota_recommendation_list}) > 0
+            ${gh_updates}=    RW.CLI.Run Bash File
+            ...    bash_file=update_github_manifests.sh
+            ...    cmd_override=./update_github_manifests.sh '${quota_recommendations.stdout}'
+            ...    env=${env}
+            ...    include_in_history=False
+            ...    secret_file__kubeconfig=${kubeconfig}
+            ${recommendations}=    RW.CLI.Run Cli
+            ...    cmd=echo '${gh_updates.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+            ...    env=${env}
+            ...    include_in_history=false
+            IF    len($recommendations.stdout) > 0
+                RW.Core.Add Issue
+                ...    severity=3
+                ...    expected=Pull Requests for manifest changes are reviewed for namespace `${NAMESPACE}`
+                ...    actual=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
+                ...    title=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
+                ...    reproduce_hint=Check Pull Request details for more information.
+                ...    details=${quota_recommendations.stdout}
+                ...    next_steps=${recommendations.stdout}
+            END
+        END
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add To Report    ${quota_usage.stdout}\n
@@ -107,28 +109,30 @@ Adjust pod resources to match VPA recommendation in `${NAMESPACE}`
     ...    cmd=echo '${vpa_usage.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
     ...    env=${env}
     ...    include_in_history=false
-    ${vpa_recommendation_list}=    Evaluate    json.loads(r'''${vpa_recommendations.stdout}''')    json
-    IF    len(@{vpa_recommendation_list}) > 0
-        ${gh_updates}=    RW.CLI.Run Bash File
-        ...    bash_file=update_github_manifests.sh
-        ...    cmd_override=./update_github_manifests.sh '${vpa_recommendations.stdout}'
-        ...    env=${env}
-        ...    include_in_history=False
-        ...    secret_file__kubeconfig=${kubeconfig}
-    END
-    ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=echo '${gh_updates.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
-    ...    env=${env}
-    ...    include_in_history=false
-    IF    len($recommendations.stdout) > 0
-        RW.Core.Add Issue
-        ...    severity=3
-        ...    expected=Pull Requests for manifest changes are reviewed for namespace `${NAMESPACE}`
-        ...    actual=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
-        ...    title=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
-        ...    reproduce_hint=Check Pull Request details for more information.
-        ...    details=${vpa_recommendations.stdout}
-        ...    next_steps=${recommendations.stdout}
+    IF    $vpa_recommendations.stdout != ""
+        ${vpa_recommendation_list}=    Evaluate    json.loads(r'''${vpa_recommendations.stdout}''')    json
+        IF    len(@{vpa_recommendation_list}) > 0
+            ${gh_updates}=    RW.CLI.Run Bash File
+            ...    bash_file=update_github_manifests.sh
+            ...    cmd_override=./update_github_manifests.sh '${vpa_recommendations.stdout}'
+            ...    env=${env}
+            ...    include_in_history=False
+            ...    secret_file__kubeconfig=${kubeconfig}
+            ${recommendations}=    RW.CLI.Run Cli
+            ...    cmd=echo '${gh_updates.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+            ...    env=${env}
+            ...    include_in_history=false
+            IF    len($recommendations.stdout) > 0
+                RW.Core.Add Issue
+                ...    severity=3
+                ...    expected=Pull Requests for manifest changes are reviewed for namespace `${NAMESPACE}`
+                ...    actual=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
+                ...    title=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
+                ...    reproduce_hint=Check Pull Request details for more information.
+                ...    details=${vpa_recommendations.stdout}
+                ...    next_steps=${recommendations.stdout}
+            END
+        END
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add To Report    ${vpa_usage.stdout}\n
