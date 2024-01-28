@@ -76,19 +76,19 @@ check_usage() {
             increased_value=$(( hard * increase_percentage / 100 ))
             suggested_value=$(( increased_value + hard ))
         fi
-        recommendation="{\"remediation_type\":\"resourcequota_update\",\"increase_percentage\":\"$increase_percentage\",\"limit_type\":\"hard\",\"current_value\":\"$hard\",\"suggested_value\":\"$suggested_value\",\"quota_name\": \"$quota_name\", \"resource\": \"$resource\", \"usage\": \"at or above 100%\", \"severity\": \"1\", \"next_step\": \"Increase the resource quota for $resource in \`$NAMESPACE\`\"}"
+        recommendation="{\"object_type\":\"ResourceQuota\",\"object_name\":\"$quota_name\",\"remediation_type\":\"resourcequota_update\",\"increase_percentage\":\"$increase_percentage\",\"limit_type\":\"hard\",\"current_value\":\"$hard\",\"suggested_value\":\"$suggested_value\",\"quota_name\": \"$quota_name\", \"resource\": \"$resource\", \"usage\": \"at or above 100%\", \"severity\": \"1\", \"next_step\": \"Increase the resource quota for $resource in \`$NAMESPACE\`\"}"
     elif [ $percentage -ge 90 ]; then
         echo "$resource: WARNING ($percentage%) - Consider increasing the resource quota for $resource in $NAMESPACE"
         increase_percentage="${WARNING_INCREASE_LEVEL:-25}"
         increased_value=$(( hard * increase_percentage / 100 ))
         suggested_value=$(( increased_value + hard ))
-        recommendation="{\"remediation_type\":\"resourcequota_update\",\"increase_percentage\":\"$increase_percentage\",\"limit_type\":\"hard\",\"current_value\":\"$hard\",\"suggested_value\":\"$suggested_value\",\"quota_name\": \"$quota_name\", \"resource\": \"$resource\", \"usage\": \"between 90-99%\", \"severity\": \"2\", \"next_step\": \"Consider increasing the resource quota for $resource in \`$NAMESPACE\`\"}"
+        recommendation="{\"object_type\":\"ResourceQuota\",\"object_name\":\"$quota_name\",\"remediation_type\":\"resourcequota_update\",\"increase_percentage\":\"$increase_percentage\",\"limit_type\":\"hard\",\"current_value\":\"$hard\",\"suggested_value\":\"$suggested_value\",\"quota_name\": \"$quota_name\", \"resource\": \"$resource\", \"usage\": \"between 90-99%\", \"severity\": \"2\", \"next_step\": \"Consider increasing the resource quota for $resource in \`$NAMESPACE\`\"}"
     elif [ $percentage -ge 80 ]; then
         echo "$resource: INFO ($percentage%) - Monitor the resource quota for $resource in $NAMESPACE"
         increase_percentage="${INFO_INCREASE_LEVEL:-10}"
         increased_value=$(( hard * increase_percentage / 100 ))
         suggested_value=$(( increased_value + hard ))
-        recommendation="{\"remediation_type\":\"resourcequota_update\",\"increase_percentage\":\"$increase_percentage\",\"limit_type\":\"hard\",\"current_value\":\"$hard\",\"suggested_value\":\"$suggested_value\",\"quota_name\": \"$quota_name\", \"resource\": \"$resource\", \"usage\": \"between 80-90%\", \"severity\": \"3\", \"next_step\": \"Monitor the resource quota for $resource in \`$NAMESPACE\`\"}"
+        recommendation="{\"object_type\":\"ResourceQuota\",\"object_name\":\"$quota_name\",\"remediation_type\":\"resourcequota_update\",\"increase_percentage\":\"$increase_percentage\",\"limit_type\":\"hard\",\"current_value\":\"$hard\",\"suggested_value\":\"$suggested_value\",\"quota_name\": \"$quota_name\", \"resource\": \"$resource\", \"usage\": \"between 80-90%\", \"severity\": \"3\", \"next_step\": \"Monitor the resource quota for $resource in \`$NAMESPACE\`\"}"
     else
         echo "$resource: OK ($percentage%)"
     fi

@@ -2,6 +2,10 @@
 
 
 declare -a next_steps=()
+declare -A change_list
+declare -A substitutions_list
+declare -A change_details
+declare -A change_summary
 
 
 
@@ -72,24 +76,28 @@ fetch_flux_owner_details() {
 ## Substitution Functions
 #########################
 probe_exec_substitution () {
+    IFS=',' read container probe_type old_string new_string invalid_ports valid_ports <<< "$substitution"
+
     # Convert the old and new strings into array elements
     IFS=' ' read -ra old_string_array <<< "$old_string"
     IFS=' ' read -ra new_string_array <<< "$new_string"
 
     # Use yq to iterate over each element in the command array and replace it if it matches
     for i in "${!old_string_array[@]}"; do
-        yq e "(select(.kind == \"Deployment\" and .metadata.name == \"$object_name\").spec.template.spec.containers[] | select(.name == \"$container\").$probe_type.exec.command[] | select(. == \"${old_string_array[$i]}\") ) |= \"${new_string_array[$i]}\"" -i "$yaml_file"
+        yq e "(select(.kind == \"$object_type\" and .metadata.name == \"$object_name\").spec.template.spec.containers[] | select(.name == \"$container\").$probe_type.exec.command[] | select(. == \"${old_string_array[$i]}\") ) |= \"${new_string_array[$i]}\"" -i "$yaml_file"
     done
 
 }
 
 resource_quota_substitution () {
+    IFS=',' read quota_name resource current_value suggested_value <<< "$substitution"
     yq e "(select(.kind == \"ResourceQuota\" and .metadata.name == \"$quota_name\").spec.hard.\"$resource\") |= sub(\"$current_value\"; \"$suggested_value\")" -i "$yaml_file"
 }
 
 resource_request_substitution () {
-    # yq e "(select(.kind == \"$object_type\" and .metadata.name == \"$object_name\").spec.template.spec.containers[]) | select(.name == \"$container\").resources.requests.$resource |= sub(\"$current_value\"; \"$suggested_value\")" -i "$yaml_file"
+    IFS=',' read container resource current_value suggested_value <<< "$substitution"
     if yq e "select(.kind == \"$object_type\" and .metadata.name == \"$object_name\")" "$yaml_file" | grep -q "$container"; then
+        yq e ".spec.template.spec.containers |= map(select(.name == \"$container\").resources.requests.$resource |= sub(\"$current_value\"; \"$suggested_value\")) | select(.kind == \"$object_type\" and .metadata.name == \"$object_name\")" "$yaml_file"
         yq e ".spec.template.spec.containers |= map(select(.name == \"$container\").resources.requests.$resource |= sub(\"$current_value\"; \"$suggested_value\")) | select(.kind == \"$object_type\" and .metadata.name == \"$object_name\")" -i "$yaml_file"
     else
         echo "No matching path found in $yaml_file"
@@ -99,11 +107,10 @@ resource_request_substitution () {
 
 ## GitHub Pull Request Functions
 #########################
-
 generate_pull_request_body_content () {
-runsession_url=$RW_FRONTEND_URL/map/$RW_WORKSPACE#selectedRunSessions=$RW_SESSION_ID
+    runsession_url=$RW_FRONTEND_URL/map/$RW_WORKSPACE#selectedRunSessions=$RW_SESSION_ID
 
-read -r -d '' PR_BODY << EOF
+    read -r -d '' PR_BODY << EOF
 ### RunSession Details
 
 A RunSession (started by $RW_USERNAME) with the following tasks has produced this Pull Request: 
@@ -113,17 +120,16 @@ A RunSession (started by $RW_USERNAME) with the following tasks has produced thi
 To view the RunSession, click [this link]($runsession_url)
 
 ### Change Details
-$change_summary
+${change_summary[@]}
 
 The following details prompted this change: 
 \`\`\`
-$json_pretty
+${change_details[@]}
 \`\`\`
 
 ---
 [RunWhen Workspace]($RW_FRONTEND_URL/map/$RW_WORKSPACE)
 EOF
-
 }
 
 update_github_manifests () {
@@ -149,7 +155,10 @@ update_github_manifests () {
     # Search for YAML files and process them
     find $git_path -type f -name '*.yaml' -o -name '*.yml' | while read yaml_file; do
         echo $yaml_file
-        $substitution_function
+        IFS=';' read -ra substitutions <<< "${substitutions_list[$object_id]}"
+        for substitution in "${substitutions[@]}"; do
+                $substitution_function
+        done
     done
 
     # Test if any git changes are made. If not, bail out and send instruction. If so, commit and PR.  
@@ -165,7 +174,7 @@ update_github_manifests () {
         git push -f -v --set-upstream origin "runwhen/manifest-update-$DATETIME"
         generate_pull_request_body_content
         PR_DATA=$(jq -n \
-            --arg title "[RunWhen] - GitOps Manifest Updates for $object_type $object_name" \
+            --arg title "[RunWhen] - GitOps Manifest Updates for $object_id" \
             --arg body "$PR_BODY" \
             --arg head "runwhen/manifest-update-$DATETIME" \
             --arg base "$git_branch" \
@@ -193,70 +202,75 @@ fi
 
 # Process the JSON
 while read -r json_object; do
-    json_pretty=$(echo $json_object | jq .)
     remediation_type=$(jq -r '.remediation_type' <<< "$json_object")
-
-    # Handle projbe updates
-    # Prefer invalid_command over invalid_ports
-    if [[ "$remediation_type" == "probe_update" ]]; then
-        object_type=$(jq -r '.object_type' <<< "$json_object")
-        object_name=$(jq -r '.object_name' <<< "$json_object")
-        probe_type=$(jq -r '.probe_type' <<< "$json_object")
-        exec=$(jq -r '.exec' <<< "$json_object")
-        invalid_command=$(jq -r '.invalid_command // empty' <<< "$json_object")
-        valid_command=$(jq -r '.valid_command // empty' <<< "$json_object")
-        invalid_ports=$(jq -r '.invalid_ports // empty' <<< "$json_object")
-        valid_ports=$(jq -r '.valid_ports // empty' <<< "$json_object")
-        container=$(jq -r '.container // empty' <<< "$json_object")
-        if [[ "$exec" == "true" && -n "$invalid_command" ]]; then
-            echo "Processing $object_type $object_name with invalidCommand"
-            find_gitops_info "$object_type" "$object_name"
-            old_string=$invalid_command
-            new_string=$valid_command
-            substitution_function=probe_exec_substitution
-            change_summary="Container \`$container\` in $object_type \`$object_name\` had an invalid exec command for $probe_type. The updated command is \`$valid_command\`"
-            update_github_manifests 
-
-        elif [[ "$exec" == "true" && -n "$invalid_ports" ]]; then
-            echo "Processing $object_type $object_name with invalidPorts"
-            find_gitops_info "$object_type" "$object_name"
-            ## Placeholder for GitOps Update Details
-        fi
-    fi
-
-    # Handle resourcequota update
-    if [[ "$remediation_type" == "resourcequota_update" ]]; then
-        object_type="ResourceQuota"
-        object_name=$(jq -r '.quota_name' <<< "$json_object")
-        increase_percentage=$(jq -r '.increase_percentage // empty' <<< "$json_object")
-        quota_name=$(jq -r '.quota_name // empty' <<< "$json_object")
-        resource=$(jq -r '.resource // empty' <<< "$json_object")
-        usage=$(jq -r '.usage // empty' <<< "$json_object")
-        current_value=$(jq -r '.current_value // empty' <<< "$json_object")
-        suggested_value=$(jq -r '.suggested_value // empty' <<< "$json_object")
-        echo "Increasing ResourceQuota $quota_name with usage $usage by $increase_percentage% to $suggested_value"
-        find_gitops_info "resourcequota" "$quota_name"
-        substitution_function=resource_quota_substitution
-        change_summary="Increasing ResourceQuota \`$quota_name\` for \`$resource\` to \`$suggested_value\` in namespace \`$NAMESPACE\`"
-        update_github_manifests
-    fi
-
-    # Handle resourcequota update
-    if [[ "$remediation_type" == "resource_request_update" ]]; then
-        object_type=$(jq -r '.target_kind' <<< "$json_object")
-        object_name=$(jq -r '.target_name' <<< "$json_object")
-        container=$(jq -r '.container // empty' <<< "$json_object")
-        resource=$(jq -r '.resource // empty' <<< "$json_object")
-        current_value=$(jq -r '.current_value // empty' <<< "$json_object")
-        suggested_value=$(jq -r '.suggested_value // empty' <<< "$json_object")
-        echo "Modifying resource request for container \`$container\` in $object_kind \`$object_name\` to \`$suggested_value\` in namespace \`$NAMESPACE\` based on VPA recommendation."
-        find_gitops_info "$object_type" "$object_name"
-        substitution_function=resource_request_substitution
-        change_summary="Modifying resource request for container \`$container\` in $object_kind \`$object_name\` to \`$suggested_value\` in namespace \`$NAMESPACE\` based on VPA recommendation."
-        update_github_manifests
-    fi
-
+    echo $json_object
+    object_type=$(jq -r '.object_type' <<< "$json_object")
+    object_name=$(jq -r '.object_name' <<< "$json_object")
+    object_id="$object_type-$object_name"
+    change_list[$object_id]+="$json_object\n"
 done < <(jq -c '.[]' <<< "$json_input")
+
+for object_id in "${!change_list[@]}"; do
+    echo "Processing changes for $object_id"
+    find_gitops_info "$object_type" "$object_name"
+
+    # Reset change summary and details for this batch
+    change_summary=""
+    change_details=""
+
+    while read -r json_object; do
+        remediation_type=$(jq -r '.remediation_type' <<< "$json_object")
+        # Set other necessary variables from json_object
+        json_pretty=$(echo $json_object | jq .)
+        if [[ "$remediation_type" == "resourcequota_update" ]]; then
+            increase_percentage=$(jq -r '.increase_percentage // empty' <<< "$json_object")
+            quota_name=$(jq -r '.quota_name // empty' <<< "$json_object")
+            resource=$(jq -r '.resource // empty' <<< "$json_object")
+            usage=$(jq -r '.usage // empty' <<< "$json_object")
+            current_value=$(jq -r '.current_value // empty' <<< "$json_object")
+            suggested_value=$(jq -r '.suggested_value // empty' <<< "$json_object")
+            echo "Increasing ResourceQuota $quota_name with usage $usage by $increase_percentage% to $suggested_value"
+            substitutions_list[$object_id]+="$quota_name,$resource,$current_value,$suggested_value;"
+            substitution_function=resource_quota_substitution     
+            change_summary+="[Change] Increasing ResourceQuota \`$quota_name\` for \`$resource\` to \`$suggested_value\` in namespace \`$NAMESPACE\`.<br>"
+            change_details+="$json_pretty"
+        elif [[ "$remediation_type" == "resource_request_update" ]]; then
+            container=$(jq -r '.container // empty' <<< "$json_object")
+            resource=$(jq -r '.resource // empty' <<< "$json_object")
+            current_value=$(jq -r '.current_value // empty' <<< "$json_object")
+            suggested_value=$(jq -r '.suggested_value // empty' <<< "$json_object")
+            echo "Modifying $resource resource request for container \`$container\` in $object_type \`$object_name\` to \`$suggested_value\` in namespace \`$NAMESPACE\` based on VPA recommendation."
+            substitutions_list[$object_id]+="$container,$resource,$current_value,$suggested_value;"
+            substitution_function=resource_request_substitution
+            change_summary+="[Change] Modifying $resource resource request for container \`$container\` in $object_type \`$object_name\` to \`$suggested_value\` in namespace \`$NAMESPACE\` based on VPA recommendation.<br>"
+            change_details+="$json_pretty"
+        elif [[ "$remediation_type" == "probe_update" ]]; then
+            probe_type=$(jq -r '.probe_type' <<< "$json_object")
+            exec=$(jq -r '.exec' <<< "$json_object")
+            invalid_command=$(jq -r '.invalid_command // empty' <<< "$json_object")
+            valid_command=$(jq -r '.valid_command // empty' <<< "$json_object")
+            invalid_ports=$(jq -r '.invalid_ports // empty' <<< "$json_object")
+            valid_ports=$(jq -r '.valid_ports // empty' <<< "$json_object")
+            container=$(jq -r '.container // empty' <<< "$json_object")
+            if [[ "$exec" == "true" && -n "$invalid_command" ]]; then
+                echo "Processing $object_type $object_name with invalidCommand"
+                find_gitops_info "$object_type" "$object_name"
+                old_string=$invalid_command
+                new_string=$valid_command
+                substitutions_list[$object_id]+="$container,$probe_type,$old_string,$new_string,$invalid_ports,$valid_ports;"
+                substitution_function=probe_exec_substitution
+                change_summary+="[Change] Container \`$container\` in $object_type \`$object_name\` had an invalid exec command for $probe_type. The updated command is \`$valid_command\`<br>"
+                change_details+="$json_pretty"
+
+            elif [[ "$exec" == "true" && -n "$invalid_ports" ]]; then
+                echo "Processing $object_type $object_name with invalidPorts"
+            fi
+        fi
+    done < <(echo -e "${change_list[$object_id]}")
+
+    # Apply changes and create a single PR
+    update_github_manifests
+done
 
 
 # Display all unique recommendations that can be shown as Next Steps

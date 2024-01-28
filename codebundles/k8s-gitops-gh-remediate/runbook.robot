@@ -1,8 +1,8 @@
 *** Settings ***
-Documentation       Provides a list of tasks that can remediate configuraiton issues with deployment manifests in GitHub based gitops repositories.
+Documentation       Provides a list of tasks that can remediate configuraiton issues with manifests in GitHub based GitOps repositories.
 Metadata            Author    stewartshea
 Metadata            Display Name    Kubernetes GitOps GitHub Remediation
-Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,FluxCD,ArgoCD
+Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,FluxCD,ArgoCD,GitHub
 
 Library             BuiltIn
 Library             RW.Core
@@ -17,11 +17,11 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 Remediate Readiness and Liveness Probe GitOps Manifests in Namespace `${NAMESPACE}`
-    [Documentation]    Fixes misconfigured readiness or liveness probe configurations for deployments in a namespace
-    [Tags]    readiness    liveness    probe    deployment    remediate    gitops    ${NAMESPACE}
+    [Documentation]    Fixes misconfigured readiness or liveness probe configurations for pods in a namespace that are managed in a GitHub GitOps repository
+    [Tags]    readiness    liveness    probe    remediate    gitops    github    ${NAMESPACE}
     ${probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_all_probes.sh
-    ...    cmd_override=./validate_all_probes.sh deployment ${NAMESPACE}
+    ...    cmd_override=./validate_all_probes.sh ${NAMESPACE}
     ...    env=${env}
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -55,8 +55,8 @@ Remediate Readiness and Liveness Probe GitOps Manifests in Namespace `${NAMESPAC
     RW.Core.Add Pre To Report    Commands Used: ${probe_health.cmd}
 
 Increase ResourceQuota for Namespace `${NAMESPACE}`
-    [Documentation]    Looks for a resourcequota object in the namespace and updates it if possible
-    [Tags]    resourcequota    quota    namespace    remediate    gitops    ${NAMESPACE}
+    [Documentation]    Looks for a resourcequota object in the namespace and increases it if applicable, and if it is managed in a GitHub GitOps repository
+    [Tags]    resourcequota    quota    namespace    remediate    github    gitops    ${NAMESPACE}
     ${quota_usage}=    RW.CLI.Run Bash File
     ...    bash_file=resource_quota_check.sh
     ...    env=${env}
@@ -96,9 +96,9 @@ Increase ResourceQuota for Namespace `${NAMESPACE}`
     RW.Core.Add To Report    ${quota_usage.stdout}\n
     RW.Core.Add Pre To Report    Commands Used: ${quota_usage.cmd}
 
-Adjust pod resources to match VPA recommendation in `${NAMESPACE}`
-    [Documentation]    Queries the namespace for any Vertical Pod Autoscaler resource recommendations and applies them to GitOps controlled manifests. 
-    [Tags]    recommendation    resources    utilization    pods    cpu    memory    allocation   vpa
+Adjust Pod Resources to Match VPA Recommendation in `${NAMESPACE}`
+    [Documentation]    Queries the namespace for any Vertical Pod Autoscaler resource recommendations and applies them to GitOps GitHub controlled manifests. 
+    [Tags]    recommendation    resources    utilization    gitops    github    pods    cpu    memory    allocation   vpa
     ${vpa_usage}=    RW.CLI.Run Bash File
     ...    bash_file=vpa_recommendations.sh
     ...    env=${env}

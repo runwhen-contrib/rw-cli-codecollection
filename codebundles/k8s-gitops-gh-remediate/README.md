@@ -1,9 +1,11 @@
-# Kubernetes Deployment Triage
+# Kubernetes GitOps GitHub Remediate
 
 This codebundle provides a suite of tasks aimed at remediating configuration issues related to Kubernetes deployments managed in github repositories.
 
 ## Tasks
-`Remediate Readiness and Liveness Probe GitOps Manifests for Deployments in Namespace`
+`Remediate Readiness and Liveness Probe GitOps Manifests in Namespace`
+`Increase ResourceQuota for Namespace`
+`Adjust Pod Resources to Match VPA Recommendation in`
 
 ## Configuration
 The TaskSet requires initialization to import necessary secrets, services, and user variables. The following variables should be set:

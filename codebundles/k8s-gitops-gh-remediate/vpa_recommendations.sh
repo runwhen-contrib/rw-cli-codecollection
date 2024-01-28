@@ -48,15 +48,15 @@ get_vpa_target_ref() {
 
 # Function to get current CPU and Memory requests for the target object
 get_current_requests() {
-    local target_kind=$1
-    local target_name=$2
+    local object_type=$1
+    local object_name=$2
     local namespace=$3
 
-    if [[ "$target_kind" == "Deployment" ]]; then
-        local target_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get "$target_kind" "$target_name" -n "$namespace" -o json)
+    if [[ "$object_type" == "Deployment" ]]; then
+        local target_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get "$object_type" "$object_name" -n "$namespace" -o json)
         echo "$target_json" | jq -r '.spec.template.spec.containers[] | .name as $name | .resources.requests | {container: $name, cpu: (.cpu // "0"), memory: (.memory // "0Mi")}'
     else
-        echo "Unsupported target kind: $target_kind"
+        echo "Unsupported target kind: $object_type"
     fi
 }
 
@@ -68,10 +68,10 @@ analyze_vpa() {
 
     # Fetch VPA target reference
     local target_ref=$(echo "$vpa_item" | jq -r '.spec.targetRef | "\(.kind) \(.name)"')
-    read target_kind target_name <<< "$target_ref"
+    read object_type object_name <<< "$target_ref"
 
     # Fetch current CPU and Memory requests
-    local current_requests=$(get_current_requests "$target_kind" "$target_name" "$namespace")
+    local current_requests=$(get_current_requests "$object_type" "$object_name" "$namespace")
 
     # Extract VPA recommendations from vpa_item
     local vpa_recommendations=$(echo "$vpa_item" | jq -r '.status.recommendation.containerRecommendations[] | {container: .containerName, targetCpu: .target.cpu, targetMemory: .target.memory}')
@@ -106,8 +106,8 @@ analyze_vpa() {
         # Generate CPU recommendation
         if [ $((100 * (current_cpu_request - vpa_cpu_target) / vpa_cpu_target)) -gt $threshold ] || [ $((100 * (current_cpu_request - vpa_cpu_target) / vpa_cpu_target)) -lt -$threshold ]; then
             local rounded_cpu_target=$(round_up "$vpa_cpu_target" 10) # Round to nearest 10 millicores
-            echo "Recommendation for $container in $target_kind $target_name: Adjust CPU request from $current_cpu_request to $rounded_cpu_target millicores"
-            recommendation="{\"remediation_type\":\"resource_request_update\",\"vpa_name\":\"$vpa_name\",\"resource\":\"cpu\", \"current_value\":\"$current_cpu_request\",\"suggested_value\":\"$rounded_cpu_target\",\"target_kind\": \"$target_kind\",\"target_name\": \"$target_name\", \"container\": \"$container\", \"severity\": \"4\", \"next_step\": \"Adjust pod resources to match VPA recommendation in \`$NAMESPACE\`\"}"
+            echo "Recommendation for $container in $object_type $object_name: Adjust CPU request from $current_cpu_request to $rounded_cpu_target millicores"
+            recommendation="{\"remediation_type\":\"resource_request_update\",\"vpa_name\":\"$vpa_name\",\"resource\":\"cpu\", \"current_value\":\"$current_cpu_request\",\"suggested_value\":\"$rounded_cpu_target\",\"object_type\": \"$object_type\",\"object_name\": \"$object_name\", \"container\": \"$container\", \"severity\": \"4\", \"next_step\": \"Adjust pod resources to match VPA recommendation in \`$NAMESPACE\`\"}"
             # Concatenate recommendation to the string
             if [ -n "$recommendation" ]; then
                 if [ -z "$recommendations" ]; then
@@ -121,8 +121,8 @@ analyze_vpa() {
         # Generate Memory recommendation
         if [ $((100 * (current_memory_request - vpa_memory_target) / vpa_memory_target)) -gt $threshold ] || [ $((100 * (current_memory_request - vpa_memory_target) / vpa_memory_target)) -lt -$threshold ]; then
             local rounded_memory_target=$(round_up "$vpa_memory_target" 10) # Round to nearest 10 Mi
-            echo "Recommendation for $container in $target_kind $target_name: Adjust Memory request from $current_memory_request to $rounded_memory_target Mi"
-            recommendation="{\"remediation_type\":\"resource_request_update\",\"vpa_name\":\"$vpa_name\",\"resource\":\"memory\", \"current_value\":\" $current_memory_request\",\"suggested_value\":\"$rounded_memory_target\",\"target_kind\": \"$target_kind\",\"target_name\": \"$target_name\", \"container\": \"$container\", \"severity\": \"4\", \"next_step\": \"Adjust pod resources to match VPA recommendation in \`$NAMESPACE\`\"}"
+            echo "Recommendation for $container in $object_type $object_name: Adjust Memory request from $current_memory_request to $rounded_memory_target Mi"
+            recommendation="{\"remediation_type\":\"resource_request_update\",\"vpa_name\":\"$vpa_name\",\"resource\":\"memory\", \"current_value\":\"$current_memory_request\",\"suggested_value\":\"$rounded_memory_target\",\"object_type\": \"$object_type\",\"object_name\": \"$object_name\", \"container\": \"$container\", \"severity\": \"4\", \"next_step\": \"Adjust pod resources to match VPA recommendation in \`$NAMESPACE\`\"}"
             # Concatenate recommendation to the string
             if [ -n "$recommendation" ]; then
                 if [ -z "$recommendations" ]; then
