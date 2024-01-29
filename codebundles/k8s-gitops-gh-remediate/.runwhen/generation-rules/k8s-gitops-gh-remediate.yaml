@@ -3,7 +3,7 @@ kind: GenerationRules
 spec:
   generationRules:
     - resourceTypes:
-        - deployment
+        - namespace
       matchRules:
         - type: and
           matches:
@@ -21,11 +21,11 @@ spec:
               properties: [custom/gitops_provider]
               mode: substring
       slxs:
-        - baseName: depl-gh-fix
+        - baseName: gitops-gh-fix
           levelOfDetail: detailed
           qualifiers: ["namespace", "cluster"]
-          baseTemplateName: k8s-deployment-gitops-gh-remediate
+          baseTemplateName: k8s-gitops-gh-remediate
           outputItems:
             - type: slx
             - type: runbook
-              templateName: k8s-deployment-gitops-gh-remediate-taskset.yaml
+              templateName: k8s-gitops-gh-remediate-taskset.yaml
