@@ -6,19 +6,39 @@ commands:
     full details."
   doc_links: '
 
-    '
-  explanation: This command activates a service account for Google Cloud and then
-    lists all the Google Cloud functions that are not in an active state, displaying
-    specific details about each function's status and severity messages. It also provides
-    a prompt to run a specific command for more information on each function.
-  multi_line_details: "\n# Activate the service account using the key file from the\
-    \ environment variable\ngcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS\
-    \ && \n\n# List all cloud functions that are not in an active state or status\n\
-    gcloud functions list --filter=\"state!=ACTIVE OR status!=ACTIVE\" \\\n--format=\"\
-    table[box](name, state, status, stateMessages.severity, stateMessages.type, stateMessages.message:wrap=30)\"\
-    \ \\\n--project=${GCP_PROJECT_ID} && \n\n# Provide a message for the user to get\
-    \ more details about a specific function\necho \"Run 'gcloud functions describe\
-    \ [name]' for full details.\"\n"
+    - [Activating a service account for authentication](https://cloud.google.com/iam/docs/creating-managing-service-accounts){:target="_blank"}
+
+    - [Listing Google Cloud functions](https://cloud.google.com/functions/docs/quickstart){:target="_blank"}
+
+    - [Formatted table of function names, states, statuses, and error messages](https://cloud.google.com/sdk/gcloud/reference/functions/list){:target="_blank"}'
+  explanation: This command activates a service account for authentication, then lists
+    any Google Cloud functions that are not currently active or in an error state,
+    and provides a formatted table of their names, states, statuses, and error messages.
+    It also reminds the user to use another command to get more detailed information
+    about a specific function.
+  multi_line_details: '# First, activate the service account using the key file specified
+    in the environment variable GOOGLE_APPLICATION_CREDENTIALS
+
+    gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+
+
+    # Next, list all Cloud Functions that are not in the ACTIVE state or have a status
+    other than ACTIVE
+
+    # Format the output into a table for easier readability and include additional
+    details about the state messages
+
+    # Specify the project using the GCP_PROJECT_ID environment variable
+
+    gcloud functions list --filter="state!=ACTIVE OR status!=ACTIVE" --format="table[box](name,
+    state, status, stateMessages.severity, stateMessages.type, stateMessages.message:wrap=30)"
+    --project=${GCP_PROJECT_ID}
+
+
+    # Lastly, provide a helpful message to remind the user how to obtain full details
+    for a specific function
+
+    echo "Run ''gcloud functions describe [name]'' for full details."'
   name: list_unhealhy_cloud_functions_in_gcp_project_gcp_project_id
 - command: gcloud functions list --filter="state!=ACTIVE OR status!=ACTIVE" --format="value(name)"
     --project=${GCP_PROJECT_ID} | xargs -I {} gcloud logging read "severity=ERROR
@@ -26,18 +46,16 @@ commands:
     50 --freshness=14d
   doc_links: '
 
-    '
-  explanation: This command is used to list all Google Cloud Functions that are not
-    in an active state, and then output the names of those functions. It then uses
-    the function names to retrieve error logs from the past 14 days for each function.
-  multi_line_details: "# This command lists all Google Cloud Functions that are not\
-    \ in an active state and then retrieves the logs for those functions with error\
-    \ severity within the last 14 days.\n\n# Step 1: List all Google Cloud Functions\
-    \ that are not in an active state\ngcloud functions list --filter=\"state!=ACTIVE\
-    \ OR status!=ACTIVE\" --format=\"value(name)\" --project=${GCP_PROJECT_ID} \n\n\
-    # Step 2: Pass the output of the previous command to the xargs command, which\
-    \ will iterate through each function name and execute the next gcloud command\
-    \ \n| xargs -I {} \n\n# Step 3: Retrieve logs for each function with error severity\
-    \ within the last 14 days\ngcloud logging read \"severity=ERROR AND resource.type=cloud_function\
-    \ AND resource.labels.function_name={}\" --limit 50 --freshness=14d"
+    - [gcloud command-line tool overview](https://cloud.google.com/sdk/gcloud){:target="_blank"}
+
+    - [Google Cloud Functions documentation](https://cloud.google.com/functions/docs){:target="_blank"}'
+  explanation: This command uses the gcloud tool to list all Google Cloud Functions
+    that are not in an active state, and then searches the logs for those functions
+    to find any error messages that have occurred in the last 14 days.
+  multi_line_details: "\n# List all cloud functions that are not in the ACTIVE state\n\
+    # and that do not have an ACTIVE status\ngcloud functions list --filter=\"state!=ACTIVE\
+    \ OR status!=ACTIVE\" \\\n    --format=\"value(name)\" --project=${GCP_PROJECT_ID}\
+    \ \\\n    | xargs -I {} \\\n    # For each cloud function found, read the error\
+    \ logs associated with it\n    gcloud logging read \"severity=ERROR AND resource.type=cloud_function\
+    \ AND resource.labels.function_name={}\" \\\n    --limit 50 --freshness=14d\n"
   name: get_error_logs_for_unhealthy_cloud_functions_in_gcp_project_gcp_project_id
