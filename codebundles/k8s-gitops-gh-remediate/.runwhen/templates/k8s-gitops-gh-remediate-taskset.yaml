@@ -19,7 +19,7 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/k8s-deployment-gitops-gh-remediate/runbook.robot
+    pathToRobot: codebundles/k8s-gitops-gh-remediate/runbook.robot
   configProvided:
     - name: NAMESPACE
       value: {{match_resource.resource.metadata.namespace}}
