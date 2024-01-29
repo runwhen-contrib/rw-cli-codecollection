@@ -4,62 +4,48 @@ commands:
     -s ''${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}'''
   doc_links: '
 
-    '
-  explanation: This command sets a variable TERRAFORM_API_TOKEN_VALUE to the value
-    of the TERRAFORM_API_TOKEN file, then uses curl to make a request to a specified
-    API URL with the token for authorization and specific content type.
-  multi_line_details: '# The following command is used to make a call to the Terraform
-    API using an API token for authentication
+    - [Variables in Terraform](https://www.terraform.io/docs/language/values/variables.html){:target="_blank"}
 
-    # First, we are assigning the value of the Terraform API token file to a variable
-    called TERRAFORM_API_TOKEN_VALUE
+    - [Terraform API documentation](https://www.terraform.io/docs/cloud/api/index.html){:target="_blank"}
 
-    TERRAFORM_API_TOKEN_VALUE=$(cat $TERRAFORM_API_TOKEN)
-
-
-    # Next, we use the curl command to make a request to the Terraform API
-
-    # We include the API token in the Authorization header and specify the Content-Type
-    as application/vnd.api+json
-
-    # We also include the variables for the organization name and workspace name in
-    the URL
-
-    curl --header "Authorization: Bearer $TERRAFORM_API_TOKEN_VALUE" --header "Content-Type:
-    application/vnd.api+json" -s ''${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}''
-
-    # Note that the variables within the URL are enclosed in curly braces and prefixed
-    with a dollar sign ($) to reference their values from the environment.'
+    - [Terraform workspaces](https://www.terraform.io/docs/language/state/workspaces.html){:target="_blank"}'
+  explanation: This command sets a variable `TERRAFORM_API_TOKEN_VALUE` using the
+    value from a file called `$TERRAFORM_API_TOKEN`, then makes a secure request to
+    the Terraform API using that token to fetch information about a specific workspace
+    within an organization.
+  multi_line_details: "\n# Read the contents of the TERRAFORM_API_TOKEN file and store\
+    \ it in the TERRAFORM_API_TOKEN_VALUE variable\nTERRAFORM_API_TOKEN_VALUE=$(cat\
+    \ $TERRAFORM_API_TOKEN) \n\n# Make a GET request to the Terraform API using curl,\
+    \ passing the authentication token in the header\ncurl \\\n--header \"Authorization:\
+    \ Bearer $TERRAFORM_API_TOKEN_VALUE\" \\ \n--header \"Content-Type: application/vnd.api+json\"\
+    \ \\\n-s '${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}'\n\
+    \n\nThis multi-line command breaks down the original one-liner and adds helpful\
+    \ comments to explain each step. This is useful for newer or less experienced\
+    \ devops engineers who may be unfamiliar with the syntax and behavior of the individual\
+    \ commands used in the original command."
   name: checking_whether_the_terraform_cloud_workspace_is_in_a_locked_state
 - command: 'TERRAFORM_API_TOKEN_VALUE=$(cat $TERRAFORM_API_TOKEN) && curl --header
     "Authorization: Bearer $TERRAFORM_API_TOKEN_VALUE" --header "Content-Type: application/vnd.api+json"
     -s ''${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}'''
   doc_links: '
 
-    '
-  explanation: This command sets a variable TERRAFORM_API_TOKEN_VALUE to the value
-    of the TERRAFORM_API_TOKEN file, then uses curl to make a request to a specified
-    API URL with the token for authorization and specific content type.
-  multi_line_details: '# The following command is used to make a call to the Terraform
-    API using an API token for authentication
+    - [Variables in Terraform](https://www.terraform.io/docs/language/values/variables.html){:target="_blank"}
 
-    # First, we are assigning the value of the Terraform API token file to a variable
-    called TERRAFORM_API_TOKEN_VALUE
+    - [Terraform API documentation](https://www.terraform.io/docs/cloud/api/index.html){:target="_blank"}
 
-    TERRAFORM_API_TOKEN_VALUE=$(cat $TERRAFORM_API_TOKEN)
-
-
-    # Next, we use the curl command to make a request to the Terraform API
-
-    # We include the API token in the Authorization header and specify the Content-Type
-    as application/vnd.api+json
-
-    # We also include the variables for the organization name and workspace name in
-    the URL
-
-    curl --header "Authorization: Bearer $TERRAFORM_API_TOKEN_VALUE" --header "Content-Type:
-    application/vnd.api+json" -s ''${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}''
-
-    # Note that the variables within the URL are enclosed in curly braces and prefixed
-    with a dollar sign ($) to reference their values from the environment.'
+    - [Terraform workspaces](https://www.terraform.io/docs/language/state/workspaces.html){:target="_blank"}'
+  explanation: This command sets a variable `TERRAFORM_API_TOKEN_VALUE` using the
+    value from a file called `$TERRAFORM_API_TOKEN`, then makes a secure request to
+    the Terraform API using that token to fetch information about a specific workspace
+    within an organization.
+  multi_line_details: "\n# Read the contents of the TERRAFORM_API_TOKEN file and store\
+    \ it in the TERRAFORM_API_TOKEN_VALUE variable\nTERRAFORM_API_TOKEN_VALUE=$(cat\
+    \ $TERRAFORM_API_TOKEN) \n\n# Make a GET request to the Terraform API using curl,\
+    \ passing the authentication token in the header\ncurl \\\n--header \"Authorization:\
+    \ Bearer $TERRAFORM_API_TOKEN_VALUE\" \\ \n--header \"Content-Type: application/vnd.api+json\"\
+    \ \\\n-s '${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}'\n\
+    \n\nThis multi-line command breaks down the original one-liner and adds helpful\
+    \ comments to explain each step. This is useful for newer or less experienced\
+    \ devops engineers who may be unfamiliar with the syntax and behavior of the individual\
+    \ commands used in the original command."
   name: checking_whether_the_terraform_cloud_workspace_is_in_a_locked_state

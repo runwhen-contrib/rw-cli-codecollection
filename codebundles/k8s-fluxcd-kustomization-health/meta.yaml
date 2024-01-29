@@ -2,68 +2,48 @@ commands:
 - command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}
   doc_links: '
 
-    - [Namespaces in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+    - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [Kubernetes Context](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/){:target="_blank"}'
-  explanation: This command is used to retrieve information about a specific Kubernetes
-    resource within a specified namespace and context. The resource name, namespace,
-    and context are all specified using the respective placeholders.
-  multi_line_details: '
-
-    # Set the variables for resource name, namespace, and context
-
-    RESOURCE_NAME=pod
-
-    NAMESPACE=default
-
-    CONTEXT=cluster-1
+    - [Kubernetes Contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/){:target="_blank"}'
+  explanation: This command retrieves information about a specific Kubernetes resource
+    within a specific namespace and context. It is a way to access and view details
+    about the specified resource in a particular environment or cluster.
+  multi_line_details: '# First, let''s list all the resources in a specific namespace
+    within a context
 
 
-    # Use kubectl to get information about a specific resource in a specific namespace
-    and context
+    # Replace ${RESOURCE_NAME} with the name of the resource you want to retrieve,
+    such as pods, deployments, services, etc.
 
-    kubectl get $RESOURCE_NAME -n $NAMESPACE --context $CONTEXT
+    # Replace ${NAMESPACE} with the name of the namespace where the resource is located
+
+    # Replace ${CONTEXT} with the name of the Kubernetes context you want to use
 
 
-
-    In this multi-line command, we start by setting the variables for the resource
-    name, namespace, and context. Then, we use `kubectl` to get information about
-    a specific resource in a specific namespace and context using the values provided
-    for the variables. This breakdown can help newer or less experienced devops engineers
-    understand the components of the command and how it is being executed.'
+    kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}'
   name: list_all_available_kustomization_objects_in_namespace_namespace
 - command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}
   doc_links: '
 
-    - [Namespaces in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+    - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [Kubernetes Context](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/){:target="_blank"}'
-  explanation: This command is used to retrieve information about a specific Kubernetes
-    resource within a specified namespace and context. The resource name, namespace,
-    and context are all specified using the respective placeholders.
-  multi_line_details: '
-
-    # Set the variables for resource name, namespace, and context
-
-    RESOURCE_NAME=pod
-
-    NAMESPACE=default
-
-    CONTEXT=cluster-1
+    - [Kubernetes Contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/){:target="_blank"}'
+  explanation: This command retrieves information about a specific Kubernetes resource
+    within a specific namespace and context. It is a way to access and view details
+    about the specified resource in a particular environment or cluster.
+  multi_line_details: '# First, let''s list all the resources in a specific namespace
+    within a context
 
 
-    # Use kubectl to get information about a specific resource in a specific namespace
-    and context
+    # Replace ${RESOURCE_NAME} with the name of the resource you want to retrieve,
+    such as pods, deployments, services, etc.
 
-    kubectl get $RESOURCE_NAME -n $NAMESPACE --context $CONTEXT
+    # Replace ${NAMESPACE} with the name of the namespace where the resource is located
+
+    # Replace ${CONTEXT} with the name of the Kubernetes context you want to use
 
 
-
-    In this multi-line command, we start by setting the variables for the resource
-    name, namespace, and context. Then, we use `kubectl` to get information about
-    a specific resource in a specific namespace and context using the values provided
-    for the variables. This breakdown can help newer or less experienced devops engineers
-    understand the components of the command and how it is being executed.'
+    kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}'
   name: list_all_available_kustomization_objects_in_namespace_namespace
 - command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json
     | jq -r ''.items[] | select (.status.conditions[] | select(.type == "Ready" and
@@ -74,36 +54,24 @@ commands:
     \(.status)\n message: \(.message)")\n---\n"'''
   doc_links: '
 
-    - [Kubectl](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
-
-    - [Namespaces in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [Kubectl Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}
-
-    - [jq Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command uses kubectl to get information about a specific resource
-    in a particular namespace and context, then organizes the output using jq to show
-    the Ready and Reconcile status along with relevant details for better visualization.
-  multi_line_details: "\n# Define the variables for the resource name, namespace,\
-    \ and context\nRESOURCE_NAME=example-resource\nNAMESPACE=example-namespace\nCONTEXT=example-context\n\
-    \n# Use kubectl to get information about the specified resource in the specified\
-    \ namespace and context, output as json\nkubectl get ${RESOURCE_NAME} -n ${NAMESPACE}\
-    \ --context ${CONTEXT} -o json \\\n  # Pipe the output into jq to filter and format\
-    \ the JSON data\n  | jq -r '.items[] | select (.status.conditions[] | select(.type\
-    \ == \"Ready\" and .status == \"False\")) \n    # Print a separator line and the\
-    \ metadata name of the resource\n    | \"---\\nKustomization Name: \\(.metadata.name)\\\
-    n\\nReady Status: \n      # Select and format the status information for the \"\
-    Ready\" condition\n      \\(.status.conditions[] | select(.type == \"Ready\")\
-    \ \n      | \"\\n ready: \\(.status)\\n message: \\(.message)\\n reason: \\(.reason)\\\
-    n last_transition_time: \\(.lastTransitionTime)\")\n    # Print the reconcile\
-    \ status information for the \"Reconciling\" condition\n    \\n\\nReconcile Status:\\\
-    (.status.conditions[] | select(.type == \"Reconciling\") \n      |\"\\n reconciling:\
-    \ \\(.status)\\n message: \\(.message)\")\\n---\\n\"'\n\nThis multi-line command\
-    \ breaks down the original command and provides helpful comments for each part\
-    \ of the command. It explains how the variables are defined, how kubectl is used\
-    \ to get the resource information, and how jq is used to filter and format the\
-    \ output. This can help newer or less experienced devops engineers understand\
-    \ the purpose and functionality of each part of the command."
+    '
+  explanation: This command retrieves a specific resource within a particular namespace
+    and context, then uses jq to format the output in a specific way, showing the
+    status of readiness and reconciliation for that resource.
+  multi_line_details: "\n# Store the resource name, namespace, and context in variables\
+    \ for easier management\nRESOURCE_NAME=\"your_resource_name\"\nNAMESPACE=\"your_namespace\"\
+    \nCONTEXT=\"your_context\"\n\n# Use kubectl to get the resource in JSON format\
+    \ and pipe the output to jq for filtering and formatting\nkubectl get ${RESOURCE_NAME}\
+    \ -n ${NAMESPACE} --context ${CONTEXT} -o json | \n\n# Use jq to filter and format\
+    \ the JSON data to display only the relevant information\njq -r '.items[] | select\
+    \ (.status.conditions[] | select(.type == \"Ready\" and .status == \"False\"))\
+    \ | \n    \"---\\nKustomization Name: \\(.metadata.name)\\n\\n\n    Ready Status:\
+    \ \\(.status.conditions[] | select(.type == \"Ready\") | \"\\n ready: \\(.status)\\\
+    n message: \\(.message)\\n reason: \\(.reason)\\n last_transition_time: \\(.lastTransitionTime)\"\
+    )\\n\n    Reconcile Status:\\(.status.conditions[] | select(.type == \"Reconciling\"\
+    ) |\"\\n reconciling: \\(.status)\\n message: \\(.message)\")\\n---\\n\"'\n\n\
+    This multi-line command breaks down the original one-liner and adds comments to\
+    \ explain each step. It also uses variables for easier modification and readability."
   name: get_details_for_unready_kustomizations_in_namespace_namespace
 - command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json
     | jq -r ''.items[] | select (.status.conditions[] | select(.type == "Ready" and
@@ -114,34 +82,22 @@ commands:
     \(.status)\n message: \(.message)")\n---\n"'''
   doc_links: '
 
-    - [Kubectl](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
-
-    - [Namespaces in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [Kubectl Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}
-
-    - [jq Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command uses kubectl to get information about a specific resource
-    in a particular namespace and context, then organizes the output using jq to show
-    the Ready and Reconcile status along with relevant details for better visualization.
-  multi_line_details: "\n# Define the variables for the resource name, namespace,\
-    \ and context\nRESOURCE_NAME=example-resource\nNAMESPACE=example-namespace\nCONTEXT=example-context\n\
-    \n# Use kubectl to get information about the specified resource in the specified\
-    \ namespace and context, output as json\nkubectl get ${RESOURCE_NAME} -n ${NAMESPACE}\
-    \ --context ${CONTEXT} -o json \\\n  # Pipe the output into jq to filter and format\
-    \ the JSON data\n  | jq -r '.items[] | select (.status.conditions[] | select(.type\
-    \ == \"Ready\" and .status == \"False\")) \n    # Print a separator line and the\
-    \ metadata name of the resource\n    | \"---\\nKustomization Name: \\(.metadata.name)\\\
-    n\\nReady Status: \n      # Select and format the status information for the \"\
-    Ready\" condition\n      \\(.status.conditions[] | select(.type == \"Ready\")\
-    \ \n      | \"\\n ready: \\(.status)\\n message: \\(.message)\\n reason: \\(.reason)\\\
-    n last_transition_time: \\(.lastTransitionTime)\")\n    # Print the reconcile\
-    \ status information for the \"Reconciling\" condition\n    \\n\\nReconcile Status:\\\
-    (.status.conditions[] | select(.type == \"Reconciling\") \n      |\"\\n reconciling:\
-    \ \\(.status)\\n message: \\(.message)\")\\n---\\n\"'\n\nThis multi-line command\
-    \ breaks down the original command and provides helpful comments for each part\
-    \ of the command. It explains how the variables are defined, how kubectl is used\
-    \ to get the resource information, and how jq is used to filter and format the\
-    \ output. This can help newer or less experienced devops engineers understand\
-    \ the purpose and functionality of each part of the command."
+    '
+  explanation: This command retrieves a specific resource within a particular namespace
+    and context, then uses jq to format the output in a specific way, showing the
+    status of readiness and reconciliation for that resource.
+  multi_line_details: "\n# Store the resource name, namespace, and context in variables\
+    \ for easier management\nRESOURCE_NAME=\"your_resource_name\"\nNAMESPACE=\"your_namespace\"\
+    \nCONTEXT=\"your_context\"\n\n# Use kubectl to get the resource in JSON format\
+    \ and pipe the output to jq for filtering and formatting\nkubectl get ${RESOURCE_NAME}\
+    \ -n ${NAMESPACE} --context ${CONTEXT} -o json | \n\n# Use jq to filter and format\
+    \ the JSON data to display only the relevant information\njq -r '.items[] | select\
+    \ (.status.conditions[] | select(.type == \"Ready\" and .status == \"False\"))\
+    \ | \n    \"---\\nKustomization Name: \\(.metadata.name)\\n\\n\n    Ready Status:\
+    \ \\(.status.conditions[] | select(.type == \"Ready\") | \"\\n ready: \\(.status)\\\
+    n message: \\(.message)\\n reason: \\(.reason)\\n last_transition_time: \\(.lastTransitionTime)\"\
+    )\\n\n    Reconcile Status:\\(.status.conditions[] | select(.type == \"Reconciling\"\
+    ) |\"\\n reconciling: \\(.status)\\n message: \\(.message)\")\\n---\\n\"'\n\n\
+    This multi-line command breaks down the original one-liner and adds comments to\
+    \ explain each step. It also uses variables for easier modification and readability."
   name: get_details_for_unready_kustomizations_in_namespace_namespace

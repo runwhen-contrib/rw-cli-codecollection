@@ -4,42 +4,94 @@ commands:
     + ", Last Started Times:" + (.status.containerStatuses[].state.running.startedAt|tostring)]'''
   doc_links: '
 
-    - [kubectl Command Documentation](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+    - [kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
-    - [kubectl get Command Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+    - [kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
 
-    - [jq Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command uses kubectl to get a list of running pods in a specific
-    namespace and outputs their container images and last started times in JSON format
-    using the jq tool. The --context flag specifies which Kubernetes cluster context
-    to use, and the --field-selector flag filters the pods by their running status.
-  multi_line_details: "\n# Retrieve the information about running pods in a specific\
-    \ Kubernetes context and namespace\nkubectl get pods --context=${CONTEXT} -n ${NAMESPACE}\
-    \ --field-selector=status.phase==Running -o json \\\n  # Use \"jq\" to process\
-    \ the output and extract relevant information in a readable format\n  | jq -r\
-    \ '[.items[] | \"Images: \" + (.spec.containers[].image|tostring) + \", Last Started\
-    \ Times:\" + (.status.containerStatuses[].state.running.startedAt|tostring)]'\n"
+    - [kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+
+    - [jq Manual](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command uses kubectl to retrieve information about running pods
+    within a specific context and namespace, filtering for those in the "Running"
+    state. It then formats the output in JSON using jq to display each pod's container
+    image and last start time.
+  multi_line_details: '
+
+    # This command retrieves information about running pods in a specific context
+    and namespace, then formats the output using jq to display container images and
+    their last start times.
+
+
+    # Set the context and namespace variables for the kubectl command
+
+    CONTEXT=my-context
+
+    NAMESPACE=my-namespace
+
+
+    # Get the pods in the specified context and namespace that are in the Running
+    state and output the results as JSON
+
+    kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Running
+    -o json | \
+
+
+    # Use jq to format the JSON output into a readable format including container
+    images and their last start times
+
+    jq -r ''[.items[] | "Images: " + (.spec.containers[].image|tostring) + ", Last
+    Started Times:" + \
+
+    (.status.containerStatuses[].state.running.startedAt|tostring)]''
+
+    '
   name: check_image_rollover_times_for_namespace_namespace
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Running
     -o json | jq -r ''[.items[] | "Images: " + (.spec.containers[].image|tostring)
     + ", Last Started Times:" + (.status.containerStatuses[].state.running.startedAt|tostring)]'''
   doc_links: '
 
-    - [kubectl Command Documentation](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+    - [kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
-    - [kubectl get Command Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+    - [kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
 
-    - [jq Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command uses kubectl to get a list of running pods in a specific
-    namespace and outputs their container images and last started times in JSON format
-    using the jq tool. The --context flag specifies which Kubernetes cluster context
-    to use, and the --field-selector flag filters the pods by their running status.
-  multi_line_details: "\n# Retrieve the information about running pods in a specific\
-    \ Kubernetes context and namespace\nkubectl get pods --context=${CONTEXT} -n ${NAMESPACE}\
-    \ --field-selector=status.phase==Running -o json \\\n  # Use \"jq\" to process\
-    \ the output and extract relevant information in a readable format\n  | jq -r\
-    \ '[.items[] | \"Images: \" + (.spec.containers[].image|tostring) + \", Last Started\
-    \ Times:\" + (.status.containerStatuses[].state.running.startedAt|tostring)]'\n"
+    - [kubectl get](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+
+    - [jq Manual](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command uses kubectl to retrieve information about running pods
+    within a specific context and namespace, filtering for those in the "Running"
+    state. It then formats the output in JSON using jq to display each pod's container
+    image and last start time.
+  multi_line_details: '
+
+    # This command retrieves information about running pods in a specific context
+    and namespace, then formats the output using jq to display container images and
+    their last start times.
+
+
+    # Set the context and namespace variables for the kubectl command
+
+    CONTEXT=my-context
+
+    NAMESPACE=my-namespace
+
+
+    # Get the pods in the specified context and namespace that are in the Running
+    state and output the results as JSON
+
+    kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Running
+    -o json | \
+
+
+    # Use jq to format the JSON output into a readable format including container
+    images and their last start times
+
+    jq -r ''[.items[] | "Images: " + (.spec.containers[].image|tostring) + ", Last
+    Started Times:" + \
+
+    (.status.containerStatuses[].state.running.startedAt|tostring)]''
+
+    '
   name: check_image_rollover_times_for_namespace_namespace
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Running
     -o=json | jq -r ''.items[] | "---", "pod_name: " + .metadata.name, "Status: "
@@ -48,23 +100,27 @@ commands:
     "---"'''
   doc_links: '
 
-    - [Kubernetes API Overview](https://kubernetes.io/docs/concepts/overview/kubernetes-api/){:target="_blank"}
+    - [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
-    - [Kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
+    - [JSON output format in kubectl](https://kubernetes.io/docs/reference/kubectl/cheatsheet/#output-format){:target="_blank"}
 
-    - [jq Manual (GitHub)](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command retrieves information about running pods in a specific
-    namespace from a Kubernetes cluster and formats the output in JSON with details
-    such as pod name, status, and container information using jq to process the JSON
-    data.
-  multi_line_details: "\n# Retrieve the pods from a specific context and namespace\n\
-    kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Running\
-    \ -o=json | \n\n# Process the output with jq and format it for easier understanding\n\
-    jq -r '.items[] | \n    \"---\", \n    \"pod_name: \" + .metadata.name, \n   \
-    \ \"Status: \" + .status.phase, \n    \"containers:\", \n    (.spec.containers[]\
-    \ | \n        \"- container_name: \" + .name, \n        \" \\ image_path: \" +\
-    \ (.image | split(\":\")[0]), \n        \" \\ image_tag: \" + (.image | split(\"\
-    :\")[1])\n    ), \n    \"---\"'\n"
+    - [jq documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command uses kubectl to retrieve information about running pods
+    in a specific context and namespace, then formats the output using JSON and jq
+    to display the pod name, status, and container details.
+  multi_line_details: "\n# Set the kubectl context to the value of the environment\
+    \ variable ${CONTEXT}\n# Set the namespace for the kubectl command using the value\
+    \ of the environment variable ${NAMESPACE}\nkubectl get pods --context=${CONTEXT}\
+    \ -n ${NAMESPACE} \\\n  --field-selector=status.phase==Running -o=json | \\\n\
+    \  # Use jq to parse the JSON output and format it in a human-readable way\n \
+    \ jq -r '.items[] | \n    \"---\", \n    \"pod_name: \" + .metadata.name, \n \
+    \   \"Status: \" + .status.phase, \n    \"containers:\", \n    (.spec.containers[]\
+    \ | \n      \"- container_name: \" + .name, \n     \" \\ image_path: \" + (.image\
+    \ | split(\":\")[0]), \n     \" \\ image_tag: \" + (.image | split(\":\")[1])\n\
+    \    ), \n   \"---\"'\n\nIn this multi-line command, we've added comments to explain\
+    \ each part of the command for those who may be new or less experienced with using\
+    \ kubectl and jq. This should make it easier for them to understand what the command\
+    \ is doing."
   name: list_images_and_tags_for_every_container_in_running_pods_for_namespace_namespace
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Running
     -o=json | jq -r ''.items[] | "---", "pod_name: " + .metadata.name, "Status: "
@@ -73,23 +129,27 @@ commands:
     "---"'''
   doc_links: '
 
-    - [Kubernetes API Overview](https://kubernetes.io/docs/concepts/overview/kubernetes-api/){:target="_blank"}
+    - [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
-    - [Kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
+    - [JSON output format in kubectl](https://kubernetes.io/docs/reference/kubectl/cheatsheet/#output-format){:target="_blank"}
 
-    - [jq Manual (GitHub)](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command retrieves information about running pods in a specific
-    namespace from a Kubernetes cluster and formats the output in JSON with details
-    such as pod name, status, and container information using jq to process the JSON
-    data.
-  multi_line_details: "\n# Retrieve the pods from a specific context and namespace\n\
-    kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Running\
-    \ -o=json | \n\n# Process the output with jq and format it for easier understanding\n\
-    jq -r '.items[] | \n    \"---\", \n    \"pod_name: \" + .metadata.name, \n   \
-    \ \"Status: \" + .status.phase, \n    \"containers:\", \n    (.spec.containers[]\
-    \ | \n        \"- container_name: \" + .name, \n        \" \\ image_path: \" +\
-    \ (.image | split(\":\")[0]), \n        \" \\ image_tag: \" + (.image | split(\"\
-    :\")[1])\n    ), \n    \"---\"'\n"
+    - [jq documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command uses kubectl to retrieve information about running pods
+    in a specific context and namespace, then formats the output using JSON and jq
+    to display the pod name, status, and container details.
+  multi_line_details: "\n# Set the kubectl context to the value of the environment\
+    \ variable ${CONTEXT}\n# Set the namespace for the kubectl command using the value\
+    \ of the environment variable ${NAMESPACE}\nkubectl get pods --context=${CONTEXT}\
+    \ -n ${NAMESPACE} \\\n  --field-selector=status.phase==Running -o=json | \\\n\
+    \  # Use jq to parse the JSON output and format it in a human-readable way\n \
+    \ jq -r '.items[] | \n    \"---\", \n    \"pod_name: \" + .metadata.name, \n \
+    \   \"Status: \" + .status.phase, \n    \"containers:\", \n    (.spec.containers[]\
+    \ | \n      \"- container_name: \" + .name, \n     \" \\ image_path: \" + (.image\
+    \ | split(\":\")[0]), \n     \" \\ image_tag: \" + (.image | split(\":\")[1])\n\
+    \    ), \n   \"---\"'\n\nIn this multi-line command, we've added comments to explain\
+    \ each part of the command for those who may be new or less experienced with using\
+    \ kubectl and jq. This should make it easier for them to understand what the command\
+    \ is doing."
   name: list_images_and_tags_for_every_container_in_running_pods_for_namespace_namespace
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Failed
     -o=json | jq -r ''.items[] | "---", "pod_name: " + .metadata.name, "Status: "
@@ -98,22 +158,24 @@ commands:
     "---"'''
   doc_links: '
 
-    - [Kubectl](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+    - [Retrieve information about pods in a specific namespace](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
-    - [Pods](https://kubernetes.io/docs/concepts/workloads/pods/){:target="_blank"}
+    - [Filter pods that have failed status](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase){:target="_blank"}
 
-    - [jq tool](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command is used to retrieve information about pods that have failed
-    in a specific namespace and print out their names, status, and container details.
-    The output will be displayed in JSON format using the jq tool.
-  multi_line_details: "\n# Use kubectl command to get pods with status.phase Failed\
-    \ in the specified context and namespace\n# Then use jq tool to format the output\
-    \ with specific details\n\nkubectl get pods --context=${CONTEXT} -n ${NAMESPACE}\
-    \ --field-selector=status.phase==Failed -o=json | \\\n  jq -r '.items[] | \n \
-    \ \"---\", \n  \"pod_name: \" + .metadata.name, \n  \"Status: \" + .status.phase,\
-    \ \n  \"containers:\",\n  (.spec.containers[] | \n    \"- container_name: \" +\
-    \ .name, \n    \" \\ image_path: \" + \\(.image | split(\":\")[0]), \n    \" \\\
-    \ image_tag: \" + (.image | split(\":\")[1])), \n  \"---\"'\n"
+    - [Format and output information in JSON format using jq](https://stedolan.github.io/jq/){:target="_blank"}'
+  explanation: This command retrieves information about specific pods in a particular
+    namespace that have failed, and then formats and outputs the information in JSON
+    format using the jq tool.
+  multi_line_details: "\n# Get pods from a specific context and namespace that have\
+    \ failed\nkubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Failed\
+    \ -o=json \\\n  # Use jq to parse the JSON output and format it for easy reading\n\
+    \  | jq -r '.items[] | \"---\", \"pod_name: \" + .metadata.name, \"Status: \"\
+    \ + .status.phase, \"containers:\", (.spec.containers[] | \n  \"- container_name:\
+    \ \" + .name, \n  \" \\ image_path: \" + \\(.image | split(\":\")[0]), \n  \"\
+    \ \\ image_tag: \" + (.image | split(\":\")[1])), \"---\"'\n\n\nThis multi-line\
+    \ command breaks down each step of the original command with helpful comments\
+    \ for better understanding. It also maintains the same functionality while making\
+    \ it easier to read and comprehend for new or less experienced devops engineers."
   name: list_images_and_tags_for_every_container_in_failed_pods_for_namespace_namespace
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Failed
     -o=json | jq -r ''.items[] | "---", "pod_name: " + .metadata.name, "Status: "
@@ -122,22 +184,24 @@ commands:
     "---"'''
   doc_links: '
 
-    - [Kubectl](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+    - [Retrieve information about pods in a specific namespace](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
-    - [Pods](https://kubernetes.io/docs/concepts/workloads/pods/){:target="_blank"}
+    - [Filter pods that have failed status](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase){:target="_blank"}
 
-    - [jq tool](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command is used to retrieve information about pods that have failed
-    in a specific namespace and print out their names, status, and container details.
-    The output will be displayed in JSON format using the jq tool.
-  multi_line_details: "\n# Use kubectl command to get pods with status.phase Failed\
-    \ in the specified context and namespace\n# Then use jq tool to format the output\
-    \ with specific details\n\nkubectl get pods --context=${CONTEXT} -n ${NAMESPACE}\
-    \ --field-selector=status.phase==Failed -o=json | \\\n  jq -r '.items[] | \n \
-    \ \"---\", \n  \"pod_name: \" + .metadata.name, \n  \"Status: \" + .status.phase,\
-    \ \n  \"containers:\",\n  (.spec.containers[] | \n    \"- container_name: \" +\
-    \ .name, \n    \" \\ image_path: \" + \\(.image | split(\":\")[0]), \n    \" \\\
-    \ image_tag: \" + (.image | split(\":\")[1])), \n  \"---\"'\n"
+    - [Format and output information in JSON format using jq](https://stedolan.github.io/jq/){:target="_blank"}'
+  explanation: This command retrieves information about specific pods in a particular
+    namespace that have failed, and then formats and outputs the information in JSON
+    format using the jq tool.
+  multi_line_details: "\n# Get pods from a specific context and namespace that have\
+    \ failed\nkubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Failed\
+    \ -o=json \\\n  # Use jq to parse the JSON output and format it for easy reading\n\
+    \  | jq -r '.items[] | \"---\", \"pod_name: \" + .metadata.name, \"Status: \"\
+    \ + .status.phase, \"containers:\", (.spec.containers[] | \n  \"- container_name:\
+    \ \" + .name, \n  \" \\ image_path: \" + \\(.image | split(\":\")[0]), \n  \"\
+    \ \\ image_tag: \" + (.image | split(\":\")[1])), \"---\"'\n\n\nThis multi-line\
+    \ command breaks down each step of the original command with helpful comments\
+    \ for better understanding. It also maintains the same functionality while making\
+    \ it easier to read and comprehend for new or less experienced devops engineers."
   name: list_images_and_tags_for_every_container_in_failed_pods_for_namespace_namespace
 - command: 'NAMESPACE=${NAMESPACE}; POD_NAME="skopeo-pod"; CONTEXT="${CONTEXT}"; events=$(kubectl
     get events -n $NAMESPACE --context=$CONTEXT -o json | jq --arg timestamp "$(date
@@ -167,48 +231,55 @@ commands:
     echo "Done"'
   doc_links: '
 
-    - [Image Pull Backoff Events in Kubernetes](https://kubernetes.io/docs/reference/kubectl/cheatsheet/#kubectl-debugging-and-troubleshooting){:target="_blank"}'
-  explanation: This command is designed to automate the process of checking for image
-    pull backoff events in Kubernetes and then running a Skopeo pod to inspect and
-    test the availability of the container images. If any issues are detected, it
-    will provide information on the tags that exist or do not exist for those container
-    images.
-  multi_line_details: "\n# Set up the required environment variables\nNAMESPACE=${NAMESPACE};\
-    \ \nPOD_NAME=\"skopeo-pod\"; \nCONTEXT=\"${CONTEXT}\"; \n\n# Fetch events from\
-    \ the Kubernetes cluster and filter them by the last 5 minutes\nevents=$(kubectl\
-    \ get events -n $NAMESPACE --context=$CONTEXT -o json | jq --arg timestamp \"\
-    $(date -u -v -5M +\"%Y-%m-%dT%H:%M:%SZ\" 2>/dev/null || date -u -d \"-5 minutes\"\
-    \ +\"%Y-%m-%dT%H:%M:%SZ\")\" '.items[] | select(.lastTimestamp > $timestamp)');\
-    \ \n\n# Check if any events were fetched; if not, exit\nif [[ ! -z \"\\${events-unset}\"\
-    \ ]]; then \n    image_pull_backoff_events=$(echo \"$events\" | jq -s '[.[] |\
-    \ select(.reason == \"BackOff\") | .message] | .[]'); \nelse \n    echo \"No events\
-    \ found in the last 5 minutes\"; \n    exit; \nfi; \n\n# Check if \"Back-off pulling\
-    \ image\" event exists, if doesn't, exit\nif [[ $image_pull_backoff_events =~\
-    \ \"Back-off pulling image\" ]]; then \n    echo \"Running Skopeo Pod\"; \n  \
-    \  \n    # Run Skopeo pod to check the availability of container images\n    kubectl\
-    \ run $POD_NAME --restart=Never -n $NAMESPACE --context=$CONTEXT --image=quay.io/containers/skopeo:latest\
-    \ --command -- sleep infinity && \n    \n    # Wait for the pod to be running\n\
-    \    echo \"Waiting for the $POD_NAME to be running...\" && \n    kubectl wait\
-    \ --for=condition=Ready pod/$POD_NAME -n $NAMESPACE --context=$CONTEXT;\nelse\
-    \ \n    echo \"No image pull backoff events found\"; \n    exit; \nfi; \n\n# Process\
-    \ each BackOff event to check for the availability of container images\nwhile\
-    \ IFS= read -r event; do \n    echo \"Found BackOff with message: $event\";\n\
-    \    \n    # Extract image path and tag from the event\n    container_image_path_tag=$(echo\
-    \ \"$event\" | cut -d' ' -f4 | tr -d '\"' | tr -d '\\'); \n    container_image_path=\"\
-    \\${container_image_path_tag%:*}\"; \n    container_image_tag=\"\\${container_image_path_tag#*:}\"\
-    ; \n    if [ -z \"$container_image_path\" ] || [ -z \"$container_image_tag\" ];\
-    \ then \n        continue; \n    fi; \n    \n    # Use Skopeo to inspect the image\
-    \ and display available tags\n    skopeo_output=$(kubectl exec $POD_NAME -n $NAMESPACE\
-    \ --context=$CONTEXT -- skopeo inspect docker://$container_image_path:$container_image_tag);\
-    \ \n    skopeo_exit_code=$?; \n    if [ $skopeo_exit_code -eq 0 ]; then \n   \
-    \     echo \"Container image '$container_image_path:$container_image_tag' exists.\"\
-    ; \n    else \n        echo \"Container image '$container_image_path:$container_image_tag'\
-    \ does not exist.\"; \n        echo \"Available tags for '$container_image_path':\"\
-    ; \n        available_tags=$(kubectl exec $POD_NAME -n $NAMESPACE --context=$CONTEXT\
-    \ -- skopeo list-tags docker://$container_image_path ); \n        echo \"$available_tags\"\
-    ; \n    fi; \ndone <<<\"$image_pull_backoff_events\"; \n\n# Clean up the Skopeo\
-    \ pod after completion\necho \"Deleting Skopeo pod\" && \nkubectl delete pod $POD_NAME\
-    \ -n $NAMESPACE --context=$CONTEXT && \necho \"Done\"\n"
+    - [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+
+    - [namespace and context in kubernetes](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}
+
+    - [Shell scripting documentation](https://www.tutorialspoint.com/unix/unix-shell-functions.htm){:target="_blank"}
+
+    - [Skopeo tool documentation](https://github.com/containers/skopeo){:target="_blank"}'
+  explanation: This command is a shell script that uses kubectl to gather information
+    about recent events in a specific namespace and context. It then evaluates whether
+    there have been any "BackOff" events related to pulling container images, and
+    if so, it deploys a new pod using the Skopeo tool to inspect the problematic container
+    image and its available tags. If the image exists, it prints a message, otherwise
+    it lists available tags and finally deletes the Skopeo pod.
+  multi_line_details: "\n# Set the NAMESPACE variable to the environment variable\
+    \ of the same name\nNAMESPACE=${NAMESPACE}\n\n# Set the POD_NAME variable to \"\
+    skopeo-pod\"\nPOD_NAME=\"skopeo-pod\"\n\n# Set the CONTEXT variable to the environment\
+    \ variable of the same name\nCONTEXT=\"${CONTEXT}\"\n\n# Get the events from the\
+    \ Kubernetes cluster and filter them based on timestamp\nevents=$(kubectl get\
+    \ events -n $NAMESPACE --context=$CONTEXT -o json | jq --arg timestamp \"$(date\
+    \ -u -v -5M +\"%Y-%m-%dT%H:%M:%SZ\" 2>/dev/null || date -u -d \"-5 minutes\" +\"\
+    %Y-%m-%dT%H:%M:%SZ\")\" '.items[] | select(.lastTimestamp > $timestamp)')\n\n\
+    # If there are no events available, exit with a message\nif [[ ! -z \"${events-unset}\"\
+    \ ]]; then\n  image_pull_backoff_events=$(echo \"$events\" | jq -s '[.[] | select(.reason\
+    \ == \"BackOff\") | .message] | .[]')\nelse\n  echo \"No events found in the last\
+    \ 5 minutes\"\n  exit\nfi\n\n# Check if the image pull backoff event contains\
+    \ the specific message\nif [[ $image_pull_backoff_events =~ \"Back-off pulling\
+    \ image\" ]]; then\n  # Run Skopeo Pod with the specified configuration\n  echo\
+    \ \"Running Skopeo Pod\"\n  kubectl run $POD_NAME --restart=Never -n $NAMESPACE\
+    \ --context=$CONTEXT --image=quay.io/containers/skopeo:latest --command -- sleep\
+    \ infinity && echo \"Waiting for the $POD_NAME to be running...\" && kubectl wait\
+    \ --for=condition=Ready pod/$POD_NAME -n $NAMESPACE --context=$CONTEXT\nelse\n\
+    \  echo \"No image pull backoff events found\"\n  exit\nfi\n\n# Process each image\
+    \ pull backoff event by checking for its availability and retrieving available\
+    \ tags using Skopeo\nwhile IFS= read -r event; do\n  echo \"Found BackOff with\
+    \ message: $event\"\n  echo \"Checking if we can reach the image with skopeo and\
+    \ what tags exist\"\n  container_image_path_tag=$(echo \"$event\" | cut -d' '\
+    \ -f4 | tr -d '\"' | tr -d '\\')\n  container_image_path=\"${container_image_path_tag%:*}\"\
+    \n  container_image_tag=\"${container_image_path_tag#*:}\"\n  if [ -z \"$container_image_path\"\
+    \ ] || [ -z \"$container_image_tag\" ]; then\n    continue\n  fi\n  skopeo_output=$(kubectl\
+    \ exec $POD_NAME -n $NAMESPACE --context=$CONTEXT -- skopeo inspect docker://$container_image_path:$container_image_tag)\n\
+    \  skopeo_exit_code=$?\n  if [ $skopeo_exit_code -eq 0 ]; then\n    echo \"Container\
+    \ image '$container_image_path:$container_image_tag' exists.\"\n  else\n    echo\
+    \ \"Container image '$container_image_path:$container_image_tag' does not exist.\"\
+    \n    echo \"Available tags for '$container_image_path':\"\n    available_tags=$(kubectl\
+    \ exec $POD_NAME -n $NAMESPACE --context=$CONTEXT -- skopeo list-tags docker://$container_image_path\
+    \ )\n    echo \"$available_tags\"\n  fi\ndone <<<\"$image_pull_backoff_events\"\
+    \n\n# Delete the Skopeo pod after processing all events\necho \"Deleting Skopeo\
+    \ pod\"\nkubectl delete pod $POD_NAME -n $NAMESPACE --context=$CONTEXT\necho \"\
+    Done\"\n"
   name: list_imagepullbackoff_events_and_test_path_and_tags_for_namespace_namespace
 - command: 'NAMESPACE=${NAMESPACE}; POD_NAME="skopeo-pod"; CONTEXT="${CONTEXT}"; events=$(kubectl
     get events -n $NAMESPACE --context=$CONTEXT -o json | jq --arg timestamp "$(date
@@ -238,46 +309,53 @@ commands:
     echo "Done"'
   doc_links: '
 
-    - [Image Pull Backoff Events in Kubernetes](https://kubernetes.io/docs/reference/kubectl/cheatsheet/#kubectl-debugging-and-troubleshooting){:target="_blank"}'
-  explanation: This command is designed to automate the process of checking for image
-    pull backoff events in Kubernetes and then running a Skopeo pod to inspect and
-    test the availability of the container images. If any issues are detected, it
-    will provide information on the tags that exist or do not exist for those container
-    images.
-  multi_line_details: "\n# Set up the required environment variables\nNAMESPACE=${NAMESPACE};\
-    \ \nPOD_NAME=\"skopeo-pod\"; \nCONTEXT=\"${CONTEXT}\"; \n\n# Fetch events from\
-    \ the Kubernetes cluster and filter them by the last 5 minutes\nevents=$(kubectl\
-    \ get events -n $NAMESPACE --context=$CONTEXT -o json | jq --arg timestamp \"\
-    $(date -u -v -5M +\"%Y-%m-%dT%H:%M:%SZ\" 2>/dev/null || date -u -d \"-5 minutes\"\
-    \ +\"%Y-%m-%dT%H:%M:%SZ\")\" '.items[] | select(.lastTimestamp > $timestamp)');\
-    \ \n\n# Check if any events were fetched; if not, exit\nif [[ ! -z \"\\${events-unset}\"\
-    \ ]]; then \n    image_pull_backoff_events=$(echo \"$events\" | jq -s '[.[] |\
-    \ select(.reason == \"BackOff\") | .message] | .[]'); \nelse \n    echo \"No events\
-    \ found in the last 5 minutes\"; \n    exit; \nfi; \n\n# Check if \"Back-off pulling\
-    \ image\" event exists, if doesn't, exit\nif [[ $image_pull_backoff_events =~\
-    \ \"Back-off pulling image\" ]]; then \n    echo \"Running Skopeo Pod\"; \n  \
-    \  \n    # Run Skopeo pod to check the availability of container images\n    kubectl\
-    \ run $POD_NAME --restart=Never -n $NAMESPACE --context=$CONTEXT --image=quay.io/containers/skopeo:latest\
-    \ --command -- sleep infinity && \n    \n    # Wait for the pod to be running\n\
-    \    echo \"Waiting for the $POD_NAME to be running...\" && \n    kubectl wait\
-    \ --for=condition=Ready pod/$POD_NAME -n $NAMESPACE --context=$CONTEXT;\nelse\
-    \ \n    echo \"No image pull backoff events found\"; \n    exit; \nfi; \n\n# Process\
-    \ each BackOff event to check for the availability of container images\nwhile\
-    \ IFS= read -r event; do \n    echo \"Found BackOff with message: $event\";\n\
-    \    \n    # Extract image path and tag from the event\n    container_image_path_tag=$(echo\
-    \ \"$event\" | cut -d' ' -f4 | tr -d '\"' | tr -d '\\'); \n    container_image_path=\"\
-    \\${container_image_path_tag%:*}\"; \n    container_image_tag=\"\\${container_image_path_tag#*:}\"\
-    ; \n    if [ -z \"$container_image_path\" ] || [ -z \"$container_image_tag\" ];\
-    \ then \n        continue; \n    fi; \n    \n    # Use Skopeo to inspect the image\
-    \ and display available tags\n    skopeo_output=$(kubectl exec $POD_NAME -n $NAMESPACE\
-    \ --context=$CONTEXT -- skopeo inspect docker://$container_image_path:$container_image_tag);\
-    \ \n    skopeo_exit_code=$?; \n    if [ $skopeo_exit_code -eq 0 ]; then \n   \
-    \     echo \"Container image '$container_image_path:$container_image_tag' exists.\"\
-    ; \n    else \n        echo \"Container image '$container_image_path:$container_image_tag'\
-    \ does not exist.\"; \n        echo \"Available tags for '$container_image_path':\"\
-    ; \n        available_tags=$(kubectl exec $POD_NAME -n $NAMESPACE --context=$CONTEXT\
-    \ -- skopeo list-tags docker://$container_image_path ); \n        echo \"$available_tags\"\
-    ; \n    fi; \ndone <<<\"$image_pull_backoff_events\"; \n\n# Clean up the Skopeo\
-    \ pod after completion\necho \"Deleting Skopeo pod\" && \nkubectl delete pod $POD_NAME\
-    \ -n $NAMESPACE --context=$CONTEXT && \necho \"Done\"\n"
+    - [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+
+    - [namespace and context in kubernetes](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}
+
+    - [Shell scripting documentation](https://www.tutorialspoint.com/unix/unix-shell-functions.htm){:target="_blank"}
+
+    - [Skopeo tool documentation](https://github.com/containers/skopeo){:target="_blank"}'
+  explanation: This command is a shell script that uses kubectl to gather information
+    about recent events in a specific namespace and context. It then evaluates whether
+    there have been any "BackOff" events related to pulling container images, and
+    if so, it deploys a new pod using the Skopeo tool to inspect the problematic container
+    image and its available tags. If the image exists, it prints a message, otherwise
+    it lists available tags and finally deletes the Skopeo pod.
+  multi_line_details: "\n# Set the NAMESPACE variable to the environment variable\
+    \ of the same name\nNAMESPACE=${NAMESPACE}\n\n# Set the POD_NAME variable to \"\
+    skopeo-pod\"\nPOD_NAME=\"skopeo-pod\"\n\n# Set the CONTEXT variable to the environment\
+    \ variable of the same name\nCONTEXT=\"${CONTEXT}\"\n\n# Get the events from the\
+    \ Kubernetes cluster and filter them based on timestamp\nevents=$(kubectl get\
+    \ events -n $NAMESPACE --context=$CONTEXT -o json | jq --arg timestamp \"$(date\
+    \ -u -v -5M +\"%Y-%m-%dT%H:%M:%SZ\" 2>/dev/null || date -u -d \"-5 minutes\" +\"\
+    %Y-%m-%dT%H:%M:%SZ\")\" '.items[] | select(.lastTimestamp > $timestamp)')\n\n\
+    # If there are no events available, exit with a message\nif [[ ! -z \"${events-unset}\"\
+    \ ]]; then\n  image_pull_backoff_events=$(echo \"$events\" | jq -s '[.[] | select(.reason\
+    \ == \"BackOff\") | .message] | .[]')\nelse\n  echo \"No events found in the last\
+    \ 5 minutes\"\n  exit\nfi\n\n# Check if the image pull backoff event contains\
+    \ the specific message\nif [[ $image_pull_backoff_events =~ \"Back-off pulling\
+    \ image\" ]]; then\n  # Run Skopeo Pod with the specified configuration\n  echo\
+    \ \"Running Skopeo Pod\"\n  kubectl run $POD_NAME --restart=Never -n $NAMESPACE\
+    \ --context=$CONTEXT --image=quay.io/containers/skopeo:latest --command -- sleep\
+    \ infinity && echo \"Waiting for the $POD_NAME to be running...\" && kubectl wait\
+    \ --for=condition=Ready pod/$POD_NAME -n $NAMESPACE --context=$CONTEXT\nelse\n\
+    \  echo \"No image pull backoff events found\"\n  exit\nfi\n\n# Process each image\
+    \ pull backoff event by checking for its availability and retrieving available\
+    \ tags using Skopeo\nwhile IFS= read -r event; do\n  echo \"Found BackOff with\
+    \ message: $event\"\n  echo \"Checking if we can reach the image with skopeo and\
+    \ what tags exist\"\n  container_image_path_tag=$(echo \"$event\" | cut -d' '\
+    \ -f4 | tr -d '\"' | tr -d '\\')\n  container_image_path=\"${container_image_path_tag%:*}\"\
+    \n  container_image_tag=\"${container_image_path_tag#*:}\"\n  if [ -z \"$container_image_path\"\
+    \ ] || [ -z \"$container_image_tag\" ]; then\n    continue\n  fi\n  skopeo_output=$(kubectl\
+    \ exec $POD_NAME -n $NAMESPACE --context=$CONTEXT -- skopeo inspect docker://$container_image_path:$container_image_tag)\n\
+    \  skopeo_exit_code=$?\n  if [ $skopeo_exit_code -eq 0 ]; then\n    echo \"Container\
+    \ image '$container_image_path:$container_image_tag' exists.\"\n  else\n    echo\
+    \ \"Container image '$container_image_path:$container_image_tag' does not exist.\"\
+    \n    echo \"Available tags for '$container_image_path':\"\n    available_tags=$(kubectl\
+    \ exec $POD_NAME -n $NAMESPACE --context=$CONTEXT -- skopeo list-tags docker://$container_image_path\
+    \ )\n    echo \"$available_tags\"\n  fi\ndone <<<\"$image_pull_backoff_events\"\
+    \n\n# Delete the Skopeo pod after processing all events\necho \"Deleting Skopeo\
+    \ pod\"\nkubectl delete pod $POD_NAME -n $NAMESPACE --context=$CONTEXT\necho \"\
+    Done\"\n"
   name: list_imagepullbackoff_events_and_test_path_and_tags_for_namespace_namespace

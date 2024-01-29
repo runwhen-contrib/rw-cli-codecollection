@@ -2,128 +2,166 @@ commands:
 - command: bash 'validate_probes.sh' livenessProbe
   doc_links: '
 
-    - [Kubernetes Documentation: Liveness and Readiness Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/){:target="_blank"}
+    - [Kubernetes Deployment Manifest](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
 
-    - [Bash Scripting Tutorial](https://ryanstutorials.net/bash-scripting-tutorial/){:target="_blank"}'
-  explanation: This Bash script is useful for validating liveness or readiness probes
-    for containers in a Kubernetes deployment. It checks if the defined ports in the
-    probes are exposed by the containers and provides recommendations for updating
-    the probe configurations.
+    - [Bash Scripting Tutorial](https://linuxconfig.org/bash-scripting-tutorial){:target="_blank"}
+
+    - [Kubernetes Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/){:target="_blank"}'
+  explanation: This script is a Bash script that validates the configuration of probes
+    in a Kubernetes deployment manifest. It checks if the ports used in the probe
+    configurations are exposed by the containers and offers recommendations for next
+    steps if any issues are found.
   multi_line_details: "\n#!/bin/bash\n\n# Set deployment name and namespace\nPROBE_TYPE=\"\
     ${1:-readinessProbe}\"  # Default to livenessProbe, can be set to readinessProbe\n\
     \n# Function to extract data using jq\nextract_data() {\n    echo \"$1\" | jq\
-    \ -r \"$2\" 2>/dev/null  # Extracts the desired JSON data field from the provided\
-    \ input using \"jq\"\n}\n\nextract_port_from_command() {\n    echo \"$1\" | grep\
-    \ -oE ':[0-9]+' | grep -oE '[0-9]+' | head -n 1  # Extracts the port number from\
-    \ a command\n}\n\n# Get deployment manifest in JSON format\n# Fetch deployment\
-    \ details from Kubernetes using the provided binary and parameters\nMANIFEST=$(${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ -r \"$2\" 2>/dev/null  # jq used to extract data in JSON format\n}\n\n# Function\
+    \ to extract port from command\nextract_port_from_command() {\n    echo \"$1\"\
+    \ | grep -oE ':[0-9]+' | grep -oE '[0-9]+' | head -n 1  # regex used to extract\
+    \ ports\n}\n\n# Get deployment manifest in JSON format\nMANIFEST=$(${KUBERNETES_DISTRIBUTION_BINARY}\
     \ get deployment \"$DEPLOYMENT_NAME\" -n \"$NAMESPACE\" --context \"$CONTEXT\"\
-    \ -o json)\nif [ $? -ne 0 ]; then  # Check if the deployment details were successfully\
-    \ fetched\n    echo \"Error fetching deployment details: $MANIFEST\"\n    exit\
-    \ 1  # Exit the script with an error status\nfi\n\n# Get number of containers\n\
-    NUM_CONTAINERS=$(extract_data \"$MANIFEST\" '.spec.template.spec.containers |\
-    \ length')  # Extracts the number of containers from the retrieved deployment\
-    \ manifest \nif [ -z \"$NUM_CONTAINERS\" ]; then  # Check if no containers were\
-    \ found in the deployment\n    echo \"No containers found in deployment.\"\n \
-    \   exit 1  # Exit the script with an error status\nfi\n\nnext_steps=()  # Initialize\
-    \ an array to store the recommended next steps\n\n# Loop through containers and\
-    \ validate probes\nfor ((i=0; i<NUM_CONTAINERS; i++)); do  # Iterate over each\
-    \ container in the deployment\n    PROBE=$(extract_data \"$MANIFEST\" \".spec.template.spec.containers[$i].${PROBE_TYPE}\"\
-    )  # Extract the specified probe type for the current container\n    CONTAINER_NAME=$(extract_data\
-    \ \"$MANIFEST\" \".spec.template.spec.containers[$i].name\")  # Extract the name\
-    \ of the current container\n    echo \"-------- START Validation - Container Name:\
-    \ $CONTAINER_NAME Probe Type: $PROBE_TYPE -------\"\n    echo \"Container: \\\
-    `$CONTAINER_NAME\\`\"\n    echo \"$PROBE_TYPE: $PROBE\"\n\n    # List container\
-    \ ports\n    CONTAINER_PORTS=$(extract_data \"$MANIFEST\" \".spec.template.spec.containers[$i].ports[].containerPort\"\
-    )  # Extract the exposed ports for the current container\n    if [ -n \"$CONTAINER_PORTS\"\
-    \ ]; then  # Check if ports are exposed by the container\n        echo \"Exposed\
-    \ Ports: $CONTAINER_PORTS\"\n    else\n        echo \"No ports exposed.\"\n  \
-    \  fi\n\n    if [ -z \"$PROBE\" ]; then  # Check if the specified probe type is\
-    \ not found for the container\n        echo \"Container \\`$CONTAINER_NAME\\`:\
-    \ ${PROBE_TYPE} not found.\"\n        continue  # Move to the next container\n\
-    \    fi\n\n    # Validate that the port in the probe is defined in the container's\
-    \ ports\n    if echo \"$PROBE\" | jq -e '.httpGet, .tcpSocket' >/dev/null; then\
-    \  # Check if either httpGet or tcpSocket configuration is present in the probe\n\
-    \        PROBE_PORT=$(extract_data \"$PROBE\" '.httpGet.port // .tcpSocket.port')\
-    \  # Extract the port from the probe configuration\n        CONTAINER_PORTS=$(extract_data\
-    \ \"$MANIFEST\" \".spec.template.spec.containers[$i].ports[].containerPort\")\
-    \  # Re-extract the container ports (as needed)\n\n        if [[ ! \" $CONTAINER_PORTS\
-    \ \" == *\"$PROBE_PORT\"* ]]; then  # Check if the specified port is exposed by\
-    \ the container\n            echo \"Container \\`$CONTAINER_NAME\\`: Port $PROBE_PORT\
-    \ used in $PROBE_TYPE is not exposed by the container.\"\n            next_steps+=(\"\
-    Update $PROBE_TYPE For \\`${DEPLOYMENT_NAME}\\` to use one of the following ports:\
-    \ $CONTAINER_PORTS\")\n        else\n            echo \"Container \\`$CONTAINER_NAME\\\
-    `: ${PROBE_TYPE} port $PROBE_PORT is valid.\"\n        fi\n    fi\n\n    # ...\
-    \ (Additional code comments for the subsequent checks and validations)\n    #\
-    \ (Comments should be added for each stage of validation or significant section\
-    \ of the script)\n\n# Display all unique recommendations that can be shown as\
-    \ Next Steps\nif [[ ${#next_steps[@]} -ne 0 ]]; then  # Check if there are any\
-    \ recommended next steps\n    printf \"\\nRecommended Next Steps: \\n\"\n    printf\
-    \ \"%s\\n\" \"${next_steps[@]}\" | sort -u  # Print and sort the unique recommended\
-    \ next steps\nfi\n"
+    \ -o json)  # Fetching deployment details using kubernetes distribution binary\
+    \ \nif [ $? -ne 0 ]; then  # Check if error occurred while fetching deployment\
+    \ details\n    echo \"Error fetching deployment details: $MANIFEST\"\n    exit\
+    \ 1\nfi\n\n# Get number of containers\nNUM_CONTAINERS=$(extract_data \"$MANIFEST\"\
+    \ '.spec.template.spec.containers | length')  # Extracting number of containers\n\
+    if [ -z \"$NUM_CONTAINERS\" ]; then  # Check if no containers found\n    echo\
+    \ \"No containers found in deployment.\"\n    exit 1\nfi\n\nnext_steps=()  # Initialize\
+    \ empty array for next steps\n\n# Loop through containers and validate probes\n\
+    for ((i=0; i<NUM_CONTAINERS; i++)); do\n    PROBE=$(extract_data \"$MANIFEST\"\
+    \ \".spec.template.spec.containers[$i].${PROBE_TYPE}\")  # Extracting type of\
+    \ probe for each container\n    CONTAINER_NAME=$(extract_data \"$MANIFEST\" \"\
+    .spec.template.spec.containers[$i].name\")  # Extracting container name\n    echo\
+    \ \"-------- START Validation - Container Name: $CONTAINER_NAME Probe Type: $PROBE_TYPE\
+    \ -------\"\n    echo \"Container: \\`$CONTAINER_NAME\\`\"\n    echo \"$PROBE_TYPE:\
+    \ $PROBE\"\n\n    # List container ports\n    CONTAINER_PORTS=$(extract_data \"\
+    $MANIFEST\" \".spec.template.spec.containers[$i].ports[].containerPort\")  # Extracting\
+    \ exposed ports for the container\n    if [ -n \"$CONTAINER_PORTS\" ]; then\n\
+    \        echo \"Exposed Ports: $CONTAINER_PORTS\"\n    else:\n        echo \"\
+    No ports exposed.\"\n    fi\n\n    if [ -z \"$PROBE\" ]; then  # Check if probe\
+    \ not found for container\n        echo \"Container \\`$CONTAINER_NAME\\`: ${PROBE_TYPE}\
+    \ not found.\"\n        continue\n    fi\n\n    # Validate that the port in the\
+    \ probe is defined in the container's ports\n    if echo \"$PROBE\" | jq -e '.httpGet,\
+    \ .tcpSocket' >/dev/null; then  # Check if HTTP GET or TCP Socket present\n  \
+    \      PROBE_PORT=$(extract_data \"$PROBE\" '.httpGet.port // .tcpSocket.port')\
+    \  # Extracting port for probe\n        CONTAINER_PORTS=$(extract_data \"$MANIFEST\"\
+    \ \".spec.template.spec.containers[$i].ports[].containerPort\")  # Extracting\
+    \ container ports\n\n        if [[ ! \" $CONTAINER_PORTS \" == *\"$PROBE_PORT\"\
+    * ]]; then  # Check if probe port exists in container ports\n            echo\
+    \ \"Container \\`$CONTAINER_NAME\\`: Port $PROBE_PORT used in $PROBE_TYPE is not\
+    \ exposed by the container.\"\n            next_steps+=(\"Update $PROBE_TYPE For\
+    \ \\`${DEPLOYMENT_NAME}\\` to use one of the following ports: $CONTAINER_PORTS\"\
+    )\n        else:\n            echo \"Container \\`$CONTAINER_NAME\\`: ${PROBE_TYPE}\
+    \ port $PROBE_PORT is valid.\"\n        fi\n    fi\n\n    # Check if exec permissions\
+    \ are available (for exec type probes)\n    if echo \"$PROBE\" | jq -e '.exec'\
+    \ >/dev/null; then  # Check if exec exists\n        IFS=$'\\n' read -r -d '' -a\
+    \ EXEC_COMMAND_ARRAY < <(echo \"$PROBE\" | jq -r '.exec.command[]' && printf '\\\
+    0')  # Extracting exec command\n        PORT_IN_COMMAND=$(extract_port_from_command\
+    \ \"${EXEC_COMMAND_ARRAY[*]}\")  # Extracting port from exec command\n\n     \
+    \   # Check if we see the port in the exec command, and if so, if it's defined\
+    \ in the manifest\n        if [ -n \"$PORT_IN_COMMAND\" ]; then  # Check if port\
+    \ exists in exec command\n            CONTAINER_PORTS=$(extract_data \"$MANIFEST\"\
+    \ \".spec.template.spec.containers[$i].ports[].containerPort\")  # Extracting\
+    \ container ports\n            if [[ ! \" $CONTAINER_PORTS \" == *\"$PORT_IN_COMMAND\"\
+    * ]]; then  # Check if port exists in container ports\n                echo \"\
+    Container \\`$CONTAINER_NAME\\`: Port $PORT_IN_COMMAND used in ${PROBE_TYPE} exec\
+    \ command is not exposed by the container. The following ports are exposed: $CONTAINER_PORTS\"\
+    \n                next_steps+=(\"Get Deployment Workload Details For \\`$DEPLOYMENT_NAME\\\
+    `\")\n                next_steps+=(\"Remediate Readiness and Liveness Probes for\
+    \ Deployments in Namespace \\`${NAMESPACE}\\`\")\n            else:\n        \
+    \        echo \"Container \\`$CONTAINER_NAME\\`: Port $PORT_IN_COMMAND in ${PROBE_TYPE}\
+    \ exec command is valid.\"\n            fi\n        fi\n\n        # Check exec\
+    \ permission and execute command\n        if ${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ auth can-i create pods/exec -n \"$NAMESPACE\" >/dev/null 2>&1; then  # Check\
+    \ exec permissions\n            # Execute command\n            # ...\n       \
+    \     # ... (more code to execute command and test ports)\n\n        else\n  \
+    \          echo \"Exec permission is not available.\"\n        fi\n    fi\n  \
+    \  echo \"------- END Validation - Container Name: $CONTAINER_NAME Probe Type:\
+    \ $PROBE_TYPE -------\"\ndone\n\n# Display all unique recommendations that can\
+    \ be shown as Next Steps\nif [[ ${#next_steps[@]} -ne 0 ]]; then  # Check if there\
+    \ are any next steps\n    printf \"\\nRecommended Next Steps: \\n\"\n    printf\
+    \ \"%s\\n\" \"${next_steps[@]}\" | sort -u  # Print unique next steps\nfi\n"
   name: check_liveness_probe_configuration_for_deployment_deployment_name
 - command: bash 'validate_probes.sh' readinessProbe
   doc_links: '
 
-    - [Kubernetes Documentation: Liveness and Readiness Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/){:target="_blank"}
+    - [Kubernetes Deployment Manifest](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
 
-    - [Bash Scripting Tutorial](https://ryanstutorials.net/bash-scripting-tutorial/){:target="_blank"}'
-  explanation: This Bash script is useful for validating liveness or readiness probes
-    for containers in a Kubernetes deployment. It checks if the defined ports in the
-    probes are exposed by the containers and provides recommendations for updating
-    the probe configurations.
+    - [Bash Scripting Tutorial](https://linuxconfig.org/bash-scripting-tutorial){:target="_blank"}
+
+    - [Kubernetes Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/){:target="_blank"}'
+  explanation: This script is a Bash script that validates the configuration of probes
+    in a Kubernetes deployment manifest. It checks if the ports used in the probe
+    configurations are exposed by the containers and offers recommendations for next
+    steps if any issues are found.
   multi_line_details: "\n#!/bin/bash\n\n# Set deployment name and namespace\nPROBE_TYPE=\"\
     ${1:-readinessProbe}\"  # Default to livenessProbe, can be set to readinessProbe\n\
     \n# Function to extract data using jq\nextract_data() {\n    echo \"$1\" | jq\
-    \ -r \"$2\" 2>/dev/null  # Extracts the desired JSON data field from the provided\
-    \ input using \"jq\"\n}\n\nextract_port_from_command() {\n    echo \"$1\" | grep\
-    \ -oE ':[0-9]+' | grep -oE '[0-9]+' | head -n 1  # Extracts the port number from\
-    \ a command\n}\n\n# Get deployment manifest in JSON format\n# Fetch deployment\
-    \ details from Kubernetes using the provided binary and parameters\nMANIFEST=$(${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ -r \"$2\" 2>/dev/null  # jq used to extract data in JSON format\n}\n\n# Function\
+    \ to extract port from command\nextract_port_from_command() {\n    echo \"$1\"\
+    \ | grep -oE ':[0-9]+' | grep -oE '[0-9]+' | head -n 1  # regex used to extract\
+    \ ports\n}\n\n# Get deployment manifest in JSON format\nMANIFEST=$(${KUBERNETES_DISTRIBUTION_BINARY}\
     \ get deployment \"$DEPLOYMENT_NAME\" -n \"$NAMESPACE\" --context \"$CONTEXT\"\
-    \ -o json)\nif [ $? -ne 0 ]; then  # Check if the deployment details were successfully\
-    \ fetched\n    echo \"Error fetching deployment details: $MANIFEST\"\n    exit\
-    \ 1  # Exit the script with an error status\nfi\n\n# Get number of containers\n\
-    NUM_CONTAINERS=$(extract_data \"$MANIFEST\" '.spec.template.spec.containers |\
-    \ length')  # Extracts the number of containers from the retrieved deployment\
-    \ manifest \nif [ -z \"$NUM_CONTAINERS\" ]; then  # Check if no containers were\
-    \ found in the deployment\n    echo \"No containers found in deployment.\"\n \
-    \   exit 1  # Exit the script with an error status\nfi\n\nnext_steps=()  # Initialize\
-    \ an array to store the recommended next steps\n\n# Loop through containers and\
-    \ validate probes\nfor ((i=0; i<NUM_CONTAINERS; i++)); do  # Iterate over each\
-    \ container in the deployment\n    PROBE=$(extract_data \"$MANIFEST\" \".spec.template.spec.containers[$i].${PROBE_TYPE}\"\
-    )  # Extract the specified probe type for the current container\n    CONTAINER_NAME=$(extract_data\
-    \ \"$MANIFEST\" \".spec.template.spec.containers[$i].name\")  # Extract the name\
-    \ of the current container\n    echo \"-------- START Validation - Container Name:\
-    \ $CONTAINER_NAME Probe Type: $PROBE_TYPE -------\"\n    echo \"Container: \\\
-    `$CONTAINER_NAME\\`\"\n    echo \"$PROBE_TYPE: $PROBE\"\n\n    # List container\
-    \ ports\n    CONTAINER_PORTS=$(extract_data \"$MANIFEST\" \".spec.template.spec.containers[$i].ports[].containerPort\"\
-    )  # Extract the exposed ports for the current container\n    if [ -n \"$CONTAINER_PORTS\"\
-    \ ]; then  # Check if ports are exposed by the container\n        echo \"Exposed\
-    \ Ports: $CONTAINER_PORTS\"\n    else\n        echo \"No ports exposed.\"\n  \
-    \  fi\n\n    if [ -z \"$PROBE\" ]; then  # Check if the specified probe type is\
-    \ not found for the container\n        echo \"Container \\`$CONTAINER_NAME\\`:\
-    \ ${PROBE_TYPE} not found.\"\n        continue  # Move to the next container\n\
-    \    fi\n\n    # Validate that the port in the probe is defined in the container's\
-    \ ports\n    if echo \"$PROBE\" | jq -e '.httpGet, .tcpSocket' >/dev/null; then\
-    \  # Check if either httpGet or tcpSocket configuration is present in the probe\n\
-    \        PROBE_PORT=$(extract_data \"$PROBE\" '.httpGet.port // .tcpSocket.port')\
-    \  # Extract the port from the probe configuration\n        CONTAINER_PORTS=$(extract_data\
-    \ \"$MANIFEST\" \".spec.template.spec.containers[$i].ports[].containerPort\")\
-    \  # Re-extract the container ports (as needed)\n\n        if [[ ! \" $CONTAINER_PORTS\
-    \ \" == *\"$PROBE_PORT\"* ]]; then  # Check if the specified port is exposed by\
-    \ the container\n            echo \"Container \\`$CONTAINER_NAME\\`: Port $PROBE_PORT\
-    \ used in $PROBE_TYPE is not exposed by the container.\"\n            next_steps+=(\"\
-    Update $PROBE_TYPE For \\`${DEPLOYMENT_NAME}\\` to use one of the following ports:\
-    \ $CONTAINER_PORTS\")\n        else\n            echo \"Container \\`$CONTAINER_NAME\\\
-    `: ${PROBE_TYPE} port $PROBE_PORT is valid.\"\n        fi\n    fi\n\n    # ...\
-    \ (Additional code comments for the subsequent checks and validations)\n    #\
-    \ (Comments should be added for each stage of validation or significant section\
-    \ of the script)\n\n# Display all unique recommendations that can be shown as\
-    \ Next Steps\nif [[ ${#next_steps[@]} -ne 0 ]]; then  # Check if there are any\
-    \ recommended next steps\n    printf \"\\nRecommended Next Steps: \\n\"\n    printf\
-    \ \"%s\\n\" \"${next_steps[@]}\" | sort -u  # Print and sort the unique recommended\
-    \ next steps\nfi\n"
+    \ -o json)  # Fetching deployment details using kubernetes distribution binary\
+    \ \nif [ $? -ne 0 ]; then  # Check if error occurred while fetching deployment\
+    \ details\n    echo \"Error fetching deployment details: $MANIFEST\"\n    exit\
+    \ 1\nfi\n\n# Get number of containers\nNUM_CONTAINERS=$(extract_data \"$MANIFEST\"\
+    \ '.spec.template.spec.containers | length')  # Extracting number of containers\n\
+    if [ -z \"$NUM_CONTAINERS\" ]; then  # Check if no containers found\n    echo\
+    \ \"No containers found in deployment.\"\n    exit 1\nfi\n\nnext_steps=()  # Initialize\
+    \ empty array for next steps\n\n# Loop through containers and validate probes\n\
+    for ((i=0; i<NUM_CONTAINERS; i++)); do\n    PROBE=$(extract_data \"$MANIFEST\"\
+    \ \".spec.template.spec.containers[$i].${PROBE_TYPE}\")  # Extracting type of\
+    \ probe for each container\n    CONTAINER_NAME=$(extract_data \"$MANIFEST\" \"\
+    .spec.template.spec.containers[$i].name\")  # Extracting container name\n    echo\
+    \ \"-------- START Validation - Container Name: $CONTAINER_NAME Probe Type: $PROBE_TYPE\
+    \ -------\"\n    echo \"Container: \\`$CONTAINER_NAME\\`\"\n    echo \"$PROBE_TYPE:\
+    \ $PROBE\"\n\n    # List container ports\n    CONTAINER_PORTS=$(extract_data \"\
+    $MANIFEST\" \".spec.template.spec.containers[$i].ports[].containerPort\")  # Extracting\
+    \ exposed ports for the container\n    if [ -n \"$CONTAINER_PORTS\" ]; then\n\
+    \        echo \"Exposed Ports: $CONTAINER_PORTS\"\n    else:\n        echo \"\
+    No ports exposed.\"\n    fi\n\n    if [ -z \"$PROBE\" ]; then  # Check if probe\
+    \ not found for container\n        echo \"Container \\`$CONTAINER_NAME\\`: ${PROBE_TYPE}\
+    \ not found.\"\n        continue\n    fi\n\n    # Validate that the port in the\
+    \ probe is defined in the container's ports\n    if echo \"$PROBE\" | jq -e '.httpGet,\
+    \ .tcpSocket' >/dev/null; then  # Check if HTTP GET or TCP Socket present\n  \
+    \      PROBE_PORT=$(extract_data \"$PROBE\" '.httpGet.port // .tcpSocket.port')\
+    \  # Extracting port for probe\n        CONTAINER_PORTS=$(extract_data \"$MANIFEST\"\
+    \ \".spec.template.spec.containers[$i].ports[].containerPort\")  # Extracting\
+    \ container ports\n\n        if [[ ! \" $CONTAINER_PORTS \" == *\"$PROBE_PORT\"\
+    * ]]; then  # Check if probe port exists in container ports\n            echo\
+    \ \"Container \\`$CONTAINER_NAME\\`: Port $PROBE_PORT used in $PROBE_TYPE is not\
+    \ exposed by the container.\"\n            next_steps+=(\"Update $PROBE_TYPE For\
+    \ \\`${DEPLOYMENT_NAME}\\` to use one of the following ports: $CONTAINER_PORTS\"\
+    )\n        else:\n            echo \"Container \\`$CONTAINER_NAME\\`: ${PROBE_TYPE}\
+    \ port $PROBE_PORT is valid.\"\n        fi\n    fi\n\n    # Check if exec permissions\
+    \ are available (for exec type probes)\n    if echo \"$PROBE\" | jq -e '.exec'\
+    \ >/dev/null; then  # Check if exec exists\n        IFS=$'\\n' read -r -d '' -a\
+    \ EXEC_COMMAND_ARRAY < <(echo \"$PROBE\" | jq -r '.exec.command[]' && printf '\\\
+    0')  # Extracting exec command\n        PORT_IN_COMMAND=$(extract_port_from_command\
+    \ \"${EXEC_COMMAND_ARRAY[*]}\")  # Extracting port from exec command\n\n     \
+    \   # Check if we see the port in the exec command, and if so, if it's defined\
+    \ in the manifest\n        if [ -n \"$PORT_IN_COMMAND\" ]; then  # Check if port\
+    \ exists in exec command\n            CONTAINER_PORTS=$(extract_data \"$MANIFEST\"\
+    \ \".spec.template.spec.containers[$i].ports[].containerPort\")  # Extracting\
+    \ container ports\n            if [[ ! \" $CONTAINER_PORTS \" == *\"$PORT_IN_COMMAND\"\
+    * ]]; then  # Check if port exists in container ports\n                echo \"\
+    Container \\`$CONTAINER_NAME\\`: Port $PORT_IN_COMMAND used in ${PROBE_TYPE} exec\
+    \ command is not exposed by the container. The following ports are exposed: $CONTAINER_PORTS\"\
+    \n                next_steps+=(\"Get Deployment Workload Details For \\`$DEPLOYMENT_NAME\\\
+    `\")\n                next_steps+=(\"Remediate Readiness and Liveness Probes for\
+    \ Deployments in Namespace \\`${NAMESPACE}\\`\")\n            else:\n        \
+    \        echo \"Container \\`$CONTAINER_NAME\\`: Port $PORT_IN_COMMAND in ${PROBE_TYPE}\
+    \ exec command is valid.\"\n            fi\n        fi\n\n        # Check exec\
+    \ permission and execute command\n        if ${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ auth can-i create pods/exec -n \"$NAMESPACE\" >/dev/null 2>&1; then  # Check\
+    \ exec permissions\n            # Execute command\n            # ...\n       \
+    \     # ... (more code to execute command and test ports)\n\n        else\n  \
+    \          echo \"Exec permission is not available.\"\n        fi\n    fi\n  \
+    \  echo \"------- END Validation - Container Name: $CONTAINER_NAME Probe Type:\
+    \ $PROBE_TYPE -------\"\ndone\n\n# Display all unique recommendations that can\
+    \ be shown as Next Steps\nif [[ ${#next_steps[@]} -ne 0 ]]; then  # Check if there\
+    \ are any next steps\n    printf \"\\nRecommended Next Steps: \\n\"\n    printf\
+    \ \"%s\\n\" \"${next_steps[@]}\" | sort -u  # Print unique next steps\nfi\n"
   name: check_readiness_probe_configuration_for_deployment_deployment_name
 - command: 'kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq ''(now
     - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind
@@ -138,40 +176,36 @@ commands:
     | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'''
   doc_links: '
 
-    - [kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+    - [Kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
 
-    - [kubectl get events](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events){:target="_blank"}
+    - [Kubectl Get Command Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
-    - [kubectl context](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}
-
-    - [kubectl namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [jq Manual (Official GitHub Repository)](https://stedolan.github.io/jq/manual/){:target="_blank"}
-
-    - [Filtering and mapping using jq](https://learnxinyminutes.com/docs/jq/){:target="_blank"}'
-  explanation: This command uses kubectl to get events from a specific context and
-    namespace, then uses jq to filter out and format the events related to a specific
-    deployment name that have occurred in the last hour.
-  multi_line_details: "\n# Set the context to the specified one\nCONTEXT=${CONTEXT}\n\
-    \n# Set the namespace to the specified one\nNAMESPACE=${NAMESPACE}\n\n# Save the\
-    \ time limit of an hour ago in seconds\n(time - (60*60)) as $time_limit\n\n# Get\
-    \ all events in json format and filter with jq\nkubectl get events --context ${CONTEXT}\
-    \ -n ${NAMESPACE} -o json | jq '\n  # Filter all warnings related to deployments,\
-    \ replica sets, or pods for a specific deployment within the last hour\n  [ .items[]\
-    \ \n    | select(\n      .type == \"Warning\" and \n      (.involvedObject.kind\
-    \ == \"Deployment\" or \n      .involvedObject.kind == \"ReplicaSet\" or \n  \
-    \    .involvedObject.kind == \"Pod\") and \n      (.involvedObject.name | tostring\
-    \ | contains(\"${DEPLOYMENT_NAME}\")) and \n      (.lastTimestamp | fromdateiso8601)\
-    \ >= $time_limit) \n    | {\n        kind: .involvedObject.kind, \n        name:\
-    \ .involvedObject.name, \n        reason: .reason, \n        message: .message,\
-    \ \n        firstTimestamp: .firstTimestamp, \n        lastTimestamp: .lastTimestamp\n\
-    \      } \n  ] \n  # Group the results by kind and name\n  | group_by([.kind,\
-    \ .name]) \n  # Map the result to get kind, name, count, reasons, messages, and\
-    \ timestamps\n  | map({\n      kind: .[0].kind, \n      name: .[0].name, \n  \
-    \    count: length, \n      reasons: map(.reason) | unique, \n      messages:\
-    \ map(.message) | unique, \n      firstTimestamp: map(.firstTimestamp | fromdateiso8601)\
-    \ | sort | .[0] | todateiso8601, \n      lastTimestamp: map(.lastTimestamp | fromdateiso8601)\
-    \ | sort | reverse | .[0] | todateiso8601\n    })' \n"
+    - [Kubectl JSONPath Guide](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}'
+  explanation: This command is using kubectl to get events from a specific context
+    and namespace in JSON format, then filtering the results to show only warnings
+    related to Deployments, ReplicaSets, or Pods with a specific name within the last
+    hour. The output is grouped by kind and name, showing the count, unique reasons,
+    unique messages, first and last timestamps of the warning events.
+  multi_line_details: "\n# Get events from a Kubernetes cluster in a specific context\
+    \ and namespace in JSON format\nkubectl get events --context ${CONTEXT} -n ${NAMESPACE}\
+    \ -o json | \\\n\n# Use jq to filter and format the data\njq '\n# Define a time\
+    \ limit based on 1 hour ago\n(now - (60*60)) as $time_limit |\n\n# Filter and\
+    \ map items based on certain conditions\n[ .items[] | \n\n# Select only Warning\
+    \ events related to Deployment, ReplicaSet, or Pod\nselect(.type == \"Warning\"\
+    \ and \n       (.involvedObject.kind == \"Deployment\" or\n        .involvedObject.kind\
+    \ == \"ReplicaSet\" or\n        .involvedObject.kind == \"Pod\") and\n\n# Make\
+    \ sure the name contains the given deployment name\n        (.involvedObject.name\
+    \ | tostring | contains(\"${DEPLOYMENT_NAME}\")) and\n\n# Check if lastTimestamp\
+    \ is more recent than the time limit\n        (.lastTimestamp | fromdateiso8601)\
+    \ >= $time_limit) | \n\n# Create a new object with selected properties\n{kind:\
+    \ .involvedObject.kind, \n name: .involvedObject.name, \n reason: .reason, \n\
+    \ message: .message, \n firstTimestamp: .firstTimestamp, \n lastTimestamp: .lastTimestamp}\
+    \ ] |\n\n# Group the objects by kind and name\ngroup_by([.kind, .name]) | \n\n\
+    # Map the grouped objects into a desired format\nmap({kind: .[0].kind, \n    \
+    \ name: .[0].name, \n     count: length, \n     reasons: map(.reason) | unique,\
+    \ \n     messages: map(.message) | unique, \n     firstTimestamp: map(.firstTimestamp\
+    \ | fromdateiso8601) | sort | .[0] | todateiso8601, \n     lastTimestamp: map(.lastTimestamp\
+    \ | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'\n"
   name: troubleshoot_deployment_warning_events_for_deployment_name
 - command: 'kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq ''(now
     - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind
@@ -186,90 +220,70 @@ commands:
     | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'''
   doc_links: '
 
-    - [kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+    - [Kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
 
-    - [kubectl get events](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events){:target="_blank"}
+    - [Kubectl Get Command Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
-    - [kubectl context](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}
-
-    - [kubectl namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [jq Manual (Official GitHub Repository)](https://stedolan.github.io/jq/manual/){:target="_blank"}
-
-    - [Filtering and mapping using jq](https://learnxinyminutes.com/docs/jq/){:target="_blank"}'
-  explanation: This command uses kubectl to get events from a specific context and
-    namespace, then uses jq to filter out and format the events related to a specific
-    deployment name that have occurred in the last hour.
-  multi_line_details: "\n# Set the context to the specified one\nCONTEXT=${CONTEXT}\n\
-    \n# Set the namespace to the specified one\nNAMESPACE=${NAMESPACE}\n\n# Save the\
-    \ time limit of an hour ago in seconds\n(time - (60*60)) as $time_limit\n\n# Get\
-    \ all events in json format and filter with jq\nkubectl get events --context ${CONTEXT}\
-    \ -n ${NAMESPACE} -o json | jq '\n  # Filter all warnings related to deployments,\
-    \ replica sets, or pods for a specific deployment within the last hour\n  [ .items[]\
-    \ \n    | select(\n      .type == \"Warning\" and \n      (.involvedObject.kind\
-    \ == \"Deployment\" or \n      .involvedObject.kind == \"ReplicaSet\" or \n  \
-    \    .involvedObject.kind == \"Pod\") and \n      (.involvedObject.name | tostring\
-    \ | contains(\"${DEPLOYMENT_NAME}\")) and \n      (.lastTimestamp | fromdateiso8601)\
-    \ >= $time_limit) \n    | {\n        kind: .involvedObject.kind, \n        name:\
-    \ .involvedObject.name, \n        reason: .reason, \n        message: .message,\
-    \ \n        firstTimestamp: .firstTimestamp, \n        lastTimestamp: .lastTimestamp\n\
-    \      } \n  ] \n  # Group the results by kind and name\n  | group_by([.kind,\
-    \ .name]) \n  # Map the result to get kind, name, count, reasons, messages, and\
-    \ timestamps\n  | map({\n      kind: .[0].kind, \n      name: .[0].name, \n  \
-    \    count: length, \n      reasons: map(.reason) | unique, \n      messages:\
-    \ map(.message) | unique, \n      firstTimestamp: map(.firstTimestamp | fromdateiso8601)\
-    \ | sort | .[0] | todateiso8601, \n      lastTimestamp: map(.lastTimestamp | fromdateiso8601)\
-    \ | sort | reverse | .[0] | todateiso8601\n    })' \n"
+    - [Kubectl JSONPath Guide](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}'
+  explanation: This command is using kubectl to get events from a specific context
+    and namespace in JSON format, then filtering the results to show only warnings
+    related to Deployments, ReplicaSets, or Pods with a specific name within the last
+    hour. The output is grouped by kind and name, showing the count, unique reasons,
+    unique messages, first and last timestamps of the warning events.
+  multi_line_details: "\n# Get events from a Kubernetes cluster in a specific context\
+    \ and namespace in JSON format\nkubectl get events --context ${CONTEXT} -n ${NAMESPACE}\
+    \ -o json | \\\n\n# Use jq to filter and format the data\njq '\n# Define a time\
+    \ limit based on 1 hour ago\n(now - (60*60)) as $time_limit |\n\n# Filter and\
+    \ map items based on certain conditions\n[ .items[] | \n\n# Select only Warning\
+    \ events related to Deployment, ReplicaSet, or Pod\nselect(.type == \"Warning\"\
+    \ and \n       (.involvedObject.kind == \"Deployment\" or\n        .involvedObject.kind\
+    \ == \"ReplicaSet\" or\n        .involvedObject.kind == \"Pod\") and\n\n# Make\
+    \ sure the name contains the given deployment name\n        (.involvedObject.name\
+    \ | tostring | contains(\"${DEPLOYMENT_NAME}\")) and\n\n# Check if lastTimestamp\
+    \ is more recent than the time limit\n        (.lastTimestamp | fromdateiso8601)\
+    \ >= $time_limit) | \n\n# Create a new object with selected properties\n{kind:\
+    \ .involvedObject.kind, \n name: .involvedObject.name, \n reason: .reason, \n\
+    \ message: .message, \n firstTimestamp: .firstTimestamp, \n lastTimestamp: .lastTimestamp}\
+    \ ] |\n\n# Group the objects by kind and name\ngroup_by([.kind, .name]) | \n\n\
+    # Map the grouped objects into a desired format\nmap({kind: .[0].kind, \n    \
+    \ name: .[0].name, \n     count: length, \n     reasons: map(.reason) | unique,\
+    \ \n     messages: map(.message) | unique, \n     firstTimestamp: map(.firstTimestamp\
+    \ | fromdateiso8601) | sort | .[0] | todateiso8601, \n     lastTimestamp: map(.lastTimestamp\
+    \ | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'\n"
   name: troubleshoot_deployment_warning_events_for_deployment_name
 - command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o yaml
   doc_links: '
 
-    - [Kubernetes kubectl explain command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#explain){:target="_blank"}
-
-    - [Kubernetes Contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters){:target="_blank"}
-
-    - [Kubernetes Namespaces](https://kubernetes.io/docs/tasks/administer-cluster/namespaces/){:target="_blank"}
-
-    - [YAML Format](https://learnxinyminutes.com/docs/yaml/){:target="_blank"}'
-  explanation: This command is used to retrieve detailed information about a specific
-    deployment within a specified Kubernetes context and namespace, and the output
-    will be in YAML format.
-  multi_line_details: "\n# This command is used to get the YAML configuration for\
-    \ a specific deployment in a given namespace and context using Kubernetes\n\n\
-    # Set the environment variables for the deployment name, context, and namespace\n\
-    DEPLOYMENT_NAME=my-deployment\nCONTEXT=my-context\nNAMESPACE=my-namespace\n\n\
-    # Use kubectl to get the deployment details in YAML format\nkubectl get deployment/${DEPLOYMENT_NAME}\
-    \ \\    # Use backslash for multi-line commands\n  --context ${CONTEXT} \\   \
-    \                    # Specify the context where the deployment is located\n \
-    \ -n ${NAMESPACE} \\                            # Specify the namespace where\
-    \ the deployment is running\n  -o yaml                                      #\
-    \ Output the details in YAML format\n"
+    '
+  explanation: This command is used to retrieve the YAML configuration for a specific
+    deployment in a Kubernetes cluster, specified by the deployment name, context,
+    and namespace. It's a way to view the detailed configuration settings for that
+    deployment.
+  multi_line_details: "\n# The following command is used to retrieve the configuration\
+    \ details of a specific deployment in a YAML format\n\n# Use kubectl to get the\
+    \ deployment with the specified name\nkubectl get deployment/${DEPLOYMENT_NAME}\
+    \ \n\n# Specify the context for the cluster where the deployment resides \n--context\
+    \ ${CONTEXT}\n\n# Specify the namespace where the deployment is located\n-n ${NAMESPACE}\
+    \ \n\n# Output the details in YAML format for easier reading and manipulation\n\
+    -o yaml\n"
   name: get_deployment_workload_details_for_deployment_name_and_add_to_report
 - command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o yaml
   doc_links: '
 
-    - [Kubernetes kubectl explain command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#explain){:target="_blank"}
-
-    - [Kubernetes Contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters){:target="_blank"}
-
-    - [Kubernetes Namespaces](https://kubernetes.io/docs/tasks/administer-cluster/namespaces/){:target="_blank"}
-
-    - [YAML Format](https://learnxinyminutes.com/docs/yaml/){:target="_blank"}'
-  explanation: This command is used to retrieve detailed information about a specific
-    deployment within a specified Kubernetes context and namespace, and the output
-    will be in YAML format.
-  multi_line_details: "\n# This command is used to get the YAML configuration for\
-    \ a specific deployment in a given namespace and context using Kubernetes\n\n\
-    # Set the environment variables for the deployment name, context, and namespace\n\
-    DEPLOYMENT_NAME=my-deployment\nCONTEXT=my-context\nNAMESPACE=my-namespace\n\n\
-    # Use kubectl to get the deployment details in YAML format\nkubectl get deployment/${DEPLOYMENT_NAME}\
-    \ \\    # Use backslash for multi-line commands\n  --context ${CONTEXT} \\   \
-    \                    # Specify the context where the deployment is located\n \
-    \ -n ${NAMESPACE} \\                            # Specify the namespace where\
-    \ the deployment is running\n  -o yaml                                      #\
-    \ Output the details in YAML format\n"
+    '
+  explanation: This command is used to retrieve the YAML configuration for a specific
+    deployment in a Kubernetes cluster, specified by the deployment name, context,
+    and namespace. It's a way to view the detailed configuration settings for that
+    deployment.
+  multi_line_details: "\n# The following command is used to retrieve the configuration\
+    \ details of a specific deployment in a YAML format\n\n# Use kubectl to get the\
+    \ deployment with the specified name\nkubectl get deployment/${DEPLOYMENT_NAME}\
+    \ \n\n# Specify the context for the cluster where the deployment resides \n--context\
+    \ ${CONTEXT}\n\n# Specify the namespace where the deployment is located\n-n ${NAMESPACE}\
+    \ \n\n# Output the details in YAML format for easier reading and manipulation\n\
+    -o yaml\n"
   name: get_deployment_workload_details_for_deployment_name_and_add_to_report
 - command: 'kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o json | jq ''.status | {desired_replicas: .replicas, ready_replicas: (.readyReplicas
@@ -281,30 +295,25 @@ commands:
     end)}'''
   doc_links: '
 
-    - [Kubernetes kubectl explain Deployment](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#explain){:target="_blank"}
-
-    - [Kubernetes kubectl scale Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#scale){:target="_blank"}
-
-    - [Kubernetes JSON Path Support](https://kubernetes.io/docs/reference/kubectl/jsonpath){:target="_blank"}
-
-    - [jq Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command retrieves information about a specific deployment in Kubernetes,
-    including the number of desired replicas, ready replicas, missing replicas, unavailable
-    replicas, and the availability and progression conditions. It uses JSON output
-    and the jq tool to format the data.
-  multi_line_details: "\n# Set the variables for the deployment name, context, and\
-    \ namespace\nDEPLOYMENT_NAME=my-deployment\nCONTEXT=development\nNAMESPACE=default\n\
-    \n# Use kubectl to get information about the specified deployment \n# in the specified\
-    \ context and namespace, and output the results as JSON\nkubectl get deployment/${DEPLOYMENT_NAME}\
-    \ --context ${CONTEXT} -n ${NAMESPACE} -o json | \n\n# Use jq to parse the JSON\
-    \ output and extract specific status information\njq '.status | {\n  desired_replicas:\
-    \ .replicas, \n  ready_replicas: (.readyReplicas // 0), \n  missing_replicas:\
-    \ ((.replicas // 0) - (.readyReplicas // 0)), \n  unavailable_replicas: (.unavailableReplicas\
-    \ // 0), \n  available_condition: (if any(.conditions[]; .type == \"Available\"\
-    ) then (.conditions[] | select(.type == \"Available\")) else \"Condition not available\"\
-    \ end), \n  progressing_condition: (if any(.conditions[]; .type == \"Progressing\"\
-    ) then (.conditions[] | select(.type == \"Progressing\")) else \"Condition not\
-    \ available\" end)\n}'\n"
+    '
+  explanation: This command retrieves information about a specific deployment from
+    the Kubernetes cluster, including the number of desired, ready, missing, and unavailable
+    replicas, as well as the available and progressing conditions. It uses jq to filter
+    and format the information in JSON output.
+  multi_line_details: "\n# Set variables for the deployment name, context, and namespace\n\
+    DEPLOYMENT_NAME=my-deployment\nCONTEXT=my-context\nNAMESPACE=my-namespace\n\n\
+    # Retrieve details about the specified deployment in JSON format, use 'jq' to\
+    \ parse the information\nkubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT}\
+    \ -n ${NAMESPACE} -o json | \\\n    jq '.status | {\n        desired_replicas:\
+    \ .replicas,\n        ready_replicas: (.readyReplicas // 0),\n        missing_replicas:\
+    \ ((.replicas // 0) - (.readyReplicas // 0)),\n        unavailable_replicas: (.unavailableReplicas\
+    \ // 0),\n        available_condition: (if any(.conditions[]; .type == \"Available\"\
+    ) then \n                                (.conditions[] | select(.type == \"Available\"\
+    )) \n                              else \"Condition not available\" end),\n  \
+    \      progressing_condition: (if any(.conditions[]; .type == \"Progressing\"\
+    ) then \n                                  (.conditions[] | select(.type == \"\
+    Progressing\")) \n                                else \"Condition not available\"\
+    \ end)\n    }'\n"
   name: troubleshoot_deployment_replicas_for_deployment_name
 - command: 'kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o json | jq ''.status | {desired_replicas: .replicas, ready_replicas: (.readyReplicas
@@ -316,30 +325,25 @@ commands:
     end)}'''
   doc_links: '
 
-    - [Kubernetes kubectl explain Deployment](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#explain){:target="_blank"}
-
-    - [Kubernetes kubectl scale Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#scale){:target="_blank"}
-
-    - [Kubernetes JSON Path Support](https://kubernetes.io/docs/reference/kubectl/jsonpath){:target="_blank"}
-
-    - [jq Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command retrieves information about a specific deployment in Kubernetes,
-    including the number of desired replicas, ready replicas, missing replicas, unavailable
-    replicas, and the availability and progression conditions. It uses JSON output
-    and the jq tool to format the data.
-  multi_line_details: "\n# Set the variables for the deployment name, context, and\
-    \ namespace\nDEPLOYMENT_NAME=my-deployment\nCONTEXT=development\nNAMESPACE=default\n\
-    \n# Use kubectl to get information about the specified deployment \n# in the specified\
-    \ context and namespace, and output the results as JSON\nkubectl get deployment/${DEPLOYMENT_NAME}\
-    \ --context ${CONTEXT} -n ${NAMESPACE} -o json | \n\n# Use jq to parse the JSON\
-    \ output and extract specific status information\njq '.status | {\n  desired_replicas:\
-    \ .replicas, \n  ready_replicas: (.readyReplicas // 0), \n  missing_replicas:\
-    \ ((.replicas // 0) - (.readyReplicas // 0)), \n  unavailable_replicas: (.unavailableReplicas\
-    \ // 0), \n  available_condition: (if any(.conditions[]; .type == \"Available\"\
-    ) then (.conditions[] | select(.type == \"Available\")) else \"Condition not available\"\
-    \ end), \n  progressing_condition: (if any(.conditions[]; .type == \"Progressing\"\
-    ) then (.conditions[] | select(.type == \"Progressing\")) else \"Condition not\
-    \ available\" end)\n}'\n"
+    '
+  explanation: This command retrieves information about a specific deployment from
+    the Kubernetes cluster, including the number of desired, ready, missing, and unavailable
+    replicas, as well as the available and progressing conditions. It uses jq to filter
+    and format the information in JSON output.
+  multi_line_details: "\n# Set variables for the deployment name, context, and namespace\n\
+    DEPLOYMENT_NAME=my-deployment\nCONTEXT=my-context\nNAMESPACE=my-namespace\n\n\
+    # Retrieve details about the specified deployment in JSON format, use 'jq' to\
+    \ parse the information\nkubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT}\
+    \ -n ${NAMESPACE} -o json | \\\n    jq '.status | {\n        desired_replicas:\
+    \ .replicas,\n        ready_replicas: (.readyReplicas // 0),\n        missing_replicas:\
+    \ ((.replicas // 0) - (.readyReplicas // 0)),\n        unavailable_replicas: (.unavailableReplicas\
+    \ // 0),\n        available_condition: (if any(.conditions[]; .type == \"Available\"\
+    ) then \n                                (.conditions[] | select(.type == \"Available\"\
+    )) \n                              else \"Condition not available\" end),\n  \
+    \      progressing_condition: (if any(.conditions[]; .type == \"Progressing\"\
+    ) then \n                                  (.conditions[] | select(.type == \"\
+    Progressing\")) \n                                else \"Condition not available\"\
+    \ end)\n    }'\n"
   name: troubleshoot_deployment_replicas_for_deployment_name
 - command: 'kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq ''(now
     - (60*60)) as $time_limit | [ .items[] | select(.type != "Warning" and (.involvedObject.kind
@@ -357,33 +361,34 @@ commands:
     | sort | reverse | .[0] | todateiso8601})'''
   doc_links: '
 
-    - [Kubernetes Events documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
-
-    - [Kubernetes Statistics calculation documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#top_deployment_object){:target="_blank"}'
-  explanation: This command retrieves events from a Kubernetes cluster, filters them
-    based on certain criteria, and then organizes and calculates statistics about
-    the events for specific deployment objects.
-  multi_line_details: "\n# Save the result of kubectl get events command in a variable\
-    \ using the given context and namespace\nevents_data=$(kubectl get events --context\
-    \ ${CONTEXT} -n ${NAMESPACE} -o json)\n\n# Use jq to filter and transform the\
-    \ events data based on specific criteria\nfiltered_events=$(echo $events_data\
-    \ | jq '(now - (60*60)) as $time_limit | [ .items[] \n    | select(.type != \"\
-    Warning\" \n    and (.involvedObject.kind == \"Deployment\" or .involvedObject.kind\
-    \ == \"ReplicaSet\" or .involvedObject.kind == \"Pod\") \n    and (.involvedObject.name\
-    \ | tostring | contains(\"${DEPLOYMENT_NAME}\"))) \n    | {kind: .involvedObject.kind,\
-    \ count: .count, name: .involvedObject.name, reason: .reason, message: .message,\
-    \ firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, duration: (if\
-    \ (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp | fromdateiso8601))\
-    \ == 0) then 1 else (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp |\
-    \ fromdateiso8601))/60) end) } ]')\n\n# Group the filtered events by kind and\
-    \ name, then calculate additional metrics for each group\ngrouped_data=$(echo\
-    \ $filtered_events | jq 'group_by([.kind, .name]) \n    | map({kind: .[0].kind,\
-    \ name: .[0].name, count: (map(.count) | add), reasons: map(.reason) | unique,\
-    \ messages: map(.message) | unique, average_events_per_minute: (if .[0].duration\
-    \ == 1 then 1 else ((map(.count) | add)/.[0].duration ) end),firstTimestamp: map(.firstTimestamp\
-    \ | fromdateiso8601) | sort | .[0] | todateiso8601, lastTimestamp: map(.lastTimestamp\
-    \ | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})')\n\n# The resulting\
-    \ grouped_data can be used for further analysis or reporting\necho $grouped_data\n"
+    '
+  explanation: This command retrieves events from a Kubernetes cluster and filters
+    them based on specific criteria such as time, type, and object kind. It then organizes
+    the filtered events into a JSON format for further analysis and monitoring.
+  multi_line_details: "\n# Here we are using kubectl to get events from a specific\
+    \ context and namespace, then filtering them using jq to extract relevant information.\n\
+    \n# Get events from the specified context and namespace in JSON format\nkubectl\
+    \ get events --context ${CONTEXT} -n ${NAMESPACE} -o json |\n\n# Using jq, filter\
+    \ and transform the data to get specific event information\njq '(now - (60*60))\
+    \ as $time_limit | \n[ .items[] | \n  select(.type != \"Warning\" and \n     \
+    \    (.involvedObject.kind == \"Deployment\" or \n          .involvedObject.kind\
+    \ == \"ReplicaSet\" or \n          .involvedObject.kind == \"Pod\") and \n   \
+    \      (.involvedObject.name | tostring | contains(\"${DEPLOYMENT_NAME}\"))) |\
+    \ \n  {kind: .involvedObject.kind, \n   count: .count, \n   name: .involvedObject.name,\
+    \ \n   reason: .reason, \n   message: .message, \n   firstTimestamp: .firstTimestamp,\
+    \ \n   lastTimestamp: .lastTimestamp, \n   duration: (if (((.lastTimestamp | fromdateiso8601)\
+    \ - \n                  (.firstTimestamp | fromdateiso8601)) == 0) then \n   \
+    \              1 else \n                 (((.lastTimestamp | fromdateiso8601)\
+    \ - \n                   (.firstTimestamp | fromdateiso8601))/60) \n         \
+    \     end) } ] |\n\n# Further process the filtered data \ngroup_by([.kind, .name])\
+    \ |\n\n# Map and organize the data to create a structured output\nmap({kind: .[0].kind,\
+    \ \n    name: .[0].name, \n    count: (map(.count) | add), \n    reasons: map(.reason)\
+    \ | unique, \n    messages: map(.message) | unique, \n    average_events_per_minute:\
+    \ (if .[0].duration == 1 then \n                                1 else \n    \
+    \                            ((map(.count) | add)/.[0].duration ) \n         \
+    \                   end),\n    firstTimestamp: map(.firstTimestamp | fromdateiso8601)\
+    \ | sort | .[0] | todateiso8601, \n    lastTimestamp: map(.lastTimestamp | fromdateiso8601)\
+    \ | sort | reverse | .[0] | todateiso8601}\n    )'\n"
   name: check_deployment_event_anomalies_for_deployment_name
 - command: 'kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq ''(now
     - (60*60)) as $time_limit | [ .items[] | select(.type != "Warning" and (.involvedObject.kind
@@ -401,31 +406,32 @@ commands:
     | sort | reverse | .[0] | todateiso8601})'''
   doc_links: '
 
-    - [Kubernetes Events documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
-
-    - [Kubernetes Statistics calculation documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#top_deployment_object){:target="_blank"}'
-  explanation: This command retrieves events from a Kubernetes cluster, filters them
-    based on certain criteria, and then organizes and calculates statistics about
-    the events for specific deployment objects.
-  multi_line_details: "\n# Save the result of kubectl get events command in a variable\
-    \ using the given context and namespace\nevents_data=$(kubectl get events --context\
-    \ ${CONTEXT} -n ${NAMESPACE} -o json)\n\n# Use jq to filter and transform the\
-    \ events data based on specific criteria\nfiltered_events=$(echo $events_data\
-    \ | jq '(now - (60*60)) as $time_limit | [ .items[] \n    | select(.type != \"\
-    Warning\" \n    and (.involvedObject.kind == \"Deployment\" or .involvedObject.kind\
-    \ == \"ReplicaSet\" or .involvedObject.kind == \"Pod\") \n    and (.involvedObject.name\
-    \ | tostring | contains(\"${DEPLOYMENT_NAME}\"))) \n    | {kind: .involvedObject.kind,\
-    \ count: .count, name: .involvedObject.name, reason: .reason, message: .message,\
-    \ firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, duration: (if\
-    \ (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp | fromdateiso8601))\
-    \ == 0) then 1 else (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp |\
-    \ fromdateiso8601))/60) end) } ]')\n\n# Group the filtered events by kind and\
-    \ name, then calculate additional metrics for each group\ngrouped_data=$(echo\
-    \ $filtered_events | jq 'group_by([.kind, .name]) \n    | map({kind: .[0].kind,\
-    \ name: .[0].name, count: (map(.count) | add), reasons: map(.reason) | unique,\
-    \ messages: map(.message) | unique, average_events_per_minute: (if .[0].duration\
-    \ == 1 then 1 else ((map(.count) | add)/.[0].duration ) end),firstTimestamp: map(.firstTimestamp\
-    \ | fromdateiso8601) | sort | .[0] | todateiso8601, lastTimestamp: map(.lastTimestamp\
-    \ | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})')\n\n# The resulting\
-    \ grouped_data can be used for further analysis or reporting\necho $grouped_data\n"
+    '
+  explanation: This command retrieves events from a Kubernetes cluster and filters
+    them based on specific criteria such as time, type, and object kind. It then organizes
+    the filtered events into a JSON format for further analysis and monitoring.
+  multi_line_details: "\n# Here we are using kubectl to get events from a specific\
+    \ context and namespace, then filtering them using jq to extract relevant information.\n\
+    \n# Get events from the specified context and namespace in JSON format\nkubectl\
+    \ get events --context ${CONTEXT} -n ${NAMESPACE} -o json |\n\n# Using jq, filter\
+    \ and transform the data to get specific event information\njq '(now - (60*60))\
+    \ as $time_limit | \n[ .items[] | \n  select(.type != \"Warning\" and \n     \
+    \    (.involvedObject.kind == \"Deployment\" or \n          .involvedObject.kind\
+    \ == \"ReplicaSet\" or \n          .involvedObject.kind == \"Pod\") and \n   \
+    \      (.involvedObject.name | tostring | contains(\"${DEPLOYMENT_NAME}\"))) |\
+    \ \n  {kind: .involvedObject.kind, \n   count: .count, \n   name: .involvedObject.name,\
+    \ \n   reason: .reason, \n   message: .message, \n   firstTimestamp: .firstTimestamp,\
+    \ \n   lastTimestamp: .lastTimestamp, \n   duration: (if (((.lastTimestamp | fromdateiso8601)\
+    \ - \n                  (.firstTimestamp | fromdateiso8601)) == 0) then \n   \
+    \              1 else \n                 (((.lastTimestamp | fromdateiso8601)\
+    \ - \n                   (.firstTimestamp | fromdateiso8601))/60) \n         \
+    \     end) } ] |\n\n# Further process the filtered data \ngroup_by([.kind, .name])\
+    \ |\n\n# Map and organize the data to create a structured output\nmap({kind: .[0].kind,\
+    \ \n    name: .[0].name, \n    count: (map(.count) | add), \n    reasons: map(.reason)\
+    \ | unique, \n    messages: map(.message) | unique, \n    average_events_per_minute:\
+    \ (if .[0].duration == 1 then \n                                1 else \n    \
+    \                            ((map(.count) | add)/.[0].duration ) \n         \
+    \                   end),\n    firstTimestamp: map(.firstTimestamp | fromdateiso8601)\
+    \ | sort | .[0] | todateiso8601, \n    lastTimestamp: map(.lastTimestamp | fromdateiso8601)\
+    \ | sort | reverse | .[0] | todateiso8601}\n    )'\n"
   name: check_deployment_event_anomalies_for_deployment_name

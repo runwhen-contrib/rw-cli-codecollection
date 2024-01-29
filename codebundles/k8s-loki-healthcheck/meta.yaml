@@ -5,23 +5,26 @@ commands:
     | jq -r ''.shards[] | select(.state != "ACTIVE") | {name: .id, state: .state}'''
   doc_links: '
 
-    - [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+    - [kubectl command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 
     - [wget command](https://www.gnu.org/software/wget/manual/wget.html){:target="_blank"}
 
-    - [JSON format](https://www.json.org/json-en.html){:target="_blank"}'
-  explanation: This command uses kubectl to execute a `wget` request on a specific
-    pod within a Kubernetes context and namespace, returning the shards that are not
-    in an "ACTIVE" state in JSON format.
-  multi_line_details: "\n# Set the kubectl context and namespace for executing commands\n\
-    CONTEXT=my-context\nNAMESPACE=my-namespace\n\n# Get the name of the pod with label\
-    \ app.kubernetes.io/component=single-binary \nPOD=$(kubectl --context=${CONTEXT}\
-    \ -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath='{.items[0].metadata.name}')\n\
-    \n# Use kubectl to exec into the selected pod and run a wget command to fetch\
-    \ JSON data\n# Then use jq to filter and format the output\nkubectl --context=${CONTEXT}\
-    \ -n ${NAMESPACE} exec ${POD} -- wget -q --header=\"Accept: application/json\"\
-    \ -O - http://localhost:3100/ring | jq -r '.shards[] | select(.state != \"ACTIVE\"\
-    ) | {name: .id, state: .state}'\n"
+    - [JSON data retrieval](https://www.json.org/json-en.html){:target="_blank"}
+
+    - [jq filtering](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command uses kubectl to execute a wget command on a specific pod
+    in a specific namespace, retrieving JSON data from a local server and then filtering
+    the data using jq to display only shards with a state other than "ACTIVE."
+  multi_line_details: "\n# Set the kubectl context to the specified CONTEXT and namespace\
+    \ to NAMESPACE\nkubectl --context=${CONTEXT} -n ${NAMESPACE} exec \\\n\n# Get\
+    \ the pod name using the specified CONTEXT and NAMESPACE with label selector \"\
+    app.kubernetes.io/component=single-binary\"\n$(kubectl --context=${CONTEXT} -n\
+    \ ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath='{.items[0].metadata.name}')\
+    \ -- \\\n\n# Use wget to make a HTTP request to http://localhost:3100/ring with\
+    \ Accept header as application/json, then pipe the output to jq for parsing and\
+    \ displaying only the shards with state not equal to \"ACTIVE\" \nwget -q --header=\"\
+    Accept: application/json\" -O - http://localhost:3100/ring | jq -r '.shards[]\
+    \ | select(.state != \"ACTIVE\") | {name: .id, state: .state}'\n"
   name: check_loki_ring_api
 - command: 'kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath=''{.items[0].metadata.name}'')
@@ -29,127 +32,108 @@ commands:
     | jq -r ''.shards[] | select(.state != "ACTIVE") | {name: .id, state: .state}'''
   doc_links: '
 
-    - [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+    - [kubectl command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 
     - [wget command](https://www.gnu.org/software/wget/manual/wget.html){:target="_blank"}
 
-    - [JSON format](https://www.json.org/json-en.html){:target="_blank"}'
-  explanation: This command uses kubectl to execute a `wget` request on a specific
-    pod within a Kubernetes context and namespace, returning the shards that are not
-    in an "ACTIVE" state in JSON format.
-  multi_line_details: "\n# Set the kubectl context and namespace for executing commands\n\
-    CONTEXT=my-context\nNAMESPACE=my-namespace\n\n# Get the name of the pod with label\
-    \ app.kubernetes.io/component=single-binary \nPOD=$(kubectl --context=${CONTEXT}\
-    \ -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath='{.items[0].metadata.name}')\n\
-    \n# Use kubectl to exec into the selected pod and run a wget command to fetch\
-    \ JSON data\n# Then use jq to filter and format the output\nkubectl --context=${CONTEXT}\
-    \ -n ${NAMESPACE} exec ${POD} -- wget -q --header=\"Accept: application/json\"\
-    \ -O - http://localhost:3100/ring | jq -r '.shards[] | select(.state != \"ACTIVE\"\
-    ) | {name: .id, state: .state}'\n"
+    - [JSON data retrieval](https://www.json.org/json-en.html){:target="_blank"}
+
+    - [jq filtering](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command uses kubectl to execute a wget command on a specific pod
+    in a specific namespace, retrieving JSON data from a local server and then filtering
+    the data using jq to display only shards with a state other than "ACTIVE."
+  multi_line_details: "\n# Set the kubectl context to the specified CONTEXT and namespace\
+    \ to NAMESPACE\nkubectl --context=${CONTEXT} -n ${NAMESPACE} exec \\\n\n# Get\
+    \ the pod name using the specified CONTEXT and NAMESPACE with label selector \"\
+    app.kubernetes.io/component=single-binary\"\n$(kubectl --context=${CONTEXT} -n\
+    \ ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath='{.items[0].metadata.name}')\
+    \ -- \\\n\n# Use wget to make a HTTP request to http://localhost:3100/ring with\
+    \ Accept header as application/json, then pipe the output to jq for parsing and\
+    \ displaying only the shards with state not equal to \"ACTIVE\" \nwget -q --header=\"\
+    Accept: application/json\" -O - http://localhost:3100/ring | jq -r '.shards[]\
+    \ | select(.state != \"ACTIVE\") | {name: .id, state: .state}'\n"
   name: check_loki_ring_api
 - command: 'kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath=''{.items[0].metadata.name}'')
     -- wget -q --header="Accept: application/json" -O - http://localhost:3100/ready'
   doc_links: '
 
-    - [kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+    - [Kubernetes](https://kubernetes.io/docs/home/){:target="_blank"}
 
-    - [Kubernetes Contexts and Namespaces](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
+    - [Kubernetes pods](https://kubernetes.io/docs/concepts/workloads/pods/){:target="_blank"}
 
-    - [Labels and Selectors in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
+    - [Container operations](https://kubernetes.io/docs/concepts/containers/){:target="_blank"}
 
-    - [wget Command Documentation](https://www.gnu.org/software/wget/manual/wget.html){:target="_blank"}
-
-    - [JSON Data Retrieval in wget](https://www.journaldev.com/35201/wget-command-guide#5-retrieve-json-data){:target="_blank"}'
-  explanation: This command is using kubectl to execute a command within a specific
-    Kubernetes context and namespace, targeting a pod labeled with the specified component.
-    The command being executed uses wget to make a request to a local endpoint and
-    retrieve JSON data from the specified URL.
+    - [Namespaces in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}'
+  explanation: This command runs a specified operation inside a container running
+    in a Kubernetes pod within a specific namespace and context, fetching some data
+    from a local web server.
   multi_line_details: '
 
-    # Set the kubectl context and namespace for the following commands
+    # Set the context and namespace for the kubectl command
 
     CONTEXT=my-context
 
     NAMESPACE=my-namespace
 
 
-    # Find the pod with label app.kubernetes.io/component=single-binary and get its
-    name
+    # Retrieve the name of the pod running the single-binary component
 
-    POD_NAME=$(kubectl --context=${CONTEXT} -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary
+    SINGLE_BINARY_POD=$(kubectl --context=${CONTEXT} -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary
     -o=jsonpath=''{.items[0].metadata.name}'')
 
 
-    # Execute a command within the specified pod to make a GET request to a local
-    endpoint
+    # Execute a command in the specified pod to send an HTTP request to check readiness
 
-    kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $POD_NAME -- wget -q --header="Accept:
-    application/json" -O - http://localhost:3100/ready
-
+    kubectl --context=${CONTEXT} -n ${NAMESPACE} exec ${SINGLE_BINARY_POD} -- wget
+    -q --header="Accept: application/json" -O - http://localhost:3100/ready
 
 
-    Explanation:
 
-    1. We first set the context and namespace variables for the kubectl command.
-
-    2. Then we use the `kubectl get pods` command to find a specific pod with the
-    label `app.kubernetes.io/component=single-binary` and extract its name using `jsonpath`.
-
-    3. Finally, we use the extracted pod name to execute a `wget` command inside the
-    pod, making a GET request to `http://localhost:3100/ready` and outputting the
-    response to the terminal.'
+    In this multi-line command, we broke down the original command into smaller, more
+    understandable steps with helpful comments to explain each part. This can help
+    newer or less experienced devops engineers understand the purpose and functionality
+    of the original command.'
   name: check_loki_api_ready
 - command: 'kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath=''{.items[0].metadata.name}'')
     -- wget -q --header="Accept: application/json" -O - http://localhost:3100/ready'
   doc_links: '
 
-    - [kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+    - [Kubernetes](https://kubernetes.io/docs/home/){:target="_blank"}
 
-    - [Kubernetes Contexts and Namespaces](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
+    - [Kubernetes pods](https://kubernetes.io/docs/concepts/workloads/pods/){:target="_blank"}
 
-    - [Labels and Selectors in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
+    - [Container operations](https://kubernetes.io/docs/concepts/containers/){:target="_blank"}
 
-    - [wget Command Documentation](https://www.gnu.org/software/wget/manual/wget.html){:target="_blank"}
-
-    - [JSON Data Retrieval in wget](https://www.journaldev.com/35201/wget-command-guide#5-retrieve-json-data){:target="_blank"}'
-  explanation: This command is using kubectl to execute a command within a specific
-    Kubernetes context and namespace, targeting a pod labeled with the specified component.
-    The command being executed uses wget to make a request to a local endpoint and
-    retrieve JSON data from the specified URL.
+    - [Namespaces in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}'
+  explanation: This command runs a specified operation inside a container running
+    in a Kubernetes pod within a specific namespace and context, fetching some data
+    from a local web server.
   multi_line_details: '
 
-    # Set the kubectl context and namespace for the following commands
+    # Set the context and namespace for the kubectl command
 
     CONTEXT=my-context
 
     NAMESPACE=my-namespace
 
 
-    # Find the pod with label app.kubernetes.io/component=single-binary and get its
-    name
+    # Retrieve the name of the pod running the single-binary component
 
-    POD_NAME=$(kubectl --context=${CONTEXT} -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary
+    SINGLE_BINARY_POD=$(kubectl --context=${CONTEXT} -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary
     -o=jsonpath=''{.items[0].metadata.name}'')
 
 
-    # Execute a command within the specified pod to make a GET request to a local
-    endpoint
+    # Execute a command in the specified pod to send an HTTP request to check readiness
 
-    kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $POD_NAME -- wget -q --header="Accept:
-    application/json" -O - http://localhost:3100/ready
-
+    kubectl --context=${CONTEXT} -n ${NAMESPACE} exec ${SINGLE_BINARY_POD} -- wget
+    -q --header="Accept: application/json" -O - http://localhost:3100/ready
 
 
-    Explanation:
 
-    1. We first set the context and namespace variables for the kubectl command.
-
-    2. Then we use the `kubectl get pods` command to find a specific pod with the
-    label `app.kubernetes.io/component=single-binary` and extract its name using `jsonpath`.
-
-    3. Finally, we use the extracted pod name to execute a `wget` command inside the
-    pod, making a GET request to `http://localhost:3100/ready` and outputting the
-    response to the terminal.'
+    In this multi-line command, we broke down the original command into smaller, more
+    understandable steps with helpful comments to explain each part. This can help
+    newer or less experienced devops engineers understand the purpose and functionality
+    of the original command.'
   name: check_loki_api_ready
