@@ -184,44 +184,7 @@ commands:
     | awk '{print $2}'
   doc_links: '
 
-    - [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
-
-    - [Kubernetes contexts and namespaces](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
-
-    - [Prometheus](https://prometheus.io/docs/introduction/overview/){:target="_blank"}
-
-    - [wget command](https://www.gnu.org/software/wget/manual/wget.html){:target="_blank"}'
-  explanation: This command uses kubectl to execute a command within a specific Kubernetes
-    context and namespace, specifically targeting the Prometheus pod. It then uses
-    wget to check the health status of the local Prometheus server and outputs the
-    HTTP status code.
-  multi_line_details: '
-
-    # Set the context to be used for the kubectl command
-
-    CONTEXT=${CONTEXT}
-
-
-    # Set the namespace where Prometheus is deployed
-
-    PROM_NAMESPACE=${PROM_NAMESPACE}
-
-
-    # Get the name of the pod running Prometheus in the specified namespace
-
-    PROM_POD=$(kubectl --context=${CONTEXT} -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/name=prometheus
-    -o=jsonpath=''{.items[0].metadata.name}'')
-
-
-    # Execute a command inside the Prometheus pod to check its health
-
-    # We use the wget command to make an HTTP request to the /-/healthy endpoint of
-    Prometheus
-
-    # We also use grep and awk to extract the HTTP status code from the response
-
-    kubectl --context=${CONTEXT} -n ${PROM_NAMESPACE} exec $PROM_POD --container prometheus
-    -- wget -qO- -S 127.0.0.1:9090/-/healthy 2>&1 | grep "HTTP/" | awk ''{print $2}''
-
-    '
+    Documentation links not available'
+  explanation: Explanation not available
+  multi_line_details: Multi-line script not available
   name: check_prometheus_api_healthy
