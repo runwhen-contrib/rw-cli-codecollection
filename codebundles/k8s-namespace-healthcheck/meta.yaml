@@ -793,3 +793,100 @@ commands:
     \ | .key + \"=\" + .value)\"' | while read -r line; do \n  check_health \"StatefulSet\"\
     \ $(echo $line | tr -d '\"'); \ndone\n"
   name: check_missing_or_risky_poddisruptionbudget_policies_in_namepace_namespace
+- command: bash 'resource_quota_check.sh'
+  doc_links: '
+
+    - [Kubernetes API Overview](https://kubernetes.io/docs/concepts/overview/kubernetes-api/){:target="_blank"}
+
+    - [Resource Quota Documentation](https://kubernetes.io/docs/concepts/policy/resource-quotas/){:target="_blank"}
+
+    - [JSON Processing in Bash](https://linuxize.com/post/json-processing-in-bash-using-jq/){:target="_blank"}
+
+    - [Bash Scripting Tutorial](https://ryanstutorials.net/bash-scripting-tutorial/){:target="_blank"}'
+  explanation: This script is a Bash script that interacts with the Kubernetes API
+    to check and assess the resource quota and usage within a specific namespace.
+    It processes the JSON data to calculate resource percentage usages and generates
+    recommendations based on these calculations, then outputs the recommendations
+    in JSON format.
+  multi_line_details: "#!/bin/bash\n\n# Initialize recommendations array\ndeclare\
+    \ -a recommendations\n\n# Function to convert memory to Mi\nconvert_memory_to_mib()\
+    \ {\n    local memory=$1\n\n    # Extract the number and unit separately\n   \
+    \ local number=${memory//[!0-9]/}\n    local unit=${memory//[0-9]/}\n\n    case\
+    \ $unit in\n        Gi)\n            echo $(( number * 1024 ))  # Convert Gi to\
+    \ Mi\n            ;;\n        Mi)\n            echo $number  # Already in Mi\n\
+    \            ;;\n        Ki)\n            echo $(( number / 1024 ))  # Convert\
+    \ Ki to Mi\n            ;;\n        *)\n            echo $(( number / (1024 *\
+    \ 1024) ))  # Convert bytes to Mi\n            ;;\n    esac\n}\n\n# Function to\
+    \ convert CPU to millicores\nconvert_cpu_to_millicores() {\n    local cpu=$1\n\
+    \    if [[ $cpu =~ ^[0-9]+m$ ]]; then\n        echo ${cpu%m}\n    else\n     \
+    \   echo $(($cpu * 1000))  # Convert CPU cores to millicores\n    fi\n}\n\n# Function\
+    \ to calculate and display resource usage status with recommendations\ncheck_usage()\
+    \ {\n    local quota_name=$1\n    local resource=$2\n    local used=$3\n    local\
+    \ hard=$4\n\n    # Convert memory and CPU to a common unit (Mi and millicores\
+    \ respectively)\n    if [[ $resource == *memory* ]]; then\n        used=$(convert_memory_to_mib\
+    \ $used)\n        hard=$(convert_memory_to_mib $hard)\n    elif [[ $resource ==\
+    \ *cpu* ]]; then\n        used=$(convert_cpu_to_millicores $used)\n        hard=$(convert_cpu_to_millicores\
+    \ $hard)\n    fi\n\n    # Calculating percentage\n    local percentage=0\n   \
+    \ if [ $hard -ne 0 ]; then\n        percentage=$(( 100 * used / hard ))\n    fi\n\
+    \n    # Generate recommendation based on usage\n    local recommendation=\"\"\n\
+    \    local increase_percentage=0\n    local increased_value=0\n    if [ $percentage\
+    \ -ge 100 ]; then\n        if [ $used -gt $hard ]; then\n            # If usage\
+    \ is over 100%, match the current usage\n            echo \"$resource: OVER LIMIT\
+    \ ($percentage%) - Adjust resource quota to match current usage with some headroom\
+    \ for $resource in $NAMESPACE\"\n            increase_percentage=\"${CRITICAL_INCREASE_LEVEL:-40}\"\
+    \n            increased_value=$(( used * increase_percentage / 100 ))\n      \
+    \      suggested_value=$(( increased_value + used ))\n        else\n         \
+    \   echo \"$resource: AT LIMIT ($percentage%) - Immediately increase the resource\
+    \ quota for $resource in $NAMESPACE\"\n            increase_percentage=\"${CRITICAL_INCREASE_LEVEL:-40}\"\
+    \n            increased_value=$(( hard * increase_percentage / 100 ))\n      \
+    \      suggested_value=$(( increased_value + hard ))\n        fi\n        recommendation=\"\
+    {\\\"remediation_type\\\":\\\"resourcequota_update\\\",\\\"increase_percentage\\\
+    \":\\\"$increase_percentage\\\",\\\"limit_type\\\":\\\"hard\\\",\\\"current_value\\\
+    \":\\\"$hard\\\",\\\"suggested_value\\\":\\\"$suggested_value\\\",\\\"quota_name\\\
+    \": \\\"$quota_name\\\", \\\"resource\\\": \\\"$resource\\\", \\\"usage\\\": \\\
+    \"at or above 100%\\\", \\\"severity\\\": \\\"1\\\", \\\"next_step\\\": \\\"Increase\
+    \ the resource quota for $resource in \\`$NAMESPACE\\`\\\"}\"\n    elif [ $percentage\
+    \ -ge 90 ]; then\n        echo \"$resource: WARNING ($percentage%) - Consider\
+    \ increasing the resource quota for $resource in $NAMESPACE\"\n        increase_percentage=\"\
+    ${WARNING_INCREASE_LEVEL:-25}\"\n        increased_value=$(( hard * increase_percentage\
+    \ / 100 ))\n        suggested_value=$(( increased_value + hard ))\n        recommendation=\"\
+    {\\\"remediation_type\\\":\\\"resourcequota_update\\\",\\\"increase_percentage\\\
+    \":\\\"$increase_percentage\\\",\\\"limit_type\\\":\\\"hard\\\",\\\"current_value\\\
+    \":\\\"$hard\\\",\\\"suggested_value\\\":\\\"$suggested_value\\\",\\\"quota_name\\\
+    \": \\\"$quota_name\\\", \\\"resource\\\": \\\"$resource\\\", \\\"usage\\\": \\\
+    \"between 90-99%\\\", \\\"severity\\\": \\\"2\\\", \\\"next_step\\\": \\\"Consider\
+    \ increasing the resource quota for $resource in \\`$NAMESPACE\\`\\\"}\"\n   \
+    \ elif [ $percentage -ge 80 ]; then\n        echo \"$resource: INFO ($percentage%)\
+    \ - Monitor the resource quota for $resource in $NAMESPACE\"\n        increase_percentage=\"\
+    ${INFO_INCREASE_LEVEL:-10}\"\n        increased_value=$(( hard * increase_percentage\
+    \ / 100 ))\n        suggested_value=$(( increased_value + hard ))\n        recommendation=\"\
+    {\\\"remediation_type\\\":\\\"resourcequota_update\\\",\\\"increase_percentage\\\
+    \":\\\"$increase_percentage\\\",\\\"limit_type\\\":\\\"hard\\\",\\\"current_value\\\
+    \":\\\"$hard\\\",\\\"suggested_value\\\":\\\"$suggested_value\\\",\\\"quota_name\\\
+    \": \\\"$quota_name\\\", \\\"resource\\\": \\\"$resource\\\", \\\"usage\\\": \\\
+    \"between 80-90%\\\", \\\"severity\\\": \\\"3\\\", \\\"next_step\\\": \\\"Monitor\
+    \ the resource quota for $resource in \\`$NAMESPACE\\`\\\"}\"\n    else\n    \
+    \    echo \"$resource: OK ($percentage%)\"\n    fi\n\n    # Concatenate recommendation\
+    \ to the string\n    if [ -n \"$recommendation\" ]; then\n        if [ -z \"$recommendations\"\
+    \ ]; then\n            recommendations=\"$recommendation\"\n        else\n   \
+    \         recommendations=\"$recommendations, $recommendation\"\n        fi\n\
+    \    fi\n}\n\n# Fetching resource quota details\nquota_json=$(${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ get quota -n \"$NAMESPACE\" --context \"$CONTEXT\" -o json)\n\n# Processing\
+    \ the quota JSON\necho \"Resource Quota and Usage for Namespace: $NAMESPACE in\
+    \ Context: $CONTEXT\"\necho \"===========================================\"\n\n\
+    # Parsing quota JSON\nwhile IFS= read -r item; do\n    quota_name=$(echo \"$item\"\
+    \ | jq -r '.metadata.name')\n    echo \"Quota: $quota_name\"\n\n    # Create temporary\
+    \ files\n    hard_file=$(mktemp)\n    used_file=$(mktemp)\n\n    echo \"$item\"\
+    \ | jq -r '.status.hard | to_entries | .[] | \"\\(.key) \\(.value)\"' > \"$hard_file\"\
+    \n    echo \"$item\" | jq -r '.status.used | to_entries | .[] | \"\\(.key) \\\
+    (.value)\"' > \"$used_file\"\n\n    # Process 'hard' limits and 'used' resources\n\
+    \    while read -r key value; do\n        hard=$(grep \"^$key \" \"$hard_file\"\
+    \ | awk '{print $2}')\n        used=$(grep \"^$key \" \"$used_file\" | awk '{print\
+    \ $2}')\n        check_usage \"$quota_name\" \"$key\" \"${used:-0}\" \"$hard\"\
+    \n    done < \"$hard_file\"\n\n    echo \"-----------------------------------\"\
+    \n\n    # Clean up temporary files\n    rm \"$hard_file\" \"$used_file\"\ndone\
+    \ < <(echo \"$quota_json\" | jq -c '.items[]')\n\n# Outputting recommendations\
+    \ as JSON\nif [ -n \"$recommendations\" ]; then\n    echo \"Recommended Next Steps:\"\
+    \n    echo \"[$recommendations]\" | jq .\nelse\n    echo \"No recommendations.\"\
+    \nfi"
+  name: check_resource_quota_utilization_in_namepace_namespace

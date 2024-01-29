@@ -90,20 +90,10 @@ commands:
     State:\t" + .status.operationState.message'
   doc_links: '
 
-    '
+    Documentation links not available'
   explanation: This command retrieves information about a specific Kubernetes resource
     in a specific namespace and context, filtering for resources related to Helm charts
     and displaying their name, target revision, attempted revision, sync status, and
     operational state using a JSON output format.
-  multi_line_details: "\n# This command retrieves information about a specific Kubernetes\
-    \ resource in a specified namespace and context, and then formats the output using\
-    \ jq.\n\n# First, we use kubectl to get the resource with the specified name in\
-    \ the specified namespace and context.\nkubectl get ${RESOURCE_NAME} -n ${NAMESPACE}\
-    \ --context ${CONTEXT} -o=json |\n\n# Next, we use jq to filter and format the\
-    \ JSON output to display only the relevant information we're interested in.\n\
-    jq -r '.items[] | \n    # Select resources that have a helm source\n    select(.spec.source.helm\
-    \ != null) | \n    \"\\nName:\\t\\t\\t\" + .metadata.name + \n    \"\\nTarget\
-    \ Revision:\\t\" + .spec.source.targetRevision + \n    \"\\nAttempted Revision:\\\
-    t\" + .status.sync.revision + \n    \"\\nSync Status:\\t\\t\" + .status.sync.status\
-    \ + \n    \"\\nOperational State:\\t\" + .status.operationState.message'\n"
+  multi_line_details: Multi-line script not available
   name: fetch_installed_argocd_helm_release_versions
