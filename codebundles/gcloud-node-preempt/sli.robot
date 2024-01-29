@@ -43,5 +43,6 @@ Count the number of nodes in active prempt operation
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud compute operations list --filter='operationType:(compute.instances.preempted)' --format=json --project=${GCP_PROJECT_ID} | jq -r --arg now "$(date -u +%s)" '[.[] | select((.startTime | sub("\\\\.[0-9]+"; "") | strptime("%Y-%m-%dT%H:%M:%S%z") | mktime) > ($now | tonumber - (${AGE}*60)))] | length'
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    timeout_seconds=180
     ${metric}=     Convert To Number    ${preempt_node_list.stdout}
     RW.Core.Push Metric    ${metric}
