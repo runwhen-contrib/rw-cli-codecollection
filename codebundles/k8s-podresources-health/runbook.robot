@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       Inspects the resources provisioned for a given set of pods, selected by their labels and raises issues if no resources were specified.
+Documentation       Inspects the resources provisioned for a given set of pods and raises issues or recommendations as necessary.
 Metadata            Author    jon-funk
 Metadata            Display Name    Kubernetes Pod Resources Scan
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
@@ -29,7 +29,7 @@ Show Pods Without Resource Limit or Resource Requests Set in Namespace `${NAMESP
     ...    prehook
     ...    liveness
     ...    readiness
-    ...    `${NAMESPACE}`
+    ...    ${NAMESPACE}
     ${pods_without_limits}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running -ojson | jq -r '[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.limits == null) | {pod: $pod.metadata.name, container_without_limits: .name}]'
     ...    env=${env}
@@ -72,7 +72,7 @@ Show Pods Without Resource Limit or Resource Requests Set in Namespace `${NAMESP
 
 Get Pod Resource Utilization with Top in Namespace `${NAMESPACE}`
     [Documentation]    Performs and a top command on list of labeled workloads to check pod resources.
-    [Tags]    top    resources    utilization    pods    workloads    cpu    memory    allocation    labeled
+    [Tags]    top    resources    utilization    pods    workloads    cpu    memory    allocation    labeled    ${NAMESPACE}
     ${pods_top}=    RW.CLI.Run Cli
     ...    cmd=for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods ${LABELS} -n ${NAMESPACE} --context ${CONTEXT} -o custom-columns=":metadata.name" --field-selector=status.phase=Running); do ${KUBERNETES_DISTRIBUTION_BINARY} top pod $pod -n ${NAMESPACE} --context ${CONTEXT} --containers; done
     ...    env=${env}
@@ -89,7 +89,7 @@ Get Pod Resource Utilization with Top in Namespace `${NAMESPACE}`
 
 Identify Pod Resource Recommendations in Namespace `${NAMESPACE}`
     [Documentation]    Queries the namespace for any Vertical Pod Autoscaler resource recommendations. 
-    [Tags]    recommendation    resources    utilization    pods    cpu    memory    allocation   vpa
+    [Tags]    recommendation    resources    utilization    pods    cpu    memory    allocation   vpa    ${NAMESPACE}
     ${vpa_usage}=    RW.CLI.Run Bash File
     ...    bash_file=vpa_recommendations.sh
     ...    env=${env}
