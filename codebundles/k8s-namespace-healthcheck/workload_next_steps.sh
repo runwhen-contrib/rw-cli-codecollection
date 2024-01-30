@@ -69,8 +69,12 @@ if [[ $messages =~ "max node group size reached"]]; then
     next_steps+=("Check for Quota Errors")
 fi
 
+if [[ $messages =~ "Health check failed after"]]; then
+    next_steps+=("Check $owner_kind $owner_name Health")
+fi
+
 if [[ -z $next_steps ]]; then
-    next_steps+=("Please review the report logs and escalate the issue if necessary.")
+    next_steps+=("Please review the report output and escalate the issue if necessary.")
 fi
 # Display the list of recommendations
 printf "%s\n" "${next_steps[@]}" | sort | uniq
