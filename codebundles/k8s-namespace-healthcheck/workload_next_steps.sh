@@ -49,8 +49,8 @@ if [[ $messages =~ "ImagePullBackOff" || $messages =~ "Back-off pulling image" |
 fi
 
 if [[ $messages =~ "Back-off restarting failed container" ]]; then
-    next_steps+=("Check Log for $item_owner $item_kind")
-    next_steps+=("Troubleshoot Warning Events for $item_owner $item_kind")
+    next_steps+=("Check Log for $owner_kind \`$owner_name\`")
+    next_steps+=("Troubleshoot Warning Events for $owner_kind \`$owner_name\`")
 
 fi
 
@@ -72,12 +72,12 @@ fi
 
 if [[ $messages =~ "max node group size reached" ]]; then
     next_steps+=("Not enough node resources available to schedule pods. Escalate this issue to your cluster owner.")
-    next_steps+=("Increase Node Count in Cluster")
-    next_steps+=("Check for Quota Errors")
+    next_steps+=("Increase node count in cluster.")
+    next_steps+=("Check for quota errors.")
 fi
 
 if [[ $messages =~ "Health check failed after" ]]; then
-    next_steps+=("Check $owner_kind $owner_name Health")
+    next_steps+=("Check $owner_kind \`$owner_name\` Health")
 fi
 
 if [[ ${#next_steps[@]} -eq 0 ]]; then
