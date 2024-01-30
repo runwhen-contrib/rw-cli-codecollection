@@ -48,6 +48,13 @@ if [[ $messages =~ "ImagePullBackOff" || $messages =~ "Back-off pulling image" |
     next_steps+=("List Images and Tags for Every Container in Failed Pods for Namespace \`$NAMESPACE\`")
 fi
 
+if [[ $messages =~ "Back-off restarting failed container" ]]; then
+    next_steps+=("Check Log for $item_owner $item_kind")
+    next_steps+=("Troubleshoot Warning Events for $item_owner $item_kind")
+
+fi
+
+
 if [[ $messages =~ "ImagePullBackOff" || $messages =~ "Back-off pulling image" || $messages =~ "ErrImagePull" ]]; then
     next_steps+=("List ImagePullBackoff Events and Test Path and Tags for Namespace \`$NAMESPACE\`")
     next_steps+=("List Images and Tags for Every Container in Failed Pods for Namespace \`$NAMESPACE\`")
