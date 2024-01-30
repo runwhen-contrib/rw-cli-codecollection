@@ -70,13 +70,13 @@ if [[ $messages =~ "No preemption victims found for incoming pod" || $messages =
     next_steps+=("Check for Quota Errors")
 fi
 
-if [[ $messages =~ "max node group size reached"]]; then
-    next_steps+=("Not enough node resources available to schedule pods. Escalate this issue to your cluster owner. ")
+if [[ $messages =~ "max node group size reached" ]]; then
+    next_steps+=("Not enough node resources available to schedule pods. Escalate this issue to your cluster owner.")
     next_steps+=("Increase Node Count in Cluster")
     next_steps+=("Check for Quota Errors")
 fi
 
-if [[ $messages =~ "Health check failed after"]]; then
+if [[ $messages =~ "Health check failed after" ]]; then
     next_steps+=("Check $owner_kind $owner_name Health")
 fi
 
