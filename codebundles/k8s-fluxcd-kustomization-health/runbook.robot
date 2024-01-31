@@ -48,6 +48,7 @@ Get details for unready Kustomizations in Namespace `${NAMESPACE}`
             ...    expected=Kustomizations should be synced and ready.   
             ...    actual=We found the following kustomization objects in a pending state: ${item}
             ...    title=Unready Kustomization \`${item["KustomizationName"]}\` Found In Namespace \`${NAMESPACE}\`
+            ...    reproduce_hint=${kustomizations_not_ready.cmd}
             ...    details=${item}
             ...    next_steps=${item_next_steps.stdout}
         END
