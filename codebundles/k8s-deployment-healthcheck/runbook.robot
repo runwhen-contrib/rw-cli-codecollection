@@ -80,7 +80,7 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' <<< "${liveness_probe_health.stdout}"
+    ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' <<< '''${liveness_probe_health.stdout}'''
     ...    env=${env}
     ...    include_in_history=false
     IF    len($recommendations.stdout) > 0
@@ -117,7 +117,7 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' <<< "${readiness_probe_health.stdout}"
+    ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' <<< '''${readiness_probe_health.stdout}'''
     ...    env=${env}
     ...    include_in_history=false
     IF    len($recommendations.stdout) > 0
