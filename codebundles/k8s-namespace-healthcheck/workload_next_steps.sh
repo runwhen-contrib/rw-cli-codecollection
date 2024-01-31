@@ -27,8 +27,13 @@ if [[ $messages =~ "Misconfiguration" && $owner_kind == "Deployment" ]]; then
 fi
 
 if [[ $messages =~ "Misconfiguration" ]]; then
-    next_steps+=("Review configuration of  owner_kind \`$owner_name\`")
+    next_steps+=("Review configuration of $owner_kind \`$owner_name\`")
     next_steps+=("Check for Node Failures or Maintenance Activities in Cluster \`$CONTEXT\`")
+fi
+
+if [[ $messages =~ "PodInitializing" ]]; then
+    next_steps+=("Check $owner_kind Health for \`$owner_name\`")
+    next_steps+=("Troubleshoot $owner_kind Warning Events for \`$owner_name\`")
 fi
 
 if [[ $messages =~ "Liveness probe failed" || $messages =~ "Liveness probe errored" ]]; then
@@ -53,7 +58,6 @@ if [[ $messages =~ "Back-off restarting failed container" ]]; then
     next_steps+=("Troubleshoot Warning Events for $owner_kind \`$owner_name\`")
 
 fi
-
 
 if [[ $messages =~ "ImagePullBackOff" || $messages =~ "Back-off pulling image" || $messages =~ "ErrImagePull" ]]; then
     next_steps+=("List ImagePullBackoff Events and Test Path and Tags for Namespace \`$NAMESPACE\`")
