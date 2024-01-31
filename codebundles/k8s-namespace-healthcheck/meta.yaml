@@ -342,7 +342,9 @@ commands:
   doc_links: '
 
     '
-  explanation: Explanation not available
+  explanation: This command retrieves information about pods in a specific namespace
+    and context, then filters the results to show only pods that are not ready or
+    have not completed, displaying their kind, name, and conditions in JSON format.
   multi_line_details: "\n# Set the context and namespace for the kubernetes command\n\
     CONTEXT=\"my-kube-context\"\nNAMESPACE=\"my-namespace\"\n\n# Get the existing\
     \ pods in JSON format using kubectl\nkubectl get pods --context ${CONTEXT} -n\

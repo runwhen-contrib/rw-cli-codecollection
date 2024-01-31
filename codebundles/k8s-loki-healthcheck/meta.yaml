@@ -32,16 +32,8 @@ commands:
     | jq -r ''.shards[] | select(.state != "ACTIVE") | {name: .id, state: .state}'''
   doc_links: '
 
-    - [kubectl command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
-
-    - [wget command](https://www.gnu.org/software/wget/manual/wget.html){:target="_blank"}
-
-    - [JSON data retrieval](https://www.json.org/json-en.html){:target="_blank"}
-
-    - [jq filtering](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command uses kubectl to execute a wget command on a specific pod
-    in a specific namespace, retrieving JSON data from a local server and then filtering
-    the data using jq to display only shards with a state other than "ACTIVE."
+    '
+  explanation: Explanation not available
   multi_line_details: "\n# Set the kubectl context to the specified CONTEXT and namespace\
     \ to NAMESPACE\nkubectl --context=${CONTEXT} -n ${NAMESPACE} exec \\\n\n# Get\
     \ the pod name using the specified CONTEXT and NAMESPACE with label selector \"\
