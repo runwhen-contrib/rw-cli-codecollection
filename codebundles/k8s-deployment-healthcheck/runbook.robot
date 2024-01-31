@@ -43,16 +43,17 @@ Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
     ...    cmd=awk '/Issues Identified:/ {start=1; next} /The namespace `${NAMESPACE}` has produced the following interesting events:/ {start=0} start' <<< '''${logs.stdout}'''
     ...    env=${env}
     ...    include_in_history=false
-    # FIXME: Refactor this to a loop of 1 issue per line of issue output - better alinging next steps with specific issues
-    RW.Core.Add Issue
-    ...    severity=2
-    ...    expected=No logs matching error patterns found in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-    ...    actual=Error logs found in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-    ...    title=Deployment `${DEPLOYMENT_NAME}` in `${NAMESPACE}` has error logs.
-    ...    reproduce_hint=View Commands Used in Report Output
-    ...    details=Deployment `${DEPLOYMENT_NAME}` in `${NAMESPACE}` generated the following log analysis: \n${logs.stdout}
-    ...    next_steps=${recommendations.stdout}
-
+    ## We should improve deployment_logs.sh to generate a match issue + next steps + severity level
+    IF    len($issues.stdout) > 0
+        RW.Core.Add Issue
+        ...    severity=3
+        ...    expected=No logs matching error patterns found in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+        ...    actual=Error logs found in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+        ...    title=Deployment `${DEPLOYMENT_NAME}` in `${NAMESPACE}` is generating error logs.
+        ...    reproduce_hint=View Commands Used in Report Output
+        ...    details=Deployment `${DEPLOYMENT_NAME}` in `${NAMESPACE}` generated the following log analysis: \n${logs.stdout}
+        ...    next_steps=${recommendations.stdout}
+    END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report
     ...    Recent logs from deployment/`${DEPLOYMENT_NAME}` in `${NAMESPACE}`:\n\n${logs.stdout}
