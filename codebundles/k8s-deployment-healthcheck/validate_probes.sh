@@ -32,7 +32,7 @@ for ((i=0; i<NUM_CONTAINERS; i++)); do
     PROBE=$(extract_data "$MANIFEST" ".spec.template.spec.containers[$i].${PROBE_TYPE}")
     CONTAINER_NAME=$(extract_data "$MANIFEST" ".spec.template.spec.containers[$i].name")
     echo "-------- START Validation - Container Name: $CONTAINER_NAME Probe Type: $PROBE_TYPE -------"
-    echo "Container: \`$CONTAINER_NAME\`"
+    echo "Container: $CONTAINER_NAME"
     echo "$PROBE_TYPE: $PROBE"
 
     # List container ports
@@ -44,7 +44,7 @@ for ((i=0; i<NUM_CONTAINERS; i++)); do
     fi
 
     if [ -z "$PROBE" ]; then
-        echo "Container \`$CONTAINER_NAME\`: ${PROBE_TYPE} not found."
+        echo "Container $CONTAINER_NAME: ${PROBE_TYPE} not found."
         continue
     fi
 
@@ -54,10 +54,10 @@ for ((i=0; i<NUM_CONTAINERS; i++)); do
         CONTAINER_PORTS=$(extract_data "$MANIFEST" ".spec.template.spec.containers[$i].ports[].containerPort")
 
         if [[ ! " $CONTAINER_PORTS " == *"$PROBE_PORT"* ]]; then
-            echo "Container \`$CONTAINER_NAME\`: Port $PROBE_PORT used in $PROBE_TYPE is not exposed by the container."
-            next_steps+=("Update $PROBE_TYPE For \`${DEPLOYMENT_NAME}\` to use one of the following ports: $CONTAINER_PORTS")
+            echo "Container $CONTAINER_NAME: Port $PROBE_PORT used in $PROBE_TYPE is not exposed by the container."
+            next_steps+=("Update $PROBE_TYPE For \`$DEPLOYMENT_NAME\` to use one of the following ports: $CONTAINER_PORTS")
         else
-            echo "Container \`$CONTAINER_NAME\`: ${PROBE_TYPE} port $PROBE_PORT is valid."
+            echo "Container $CONTAINER_NAME: ${PROBE_TYPE} port $PROBE_PORT is valid."
         fi
     fi
 
@@ -70,11 +70,11 @@ for ((i=0; i<NUM_CONTAINERS; i++)); do
         if [ -n "$PORT_IN_COMMAND" ]; then
             CONTAINER_PORTS=$(extract_data "$MANIFEST" ".spec.template.spec.containers[$i].ports[].containerPort")
             if [[ ! " $CONTAINER_PORTS " == *"$PORT_IN_COMMAND"* ]]; then
-                echo "Container \`$CONTAINER_NAME\`: Port $PORT_IN_COMMAND used in ${PROBE_TYPE} exec command is not exposed by the container. The following ports are exposed: $CONTAINER_PORTS"
+                echo "Container $CONTAINER_NAME: Port $PORT_IN_COMMAND used in ${PROBE_TYPE} exec command is not exposed by the container. The following ports are exposed: $CONTAINER_PORTS"
                 next_steps+=("Get Deployment Workload Details For \`$DEPLOYMENT_NAME\`")
-                next_steps+=("Remediate Readiness and Liveness Probes for Deployments in Namespace \`${NAMESPACE}\`")
+                next_steps+=("Remediate Readiness and Liveness Probes for Deployments in Namespace \`$NAMESPACE\`")
             else
-                echo "Container \`$CONTAINER_NAME\`: Port $PORT_IN_COMMAND in ${PROBE_TYPE} exec command is valid."
+                echo "Container $CONTAINER_NAME: Port $PORT_IN_COMMAND in ${PROBE_TYPE} exec command is valid."
             fi
         fi
 
