@@ -127,9 +127,9 @@ Troubleshoot Pending Pods In Namespace `${NAMESPACE}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
-    ${pendind_pod_list}=    Split String    ${pending_pods.stdout}    _______-
-    IF    len($pendind_pod_list) > 0
-        FOR    ${item}    IN    @{pendind_pod_list}
+    ${pending_pod_list}=    Split String    ${pending_pods.stdout}    _______-
+    IF    len($pending_pod_list) > 0
+        FOR    ${item}    IN    @{pending_pod_list}
             ${is_not_just_newline}=    Evaluate    '''${item}'''.strip() != ''
             IF    ${is_not_just_newline}
                 ${pod_name}=    RW.CLI.Run Cli

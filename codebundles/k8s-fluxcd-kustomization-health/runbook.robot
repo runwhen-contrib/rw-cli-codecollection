@@ -6,6 +6,8 @@ Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,FluxCD
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             RW.NextSteps
+Library             String
 
 Suite Setup         Suite Initialization
 
@@ -28,26 +30,35 @@ Get details for unready Kustomizations in Namespace `${NAMESPACE}`
     [Documentation]    List all Kustomizations that are not found in a ready state in namespace ${NAMESPACE}  
     [Tags]        FluxCD     Kustomization    Versions    ${NAMESPACE}
     ${kustomizations_not_ready}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select (.status.conditions[] | select(.type == "Ready" and .status == "False")) | "---\\nKustomization Name: \\(.metadata.name)\\n\\nReady Status: \\(.status.conditions[] | select(.type == "Ready") | "\\n ready: \\(.status)\\n message: \\(.message)\\n reason: \\(.reason)\\n last_transition_time: \\(.lastTransitionTime)")\\n\\nReconcile Status:\\(.status.conditions[] | select(.type == "Reconciling") |"\\n reconciling: \\(.status)\\n message: \\(.message)")\\n---\\n"'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json | jq '[.items[] | select(.status.conditions[] | select(.type == "Ready" and .status == "False")) | {KustomizationName: .metadata.name, ReadyStatus: {ready: (.status.conditions[] | select(.type == "Ready").status), message: (.status.conditions[] | select(.type == "Ready").message), reason: (.status.conditions[] | select(.type == "Ready").reason), last_transition_time: (.status.conditions[] | select(.type == "Ready").lastTransitionTime)}, ReconcileStatus: {reconciling: (.status.conditions[] | select(.type == "Reconciling").status), message: (.status.conditions[] | select(.type == "Reconciling").message)}}]'
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${kustomizations_not_ready}
-    ...    set_severity_level=2
-    ...    set_issue_expected=Kustomizations should be synced and ready.   
-    ...    set_issue_actual=We found the following kustomization objects in a pending state: $_stdout
-    ...    set_issue_title=Unready Kustomizations Found In Namespace ${NAMESPACE}
-    ...    set_issue_details=Kustomizations pending with reasons:\n"$_stdout" in the namespace ${NAMESPACE}
-    ...    _line__raise_issue_if_contains=-
+    ${kustomizations_not_ready_list}=    Evaluate    json.loads(r'''${kustomizations_not_ready.stdout}''')    json
+    IF    len(@{kustomizations_not_ready_list}) > 0
+        FOR    ${item}    IN    @{kustomizations_not_ready_list}               
+            ${messages}=    Replace String    ${item["ReadyStatus"]["message"]}   "    ${EMPTY}
+            ${item_next_steps}=    RW.CLI.Run Bash File
+            ...    bash_file=workload_next_steps.sh
+            ...    cmd_override=./workload_next_steps.sh "${messages}"
+            ...    env=${env}
+            ...    include_in_history=False
+            RW.Core.Add Issue
+            ...    severity=2
+            ...    expected=Kustomizations should be synced and ready.   
+            ...    actual=We found the following kustomization objects in a pending state: ${item}
+            ...    title=Unready Kustomization \`${item["KustomizationName"]}\` Found In Namespace \`${NAMESPACE}\`
+            ...    reproduce_hint=${kustomizations_not_ready.cmd}
+            ...    details=${item}
+            ...    next_steps=${item_next_steps.stdout}
+        END
+    END
     ${history}=    RW.CLI.Pop Shell History
     IF    """${kustomizations_not_ready.stdout}""" == ""
         ${kustomizations_not_ready}=    Set Variable    No Kustomizations Pending Found
     ELSE
         ${kustomizations_not_ready}=    Set Variable    ${kustomizations_not_ready.stdout}
     END
-    ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Kustomizations with: \n ${kustomizations_not_ready}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 

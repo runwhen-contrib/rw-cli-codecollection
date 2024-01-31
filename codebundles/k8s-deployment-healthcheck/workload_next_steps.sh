@@ -26,14 +26,14 @@ if [[ $messages =~ "Misconfiguration" && $owner_kind == "Deployment" ]]; then
     next_steps+=("Get Deployment Workload Details For \`$owner_name\` and Add to Report")
 fi
 
-if [[ $messages =~ "Deployment does not have minimum availability" && $owner_kind == "Deployment" ]]; then
-    next_steps+=("Troubleshoot Deployment Warning Events for \`$owner_name\`")
-    next_steps+=("Troubleshoot Container Restarts In Namespace \`$NAMESPACE\`")
+if [[ $messages =~ "Misconfiguration" ]]; then
+    next_steps+=("Review configuration of $owner_kind \`$owner_name\`")
+    next_steps+=("Check for Node Failures or Maintenance Activities in Cluster \`$CONTEXT\`")
 fi
 
-if [[ $messages =~ "Misconfiguration" ]]; then
-    next_steps+=("Review configuration of  owner_kind \`$owner_name\`")
-    next_steps+=("Check for Node Failures or Maintenance Activities in Cluster \`$CONTEXT\`")
+if [[ $messages =~ "PodInitializing" ]]; then
+    next_steps+=("Check $owner_kind Health for \`$owner_name\`")
+    next_steps+=("Troubleshoot $owner_kind Warning Events for \`$owner_name\`")
 fi
 
 if [[ $messages =~ "Liveness probe failed" || $messages =~ "Liveness probe errored" ]]; then
@@ -44,9 +44,19 @@ if [[ $messages =~ "Readiness probe errored" || $messages =~ "Readiness probe fa
     next_steps+=("Check Readiness Probe Configuration for $owner_kind \`$owner_name\`")
 fi
 
+if [[ $messages =~ "PodFailed" ]]; then
+    next_steps+=("Check Readiness Probe Configuration for $owner_kind \`$owner_name\`")
+fi
+
 if [[ $messages =~ "ImagePullBackOff" || $messages =~ "Back-off pulling image" || $messages =~ "ErrImagePull" ]]; then
     next_steps+=("List ImagePullBackoff Events and Test Path and Tags for Namespace \`$NAMESPACE\`")
     next_steps+=("List Images and Tags for Every Container in Failed Pods for Namespace \`$NAMESPACE\`")
+fi
+
+if [[ $messages =~ "Back-off restarting failed container" ]]; then
+    next_steps+=("Check Log for $owner_kind \`$owner_name\`")
+    next_steps+=("Troubleshoot Warning Events for $owner_kind \`$owner_name\`")
+
 fi
 
 if [[ $messages =~ "ImagePullBackOff" || $messages =~ "Back-off pulling image" || $messages =~ "ErrImagePull" ]]; then
@@ -56,6 +66,26 @@ fi
 
 if [[ $messages =~ "forbidden: failed quota" ]]; then
     next_steps+=("Check Resource Quota Utilization in Namepace `${NAMESPACE}`")
+fi
+
+if [[ $messages =~ "No preemption victims found for incoming pod" || $messages =~ "Insufficient cpu" ]]; then
+    next_steps+=("Not enough node resources available to schedule pods. Escalate this issue to your cluster owner. ")
+    next_steps+=("Increase Node Count in Cluster")
+    next_steps+=("Check for Quota Errors")
+fi
+
+if [[ $messages =~ "max node group size reached" ]]; then
+    next_steps+=("Not enough node resources available to schedule pods. Escalate this issue to your cluster owner.")
+    next_steps+=("Increase node count in cluster.")
+    next_steps+=("Check for quota errors.")
+fi
+
+if [[ $messages =~ "Health check failed after" ]]; then
+    next_steps+=("Check $owner_kind \`$owner_name\` Health")
+fi
+
+if [[ ${#next_steps[@]} -eq 0 ]]; then
+    next_steps+=("Please review the report logs and escalate the issue if necessary.")
 fi
 
 # Display the list of recommendations

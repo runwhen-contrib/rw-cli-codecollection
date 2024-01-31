@@ -114,11 +114,14 @@ SEARCH_RESOURCES=""
 
 # Format file / table http_logrus_custom
 # Search for http log format used by online-boutique (which uses logrus but is custom)
+echo "Query for HTTP Path patterns"
 for FILE in "${LOG_FILES[@]}"; do
     echo "$FILE"
     LOG_SUMMARY=$(lnav -n -c ';SELECT COUNT(*) AS error_count, CASE WHEN "http.req.path" LIKE "/product%" THEN "/product" ELSE "http.req.path" END AS root_path, "http.resp.status" FROM http_logrus_custom WHERE "http.resp.status" = 500 AND NOT "http.req.path" = "/" GROUP BY root_path, "http.resp.status" ORDER BY error_count DESC;' $FILE)
     echo "$LOG_SUMMARY"
-    INTERESTING_PATHS+=$(echo "$LOG_SUMMARY" | awk 'NR>1 && NR<5 {sub(/^\//, "", $2); print $2}')$'\n'
+    if [[ $LOG_SUMMARY ]]; then 
+        INTERESTING_PATHS+=$(echo "$LOG_SUMMARY" | awk 'NR>1 && NR<5 {sub(/^\//, "", $2); print $2}')$'\n'
+    fi
 done
 
 if [[ -n "$INTERESTING_PATHS" ]]; then
@@ -129,7 +132,17 @@ else
     echo "No interesting HTTP paths found."
 fi
 
+## Lightweight - we explicitly specify which resources we want to search
+# Run RESOURCE_SEARCH_LIST only if SEARCH_RESOURCES has content
+if [[ -n "$SEARCH_RESOURCES" ]]; then
+    RESOURCE_SEARCH_LIST=$(${KUBERNETES_DISTRIBUTION_BINARY} get deployment,pods,service,statefulset --context=${CONTEXT} -n ${NAMESPACE})
+else
+    echo "No search queries based on HTTP Paths returned results."
+fi
+
+
 # Search for error fields and strings
+echo "Query for generic error logs and sort"
 for FILE in "${LOG_FILES[@]}"; do
     echo "$FILE"
     ERROR_SUMMARY=$(lnav -n -c ';SELECT error, COUNT(*) AS count FROM http_logrus_custom WHERE error IS NOT NULL GROUP BY error;' $FILE)
@@ -139,30 +152,11 @@ done
 ERROR_FUZZY_STRING=$(echo "$ERROR_FUZZY_STRING" | sort | uniq)
 ##### End query #####
 
-
-
-
-# # Fetch a list of all resources in the namespace
-## Heavyweight - this times out after 30s, but is a better way to get any and all resources
-# SEARCH_LIST=$(${KUBERNETES_DISTRIBUTION_BINARY} api-resources --verbs=list --namespaced -o name  | xargs -n 1 ${KUBERNETES_DISTRIBUTION_BINARY} get --show-kind --ignore-not-found -n $NAMESPACE)
-
-## Lightweight - we explicitly specify which resources we want to search
-# Run RESOURCE_SEARCH_LIST only if SEARCH_RESOURCES has content
-if [[ -n "$SEARCH_RESOURCES" ]]; then
-    RESOURCE_SEARCH_LIST=$(${KUBERNETES_DISTRIBUTION_BINARY} get deployment,pods,service,statefulset --context=${CONTEXT} -n ${NAMESPACE})
-else
-    echo "No search queries returned results."
-    exit
-fi
-
-
-
 # Fuzzy match env vars in deployments with ERROR_FUZZY_STRING
 declare -a FUZZY_ENV_VAR_RESOURCE_MATCHES
-if [[ -n "$SEARCH_RESOURCES" && -n "$ERROR_FUZZY_STRING" ]]; then
+if [[ -n "$ERROR_FUZZY_STRING" ]]; then
     # Filter out common words from ERROR_FUZZY_STRING
     FILTERED_ERROR_STRING=$(filter_common_words "$ERROR_FUZZY_STRING")
-
     # Convert FILTERED_ERROR_STRING into an array
     mapfile -t PATTERNS <<< "$FILTERED_ERROR_STRING"
 
@@ -188,7 +182,6 @@ if [[ -n "$SEARCH_RESOURCES" && -n "$ERROR_FUZZY_STRING" ]]; then
     done
 else
     echo "No search queries or fuzzy matches to perform."
-    exit
 fi
 
 for match in "${FUZZY_ENV_VAR_RESOURCE_MATCHES[@]}"; do
@@ -202,7 +195,7 @@ done
 
 # Fetch namespace events for searching through
 EVENT_SEARCH_LIST=$(${KUBERNETES_DISTRIBUTION_BINARY}  get events --context=${CONTEXT} -n ${NAMESPACE})
-event_details="\nThe namespace `${NAMESPACE}` has produced the following interesting events:"
+event_details="\nThe namespace \`${NAMESPACE}\` has produced the following interesting events:"
 event_details+="\n"
 
 # For each value, search the namespace for applicable resources and events
@@ -226,6 +219,7 @@ if [[ ${#FUZZY_ENV_VAR_RESOURCE_MATCHES[@]} -ne 0 ]]; then
         env_value=${parts[3]}
 
         if [[ -z ${seen_resources[$resource]} ]]; then
+            issue_descriptions+=("Error log could be related to \`$resource\`")
             recommendations+=("Review manifest for \`$resource\` in namespace: \`${NAMESPACE}\`. Matched error log string \`$string\` in environment variable \`$env_key\`.  ")
             seen_resources[$resource]=1
         fi
@@ -255,18 +249,16 @@ if [[ -n "$INTERESTING_RESOURCES" ]]; then
             fi
             ;;
         deployment|deployment.apps)
-            recommendations+=("Check deployment health \`$name\` in namespace \`${NAMESPACE}\`")
+            recommendations+=("Check Deployment health \`$name\` in namespace \`${NAMESPACE}\`")
             ;;
         service)
-            recommendations+=("Check service health \`$name\` in namespace \`${NAMESPACE}\`")
+            recommendations+=("Check Service health \`$name\` in namespace \`${NAMESPACE}\`")
             ;;
         statefulset|statefulset.apps)
-            recommendations+=("Check statefulset health \`$name\` in namespace \`${NAMESPACE}\`")
+            recommendations+=("Check Statefulset health \`$name\` in namespace \`${NAMESPACE}\`")
             ;;
         esac
     done <<< "$INTERESTING_RESOURCES"
-else
-    echo "No resources found based on log query output"
 fi 
 
 # Display the issue descriptions
