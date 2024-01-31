@@ -263,12 +263,63 @@ commands:
     | Available Version: $available_version"; done'
   doc_links: '
 
-    Documentation links not available'
+    - [Helm](https://helm.sh/docs/){:target="_blank"}
+
+    - [Kubernetes cluster](https://kubernetes.io/docs/home/){:target="_blank"}
+
+    - [Helm releases](https://artifacthub.io/packages/helm){:target="_blank"}
+
+    - [Chart details](https://helm.sh/docs/topics/charts/){:target="_blank"}
+
+    - [Available updates for charts](https://helm.sh/docs/howto/charts_tips_and_tricks/){:target="_blank"}
+
+    - [Summary for each release](https://helm.sh/docs/related/){:target="_blank"}'
   explanation: This command retrieves information about Helm releases in a Kubernetes
     cluster, including chart details and available updates for the charts. It then
     prints out a summary for each release, including the installed version and whether
     an update is available.
-  multi_line_details: Multi-line script not available
+  multi_line_details: "\n# Set the namespace and context variables for use in the\
+    \ command\nnamespace=\"${NAMESPACE}\"\ncontext=\"${CONTEXT}\"\n\n# Get a list\
+    \ of helm releases in the specified namespace and context\nhelm_releases=$(kubectl\
+    \ get ${RESOURCE_NAME} -n \"$namespace\" --context \"$context\" -o json | jq -r\
+    \ '.items[] | .metadata.name')\n\n# Iterate through each helm release\necho \"\
+    $helm_releases\" | while IFS= read -r release; do\n\n  # Get details about the\
+    \ helm chart for the current release\n  chart_details=$(kubectl get ${RESOURCE_NAME}\
+    \ \"$release\" -n \"$namespace\" --context \"$context\" -o json | jq -r '.spec.chart.spec\
+    \ // empty')\n\n  # Check if the chart details exist\n  if [[ -n \"$chart_details\"\
+    \ ]]; then\n    \n    # Extract specific details such as kind, name, namespace,\
+    \ version\n    chart_kind=$(echo \"$chart_details\" | jq -r '.sourceRef.kind //\
+    \ empty')\n    chart_name=$(echo \"$chart_details\" | jq -r '.chart // empty')\n\
+    \    chart_source_name=$(echo \"$chart_details\" | jq -r '.sourceRef.name // empty')\n\
+    \    chart_namespace=$(echo \"$chart_details\" | jq -r '.sourceRef.namespace //\
+    \ empty')\n    chart_version=$(echo \"$chart_details\" | jq -r '.version // \"\
+    N/A\"')\n\n    # Check if the chart kind is HelmRepository and relevant information\
+    \ exists\n    if [[ \"$chart_kind\" == \"HelmRepository\" && -n \"$chart_name\"\
+    \ && -n \"$chart_namespace\" ]]; then\n      \n      # Get the repository URL\
+    \ for the chart\n      repo_url=$(kubectl get helmrepositories.source.toolkit.fluxcd.io\
+    \ \"$chart_source_name\" -n \"$chart_namespace\" --context \"$context\" -o json\
+    \ | jq -r '.spec.url // empty')\n\n      # If the repository URL exists, proceed\
+    \ with checking for available updates\n      if [[ -n \"$repo_url\" ]]; then\n\
+    \        \n        # Add the temporary repo for the chart to check available versions\n\
+    \        temp_repo_name=\"$chart_source_name-temp-$release\"\n        add_repo=$(helm\
+    \ repo add \"$temp_repo_name\" \"$repo_url\")\n        \n        # Check for the\
+    \ latest available version of the chart\n        available_chart_version=$(helm\
+    \ search repo \"$temp_repo_name\"/\"$chart_name\" --version \">$chart_version\"\
+    \ --output json | jq -r '.[].version')\n        \n        # If there is an available\
+    \ version, update the available_version variable\n        if [[ -n \"$available_chart_version\"\
+    \ ]]; then\n          sorted_versions=($(echo \"\\${available_chart_version[@]}\"\
+    \ | tr ' ' '\\n' | sort -V))\n          available_version=${sorted_versions[-1]}\n\
+    \          version_update_available=\"True\"\n        else\n          available_version=\"\
+    N/A\"\n          version_update_available=\"False\"\n        fi\n        \n  \
+    \      # Remove the temporary repo\n        remove_repo=$(helm repo remove \"\
+    $temp_repo_name\")\n\n      else\n        available_version=\"N/A\"\n        version_update_available=\"\
+    False\"\n      fi\n\n    else\n      available_version=\"N/A\"\n      version_update_available=\"\
+    False\"\n    fi\n\n  else \n    chart_name=\"N/A\"\n    chart_namespace=\"N/A\"\
+    \n    chart_version=\"N/A\"\n    available_version=\"N/A\"\n    version_update_available=\"\
+    False\"\n  fi\n\n  # Display the release, chart details, and update information\n\
+    \  echo \"Release: $release | Chart: $chart_namespace/$chart_name | Installed\
+    \ Version: $chart_version | Available Update: $version_update_available | Available\
+    \ Version: $available_version\"\n\ndone\n"
   name: check_for_available_helm_chart_updates_in_namespace_namespace
 - command: 'namespace="${NAMESPACE}" context="${CONTEXT}"; helm_releases=$(kubectl
     get ${RESOURCE_NAME} -n "$namespace" --context "$context" -o json | jq -r ''.items[]

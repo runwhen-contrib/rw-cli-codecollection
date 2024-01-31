@@ -46,58 +46,47 @@ commands:
     kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}'
   name: list_all_available_kustomization_objects_in_namespace_namespace
 - command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json
-    | jq -r ''.items[] | select (.status.conditions[] | select(.type == "Ready" and
-    .status == "False")) | "---\nKustomization Name: \(.metadata.name)\n\nReady Status:
-    \(.status.conditions[] | select(.type == "Ready") | "\n ready: \(.status)\n message:
-    \(.message)\n reason: \(.reason)\n last_transition_time: \(.lastTransitionTime)")\n\nReconcile
-    Status:\(.status.conditions[] | select(.type == "Reconciling") |"\n reconciling:
-    \(.status)\n message: \(.message)")\n---\n"'''
+    | jq ''[.items[] | select(.status.conditions[] | select(.type == "Ready" and .status
+    == "False")) | {KustomizationName: .metadata.name, ReadyStatus: {ready: (.status.conditions[]
+    | select(.type == "Ready").status), message: (.status.conditions[] | select(.type
+    == "Ready").message), reason: (.status.conditions[] | select(.type == "Ready").reason),
+    last_transition_time: (.status.conditions[] | select(.type == "Ready").lastTransitionTime)},
+    ReconcileStatus: {reconciling: (.status.conditions[] | select(.type == "Reconciling").status),
+    message: (.status.conditions[] | select(.type == "Reconciling").message)}}]'''
   doc_links: '
 
-    '
-  explanation: This command retrieves a specific resource within a particular namespace
-    and context, then uses jq to format the output in a specific way, showing the
-    status of readiness and reconciliation for that resource.
-  multi_line_details: "\n# Store the resource name, namespace, and context in variables\
-    \ for easier management\nRESOURCE_NAME=\"your_resource_name\"\nNAMESPACE=\"your_namespace\"\
-    \nCONTEXT=\"your_context\"\n\n# Use kubectl to get the resource in JSON format\
-    \ and pipe the output to jq for filtering and formatting\nkubectl get ${RESOURCE_NAME}\
-    \ -n ${NAMESPACE} --context ${CONTEXT} -o json | \n\n# Use jq to filter and format\
-    \ the JSON data to display only the relevant information\njq -r '.items[] | select\
-    \ (.status.conditions[] | select(.type == \"Ready\" and .status == \"False\"))\
-    \ | \n    \"---\\nKustomization Name: \\(.metadata.name)\\n\\n\n    Ready Status:\
-    \ \\(.status.conditions[] | select(.type == \"Ready\") | \"\\n ready: \\(.status)\\\
-    n message: \\(.message)\\n reason: \\(.reason)\\n last_transition_time: \\(.lastTransitionTime)\"\
-    )\\n\n    Reconcile Status:\\(.status.conditions[] | select(.type == \"Reconciling\"\
-    ) |\"\\n reconciling: \\(.status)\\n message: \\(.message)\")\\n---\\n\"'\n\n\
-    This multi-line command breaks down the original one-liner and adds comments to\
-    \ explain each step. It also uses variables for easier modification and readability."
-  name: get_details_for_unready_kustomizations_in_namespace_namespace
-- command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json
-    | jq -r ''.items[] | select (.status.conditions[] | select(.type == "Ready" and
-    .status == "False")) | "---\nKustomization Name: \(.metadata.name)\n\nReady Status:
-    \(.status.conditions[] | select(.type == "Ready") | "\n ready: \(.status)\n message:
-    \(.message)\n reason: \(.reason)\n last_transition_time: \(.lastTransitionTime)")\n\nReconcile
-    Status:\(.status.conditions[] | select(.type == "Reconciling") |"\n reconciling:
-    \(.status)\n message: \(.message)")\n---\n"'''
-  doc_links: '
+    - [Kubernetes resource status](https://kubernetes.io/docs/reference/using-api/api-concepts/){:target="_blank"}
 
-    '
-  explanation: This command retrieves a specific resource within a particular namespace
-    and context, then uses jq to format the output in a specific way, showing the
-    status of readiness and reconciliation for that resource.
-  multi_line_details: "\n# Store the resource name, namespace, and context in variables\
-    \ for easier management\nRESOURCE_NAME=\"your_resource_name\"\nNAMESPACE=\"your_namespace\"\
-    \nCONTEXT=\"your_context\"\n\n# Use kubectl to get the resource in JSON format\
-    \ and pipe the output to jq for filtering and formatting\nkubectl get ${RESOURCE_NAME}\
-    \ -n ${NAMESPACE} --context ${CONTEXT} -o json | \n\n# Use jq to filter and format\
-    \ the JSON data to display only the relevant information\njq -r '.items[] | select\
-    \ (.status.conditions[] | select(.type == \"Ready\" and .status == \"False\"))\
-    \ | \n    \"---\\nKustomization Name: \\(.metadata.name)\\n\\n\n    Ready Status:\
-    \ \\(.status.conditions[] | select(.type == \"Ready\") | \"\\n ready: \\(.status)\\\
-    n message: \\(.message)\\n reason: \\(.reason)\\n last_transition_time: \\(.lastTransitionTime)\"\
-    )\\n\n    Reconcile Status:\\(.status.conditions[] | select(.type == \"Reconciling\"\
-    ) |\"\\n reconciling: \\(.status)\\n message: \\(.message)\")\\n---\\n\"'\n\n\
-    This multi-line command breaks down the original one-liner and adds comments to\
-    \ explain each step. It also uses variables for easier modification and readability."
+    - [Kubernetes namespace and context](https://kubernetes.io/docs/tasks/administer-cluster/namespaces/){:target="_blank"}
+
+    - [Filtering resources in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/object-management/#using-kubectl){:target="_blank"}
+
+    - [Field extraction in Kubernetes](https://kustomize.io/#functions){:target="_blank"}'
+  explanation: This command retrieves information about the status of a specific Kubernetes
+    resource in a particular namespace and context, then formats the results as JSON
+    and filters for resources that are not ready. It then extracts specific fields
+    related to the ready and reconciling status conditions.
+  multi_line_details: "\n# Set the RESOURCE_NAME, NAMESPACE, and CONTEXT variables\n\
+    RESOURCE_NAME=deployment\nNAMESPACE=default\nCONTEXT=minikube\n\n# Use kubectl\
+    \ to get a specific resource in a namespace, format the output as JSON, and then\
+    \ use jq to filter the results\nkubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context\
+    \ ${CONTEXT} -o json | \\\n  jq '[.items[] | \n    select(\n      .status.conditions[]\
+    \ | \n      # Select only items where the \"Ready\" condition is \"False\"\n \
+    \     select(.type == \"Ready\" and .status == \"False\")\n    ) | \n    {\n \
+    \     KustomizationName: .metadata.name, \n      ReadyStatus: {\n        ready:\
+    \ (.status.conditions[] | select(.type == \"Ready\").status), \n        message:\
+    \ (.status.conditions[] | select(.type == \"Ready\").message), \n        reason:\
+    \ (.status.conditions[] | select(.type == \"Ready\").reason), \n        last_transition_time:\
+    \ (.status.conditions[] | select(.type == \"Ready\").lastTransitionTime)\n   \
+    \   }, \n      ReconcileStatus: {\n        reconciling: (.status.conditions[]\
+    \ | select(.type == \"Reconciling\").status), \n        message: (.status.conditions[]\
+    \ | select(.type == \"Reconciling\").message)\n      }\n    }\n  ]'\n\nIn this\
+    \ multi-line command with helpful comments, we first set our variables for the\
+    \ RESOURCE_NAME, NAMESPACE, and CONTEXT. Then we use the `kubectl` command to\
+    \ retrieve information about a specific Kubernetes resource in a specified namespace,\
+    \ formatting the output as JSON. We then use the `jq` tool to filter the JSON\
+    \ output based on specific conditions and construct a custom JSON response.\n\n\
+    By breaking down the command into multiple lines and adding explanatory comments,\
+    \ newer or less experienced devops engineers can better understand the purpose\
+    \ and functionality of each part of the command."
   name: get_details_for_unready_kustomizations_in_namespace_namespace

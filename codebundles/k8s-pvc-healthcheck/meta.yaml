@@ -167,7 +167,11 @@ commands:
     $reclaimpolicy\nCSIDriver: $csidriver\n"; done; done'
   doc_links: '
 
-    Documentation links not available'
+    - [Kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
+
+    - [Persistent Volume Claims](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims){:target="_blank"}
+
+    - [Storage Classes in Kubernetes](https://kubernetes.io/docs/concepts/storage/storage-classes/){:target="_blank"}'
   explanation: This command uses kubectl to retrieve information about running pods
     in a specific namespace, including details about the persistent volume claims
     (PVC) and their associated storage volumes. It then prints out various attributes
