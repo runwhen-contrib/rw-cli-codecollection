@@ -200,7 +200,8 @@ if [[ -z "$json_input" ]]; then
     exit 1
 fi
 
-# Process the JSON
+
+# # Process the JSON
 while read -r json_object; do
     remediation_type=$(jq -r '.remediation_type' <<< "$json_object")
     echo $json_object
