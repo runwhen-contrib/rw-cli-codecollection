@@ -65,23 +65,27 @@ if [[ $messages =~ "ImagePullBackOff" || $messages =~ "Back-off pulling image" |
 fi
 
 if [[ $messages =~ "forbidden: failed quota" || $messages =~ "forbidden: exceeded quota" ]]; then
-    next_steps+=("Check Resource Quota Utilization in Namepace `${NAMESPACE}`")
+    next_steps+=("Check Resource Quota Utilization in Namepace \`$NAMESPACE\`")
 fi
 
 if [[ $messages =~ "No preemption victims found for incoming pod" || $messages =~ "Insufficient cpu" ]]; then
-    next_steps+=("Not enough node resources available to schedule pods. Escalate this issue to your cluster owner. ")
-    next_steps+=("Increase Node Count in Cluster")
-    next_steps+=("Check for Quota Errors")
+    next_steps+=("Not enough node resources available to schedule pods. Escalate this issue to the service owner of cluster context \`$CONTEXT\`. ")
+    next_steps+=("Increase node count in cluster context \`$CONTEXT\`")
+    next_steps+=("Check for cloud provider quota")
 fi
 
 if [[ $messages =~ "max node group size reached" ]]; then
-    next_steps+=("Not enough node resources available to schedule pods. Escalate this issue to your cluster owner.")
-    next_steps+=("Increase node count in cluster.")
-    next_steps+=("Check for quota errors.")
+    next_steps+=("Not enough node resources available to schedule pods. Escalate this issue to the service owner of cluster context \`$CONTEXT\`.")
+    next_steps+=("Increase node count in cluster context \`$CONTEXT\`")
+    next_steps+=("Check for cloud provider quota errors.")
 fi
 
 if [[ $messages =~ "Health check failed after" ]]; then
     next_steps+=("Check $owner_kind \`$owner_name\` Health")
+fi
+
+if [[ $messages =~ "Deployment does not have minimum availability" ]]; then
+    next_steps+=("Troubleshoot Deployment Warning Events for \`$owner_name\`")
 fi
 
 if [[ ${#next_steps[@]} -eq 0 ]]; then
