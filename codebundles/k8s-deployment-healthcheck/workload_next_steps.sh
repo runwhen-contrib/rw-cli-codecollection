@@ -84,6 +84,11 @@ if [[ $messages =~ "Health check failed after" ]]; then
     next_steps+=("Check $owner_kind \`$owner_name\` Health")
 fi
 
+if [[ $messages =~ "Deployment does not have minimum availability" ]]; then
+    next_steps+=("Troubleshoot Deployment Warning Events for \`$owner_name\`")
+fi
+
+
 if [[ ${#next_steps[@]} -eq 0 ]]; then
     next_steps+=("Please review the report logs and escalate the issue if necessary.")
 fi
