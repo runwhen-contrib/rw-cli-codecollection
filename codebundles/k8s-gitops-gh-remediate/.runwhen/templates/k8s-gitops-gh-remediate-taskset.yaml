@@ -29,6 +29,6 @@ spec:
       value: {{custom.kubernetes_distribution_binary}}
   secretsProvided:
     - name: kubeconfig
-      workspaceKey: {{custom.kubeconfig_secret_name}}
+      workspaceKey: {{custom.kubeconfig_secret_name | default('no-secret-provided')}}
     - name: github_token
-      workspaceKey: {{custom.github_token_secret_name}}
+      workspaceKey: {{custom.github_token_secret_name | default('no-secret-provided')}}
