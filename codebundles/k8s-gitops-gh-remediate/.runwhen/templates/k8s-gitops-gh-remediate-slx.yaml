@@ -8,16 +8,16 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/github-mark.svg
-  alias: {{match_resource.resource.metadata.namespace}} Deployment GitOps Configuration Remediations
+  alias: {{match_resource.resource.metadata.name}} Deployment GitOps Configuration Remediations
   asMeasuredBy: "" 
   configProvided:
   - name: OBJECT_NAME
     value: {{match_resource.resource.metadata.name}}
   owners:
   - {{workspace.owner_email}}
-  statement: Remediate deployments in Namespace {{match_resource.resource.metadata.namespace}} managed in GitHub repositories. 
+  statement: Remediate resources in Namespace {{match_resource.resource.metadata.name}} managed in GitHub repositories. 
   additionalContext:  
-    namespace: "{{match_resource.resource.metadata.namespace}}"
+    namespace: "{{match_resource.resource.metadata.names}}"
     labelMap: "{{match_resource.resource.metadata.labels}}"
     cluster: "{{ cluster.name }}"
     context: "{{ cluster.context }}"
