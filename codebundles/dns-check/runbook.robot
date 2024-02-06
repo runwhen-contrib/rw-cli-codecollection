@@ -1,7 +1,10 @@
 *** Settings ***
-Documentation       This runbook provides a comprehensive guide to managing and troubleshooting DNS configurations for Runwhen.com. It outlines steps for checking DNS configurations, testing DNS resolution using the Dig command, and analyzing network traffic with Tcpdump. Additionally, it includes procedures for conducting DNS health checks and interpreting DNS logs for potential errors. This runbook is essential for maintaining optimal DNS performance and resolving any related issues promptly.
-Metadata            Author    Placeholder
-Metadata            Display Name    linux-dns-issue-runwhen-com-resolution
+Documentation       This runbook provides a comprehensive guide to managing and troubleshooting DNS configurations for Runwhen.com.
+...    It outlines steps for checking DNS configurations, testing DNS resolution using the Dig command, and analyzing network traffic with Tcpdump.
+...    Additionally, it includes procedures for conducting DNS health checks and interpreting DNS logs for potential errors.
+...    This runbook is essential for maintaining optimal DNS performance and resolving any related issues promptly.
+Metadata            Author    Jonathan Funk
+Metadata            Display Name    linux-dns-resolution
 Metadata            Supports    `Linux`, `DNS Issue`, `Runwhen.com`, `DNS Settings`, `Developer Report`, `Incident Investigation`, `Issue Resolution`, 
 
 Library             BuiltIn
@@ -17,32 +20,32 @@ Suite Setup         Suite Initialization
 Test DNS Resolution using Dig Command
     [Documentation]   This script is used to test DNS resolution for a specified domain using a specified DNS server. It uses the 'dig' command to perform the DNS lookup and then checks if the resolution was successful. If successful, it extracts the A record from the 'dig' command output and checks if the A record was found. The script outputs the status of the DNS resolution and the A record (if found).
     [Tags]  DNS resolution    Bash scripting    dig command    A record    DNS server    Domain name    Error handling    Shell script    Linux    Network troubleshooting    Server administration    Domain troubleshooting    IP address resolution    Google DNS    Automation    Scripting    Networking    
-    ${process}=    Run Process    ./test_dns_resolution_dig_command.sh
-    Log To Console    ${process.stdout}
+    ${process}=    Run Process    ./test_dns_resolution_dig_command.sh    env=${env}
+    RW.Core.Add Pre To Report    ${process.stdout}
 
 Interpret DNS Logs for Errors
     [Documentation]   This bash script checks a system log file for DNS-related errors. It first verifies the existence of the log file, then searches for lines containing both "named" and "error" (case-insensitive), outputting any matches to a temporary file. The script then checks if this file is empty or not, printing its contents if it contains any lines, and finally removes the temporary file.
     [Tags]  bash script    log file    error checking    DNS errors    syslog    grep    conditional statements    file existence check    script cleanup    output redirection    text search    Linux    system administration    troubleshooting    automation    
-    ${process}=    Run Process    ./interpret_dns_logs_for_errors.sh
-    Log To Console    ${process.stdout}
+    ${process}=    Run Process    ./interpret_dns_logs_for_errors.sh    env=${env}
+    RW.Core.Add Pre To Report    ${process.stdout}
 
 Perform DNS Health Checks
     [Documentation]   This script performs a series of DNS health checks for a specified domain on a specified DNS server. It checks for various DNS record types, DNSSEC, DNS response time, and reverse DNS. The script requires the 'dig' command to be installed on the system. It outputs the results of each check, providing useful information for diagnosing DNS issues.
     [Tags]  DNS Health Check    Bash Script    DNS Records    DNSSEC    DNS Response Time    Reverse DNS    dig command    dnsutils package    Shell Scripting    Network Administration    Server Monitoring    System Administration    
-    ${process}=    Run Process    ./dns_health_check.sh
-    Log To Console    ${process.stdout}
+    ${process}=    Run Process    ./dns_health_check.sh    env=${env}
+    RW.Core.Add Pre To Report    ${process.stdout}
 
 Analyze Network Traffic with Tcpdump
     [Documentation]   This script captures and analyzes DNS traffic on a specified network interface using tcpdump. It checks for the presence of tcpdump, captures a specified number of packets on the DNS port, and then analyzes the output to count the number of DNS queries and responses. It also checks for any DNS errors in the captured traffic. The script then cleans up by removing the output file.
     [Tags]  Network Monitoring    TCPDump    DNS Traffic    Bash Scripting    Packet Capture    Error Detection    System Administration    Linux    Network Troubleshooting    Server Maintenance    DNS Queries    DNS Responses    DNS Errors    Automated Analysis    Output Analysis    Command Line Tools    Network Analysis    Data Capture    Network Security    Network Administration    
-    ${process}=    Run Process    ./analyze_network_traffic_tcpdump.sh
-    Log To Console    ${process.stdout}
+    ${process}=    Run Process    ./analyze_network_traffic_tcpdump.sh    env=${env}
+    RW.Core.Add Pre To Report    ${process.stdout}
 
 Check DNS Configuration for Runwhen.com
     [Documentation]   This script is designed to perform a comprehensive check on the DNS configuration for a specified domain, in this case "runwhen.com". It checks various DNS records including A, AAAA, CNAME, MX, NS, PTR, SOA, SRV, TXT, and DNSSEC. The script also checks the connectivity to the DNS server by pinging it and verifies if the domain is resolvable. Lastly, it performs a trace route to check the overall DNS health.
     [Tags]  DNS Check    Bash Script    Domain Verification    A Record    AAAA Record    CNAME Record    MX Record    NS Record    PTR Record    SOA Record    SRV Record    TXT Record    DNSSEC    DNS Server Connectivity    Domain Resolvability    DNS Health    Network Administration    System Administration    Troubleshooting    DNS Configuration    
-    ${process}=    Run Process    ./check_dns_config_runwhen_com.sh
-    Log To Console    ${process.stdout}
+    ${process}=    Run Process    ./check_dns_config_runwhen_com.sh    env=${env}
+    RW.Core.Add Pre To Report    ${process.stdout}
 
 
 *** Keywords ***
@@ -118,8 +121,6 @@ Suite Initialization
     ...    description=Runbook input.
     ...    pattern=\w*
 
-
-
     Set Suite Variable    ${DOMAIN_NAME}    ${DOMAIN_NAME}
     Set Suite Variable    ${DNS_SERVER}    ${DNS_SERVER}
     Set Suite Variable    ${LOG_FILE}    ${LOG_FILE}
@@ -136,5 +137,18 @@ Suite Initialization
     Set Suite Variable    ${DOMAIN}    ${DOMAIN}
 
     Set Suite Variable
-    ...    ${env}
-    ...    {"DOMAIN_NAME":"${DOMAIN_NAME}", "DNS_SERVER":"${DNS_SERVER}", "LOG_FILE":"${LOG_FILE}", "ERROR_KEYWORD":"${ERROR_KEYWORD}", "DNS_KEYWORD":"${DNS_KEYWORD}", "DOMAIN_TO_CHECK":"${DOMAIN_TO_CHECK}", "DNS_RECORD_TYPES":"${DNS_RECORD_TYPES}", "IP_ADDRESS":"${IP_ADDRESS}", "TCPDUMP_PATH":"${TCPDUMP_PATH}", "OUTPUT_FILE":"${OUTPUT_FILE}", "INTERFACE":"${INTERFACE}", "PORT":"${PORT}", "PACKET_COUNT":"${PACKET_COUNT}", "DOMAIN":"${DOMAIN}"}
+    ...    &{env}
+    ...    DOMAIN_NAME=${DOMAIN_NAME}
+    ...    DNS_SERVER=${DNS_SERVER}
+    ...    LOG_FILE=${LOG_FILE}
+    ...    ERROR_KEYWORD=${ERROR_KEYWORD}
+    ...    DNS_KEYWORD=${DNS_KEYWORD}
+    ...    DOMAIN_TO_CHECK=${DOMAIN_TO_CHECK}
+    ...    DNS_RECORD_TYPES=${DNS_RECORD_TYPES}
+    ...    IP_ADDRESS=${IP_ADDRESS}
+    ...    TCPDUMP_PATH=${TCPDUMP_PATH}
+    ...    OUTPUT_FILE=${OUTPUT_FILE}
+    ...    INTERFACE=${INTERFACE}
+    ...    PORT=${PORT}
+    ...    PACKET_COUNT=${PACKET_COUNT}
+    ...    DOMAIN=${DOMAIN}

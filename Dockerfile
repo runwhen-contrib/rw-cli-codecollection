@@ -9,7 +9,7 @@ RUN pip install -r /app/codecollection/requirements.txt
 
 # Install packages
 RUN apt-get update && \
-    apt install -y git && \
+    apt install -y git dnsutils && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     rm -rf /var/cache/apt
