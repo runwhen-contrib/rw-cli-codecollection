@@ -18,7 +18,9 @@ declare -A flux_type_map
 flux_type_map["kustomize"]="kustomization"
 flux_label="toolkit.fluxcd.io"
 
-# Argo (placeholder)
+# ArgoCD (placeholder)
+argocd_type_map["project"]="project"
+argocd_label="argocd.argoproj.io/instance"
 
 # Function to find GitOps owner and Git manifest location
 find_gitops_info() {
@@ -33,6 +35,14 @@ find_gitops_info() {
         fetch_flux_owner_details "$object_json"
     else
         echo "No label containing '$flux_label' found in $objectType $objectName"
+    fi
+
+    # Check if the object is from Argo
+    argocd_match=$(echo "$object_json" | grep "$argocd_label")
+    if [[ -n $argocd_match ]]; then
+        fetch_argocd_owner_details "$object_json"
+    else
+        echo "No label containing '$argocd_label' found in $objectType $objectName"
     fi
 
 }
@@ -68,10 +78,22 @@ fetch_flux_owner_details() {
 }
 
 ## Argo placeholder
-# fetch_argo_owner_details() {
-
-# }
-
+fetch_argocd_owner_details() {
+    local object_json="$1"
+    echo "Processing ArgoCD owner details..."
+    # Get argo instance name
+    argocd_instance=$(echo $object_json | jq  -r '.metadata.labels."argocd.argoproj.io/instance"')
+    echo "instance: $argocd_instance"
+    application_namespace=$(awk -F '_' '{print $1}' <<< $argocd_instance)
+    echo "app_namespace: $application_namespace"
+    application_name=$(awk -F '_' '{print $2}' <<< $argocd_instance)
+    echo "app_name: $application_name"
+    argocd_object_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get application $application_name -n $application_namespace --context $CONTEXT -o json)
+    git_url=$(echo "$argocd_object_json" | jq -r .spec.source.repoURL )
+    git_path=$(echo "$argocd_object_json" | jq -r .spec.source.path )
+    git_branch=$(echo "$argocd_object_json" | jq -r .spec.source.targetRevision )
+    echo "Found ArgoCD application name: $application_name, namespace: $application_namespace, source_object: $argocd_object_json, git_url: $git_url, git_path: $git_path, git_branch: $git_branch"
+}
 
 ## Substitution Functions
 #########################
@@ -93,6 +115,10 @@ resource_quota_substitution () {
     IFS=',' read quota_name resource current_value suggested_value <<< "$substitution"
     yq e "(select(.kind == \"ResourceQuota\" and .metadata.name == \"$quota_name\").spec.hard.\"$resource\") |= sub(\"$current_value\"; \"$suggested_value\")" -i "$yaml_file"
 }
+pvc_increase () {
+    IFS=',' read pvc_name pod current_size recommended_size <<< "$substitution"
+    yq e "(select(.kind == \"PersistentVolumeClaim\" and .metadata.name == \"$pvc_name\").spec.resources.requests.storage) |= sub(\"$current_size\"; \"$recommended_size\")" -i "$yaml_file"
+} 
 
 resource_request_substitution () {
     IFS=',' read container resource current_value suggested_value <<< "$substitution"
@@ -244,6 +270,17 @@ for object_id in "${!change_list[@]}"; do
             substitutions_list[$object_id]+="$container,$resource,$current_value,$suggested_value;"
             substitution_function=resource_request_substitution
             change_summary+="[Change] Modifying $resource resource request for container \`$container\` in $object_type \`$object_name\` to \`$suggested_value\` in namespace \`$NAMESPACE\` based on VPA recommendation.<br>"
+            change_details+="$json_pretty"
+        elif [[ "$remediation_type" == "pvc_increase" ]]; then
+            pvc_name=$(jq -r '.object_name // empty' <<< "$json_object")
+            pod=$(jq -r '.pod // empty' <<< "$json_object")
+            usage=$(jq -r '.usage // empty' <<< "$json_object")
+            current_size=$(jq -r '.current_size // empty' <<< "$json_object")
+            recommended_size=$(jq -r '.recommended_size // empty' <<< "$json_object")
+            echo "Increasing PersistentVolumeClaim $pvc_name with usage $usage from $current_size to $recommended_size"
+            substitutions_list[$object_id]+="$pvc_name,$resource,$current_size,$recommended_size;"
+            substitution_function=pvc_increase     
+            change_summary+="[Change] Increasing PersistentVolumeClaim \`$pvc_name\` attached to \`$pod\` to \`$recommended_size\` in namespace \`$NAMESPACE\`.<br>"
             change_details+="$json_pretty"
         elif [[ "$remediation_type" == "probe_update" ]]; then
             probe_type=$(jq -r '.probe_type' <<< "$json_object")

@@ -144,40 +144,31 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
-    ${unhealthy_volume_capacity}=    RW.CLI.Run Cli
-    ...    cmd=echo "${pod_pvc_utilization.stdout}" | awk '/------------/ { if (flag) { print record "\\n" $0; } record = ""; flag = 0; next; } $5 ~ /[9][5-9]%/ || $5 == "100%" { flag = 1; } { if (record == "") { record = $0; } else { record = record "\\n" $0; } } END { if (flag) { print record; } }'
+    ${pvc_utilization_script}=    RW.CLI.Run Bash File
+    ...    bash_file=pvc_utilization_check.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=180
     ...    include_in_history=false
-    @{next_steps}=     Create List
-    ${unhealthy_volume_list}=    Split String  ${unhealthy_volume_capacity.stdout}    ------------
-    IF    len($unhealthy_volume_list) > 0
-        FOR    ${item}    IN    @{unhealthy_volume_list}
-            ${is_not_just_newline}=    Evaluate    '''${item}'''.strip() != ''
-            IF    ${is_not_just_newline}  
-                ${pvc}=    RW.CLI.Run Cli
-                ...    cmd=echo "${item}" | grep PVC | awk -F', ' '{split($2,a,": "); print a[2]}' | sed 's/ *$//' | tr -d '\n'
-                ...    env=${env}
-                ...    secret_file__kubeconfig=${kubeconfig}
-                ...    include_in_history=false
-                Append To List    ${next_steps}    "Expand Persistent Volume Claim in namespace `${NAMESPACE}`: `${pvc.stdout}`" 
+    ${pvc_recommendations}=    RW.CLI.Run Cli
+    ...    cmd=echo '${pvc_utilization_script.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+    ...    env=${env}
+    ...    include_in_history=false
+    IF    $pvc_recommendations.stdout != ""
+        ${pvc_recommendation_list}=    Evaluate    json.loads(r'''${pvc_recommendations.stdout}''')    json
+        IF    len(@{pvc_recommendation_list}) > 0
+            FOR    ${item}    IN    @{pvc_recommendation_list}
+                RW.Core.Add Issue
+                ...    severity=${item["severity"]}
+                ...    expected=PVCs should be less than 85% utilized for Namespace `${NAMESPACE}`
+                ...    actual=PVC utilization is ${item["usage"]} Namespace `${NAMESPACE}`
+                ...    title=PVC Storage Utilization is at ${item["usage"]} in `${NAMESPACE}`
+                ...    reproduce_hint=${pod_pvc_utilization.cmd}
+                ...    details=Found excessive PVC utilization for ${item["pvc_name"]}:\n${item}
+                ...    next_steps=Expand Persistent Volume Claim \`${item["pvc_name"]}'\ in Namespace \`${NAMESPACE}\` to ${item["recommended_size"]}
             END
         END
-    END
-    IF    len($next_steps) > 0
-        ${next_steps_string}=    Catenate    SEPARATOR=\n    @{next_steps} 
-        ${next_steps_string}=    Replace String    ${next_steps_string}    "    ${EMPTY}
-        ${next_steps_string}=    Replace String    ${next_steps_string}    ,    ${EMPTY}
-
-        RW.Core.Add Issue
-        ...    severity=2
-        ...    expected=PVCs should be less than 95% utilized for Namespace `${NAMESPACE}`
-        ...    actual=PVC utilization is 95% or greater in Namespace `${NAMESPACE}`
-        ...    title=PVC Storage Utilization Issues in Namespace `${NAMESPACE}`
-        ...    reproduce_hint=${pod_pvc_utilization.cmd}
-        ...    details=Found excessive PVC utilization for:\n${unhealthy_volume_capacity.stdout}
-        ...    next_steps=${next_steps_string}
-    END
+    END    
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of PVC storage mount utilization in ${NAMESPACE}:
     RW.Core.Add Pre To Report    ${pod_pvc_utilization.stdout}
@@ -215,10 +206,6 @@ Suite Initialization
     ...    description=The kubernetes kubeconfig yaml containing connection configuration used to connect to cluster(s).
     ...    pattern=\w*
     ...    example=For examples, start here https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
-    ${kubectl}=    RW.Core.Import Service    kubectl
-    ...    description=The location service used to interpret shell commands.
-    ...    default=kubectl-service.shared
-    ...    example=kubectl-service.shared
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
@@ -236,9 +223,15 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=otel-demo
     ...    default=
+    ${HOME}=    RW.Core.Import User Variable    HOME
+    ...    type=string
+    ...    description=The home path of the runner
+    ...    pattern=\w*
+    ...    example=/root
+    ...    default=/root
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
-    Set Suite Variable    ${kubectl}    ${kubectl}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
-    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}"}
+    Set Suite Variable    ${HOME}    ${HOME}
+    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "HOME":"${HOME}"}

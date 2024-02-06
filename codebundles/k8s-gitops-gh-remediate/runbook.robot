@@ -138,6 +138,48 @@ Adjust Pod Resources to Match VPA Recommendation in `${NAMESPACE}`
     RW.Core.Add To Report    ${vpa_usage.stdout}\n
     RW.Core.Add Pre To Report    Commands Used: ${vpa_usage.cmd}
 
+Expand Persistent Volume Claims in Namespace `${NAMESPACE}`
+    [Documentation]    Checks the disk utilization for all PVCs and updates the GitOps manifest for any that are highly utilized. 
+    [Tags]    recommendation    pv    pvc    utilization    gitops    github    persistentvolumeclaim    persistentvolume    storage    capacity    ${NAMESPACE}
+    ${pvc_utilization}=    RW.CLI.Run Bash File
+    ...    bash_file=pvc_utilization_check.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${pvc_recommendations}=    RW.CLI.Run Cli
+    ...    cmd=echo '${pvc_utilization.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+    ...    env=${env}
+    ...    include_in_history=false
+    IF    $pvc_recommendations.stdout != ""
+        ${pvc_recommendation_list}=    Evaluate    json.loads(r'''${pvc_recommendations.stdout}''')    json
+        IF    len(@{pvc_recommendation_list}) > 0
+            ${gh_updates}=    RW.CLI.Run Bash File
+            ...    bash_file=update_github_manifests.sh
+            ...    cmd_override=./update_github_manifests.sh '${pvc_recommendations.stdout}'
+            ...    env=${env}
+            ...    include_in_history=False
+            ...    secret_file__kubeconfig=${kubeconfig}
+            ${recommendations}=    RW.CLI.Run Cli
+            ...    cmd=echo '${gh_updates.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+            ...    env=${env}
+            ...    include_in_history=false
+            IF    len($recommendations.stdout) > 0
+                RW.Core.Add Issue
+                ...    severity=3
+                ...    expected=Pull Requests for manifest changes are reviewed for namespace `${NAMESPACE}`
+                ...    actual=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
+                ...    title=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
+                ...    reproduce_hint=Check Pull Request details for more information.
+                ...    details=${pvc_recommendations.stdout}
+                ...    next_steps=${recommendations.stdout}
+            END
+        END
+    END
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add To Report    ${pvc_utilization.stdout}\n
+    RW.Core.Add Pre To Report    Commands Used: ${pvc_utilization.cmd}
+
 *** Keywords ***
 Suite Initialization
     ${kubeconfig}=    RW.Core.Import Secret
@@ -169,6 +211,11 @@ Suite Initialization
     ...    example=kubectl
     ...    default=kubectl
     ${HOME}=    RW.Core.Import User Variable    HOME
+    ...    type=string
+    ...    description=The home path of the runner
+    ...    pattern=\w*
+    ...    example=/root
+    ...    default=/root
     ${RW_TASK_TITLES}=    Get Environment Variable    RW_TASK_TITLES    "[]"
     ${RW_TASK_STRING}=    Evaluate    ${RW_TASK_TITLES}    json
     ${RW_TASK_STRING}=    Evaluate    ', '.join(${RW_TASK_STRING})    json
