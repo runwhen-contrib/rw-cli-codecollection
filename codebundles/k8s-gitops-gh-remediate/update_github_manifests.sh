@@ -42,7 +42,7 @@ find_gitops_info() {
     if [[ -n $argocd_match ]]; then
         fetch_argocd_owner_details "$object_json"
     else
-        echo "No label containing '$flux_label' found in $objectType $objectName"
+        echo "No label containing '$argocd_label' found in $objectType $objectName"
     fi
 
 }
@@ -82,9 +82,12 @@ fetch_argocd_owner_details() {
     local object_json="$1"
     echo "Processing ArgoCD owner details..."
     # Get argo instance name
-    argocd_instance=jq '.items[] | select(.metadata.labels."argocd.argoproj.io/instance") | .metadata.labels."argocd.argoproj.io/instance"'
+    argocd_instance=$(echo $object_json | jq  -r '.metadata.labels."argocd.argoproj.io/instance"')
+    echo "instance: $argocd_instance"
     application_namespace=$(awk -F '_' '{print $1}' <<< $argocd_instance)
+    echo "app_namespace: $application_namespace"
     application_name=$(awk -F '_' '{print $2}' <<< $argocd_instance)
+    echo "app_name: $application_name"
     argocd_object_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get application $application_name -n $application_namespace --context $CONTEXT -o json)
     git_url=$(echo "$argocd_object_json" | jq -r .spec.source.repoURL )
     git_path=$(echo "$argocd_object_json" | jq -r .spec.source.path )

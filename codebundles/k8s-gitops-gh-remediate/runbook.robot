@@ -142,21 +142,21 @@ Expand Persistent Volume Claims in Namespace `${NAMESPACE}`
     [Documentation]    Checks the disk utilization for all PVCs and updates the GitOps manifest for any that are highly utilized. 
     [Tags]    recommendation    pv    pvc    utilization    gitops    github    persistentvolumeclaim    persistentvolume    storage    capacity    ${NAMESPACE}
     ${pvc_utilization}=    RW.CLI.Run Bash File
-    ...    bash_file=vpvc_utilization_check.sh
+    ...    bash_file=pvc_utilization_check.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${pvc_recommendations}=    RW.CLI.Run Cli
-    ...    cmd=echo '${vpa_usage.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+    ...    cmd=echo '${pvc_utilization.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
     ...    env=${env}
     ...    include_in_history=false
     IF    $pvc_recommendations.stdout != ""
-        ${pvc_recommendation_list}=    Evaluate    json.loads(r'''${pvc_recommendation.stdout}''')    json
+        ${pvc_recommendation_list}=    Evaluate    json.loads(r'''${pvc_recommendations.stdout}''')    json
         IF    len(@{pvc_recommendation_list}) > 0
             ${gh_updates}=    RW.CLI.Run Bash File
             ...    bash_file=update_github_manifests.sh
-            ...    cmd_override=./update_github_manifests.sh '${pvc_recommendation.stdout}'
+            ...    cmd_override=./update_github_manifests.sh '${pvc_recommendations.stdout}'
             ...    env=${env}
             ...    include_in_history=False
             ...    secret_file__kubeconfig=${kubeconfig}
@@ -171,7 +171,7 @@ Expand Persistent Volume Claims in Namespace `${NAMESPACE}`
                 ...    actual=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
                 ...    title=Pull Requests for manifest changes are open and in need of review for namespace `${NAMESPACE}`
                 ...    reproduce_hint=Check Pull Request details for more information.
-                ...    details=${pvc_recommendation.stdout}
+                ...    details=${pvc_recommendations.stdout}
                 ...    next_steps=${recommendations.stdout}
             END
         END
