@@ -87,7 +87,7 @@ for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} --contex
 
         if [ $recommended_new_size -ne 0 ]; then
             # Format the recommendation as JSON
-            recommendation="{ \"remediation_type\":\"pvc_increase\", \"object_type\":\"PersistentVolumeClaim\", \"object_name\":\"$pvc\", \"pod\": \"$pod\", \"volume_name\": \"$volumeName\", \"container_name\": \"$containerName\", \"mount_path\": \"$mountPath\", \"current_size\": \"$disk_size\", \"usage\": \"$disk_usage%\", \"recommended_size\": \"${recommended_new_size}Gi\", \"severity\": \"$severity\" }"
+            recommendation="{ \"pvc_name\":\"$pvc\", \"pod\": \"$pod\", \"volume_name\": \"$volumeName\", \"container_name\": \"$containerName\", \"mount_path\": \"$mountPath\", \"current_size\": \"$disk_size\", \"usage\": \"$disk_usage%\", \"recommended_size\": \"${recommended_new_size}Gi\", \"severity\": \"$severity\" }"
             # Add the recommendation to the array
             if [ -z "$recommendations" ]; then
                 recommendations="$recommendation"

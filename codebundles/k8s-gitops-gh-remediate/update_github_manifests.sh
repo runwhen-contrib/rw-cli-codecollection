@@ -272,7 +272,7 @@ for object_id in "${!change_list[@]}"; do
             change_summary+="[Change] Modifying $resource resource request for container \`$container\` in $object_type \`$object_name\` to \`$suggested_value\` in namespace \`$NAMESPACE\` based on VPA recommendation.<br>"
             change_details+="$json_pretty"
         elif [[ "$remediation_type" == "pvc_increase" ]]; then
-            pvc_name=$(jq -r '.mongodata-users-mongo // empty' <<< "$json_object")
+            pvc_name=$(jq -r '.object_name // empty' <<< "$json_object")
             pod=$(jq -r '.pod // empty' <<< "$json_object")
             usage=$(jq -r '.usage // empty' <<< "$json_object")
             current_size=$(jq -r '.current_size // empty' <<< "$json_object")
