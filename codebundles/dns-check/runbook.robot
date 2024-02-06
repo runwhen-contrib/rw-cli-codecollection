@@ -21,6 +21,8 @@ Test DNS Resolution using Dig Command
     [Documentation]   This script is used to test DNS resolution for a specified domain using a specified DNS server. It uses the 'dig' command to perform the DNS lookup and then checks if the resolution was successful. If successful, it extracts the A record from the 'dig' command output and checks if the A record was found. The script outputs the status of the DNS resolution and the A record (if found).
     [Tags]  DNS resolution    Bash scripting    dig command    A record    DNS server    Domain name    Error handling    Shell script    Linux    Network troubleshooting    Server administration    Domain troubleshooting    IP address resolution    Google DNS    Automation    Scripting    Networking    
     ${ls}=    Run Process    ls
+    Log    ${ls.stdout}
+    Log    ${ls.stderr}
     ${process}=    Run Process    ./test_dns_resolution_dig_command.sh    env=${env}
     RW.Core.Add Pre To Report    ${process.stdout}
 
