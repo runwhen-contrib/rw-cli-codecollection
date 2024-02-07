@@ -165,7 +165,7 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
                 ...    title=PVC Storage Utilization is at ${item["usage"]} in `${NAMESPACE}`
                 ...    reproduce_hint=${pod_pvc_utilization.cmd}
                 ...    details=Found excessive PVC utilization for ${item["pvc_name"]}:\n${item}
-                ...    next_steps=Expand Persistent Volume Claim \`${item["pvc_name"]}'\ in Namespace \`${NAMESPACE}\` to ${item["recommended_size"]}
+                ...    next_steps=Expand Persistent Volume Claim \`${item["pvc_name"]}\' in Namespace \`${NAMESPACE}\` to ${item["recommended_size"]}
             END
         END
     END    
