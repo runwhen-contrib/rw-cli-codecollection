@@ -476,17 +476,19 @@ Check Resource Quota Utilization in Namepace `${NAMESPACE}`
     ...    cmd=echo '${quota_usage.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
     ...    env=${env}
     ...    include_in_history=false
-    ${recommendation_list}=    Evaluate    json.loads(r'''${recommendations.stdout}''')    json
-    IF    len(@{recommendation_list}) > 0
-        FOR    ${item}    IN    @{recommendation_list}
-            RW.Core.Add Issue
-            ...    severity=${item["severity"]}
-            ...    expected=Resource quota should not constrain deployment of resources.
-            ...    actual=Resource quota is constrained and might affect deployments.
-            ...    title=Resource quota is ${item["usage"]} in namespace `${NAMESPACE}`
-            ...    reproduce_hint=kubectl describe resourcequota -n ${NAMESPACE}
-            ...    details=${item}
-            ...    next_steps=${item["next_step"]}
+    IF    $recommendations.stdout != ""
+        ${recommendation_list}=    Evaluate    json.loads(r'''${recommendations.stdout}''')    json
+        IF    len(@{recommendation_list}) > 0
+            FOR    ${item}    IN    @{recommendation_list}
+                RW.Core.Add Issue
+                ...    severity=${item["severity"]}
+                ...    expected=Resource quota should not constrain deployment of resources.
+                ...    actual=Resource quota is constrained and might affect deployments.
+                ...    title=Resource quota is ${item["usage"]} in namespace `${NAMESPACE}`
+                ...    reproduce_hint=kubectl describe resourcequota -n ${NAMESPACE}
+                ...    details=${item}
+                ...    next_steps=${item["next_step"]}
+            END
         END
     END
     RW.Core.Add To Report    ${quota_usage.stdout}\n
@@ -530,6 +532,11 @@ Suite Initialization
     ...    example=kubectl
     ...    default=kubectl
     ${HOME}=    RW.Core.Import User Variable    HOME
+    ...    type=string
+    ...    description=The home path of the runner
+    ...    pattern=\w*
+    ...    example=/root
+    ...    default=/root
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
