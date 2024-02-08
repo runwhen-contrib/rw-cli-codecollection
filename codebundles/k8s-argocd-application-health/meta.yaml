@@ -20,7 +20,7 @@ commands:
     \ Message: {.status.conditions[].message}'\n\n\nBreaking the command into multiple\
     \ lines with comments provides better context and explanation for newer or less\
     \ experienced devops engineers."
-  name: fetch_argocd_application_sync_status_health
+  name: fetch_argocd_application_sync_status_health_for_application
 - command: 'kubectl get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
     --context ${CONTEXT} -o jsonpath=''Application Name: {.metadata.name}, Sync Status:
     {.status.sync.status}, Health Status: {.status.health.status}, Message: {.status.conditions[].message}'''
@@ -42,7 +42,7 @@ commands:
     \ Message: {.status.conditions[].message}'\n\n\nBreaking the command into multiple\
     \ lines with comments provides better context and explanation for newer or less\
     \ experienced devops engineers."
-  name: fetch_argocd_application_sync_status_health
+  name: fetch_argocd_application_sync_status_health_for_application
 - command: 'kubectl get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
     --context ${CONTEXT} -o json | jq -r ''"Application Name: " + .metadata.name +
     "\nApplication Namespace: "+ .metadata.namespace + "\nLast Sync Start Time: "
@@ -73,7 +73,7 @@ commands:
     \ can better understand what each part of the command does. This helps to improve\
     \ readability and comprehension, making it easier for them to learn and work with\
     \ the command."
-  name: fetch_argocd_application_last_sync_operation_details
+  name: fetch_argocd_application_last_sync_operation_details_for_application
 - command: 'kubectl get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
     --context ${CONTEXT} -o json | jq -r ''"Application Name: " + .metadata.name +
     "\nApplication Namespace: "+ .metadata.namespace + "\nLast Sync Start Time: "
@@ -104,7 +104,7 @@ commands:
     \ can better understand what each part of the command does. This helps to improve\
     \ readability and comprehension, making it easier for them to learn and work with\
     \ the command."
-  name: fetch_argocd_application_last_sync_operation_details
+  name: fetch_argocd_application_last_sync_operation_details_for_application
 - command: kubectl get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
     --context ${CONTEXT} -o json | jq -r '[.status.resources[] | select(.health.status
     != null) | select(.health.status != "Healthy") | {name,kind,namespace,health}]'
@@ -130,7 +130,7 @@ commands:
     \ status of resources that are not healthy\n  | jq -r '[.status.resources[] \n\
     \           | select(.health.status != null) \n           | select(.health.status\
     \ != \"Healthy\") \n           | {name,kind,namespace,health}]'\n"
-  name: fetch_unhealthy_argocd_application_resources
+  name: fetch_unhealthy_argocd_application_resources_for_application
 - command: kubectl get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
     --context ${CONTEXT} -o json | jq -r '[.status.resources[] | select(.health.status
     != null) | select(.health.status != "Healthy") | {name,kind,namespace,health}]'
@@ -156,7 +156,7 @@ commands:
     \ status of resources that are not healthy\n  | jq -r '[.status.resources[] \n\
     \           | select(.health.status != null) \n           | select(.health.status\
     \ != \"Healthy\") \n           | {name,kind,namespace,health}]'\n"
-  name: fetch_unhealthy_argocd_application_resources
+  name: fetch_unhealthy_argocd_application_resources_for_application
 - command: 'for deployment_name in $(kubectl get deployments -l argocd.argoproj.io/instance=${APPLICATION_TARGET_NAMESPACE}_${APPLICATION}
     -o=custom-columns=NAME:.metadata.name --no-headers -n ${APPLICATION_TARGET_NAMESPACE});
     do echo "\nDEPLOYMENT NAME: $deployment_name \n" && kubectl logs deployment/$deployment_name
@@ -180,7 +180,7 @@ commands:
     \ | grep -E '${ERROR_PATTERN}'\ndone\n\n\nThis multi-line command will help in\
     \ understanding the purpose of each step and make it easier to troubleshoot and\
     \ modify the command as needed."
-  name: scan_for_errors_in_pod_logs_related_to_argocd_application_deployments
+  name: scan_for_errors_in_pod_logs_related_to_argocd_application_application
 - command: 'for deployment_name in $(kubectl get deployments -l argocd.argoproj.io/instance=${APPLICATION_TARGET_NAMESPACE}_${APPLICATION}
     -o=custom-columns=NAME:.metadata.name --no-headers -n ${APPLICATION_TARGET_NAMESPACE});
     do echo "\nDEPLOYMENT NAME: $deployment_name \n" && kubectl logs deployment/$deployment_name
@@ -204,7 +204,7 @@ commands:
     \ | grep -E '${ERROR_PATTERN}'\ndone\n\n\nThis multi-line command will help in\
     \ understanding the purpose of each step and make it easier to troubleshoot and\
     \ modify the command as needed."
-  name: scan_for_errors_in_pod_logs_related_to_argocd_application_deployments
+  name: scan_for_errors_in_pod_logs_related_to_argocd_application_application
 - command: kubectl describe applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
     --context ${CONTEXT}
   doc_links: '
@@ -225,7 +225,7 @@ commands:
     \  -n ${APPLICATION_APP_NAMESPACE} \\ # Specify the namespace of the application\
     \ using the -n flag\n  --context ${CONTEXT} # Use the --context flag to specify\
     \ the Kubernetes context where the application is running\n"
-  name: fully_describe_argocd_application
+  name: fully_describe_argocd_application_application
 - command: kubectl describe applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
     --context ${CONTEXT}
   doc_links: '
@@ -246,4 +246,4 @@ commands:
     \  -n ${APPLICATION_APP_NAMESPACE} \\ # Specify the namespace of the application\
     \ using the -n flag\n  --context ${CONTEXT} # Use the --context flag to specify\
     \ the Kubernetes context where the application is running\n"
-  name: fully_describe_argocd_application
+  name: fully_describe_argocd_application_application
