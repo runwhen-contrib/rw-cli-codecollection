@@ -44,6 +44,7 @@ Show Pods Without Resource Limit or Resource Requests Set in Namespace `${NAMESP
     ...    set_issue_title=Pods With No Limits In Namespace ${NAMESPACE}
     ...    set_issue_details=Pods found without limits applied in namespace ${NAMESPACE}. \n $_stdout \n Review each manifest and edit configuration to set appropriate resource limits.
     ...    assign_stdout_from_var=no_limits_count
+    ...    set_issue_next_steps=Review issue details and set resource limits for pods. 
     ${pods_without_requests}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running -ojson | jq -r '[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.requests == null) | {pod: $pod.metadata.name, container_without_requests: .name}]'
     ...    env=${env}
@@ -58,6 +59,7 @@ Show Pods Without Resource Limit or Resource Requests Set in Namespace `${NAMESP
     ...    no_requests_count__raise_issue_if_gt=0
     ...    set_issue_details=Pods found without resource requests applied in namespace ${NAMESPACE}. \n $_stdout \n Review each manifest and edit configuration to set appropriate resource limits.
     ...    assign_stdout_from_var=no_requests_count
+    ...    set_issue_next_steps=Review issue details and set resource requests for pods. 
     ${history}=    RW.CLI.Pop Shell History
     ${no_requests_pod_count}=    Convert To Number    ${no_requests_count.stdout}
     ${no_limits_pod_count}=    Convert To Number    ${no_limits_count.stdout}
@@ -114,7 +116,7 @@ Identify Pod Resource Recommendations in Namespace `${NAMESPACE}`
             ...    next_steps=${item["next_step"]}
         END
     END
-    RW.Core.Add To Report    ${vpa_usage.stdout}\n
+    RW.Core.Add Pre To Report    ${vpa_usage.stdout}\n
 
 *** Keywords ***
 Suite Initialization

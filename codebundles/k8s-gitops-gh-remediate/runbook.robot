@@ -93,7 +93,7 @@ Increase ResourceQuota for Namespace `${NAMESPACE}`
         END
     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add To Report    ${quota_usage.stdout}\n
+    RW.Core.Add Pre To Report    ${quota_usage.stdout}\n
     RW.Core.Add Pre To Report    Commands Used: ${quota_usage.cmd}
 
 Adjust Pod Resources to Match VPA Recommendation in `${NAMESPACE}`
@@ -135,7 +135,7 @@ Adjust Pod Resources to Match VPA Recommendation in `${NAMESPACE}`
         END
     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add To Report    ${vpa_usage.stdout}\n
+    RW.Core.Add Pre To Report    ${vpa_usage.stdout}\n
     RW.Core.Add Pre To Report    Commands Used: ${vpa_usage.cmd}
 
 Expand Persistent Volume Claims in Namespace `${NAMESPACE}`
@@ -177,7 +177,7 @@ Expand Persistent Volume Claims in Namespace `${NAMESPACE}`
         END
     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add To Report    ${pvc_utilization.stdout}\n
+    RW.Core.Add Pre To Report    ${pvc_utilization.stdout}\n
     RW.Core.Add Pre To Report    Commands Used: ${pvc_utilization.cmd}
 
 *** Keywords ***

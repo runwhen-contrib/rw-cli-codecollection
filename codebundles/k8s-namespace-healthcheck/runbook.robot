@@ -98,16 +98,21 @@ Troubleshoot Container Restarts In Namespace `${NAMESPACE}`
     ...    cmd=echo '${container_restart_analysis.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
     ...    env=${env}
     ...    include_in_history=false
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${container_restart_analysis}
-    ...    set_severity_level=2
-    ...    set_issue_expected=Containers should not be restarting in namespace `${NAMESPACE}`
-    ...    set_issue_actual=We found containers with restarts in namespace `${NAMESPACE}`
-    ...    set_issue_title=Container Restarts Detected In Namespace `${NAMESPACE}`
-    ...    set_issue_reproduce_hint=View Commands Used in Report Output
-    ...    set_issue_details=${container_restart_analysis.stdout}
-    ...    set_issue_next_steps=${recommendations.stdout}
-    ...    _line__raise_issue_if_contains=Recommend
+    IF    $recommendations.stdout != ""
+        ${recommendation_list}=    Evaluate    json.loads(r'''${recommendations.stdout}''')    json
+        IF    len(@{recommendation_list}) > 0
+            FOR    ${item}    IN    @{recommendation_list}
+                RW.Core.Add Issue
+                ...    severity=${item["severity"]}
+                ...    expected=Containers should not be restarting in namespace `${NAMESPACE}`
+                ...    actual=We found containers with restarts in namespace `${NAMESPACE}`
+                ...    title=Container Restarts Detected In Namespace `${NAMESPACE}`
+                ...    reproduce_hint=${container_restart_details.cmd}
+                ...    details=${item["details"]}
+                ...    next_steps=${item["next_steps"]}
+            END
+        END
+    END
     ${history}=    RW.CLI.Pop Shell History
     IF    """${container_restart_details.stdout}""" == ""
         ${container_restart_details}=    Set Variable    No container restarts found
@@ -402,8 +407,8 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
     END
 
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add To Report    Summary Of Anomalies Detected:\n
-    RW.Core.Add To Report    ${recent_events_by_object.stdout}\n
+    RW.Core.Add Pre To Report    Summary Of Anomalies Detected:\n
+    RW.Core.Add Pre To Report    ${recent_events_by_object.stdout}\n
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`
@@ -459,7 +464,7 @@ Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`
         END
     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add To Report    ${pdb_check.stdout}\n
+    RW.Core.Add Pre To Report    ${pdb_check.stdout}\n
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Check Resource Quota Utilization in Namepace `${NAMESPACE}`
@@ -476,20 +481,22 @@ Check Resource Quota Utilization in Namepace `${NAMESPACE}`
     ...    cmd=echo '${quota_usage.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
     ...    env=${env}
     ...    include_in_history=false
-    ${recommendation_list}=    Evaluate    json.loads(r'''${recommendations.stdout}''')    json
-    IF    len(@{recommendation_list}) > 0
-        FOR    ${item}    IN    @{recommendation_list}
-            RW.Core.Add Issue
-            ...    severity=${item["severity"]}
-            ...    expected=Resource quota should not constrain deployment of resources.
-            ...    actual=Resource quota is constrained and might affect deployments.
-            ...    title=Resource quota is ${item["usage"]} in namespace `${NAMESPACE}`
-            ...    reproduce_hint=kubectl describe resourcequota -n ${NAMESPACE}
-            ...    details=${item}
-            ...    next_steps=${item["next_step"]}
+    IF    $recommendations.stdout != ""
+        ${recommendation_list}=    Evaluate    json.loads(r'''${recommendations.stdout}''')    json
+        IF    len(@{recommendation_list}) > 0
+            FOR    ${item}    IN    @{recommendation_list}
+                RW.Core.Add Issue
+                ...    severity=${item["severity"]}
+                ...    expected=Resource quota should not constrain deployment of resources.
+                ...    actual=Resource quota is constrained and might affect deployments.
+                ...    title=Resource quota is ${item["usage"]} in namespace `${NAMESPACE}`
+                ...    reproduce_hint=kubectl describe resourcequota -n ${NAMESPACE}
+                ...    details=${item}
+                ...    next_steps=${item["next_step"]}
+            END
         END
     END
-    RW.Core.Add To Report    ${quota_usage.stdout}\n
+    RW.Core.Add Pre To Report    ${quota_usage.stdout}\n
 
 
 *** Keywords ***
@@ -530,6 +537,11 @@ Suite Initialization
     ...    example=kubectl
     ...    default=kubectl
     ${HOME}=    RW.Core.Import User Variable    HOME
+    ...    type=string
+    ...    description=The home path of the runner
+    ...    pattern=\w*
+    ...    example=/root
+    ...    default=/root
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
