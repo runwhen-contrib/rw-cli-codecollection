@@ -22,10 +22,6 @@ Suite Initialization
     ...    description=The kubernetes kubeconfig yaml containing connection configuration used to connect to cluster(s).
     ...    pattern=\w*
     ...    example=For examples, start here https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
-    ${kubectl}=    RW.Core.Import Service    kubectl
-    ...    description=The location service used to interpret shell commands.
-    ...    default=kubectl-service.shared
-    ...    example=kubectl-service.shared
     ${binary_name}=    RW.Core.Import User Variable    binary_name
     ...    description=The Kubernetes cli binary to use.
     ...    default=kubectl
@@ -59,7 +55,6 @@ Suite Initialization
     ...    example=app-namespace
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${binary_name}    ${binary_name}
-    Set Suite Variable    ${kubectl}    ${kubectl}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${APPLICATION_TARGET_NAMESPACE}    ${APPLICATION_TARGET_NAMESPACE}
     Set Suite Variable    ${APPLICATION_APP_NAMESPACE}    ${APPLICATION_APP_NAMESPACE}
@@ -106,15 +101,19 @@ Fetch Unhealthy ArgoCD Application Resources
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
-    ${resource_issues}=    RW.CLI.Parse Cli Json Output
-    ...    rsp=${unhealthy_resources}
-    ...    extract_path_to_var__unhealthy_resource_count=length(@)
-    ...    set_severity_level=2
-    ...    unhealthy_resource_count__raise_issue_if_gt=0
-    ...    set_issue_expected=ArgoCD application resources should be in a healthy state 
-    ...    set_issue_actual=ArgoCD application resources are not in a healthy state 
-    ...    set_issue_title=ArgoCD Application Resource Issues
-    ...    set_issue_details=We found $unhealthy_resource_count unhealthy ArgoCD appliation resources in the namespace: ${APPLICATION_APP_NAMESPACE}. Check argocd application logs and events and configuration, argocd controller events, pod logs, namespace events, resource status, resource limits and quotas. 
+    ${unhealthy_resource_list}=    Evaluate    json.loads(r'''${unhealthy_resources.stdout}''')    json
+    IF    len(@{unhealthy_resource_list}) > 0
+        FOR    ${item}    IN    @{unhealthy_resource_list}
+            RW.Core.Add Issue
+            ...    severity=2
+            ...    expected=Resources should be synced and healthy for Application \`${APPLICATION}\` in Namespace \`${APPLICATION_TARGET_NAMESPACE}\`
+            ...    actual=Resources are unhealthy for Application \`${APPLICATION}\` in Namespace \`${APPLICATION_TARGET_NAMESPACE}\`
+            ...    title=ArgoCD Application \`${APPLICATION}\` has unhealthy resources in namespace `${APPLICATION_TARGET_NAMESPACE}`
+            ...    reproduce_hint=${unhealthy_resources.cmd}
+            ...    details=${item}
+            ...    next_steps=Check ${item["kind"]} \`${item["name"]}\` for Warning Events or Pod Restarts
+        END
+    END    
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    List of unhealthy resources for application: ${APPLICATION}
     RW.Core.Add Pre To Report    ${unhealthy_resources.stdout}
