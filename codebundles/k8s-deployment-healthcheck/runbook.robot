@@ -205,7 +205,7 @@ Troubleshoot Deployment Replicas for `${DEPLOYMENT_NAME}`
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
     ${deployment_status}=    Evaluate    json.loads(r'''${deployment_replicas.stdout}''')    json
-    IF    $deployment_status["available_condition"]["status"] == "False" and $deployment_status["progressing_condition"]["status"] == "False"
+    IF    $deployment_status["available_condition"]["status"] == "False" or $deployment_status["ready_replicas"] == "0"
         ${item_next_steps}=    RW.CLI.Run Bash File
         ...    bash_file=workload_next_steps.sh
         ...    cmd_override=./workload_next_steps.sh "${deployment_status["available_condition"]["message"]}" "Deployment" "${DEPLOYMENT_NAME}"
