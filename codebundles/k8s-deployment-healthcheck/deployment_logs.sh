@@ -179,9 +179,8 @@ if [[ -z "$ERROR_FUZZY_STRING" && -z "$INTERESTING_PATHS" ]]; then
                         "no such host")
                             # Extract hostname and perform actions specific to "no such host"
                             host=$(echo "$line" | grep -oP '(?<=http://)[^/]+' | uniq)
-                            escaped_host=$(echo "$host" | sed 's/\./\\./g')
-                            echo "Issue with host: $escaped_host"
-                            ERROR_FUZZY_STRING+="$escaped_host"
+                            echo "Issue with host: $host"
+                            ERROR_FUZZY_STRING+="$host"
                             ;;
                         "error")
                             # Handle general "error" differently if needed
