@@ -193,7 +193,7 @@ for item in "${container_restarts_dict[@]}"; do
         "Error")
             echo "Container exited with an error code."
             details=$(exit_code_error "$pod_name")
-            issue_details="{\"severity\":\"2\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Check $owner_kind Log for Issues with \`$owner_name\`\",\"details\":\"Container exited with an error code. Log Details: \\n$details\"}"
+            issue_details="{\"severity\":\"2\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Check $owner_kind Log for Issues with \`$owner_name\`\\nView issue details in report for container log details\",\"details\":\"Container exited with an error code. Log Details: \\n$details\"}"
             ;;
         "Misconfiguration")
             echo "Container stopped due to misconfiguration"
