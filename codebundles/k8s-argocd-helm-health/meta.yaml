@@ -61,7 +61,7 @@ commands:
     the resource information in JSON format and store it in a variable. After that,
     we use `jq` to filter and format the JSON data to display specific information
     about Helm charts. Finally, we print the formatted information to the console.'
-  name: fetch_all_available_argocd_helm_releases
+  name: fetch_all_available_argocd_helm_releases_in_namespace_namespace
 - command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json
     | jq -r '.items[] | select(.spec.source.helm != null) | "\nName:\t\t\t" + .metadata.name
     + "\nSync Status:\t\t" + .status.sync.status + "\nHealth Status:\t\t" + .status.health.status'
@@ -124,7 +124,7 @@ commands:
     the resource information in JSON format and store it in a variable. After that,
     we use `jq` to filter and format the JSON data to display specific information
     about Helm charts. Finally, we print the formatted information to the console.'
-  name: fetch_all_available_argocd_helm_releases
+  name: fetch_all_available_argocd_helm_releases_in_namespace_namespace
 - command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json
     | jq -r '.items[] | select(.spec.source.helm != null) | "\nName:\t\t\t" + .metadata.name
     + "\nTarget Revision:\t" + .spec.source.targetRevision + "\nAttempted Revision:\t"
@@ -152,7 +152,7 @@ commands:
     \ we added comments to explain each step of the command. This can help newer or\
     \ less experienced devops engineers understand what each part of the command does\
     \ and how it contributes to the overall functionality."
-  name: fetch_installed_argocd_helm_release_versions
+  name: fetch_installed_argocd_helm_release_versions_in_namespace_namespace
 - command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json
     | jq -r '.items[] | select(.spec.source.helm != null) | "\nName:\t\t\t" + .metadata.name
     + "\nTarget Revision:\t" + .spec.source.targetRevision + "\nAttempted Revision:\t"
@@ -180,4 +180,4 @@ commands:
     \ we added comments to explain each step of the command. This can help newer or\
     \ less experienced devops engineers understand what each part of the command does\
     \ and how it contributes to the overall functionality."
-  name: fetch_installed_argocd_helm_release_versions
+  name: fetch_installed_argocd_helm_release_versions_in_namespace_namespace

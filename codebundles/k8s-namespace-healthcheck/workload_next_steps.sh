@@ -71,13 +71,13 @@ fi
 if [[ $messages =~ "No preemption victims found for incoming pod" || $messages =~ "Insufficient cpu" ]]; then
     next_steps+=("Not enough node resources available to schedule pods. Escalate this issue to the service owner of cluster context \`$CONTEXT\`. ")
     next_steps+=("Increase node count in cluster context \`$CONTEXT\`")
-    next_steps+=("Check for cloud provider quota")
+    next_steps+=("Check Cloud Provider Quota Errors")
 fi
 
 if [[ $messages =~ "max node group size reached" ]]; then
-    next_steps+=("Not enough node resources available to schedule pods. Escalate this issue to the service owner of cluster context \`$CONTEXT\`.")
+    next_steps+=("Not enough node resources available to schedule pods. Escalate this issue to the service owner of cluster context \`$CONTEXT\`")
     next_steps+=("Increase node count in cluster context \`$CONTEXT\`")
-    next_steps+=("Check for cloud provider quota errors.")
+    next_steps+=("Check Cloud Provider Quota Errors")
 fi
 
 if [[ $messages =~ "Health check failed after" ]]; then
