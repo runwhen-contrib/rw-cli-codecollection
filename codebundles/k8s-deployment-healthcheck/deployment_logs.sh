@@ -168,7 +168,6 @@ if [[ -z "$ERROR_FUZZY_STRING" && -z "$INTERESTING_PATHS" ]]; then
     for FILE in "${LOG_FILES[@]}"; do
         echo "Processing file: $FILE"
         for grep_pattern in "${grep_patterns[@]}"; do
-            echo "Grep for '$grep_pattern'"
             # Use process substitution to avoid subshell creation by the pipeline
             while IFS= read -r line; do
                 # Remove timestamp
