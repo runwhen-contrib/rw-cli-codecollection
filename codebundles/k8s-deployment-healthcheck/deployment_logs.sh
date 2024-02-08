@@ -178,7 +178,7 @@ if [[ -z "$ERROR_FUZZY_STRING" && -z "$INTERESTING_PATHS" ]]; then
                     case $grep_pattern in
                         "no such host")
                             # Extract hostname and perform actions specific to "no such host"
-                            host=$(echo "$line" | grep -oP '(?<=http://)[^/]+' | uniq)
+                            host=$(echo "$line" | grep -oP '(?<=http://)[^/]+' | uniq | sed 's/^\s+|\s+$//g' | tr -d "[:space:]")
                             echo "Issue with host: $host"
                             ERROR_FUZZY_STRING+="$host"
                             ;;
@@ -193,7 +193,7 @@ if [[ -z "$ERROR_FUZZY_STRING" && -z "$INTERESTING_PATHS" ]]; then
             done < <(grep "$grep_pattern" "$FILE" | sed 's/^[^ ]* //' | sort | uniq)
         done
     done
-    ERROR_FUZZY_STRING=$(echo "$ERROR_FUZZY_STRING" | tr ' ' '\n' | sort | uniq | tr '\n' ' ')
+    ERROR_FUZZY_STRING=$(echo "$ERROR_FUZZY_STRING" | tr ' ' '\n' | sort | uniq | tr '\n' ' '| tr -d "[:space:]")
     echo "Error summary: $ERROR_FUZZY_STRING"
 fi
 
@@ -202,13 +202,11 @@ declare -a FUZZY_ENV_VAR_RESOURCE_MATCHES
 if [[ -n "$ERROR_FUZZY_STRING" ]]; then
     # Filter out common words from ERROR_FUZZY_STRING
     FILTERED_ERROR_STRING=$(filter_common_words "$ERROR_FUZZY_STRING")
-    echo "Filtered String: $FILTERED_ERROR_STRING"
     # Convert FILTERED_ERROR_STRING into an array
     mapfile -t PATTERNS <<< "$FILTERED_ERROR_STRING"
 
     for resource_type in "deployments" "statefulsets"; do
         for pattern in "${PATTERNS[@]}"; do
-            echo "pattern: $pattern"
             while IFS="|" read -r resource_name env_key env_value; do
                 formatted_string="$pattern:$resource_type/$resource_name:$env_key:$env_value"
                 FUZZY_ENV_VAR_RESOURCE_MATCHES+=("$formatted_string")
