@@ -114,7 +114,7 @@ Troubleshoot `${CONTAINER_NAME}` Application Logs
         ...    expected=No exceptions were found in the application logs of ${CONTAINER_NAME}
         ...    actual=Found exceptions in the application logs of ${CONTAINER_NAME}
         ...    reproduce_hint=Run:\n${cmd}\n view logs results for exceptions.
-        ...    title=A GitHub issue is open for review that contains information related to the exception(s) found in the application logs of ${CONTAINER_NAME}
+        ...    title=Application Exceptions detected in ${CONTAINER_NAME}
         ...    details=This exception prompted the creation of a GitHub issue: ${most_common_exception}
         ...    next_steps=${nextsteps}
     END
