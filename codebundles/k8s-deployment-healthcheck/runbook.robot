@@ -338,7 +338,7 @@ Suite Initialization
     ...    description=The error pattern to use when grep-ing logs.
     ...    pattern=\w*
     ...    example=(Error: 13|Error: 14)
-    ...    default=(ERROR)
+    ...    default=("")
     ${LOGS_EXCLUDE_PATTERN}=    RW.Core.Import User Variable    LOGS_EXCLUDE_PATTERN
     ...    type=string
     ...    description=Pattern used to exclude entries from log results when searching in log results.

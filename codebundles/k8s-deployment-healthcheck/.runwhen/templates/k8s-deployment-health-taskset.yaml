@@ -34,7 +34,7 @@ spec:
     - name: ANOMALY_THRESHOLD
       value: "3"
     - name: LOGS_ERROR_PATTERN
-      value: "500"
+      value: ""
     - name: LOGS_EXCLUDE_PATTERN
       value: "info"
   secretsProvided:

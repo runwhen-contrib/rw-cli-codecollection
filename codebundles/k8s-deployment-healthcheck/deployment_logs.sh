@@ -41,6 +41,7 @@ filter_common_words() {
 }
 # ------------------------- Dependency Verification ---------------------------
 
+
 # Ensure all the required binaries are accessible
 check_command_exists ${KUBERNETES_DISTRIBUTION_BINARY}
 check_command_exists jq
@@ -114,6 +115,7 @@ SEARCH_RESOURCES=""
 
 # Format file / table http_logrus_custom
 # Search for http log format used by online-boutique (which uses logrus but is custom)
+echo "---"
 echo "Query for HTTP Path patterns"
 for FILE in "${LOG_FILES[@]}"; do
     echo "$FILE"
@@ -142,7 +144,8 @@ fi
 
 
 # Search for error fields and strings
-echo "Query for generic error logs and sort"
+echo "---"
+echo "Query for generic error logs with lnav and sort"
 for FILE in "${LOG_FILES[@]}"; do
     echo "$FILE"
     ERROR_SUMMARY=$(lnav -n -c ';SELECT error, COUNT(*) AS count FROM http_logrus_custom WHERE error IS NOT NULL GROUP BY error;' $FILE)
@@ -152,16 +155,61 @@ done
 ERROR_FUZZY_STRING=$(echo "$ERROR_FUZZY_STRING" | sort | uniq)
 ##### End query #####
 
+# If neither above work, query with grep
+if [[ -z "$ERROR_FUZZY_STRING" && -z "$INTERESTING_PATHS" ]]; then
+    # Define patterns to grep for errors
+    grep_patterns=(
+        "no such host"
+        "error"
+        "dial tcp: lookup"
+    )
+    echo "---"
+    echo "Fallback search: Grep error logs and sort"
+    for FILE in "${LOG_FILES[@]}"; do
+        echo "Processing file: $FILE"
+        for grep_pattern in "${grep_patterns[@]}"; do
+            echo "Grep for '$grep_pattern'"
+            # Use process substitution to avoid subshell creation by the pipeline
+            while IFS= read -r line; do
+                # Remove timestamp
+                line=$(echo "$line" | sed 's/^[^ ]* //')
+                echo "$line"
+                if [[ "$line" =~ $grep_pattern ]]; then
+                    case $grep_pattern in
+                        "no such host")
+                            # Extract hostname and perform actions specific to "no such host"
+                            host=$(echo "$line" | grep -oP '(?<=http://)[^/]+' | uniq)
+                            escaped_host=$(echo "$host" | sed 's/\./\\./g')
+                            echo "Issue with host: $escaped_host"
+                            ERROR_FUZZY_STRING+="$escaped_host"
+                            ;;
+                        "error")
+                            # Handle general "error" differently if needed
+                            ;;
+                        "dial tcp: lookup")
+                            # Handle "dial tcp: lookup" errors differently if needed
+                            ;;
+                    esac
+                fi
+            done < <(grep "$grep_pattern" "$FILE" | sed 's/^[^ ]* //' | sort | uniq)
+        done
+    done
+    ERROR_FUZZY_STRING=$(echo "$ERROR_FUZZY_STRING" | tr ' ' '\n' | sort | uniq | tr '\n' ' ')
+    echo "Error summary: $ERROR_FUZZY_STRING"
+fi
+
 # Fuzzy match env vars in deployments with ERROR_FUZZY_STRING
 declare -a FUZZY_ENV_VAR_RESOURCE_MATCHES
 if [[ -n "$ERROR_FUZZY_STRING" ]]; then
     # Filter out common words from ERROR_FUZZY_STRING
     FILTERED_ERROR_STRING=$(filter_common_words "$ERROR_FUZZY_STRING")
+    echo "Filtered String: $FILTERED_ERROR_STRING"
     # Convert FILTERED_ERROR_STRING into an array
     mapfile -t PATTERNS <<< "$FILTERED_ERROR_STRING"
 
     for resource_type in "deployments" "statefulsets"; do
         for pattern in "${PATTERNS[@]}"; do
+            echo "pattern: $pattern"
             while IFS="|" read -r resource_name env_key env_value; do
                 formatted_string="$pattern:$resource_type/$resource_name:$env_key:$env_value"
                 FUZZY_ENV_VAR_RESOURCE_MATCHES+=("$formatted_string")
