@@ -94,6 +94,7 @@ Troubleshoot Container Restarts In Namespace `${NAMESPACE}`
     ...    bash_file=container_restarts.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=False
     ${recommendations}=    RW.CLI.Run Cli
     ...    cmd=echo '${container_restart_analysis.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
     ...    env=${env}
