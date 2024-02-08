@@ -98,16 +98,31 @@ Troubleshoot Container Restarts In Namespace `${NAMESPACE}`
     ...    cmd=echo '${container_restart_analysis.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
     ...    env=${env}
     ...    include_in_history=false
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${container_restart_analysis}
-    ...    set_severity_level=2
-    ...    set_issue_expected=Containers should not be restarting in namespace `${NAMESPACE}`
-    ...    set_issue_actual=We found containers with restarts in namespace `${NAMESPACE}`
-    ...    set_issue_title=Container Restarts Detected In Namespace `${NAMESPACE}`
-    ...    set_issue_reproduce_hint=View Commands Used in Report Output
-    ...    set_issue_details=${container_restart_analysis.stdout}
-    ...    set_issue_next_steps=${recommendations.stdout}
-    ...    _line__raise_issue_if_contains=Recommend
+    IF    $recommendations.stdout != ""
+        ${recommendation_list}=    Evaluate    json.loads(r'''${recommendations.stdout}''')    json
+        IF    len(@{recommendation_list}) > 0
+            FOR    ${item}    IN    @{recommendation_list}
+                RW.Core.Add Issue
+                ...    severity=${item["severity"]}
+                ...    expected=Containers should not be restarting in namespace `${NAMESPACE}`
+                ...    actual=We found containers with restarts in namespace `${NAMESPACE}`
+                ...    title=Container Restarts Detected In Namespace `${NAMESPACE}`
+                ...    reproduce_hint=${container_restart_details.cmd}
+                ...    details=${item["details"]}
+                ...    next_steps=${item["next_steps"]}
+            END
+        END
+    END
+    # RW.CLI.Parse Cli Output By Line
+    # ...    rsp=${container_restart_analysis}
+    # ...    set_severity_level=2
+    # ...    set_issue_expected=Containers should not be restarting in namespace `${NAMESPACE}`
+    # ...    set_issue_actual=We found containers with restarts in namespace `${NAMESPACE}`
+    # ...    set_issue_title=Container Restarts Detected In Namespace `${NAMESPACE}`
+    # ...    set_issue_reproduce_hint=View Commands Used in Report Output
+    # ...    set_issue_details=${container_restart_analysis.stdout}
+    # ...    set_issue_next_steps=${recommendations.stdout}
+    # ...    _line__raise_issue_if_contains=Recommend
     ${history}=    RW.CLI.Pop Shell History
     IF    """${container_restart_details.stdout}""" == ""
         ${container_restart_details}=    Set Variable    No container restarts found

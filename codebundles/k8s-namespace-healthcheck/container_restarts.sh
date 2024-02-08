@@ -21,7 +21,13 @@ function check_command_exists() {
         exit
     fi
 }
+# Tasks to perform when container exit code is "Error" or 1
+function exit_code_error() {
+    logs=$(${KUBERNETES_DISTRIBUTION_BINARY} logs -p $1  --all-containers --context=${CONTEXT} -n ${NAMESPACE} )
+    escaped_log_data=$(echo "$logs" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
 
+    echo $escaped_log_data
+}
 # Tasks to perform when container exit code is "Success"
 function exit_code_success() {
     echo "The exit code returned was 'Success' for pod \`$1\`. This usually means that the container has successfully run to completion."
@@ -42,23 +48,25 @@ function exit_code_success() {
         flux_labels=$(echo "$flux_labels" | tr ' ' '\n')
         namespace=$(echo "$flux_labels" | grep namespace: | awk -F ":" '{print $2}') 
         name=$(echo "$flux_labels" | grep name: | awk -F ":" '{print $2}')
-        recommendations+=("Check that the FluxCD resources are not suspended and the manifests are accurate for app:\`$name\`, configured in GitOps namespace:\`$namespace\`") 
+        issue_details="{\"severity\":\"4\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Check that the FluxCD resources are not suspended and the manifests are accurate for app:\`$name\`, configured in GitOps namespace:\`$namespace\`\",\"details\":\"The exit code returned was 'Success' for pod \`$1\`. This usually means that the container has successfully run to completion.\"}"
     elif [[ "$argocd_labels" ]]; then
         echo "Detected ArgoCD"
         argocd_labels=$(echo "$argocd_labels" | tr ' ' '\n')
         instance=$(echo "$argocd_labels" | grep instance: | awk -F ":" '{print $2}') 
-        recommendations+=("Check that the ArgoCD resources and manifests are accurate for app instance \`$instance\`")
+        issue_details="{\"severity\":\"4\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Check that the ArgoCD resources and manifests are accurate for app instance \`$instance\`\",\"details\":\"The exit code returned was 'Success' for pod \`$1\`. This usually means that the container has successfully run to completion.\"}"
     else
-      recommendations+=("Owner resources appear to be manually applied. Please review the manifest for \`$owner\` in \`$NAMESPACE\` for accuracy.")
+      issue_details="{\"severity\":\"4\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Owner resources appear to be manually applied. Please review the manifest for \`$owner\` in \`$NAMESPACE\` for accuracy.\",\"details\":\"The exit code returned was 'Success' for pod \`$1\`. This usually means that the container has successfully run to completion.\"}"
     fi
 }
 
 function find_resource_owner(){
-    pod_owner_kind=$(kubectl get pods $1 -o json --context=${CONTEXT} -n ${NAMESPACE}| jq -r '.metadata.ownerReferences[0].kind' )
-    pod_owner_name=$(kubectl get pods $1 -o json --context=${CONTEXT} -n ${NAMESPACE}| jq -r '.metadata.ownerReferences[0].name' )
-    resource_owner_kind=$(kubectl get $pod_owner_kind/$pod_owner_name -o json --context=${CONTEXT} -n ${NAMESPACE} | jq -r '.metadata.ownerReferences[0].kind' )
-    resource_owner_name=$(kubectl get $pod_owner_kind/$pod_owner_name -o json --context=${CONTEXT} -n ${NAMESPACE} | jq -r '.metadata.ownerReferences[0].name' )
-    owner=$(kubectl get $resource_owner_kind/$resource_owner_name -o json  --context=${CONTEXT} -n ${NAMESPACE})
+    pod=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $1 --context=${CONTEXT} -n ${NAMESPACE} -o json )
+    pod_owner_kind=$(echo $pod |  jq -r '.metadata.ownerReferences[0].kind' )
+    pod_owner_name=$(echo $pod | jq -r '.metadata.ownerReferences[0].name' )
+    resource_owner=$(${KUBERNETES_DISTRIBUTION_BINARY} get $pod_owner_kind/$pod_owner_name --context=${CONTEXT} -n ${NAMESPACE} -o json)
+    resource_owner_kind=$(echo $resource_owner | jq -r '.metadata.ownerReferences[0].kind' )
+    resource_owner_name=$(echo $resource_owner | jq -r '.metadata.ownerReferences[0].name' )
+    owner=$(${KUBERNETES_DISTRIBUTION_BINARY} get $resource_owner_kind/$resource_owner_name --context=${CONTEXT} -n ${NAMESPACE} -o json)
     echo $owner
 }
 
@@ -80,7 +88,7 @@ function find_matching_labels() {
 }
 function check_manifest_configuration() {
     resource="$1"
-    command_override_check=$(kubectl get $1 --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r '
+    command_override_check=$(${KUBERNETES_DISTRIBUTION_BINARY} get $1 --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r '
     .spec.template.spec.containers[] |
     select(.command != null) |
     "Container Name: \(.name)\nCommand: \(.command | join(" "))\nArguments: \(.args | join(" "))\n---"
@@ -175,8 +183,8 @@ for item in "${container_restarts_dict[@]}"; do
     exit_code_explanation=$(jq -r '.item.containers[0].exit_code_explanation' <<< "$item")
     pod_name=$(jq -r .item.pod_name <<< "$item")
     owner=$(find_resource_owner "$pod_name")
-    owner_kind=$(jq -r '.kind' <<< "$item")
-    owner_name=$(jq -r '.metadata.name' <<< "$item")
+    owner_kind=$(jq -r '.kind' <<< "$owner")
+    owner_name=$(jq -r '.metadata.name' <<< "$owner")
     # Use a case statement to check the exit code and perform actions or recommendations
     case "$exit_code_explanation" in
         "Success")
@@ -184,49 +192,61 @@ for item in "${container_restarts_dict[@]}"; do
             ;;
         "Error")
             echo "Container exited with an error code."
-            # Add your action for Error here
-            recommendations+=("Check $owner_kind Log for Issues with \`$owner_name\`")
+            details=$(exit_code_error "$pod_name")
+            issue_details="{\"severity\":\"2\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Check $owner_kind Log for Issues with \`$owner_name\`\",\"details\":\"Container exited with an error code. Log Details: \\n$details\"}"
             ;;
         "Misconfiguration")
             echo "Container stopped due to misconfiguration"
-            # Add your action for Misconfiguration here
-            recommendations+=("Review $owner_kind \`$owner_name\` configuration for any mistakes. Ensure environment variables, volume mounts, and resource limits are correctly set.")
+            
+            issue_details="{\"severity\":\"2\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Get $owner_kind \`$owner_name\` manifest and check configuration for any mistakes.\",\"details\":\"Container stopped due to misconfiguration\"}"
             ;;
         "Pod terminated by SIGINT")
             echo "Container received SIGINT signal, indicating an interrupted process."
-            # Add your action for SIGINT here
-            recommendations+=("Check $owner_kind Event Anomalies for \`$owner_name\`")
-            recommendations+=("If SIGINT is frequently occuring, escalate to the service or infrastructure owner for further investigation.")
+            issue_details="{\"severity\":\"3\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Check $owner_kind Event Anomalies for \`$owner_name\`\\nIf SIGINT is frequently occuring, escalate to the service or infrastructure owner for further investigation.\",\"details\":\"Container received SIGINT signal, indicating an interrupted process.\"}"           
+
             ;;
         "Abnormal Termination SIGABRT")
             echo "Container terminated abnormally with SIGABRT signal."
-            # Add your action for SIGABRT here
-            recommendations+=("Check $owner_kind Log for Issues with \`$owner_name\`")
-            recommendations+=("SIGABRT is usually a serious error. If it doesn't appear application related, escalate to the service or infrastructure owner for further investigation.")
+            issue_details="{\"severity\":\"2\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Check $owner_kind Log for Issues with \`$owner_name\`\\nSIGABRT is usually a serious error. If it doesn't appear application related, escalate to the service or infrastructure owner for further investigation.\",\"details\":\"Container terminated abnormally with SIGABRT signal.\"}"           
             ;;
         "Pod terminated by SIGKILL - Possible OOM")
             echo "Container terminated by SIGKILL, possibly due to Out Of Memory. Check if the container exceeded its memory limit. Consider increasing memory allocation or optimizing the application for better memory usage."
-            # Add your action for SIGKILL - Possible OOM here
-            recommendations+=("Check $owner_kind Log for Issues with \`$owner_name\`")
-            recommendations+=("Get Pod Resource Utilization with Top in Namespace \`$NAMESPACE\`")
-            recommendations+=("Show Pods Without Resource Limit or Resource Requests Set in Namespace \`$NAMESPACE\`")
+            issue_details="{\"severity\":\"2\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Check $owner_kind Log for Issues with \`$owner_name\`\\nGet Pod Resource Utilization with Top in Namespace \`$NAMESPACE\`\\nShow Pods Without Resource Limit or Resource Requests Set in Namespace \`$NAMESPACE\`\",\"details\":\"Container terminated by SIGKILL, possibly due to Out Of Memory. Check if the container exceeded its memory limit. Consider increasing memory allocation or optimizing the application for better memory usage.\"}"
+
             ;;
         "Graceful Termination SIGTERM")
             echo "Container received SIGTERM signal for graceful termination.Ensure that the container's shutdown process is handling SIGTERM correctly. This may be a normal part of the pod lifecycle."
-            # Add your action for SIGTERM here
-            recommendations+=("If SIGTERM is frequently occuring, escalate to the service or infrastructure owner for further investigation.")
+            issue_details="{\"severity\":\"4\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"If SIGTERM is frequently occuring, escalate to the service or infrastructure owner for further investigation.\",\"details\":\"Container received SIGTERM signal for graceful termination.Ensure that the container's shutdown process is handling SIGTERM correctly. This may be a normal part of the pod lifecycle.\"}"
             ;;
         *)
             echo "Unknown exit code for pod \`$pod_name\`: $exit_code_explanation"
             echo "$item"
             # Handle unknown exit codes here
-            recommendations+=("Unknown exit code for pod \`$pod_name\`. Escalate to the service or infrastructure owner for further investigation.")
+            issue_details="{\"severity\":\"3\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Unknown exit code for pod \`$pod_name\`. Escalate to the service or infrastructure owner for further investigation.\",\"details\":\"Unknown exit code for pod \`$pod_name\`: $exit_code_explanation\"}"
             ;;
     esac
+    # Initialize issues as an empty array if not already set
+    if [ -z "$issues" ]; then
+        issues="[]"
+    fi
+
+    # Concatenate issue detail to the string
+    if [ -n "$issue_details" ]; then
+        # Remove the closing bracket from issues to prepare for adding a new item
+        issues="${issues%]}"
+
+        # If issues is not an empty array (more than just "["), add a comma before the new item
+        if [ "$issues" != "[" ]; then
+            issues="$issues,"
+        fi
+
+        # Add the new issue detail and close the array
+        issues="$issues $issue_details]"
+    fi
 done
 
 # Display all unique recommendations that can be shown as Next Steps
-if [[ ${#recommendations[@]} -ne 0 ]]; then
-    printf "\nRecommended Next Steps: \n"
-    printf "%s\n" "${recommendations[@]}" | sort -u
+if [ -n "$issues" ]; then
+    echo -e "\nRecommended Next Steps: \n"
+    echo "$issues"
 fi
