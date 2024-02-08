@@ -37,13 +37,48 @@ commands:
     "Health Status: $health_status";echo "------------";done'
   doc_links: '
 
-    Documentation links not available'
+    - [Kubernetes Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/){:target="_blank"}
+
+    - [Kubernetes Services](https://kubernetes.io/docs/concepts/services-networking/service/){:target="_blank"}
+
+    - [Kubernetes Health Checks](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/){:target="_blank"}
+
+    - [Kubernetes Pods](https://kubernetes.io/docs/concepts/workloads/pods/){:target="_blank"}
+
+    - [Kubernetes Endpoints](https://kubernetes.io/docs/concepts/services-networking/service/#services-without-selectors){:target="_blank"}
+
+    - [Kubernetes Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
+
+    - [Kubernetes StatefulSets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
+
+    - [Kubernetes DaemonSets](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/){:target="_blank"}'
   explanation: This command retrieves information about ingresses, backend services,
     and their health status in a Kubernetes cluster and namespace specified in the
     NAMESPACE and CONTEXT variables. The command also checks for associated pods,
     endpoints, and deployment, statefulset, or daemonset objects to determine the
     overall health status of the services.
-  multi_line_details: Multi-line script not available
+  multi_line_details: "\n# Assign values to NAMESPACE and CONTEXT variables\nNAMESPACE=\"\
+    ${NAMESPACE}\"\nCONTEXT=\"${CONTEXT}\"\n\n# Get a list of all ingresses in the\
+    \ specified namespace and context\ningresses=$(kubectl get ingress -n \"$NAMESPACE\"\
+    \ --context \"$CONTEXT\" -o jsonpath='{range .items[*]}{.metadata.name}{\"\\n\"\
+    }{end}')\n\n# Loop through each ingress and perform health checks on related backend\
+    \ services\nfor ingress in $ingresses; do\n  # Print the name of the current ingress\n\
+    \  echo \"Ingress: $ingress\"\n  \n  # Set initial health status to \"NA\" and\
+    \ get the list of backend services for the current ingress\n  health_status=\"\
+    NA\"\n  backend_services=$(kubectl get ingress \"$ingress\" -n \"$NAMESPACE\"\
+    \ --context \"$CONTEXT\" -o jsonpath='{range .spec.rules[*].http.paths[*]}{.backend.service.name}{\"\
+    |\"}{.backend.service.port.number}{\"\\n\"}{end}')\n  \n  while IFS='|' read -r\
+    \ service port; do\n    # Print the name and port of each backend service\n  \
+    \  echo \"Backend Service: $service, Port: $port\"\n    \n    # Check if the service\
+    \ exists, set health status accordingly, and provide instructions for next steps\
+    \ if not found\n    target_ports=$(kubectl get service \"$service\" -n \"$NAMESPACE\"\
+    \ --context \"$CONTEXT\" -o jsonpath=\"{.spec.ports[?(@.port==$port)].targetPort}\"\
+    )\n    service_exists=$(kubectl get service \"$service\" -n \"$NAMESPACE\" --context\
+    \ \"$CONTEXT\" -ojsonpath='{.metadata.name}')\n    \n    # Continues...\n\n\n\
+    This multi-line command has been started with helpful comments explaining the\
+    \ purpose of each part of the script. Continuing from where it is left off, additional\
+    \ comments should be added to further explain each step and provide insights or\
+    \ tips for improving or troubleshooting the code."
   name: fetch_ingress_object_health_in_namespace_namespace
 - command: 'NAMESPACE="${NAMESPACE}";CONTEXT="${CONTEXT}";ingresses=$(kubectl get
     ingress -n "$NAMESPACE" --context "$CONTEXT" -o jsonpath=''{range .items[*]}{.metadata.name}{"\n"}{end}'');for
