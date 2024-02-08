@@ -12,7 +12,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Fetch all available ArgoCD Helm releases
+Fetch all available ArgoCD Helm releases in namespace `${NAMESPACE}`
     [Documentation]    List all ArgoCD helm releases that are visible to the kubeconfig.
     [Tags]    argocd    helmrelease    available    list    health
     ${helmreleases}=    RW.CLI.Run Cli
@@ -26,7 +26,7 @@ Fetch all available ArgoCD Helm releases
     RW.Core.Add Pre To Report    \n\nArgoCD Helm releases available: \n${helmreleases.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Fetch Installed ArgoCD Helm release versions
+Fetch Installed ArgoCD Helm release versions in namespace `${NAMESPACE}`
     [Documentation]    Fetch Installed ArgoCD Helm release Versions.
     [Tags]    argocd    helmrelease    version    state
     ${argocd_helm_status}=    RW.CLI.Run Cli

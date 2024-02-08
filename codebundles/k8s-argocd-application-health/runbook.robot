@@ -63,7 +63,7 @@ Suite Initialization
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
 
 *** Tasks ***
-Fetch ArgoCD Application Sync Status & Health
+Fetch ArgoCD Application Sync Status & Health for `${APPLICATION}`
     [Documentation]    Shows the sync status and health of the ArgoCD application. 
     [Tags]    Application    Sync    Health    ArgoCD
     ${app_sync_status}=    RW.CLI.Run Cli
@@ -77,7 +77,7 @@ Fetch ArgoCD Application Sync Status & Health
     RW.Core.Add Pre To Report    ${app_sync_status.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Fetch ArgoCD Application Last Sync Operation Details
+Fetch ArgoCD Application Last Sync Operation Details for `${APPLICATION}`
     [Documentation]    Fetches the last ArgoCD Application sync operation staus. 
     [Tags]    Application    SyncOperation    History    ArgoCD
     ${last_sync_status}=    RW.CLI.Run Cli
@@ -92,7 +92,7 @@ Fetch ArgoCD Application Last Sync Operation Details
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 
-Fetch Unhealthy ArgoCD Application Resources
+Fetch Unhealthy ArgoCD Application Resources for `${APPLICATION}`
     [Documentation]    Displays all resources in an ArgoCD Application that are not in a healthy state. 
     [Tags]    Resources    Unhealthy    SyncStatus    ArgoCD
     ${unhealthy_resources}=    RW.CLI.Run Cli
@@ -119,7 +119,7 @@ Fetch Unhealthy ArgoCD Application Resources
     RW.Core.Add Pre To Report    ${unhealthy_resources.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Scan For Errors in Pod Logs Related to ArgoCD Application Deployments
+Scan For Errors in Pod Logs Related to ArgoCD Application `${APPLICATION}`
     [Documentation]    Grep for the error pattern across all pods managed by this Applications deployments.  
     [Tags]    Error    Logs    Deployments    ArgoCD    Pods
     ${log_errors}=    RW.CLI.Run Cli
@@ -133,7 +133,7 @@ Scan For Errors in Pod Logs Related to ArgoCD Application Deployments
     RW.Core.Add Pre To Report    ${log_errors.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Fully Describe ArgoCD Application
+Fully Describe ArgoCD Application `${APPLICATION}`
     [Documentation]    Describe all details regarding the ArgoCD Application. Useful if reviewing all content.   
     [Tags]    Application    Describe    ArgoCD
     ${application_describe}=    RW.CLI.Run Cli
