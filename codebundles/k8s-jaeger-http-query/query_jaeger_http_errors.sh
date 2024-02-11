@@ -1,10 +1,5 @@
 #!/bin/bash
 
-# Assume NAMESPACE, KUBERNETES_DISTRIBUTION_BINARY, and CONTEXT are defined externally
-# NAMESPACE="jaeger-namespace"
-# KUBERNETES_DISTRIBUTION_BINARY="kubectl"
-# CONTEXT="your-k8s-context"
-
 # Define an array of label selectors to identify the Jaeger Query service
 LABEL_SELECTORS=("app=jaeger,app.kubernetes.io/component=query" "app=jaeger-query")
 
@@ -28,7 +23,9 @@ fi
 
 # Use the first found service for demonstration purposes
 JAEGER_SERVICE_NAME=${JAEGER_SERVICES[0]}
+echo "--------"
 echo "Jaeger Service Found: $JAEGER_SERVICE_NAME"
+echo "--------"
 
 # Fetch all ports for the service
 ports=$(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} get svc ${JAEGER_SERVICE_NAME} -n ${NAMESPACE} -o jsonpath='{.spec.ports[*].name}')
@@ -73,13 +70,82 @@ sleep 5
 # Jaeger Query base URL using the forwarded port
 JAEGER_QUERY_BASE_URL="http://localhost:${LOCAL_PORT}"
 
-# Your script's logic here
+# Query and process service health
+echo "--------"
 echo "Fetching all available services from Jaeger..."
 services=$(curl -s "${JAEGER_QUERY_BASE_URL}/api/services" | jq -r '.data[]')
 echo "Available services:"
 echo "${services}"
+echo "--------"
+
+
+# Iterate over each service to fetch and store their traces from the last 5 minutes
+declare -A traces
+# Fetch traces for each service and store in associative array
+for service in $services; do
+    echo "Fetching traces for service: $service from the last $LOOKBACK..."
+    traces["$service"]=$(curl -s "${JAEGER_QUERY_BASE_URL}/api/traces?service=${service}&lookback=${LOOKBACK}&limit=1000")
+    # echo "${traces["$service"]}" > "${service}_traces.json"
+
+done
+
+
+
 
 # Cleanup: Stop the port-forwarding process
+echo "--------"
+echo "Clean up port-forward process."
 kill $PF_PID
+echo "Port-forwarding stopped."
+echo "--------"
 
-echo "Script finished. Port-forwarding stopped."
+
+
+# Process Traces
+for service in "${!traces[@]}"; do
+    echo "--------"
+    echo "Processing traces for service: $service"
+    # Access each service's traces using ${traces[$service]}
+    echo "${traces["$service"]}" | jq '
+    # Define a dictionary of HTTP status codes to descriptions
+    def httpStatusDescriptions: {
+        "400": "Bad Request",
+        "401": "Unauthorized",
+        "403": "Forbidden",
+        "404": "Not Found",
+        "500": "Internal Server Error",
+        "501": "Not Implemented",
+        "502": "Bad Gateway",
+        "503": "Service Unavailable",
+        "504": "Gateway Timeout"
+    };
+
+    # Process traces
+    [.data[].spans[] |
+    {
+        traceID: .traceID,
+        spanID: .spanID,
+        route_or_url: (
+        [.tags[] | select(.key == "http.route" or .key == "http.url").value] |
+        if . | length > 0 then .[0] else "unknown" end
+        ),
+        status_code: (.tags[] | select(.key == "http.status_code").value | tostring | tonumber)
+    }] |
+    map(select(.status_code != 200)) |
+    group_by(.route_or_url) |
+    map({
+        route_or_url: .[0].route_or_url,
+        by_status_code: group_by(.status_code) | 
+        map({
+        status_code: .[0].status_code,
+        status_description: (
+            # Convert status_code to string for lookup
+            .[0].status_code | tostring | 
+            # Use the string value for description lookup, providing a default if not found
+            if httpStatusDescriptions[.] then httpStatusDescriptions[.] else "Unknown Status Code" end
+        ),
+        traces: map({traceID: .traceID, spanID: .spanID})
+        })
+    })
+    '
+done
