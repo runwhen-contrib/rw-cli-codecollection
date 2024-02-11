@@ -106,7 +106,7 @@ for service in "${!traces[@]}"; do
     echo "--------"
     echo "Processing traces for service: $service"
     # Access each service's traces using ${traces[$service]}
-    echo "${traces["$service"]}" | jq '
+    errors=$(echo "${traces["$service"]}" | jq '
     # Define a dictionary of HTTP status codes to descriptions
     def httpStatusDescriptions: {
         "400": "Bad Request",
@@ -148,4 +148,65 @@ for service in "${!traces[@]}"; do
         })
     })
     '
+    )
+    while IFS= read -r line; do
+        route_or_url=$(echo "$line" | jq '.route_or_url')
+        # Initialize the recommendation variable
+        recommendation=""
+        
+         while IFS= read -r error; do
+            status_code=$(echo "$error" | jq '.status_code')
+            status_description=$(echo "$error" | jq '.status_description')
+            # Generate a recommendation based on the status code
+            case "$status_code" in
+                400) 
+                    http_error_recommendation="Check the request syntax."
+                    issue_details="{\"severity\":\"4\",\"title\":HTTP Error 400 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\",\"details\":\"View traces in Jaeger and $http_error_recommendation: ${line}\"}" ;;
+                401) 
+                    http_error_recommendation="Ensure proper authentication."
+                    issue_details="{\"severity\":\"4\",\"title\":HTTP Error 401 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\",\"details\":\"View traces in Jaeger and $http_error_recommendation: ${line}\"}" ;;
+                403) 
+                    http_error_recommendation="Check permissions."
+                    issue_details="{\"severity\":\"4\",\"title\":HTTP Error 403 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\",\"details\":\"View traces in Jaeger and $http_error_recommendation: ${line}\"}" ;;
+                404) 
+                    http_error_recommendation="Verify the URL or resource."
+                    issue_details="{\"severity\":\"3\",\"title\":HTTP Error 404 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\",\"details\":\"View traces in Jaeger and $http_error_recommendation: ${line}\"}" ;;
+                500) 
+                    http_error_recommendation="Investigate server-side errors." 
+                    issue_details="{\"severity\":\"2\",\"title\":HTTP Error 500 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\",\"details\":\"View traces in Jaeger and $http_error_recommendation: ${line}\"}" ;;
+                # Add more cases as needed
+                *) 
+                    http_error_recommendation="No specific recommendation." ;;
+            esac
+            echo $issue_details
+
+            # Initialize issues as an empty array if not already set
+            if [ -z "$issues" ]; then
+                issues="[]"
+            fi
+
+            # Concatenate issue detail to the string
+            if [ -n "$issue_details" ]; then
+                # Remove the closing bracket from issues to prepare for adding a new item
+                issues="${issues%]}"
+
+                # If issues is not an empty array (more than just "["), add a comma before the new item
+                if [ "$issues" != "[" ]; then
+                    issues="$issues,"
+                fi
+
+                # Add the new issue detail and close the array
+                issues="$issues $issue_details]"
+            fi
+
+        done <<< "$(echo "$line" | jq -c '.by_status_code[]')"
+    done <<< "$(echo "$errors" | jq -c '.[]')"
+
 done
+
+
+# Display all unique recommendations that can be shown as Next Steps
+if [ -n "$issues" ]; then
+    echo -e "\nRecommended Next Steps: \n"
+    echo "$issues"
+fi
