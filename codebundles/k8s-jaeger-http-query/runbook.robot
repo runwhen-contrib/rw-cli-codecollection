@@ -2,7 +2,7 @@
 Documentation       This taskset queries Jaeger API directly for trace details and parses the results
 Metadata            Author    stewartshea
 Metadata            Display Name    K8s Jaeger Query
-Metadata            Supports    GKE EKS  HTTP
+Metadata            Supports    GKE EKS AKS Kubernetes    HTTP
 
 Library             BuiltIn
 Library             RW.Core
@@ -13,64 +13,80 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Query Traces in Jaeger for Unhealthy HTTP Response Codes in Namespace `${JAEGER_INSTANCE_NAME}`
-    [Documentation]    Use cURL to validate the http response
-    [Tags]    jaeger    http    ingress    latency    errors    traces
-    ${curl_rsp}=    RW.CLI.Run Bash File
-    ...    cmd=curl -o /dev/null -w '{"http_code": \%{http_code}, "time_total": \%{time_total}}' -s ${URL}
-    ...    show_in_rwl_cheatsheet=true
+Query Traces in Jaeger for Unhealthy HTTP Response Codes in Namespace `${NAMESPACE}`
+    [Documentation]    Query Jaeger for all services and report on any HTTP related trace errors
+    [Tags]    jaeger    http    ingress    latency    errors    traces    kubernetes
+    ${http_traces}=    RW.CLI.Run Bash File
+    ...    bash_file=query_jaeger_http_errors.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
     ...    render_in_commandlist=true
-    ${http_rsp_code}=    RW.CLI.Parse Cli Json Output
-    ...    rsp=${curl_rsp}
-    ...    extract_path_to_var__http_code=http_code
-    ...    set_issue_title=Actual HTTP response code $http_code does not match desired HTTP response code ${DESIRED_RESPONSE_CODE} for ${owner_kind.stdout} `${owner_name.stdout}`
-    ...    set_severity_level=4
-    ...    http_code__raise_issue_if_neq=${DESIRED_RESPONSE_CODE}
-    ...    set_issue_details=${URL} responded with a status of:$http_code \n\n Check related ingress objects, services, and pods.
-    ...    set_issue_next_steps=Check ${owner_kind.stdout} Log for Issues with `${owner_name.stdout}`\n Troubleshoot Warning Events in Namespace `${owner_namespace.stdout}`
-    ...    assign_stdout_from_var=http_code
-    ${http_latency}=    RW.CLI.Parse Cli Json Output
-    ...    rsp=${curl_rsp}
-    ...    extract_path_to_var__time_total=time_total
-    ...    set_issue_title=Actual HTTP latency exceeded target latency for ${owner_kind.stdout} `${owner_name.stdout}`
-    ...    set_severity_level=4
-    ...    time_total__raise_issue_if_gt=${TARGET_LATENCY}
-    ...    set_issue_next_steps=Check ${owner_kind.stdout} Log for Issues with `${owner_name.stdout}`
-    ...    set_issue_details=${URL} responded with a latency of $time_total. Check services, pods, load balanacers, and virtual machines for unexpected saturation.
-    ...    assign_stdout_from_var=time_total
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
-    RW.Core.Add Pre To Report    URL Latency: ${http_latency.stdout}
-    RW.Core.Add Pre To Report    URL Response Code: ${http_rsp_code.stdout}
+    ${recommendations}=    RW.CLI.Run Cli
+    ...    cmd=echo '${http_traces.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+    ...    env=${env}
+    ...    include_in_history=false
+    IF    $recommendations.stdout != ""
+        ${recommendation_list}=    Evaluate    json.loads(r'''${recommendations.stdout}''')    json
+        IF    len(@{recommendation_list}) > 0
+            FOR    ${item}    IN    @{recommendation_list}
+                RW.Core.Add Issue
+                ...    severity=${item["severity"]}
+                ...    expected=Service `${item["service"]}` should not have HTTP errors in namespace `${NAMESPACE}`
+                ...    actual=Service `${item["service"]}` has HTTP errors in namespace `${NAMESPACE}`
+                ...    title=${item["title"]}
+                ...    reproduce_hint=${http_traces.cmd}
+                ...    details=${item["details"]}
+                ...    next_steps=${item["next_steps"]}
+            END
+        END
+    END
+    RW.Core.Add Pre To Report    ${http_traces.stdout}\n
 
 
 *** Keywords ***
 Suite Initialization
-    ${URL}=    RW.Core.Import User Variable    URL
+    ${kubeconfig}=    RW.Core.Import Secret
+    ...    kubeconfig
     ...    type=string
-    ...    description=What URL to perform requests against.
+    ...    description=The kubernetes kubeconfig yaml containing connection configuration used to connect to cluster(s).
     ...    pattern=\w*
-    ...    default=https://www.runwhen.com
-    ...    example=https://www.runwhen.com
-    ${TARGET_LATENCY}=    RW.Core.Import User Variable    TARGET_LATENCY
+    ...    example=For examples, start here https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
+    ${NAMESPACE}=    RW.Core.Import User Variable    NAMESPACE
     ...    type=string
-    ...    description=The maximum latency in seconds as a float value allowed for requests to have.
+    ...    description=The name of the Kubernetes namespace to scope actions and searching to.
     ...    pattern=\w*
-    ...    default=1.2
-    ...    example=1.2
-    ${DESIRED_RESPONSE_CODE}=    RW.Core.Import User Variable    DESIRED_RESPONSE_CODE
+    ...    example=my-namespace
+    ${CONTEXT}=    RW.Core.Import User Variable    CONTEXT
     ...    type=string
-    ...    description=The response code that indicates success.
+    ...    description=Which Kubernetes context to operate within.
     ...    pattern=\w*
-    ...    default=200
-    ...    example=200
-    ${OWNER_DETAILS}=    RW.Core.Import User Variable    OWNER_DETAILS
+    ...    example=my-main-cluster
+    ${SERVICE_EXCLUSIONS}=    RW.Core.Import User Variable    SERVICE_EXCLUSIONS
     ...    type=string
-    ...    description=Json list of owner details
+    ...    description=Comma separated list of serivces to exclude from the query
     ...    pattern=\w*
-    ...    default={"name": "my-ingress", "kind": "Ingress", "namespace": "default"}
-    ...    example={"name": "my-ingress", "kind": "Ingress", "namespace": "default"}
-    Set Suite Variable    ${DESIRED_RESPONSE_CODE}    ${DESIRED_RESPONSE_CODE}
-    Set Suite Variable    ${URL}    ${URL}
-    Set Suite Variable    ${TARGET_LATENCY}    ${TARGET_LATENCY}
-    Set Suite Variable    ${OWNER_DETAILS}    ${OWNER_DETAILS}
+    ...    example=jaeger-all-in-one
+    ...    default=""
+    ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
+    ...    type=string
+    ...    description=Which binary to use for Kubernetes CLI commands.
+    ...    enum=[kubectl,oc]
+    ...    example=kubectl
+    ...    default=kubectl
+    ${HOME}=    RW.Core.Import User Variable    HOME
+    ...    type=string
+    ...    description=The home path of the runner
+    ...    pattern=\w*
+    ...    example=/root
+    ...    default=/root
+    Set Suite Variable    ${kubeconfig}    ${kubeconfig}
+    Set Suite Variable    ${CONTEXT}    ${CONTEXT}
+    Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
+    Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
+    Set Suite Variable    ${SERVICE_EXCLUSIONS}    ${SERVICE_EXCLUSIONS}
+    Set Suite Variable    ${HOME}    ${HOME}
+    Set Suite Variable
+    ...    ${env}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "HOME":"${HOME}", "SERVICE_EXCLUSIONS":"${SERVICE_EXCLUSIONS}"}

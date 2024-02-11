@@ -99,110 +99,117 @@ kill $PF_PID
 echo "Port-forwarding stopped."
 echo "--------"
 
+SPACE_SEPARATED_EXCLUSIONS=" ${SERVICE_EXCLUSIONS//,/ } "
 
 
 # Process Traces
 for service in "${!traces[@]}"; do
-    echo "--------"
-    echo "Processing traces for service: $service"
-    # Access each service's traces using ${traces[$service]}
-    errors=$(echo "${traces["$service"]}" | jq '
-    # Define a dictionary of HTTP status codes to descriptions
-    def httpStatusDescriptions: {
-        "400": "Bad Request",
-        "401": "Unauthorized",
-        "403": "Forbidden",
-        "404": "Not Found",
-        "500": "Internal Server Error",
-        "501": "Not Implemented",
-        "502": "Bad Gateway",
-        "503": "Service Unavailable",
-        "504": "Gateway Timeout"
-    };
+    if [[ $SPACE_SEPARATED_EXCLUSIONS =~ " $service " ]]; then
+        echo "Skipping service $service - found in SERVICE_EXCLUSIONS configuration"
+    else
+        echo "--------"
+        echo "Processing traces for service: $service"
+        # Access each service's traces using ${traces[$service]}
+        service_errors=$(echo "${traces["$service"]}" | jq '
+        # Define dictionaries for status codes and descriptions
+        def httpStatusDescriptions: {
+            "400": "Bad Request",
+            "401": "Unauthorized",
+            "403": "Forbidden",
+            "404": "Not Found",
+            "500": "Internal Server Error",
+            "501": "Not Implemented",
+            "502": "Bad Gateway",
+            "503": "Service Unavailable",
+            "504": "Gateway Timeout"
+        };
 
-    # Process traces
-    [.data[].spans[] |
-    {
-        traceID: .traceID,
-        spanID: .spanID,
-        route_or_url: (
-        [.tags[] | select(.key == "http.route" or .key == "http.url").value] |
-        if . | length > 0 then .[0] else "unknown" end
-        ),
-        status_code: (.tags[] | select(.key == "http.status_code").value | tostring | tonumber)
-    }] |
-    map(select(.status_code != 200)) |
-    group_by(.route_or_url) |
-    map({
-        route_or_url: .[0].route_or_url,
-        by_status_code: group_by(.status_code) | 
+        # Normalize and process traces
+        [.data[].spans[] |
+        {
+            traceID: .traceID,
+            spanID: .spanID,
+            route_or_url: (
+            [.tags[] | select(.key == "http.route" or .key == "http.url").value][0] // "unknown"
+            | if test("http[s]?://[^/]+/[^/]+") then split("/")[0:3] | join("/") else . end
+            ),
+            status_code: (.tags[] | select(.key == "http.status_code").value | tostring | tonumber)
+        }] |
+        map(select(.status_code != 200)) |
+        group_by(.route_or_url) |
         map({
-        status_code: .[0].status_code,
-        status_description: (
-            # Convert status_code to string for lookup
-            .[0].status_code | tostring | 
-            # Use the string value for description lookup, providing a default if not found
-            if httpStatusDescriptions[.] then httpStatusDescriptions[.] else "Unknown Status Code" end
-        ),
-        traces: map({traceID: .traceID, spanID: .spanID})
+            route_or_url: .[0].route_or_url,
+            by_status_code: group_by(.status_code) | 
+            map({
+            status_code: .[0].status_code,
+            status_description: (
+                .[0].status_code | tostring | 
+                if httpStatusDescriptions[.] then httpStatusDescriptions[.] else "Unknown Status Code" end
+            ),
+            traces: map({traceID: .traceID, spanID: .spanID})
+            })
         })
-    })
-    '
-    )
-    while IFS= read -r line; do
-        route_or_url=$(echo "$line" | jq '.route_or_url')
-        # Initialize the recommendation variable
-        recommendation=""
-        
-         while IFS= read -r error; do
-            status_code=$(echo "$error" | jq '.status_code')
-            status_description=$(echo "$error" | jq '.status_description')
-            # Generate a recommendation based on the status code
-            case "$status_code" in
-                400) 
-                    http_error_recommendation="Check the request syntax."
-                    issue_details="{\"severity\":\"4\",\"title\":HTTP Error 400 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\",\"details\":\"View traces in Jaeger and $http_error_recommendation: ${line}\"}" ;;
-                401) 
-                    http_error_recommendation="Ensure proper authentication."
-                    issue_details="{\"severity\":\"4\",\"title\":HTTP Error 401 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\",\"details\":\"View traces in Jaeger and $http_error_recommendation: ${line}\"}" ;;
-                403) 
-                    http_error_recommendation="Check permissions."
-                    issue_details="{\"severity\":\"4\",\"title\":HTTP Error 403 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\",\"details\":\"View traces in Jaeger and $http_error_recommendation: ${line}\"}" ;;
-                404) 
-                    http_error_recommendation="Verify the URL or resource."
-                    issue_details="{\"severity\":\"3\",\"title\":HTTP Error 404 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\",\"details\":\"View traces in Jaeger and $http_error_recommendation: ${line}\"}" ;;
-                500) 
-                    http_error_recommendation="Investigate server-side errors." 
-                    issue_details="{\"severity\":\"2\",\"title\":HTTP Error 500 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\",\"details\":\"View traces in Jaeger and $http_error_recommendation: ${line}\"}" ;;
-                # Add more cases as needed
-                *) 
-                    http_error_recommendation="No specific recommendation." ;;
-            esac
-            echo $issue_details
+        ')
+        while IFS= read -r line; do
+            route_or_url=$(echo "$line" | jq '.route_or_url')
+            # Initialize the recommendation variable
+            issue_details=""
+            
+            while IFS= read -r error; do
+                status_code=$(echo "$error" | jq '.status_code')
+                status_description=$(echo "$error" | jq -r '.status_description')
+                # Generate issue_details based on the status code
+                case "$status_code" in
+                    400) 
+                        http_error_recommendation="Check the request syntax."
+                        details=$(printf '%s' "${line}" | sed 's/"/\\"/g')
+                        issue_details="{\"severity\":\"4\",\"service\":\"$service\",\"title\":\"HTTP Error 400 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\",\"details\":\"View traces in Jaeger and $http_error_recommendation:\\n$details\"}" ;;
+                    401) 
+                        http_error_recommendation="Ensure proper authentication."
+                        details=$(printf '%s' "${line}" | sed 's/"/\\"/g')
+                        issue_details="{\"severity\":\"4\",\"service\":\"$service\",\"title\":\"HTTP Error 401 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\",\"details\":\"View traces in Jaeger and $http_error_recommendation:\\n$details\"}" ;;
+                    403) 
+                        http_error_recommendation="Check permissions."
+                        details=$(printf '%s' "${line}" | sed 's/"/\\"/g')
+                        issue_details="{\"severity\":\"4\",\"service\":\"$service\",\"title\":\"HTTP Error 403 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\",\"details\":\"View traces in Jaeger and $http_error_recommendation:\\n$details\"}" ;;
+                    404) 
+                        http_error_recommendation="Verify the URL or resource."
+                        details=$(printf '%s' "${line}" | sed 's/"/\\"/g')
+                        issue_details="{\"severity\":\"4\",\"service\":\"$service\",\"title\":\"HTTP Error 404 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\",\"details\":\"View traces in Jaeger and $http_error_recommendation:\\n$details\"}" ;;
+                    500) 
+                        http_error_recommendation="Investigate server-side errors." 
+                        details=$(printf '%s' "${line}" | sed 's/"/\\"/g')
+                        issue_details="{\"severity\":\"4\",\"service\":\"$service\",\"title\":\"HTTP Error 500 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\\nCheck Log for Issues with \`$service\`\\nCheck Warning Events for \`$service\`\",\"details\":\"View traces in Jaeger and $http_error_recommendation:\\n$details\"}" ;;
+                    # Add more cases as needed
+                    *) 
+                        http_error_recommendation="No specific recommendation." ;;
+                esac
+                echo $issue_details
 
-            # Initialize issues as an empty array if not already set
-            if [ -z "$issues" ]; then
-                issues="[]"
-            fi
-
-            # Concatenate issue detail to the string
-            if [ -n "$issue_details" ]; then
-                # Remove the closing bracket from issues to prepare for adding a new item
-                issues="${issues%]}"
-
-                # If issues is not an empty array (more than just "["), add a comma before the new item
-                if [ "$issues" != "[" ]; then
-                    issues="$issues,"
+                # Initialize issues as an empty array if not already set
+                if [ -z "$issues" ]; then
+                    issues="[]"
                 fi
 
-                # Add the new issue detail and close the array
-                issues="$issues $issue_details]"
-            fi
+                # Concatenate issue detail to the string
+                if [ -n "$issue_details" ]; then
+                    # Remove the closing bracket from issues to prepare for adding a new item
+                    issues="${issues%]}"
 
-        done <<< "$(echo "$line" | jq -c '.by_status_code[]')"
-    done <<< "$(echo "$errors" | jq -c '.[]')"
+                    # If issues is not an empty array (more than just "["), add a comma before the new item
+                    if [ "$issues" != "[" ]; then
+                        issues="$issues,"
+                    fi
 
+                    # Add the new issue detail and close the array
+                    issues="$issues $issue_details]"
+                fi
+
+            done <<< "$(echo "$line" | jq -c '.by_status_code[]')"
+        done <<< "$(echo "$service_errors" | jq -c '.[]')"
+    fi
 done
+
 
 
 # Display all unique recommendations that can be shown as Next Steps
