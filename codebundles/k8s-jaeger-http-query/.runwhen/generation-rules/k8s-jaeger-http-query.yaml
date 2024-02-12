@@ -1,0 +1,26 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+    - resourceTypes:
+        - service
+      matchRules:
+          - type: and
+            matches:
+              - type: pattern
+                pattern: "query"
+                properties: [label-values]
+                mode: exact
+              - type: pattern
+                pattern: "jaeger"
+                properties: [label-value]
+                mode: exact
+      slxs:
+        - baseName: jaeger-http
+          levelOfDetail: basic
+          qualifiers: ["resource", "namespace", "cluster"]
+          baseTemplateName: k8s-jaeger-http-query
+          outputItems:
+            - type: slx
+            - type: runbook
+              templateName: k8s-jaeger-http-query-taskset.yaml
