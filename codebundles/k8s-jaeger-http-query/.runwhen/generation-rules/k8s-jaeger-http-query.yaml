@@ -5,16 +5,16 @@ spec:
     - resourceTypes:
         - service
       matchRules:
-          - type: and
-            matches:
-              - type: pattern
-                pattern: "query"
-                properties: [label-values]
-                mode: substring
-              - type: pattern
-                pattern: "jaeger"
-                properties: [label-value]
-                mode: substring
+        - type: and
+          matches:
+            - type: pattern
+              pattern: "query"
+              properties: [label-values]
+              mode: substring
+            # - type: pattern
+            #   pattern: "jaeger"
+            #   properties: [label-value]
+            #   mode: substring
       slxs:
         - baseName: jaeger-http
           levelOfDetail: basic
