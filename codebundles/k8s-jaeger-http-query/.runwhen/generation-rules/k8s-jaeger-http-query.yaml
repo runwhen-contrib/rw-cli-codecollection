@@ -17,7 +17,7 @@ spec:
             #   mode: substring
       slxs:
         - baseName: jaeger-http
-          levelOfDetail: basic
+          levelOfDetail: detailed
           qualifiers: ["resource", "namespace", "cluster"]
           baseTemplateName: k8s-jaeger-http-query
           outputItems:
