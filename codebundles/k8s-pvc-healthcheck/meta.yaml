@@ -328,20 +328,8 @@ commands:
     -- df -h $mountPath; done; done; done;'
   doc_links: '
 
-    - [Kubernetes Documentation](https://kubernetes.io/docs/home/){:target="_blank"}
-
-    - [Kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
-
-    - [Understanding Kubernetes Objects](https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects/){:target="_blank"}
-
-    - [Using Persistent Volumes in Kubernetes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/){:target="_blank"}
-
-    - [Linux Disk Usage (du) Command](https://linux.die.net/man/1/du){:target="_blank"}'
-  explanation: This command is a complex series of nested loops that uses the Kubernetes
-    command line tool (kubectl) to gather information about running pods in a specific
-    namespace and context. It then retrieves information about the persistent volume
-    claims, volumes, container names, and mount paths associated with these pods and
-    prints the information along with disk usage statistics for each mount path.
+    '
+  explanation: Explanation not available
   multi_line_details: "\n# Start by iterating through each running pod in the specified\
     \ namespace and context\nfor pod in $(kubectl get pods -n ${NAMESPACE} --field-selector=status.phase=Running\
     \ --context ${CONTEXT} -o jsonpath='{range .items[*]}{.metadata.name}{\"\\n\"\
