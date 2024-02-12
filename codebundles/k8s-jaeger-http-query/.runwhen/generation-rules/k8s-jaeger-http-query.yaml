@@ -10,11 +10,11 @@ spec:
               - type: pattern
                 pattern: "query"
                 properties: [label-values]
-                mode: exact
+                mode: substring
               - type: pattern
                 pattern: "jaeger"
                 properties: [label-value]
-                mode: exact
+                mode: substring
       slxs:
         - baseName: jaeger-http
           levelOfDetail: basic
