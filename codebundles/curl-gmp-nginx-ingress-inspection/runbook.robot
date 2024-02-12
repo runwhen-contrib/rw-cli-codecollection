@@ -49,7 +49,7 @@ Fetch Nginx HTTP Errors From GMP for Ingress `${INGRESS_OBJECT_NAME}`
     ...    set_issue_actual=We found the following HTTP error codes: ${ERROR_CODES} associated with the ingress in $_line
     ...    set_issue_title=Detected HTTP Error Codes for Ingress `${INGRESS_OBJECT_NAME}`
     ...    set_issue_details=HTTP error codes in ingress and service "$_line". Troubleshoot the application associated with ${owner_kind.stdout} `${owner_name.stdout}`
-    ...    set_issue_next_steps=Check Deployment Log For Issues with `${owner_name.stdout}`
+    ...    set_issue_next_steps=Check Deployment Log For Issues with `${owner_name.stdout}`\nQuery Traces for HTTP Errors in Namespace `${NAMESPACE}`
     ...    _line__raise_issue_if_contains=Host
     ${ingress_info}=    Set Variable    ${gmp_rsp.stdout}
     IF    """${ingress_info}""" == "" or """${ingress_info}""".isspace()

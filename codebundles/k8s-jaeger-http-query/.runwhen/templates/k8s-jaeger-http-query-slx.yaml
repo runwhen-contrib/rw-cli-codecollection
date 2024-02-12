@@ -1,0 +1,23 @@
+apiVersion: runwhen.com/v1
+kind: ServiceLevelX
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/jaeger_tracing.svg
+  alias: Jaeger HTTP Query for Namespace {{match_resource.resource.metadata.namespace}}
+  asMeasuredBy: None
+  configProvided:
+  - name: OBJECT_NAME
+    value: {{match_resource.resource.metadata.name}}
+  owners:
+  - {{workspace.owner_email}}
+  statement: Jaeger instance {{match_resource.resource.metadata.name}} should report on HTTP traces related to ingested services. 
+  additionalContext:  
+    namespace: "{{match_resource.resource.metadata.namespace}}"
+    labelMap: "{{match_resource.resource.metadata.labels}}"
+    cluster: "{{ cluster.name }}"
+    context: "{{ cluster.context }}"
