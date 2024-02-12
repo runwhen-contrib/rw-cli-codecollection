@@ -10,6 +10,7 @@
 * [aws-eks-node-reboot](codebundles/aws-eks-node-reboot/README.md)
 * [k8s-gitops-gh-remediate](codebundles/k8s-gitops-gh-remediate/README.md)
 * [k8s-ingress-healthcheck](codebundles/k8s-ingress-healthcheck/README.md)
+* [k8s-jaeger-http-query](codebundles/k8s-jaeger-http-query/README.md)
 * [k8s-ingress-gce-healthcheck](codebundles/k8s-ingress-gce-healthcheck/README.md)
 * [k8s-vault-healthcheck](codebundles/k8s-vault-healthcheck/README.md)
 * [k8s-deployment-healthcheck](codebundles/k8s-deployment-healthcheck/README.md)
