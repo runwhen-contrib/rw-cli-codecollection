@@ -29,6 +29,8 @@ spec:
       value: {{context}}
     - name: LOOKBACK
       value: 5m
+    - name: SERVICE_EXCLUSIONS
+      value: jaeger-all-in-one
   secretsProvided:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
