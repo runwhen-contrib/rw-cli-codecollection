@@ -255,8 +255,11 @@ commands:
     ${NAMESPACE}
   doc_links: '
 
-    '
-  explanation: Explanation not available
+    - [Kubernetes kubectl command reference](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+
+    - [Kubernetes context and namespace](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/){:target="_blank"}'
+  explanation: This command restarts the specified resource in Kubernetes using kubectl,
+    with the context and namespace specified.
   multi_line_details: '
 
     # Assign the stdout of resource_name to a variable for easier reference
