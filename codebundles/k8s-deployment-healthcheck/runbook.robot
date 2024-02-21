@@ -13,6 +13,7 @@ Library             OperatingSystem
 Library             String
 
 Suite Setup         Suite Initialization
+Suite Teardown      Suite Teardown
 
 
 *** Tasks ***
@@ -30,20 +31,20 @@ Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
     ${logs}=    RW.CLI.Run Bash File
-    ...    bash_file=deployment_logs.sh
+    ...    bash_file=deployment_logs.sh 
+    ...    cmd_override=./deployment_logs.sh | tee "${SCRIPT_TMP_DIR}/log_analysis"
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=awk "/Recommended Next Steps:/ {start=1; getline} start" <<< '''${logs.stdout}'''
+    ...    cmd=awk "/Recommended Next Steps:/ {start=1; getline} start" "${SCRIPT_TMP_DIR}/log_analysis"
     ...    env=${env}
     ...    include_in_history=false
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=awk '/Issues Identified:/ {start=1; next} /The namespace `${NAMESPACE}` has produced the following interesting events:/ {start=0} start' <<< '''${logs.stdout}'''
+    ...    cmd=awk '/Issues Identified:/ {start=1; next} /The namespace `${NAMESPACE}` has produced the following interesting events:/ {start=0} start' "${SCRIPT_TMP_DIR}/log_analysis"
     ...    env=${env}
     ...    include_in_history=false
-    ## We should improve deployment_logs.sh to generate a match issue + next steps + severity level
     IF    len($issues.stdout) > 0
         RW.Core.Add Issue
         ...    severity=3
@@ -51,12 +52,12 @@ Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
         ...    actual=Error logs found in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
         ...    title=Deployment `${DEPLOYMENT_NAME}` in `${NAMESPACE}` is generating error logs.
         ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=Deployment `${DEPLOYMENT_NAME}` in `${NAMESPACE}` generated the following log analysis: \n${logs.stdout}
+        ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} generated the following log analysis: \n${logs.stdout}
         ...    next_steps=${recommendations.stdout}
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report
-    ...    Recent logs from deployment/`${DEPLOYMENT_NAME}` in `${NAMESPACE}`:\n\n${logs.stdout}
+    ...    Recent logs from Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE}:\n\n${logs.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
 # Fetch Previous Logs for Deployment `${DEPLOYMENT_NAME}`
@@ -75,13 +76,13 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     ...    ${DEPLOYMENT_NAME}
     ${liveness_probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_probes.sh
-    ...    cmd_override=./validate_probes.sh livenessProbe
+    ...    cmd_override=./validate_probes.sh livenessProbe | tee "${SCRIPT_TMP_DIR}/liveness_probe_output"
     ...    env=${env}
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' <<< '''${liveness_probe_health.stdout}'''
+    ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' "${SCRIPT_TMP_DIR}/liveness_probe_output"
     ...    env=${env}
     ...    include_in_history=false
     IF    len($recommendations.stdout) > 0
@@ -112,13 +113,13 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     ...    ${DEPLOYMENT_NAME}
     ${readiness_probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_probes.sh
-    ...    cmd_override=./validate_probes.sh readinessProbe
+    ...    cmd_override=./validate_probes.sh readinessProbe | tee "${SCRIPT_TMP_DIR}/readiness_probe_output"
     ...    env=${env}
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' <<< '''${readiness_probe_health.stdout}'''
+    ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' "${SCRIPT_TMP_DIR}/readiness_probe_output"
     ...    env=${env}
     ...    include_in_history=false
     IF    len($recommendations.stdout) > 0
@@ -253,8 +254,6 @@ Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`
     ...    anomolies
     ...    count
     ...    occurences
-    ...    <service_name>
-    ...    we found the following distinctly counted errors in the service workloads of namespace
     ...    connection error
     ...    ${DEPLOYMENT_NAME}
     ${recent_anomalies}=    RW.CLI.Run Cli
@@ -301,10 +300,6 @@ Suite Initialization
     ...    description=The kubernetes kubeconfig yaml containing connection configuration used to connect to cluster(s).
     ...    pattern=\w*
     ...    example=For examples, start here https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
-    ${kubectl}=    RW.Core.Import Service    kubectl
-    ...    description=The location service used to interpret shell commands.
-    ...    default=kubectl-service.shared
-    ...    example=kubectl-service.shared
     ${DEPLOYMENT_NAME}=    RW.Core.Import User Variable    DEPLOYMENT_NAME
     ...    type=string
     ...    description=Used to target the resource for queries and filtering events.
@@ -352,8 +347,12 @@ Suite Initialization
     ...    example=kubectl
     ...    default=kubectl
     ${HOME}=    RW.Core.Import User Variable    HOME
+    ...    type=string
+    ...    description=The home path of the runner
+    ...    pattern=\w*
+    ...    example=/root
+    ...    default=/root    
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
-    Set Suite Variable    ${kubectl}    ${kubectl}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
@@ -363,6 +362,10 @@ Suite Initialization
     Set Suite Variable    ${LOGS_ERROR_PATTERN}    ${LOGS_ERROR_PATTERN}
     Set Suite Variable    ${LOGS_EXCLUDE_PATTERN}    ${LOGS_EXCLUDE_PATTERN}
     Set Suite Variable    ${HOME}    ${HOME}
+    ${temp_dir}=    RW.CLI.Run Cli    cmd=mktemp -d ${HOME}/k8s-deployment-healthcheck-XXXXXXXXXX | tr -d '\n'
+    Set Suite Variable    ${SCRIPT_TMP_DIR}    ${temp_dir.stdout}
     Set Suite Variable
     ...    ${env}
     ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "LOGS_ERROR_PATTERN":"${LOGS_ERROR_PATTERN}", "LOGS_EXCLUDE_PATTERN":"${LOGS_EXCLUDE_PATTERN}", "ANOMALY_THRESHOLD":"${ANOMALY_THRESHOLD}", "DEPLOYMENT_NAME": "${DEPLOYMENT_NAME}", "HOME":"${HOME}"}
+Suite Teardown
+     RW.CLI.Run Cli    cmd=rm -rf ${SCRIPT_TMP_DIR}

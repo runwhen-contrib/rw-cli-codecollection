@@ -10,6 +10,9 @@
 # cover many logfile use cases
 # -----------------------------------------------------------------------------
 
+# Initialize recommendations
+recommendations=()
+
 # Update PATH to ensure script dependencies are found
 export PATH="$PATH:$HOME/.lnav:$HOME/.local/bin"
 
@@ -162,6 +165,8 @@ if [[ -z "$ERROR_FUZZY_STRING" && -z "$INTERESTING_PATHS" ]]; then
         "no such host"
         "error"
         "dial tcp: lookup"
+        "No space left on device"
+        "could not extend file"
     )
     echo "---"
     echo "Fallback search: Grep error logs and sort"
@@ -186,6 +191,14 @@ if [[ -z "$ERROR_FUZZY_STRING" && -z "$INTERESTING_PATHS" ]]; then
                             ;;
                         "dial tcp: lookup")
                             # Handle "dial tcp: lookup" errors differently if needed
+                            ;;
+                        "No space left on device")
+                            issue_descriptions+=("Errors found in logs could be related to storage issues.")
+                            recommendations+=("Fetch the Storage Utilization for PVC Mounts in Namespace \`${NAMESPACE}\`")                    
+                            ;;
+                        "could not extend file")
+                            issue_descriptions+=("Errors found in logs could be related to storage issues.")
+                            recommendations+=("Fetch the Storage Utilization for PVC Mounts in Namespace \`${NAMESPACE}\`")                    
                             ;;
                     esac
                 fi
@@ -249,9 +262,6 @@ for RESOURCE in "${SEARCH_RESOURCES[@]}"; do
 done
 
 
-# Try to generate some recommendations from the resource strings we discovered
-recommendations=()
-
 declare -A seen_resources
 
 if [[ ${#FUZZY_ENV_VAR_RESOURCE_MATCHES[@]} -ne 0 ]]; then
@@ -263,7 +273,7 @@ if [[ ${#FUZZY_ENV_VAR_RESOURCE_MATCHES[@]} -ne 0 ]]; then
         env_value=${parts[3]}
 
         if [[ -z ${seen_resources[$resource]} ]]; then
-            issue_descriptions+=("Error log could be related to \`$resource\`")
+            issue_descriptions+=("Errors found in logs could be related to \`$resource\`")
             recommendations+=("Review manifest for \`$resource\` in namespace: \`${NAMESPACE}\`. Matched error log string \`$string\` in environment variable \`$env_key\`.  ")
             seen_resources[$resource]=1
         fi
