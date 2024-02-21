@@ -31,7 +31,7 @@ Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
     ...    ${DEPLOYMENT_NAME}
     ${logs}=    RW.CLI.Run Bash File
     ...    bash_file=deployment_logs.sh 
-    ...    cmd_override=./deployment_logs.sh > "${HOME}/log_analysis"
+    ...    cmd_override=./deployment_logs.sh | tee "${HOME}/log_analysis"
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=180
@@ -44,15 +44,6 @@ Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
     ...    cmd=awk '/Issues Identified:/ {start=1; next} /The namespace `${NAMESPACE}` has produced the following interesting events:/ {start=0} start' "${HOME}/log_analysis"
     ...    env=${env}
     ...    include_in_history=false
-    # ${recommendations}=    RW.CLI.Run Cli
-    # ...    cmd=awk "/Recommended Next Steps:/ {start=1; getline} start" <<< '''${logs.stdout}'''
-    # ...    env=${env}
-    # ...    include_in_history=false
-    # ${issues}=    RW.CLI.Run Cli
-    # ...    cmd=awk '/Issues Identified:/ {start=1; next} /The namespace `${NAMESPACE}` has produced the following interesting events:/ {start=0} start' <<< '''${logs.stdout}'''
-    # ...    env=${env}
-    # ...    include_in_history=false
-    ## We should improve deployment_logs.sh to generate a match issue + next steps + severity level
     IF    len($issues.stdout) > 0
         RW.Core.Add Issue
         ...    severity=3
