@@ -76,13 +76,13 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     ...    ${DEPLOYMENT_NAME}
     ${liveness_probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_probes.sh
-    ...    cmd_override=./validate_probes.sh livenessProbe
+    ...    cmd_override=./validate_probes.sh livenessProbe | tee "${SCRIPT_TMP_DIR}/liveness_probe_output"
     ...    env=${env}
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' <<< '''${liveness_probe_health.stdout}'''
+    ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' "${SCRIPT_TMP_DIR}/liveness_probe_output"
     ...    env=${env}
     ...    include_in_history=false
     IF    len($recommendations.stdout) > 0
@@ -113,13 +113,13 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     ...    ${DEPLOYMENT_NAME}
     ${readiness_probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_probes.sh
-    ...    cmd_override=./validate_probes.sh readinessProbe
+    ...    cmd_override=./validate_probes.sh readinessProbe | tee "${SCRIPT_TMP_DIR}/readiness_probe_output"
     ...    env=${env}
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' <<< '''${readiness_probe_health.stdout}'''
+    ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' "${SCRIPT_TMP_DIR}/readiness_probe_output"
     ...    env=${env}
     ...    include_in_history=false
     IF    len($recommendations.stdout) > 0
