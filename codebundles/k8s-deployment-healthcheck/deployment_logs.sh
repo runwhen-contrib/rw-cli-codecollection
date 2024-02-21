@@ -193,11 +193,11 @@ if [[ -z "$ERROR_FUZZY_STRING" && -z "$INTERESTING_PATHS" ]]; then
                             # Handle "dial tcp: lookup" errors differently if needed
                             ;;
                         "No space left on device")
-                            issue_descriptions+=("Error log could be related to storage")
+                            issue_descriptions+=("Errors found in logs could be related to storage issues.")
                             recommendations+=("Fetch the Storage Utilization for PVC Mounts in Namespace \`${NAMESPACE}\`")                    
                             ;;
                         "could not extend file")
-                            issue_descriptions+=("Error log could be related to storage. ")
+                            issue_descriptions+=("Errors found in logs could be related to storage issues.")
                             recommendations+=("Fetch the Storage Utilization for PVC Mounts in Namespace \`${NAMESPACE}\`")                    
                             ;;
                     esac
@@ -273,7 +273,7 @@ if [[ ${#FUZZY_ENV_VAR_RESOURCE_MATCHES[@]} -ne 0 ]]; then
         env_value=${parts[3]}
 
         if [[ -z ${seen_resources[$resource]} ]]; then
-            issue_descriptions+=("Error log could be related to \`$resource\`")
+            issue_descriptions+=("Errors found in logs could be related to \`$resource\`")
             recommendations+=("Review manifest for \`$resource\` in namespace: \`${NAMESPACE}\`. Matched error log string \`$string\` in environment variable \`$env_key\`.  ")
             seen_resources[$resource]=1
         fi
