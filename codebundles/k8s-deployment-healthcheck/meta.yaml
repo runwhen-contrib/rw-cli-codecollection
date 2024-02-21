@@ -1,5 +1,5 @@
 commands:
-- command: bash 'validate_probes.sh' livenessProbe
+- command: bash 'validate_probes.sh' livenessProbe | tee "${SCRIPT_TMP_DIR}/liveness_probe_output"
   doc_links: '
 
     - [Kubernetes Deployment Manifest](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
@@ -81,7 +81,7 @@ commands:
     \ are any next steps\n    printf \"\\nRecommended Next Steps: \\n\"\n    printf\
     \ \"%s\\n\" \"${next_steps[@]}\" | sort -u  # Print unique next steps\nfi\n"
   name: check_liveness_probe_configuration_for_deployment_deployment_name
-- command: bash 'validate_probes.sh' readinessProbe
+- command: bash 'validate_probes.sh' readinessProbe | tee "${SCRIPT_TMP_DIR}/readiness_probe_output"
   doc_links: '
 
     - [Kubernetes Deployment Manifest](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
