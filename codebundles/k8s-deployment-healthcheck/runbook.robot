@@ -13,6 +13,7 @@ Library             OperatingSystem
 Library             String
 
 Suite Setup         Suite Initialization
+Suite Teardown      Suite Teardown
 
 
 *** Tasks ***
@@ -31,17 +32,17 @@ Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
     ...    ${DEPLOYMENT_NAME}
     ${logs}=    RW.CLI.Run Bash File
     ...    bash_file=deployment_logs.sh 
-    ...    cmd_override=./deployment_logs.sh | tee "${HOME}/log_analysis"
+    ...    cmd_override=./deployment_logs.sh | tee "${SCRIPT_TMP_DIR}/log_analysis"
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=awk "/Recommended Next Steps:/ {start=1; getline} start" "${HOME}/log_analysis"
+    ...    cmd=awk "/Recommended Next Steps:/ {start=1; getline} start" "${SCRIPT_TMP_DIR}/log_analysis"
     ...    env=${env}
     ...    include_in_history=false
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=awk '/Issues Identified:/ {start=1; next} /The namespace `${NAMESPACE}` has produced the following interesting events:/ {start=0} start' "${HOME}/log_analysis"
+    ...    cmd=awk '/Issues Identified:/ {start=1; next} /The namespace `${NAMESPACE}` has produced the following interesting events:/ {start=0} start' "${SCRIPT_TMP_DIR}/log_analysis"
     ...    env=${env}
     ...    include_in_history=false
     IF    len($issues.stdout) > 0
@@ -361,6 +362,10 @@ Suite Initialization
     Set Suite Variable    ${LOGS_ERROR_PATTERN}    ${LOGS_ERROR_PATTERN}
     Set Suite Variable    ${LOGS_EXCLUDE_PATTERN}    ${LOGS_EXCLUDE_PATTERN}
     Set Suite Variable    ${HOME}    ${HOME}
+    ${temp_dir}=    RW.CLI.Run Cli    cmd=mktemp -d ${HOME}/k8s-deployment-healthcheck-XXXXXXXXXX | tr -d '\n'
+    Set Suite Variable    ${SCRIPT_TMP_DIR}    ${temp_dir.stdout}
     Set Suite Variable
     ...    ${env}
     ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "LOGS_ERROR_PATTERN":"${LOGS_ERROR_PATTERN}", "LOGS_EXCLUDE_PATTERN":"${LOGS_EXCLUDE_PATTERN}", "ANOMALY_THRESHOLD":"${ANOMALY_THRESHOLD}", "DEPLOYMENT_NAME": "${DEPLOYMENT_NAME}", "HOME":"${HOME}"}
+Suite Teardown
+     RW.CLI.Run Cli    cmd=rm -rf ${SCRIPT_TMP_DIR}
