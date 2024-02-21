@@ -10,6 +10,9 @@
 # cover many logfile use cases
 # -----------------------------------------------------------------------------
 
+# Initialize recommendations
+recommendations=()
+
 # Update PATH to ensure script dependencies are found
 export PATH="$PATH:$HOME/.lnav:$HOME/.local/bin"
 
@@ -162,6 +165,7 @@ if [[ -z "$ERROR_FUZZY_STRING" && -z "$INTERESTING_PATHS" ]]; then
         "no such host"
         "error"
         "dial tcp: lookup"
+        "No space left on device"
     )
     echo "---"
     echo "Fallback search: Grep error logs and sort"
@@ -186,6 +190,9 @@ if [[ -z "$ERROR_FUZZY_STRING" && -z "$INTERESTING_PATHS" ]]; then
                             ;;
                         "dial tcp: lookup")
                             # Handle "dial tcp: lookup" errors differently if needed
+                            ;;
+                        "No space left on device")
+                            recommendations+=("Fetch the Storage Utilization for PVC Mounts in Namespace \`${NAMESPACE}\`")                    
                             ;;
                     esac
                 fi
@@ -248,9 +255,6 @@ for RESOURCE in "${SEARCH_RESOURCES[@]}"; do
     INTERESTING_RESOURCES+=$(echo "$RESOURCE_SEARCH_LIST" | grep "$RESOURCE")
 done
 
-
-# Try to generate some recommendations from the resource strings we discovered
-recommendations=()
 
 declare -A seen_resources
 
