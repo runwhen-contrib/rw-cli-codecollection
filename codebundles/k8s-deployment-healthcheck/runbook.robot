@@ -253,8 +253,6 @@ Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`
     ...    anomolies
     ...    count
     ...    occurences
-    ...    <service_name>
-    ...    we found the following distinctly counted errors in the service workloads of namespace
     ...    connection error
     ...    ${DEPLOYMENT_NAME}
     ${recent_anomalies}=    RW.CLI.Run Cli
@@ -301,10 +299,6 @@ Suite Initialization
     ...    description=The kubernetes kubeconfig yaml containing connection configuration used to connect to cluster(s).
     ...    pattern=\w*
     ...    example=For examples, start here https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
-    ${kubectl}=    RW.Core.Import Service    kubectl
-    ...    description=The location service used to interpret shell commands.
-    ...    default=kubectl-service.shared
-    ...    example=kubectl-service.shared
     ${DEPLOYMENT_NAME}=    RW.Core.Import User Variable    DEPLOYMENT_NAME
     ...    type=string
     ...    description=Used to target the resource for queries and filtering events.
@@ -356,8 +350,8 @@ Suite Initialization
     ...    description=The home path of the runner
     ...    pattern=\w*
     ...    example=/root
-    ...    default=/root    Set Suite Variable    ${kubeconfig}    ${kubeconfig}
-    Set Suite Variable    ${kubectl}    ${kubectl}
+    ...    default=/root    
+    Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
