@@ -52,12 +52,12 @@ Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
         ...    actual=Error logs found in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
         ...    title=Deployment `${DEPLOYMENT_NAME}` in `${NAMESPACE}` is generating error logs.
         ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=Deployment `${DEPLOYMENT_NAME}` in `${NAMESPACE}` generated the following log analysis: \n${logs.stdout}
+        ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} generated the following log analysis: \n${logs.stdout}
         ...    next_steps=${recommendations.stdout}
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report
-    ...    Recent logs from deployment/`${DEPLOYMENT_NAME}` in `${NAMESPACE}`:\n\n${logs.stdout}
+    ...    Recent logs from Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE}:\n\n${logs.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
 # Fetch Previous Logs for Deployment `${DEPLOYMENT_NAME}`
