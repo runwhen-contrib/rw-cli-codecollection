@@ -166,6 +166,7 @@ if [[ -z "$ERROR_FUZZY_STRING" && -z "$INTERESTING_PATHS" ]]; then
         "error"
         "dial tcp: lookup"
         "No space left on device"
+        "could not extend file"
     )
     echo "---"
     echo "Fallback search: Grep error logs and sort"
@@ -192,6 +193,11 @@ if [[ -z "$ERROR_FUZZY_STRING" && -z "$INTERESTING_PATHS" ]]; then
                             # Handle "dial tcp: lookup" errors differently if needed
                             ;;
                         "No space left on device")
+                            issue_descriptions+=("Error log could be related to storage")
+                            recommendations+=("Fetch the Storage Utilization for PVC Mounts in Namespace \`${NAMESPACE}\`")                    
+                            ;;
+                        "could not extend file")
+                            issue_descriptions+=("Error log could be related to storage. ")
                             recommendations+=("Fetch the Storage Utilization for PVC Mounts in Namespace \`${NAMESPACE}\`")                    
                             ;;
                     esac
