@@ -42,7 +42,7 @@ get_vpa_target_ref() {
     local vpa_name=$1
     local namespace=$2
 
-    local vpa_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get vpa "$vpa_name" -n "$namespace" -o json)
+    local vpa_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get vpa "$vpa_name" -n "$namespace" --context "${CONTEXT}" -o json)
     echo "$vpa_json" | jq -r '.spec.targetRef | "\(.kind) \(.name)"'
 }
 
@@ -53,7 +53,7 @@ get_current_requests() {
     local namespace=$3
 
     if [[ "$object_type" == "Deployment" ]]; then
-        local target_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get "$object_type" "$object_name" -n "$namespace" -o json)
+        local target_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get "$object_type" "$object_name" -n "$namespace" --context "${CONTEXT}" -o json)
         echo "$target_json" | jq -r '.spec.template.spec.containers[] | .name as $name | .resources.requests | {container: $name, cpu: (.cpu // "0"), memory: (.memory // "0Mi")}'
     else
         echo "Unsupported target kind: $object_type"

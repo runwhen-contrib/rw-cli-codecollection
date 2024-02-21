@@ -68,7 +68,7 @@ Suite Initialization
     ...    description=Comma separated list of serivces to exclude from the query
     ...    pattern=\w*
     ...    example=jaeger-all-in-one
-    ...    default=""
+    ...    default=none
    ${LOOKBACK}=    RW.Core.Import User Variable    LOOKBACK
     ...    type=string
     ...    description=The age to query for traces. Defaults to 5m. 
