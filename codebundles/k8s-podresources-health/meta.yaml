@@ -188,15 +188,18 @@ commands:
 - command: bash 'vpa_recommendations.sh'
   doc_links: '
 
-    - [Virtual Pod Autoscaler documentation](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler){:target="_blank"}
+    - [Kubernetes cluster documentation](https://kubernetes.io/docs/home/){:target="_blank"}
 
-    - [Bash scripting documentation](https://www.gnu.org/software/bash/manual/bash.html){:target="_blank"}'
-  explanation: This is a bash script that fetches Virtual Pod Autoscaler (VPA) details
-    and their current configurations from Kubernetes. It then analyzes the details,
-    compares them to the recommendations provided by VPA, generates outputs based
-    on the comparison, and outputs those results as JSON.
-  multi_line_details: "\n#!/bin/bash\n\n# Initialize recommendations array\ndeclare\
-    \ -a recommendations\n\n# Function to convert memory to Mi\nconvert_memory_to_mib()\
+    - [Bash scripting documentation](https://www.gnu.org/software/bash/manual/bash.html){:target="_blank"}
+
+    - [JSON format documentation](https://www.json.org/json-en.html){:target="_blank"}'
+  explanation: This script is a bash script that fetches VPA (Vertical Pod Autoscaler)
+    recommendations from the Kubernetes cluster for a specific namespace and context,
+    analyzes the current CPU and Memory requests in the cluster, and generates recommendations
+    to adjust pod resources such as CPU and Memory based on the VPA recommendations.
+    The final output is provided in JSON format.
+  multi_line_details: "\n# Start a bash script\n\n# Initialize recommendations array\n\
+    declare -a recommendations\n\n# Function to convert memory to Mi\nconvert_memory_to_mib()\
     \ {\n    local memory=$1\n\n    # Extract the number and unit separately\n   \
     \ local number=${memory//[!0-9]/}\n    local unit=${memory//[0-9]/}\n\n    case\
     \ $unit in\n        Gi)\n            echo $(( number * 1024 ))  # Convert Gi to\
@@ -206,30 +209,6 @@ commands:
     \ 1024) ))  # Convert bytes to Mi\n            ;;\n    esac\n}\n\n# Function to\
     \ convert CPU to millicores\nconvert_cpu_to_millicores() {\n    local cpu=$1\n\
     \    if [[ $cpu =~ ^[0-9]+m$ ]]; then\n        echo ${cpu%m}\n    else\n     \
-    \   echo $(($cpu * 1000))  # Convert CPU cores to millicores\n    fi\n}\n\n# Function\
-    \ to extract target reference from VPA\nget_vpa_target_ref() {\n    local vpa_name=$1\n\
-    \    local namespace=$2\n\n    local vpa_json=$(${KUBERNETES_DISTRIBUTION_BINARY}\
-    \ get vpa \"$vpa_name\" -n \"$namespace\" -o json)\n    echo \"$vpa_json\" | jq\
-    \ -r '.spec.targetRef | \"\\(.kind) \\(.name)\"'\n}\n\n# Function to get current\
-    \ CPU and Memory requests for the target object\nget_current_requests() {\n  \
-    \  local object_type=$1\n    local object_name=$2\n    local namespace=$3\n\n\
-    \    if [[ \"$object_type\" == \"Deployment\" ]]; then\n        local target_json=$(${KUBERNETES_DISTRIBUTION_BINARY}\
-    \ get \"$object_type\" \"$object_name\" -n \"$namespace\" -o json)\n        echo\
-    \ \"$target_json\" | jq -r '.spec.template.spec.containers[] | .name as $name\
-    \ | .resources.requests | {container: $name, cpu: (.cpu // \"0\"), memory: (.memory\
-    \ // \"0Mi\")}'\n    else\n        echo \"Unsupported target kind: $object_type\"\
-    \n    fi\n}\n\n# Function to analyze VPA and current configuration\nanalyze_vpa()\
-    \ {\n# This part of the script uses other functions such as convert_memory_to_mib,\
-    \ convert_cpu_to_millicores, get_vpa_target_ref, and get_current_requests to analyze\
-    \ and generate recommendations based on VPA.\n}\n\n# Fetching VPA details\nvpa_json=$(${KUBERNETES_DISTRIBUTION_BINARY}\
-    \ get vpa -n ${NAMESPACE} --context ${CONTEXT} -o json)\n\n# Processing the VPA\
-    \ JSON\necho \"VPA Recommendations for Namespace: ${NAMESPACE} for Context: ${CONTEXT}\"\
-    \necho \"===========================================\"\n\n# Parsing VPA JSON\n\
-    while IFS= read -r vpa_item; do\n    vpa_name=$(echo \"$vpa_item\" | jq -r '.metadata.name')\n\
-    \    analyze_vpa \"$vpa_name\" \"$NAMESPACE\" \"$vpa_item\"\ndone < <(echo \"\
-    $vpa_json\" | jq -c '.items[]')\n\n# Outputting recommendations as JSON\nif [\
-    \ -n \"$recommendations\" ]; then\n    # Display the recommended next steps in\
-    \ a readable JSON format\n    echo \"Recommended Next Steps:\"\n    echo \"[$recommendations]\"\
-    \ | jq .\nelse\n    # If no recommendations are found, display a message indicating\
-    \ so\n    echo \"No recommendations.\"\nfi\n"
+    \   echo $(($cpu * 1000))  # Convert CPU cores to millicores\n    fi\n}\n\n# ...\n\
+    # (Remaining script left for comment...)\n"
   name: identify_pod_resource_recommendations_in_namespace_namespace

@@ -773,4 +773,4 @@ commands:
     \ as JSON\nif [ -n \"$recommendations\" ]; then\n    echo \"Recommended Next Steps:\"\
     \n    echo \"[$recommendations]\" | jq .\nelse\n    echo \"No recommendations.\"\
     \nfi\n"
-  name: check_resource_quota_utilization_in_namepace_namespace
+  name: check_resource_quota_utilization_in_namespace_namespace
