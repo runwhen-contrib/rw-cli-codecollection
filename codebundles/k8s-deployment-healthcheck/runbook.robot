@@ -308,7 +308,7 @@ Check ReplicaSet Health for Deployment `${DEPLOYMENT_NAME}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=180
     ...    include_in_history=false
-    ...    render_in_commandlist=true
+    ...    show_in_rwl_cheatsheet=true
     ${recommendations}=    RW.CLI.Run Cli
     ...    cmd=awk "/Recommended Next Steps:/ {start=1; getline} start" "${SCRIPT_TMP_DIR}/rs_analysis"
     ...    env=${env}
