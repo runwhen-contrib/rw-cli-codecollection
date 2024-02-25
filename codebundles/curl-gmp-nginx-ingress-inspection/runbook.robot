@@ -147,7 +147,7 @@ Suite Initialization
     ...    description=Which http status codes to look for and classify as errors.
     ...    pattern=\w*
     ...    example=500
-    ...    default=500|501|502
+    ...    default=500|501|502|503|504
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
