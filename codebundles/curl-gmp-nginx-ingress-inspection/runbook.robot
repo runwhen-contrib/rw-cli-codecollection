@@ -8,6 +8,7 @@ Metadata            Supports    GCP,GMP,Ingress,Nginx,Metrics
 Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
+Library             RW.K8sHelper
 Library             RW.platform
 Library             OperatingSystem
 
@@ -42,6 +43,12 @@ Fetch Nginx HTTP Errors From GMP for Ingress `${INGRESS_OBJECT_NAME}`
     ${owner_name}=    RW.CLI.Run Cli
     ...    cmd=echo "${k8s_ingress_details.stdout}" | grep 'Owner:[^ ]*' | awk -F': ' '{print $2}' |awk -F':' '{print $2}'| sed 's/ *$//' | tr -d '\n'
     ...    include_in_history=false
+   ${k8s_ingress_details}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ingress ${INGRESS_OBJECT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ${related_resource_recommendations}=    RW.K8sHelper.Get Related Resource Recommendations
+    ...    k8s_object=${k8s_ingress_details.stdout}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${gmp_rsp}
     ...    set_severity_level=2
@@ -49,7 +56,7 @@ Fetch Nginx HTTP Errors From GMP for Ingress `${INGRESS_OBJECT_NAME}`
     ...    set_issue_actual=We found the following HTTP error codes: ${ERROR_CODES} associated with the ingress in $_line
     ...    set_issue_title=Detected HTTP Error Codes for Ingress `${INGRESS_OBJECT_NAME}`
     ...    set_issue_details=HTTP error codes in ingress and service "$_line". Troubleshoot the application associated with ${owner_kind.stdout} `${owner_name.stdout}`
-    ...    set_issue_next_steps=Check Deployment Log For Issues with `${owner_name.stdout}`\nQuery Traces for HTTP Errors in Namespace `${NAMESPACE}`
+    ...    set_issue_next_steps=Check Deployment Log For Issues with `${owner_name.stdout}`\nQuery Traces for HTTP Errors in Namespace `${NAMESPACE}`\n${related_resource_recommendations}
     ...    _line__raise_issue_if_contains=Host
     ${ingress_info}=    Set Variable    ${gmp_rsp.stdout}
     IF    """${ingress_info}""" == "" or """${ingress_info}""".isspace()
@@ -75,7 +82,6 @@ Find Owner and Service Health for Ingress `${INGRESS_OBJECT_NAME}`
     RW.Core.Add Pre To Report    Commands Used: ${history}
     RW.Core.Add Pre To Report    Ingress Info:\n${k8s_ingress_details.stdout}
 
-
 *** Keywords ***
 Suite Initialization
     ${kubeconfig}=    RW.Core.Import Secret
@@ -84,10 +90,6 @@ Suite Initialization
     ...    description=The kubernetes kubeconfig yaml containing connection configuration used to connect to cluster(s).
     ...    pattern=\w*
     ...    example=For examples, start here https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
-    ${kubectl}=    RW.Core.Import Service    kubectl
-    ...    description=The location service used to interpret shell commands.
-    ...    default=kubectl-service.shared
-    ...    example=kubectl-service.shared
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
@@ -105,12 +107,6 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=otel-demo
     ...    default=
-    ${GCLOUD_SERVICE}=    RW.Core.Import Service    gcloud
-    ...    type=string
-    ...    description=The selected RunWhen Service to use for accessing services within a network.
-    ...    pattern=\w*
-    ...    example=gcloud-service.shared
-    ...    default=gcloud-service.shared
     ${gcp_credentials_json}=    RW.Core.Import Secret    gcp_credentials_json
     ...    type=string
     ...    description=GCP service account json used to authenticate with GCP APIs.
@@ -154,12 +150,10 @@ Suite Initialization
     ...    default=500|501|502
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
-    Set Suite Variable    ${kubectl}    ${kubectl}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${ERROR_CODES}    ${ERROR_CODES}
-    Set Suite Variable    ${GCLOUD_SERVICE}    ${GCLOUD_SERVICE}
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${INGRESS_HOST}    ${INGRESS_HOST}
