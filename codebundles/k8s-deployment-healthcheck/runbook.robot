@@ -291,6 +291,46 @@ Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`
     RW.Core.Add To Report    ${anomalies_report_output}\n
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
+Check ReplicaSet Health for Deployment `${DEPLOYMENT_NAME}`
+    [Documentation]    Fetches all replicasets related to deployment to ensure that conflicting versions don't exist. 
+    [Tags]
+    ...    replica
+    ...    replicaset
+    ...    versions
+    ...    container
+    ...    pods
+    ...    deployment
+    ...    ${DEPLOYMENT_NAME}
+    ${check_replicaset}=    RW.CLI.Run Bash File
+    ...    bash_file=check_replicaset.sh 
+    ...    cmd_override=./check_replicaset.sh | tee "${SCRIPT_TMP_DIR}/rs_analysis"
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    render_in_commandlist=true
+    ${recommendations}=    RW.CLI.Run Cli
+    ...    cmd=awk "/Recommended Next Steps:/ {start=1; getline} start" "${SCRIPT_TMP_DIR}/rs_analysis"
+    ...    env=${env}
+    ...    include_in_history=false
+    IF    $recommendations.stdout != ""
+        ${recommendation_list}=    Evaluate    json.loads(r'''${recommendations.stdout}''')    json
+        IF    len(@{recommendation_list}) > 0
+            FOR    ${item}    IN    @{recommendation_list}
+                RW.Core.Add Issue
+                ...    severity=${item["severity"]}
+                ...    expected=Deployment `${DEPLOYMENT_NAME}` should only have one active replicaset in namespace `${NAMESPACE}`
+                ...    actual=Deployment `${DEPLOYMENT_NAME}` has more than one active replicaset in namespace `${NAMESPACE}`
+                ...    title=${item["title"]}
+                ...    reproduce_hint=${check_replicaset.cmd}
+                ...    details=${item["details"]}
+                ...    next_steps=${item["next_steps"]}
+            END
+        END
+    END
+    RW.Core.Add Pre To Report    ${check_replicaset.stdout}\n
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 *** Keywords ***
 Suite Initialization
@@ -339,7 +379,7 @@ Suite Initialization
     ...    description=Pattern used to exclude entries from log results when searching in log results.
     ...    pattern=\w*
     ...    example=(node_modules|opentelemetry)
-    ...    default=(node_modules|opentelemetry)
+    ...    default=("")
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.

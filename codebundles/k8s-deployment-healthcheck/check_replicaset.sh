@@ -109,7 +109,7 @@ if [[ $(echo $ALL_RS | tr ' ' '\n' | wc -l) -gt 1 ]]; then
             elif [[ $ROLLING_UPDATE_STATUS -eq 1 ]]; then
                 echo "Multiple ReplicaSets are active and no update appears to be in place. Investigation may be required to ensure they are not conflicting."
                 verify_pods_association_with_latest_rs
-                issue_details="{\"severity\":\"2\",\"title\":\"Conflicting versions detected for Deployment \`$DEPLOYMENT_NAME\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Clean up stale ReplicaSet \`$RS\` for Deployment \`$DEPLOYMENT_NAME\` in namespace \`${NAMESPACE}\` \",\"details\":\"$RS_DETAILS\"}"
+                issue_details="{\"severity\":\"2\",\"title\":\"Conflicting versions detected for Deployment \`$DEPLOYMENT_NAME\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Clean up stale ReplicaSet \`$RS\` for Deployment \`$DEPLOYMENT_NAME\` in namespace \`${NAMESPACE}\` \",\"details\":\"$RS_DETAILS_JSON\"}"
             else
                 echo "Multiple ReplicaSets are active and no update appears to be in place. Investigation may be required to ensure they are not conflicting."
             fi
