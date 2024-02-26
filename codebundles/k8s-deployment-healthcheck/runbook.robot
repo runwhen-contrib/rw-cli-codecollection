@@ -9,6 +9,7 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
 Library             RW.NextSteps
+Library             RW.K8sHelper
 Library             OperatingSystem
 Library             String
 
@@ -145,6 +146,12 @@ Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
+   ${k8s_deployment_details}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ${related_resource_recommendations}=    RW.K8sHelper.Get Related Resource Recommendations
+    ...    k8s_object=${k8s_deployment_details.stdout}
     ${object_list}=    Evaluate    json.loads(r'''${events.stdout}''')    json
     IF    len(@{object_list}) > 0
         FOR    ${item}    IN    @{object_list}
@@ -163,7 +170,7 @@ Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
             ...    title= Deployment `${DEPLOYMENT_NAME}` generated warning events for ${item["kind"]} `${item["name"]}`.
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=${item["kind"]} `${item["name"]}` generated the following warning details:\n`${item}`
-            ...    next_steps=${item_next_steps.stdout}
+            ...    next_steps=${item_next_steps.stdout}\n${related_resource_recommendations}
         END
     END
     ${history}=    RW.CLI.Pop Shell History
@@ -216,7 +223,7 @@ Troubleshoot Deployment Replicas for `${DEPLOYMENT_NAME}`
         ...    severity=1
         ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should have minimum availability / pod.
         ...    actual=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` does not have minimum availability / pods.
-        ...    title= Deployment `${DEPLOYMENT_NAME}` has status: ${deployment_status["available_condition"]["message"]}
+        ...    title= Deployment `${DEPLOYMENT_NAME}` is unavailable. Status: `${deployment_status["available_condition"]["message"]}`
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment `${DEPLOYMENT_NAME}` has ${deployment_status["ready_replicas"]} pods and needs ${deployment_status["desired_replicas"]}:\n`${deployment_status}`
         ...    next_steps=${item_next_steps.stdout}
@@ -225,7 +232,7 @@ Troubleshoot Deployment Replicas for `${DEPLOYMENT_NAME}`
         ...    severity=3
         ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should have ${deployment_status["desired_replicas"]} pods.
         ...    actual=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` has ${deployment_status["ready_replicas"]} pods.
-        ...    title= Deployment `${DEPLOYMENT_NAME}` has ${deployment_status["unavailable_replicas"]} unavailable pods.
+        ...    title= Deployment `${DEPLOYMENT_NAME}` has ${deployment_status["unavailable_replicas"]} pods that are not running.
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment `${DEPLOYMENT_NAME}` has minimum availability, but has unready pods:\n`${deployment_status}`
         ...    next_steps=Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
@@ -256,12 +263,18 @@ Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`
     ...    occurences
     ...    connection error
     ...    ${DEPLOYMENT_NAME}
-    ${recent_anomalies}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '(now - (60*60)) as $time_limit | [ .items[] | select(.type != "Warning" and (.involvedObject.kind == "Deployment" or .involvedObject.kind == "ReplicaSet" or .involvedObject.kind == "Pod") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}"))) | {kind: .involvedObject.kind, count: .count, name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, duration: (if (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp | fromdateiso8601)) == 0) then 1 else (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp | fromdateiso8601))/60) end) } ] | group_by([.kind, .name]) | map({kind: .[0].kind, name: .[0].name, count: (map(.count) | add), reasons: map(.reason) | unique, messages: map(.message) | unique, average_events_per_minute: (if .[0].duration == 1 then 1 else ((map(.count) | add)/.[0].duration ) end),firstTimestamp: map(.firstTimestamp | fromdateiso8601) | sort | .[0] | todateiso8601, lastTimestamp: map(.lastTimestamp | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'
+    ${recent_anomalies}=    RW.CLI.Run Bash File
+    ...    bash_file=event_anomalies.sh 
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
+   ${k8s_deployment_details}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ${related_resource_recommendations}=    RW.K8sHelper.Get Related Resource Recommendations
+    ...    k8s_object=${k8s_deployment_details.stdout}
     ${anomaly_list}=    Evaluate    json.loads(r'''${recent_anomalies.stdout}''')    json
     IF    len($anomaly_list) > 0
         FOR    ${item}    IN    @{anomaly_list}
@@ -279,7 +292,7 @@ Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`
                 ...    title= ${item["kind"]} `${item["name"]}` has an average of ${item["average_events_per_minute"]} events per minute (above the threshold of ${ANOMALY_THRESHOLD})
                 ...    reproduce_hint=View Commands Used in Report Output
                 ...    details=${item["kind"]} `${item["name"]}` has ${item["count"]} normal events that should be reviewed:\n`${item}`
-                ...    next_steps=${item_next_steps.stdout}
+                ...    next_steps=${item_next_steps.stdout}\n${related_resource_recommendations}
             END
         END
         ${anomalies_report_output}=    Set Variable    ${recent_anomalies.stdout}
@@ -291,6 +304,46 @@ Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`
     RW.Core.Add To Report    ${anomalies_report_output}\n
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
+Check ReplicaSet Health for Deployment `${DEPLOYMENT_NAME}`
+    [Documentation]    Fetches all replicasets related to deployment to ensure that conflicting versions don't exist. 
+    [Tags]
+    ...    replica
+    ...    replicaset
+    ...    versions
+    ...    container
+    ...    pods
+    ...    deployment
+    ...    ${DEPLOYMENT_NAME}
+    ${check_replicaset}=    RW.CLI.Run Bash File
+    ...    bash_file=check_replicaset.sh 
+    ...    cmd_override=./check_replicaset.sh | tee "${SCRIPT_TMP_DIR}/rs_analysis"
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    ${recommendations}=    RW.CLI.Run Cli
+    ...    cmd=awk "/Recommended Next Steps:/ {start=1; getline} start" "${SCRIPT_TMP_DIR}/rs_analysis"
+    ...    env=${env}
+    ...    include_in_history=false
+    IF    $recommendations.stdout != ""
+        ${recommendation_list}=    Evaluate    json.loads(r'''${recommendations.stdout}''')    json
+        IF    len(@{recommendation_list}) > 0
+            FOR    ${item}    IN    @{recommendation_list}
+                RW.Core.Add Issue
+                ...    severity=${item["severity"]}
+                ...    expected=Deployment `${DEPLOYMENT_NAME}` should only have one active replicaset in namespace `${NAMESPACE}`
+                ...    actual=Deployment `${DEPLOYMENT_NAME}` has more than one active replicaset in namespace `${NAMESPACE}`
+                ...    title=${item["title"]}
+                ...    reproduce_hint=${check_replicaset.cmd}
+                ...    details=${item["details"]}
+                ...    next_steps=${item["next_steps"]}
+            END
+        END
+    END
+    RW.Core.Add Pre To Report    ${check_replicaset.stdout}\n
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 *** Keywords ***
 Suite Initialization
@@ -339,7 +392,7 @@ Suite Initialization
     ...    description=Pattern used to exclude entries from log results when searching in log results.
     ...    pattern=\w*
     ...    example=(node_modules|opentelemetry)
-    ...    default=(node_modules|opentelemetry)
+    ...    default=("")
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
