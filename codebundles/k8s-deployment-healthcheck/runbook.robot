@@ -223,7 +223,7 @@ Troubleshoot Deployment Replicas for `${DEPLOYMENT_NAME}`
         ...    severity=1
         ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should have minimum availability / pod.
         ...    actual=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` does not have minimum availability / pods.
-        ...    title= Deployment `${DEPLOYMENT_NAME}` has status: ${deployment_status["available_condition"]["message"]}
+        ...    title= Deployment `${DEPLOYMENT_NAME}` is unavailable. Status: `${deployment_status["available_condition"]["message"]}`
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment `${DEPLOYMENT_NAME}` has ${deployment_status["ready_replicas"]} pods and needs ${deployment_status["desired_replicas"]}:\n`${deployment_status}`
         ...    next_steps=${item_next_steps.stdout}
@@ -232,7 +232,7 @@ Troubleshoot Deployment Replicas for `${DEPLOYMENT_NAME}`
         ...    severity=3
         ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should have ${deployment_status["desired_replicas"]} pods.
         ...    actual=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` has ${deployment_status["ready_replicas"]} pods.
-        ...    title= Deployment `${DEPLOYMENT_NAME}` has ${deployment_status["unavailable_replicas"]} unavailable pods.
+        ...    title= Deployment `${DEPLOYMENT_NAME}` has ${deployment_status["unavailable_replicas"]} pods that are not running.
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment `${DEPLOYMENT_NAME}` has minimum availability, but has unready pods:\n`${deployment_status}`
         ...    next_steps=Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
