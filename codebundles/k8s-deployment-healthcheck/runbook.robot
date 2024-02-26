@@ -9,6 +9,7 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
 Library             RW.NextSteps
+Library             RW.K8sHelper
 Library             OperatingSystem
 Library             String
 
@@ -145,6 +146,12 @@ Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
+   ${k8s_deployment_details}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ${related_resource_recommendations}=    RW.K8sHelper.Get Related Resource Recommendations
+    ...    k8s_object=${k8s_deployment_details.stdout}
     ${object_list}=    Evaluate    json.loads(r'''${events.stdout}''')    json
     IF    len(@{object_list}) > 0
         FOR    ${item}    IN    @{object_list}
@@ -163,7 +170,7 @@ Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
             ...    title= Deployment `${DEPLOYMENT_NAME}` generated warning events for ${item["kind"]} `${item["name"]}`.
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=${item["kind"]} `${item["name"]}` generated the following warning details:\n`${item}`
-            ...    next_steps=${item_next_steps.stdout}
+            ...    next_steps=${item_next_steps.stdout}\n${related_resource_recommendations}
         END
     END
     ${history}=    RW.CLI.Pop Shell History
@@ -262,6 +269,12 @@ Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
+   ${k8s_deployment_details}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ${related_resource_recommendations}=    RW.K8sHelper.Get Related Resource Recommendations
+    ...    k8s_object=${k8s_deployment_details.stdout}
     ${anomaly_list}=    Evaluate    json.loads(r'''${recent_anomalies.stdout}''')    json
     IF    len($anomaly_list) > 0
         FOR    ${item}    IN    @{anomaly_list}
@@ -279,7 +292,7 @@ Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`
                 ...    title= ${item["kind"]} `${item["name"]}` has an average of ${item["average_events_per_minute"]} events per minute (above the threshold of ${ANOMALY_THRESHOLD})
                 ...    reproduce_hint=View Commands Used in Report Output
                 ...    details=${item["kind"]} `${item["name"]}` has ${item["count"]} normal events that should be reviewed:\n`${item}`
-                ...    next_steps=${item_next_steps.stdout}
+                ...    next_steps=${item_next_steps.stdout}\n${related_resource_recommendations}
             END
         END
         ${anomalies_report_output}=    Set Variable    ${recent_anomalies.stdout}

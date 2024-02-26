@@ -25,11 +25,13 @@ def get_related_resource_recommendations(k8s_object):
     # Checking for an ArgoCD label
     if 'argocd.argoproj.io/instance' in labels:
         app_name = labels['argocd.argoproj.io/instance'].split('_')[0]
-        recommendations = f"Troubleshoot ArgoCD Application `{app_name.capitalize()}`."
+        recommendations = f"Troubleshoot ArgoCD Application `{app_name.capitalize()}`"
 
-    # # Example: Checking for a specific annotation (dummy example)
-    # if 'example.annotation/key' in annotations:
-    #     recommendations += " Check the example.annotation/key for more insights."
+    # Check for Flux Resources
+    if 'helm.toolkit.fluxcd.io/name' in labels:
+        fluxcd_helm_name = labels['helm.toolkit.fluxcd.io/name']
+        fluxcd_helm_namespace = labels['helm.toolkit.fluxcd.io/namespace']
+        recommendations = f"Troubleshoot `{fluxcd_helm_name}` Helm Release Health in Namespace `{fluxcd_helm_namespace}`"
 
     # Extend this function to check for other specific labels or annotations as needed
 
