@@ -40,6 +40,7 @@
 
 ## Keywords
 * [json_parser](libraries/.docs/json_parser.md)
+* [k8s_helper](libraries/.docs/k8s_helper.md)
 * [postgres_helper](libraries/.docs/postgres_helper.md)
 * [stdout_parser](libraries/.docs/stdout_parser.md)
 * [repository](libraries/.docs/repository.md)
