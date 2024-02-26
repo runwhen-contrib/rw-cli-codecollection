@@ -27,12 +27,18 @@ def get_related_resource_recommendations(k8s_object):
         app_name = labels['argocd.argoproj.io/instance'].split('_')[0]
         recommendations = f"Troubleshoot ArgoCD Application `{app_name.capitalize()}`"
 
-    # Check for Flux Resources
+    # Check for Flux Helm Resources
     elif 'helm.toolkit.fluxcd.io/name' in labels:
         fluxcd_helm_name = labels['helm.toolkit.fluxcd.io/name']
         fluxcd_helm_namespace = labels['helm.toolkit.fluxcd.io/namespace']
         recommendations = f"Troubleshoot `{fluxcd_helm_name}` Helm Release Health in Namespace `{fluxcd_helm_namespace}`"
 
+    # Check for Flux Kustomize Resources
+    elif 'kustomize.toolkit.fluxcd.io/name' in labels:
+        fluxcd_helm_name = labels['kustomize.toolkit.fluxcd.io/name']
+        fluxcd_helm_namespace = labels['kustomize.toolkit.fluxcd.io/namespace']
+        recommendations = f"Get details for unready Kustomizations in Namespace `{fluxcd_helm_namespace}`"
+        
     # Extend this function to check for other specific labels or annotations as needed
 
     return recommendations
