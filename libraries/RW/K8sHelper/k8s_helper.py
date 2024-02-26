@@ -16,7 +16,7 @@ def get_related_resource_recommendations(k8s_object):
     except json.JSONDecodeError as e:
         return f"Error decoding JSON: {e}"
 
-    recommendations = "No recommendations available."
+    recommendations = ""
 
     # Check for specific labels or annotations in the object JSON
     labels = obj_json.get("metadata", {}).get("labels", {})
@@ -28,7 +28,7 @@ def get_related_resource_recommendations(k8s_object):
         recommendations = f"Troubleshoot ArgoCD Application `{app_name.capitalize()}`"
 
     # Check for Flux Resources
-    if 'helm.toolkit.fluxcd.io/name' in labels:
+    elif 'helm.toolkit.fluxcd.io/name' in labels:
         fluxcd_helm_name = labels['helm.toolkit.fluxcd.io/name']
         fluxcd_helm_namespace = labels['helm.toolkit.fluxcd.io/namespace']
         recommendations = f"Troubleshoot `{fluxcd_helm_name}` Helm Release Health in Namespace `{fluxcd_helm_namespace}`"
