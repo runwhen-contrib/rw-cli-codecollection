@@ -134,7 +134,7 @@ resource_request_substitution () {
 ## GitHub Pull Request Functions
 #########################
 generate_pull_request_body_content () {
-    runsession_url=$RW_FRONTEND_URL/map/$RW_WORKSPACE#selectedRunSessions=$RW_SESSION_ID
+    runsession_url=$RW_FRONTEND_URL/map/$RW_WORKSPACE?selectedRunSessions=$RW_SESSION_ID
 
     read -r -d '' PR_BODY << EOF
 ### RunSession Details

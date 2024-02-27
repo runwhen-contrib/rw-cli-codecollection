@@ -91,9 +91,9 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
         ...    severity=2
         ...    expected=Liveness probes should be configured and functional for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
         ...    actual=Issues found with liveness probe configuration for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-        ...    title=Liveness Probe Configuration Issues with Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+        ...    title=Configuration Issues with Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
         ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=${liveness_probe_health.stdout}
+        ...    details=Liveness Probe Configuration Issues with Deployment ${DEPLOYMENT_NAME}\n${liveness_probe_health.stdout}
         ...    next_steps=${recommendations.stdout}
     END
     ${history}=    RW.CLI.Pop Shell History
@@ -128,9 +128,9 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
         ...    severity=2
         ...    expected=Readiness probes should be configured and functional for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
         ...    actual=Issues found with readiness probe configuration for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-        ...    title=Readiness Probe Configuration Issues with Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+        ...    title=Configuration Issues with Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
         ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=${readiness_probe_health.stdout}
+        ...    details=Readiness Probe Issues with Deployment ${DEPLOYMENT_NAME}\n${readiness_probe_health.stdout}
         ...    next_steps=${recommendations.stdout}
     END
     ${history}=    RW.CLI.Pop Shell History
@@ -223,16 +223,16 @@ Troubleshoot Deployment Replicas for `${DEPLOYMENT_NAME}`
         ...    severity=1
         ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should have minimum availability / pod.
         ...    actual=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` does not have minimum availability / pods.
-        ...    title= Deployment `${DEPLOYMENT_NAME}` is unavailable. Status: `${deployment_status["available_condition"]["message"]}`
+        ...    title= Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` is unavailable
         ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=Deployment `${DEPLOYMENT_NAME}` has ${deployment_status["ready_replicas"]} pods and needs ${deployment_status["desired_replicas"]}:\n`${deployment_status}`
+        ...    details=Deployment `${DEPLOYMENT_NAME}` has ${deployment_status["ready_replicas"]} ready pods and needs ${deployment_status["desired_replicas"]}:\n`${deployment_status}`
         ...    next_steps=${item_next_steps.stdout}
     ELSE IF    $deployment_status["unavailable_replicas"] > 0 and $deployment_status["available_condition"]["status"] == "True" and $deployment_status["progressing_condition"]["status"] == "False"
         RW.Core.Add Issue
         ...    severity=3
         ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should have ${deployment_status["desired_replicas"]} pods.
         ...    actual=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` has ${deployment_status["ready_replicas"]} pods.
-        ...    title= Deployment `${DEPLOYMENT_NAME}` has ${deployment_status["unavailable_replicas"]} pods that are not running.
+        ...    title= Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` has less than the desired availability
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment `${DEPLOYMENT_NAME}` has minimum availability, but has unready pods:\n`${deployment_status}`
         ...    next_steps=Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
@@ -242,7 +242,7 @@ Troubleshoot Deployment Replicas for `${DEPLOYMENT_NAME}`
         ...    severity=4
         ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should have more than 1 desired pod.
         ...    actual=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` is configured to have only 1 pod.
-        ...    title= Deployment `${DEPLOYMENT_NAME}` is not configured to be highly available.
+        ...    title= Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` is not configured to be highly available.
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment `${DEPLOYMENT_NAME}` is only configured to have a single pod:\n`${deployment_status}`
         ...    next_steps=Get Deployment Workload Details For `${DEPLOYMENT_NAME}` and Add to Report\nAdjust Deployment `${DEPLOYMENT_NAME}` spec.replicas to be greater than 1.
@@ -289,9 +289,9 @@ Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`
                 ...    severity=3
                 ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` has generated an average events per minute above the threshold of ${ANOMALY_THRESHOLD}.
                 ...    actual=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should have less than ${ANOMALY_THRESHOLD} events per minute related to a specific object.
-                ...    title= ${item["kind"]} `${item["name"]}` has an average of ${item["average_events_per_minute"]} events per minute (above the threshold of ${ANOMALY_THRESHOLD})
+                ...    title= ${item["kind"]} `${item["name"]}` has rapidly generated events that might warrant further investigation. 
                 ...    reproduce_hint=View Commands Used in Report Output
-                ...    details=${item["kind"]} `${item["name"]}` has ${item["count"]} normal events that should be reviewed:\n`${item}`
+                ...    details=${item["kind"]} `${item["name"]}` has an average of ${item["average_events_per_minute"]} events per minute (above the threshold of ${ANOMALY_THRESHOLD}):\n`${item}`
                 ...    next_steps=${item_next_steps.stdout}\n${related_resource_recommendations}
             END
         END
