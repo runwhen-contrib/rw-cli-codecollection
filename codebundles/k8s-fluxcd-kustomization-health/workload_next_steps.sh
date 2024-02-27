@@ -11,24 +11,22 @@
 # Input: List of event messages, related owner kind, and related owner name
 messages="$1"
 
+# Dynamically extract the pattern allowing for any object type
+matched=$(echo "$messages" | grep -oP "\[\K.*?(?=\sstatus)")
 
-# Try to parse out object details
-# Splitting the extracted string to get individual parts
-matched=$(echo "$messages" | grep -oP "\[\K(\w+\/\w+\/.+?)(?=\])")
+# Extracting kind, namespace, and name
 owner_kind=$(echo "$matched" | cut -d'/' -f1)
-owner_name=$(echo "$matched" | cut -d'/' -f2)
-additional_details=$(echo "$matched" | cut -d'/' -f3-)
+namespace=$(echo "$matched" | cut -d'/' -f2)
+owner_name=$(echo "$matched" | cut -d'/' -f3)
+
 
 # Initialize an empty array to store recommendations
 next_steps=()
 
-
 if [[ $messages =~ "Health check failed" ]]; then
-    next_steps+=("Troubleshoot $owner_kind Replicas for \`$owner_name\`")
-    next_steps+=("Troubleshoot $owner_kind Warning Events for \`$owner_name\`")
+    next_steps+=("Check $owner_kind Warning Events in '$namespace' namespace for '$owner_name'")
+    next_steps+=("Troubleshoot $owner_kind Replicas in '$namespace' namespace for '$owner_name'")
 fi
-
-
 
 # Display the list of recommendations
 printf "%s\n" "${next_steps[@]}" | sort | uniq

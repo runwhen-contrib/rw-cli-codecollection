@@ -46,7 +46,7 @@ Get details for unready Kustomizations in Namespace `${NAMESPACE}`
             RW.Core.Add Issue
             ...    severity=2
             ...    expected=Kustomizations should be synced and ready.   
-            ...    actual=We found the following kustomization objects in a pending state: ${item}
+            ...    actual=Objects are not ready.
             ...    title=Unready Kustomization \`${item["KustomizationName"]}\` Found In Namespace \`${NAMESPACE}\`
             ...    reproduce_hint=${kustomizations_not_ready.cmd}
             ...    details=${item}
