@@ -22,7 +22,7 @@ spec:
     pathToRobot: codebundles/k8s-gitops-gh-remediate/runbook.robot
   configProvided:
     - name: NAMESPACE
-      value: {{match_resource.resource.metadata.namespace}}
+      value: {{match_resource.resource.metadata.name}}
     - name: CONTEXT
       value: {{context}}
     - name: KUBERNETES_DISTRIBUTION_BINARY
