@@ -24,8 +24,8 @@ owner_name=$(echo "$matched" | cut -d'/' -f3)
 next_steps=()
 
 if [[ $messages =~ "Health check failed" ]]; then
-    next_steps+=("Check $owner_kind Warning Events in `$namespace` namespace for `$owner_name`")
-    next_steps+=("Troubleshoot $owner_kind Replicas in `$namespace` namespace for `$owner_name`")
+    next_steps+=("Check $owner_kind Warning Events in \`$namespace\` namespace for \`$owner_name\`")
+    next_steps+=("Troubleshoot $owner_kind Replicas in \`$namespace\` namespace for \`$owner_name\`")
 fi
 
 # Display the list of recommendations
