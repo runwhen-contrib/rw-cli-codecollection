@@ -66,13 +66,13 @@ Troubleshoot `${CONTAINER_NAME}` Application Logs
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ${printenv}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} exec $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head -n 1) --container=${CONTAINER_NAME} -- printenv
-    ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
-    ...    include_in_history=False
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
+    # ${printenv}=    RW.CLI.Run Cli
+    # ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} exec $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head -n 1) --container=${CONTAINER_NAME} -- printenv
+    # ...    show_in_rwl_cheatsheet=true
+    # ...    render_in_commandlist=true
+    # ...    include_in_history=False
+    # ...    env=${env}
+    # ...    secret_file__kubeconfig=${kubeconfig}
     ${proc_list}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} exec $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head -n 1) --container=${CONTAINER_NAME} -- ps -eo command --no-header | grep -v "ps -eo"
     ...    show_in_rwl_cheatsheet=true
@@ -83,14 +83,14 @@ Troubleshoot `${CONTAINER_NAME}` Application Logs
     ${app_repo}=    RW.K8sApplications.Clone Repo    ${REPO_URI}    ${REPO_AUTH_TOKEN}    ${NUM_OF_COMMITS}
     # ${test_data}=    RW.K8sApplications.Get Test Data
     ${proc_list}=    RW.K8sApplications.Format Process List    ${proc_list.stdout}
-    ${serialized_env}=    RW.K8sApplications.Serialize env    ${printenv.stdout}
+    # ${serialized_env}=    RW.K8sApplications.Serialize env    ${printenv.stdout}
     ${parsed_exceptions}=    RW.K8sApplications.Parse Exceptions    ${logs.stdout}
     # ${parsed_exceptions}=    RW.K8sApplications.Parse Exceptions    ${test_data}
     ${repos}=    Create List    ${app_repo}
     ${ts_results}=    RW.K8sApplications.Troubleshoot Application
     ...    repos=${repos}
     ...    exceptions=${parsed_exceptions}
-    ...    env=${serialized_env}
+    # ...    env=${serialized_env}
     ...    process_list=${proc_list}
     ...    app_name=${CONTAINER_NAME}
     ${history}=    RW.CLI.Pop Shell History

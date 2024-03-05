@@ -126,6 +126,7 @@ def troubleshoot_application(
     search_words: list[str] = []
     exception_occurences: dict = {}
     most_common_exception: str = ""
+    most_common_file_peek: str = ""
     errors_summary: str = ""
     report: str = ""
     for repo in repos:
@@ -141,10 +142,10 @@ def troubleshoot_application(
                 # we hash the exception strings to shorten them for dict searches
                 hashed_exception = _hash_string_md5(excep.raw)
                 if hashed_exception not in exception_occurences:
+                    # TODO: clean this up to use dataclass
                     exception_occurences[hashed_exception] = {
                         "count": 1,
-                        "content": excep.raw,
-                        "errors_summary": excep.errors_summary,
+                        "exception": excep,
                     }
                 elif hashed_exception in exception_occurences:
                     exception_occurences[hashed_exception]["count"] += 1
@@ -171,9 +172,14 @@ def troubleshoot_application(
     for hashed_exception in exception_occurences:
         count = exception_occurences[hashed_exception]["count"]
         if count > max_count:
+            excep = exception_occurences[hashed_exception]["exception"]
+            repo_file = repos[0].find_file(excep.first_file)
+            if excep.first_line_nums:
+                logger.info(f"line nums: {excep.first_line_nums}")
+                most_common_file_peek = repo_file.content_peek(excep.first_line_nums[0])
             max_count = count
-            most_common_exception = exception_occurences[hashed_exception]["content"]
-            errors_summary = exception_occurences[hashed_exception]["errors_summary"]
+            most_common_exception = excep.raw
+            errors_summary = excep.errors_summary
     err_msg_line = f"There are some error(s) with the {app_name} application: {errors_summary}\nThis was the most common exception found:"
     if not errors_summary:
         err_msg_line = f"The following exception was found while parsing the application logs of {app_name}"
@@ -190,6 +196,10 @@ To view the RunSession, click [this link]({_get_runsession_url()})
 
 ```
 {most_common_exception}
+```
+Near this code:
+```
+{most_common_file_peek}
 ```
 """
         if most_common_exception
@@ -216,6 +226,9 @@ ___
         "associated_files": rsr_report,
         "found_exceptions": (True if most_common_exception else False),
     }
+
+def get_file_contents_peek(filename: str, st: StackTraceData) -> str:
+    return 
 
 def _get_workspace_url():
     workspace: str = os.getenv("RW_WORKSPACE", "")
