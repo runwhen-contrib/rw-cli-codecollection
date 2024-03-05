@@ -136,6 +136,14 @@ class RepositoryFile:
         # skip_regex = r"^[ \t\n\r#*,(){}\[\]\"\'\':]*$"
         return None
 
+    def content_peek(self, line_num: int, before: int=44, after: int=6) -> str:
+        lines = self.content.splitlines()
+        start = max(0, line_num - before - 1)
+        end = min(len(lines), line_num + after)
+        peek_lines = lines[start:end]
+        result = '\n'.join(peek_lines)
+        return result
+
     def git_add(self):
         try:
             add_stdout = subprocess.run(
@@ -228,6 +236,15 @@ class Repository:
             self.auth_token = None
         self.files = RepositoryFiles()
         self.branch = branch
+    
+    def find_file(self, filename: str) -> RepositoryFile:
+        if not filename:
+            return None
+        for fn, obj in self.files.files.items():
+            if obj.basename == filename:
+                return obj
+            elif obj.basename == os.path.basename(filename):
+                return obj
 
     def clone_repo(
         self,

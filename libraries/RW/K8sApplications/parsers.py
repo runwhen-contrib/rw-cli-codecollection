@@ -10,6 +10,7 @@ class StackTraceData:
     # similar to urls, except just the API endpoints if found
     endpoints: list[str]
     files: list[str]
+    line_nums: dict[str, list[int]] # line numbers associated with exceptions per file
     error_messages: list[str]
     raw: str = field(default="", repr=False)
     # TODO: create a in-mem db of exception types
@@ -30,6 +31,20 @@ class StackTraceData:
     @property
     def errors_summary(self) -> str:
         return ", ".join(self.error_messages)
+    
+    @property
+    def first_file(self) -> str:
+        if len(self.files) > 0:
+            return self.files[0]
+        else:
+            return ""
+    
+    @property
+    def first_line_nums(self) -> list[int]:
+        if len(self.line_nums.keys()) > 0:
+            return list(self.line_nums.values())[0]
+        else:
+            return []
 
 
 class BaseStackTraceParse:
@@ -57,6 +72,7 @@ class BaseStackTraceParse:
     @staticmethod
     def parse_log(log) -> StackTraceData:
         file_paths: list[str] = BaseStackTraceParse.extract_files(log)
+        line_nums: dict[str,list[int]] = BaseStackTraceParse.extract_line_nums(log)
         urls: list[str] = BaseStackTraceParse.extract_urls(log)
         endpoints: list[str] = BaseStackTraceParse.extract_endpoints(log)
         error_messages: list[str] = BaseStackTraceParse.extract_sentences(log)
@@ -64,10 +80,34 @@ class BaseStackTraceParse:
             urls=urls,
             endpoints=endpoints,
             files=file_paths,
+            line_nums=line_nums,
             error_messages=error_messages,
             raw=log,
         )
         return st_data
+    
+    @staticmethod
+    def extract_line_nums(text, exclude_paths: list[str] = None) -> dict[str,list[int]]:
+        if exclude_paths is None:
+            exclude_paths = BaseStackTraceParse.exclude_file_paths
+        results = {}
+        regex = r"/[\w./_-]+\.[a-zA-Z0-9]+"
+        matches = re.findall(regex, text)
+        matches = [
+            m
+            for m in matches
+            if not any(exclude_path in m for exclude_path in exclude_paths)
+        ]
+        for m in matches:
+            if m not in results.keys():
+                results[m] = []
+            regex = r"line (\d+)"
+            line_nums = re.findall(regex, text)
+            for line_num in line_nums:
+                if line_num not in results[m]:
+                    results[m].append(int(line_num))
+        return results
+
 
     @staticmethod
     def extract_files(text, exclude_paths: list[str] = None) -> list[str]:
