@@ -9,7 +9,9 @@
         "-p",
         "3000:3000",
         "--name",
-        "mycodecollection"
+        "mycodecollection",
+        "-v",
+        "./:/app/codecollection/:z"
     ],
     "forwardPorts": [
         3000
@@ -49,8 +51,6 @@
                 "robot.language-server.python": "/usr/local/bin/python",
                 "robot.pythonpath": [
                     "/app",
-                    "/app/rw-public-codecollection/libraries",
-                    "/app/rw-public-codecollection/libraries/RW",
                     "/app/codecollection/libraries",
                     "/app/codecollection/libraries/RW",
                     "/app/dev_facade"
