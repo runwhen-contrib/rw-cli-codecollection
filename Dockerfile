@@ -14,6 +14,12 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* && \
     rm -rf /var/cache/apt
 
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+    unzip awscliv2.zip && \
+    ./aws/install && \
+    rm awscliv2.zip && \
+    rm -rf ./aws
+
 # Change the owner of all files inside /app to user and give full permissions
 RUN chown 1000:0 -R $WORKDIR
 RUN chown 1000:0 -R /app/codecollection
