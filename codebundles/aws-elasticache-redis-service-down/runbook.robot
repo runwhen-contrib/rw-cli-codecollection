@@ -22,7 +22,7 @@ Validate AWS Elasticache Redis Configuration
     RW.Core.Add Pre To Report    ${process.stdout}
 
 Analyze AWS Elasticache Redis Metrics
-    [Documentation]   This script is used to analyze and monitor various aspects of an AWS ElastiCache Redis cluster. It retrieves and displays metrics related to CPU utilization, replication, persistence, performance, security, and overall cluster management. The script makes use of the AWS CLI to interact with the AWS CloudWatch and ElastiCache services. It is configured to work with a specific Redis cluster, but can easily be modified to monitor different clusters by changing the `ELASTICACHE_ID` variable.
+    [Documentation]   This script is used to analyze and monitor various aspects of an AWS ElastiCache Redis cluster. It retrieves and displays metrics related to CPU utilization, replication, persistence, performance, security, and overall cluster management. The script makes use of the AWS CLI to interact with the AWS CloudWatch and ElastiCache services.
     [Tags]  aws    bash    script    cloudwatch    metrics    elasticache    redis    replication    persistence
     ${process}=    Run Process    ${CURDIR}/analyze_aws_elasticache_redis_metrics.sh    env=${env}
     RW.Core.Add Pre To Report    ${process.stdout}
@@ -54,12 +54,6 @@ Suite Initialization
     ...    type=string
     ...    description=AWS Secret Access Key
     ...    pattern=\w*
-
-    ${ELASTICACHE_ID}=    RW.Core.Import User Variable    ELASTICACHE_ID
-    ...    type=string
-    ...    description=Runbook input.
-    ...    pattern=\w*
-    ...    default=placeholder
 
     ${METRIC_NAMESPACE}=    RW.Core.Import User Variable    METRIC_NAMESPACE
     ...    type=string
@@ -155,7 +149,6 @@ Suite Initialization
     Set Suite Variable    ${AWS_REGION}    ${AWS_REGION.value}
     Set Suite Variable    ${AWS_ACCESS_KEY_ID}    ${AWS_ACCESS_KEY_ID.value}
     Set Suite Variable    ${AWS_SECRET_ACCESS_KEY}    ${AWS_SECRET_ACCESS_KEY.value}
-    Set Suite Variable    ${ELASTICACHE_ID}    ${ELASTICACHE_ID}
     Set Suite Variable    ${METRIC_NAMESPACE}    ${METRIC_NAMESPACE}
     Set Suite Variable    ${METRIC_NAME}    ${METRIC_NAME}
     Set Suite Variable    ${START_TIME}    ${START_TIME}
@@ -177,7 +170,6 @@ Suite Initialization
     ...    AWS_REGION=${AWS_REGION}
     ...    AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
     ...    AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-    ...    ELASTICACHE_ID=${ELASTICACHE_ID}
     ...    METRIC_NAMESPACE=${METRIC_NAMESPACE}
     ...    METRIC_NAME=${METRIC_NAME}
     ...    START_TIME=${START_TIME}
