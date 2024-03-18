@@ -27,26 +27,32 @@
                 "ms-python.pylint",
                 "ms-python.black-formatter",
                 "ms-python.python",
-                "njpwerner.autodocstring"
+                "njpwerner.autodocstring",
+                "timonwong.shellcheck"
             ],
             "settings": {
-                "python.languageServer": "Jedi",
+                // "python.languageServer": "Jedi", disabling for now due to conflict
                 "python.linting.enabled": true,
-                "python.linting.pylintEnabled": true,
-                "python.linting.pylintArgs": [
+                "pylint.interpreter": [
+                    "/usr/local/bin/python"
+                ],
+                "pylint.args": [
                     "--max-line-length=120",
                     "--enable=W0614" // track unused imports
                 ],
                 "[python]": {
+                    "editor.defaultFormatter": "ms-python.black-formatter",
                     "editor.insertSpaces": true,
                     "editor.tabSize": 4
                 },
                 "editor.formatOnSave": true,
                 "editor.lineNumbers": "on",
-                "python.formatting.provider": "black",
-                "python.formatting.blackArgs": [
+                "black-formatter.args": [
                     "--line-length",
                     "120"
+                ],
+                "black-formatter.interpreter": [
+                    "/usr/local/bin/python"
                 ],
                 "robot.language-server.python": "/usr/local/bin/python",
                 "robot.pythonpath": [
