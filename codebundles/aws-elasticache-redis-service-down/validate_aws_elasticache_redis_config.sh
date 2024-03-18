@@ -1,35 +1,45 @@
 #!/bin/bash
 
-# Variables
-AWS_REGION="us-west-2"
-ELASTICACHE_CLUSTER_ID="my-redis-cluster"
+# Environment Variables:
+# AWS_REGION
 
-# Get the configuration endpoint
-CONFIG_ENDPOINT=$(aws elasticache describe-cache-clusters --cache-cluster-id $ELASTICACHE_CLUSTER_ID --region $AWS_REGION --show-cache-node-info --query "CacheClusters[0].CacheNodes[0].Endpoint.Address" --output text)
+serverless_caches=$(aws elasticache describe-serverless-caches --region "$AWS_REGION" | jq -c '.ServerlessCaches[]')
+if [[ -z $serverless_caches ]]; then
+    echo "No serverless caches found."
+    exit 0
+fi
+echo $serverless_caches | while read i; do
+    echo $i
+    arn=$(echo "$i" | jq -r '.ARN')
+    cache_name=$(echo "$i" | jq -r '.ServerlessCacheName')
+    status=$(echo "$i" | jq -r '.Status')
+    port=$(echo "$i" | jq -r '.Port')
+    version=$(echo "$i" | jq -r '.FullEngineVersion')
+    endpoint=$(echo "$i" | jq -r '.Endpoint.Address')
+    snapshot_limit=$(echo "$i" | jq -r '.SnapshotRetentionLimit')
+    issue_snapshot_zero=""
+    if [[ $snapshot_limit == "0" ]]; then
+        issue_snapshot_zero="Error: Snapshot retention limit is set to 0"
+    fi
+    issue_status=""
+    if [[ $status != "available" ]]; then
+        issue_status="Error: Status is not available"
+    fi
 
-# Get the port
-PORT=$(aws elasticache describe-cache-clusters --cache-cluster-id $ELASTICACHE_CLUSTER_ID --region $AWS_REGION --show-cache-node-info --query "CacheClusters[0].CacheNodes[0].Endpoint.Port" --output text)
-
-# Get the replication group ID
-REPL_GROUP_ID=$(aws elasticache describe-cache-clusters --cache-cluster-id $ELASTICACHE_CLUSTER_ID --region $AWS_REGION --query "CacheClusters[0].ReplicationGroupId" --output text)
-
-# Get the number of replicas
-NUM_REPLICAS=$(aws elasticache describe-replication-groups --replication-group-id $REPL_GROUP_ID --region $AWS_REGION --query "ReplicationGroups[0].NodeGroups[0].NodeGroupMembers" --output text | wc -l)
-
-# Get the engine version
-ENGINE_VERSION=$(aws elasticache describe-cache-clusters --cache-cluster-id $ELASTICACHE_CLUSTER_ID --region $AWS_REGION --query "CacheClusters[0].EngineVersion" --output text)
-
-# Get the parameter group
-PARAM_GROUP=$(aws elasticache describe-cache-clusters --cache-cluster-id $ELASTICACHE_CLUSTER_ID --region $AWS_REGION --query "CacheClusters[0].CacheParameterGroup.CacheParameterGroupName" --output text)
-
-# Get the security groups
-SECURITY_GROUPS=$(aws elasticache describe-cache-clusters --cache-cluster-id $ELASTICACHE_CLUSTER_ID --region $AWS_REGION --query "CacheClusters[0].SecurityGroups[*].SecurityGroupId" --output text)
-
-# Output the configuration
-echo "Configuration Endpoint: $CONFIG_ENDPOINT"
-echo "Port: $PORT"
-echo "Replication Group ID: $REPL_GROUP_ID"
-echo "Number of Replicas: $NUM_REPLICAS"
-echo "Engine Version: $ENGINE_VERSION"
-echo "Parameter Group: $PARAM_GROUP"
-echo "Security Groups: $SECURITY_GROUPS"
+    echo "-------------------"
+    echo "ARN: $arn"
+    echo "Serverless Cache Name: $cache_name"
+    echo "Status: $status"
+    echo "Port: $port"
+    echo "Version: $version"
+    echo "Endpoint: $endpoint"
+    echo "Snapshot Limit: $snapshot_limit"
+    if [[ -n $issue_snapshot_zero ]]; then
+        echo $issue_snapshot_zero
+    fi
+    if [[ -n $issue_status ]]; then
+        echo $issue_status
+    fi
+    echo "-------------------"
+    echo ""
+done
