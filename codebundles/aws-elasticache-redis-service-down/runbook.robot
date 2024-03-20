@@ -21,14 +21,14 @@ Validate AWS Elasticache Redis Configuration
     ${process}=    Run Process    ${CURDIR}/validate_aws_elasticache_redis_config.sh    env=${env}
     RW.Core.Add Pre To Report    ${process.stdout}
     IF    "Snapshot retention limit is set to 0" in ${process.stdout}
-        RW.Core.Add Issue    title=Snapshots not configured for Elasticache
+        RW.Core.Add Issue    title=Snapshots not configured for Elasticache in region ${AWS_REGION}
         ...    severity=4
         ...    next_steps=Update the configuration of the Elasticache instance(s) to include a retention limit for snapshots.        
     END
     IF    "is not available" in ${process.stdout}"
-        RW.Core.Add Issue    title=Elasticache instance not available
+        RW.Core.Add Issue    title=Elasticache instance(s) not available in region ${AWS_REGION}
         ...    severity=2
-        ...    next_steps=Review metrics and logs of the Elasticache instance(s) to determine the cause of the issue.
+        ...    next_steps=Review metrics of the Elasticache instance(s) to determine the cause of the issue.
         
     END
 
@@ -39,7 +39,7 @@ Analyze AWS Elasticache Redis Metrics
     RW.Core.Add Pre To Report    ${process.stdout}
     IF    "" in ${process.stdout}
         RW.Core.Add Issue
-        ...    title=ElastiCache Instances have events occuring
+        ...    title=ElastiCache Instance(s) in region ${AWS_REGION} have events occuring
         ...    severity=3
         ...    next_steps=Review ElastiCache event logs.
     END
@@ -54,7 +54,7 @@ Analyze AWS Elasticache Redis Metrics
 
 *** Keywords ***
 Suite Initialization
-    ${AWS_REGION}=    RW.Core.Import Secret    AWS_REGION
+    ${AWS_REGION}=    RW.Core.Import User Variable    AWS_REGION
     ...    type=string
     ...    description=AWS Region
     ...    pattern=\w*
@@ -68,7 +68,7 @@ Suite Initialization
     ...    pattern=\w*
 
 
-    Set Suite Variable    ${AWS_REGION}    ${AWS_REGION.value}
+    Set Suite Variable    ${AWS_REGION}    ${AWS_REGION}
     Set Suite Variable    ${AWS_ACCESS_KEY_ID}    ${AWS_ACCESS_KEY_ID.value}
     Set Suite Variable    ${AWS_SECRET_ACCESS_KEY}    ${AWS_SECRET_ACCESS_KEY.value}
 

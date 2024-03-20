@@ -35,7 +35,7 @@ event_count=$(echo "$events" | jq '.Events | length')
 if [[ $event_count -gt 0 ]]; then
     echo ""
     echo -----------------------------
-    echo "Warning: Redis events are present. Total events: $event_count"
+    echo "Error: Redis events are present. Total events: $event_count"
     echo Events:
     echo "$events"
 fi
