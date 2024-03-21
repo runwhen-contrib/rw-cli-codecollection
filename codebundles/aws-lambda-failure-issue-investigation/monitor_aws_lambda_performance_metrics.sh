@@ -1,32 +1,62 @@
 #!/bin/bash
 
-# Variables
-AWS_REGION="us-west-2"
-FUNCTION_NAME="myLambdaFunction"
+# Environment Variables:
+# AWS_REGION
+START=$(date -d "60 minutes ago" +%s)
+END=$(date +%s)
+PERIOD=3600
 
-# Get the function details
-aws lambda get-function --function-name $FUNCTION_NAME --region $AWS_REGION
+lambda_functions=$(aws lambda list-functions --region "$AWS_REGION" --query 'Functions[*].[FunctionName]' --output text)
+for lambda in $lambda_functions; do
+    lambda_names+=("$lambda")
+done
 
-# Get the last 100 log events
-aws logs get-log-events --log-group-name /aws/lambda/$FUNCTION_NAME --limit 100 --region $AWS_REGION
+echo ------------------------
+echo "Found lambda functions: ${lambda_names[*]}"
+echo "Checking metrics: Duration, Errors, Throttles, Invocations"
+echo "For the last 60 minutes"
+echo ------------------------
 
-# Get function metrics for the last 24 hours
-aws cloudwatch get-metric-statistics --namespace AWS/Lambda --metric-name Duration \
---dimensions Name=FunctionName,Value=$FUNCTION_NAME --statistics Average \
---start-time $(date -d "-24 hours" -u +"%Y-%m-%dT%H:%M:%SZ") \
---end-time $(date -u +"%Y-%m-%dT%H:%M:%SZ") --period 3600 --region $AWS_REGION
+for lambda_name in "${lambda_names[@]}"; do
+    echo "Function Name: $lambda_name"
+    echo "------------------------"
+    aws cloudwatch get-metric-statistics --namespace AWS/Lambda --metric-name Duration \
+    --dimensions Name=FunctionName,Value="$lambda_name" --statistics Average \
+    --start-time "$START" \
+    --end-time "$END" --period "$PERIOD" --region "$AWS_REGION"
 
-aws cloudwatch get-metric-statistics --namespace AWS/Lambda --metric-name Errors \
---dimensions Name=FunctionName,Value=$FUNCTION_NAME --statistics Sum \
---start-time $(date -d "-24 hours" -u +"%Y-%m-%dT%H:%M:%SZ") \
---end-time $(date -u +"%Y-%m-%dT%H:%M:%SZ") --period 3600 --region $AWS_REGION
+    aws cloudwatch get-metric-statistics --namespace AWS/Lambda --metric-name Errors \
+    --dimensions Name=FunctionName,Value="$lambda_name" --statistics Sum \
+    --start-time "$START" \
+    --end-time "$END" --period "$PERIOD" --region "$AWS_REGION"
 
-aws cloudwatch get-metric-statistics --namespace AWS/Lambda --metric-name Throttles \
---dimensions Name=FunctionName,Value=$FUNCTION_NAME --statistics Sum \
---start-time $(date -d "-24 hours" -u +"%Y-%m-%dT%H:%M:%SZ") \
---end-time $(date -u +"%Y-%m-%dT%H:%M:%SZ") --period 3600 --region $AWS_REGION
+    aws cloudwatch get-metric-statistics --namespace AWS/Lambda --metric-name Throttles \
+    --dimensions Name=FunctionName,Value="$lambda_name" --statistics Sum \
+    --start-time "$START" \
+    --end-time "$END" --period "$PERIOD" --region "$AWS_REGION"
 
-aws cloudwatch get-metric-statistics --namespace AWS/Lambda --metric-name Invocations \
---dimensions Name=FunctionName,Value=$FUNCTION_NAME --statistics Sum \
---start-time $(date -d "-24 hours" -u +"%Y-%m-%dT%H:%M:%SZ") \
---end-time $(date -u +"%Y-%m-%dT%H:%M:%SZ") --period 3600 --region $AWS_REGION
+    aws cloudwatch get-metric-statistics --namespace AWS/Lambda --metric-name Invocations \
+    --dimensions Name=FunctionName,Value="$lambda_name" --statistics Sum \
+    --start-time "$START" \
+    --end-time "$END" --period "$PERIOD" --region "$AWS_REGION"
+done
+# # Get function metrics for the last 24 hours
+# aws cloudwatch get-metric-statistics --namespace AWS/Lambda --metric-name Duration \
+# --dimensions Name=FunctionName,Value=$FUNCTION_NAME --statistics Average \
+# --start-time "$START" \
+# --end-time "$END"--period 3600 --region $AWS_REGION
+
+# aws cloudwatch get-metric-statistics --namespace AWS/Lambda --metric-name Errors \
+# --dimensions Name=FunctionName,Value=$FUNCTION_NAME --statistics Sum \
+# --start-time "$START" \
+# --end-time "$END"--period 3600 --region $AWS_REGION
+
+# aws cloudwatch get-metric-statistics --namespace AWS/Lambda --metric-name Throttles \
+# --dimensions Name=FunctionName,Value=$FUNCTION_NAME --statistics Sum \
+# --start-time "$START" \
+# --end-time "$END"--period 3600 --region $AWS_REGION
+
+# aws cloudwatch get-metric-statistics --namespace AWS/Lambda --metric-name Invocations \
+# --dimensions Name=FunctionName,Value=$FUNCTION_NAME --statistics Sum \
+# --start-time "$START" \
+# --end-time "$END"--period 3600 --region $AWS_REGION
