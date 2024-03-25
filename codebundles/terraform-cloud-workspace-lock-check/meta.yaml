@@ -29,15 +29,8 @@ commands:
     -s ''${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}'''
   doc_links: '
 
-    - [Variables in Terraform](https://www.terraform.io/docs/language/values/variables.html){:target="_blank"}
-
-    - [Terraform API documentation](https://www.terraform.io/docs/cloud/api/index.html){:target="_blank"}
-
-    - [Terraform workspaces](https://www.terraform.io/docs/language/state/workspaces.html){:target="_blank"}'
-  explanation: This command sets a variable `TERRAFORM_API_TOKEN_VALUE` using the
-    value from a file called `$TERRAFORM_API_TOKEN`, then makes a secure request to
-    the Terraform API using that token to fetch information about a specific workspace
-    within an organization.
+    '
+  explanation: Explanation not available
   multi_line_details: "\n# Read the contents of the TERRAFORM_API_TOKEN file and store\
     \ it in the TERRAFORM_API_TOKEN_VALUE variable\nTERRAFORM_API_TOKEN_VALUE=$(cat\
     \ $TERRAFORM_API_TOKEN) \n\n# Make a GET request to the Terraform API using curl,\
