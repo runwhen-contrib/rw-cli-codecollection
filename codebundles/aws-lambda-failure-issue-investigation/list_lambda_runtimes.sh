@@ -1,4 +1,6 @@
 #!/bin/bash
+source ./auth.sh
+
 
 # Fetch all Lambda function names
 function_names=$(aws lambda list-functions --query 'Functions[*].FunctionName' --output text)

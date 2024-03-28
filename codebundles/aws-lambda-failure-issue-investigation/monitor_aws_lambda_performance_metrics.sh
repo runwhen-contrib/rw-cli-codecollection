@@ -1,4 +1,6 @@
 #!/bin/bash
+source ./auth.sh
+
 
 # Environment Variables:
 # AWS_REGION
@@ -40,23 +42,3 @@ for lambda_name in "${lambda_names[@]}"; do
     --start-time "$START" \
     --end-time "$END" --period "$PERIOD" --region "$AWS_REGION"
 done
-# # Get function metrics for the last 24 hours
-# aws cloudwatch get-metric-statistics --namespace AWS/Lambda --metric-name Duration \
-# --dimensions Name=FunctionName,Value=$FUNCTION_NAME --statistics Average \
-# --start-time "$START" \
-# --end-time "$END"--period 3600 --region $AWS_REGION
-
-# aws cloudwatch get-metric-statistics --namespace AWS/Lambda --metric-name Errors \
-# --dimensions Name=FunctionName,Value=$FUNCTION_NAME --statistics Sum \
-# --start-time "$START" \
-# --end-time "$END"--period 3600 --region $AWS_REGION
-
-# aws cloudwatch get-metric-statistics --namespace AWS/Lambda --metric-name Throttles \
-# --dimensions Name=FunctionName,Value=$FUNCTION_NAME --statistics Sum \
-# --start-time "$START" \
-# --end-time "$END"--period 3600 --region $AWS_REGION
-
-# aws cloudwatch get-metric-statistics --namespace AWS/Lambda --metric-name Invocations \
-# --dimensions Name=FunctionName,Value=$FUNCTION_NAME --statistics Sum \
-# --start-time "$START" \
-# --end-time "$END"--period 3600 --region $AWS_REGION

@@ -1,4 +1,6 @@
 #!/bin/bash
+source ./auth.sh
+
 # Environment Variables:
 #AWS_REGION
 
