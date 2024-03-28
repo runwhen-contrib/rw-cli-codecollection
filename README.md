@@ -96,3 +96,15 @@ Run the codebundle
 | [k8s-kubectl-cmd-sli](https://github.com/runwhen-contrib/rw-cli-codecollection/blob/main/codebundles/k8s-kubectl-cmd/sli.robot) | `k8s` | `Run User Provided Kubectl Command` | This taskset runs a user provided kubectl command and pushes the metric. The supplied command must result in distinct single metric. Command line tools like jq are available. [Docs](https://docs.runwhen.com/public/v/cli-codecollection/k8s-kubectl-cmd) |
 | [k8s-kubectl-cmd-taskset](https://github.com/runwhen-contrib/rw-cli-codecollection/blob/main/codebundles/k8s-kubectl-cmd/runbook.robot) | `k8s` | `Run User Provided Kubectl Command` | This taskset runs a user provided kubectl command andadds the output to the report. Command line tools like jq are available. [Docs](https://docs.runwhen.com/public/v/cli-codecollection/k8s-kubectl-cmd) |
 
+## Running API
+
+### Run Codebundle generator with docker-compose file
+https://github.com/Peikae3IWaeG/robotgen
+
+### Build dockerfile and start generator-api/main.py script. 
+
+Example commands:
+
+`docker build --no-cache --tag robot-runner .`
+
+`docker run --name dev-api --network robotgen_default --rm  -p 8001:8001 -v $PWD:/app/codecollection -v $PWD/auth:/app/auth --env-file .env robot-runner python codecollection/generator-api/main.py`
