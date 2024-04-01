@@ -1,0 +1,26 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+    - resourceTypes:
+        - deployment
+      matchRules:
+        - type: and
+          matches:
+            - type: pattern
+              pattern: ".+"
+              properties: [name]
+              mode: substring
+            - type: pattern
+              pattern: "runwhen.com/gitApplication"
+              properties: [metadata/labels]
+              mode: substring
+      slxs:
+        - baseName: k8s-app-troubleshoot
+          qualifiers: ["resource", "namespace", "cluster"]
+          baseTemplateName: k8s-app-troubleshoot
+          levelOfDetail: detailed
+          outputItems:
+            - type: slx
+            - type: runbook
+              templateName: k8s-app-troubleshoot-taskset.yaml
