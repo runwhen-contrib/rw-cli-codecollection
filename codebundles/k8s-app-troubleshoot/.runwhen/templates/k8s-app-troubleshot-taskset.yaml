@@ -25,8 +25,6 @@ spec:
       value: {{match_resource.resource.metadata.namespace}}
     - name: CONTEXT
       value: {{context}}
-    # - LABELS:
-    #   value: runwhen.com/gitApplication={{match_resource.resource.metadata.labels.runwhen.com/gitApplication}}
     - name: KUBERNETES_DISTRIBUTION_BINARY
       value: {{custom.kubernetes_distribution_binary}}
     - name: NUM_OF_COMMITS
@@ -36,18 +34,14 @@ spec:
     - name: LOGS_SINCE
       value: 60m
     - name: EXCLUDE_PATTERN
-      value: InvalidToken|Placeholder
+      value: Placeholder
     - name: MAX_LOG_LINES
       value: '500'
-    # - name: CONTAINER_NAME
-    #   value: {{match_resource.resource.metadata.labels.runwhen.com/gitApplication}}
     - name: WORKLOAD_NAME
       value: {{match_resource.resource.metadata.name}}
   secretsProvided:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
-    # - name: REPO_AUTH_TOKEN
-    #   workspaceKey: {{custom.git_applications[match_resource.resource.metadata.labels.runwhen.com/gitApplication]}}
   servicesProvided:
     - name: {{custom.kubernetes_distribution_binary}}
       locationServiceName: {{custom.kubernetes_distribution_binary}}-service.shared
