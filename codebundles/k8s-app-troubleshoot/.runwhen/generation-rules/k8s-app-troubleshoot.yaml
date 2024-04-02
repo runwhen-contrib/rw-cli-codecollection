@@ -8,7 +8,7 @@ spec:
         - type: and
           matches:
             - type: pattern
-              pattern: "runwhen.com/gitApplication"
+              pattern: "gitApplication"
               properties: [labels]
               mode: substring
       slxs:
