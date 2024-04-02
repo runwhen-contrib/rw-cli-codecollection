@@ -16,7 +16,7 @@ spec:
             #   properties: [name]
             #   mode: substring
             - type: pattern
-              pattern: "runwhen.com/gitApplication"
+              pattern: "gitApplication"
               properties: [metadata/labels]
               mode: substring
       slxs:
