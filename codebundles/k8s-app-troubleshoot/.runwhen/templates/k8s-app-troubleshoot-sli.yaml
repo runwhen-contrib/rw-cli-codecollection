@@ -11,7 +11,7 @@ spec:
   displayUnitsShort: ok
   locations:
     - {{default_location}}
-  description: Measures the health of a namespace by scoring Warning events, container restarts, and pods not ready. 
+  description: Measures the health of a application workload by parsing for exceptions in its logs.
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
