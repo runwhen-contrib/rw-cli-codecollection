@@ -15,9 +15,13 @@ spec:
             #   pattern: "worker"
             #   properties: [name]
             #   mode: substring
+            # - type: pattern
+            #   pattern: "gitApplication"
+            #   properties: [metadata/labels]
+            #   mode: substring
             - type: pattern
-              pattern: "gitApplication"
-              properties: [metadata/labels]
+              pattern: "runwhen.com/gitApplication"
+              properties: [labels]
               mode: substring
       slxs:
         - baseName: k8s-app-troubleshoot
