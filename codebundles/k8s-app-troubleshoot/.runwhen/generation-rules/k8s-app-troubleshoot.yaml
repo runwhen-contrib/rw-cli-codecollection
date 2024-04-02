@@ -11,14 +11,14 @@ spec:
             #   pattern: ".+"
             #   properties: [name]
             #   mode: substring
-            - type: pattern
-              pattern: "worker"
-              properties: [name]
-              mode: substring
             # - type: pattern
-            #   pattern: "runwhen.com/gitApplication"
-            #   properties: [metadata/labels]
+            #   pattern: "worker"
+            #   properties: [name]
             #   mode: substring
+            - type: pattern
+              pattern: "runwhen.com/gitApplication"
+              properties: [metadata/labels]
+              mode: substring
       slxs:
         - baseName: k8s-app-troubleshoot
           qualifiers: ["resource", "namespace", "cluster"]
