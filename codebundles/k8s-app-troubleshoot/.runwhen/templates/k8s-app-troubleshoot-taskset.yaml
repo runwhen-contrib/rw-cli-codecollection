@@ -37,8 +37,8 @@ spec:
       value: Placeholder
     - name: MAX_LOG_LINES
       value: '500'
-    - name: WORKLOAD_NAME
-      value: {{ match_resource.resource.metadata.labels }}
+    # - name: WORKLOAD_NAME
+    #   value: {{ match_resource.resource.metadata.labels }}
     #   value: {{ match_resource.resource.metadata.labels[runwhen.com/gitApplication] }}
     # - name: REPO_URI
     #   value: {{ custom.gitApplications[match_resource.resource.metadata.labels.runwhen.com/gitApplication].git }}
