@@ -11,6 +11,14 @@ spec:
               pattern: "gitApplication"
               properties: [annotations]
               mode: substring
+            - type: pattern
+              pattern: "gitTokenName"
+              properties: [annotations]
+              mode: substring
+            - type: pattern
+              pattern: "app"
+              properties: [annotations]
+              mode: substring
       slxs:
         - baseName: k8s-app-troubleshoot
           qualifiers: ["resource", "namespace", "cluster"]
@@ -20,3 +28,5 @@ spec:
             - type: slx
             - type: runbook
               templateName: k8s-app-troubleshoot-taskset.yaml
+            - type: sli
+              templateName: k8s-app-troubleshoot-sli.yaml

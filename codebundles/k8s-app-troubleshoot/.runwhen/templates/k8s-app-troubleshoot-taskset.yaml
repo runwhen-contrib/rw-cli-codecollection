@@ -37,8 +37,12 @@ spec:
       value: Placeholder
     - name: MAX_LOG_LINES
       value: '500'
-    - name: WORKLOAD_NAME
+    - name: LABELS
+      value: app={{ match_resource.resource.metadata.labels.app }}
+    - name: CONTAINER_NAME
       value: {{ match_resource.resource.metadata.labels.app }}
+    - name: WORKLOAD_NAME
+      value: {{ match_resource.resource.metadata.name }}
     - name: REPO_URI
       value: {{ match_resource.resource.metadata.annotations.gitApplication }}
   secretsProvided:
