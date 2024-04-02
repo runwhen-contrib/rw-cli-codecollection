@@ -17,7 +17,7 @@ spec:
               mode: substring
             - type: pattern
               pattern: "app"
-              properties: [annotations]
+              properties: [labels]
               mode: substring
       slxs:
         - baseName: k8s-app-troubleshoot
