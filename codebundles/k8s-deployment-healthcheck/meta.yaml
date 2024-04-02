@@ -81,6 +81,29 @@ commands:
     \ are any next steps\n    printf \"\\nRecommended Next Steps: \\n\"\n    printf\
     \ \"%s\\n\" \"${next_steps[@]}\" | sort -u  # Print unique next steps\nfi\n"
   name: check_liveness_probe_configuration_for_deployment_deployment_name
+  when_is_it_useful: '1. Deploying a new application or service to a Kubernetes cluster
+    and wanting to ensure that the probes are correctly configured to monitor the
+    health and readiness of the application.
+
+
+    2. Troubleshooting ongoing issues with applications or services experiencing CrashLoopBackoff
+    events within a Kubernetes cluster, and needing to verify if the probe configurations
+    are contributing to the problem.
+
+
+    3. Performing routine maintenance or updates on existing deployments in a Kubernetes
+    cluster and wanting to ensure that all probe configurations are set up correctly
+    before making any changes.
+
+
+    4. Investigating performance issues within a Kubernetes cluster and wanting to
+    validate the probe configurations for potential improvements in monitoring and
+    managing the health of applications.
+
+
+    5. Onboarding new team members or colleagues to work on managing Kubernetes deployments
+    and wanting to provide a tool for them to easily validate and understand the probe
+    configurations in deployment manifests.'
 - command: bash 'validate_probes.sh' readinessProbe | tee "${SCRIPT_TMP_DIR}/readiness_probe_output"
   doc_links: '
 
@@ -163,6 +186,29 @@ commands:
     \ are any next steps\n    printf \"\\nRecommended Next Steps: \\n\"\n    printf\
     \ \"%s\\n\" \"${next_steps[@]}\" | sort -u  # Print unique next steps\nfi\n"
   name: check_readiness_probe_configuration_for_deployment_deployment_name
+  when_is_it_useful: '1. Deploying a new application or service to a Kubernetes cluster
+    and wanting to ensure that the probes are correctly configured to monitor the
+    health and readiness of the application.
+
+
+    2. Troubleshooting ongoing issues with applications or services experiencing CrashLoopBackoff
+    events within a Kubernetes cluster, and needing to verify if the probe configurations
+    are contributing to the problem.
+
+
+    3. Performing routine maintenance or updates on existing deployments in a Kubernetes
+    cluster and wanting to ensure that all probe configurations are set up correctly
+    before making any changes.
+
+
+    4. Investigating performance issues within a Kubernetes cluster and wanting to
+    validate the probe configurations for potential improvements in monitoring and
+    managing the health of applications.
+
+
+    5. Onboarding new team members or colleagues to work on managing Kubernetes deployments
+    and wanting to provide a tool for them to easily validate and understand the probe
+    configurations in deployment manifests.'
 - command: 'kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq ''(now
     - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind
     == "Deployment" or .involvedObject.kind == "ReplicaSet" or .involvedObject.kind
@@ -207,6 +253,36 @@ commands:
     \ | fromdateiso8601) | sort | .[0] | todateiso8601, \n     lastTimestamp: map(.lastTimestamp\
     \ | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'\n"
   name: troubleshoot_deployment_warning_events_for_deployment_name
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes applications: A
+    DevOps or Site Reliability Engineer might use this command to quickly identify
+    and address warning events related to Deployments, ReplicaSets, or Pods within
+    a specific timeframe, in order to ensure the stability and performance of the
+    application.
+
+
+    2. Investigating performance issues: In the event of performance degradation or
+    intermittent errors within a Kubernetes cluster, a DevOps or Site Reliability
+    Engineer may use this command to pinpoint warning events related to specific resources
+    and assess the impact on overall performance.
+
+
+    3. Debugging CrashLoopBackoff events: When dealing with recurring CrashLoopBackoff
+    events in Kubernetes, a DevOps or Site Reliability Engineer could utilize this
+    command to gather and analyze warning events associated with Pods, identifying
+    potential issues that are causing the continuous restarts.
+
+
+    4. Incident response and resolution: During incident response activities, such
+    as service outages or disruptions, a DevOps or Site Reliability Engineer may employ
+    this command to swiftly isolate warning events impacting critical resources and
+    take corrective actions to mitigate the impact on the system.
+
+
+    5. Proactive maintenance and optimization: As part of routine maintenance and
+    optimization efforts, a DevOps or Site Reliability Engineer might use this command
+    to regularly review warning events within a specified timeframe, identifying patterns
+    or trends that require further investigation and remediation to ensure the overall
+    health of the Kubernetes environment.'
 - command: 'kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq ''(now
     - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind
     == "Deployment" or .involvedObject.kind == "ReplicaSet" or .involvedObject.kind
@@ -251,6 +327,36 @@ commands:
     \ | fromdateiso8601) | sort | .[0] | todateiso8601, \n     lastTimestamp: map(.lastTimestamp\
     \ | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'\n"
   name: troubleshoot_deployment_warning_events_for_deployment_name
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes applications: A
+    DevOps or Site Reliability Engineer might use this command to quickly identify
+    and address warning events related to Deployments, ReplicaSets, or Pods within
+    a specific timeframe, in order to ensure the stability and performance of the
+    application.
+
+
+    2. Investigating performance issues: In the event of performance degradation or
+    intermittent errors within a Kubernetes cluster, a DevOps or Site Reliability
+    Engineer may use this command to pinpoint warning events related to specific resources
+    and assess the impact on overall performance.
+
+
+    3. Debugging CrashLoopBackoff events: When dealing with recurring CrashLoopBackoff
+    events in Kubernetes, a DevOps or Site Reliability Engineer could utilize this
+    command to gather and analyze warning events associated with Pods, identifying
+    potential issues that are causing the continuous restarts.
+
+
+    4. Incident response and resolution: During incident response activities, such
+    as service outages or disruptions, a DevOps or Site Reliability Engineer may employ
+    this command to swiftly isolate warning events impacting critical resources and
+    take corrective actions to mitigate the impact on the system.
+
+
+    5. Proactive maintenance and optimization: As part of routine maintenance and
+    optimization efforts, a DevOps or Site Reliability Engineer might use this command
+    to regularly review warning events within a specified timeframe, identifying patterns
+    or trends that require further investigation and remediation to ensure the overall
+    health of the Kubernetes environment.'
 - command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o yaml
   doc_links: '
@@ -268,6 +374,30 @@ commands:
     \ \n\n# Output the details in YAML format for easier reading and manipulation\n\
     -o yaml\n"
   name: get_deployment_workload_details_for_deployment_name_and_add_to_report
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: When
+    a deployment is continuously crashing and restarting, a DevOps or SRE might use
+    this command to retrieve the YAML configuration in order to review the settings
+    and find any misconfigurations that could be causing the issue.
+
+
+    2. Investigating performance issues: If there are performance issues with a specific
+    deployment, a DevOps or SRE might use this command to view the detailed configuration
+    and identify any potential bottlenecks or inefficiencies.
+
+
+    3. Auditing and documentation: In order to keep track of the configurations for
+    different deployments, a DevOps or SRE might use this command to retrieve the
+    YAML configuration and document it for future reference or auditing purposes.
+
+
+    4. Comparing configurations: When comparing the settings of different deployments
+    or versions of a deployment, a DevOps or SRE might use this command to retrieve
+    the YAML configuration and compare them side by side.
+
+
+    5. Making changes to the deployment: Before making any changes to the deployment
+    configuration, a DevOps or SRE might use this command to retrieve the current
+    configuration as a reference point for the updates.'
 - command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o yaml
   doc_links: '
@@ -285,6 +415,30 @@ commands:
     \ \n\n# Output the details in YAML format for easier reading and manipulation\n\
     -o yaml\n"
   name: get_deployment_workload_details_for_deployment_name_and_add_to_report
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: When
+    a deployment is continuously crashing and restarting, a DevOps or SRE might use
+    this command to retrieve the YAML configuration in order to review the settings
+    and find any misconfigurations that could be causing the issue.
+
+
+    2. Investigating performance issues: If there are performance issues with a specific
+    deployment, a DevOps or SRE might use this command to view the detailed configuration
+    and identify any potential bottlenecks or inefficiencies.
+
+
+    3. Auditing and documentation: In order to keep track of the configurations for
+    different deployments, a DevOps or SRE might use this command to retrieve the
+    YAML configuration and document it for future reference or auditing purposes.
+
+
+    4. Comparing configurations: When comparing the settings of different deployments
+    or versions of a deployment, a DevOps or SRE might use this command to retrieve
+    the YAML configuration and compare them side by side.
+
+
+    5. Making changes to the deployment: Before making any changes to the deployment
+    configuration, a DevOps or SRE might use this command to retrieve the current
+    configuration as a reference point for the updates.'
 - command: 'kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o json | jq ''.status | {desired_replicas: .replicas, ready_replicas: (.readyReplicas
     // 0), missing_replicas: ((.replicas // 0) - (.readyReplicas // 0)), unavailable_replicas:
@@ -315,6 +469,21 @@ commands:
     Progressing\")) \n                                else \"Condition not available\"\
     \ end)\n    }'\n"
   name: troubleshoot_deployment_replicas_for_deployment_name
+  when_is_it_useful: '1. Monitoring the health and status of a specific deployment
+    in a Kubernetes cluster to ensure that it is functioning as expected.
+
+    2. Debugging issues related to the availability and readiness of replicas within
+    a deployment, such as pods continuously restarting or not being able to start.
+
+    3. Investigating and troubleshooting CrashLoopBackoff events that may be occurring
+    within a deployment.
+
+    4. Analyzing and diagnosing problems with progressing conditions for a deployment,
+    such as delays or failures in updating and rolling out new versions of an application.
+
+    5. Gathering detailed information about the current state of a deployment in order
+    to make informed decisions and take appropriate actions, such as scaling or modifying
+    its configuration.'
 - command: 'kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o json | jq ''.status | {desired_replicas: .replicas, ready_replicas: (.readyReplicas
     // 0), missing_replicas: ((.replicas // 0) - (.readyReplicas // 0)), unavailable_replicas:
@@ -345,6 +514,21 @@ commands:
     Progressing\")) \n                                else \"Condition not available\"\
     \ end)\n    }'\n"
   name: troubleshoot_deployment_replicas_for_deployment_name
+  when_is_it_useful: '1. Monitoring the health and status of a specific deployment
+    in a Kubernetes cluster to ensure that it is functioning as expected.
+
+    2. Debugging issues related to the availability and readiness of replicas within
+    a deployment, such as pods continuously restarting or not being able to start.
+
+    3. Investigating and troubleshooting CrashLoopBackoff events that may be occurring
+    within a deployment.
+
+    4. Analyzing and diagnosing problems with progressing conditions for a deployment,
+    such as delays or failures in updating and rolling out new versions of an application.
+
+    5. Gathering detailed information about the current state of a deployment in order
+    to make informed decisions and take appropriate actions, such as scaling or modifying
+    its configuration.'
 - command: bash 'event_anomalies.sh'
   doc_links: '
 
@@ -395,6 +579,20 @@ commands:
     \      lastTimestamp: (map(.lastTimestamp | fromdateiso8601) | sort | reverse\
     \ | .[0] | todateiso8601)\n    })\n')\n\necho \"${PROCESSED_EVENTS}\"\n"
   name: check_deployment_event_anomalies_for_deployment_name
+  when_is_it_useful: '1. Monitoring Kubernetes deployments for any CrashLoopBackoff
+    events, which could indicate a problem with the application or its environment.
+
+    2. Analyzing the events to identify any performance issues or unusual behavior
+    within the Kubernetes cluster.
+
+    3. Troubleshooting issues with pods or replica sets that are not starting or are
+    failing repeatedly.
+
+    4. Investigating any unusual or unexpected events occurring within the Kubernetes
+    environment, such as sudden spike in errors or resource usage.
+
+    5. Identifying and analyzing events related to pod evictions, which may impact
+    application availability and reliability.'
 - command: bash 'check_replicaset.sh' | tee "${SCRIPT_TMP_DIR}/rs_analysis"
   doc_links: '
 
@@ -516,3 +714,30 @@ commands:
     \ \"$issues\" ]; then\n    echo -e \"\\nRecommended Next Steps: \\n\"\n    echo\
     \ \"$issues\"\nfi\n"
   name: check_replicaset_health_for_deployment_deployment_name
+  when_is_it_useful: '1. During a routine health check of the Kubernetes cluster,
+    the DevOps or Site Reliability Engineer may run this script to ensure that all
+    ReplicaSets are functioning properly and there are no conflicts or inactive ReplicaSets
+    causing issues.
+
+
+    2. When deploying a new version of an application using rolling updates in Kubernetes,
+    the engineer may use this script to verify the status of ReplicaSets and ensure
+    that the new ReplicaSet is active and serving traffic while the old one is being
+    phased out.
+
+
+    3. If users report intermittent issues with a specific service or application
+    running on Kubernetes, the engineer may use this script to investigate whether
+    any ReplicaSets are experiencing CrashLoopBackoff events or other issues that
+    could be impacting the availability of the service.
+
+
+    4. After a scaling event or maintenance activity on the Kubernetes cluster, the
+    engineer may utilize this script to validate that all ReplicaSets have scaled
+    up or down as expected and that there are no unexpected conflicts or problems
+    with the deployment.
+
+
+    5. As part of a proactive monitoring and alerting strategy, the engineer may schedule
+    regular executions of this script to continuously monitor and ensure the stability
+    and proper functioning of ReplicaSets in the Kubernetes environment.'

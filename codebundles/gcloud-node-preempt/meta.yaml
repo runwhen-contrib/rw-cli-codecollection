@@ -26,3 +26,22 @@ commands:
     \ This helps them understand what each part of the command is doing and how it\
     \ contributes to the overall functionality."
   name: list_all_nodes_in_an_active_prempt_operation_for_gcp_project_gcp_project_id
+  when_is_it_useful: '1. Investigating and resolving performance issues in a Kubernetes
+    cluster, such as high CPU or memory utilization, by identifying and addressing
+    any bottlenecked or underperforming pods.
+
+    2. Troubleshooting and resolving Kubernetes CrashLoopBackoff events, which occur
+    when a container repeatedly crashes after starting up, by identifying the root
+    cause and implementing appropriate fixes.
+
+    3. Monitoring and optimizing resource allocation in a Kubernetes cluster to ensure
+    efficient usage of compute instances and avoid potential overutilization or underutilization.
+
+    4. Managing service account authentication for accessing resources within a Google
+    Cloud Platform project and ensuring proper authorization and permissions are in
+    place for preempted compute instances.
+
+    5. Implementing automated alerting and reporting for preempted compute instances
+    within a specific time frame in a Google Cloud Platform project, in order to gain
+    insights into potential service disruptions and take proactive measures to mitigate
+    them.'

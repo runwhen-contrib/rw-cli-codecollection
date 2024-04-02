@@ -28,6 +28,20 @@ commands:
     \ container using the --container flag\n# Replace ${CONTAINER_NAME} with the name\
     \ of the container you want to view logs for\n--container=${CONTAINER_NAME}\n"
   name: get_container_name_application_logs
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event to identify
+    the root cause of the issue and fix the underlying problem.
+
+    2. Analyzing application errors or performance issues in a Kubernetes cluster
+    by examining the logs of specific containers.
+
+    3. Monitoring and debugging a deployment rollout to verify that new pods are starting
+    correctly and to investigate any potential failures.
+
+    4. Investigating a security incident or suspicious activity within a Kubernetes
+    cluster by reviewing container logs for any unauthorized access or malicious behavior.
+
+    5. Troubleshooting connectivity or networking problems within a Kubernetes environment
+    by inspecting the logs of affected containers.'
 - command: kubectl --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES}
     --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
   doc_links: '
@@ -57,6 +71,20 @@ commands:
     \ container using the --container flag\n# Replace ${CONTAINER_NAME} with the name\
     \ of the container you want to view logs for\n--container=${CONTAINER_NAME}\n"
   name: get_container_name_application_logs
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event to identify
+    the root cause of the issue and fix the underlying problem.
+
+    2. Analyzing application errors or performance issues in a Kubernetes cluster
+    by examining the logs of specific containers.
+
+    3. Monitoring and debugging a deployment rollout to verify that new pods are starting
+    correctly and to investigate any potential failures.
+
+    4. Investigating a security incident or suspicious activity within a Kubernetes
+    cluster by reviewing container logs for any unauthorized access or malicious behavior.
+
+    5. Troubleshooting connectivity or networking problems within a Kubernetes environment
+    by inspecting the logs of affected containers.'
 - command: ${cmd}
   doc_links: '
 
@@ -85,6 +113,30 @@ commands:
 
     ${cmd}'
   name: troubleshoot_container_name_application_logs
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event: A DevOps
+    or Site Reliability Engineer might need to run specific system commands to investigate
+    and resolve the underlying issues causing the CrashLoopBackoff.
+
+
+    2. Monitoring and optimizing resource usage in a Kubernetes cluster: Using dynamic
+    execution of commands, DevOps or Site Reliability Engineers can gather performance
+    data and make adjustments to ensure efficient resource utilization within the
+    cluster.
+
+
+    3. Automating tasks related to scaling up or down Kubernetes deployments: By using
+    dynamic execution of commands, engineers can automate the process of scaling deployments
+    based on predefined conditions such as CPU or memory usage.
+
+
+    4. Handling failover and disaster recovery in a distributed system: When certain
+    conditions are met, such as a node failure or high latency, running specific system
+    commands can help facilitate failover processes and ensure system resilience.
+
+
+    5. Applying security patches and updates across a Kubernetes environment: Dynamic
+    execution of commands can be used to automate the process of applying security
+    patches and updates to the various components of a Kubernetes cluster.'
 - command: ${cmd}
   doc_links: '
 
@@ -113,76 +165,30 @@ commands:
 
     ${cmd}'
   name: troubleshoot_container_name_application_logs
-- command: kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
-    -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head
-    -n 1) --container=${CONTAINER_NAME} -- printenv
-  doc_links: '
-
-    '
-  explanation: This command allows you to execute a specific command within a running
-    container in a Kubernetes cluster by specifying the context, namespace, labels,
-    and container name. It makes use of kubectl to find the relevant resources and
-    then runs the specified command within the chosen container.
-  multi_line_details: '
-
-    # Set the context and namespace to be used
-
-    CONTEXT=my-context
-
-    NAMESPACE=my-namespace
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event: A DevOps
+    or Site Reliability Engineer might need to run specific system commands to investigate
+    and resolve the underlying issues causing the CrashLoopBackoff.
 
 
-    # Get the name of the first deployment or stateful set based on specified labels
-
-    RESOURCE_NAME=$(kubectl --context=${CONTEXT} -n ${NAMESPACE} get all -l ${LABELS}
-    -oname | grep -iE "deploy|stateful" | head -n 1)
-
-
-    # Execute the command within the specified container using the retrieved resource
-    name
-
-    CONTAINER_NAME=my-container
-
-    kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $RESOURCE_NAME --container=${CONTAINER_NAME}
-    -- printenv
-
-    '
-  name: troubleshoot_container_name_application_logs
-- command: kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
-    -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head
-    -n 1) --container=${CONTAINER_NAME} -- printenv
-  doc_links: '
-
-    '
-  explanation: This command allows you to execute a specific command within a running
-    container in a Kubernetes cluster by specifying the context, namespace, labels,
-    and container name. It makes use of kubectl to find the relevant resources and
-    then runs the specified command within the chosen container.
-  multi_line_details: '
-
-    # Set the context and namespace to be used
-
-    CONTEXT=my-context
-
-    NAMESPACE=my-namespace
+    2. Monitoring and optimizing resource usage in a Kubernetes cluster: Using dynamic
+    execution of commands, DevOps or Site Reliability Engineers can gather performance
+    data and make adjustments to ensure efficient resource utilization within the
+    cluster.
 
 
-    # Get the name of the first deployment or stateful set based on specified labels
+    3. Automating tasks related to scaling up or down Kubernetes deployments: By using
+    dynamic execution of commands, engineers can automate the process of scaling deployments
+    based on predefined conditions such as CPU or memory usage.
 
-    RESOURCE_NAME=$(kubectl --context=${CONTEXT} -n ${NAMESPACE} get all -l ${LABELS}
-    -oname | grep -iE "deploy|stateful" | head -n 1)
+
+    4. Handling failover and disaster recovery in a distributed system: When certain
+    conditions are met, such as a node failure or high latency, running specific system
+    commands can help facilitate failover processes and ensure system resilience.
 
 
-    # Execute the command within the specified container using the retrieved resource
-    name
-
-    CONTAINER_NAME=my-container
-
-    kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $RESOURCE_NAME --container=${CONTAINER_NAME}
-    -- printenv
-
-    '
-  name: troubleshoot_container_name_application_logs
+    5. Applying security patches and updates across a Kubernetes environment: Dynamic
+    execution of commands can be used to automate the process of applying security
+    patches and updates to the various components of a Kubernetes cluster.'
 - command: kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head
     -n 1) --container=${CONTAINER_NAME} -- ps -eo command --no-header | grep -v "ps
@@ -256,6 +262,18 @@ commands:
     steps with explanatory comments, making it easier for newer or less experienced
     devops engineers to understand and modify as needed.'
   name: troubleshoot_container_name_application_logs
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events
+
+    2. Analyzing performance issues within a specific container in a deployment or
+    stateful set
+
+    3. Investigating resource utilization and potential bottlenecks within a specific
+    namespace and context
+
+    4. Monitoring and debugging application errors or crashes within a specific container
+
+    5. Identifying and resolving networking issues within a specific deployment or
+    stateful set'
 - command: kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${NAMESPACE} get all -l ${LABELS} -oname | grep -iE "deploy|stateful" | head
     -n 1) --container=${CONTAINER_NAME} -- ps -eo command --no-header | grep -v "ps
@@ -329,3 +347,15 @@ commands:
     steps with explanatory comments, making it easier for newer or less experienced
     devops engineers to understand and modify as needed.'
   name: troubleshoot_container_name_application_logs
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events
+
+    2. Analyzing performance issues within a specific container in a deployment or
+    stateful set
+
+    3. Investigating resource utilization and potential bottlenecks within a specific
+    namespace and context
+
+    4. Monitoring and debugging application errors or crashes within a specific container
+
+    5. Identifying and resolving networking issues within a specific deployment or
+    stateful set'
