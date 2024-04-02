@@ -39,6 +39,8 @@ spec:
       value: '500'
     - name: WORKLOAD_NAME
       value: {{ match_resource.resource.metadata.labels.gitApplication }}
+    - name: REPO_URI
+      value: {{ custom.gitApplications[match_resource.resource.metadata.labels.gitApplication].git }}
   secretsProvided:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
