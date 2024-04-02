@@ -9,7 +9,7 @@ spec:
           matches:
             - type: pattern
               pattern: "gitApplication"
-              properties: [labels]
+              properties: [annotations]
               mode: substring
       slxs:
         - baseName: k8s-app-troubleshoot
