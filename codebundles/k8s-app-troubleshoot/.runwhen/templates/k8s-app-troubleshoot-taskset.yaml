@@ -42,7 +42,7 @@ spec:
     - name: CONTAINER_NAME
       value: {{ match_resource.resource.metadata.labels.app }}
     - name: WORKLOAD_NAME
-      value: {{match_resource.resource.resource_type }} {{ match_resource.resource.metadata.name }}
+      value: deployment.apps/{{ match_resource.resource.metadata.name }}
     - name: REPO_URI
       value: {{ match_resource.resource.metadata.annotations.gitApplication }}
   secretsProvided:
