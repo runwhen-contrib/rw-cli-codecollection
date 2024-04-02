@@ -45,6 +45,20 @@ commands:
 
     '
   name: check_for_successful_rule_setup
+  when_is_it_useful: '1. Monitoring and troubleshooting the overall health and performance
+    of Kubernetes clusters
+
+    2. Investigating issues with applications or microservices running on Kubernetes
+    pods, such as service failures or high resource usage
+
+    3. Identifying and addressing problems with containerized applications, such as
+    crashes or network connectivity issues
+
+    4. Analyzing and debugging system and application logs for specific error patterns
+    or anomalies
+
+    5. Proactively monitoring and detecting potential security threats or unauthorized
+    access within Kubernetes environments'
 - command: kubectl --context=${CONTEXT} -n ${PROM_NAMESPACE} logs $(kubectl --context=${CONTEXT}
     -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/name=prometheus -o=jsonpath='{.items[0].metadata.name}')
     -c prometheus | grep -iP "(load.*.fail)" || true
@@ -91,6 +105,20 @@ commands:
 
     '
   name: check_for_successful_rule_setup
+  when_is_it_useful: '1. Monitoring and troubleshooting the overall health and performance
+    of Kubernetes clusters
+
+    2. Investigating issues with applications or microservices running on Kubernetes
+    pods, such as service failures or high resource usage
+
+    3. Identifying and addressing problems with containerized applications, such as
+    crashes or network connectivity issues
+
+    4. Analyzing and debugging system and application logs for specific error patterns
+    or anomalies
+
+    5. Proactively monitoring and detecting potential security threats or unauthorized
+    access within Kubernetes environments'
 - command: kubectl get clusterrole/kube-prometheus-stack-operator -ojson
   doc_links: '
 
@@ -123,6 +151,35 @@ commands:
 
     '
   name: verify_prometheus_rbac_can_access_servicemonitors
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to retrieve the details of
+    a specific ClusterRole in order to investigate if the role permissions are causing
+    the CrashLoopBackoff events.
+
+
+    2. Managing and auditing access control: This command can be used to view and
+    manage the permissions and access controls for different resources within a Kubernetes
+    cluster. A DevOps or Site Reliability Engineer might use this command to audit
+    and update the permissions of a specific ClusterRole.
+
+
+    3. Debugging deployment issues: If there are issues with deploying certain resources
+    within the Kubernetes cluster, a DevOps or Site Reliability Engineer might use
+    this command to retrieve the details of a specific ClusterRole to ensure that
+    the necessary permissions are in place for the deployment to succeed.
+
+
+    4. Monitoring and troubleshooting resource usage: This command can be used to
+    retrieve information about the resources allocated and used by a specific ClusterRole
+    within the Kubernetes cluster. A DevOps or Site Reliability Engineer might use
+    this command to monitor and troubleshoot any resource usage issues related to
+    the role.
+
+
+    5. Performing routine maintenance and upgrades: As part of routine maintenance
+    and upgrade tasks, a DevOps or Site Reliability Engineer might use this command
+    to review and update the permissions of a specific ClusterRole to ensure compatibility
+    and compliance with the latest changes and updates in the Kubernetes cluster.'
 - command: kubectl get clusterrole/kube-prometheus-stack-operator -ojson
   doc_links: '
 
@@ -155,6 +212,35 @@ commands:
 
     '
   name: verify_prometheus_rbac_can_access_servicemonitors
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to retrieve the details of
+    a specific ClusterRole in order to investigate if the role permissions are causing
+    the CrashLoopBackoff events.
+
+
+    2. Managing and auditing access control: This command can be used to view and
+    manage the permissions and access controls for different resources within a Kubernetes
+    cluster. A DevOps or Site Reliability Engineer might use this command to audit
+    and update the permissions of a specific ClusterRole.
+
+
+    3. Debugging deployment issues: If there are issues with deploying certain resources
+    within the Kubernetes cluster, a DevOps or Site Reliability Engineer might use
+    this command to retrieve the details of a specific ClusterRole to ensure that
+    the necessary permissions are in place for the deployment to succeed.
+
+
+    4. Monitoring and troubleshooting resource usage: This command can be used to
+    retrieve information about the resources allocated and used by a specific ClusterRole
+    within the Kubernetes cluster. A DevOps or Site Reliability Engineer might use
+    this command to monitor and troubleshoot any resource usage issues related to
+    the role.
+
+
+    5. Performing routine maintenance and upgrades: As part of routine maintenance
+    and upgrade tasks, a DevOps or Site Reliability Engineer might use this command
+    to review and update the permissions of a specific ClusterRole to ensure compatibility
+    and compliance with the latest changes and updates in the Kubernetes cluster.'
 - command: kubectl --context=${CONTEXT} -n ${PROM_NAMESPACE} logs $(kubectl --context=${CONTEXT}
     -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/name=prometheus -o=jsonpath='{.items[0].metadata.name}')
     -c prometheus | grep -iP "(scrape.*.error)" || true
@@ -192,6 +278,14 @@ commands:
 
     '
   name: identify_endpoint_scraping_errors
+  when_is_it_useful: "1. Monitoring the health and performance of the Prometheus container\
+    \ in a Kubernetes environment\n2. Troubleshooting issues with data scraping or\
+    \ ingestion in a Prometheus instance running in a Kubernetes cluster\n3. Investigating\
+    \ errors or anomalies related to Prometheus metrics collection and storage\n4.\
+    \ Performing log analysis and troubleshooting for Prometheus containers experiencing\
+    \ CrashLoopBackoff events \n5. Verifying the successful retrieval and filtering\
+    \ of logs from the Prometheus container for proactive monitoring and alerting\
+    \ purposes"
 - command: kubectl --context=${CONTEXT} -n ${PROM_NAMESPACE} logs $(kubectl --context=${CONTEXT}
     -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/name=prometheus -o=jsonpath='{.items[0].metadata.name}')
     -c prometheus | grep -iP "(scrape.*.error)" || true
@@ -229,6 +323,14 @@ commands:
 
     '
   name: identify_endpoint_scraping_errors
+  when_is_it_useful: "1. Monitoring the health and performance of the Prometheus container\
+    \ in a Kubernetes environment\n2. Troubleshooting issues with data scraping or\
+    \ ingestion in a Prometheus instance running in a Kubernetes cluster\n3. Investigating\
+    \ errors or anomalies related to Prometheus metrics collection and storage\n4.\
+    \ Performing log analysis and troubleshooting for Prometheus containers experiencing\
+    \ CrashLoopBackoff events \n5. Verifying the successful retrieval and filtering\
+    \ of logs from the Prometheus container for proactive monitoring and alerting\
+    \ purposes"
 - command: kubectl --context=${CONTEXT} -n ${PROM_NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/name=prometheus -o=jsonpath='{.items[0].metadata.name}')
     --container prometheus -- wget -qO- -S 127.0.0.1:9090/-/healthy 2>&1 | grep "HTTP/"
@@ -273,6 +375,36 @@ commands:
 
     '
   name: check_prometheus_api_healthy
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to check the health status
+    of the Prometheus container after it experiences CrashLoopBackoff events, in order
+    to diagnose and resolve any issues causing the continuous crashing.
+
+
+    2. Monitoring application health during deployment: During the deployment of a
+    new version of an application on Kubernetes, a DevOps or Site Reliability Engineer
+    might use this command to continuously monitor the health status of the Prometheus
+    container to ensure that the new version is functioning properly.
+
+
+    3. Investigating intermittent connectivity issues: If there are intermittent connectivity
+    issues reported by users accessing the application hosted on Kubernetes, a DevOps
+    or Site Reliability Engineer might use this command to check the health status
+    of the Prometheus container and investigate if there are any underlying network
+    issues affecting the application.
+
+
+    4. Performance troubleshooting: When performance issues are reported with an application
+    running on Kubernetes, a DevOps or Site Reliability Engineer might use this command
+    to monitor the health status of the Prometheus container and gather insights into
+    potential performance bottlenecks.
+
+
+    5. Post-incident analysis: After an incident or outage involving the application
+    on Kubernetes, a DevOps or Site Reliability Engineer might use this command to
+    analyze the health status of the Prometheus container and identify any issues
+    that contributed to the incident, in order to prevent similar problems in the
+    future.'
 - command: kubectl --context=${CONTEXT} -n ${PROM_NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/name=prometheus -o=jsonpath='{.items[0].metadata.name}')
     --container prometheus -- wget -qO- -S 127.0.0.1:9090/-/healthy 2>&1 | grep "HTTP/"
@@ -317,3 +449,33 @@ commands:
 
     '
   name: check_prometheus_api_healthy
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to check the health status
+    of the Prometheus container after it experiences CrashLoopBackoff events, in order
+    to diagnose and resolve any issues causing the continuous crashing.
+
+
+    2. Monitoring application health during deployment: During the deployment of a
+    new version of an application on Kubernetes, a DevOps or Site Reliability Engineer
+    might use this command to continuously monitor the health status of the Prometheus
+    container to ensure that the new version is functioning properly.
+
+
+    3. Investigating intermittent connectivity issues: If there are intermittent connectivity
+    issues reported by users accessing the application hosted on Kubernetes, a DevOps
+    or Site Reliability Engineer might use this command to check the health status
+    of the Prometheus container and investigate if there are any underlying network
+    issues affecting the application.
+
+
+    4. Performance troubleshooting: When performance issues are reported with an application
+    running on Kubernetes, a DevOps or Site Reliability Engineer might use this command
+    to monitor the health status of the Prometheus container and gather insights into
+    potential performance bottlenecks.
+
+
+    5. Post-incident analysis: After an incident or outage involving the application
+    on Kubernetes, a DevOps or Site Reliability Engineer might use this command to
+    analyze the health status of the Prometheus container and identify any issues
+    that contributed to the incident, in order to prevent similar problems in the
+    future.'

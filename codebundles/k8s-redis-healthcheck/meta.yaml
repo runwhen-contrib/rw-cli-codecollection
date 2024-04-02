@@ -19,6 +19,21 @@ commands:
     \ appropriate flags and parameters\nkubectl exec deployment/${DEPLOYMENT_NAME}\
     \ \\\n    --context=${CONTEXT} \\\n    -n ${NAMESPACE} \\\n    -- redis-cli PING\n"
   name: ping_deployment_name_redis_workload
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event for a
+    specific Redis deployment to see if the server is running properly and responding
+    to commands.
+
+    2. Performing routine health checks on Redis deployments within the Kubernetes
+    cluster to ensure that the servers are operational and responsive.
+
+    3. Checking the status of the Redis server after a recent deployment or upgrade
+    to ensure that it is functioning as expected within the Kubernetes environment.
+
+    4. Verifying the status of the Redis server in response to user-reported issues
+    or errors related to data storage or retrieval.
+
+    5. Investigating performance or latency issues within the Kubernetes cluster by
+    inspecting the responsiveness of the Redis servers using the redis-cli PING command.'
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli PING
   doc_links: '
@@ -39,6 +54,21 @@ commands:
     \ appropriate flags and parameters\nkubectl exec deployment/${DEPLOYMENT_NAME}\
     \ \\\n    --context=${CONTEXT} \\\n    -n ${NAMESPACE} \\\n    -- redis-cli PING\n"
   name: ping_deployment_name_redis_workload
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event for a
+    specific Redis deployment to see if the server is running properly and responding
+    to commands.
+
+    2. Performing routine health checks on Redis deployments within the Kubernetes
+    cluster to ensure that the servers are operational and responsive.
+
+    3. Checking the status of the Redis server after a recent deployment or upgrade
+    to ensure that it is functioning as expected within the Kubernetes environment.
+
+    4. Verifying the status of the Redis server in response to user-reported issues
+    or errors related to data storage or retrieval.
+
+    5. Investigating performance or latency issues within the Kubernetes cluster by
+    inspecting the responsiveness of the Redis servers using the redis-cli PING command.'
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli SET ${REDIS_HEALTHCHECK_KEY} 0
   doc_links: '
@@ -82,6 +112,26 @@ commands:
 
     '
   name: verify_deployment_name_redis_read_write_operation
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event in a
+    specific deployment where the Redis service is failing to maintain a healthy state.
+
+
+    2. Performing a health check on a Redis cluster within a Kubernetes environment
+    to ensure that the key is set to 0 and that the cluster is functioning properly.
+
+
+    3. Monitoring and maintaining the health of a Redis database within a Kubernetes
+    context, ensuring that it is performing optimally and not experiencing any issues.
+
+
+    4. Implementing a proactive approach to ensure the stability and availability
+    of a Redis service within a Kubernetes cluster by regularly checking and setting
+    the key to 0 for health check purposes.
+
+
+    5. Automating the process of setting a key in Redis to 0 for health check purposes
+    within a Kubernetes environment, allowing for efficient monitoring and maintenance
+    of the database.'
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli SET ${REDIS_HEALTHCHECK_KEY} 0
   doc_links: '
@@ -125,6 +175,26 @@ commands:
 
     '
   name: verify_deployment_name_redis_read_write_operation
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event in a
+    specific deployment where the Redis service is failing to maintain a healthy state.
+
+
+    2. Performing a health check on a Redis cluster within a Kubernetes environment
+    to ensure that the key is set to 0 and that the cluster is functioning properly.
+
+
+    3. Monitoring and maintaining the health of a Redis database within a Kubernetes
+    context, ensuring that it is performing optimally and not experiencing any issues.
+
+
+    4. Implementing a proactive approach to ensure the stability and availability
+    of a Redis service within a Kubernetes cluster by regularly checking and setting
+    the key to 0 for health check purposes.
+
+
+    5. Automating the process of setting a key in Redis to 0 for health check purposes
+    within a Kubernetes environment, allowing for efficient monitoring and maintenance
+    of the database.'
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli INCR ${REDIS_HEALTHCHECK_KEY}
   doc_links: '
@@ -143,6 +213,28 @@ commands:
     \ the container to increment the value of a key used for health checking in Redis\n\
     redis-cli INCR ${REDIS_HEALTHCHECK_KEY}\n"
   name: verify_deployment_name_redis_read_write_operation
+  when_is_it_useful: '1. Monitoring and troubleshooting the health of a Kubernetes
+    deployment by checking the status of a specific key in a Redis database within
+    the container.
+
+
+    2. Performing maintenance or debugging tasks on a specific container within a
+    Kubernetes deployment without interrupting its overall operation.
+
+
+    3. Investigating and resolving issues related to the CrashLoopBackoff events by
+    using the redis-cli tool to diagnose potential problems with the application''s
+    state or data within the container.
+
+
+    4. Testing and verifying the functionality of the redis-cli tool within a Kubernetes
+    deployment to ensure that it can accurately execute commands and interact with
+    the Redis database.
+
+
+    5. Automating health checks or monitoring processes within a Kubernetes deployment
+    by using the redis-cli tool to increment a designated key and track changes in
+    the Redis database over time.'
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli INCR ${REDIS_HEALTHCHECK_KEY}
   doc_links: '
@@ -161,6 +253,28 @@ commands:
     \ the container to increment the value of a key used for health checking in Redis\n\
     redis-cli INCR ${REDIS_HEALTHCHECK_KEY}\n"
   name: verify_deployment_name_redis_read_write_operation
+  when_is_it_useful: '1. Monitoring and troubleshooting the health of a Kubernetes
+    deployment by checking the status of a specific key in a Redis database within
+    the container.
+
+
+    2. Performing maintenance or debugging tasks on a specific container within a
+    Kubernetes deployment without interrupting its overall operation.
+
+
+    3. Investigating and resolving issues related to the CrashLoopBackoff events by
+    using the redis-cli tool to diagnose potential problems with the application''s
+    state or data within the container.
+
+
+    4. Testing and verifying the functionality of the redis-cli tool within a Kubernetes
+    deployment to ensure that it can accurately execute commands and interact with
+    the Redis database.
+
+
+    5. Automating health checks or monitoring processes within a Kubernetes deployment
+    by using the redis-cli tool to increment a designated key and track changes in
+    the Redis database over time.'
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli GET ${REDIS_HEALTHCHECK_KEY}
   doc_links: '
@@ -202,6 +316,20 @@ commands:
 
     '
   name: verify_deployment_name_redis_read_write_operation
+  when_is_it_useful: '1. Troubleshooting application performance issues related to
+    Redis in a Kubernetes environment.
+
+    2. Investigating and resolving connectivity issues between a Kubernetes deployment
+    and the Redis database.
+
+    3. Monitoring and diagnosing potential data inconsistencies or corruption in the
+    Redis database within a Kubernetes cluster.
+
+    4. Analyzing and troubleshooting CrashLoopBackoff events related to the Redis
+    deployment in Kubernetes.
+
+    5. Providing support for developers by retrieving specific key values from the
+    Redis database within a Kubernetes environment for debugging purposes.'
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli GET ${REDIS_HEALTHCHECK_KEY}
   doc_links: '
@@ -243,3 +371,17 @@ commands:
 
     '
   name: verify_deployment_name_redis_read_write_operation
+  when_is_it_useful: '1. Troubleshooting application performance issues related to
+    Redis in a Kubernetes environment.
+
+    2. Investigating and resolving connectivity issues between a Kubernetes deployment
+    and the Redis database.
+
+    3. Monitoring and diagnosing potential data inconsistencies or corruption in the
+    Redis database within a Kubernetes cluster.
+
+    4. Analyzing and troubleshooting CrashLoopBackoff events related to the Redis
+    deployment in Kubernetes.
+
+    5. Providing support for developers by retrieving specific key values from the
+    Redis database within a Kubernetes environment for debugging purposes.'

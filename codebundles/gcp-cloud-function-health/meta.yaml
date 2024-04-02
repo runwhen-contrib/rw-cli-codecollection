@@ -40,6 +40,24 @@ commands:
 
     echo "Run ''gcloud functions describe [name]'' for full details."'
   name: list_unhealhy_cloud_functions_in_gcp_project_gcp_project_id
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events to identify
+    and resolve issues with the containerized applications running on the cluster.
+
+
+    2. Monitoring and managing Google Cloud functions to ensure they are running properly
+    and addressing any errors or inactive states.
+
+
+    3. Automating the activation of service accounts for authentication in a continuous
+    integration/continuous deployment (CI/CD) pipeline.
+
+
+    4. Creating automated alerts or notifications for when Google Cloud functions
+    encounter errors or become inactive.
+
+
+    5. Developing scripts or programs to provide detailed information about specific
+    Google Cloud functions for debugging and troubleshooting purposes.'
 - command: gcloud functions list --filter="state!=ACTIVE OR status!=ACTIVE" --format="value(name)"
     --project=${GCP_PROJECT_ID} | xargs -I {} gcloud logging read "severity=ERROR
     AND resource.type=cloud_function AND resource.labels.function_name={}" --limit
@@ -59,3 +77,25 @@ commands:
     \ logs associated with it\n    gcloud logging read \"severity=ERROR AND resource.type=cloud_function\
     \ AND resource.labels.function_name={}\" \\\n    --limit 50 --freshness=14d\n"
   name: get_error_logs_for_unhealthy_cloud_functions_in_gcp_project_gcp_project_id
+  when_is_it_useful: '1. Identifying and troubleshooting issues with a Google Cloud
+    Function that is not in an active state, such as identifying error messages or
+    potential underlying causes for the function not being active.
+
+
+    2. Monitoring and maintaining the health of Google Cloud Functions, proactively
+    searching for any potential issues or errors in the logs to address them before
+    they escalate.
+
+
+    3. Investigating and resolving Kubernetes CrashLoopBackoff events by analyzing
+    logs and identifying any errors that may have occurred.
+
+
+    4. Troubleshooting issues with Google Cloud Functions that are experiencing performance
+    issues or errors, using the gcloud tool to search for relevant logs and error
+    messages.
+
+
+    5. Performing routine maintenance and monitoring of Google Cloud Functions to
+    ensure their proper functioning and availability, using the gcloud tool to search
+    for any potential issues in the logs.'

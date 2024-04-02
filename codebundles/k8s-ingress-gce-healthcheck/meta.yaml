@@ -33,6 +33,35 @@ commands:
     \ involvedObject.kind=Service,involvedObject.name=$SERVICE_NAME,type!=Normal;\
     \ \ndone"
   name: search_for_gce_ingress_warnings_in_gke
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to gather information on abnormal
+    events related to an Ingress and its associated Services in order to identify
+    and fix any issues causing the CrashLoopBackoff events.
+
+
+    2. Investigating service disruption: If there are reports of service disruption
+    within a specific namespace, a DevOps or Site Reliability Engineer might use this
+    command to retrieve events related to the Ingress and Services to identify any
+    abnormal events causing the disruption.
+
+
+    3. Debugging failed deployments: When a deployment fails within a specified namespace,
+    a DevOps or Site Reliability Engineer might use this command to gather information
+    on any abnormal events related to the Ingress and Services that could be contributing
+    to the failed deployment.
+
+
+    4. Monitoring for unusual behavior: As part of routine monitoring and maintenance,
+    a DevOps or Site Reliability Engineer might use this command to regularly check
+    for abnormal events related to Ingress and Services within a specific namespace
+    for any unusual behavior that could indicate potential issues.
+
+
+    5. Identifying resource conflicts: In a multi-tenant environment, a DevOps or
+    Site Reliability Engineer might use this command to retrieve events related to
+    the Ingress and Services in order to identify any resource conflicts or issues
+    arising from interactions between different applications or services within the
+    same namespace.'
 - command: INGRESS_NAME=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT=${CONTEXT}; kubectl
     get events -n $NAMESPACE --context $CONTEXT --field-selector involvedObject.kind=Ingress,involvedObject.name=$INGRESS_NAME,type!=Normal;
     for SERVICE_NAME in $(kubectl get ingress $INGRESS_NAME -n $NAMESPACE --context
@@ -67,6 +96,35 @@ commands:
     \ involvedObject.kind=Service,involvedObject.name=$SERVICE_NAME,type!=Normal;\
     \ \ndone"
   name: search_for_gce_ingress_warnings_in_gke
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to gather information on abnormal
+    events related to an Ingress and its associated Services in order to identify
+    and fix any issues causing the CrashLoopBackoff events.
+
+
+    2. Investigating service disruption: If there are reports of service disruption
+    within a specific namespace, a DevOps or Site Reliability Engineer might use this
+    command to retrieve events related to the Ingress and Services to identify any
+    abnormal events causing the disruption.
+
+
+    3. Debugging failed deployments: When a deployment fails within a specified namespace,
+    a DevOps or Site Reliability Engineer might use this command to gather information
+    on any abnormal events related to the Ingress and Services that could be contributing
+    to the failed deployment.
+
+
+    4. Monitoring for unusual behavior: As part of routine monitoring and maintenance,
+    a DevOps or Site Reliability Engineer might use this command to regularly check
+    for abnormal events related to Ingress and Services within a specific namespace
+    for any unusual behavior that could indicate potential issues.
+
+
+    5. Identifying resource conflicts: In a multi-tenant environment, a DevOps or
+    Site Reliability Engineer might use this command to retrieve events related to
+    the Ingress and Services in order to identify any resource conflicts or issues
+    arising from interactions between different applications or services within the
+    same namespace.'
 - command: 'INGRESS_NAME=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT=${CONTEXT}; kubectl
     get ingress $INGRESS_NAME -n $NAMESPACE --context $CONTEXT -o=json | jq -r ''.metadata.annotations["ingress.kubernetes.io/backends"]
     | fromjson | to_entries[] | select(.value != "HEALTHY") | "Backend: " + .key +
@@ -87,6 +145,29 @@ commands:
     \ fromjson | to_entries[] | select(.value != \"HEALTHY\") | \"Backend: \" + .key\
     \ + \" Status: \" + .value'"
   name: identify_unhealthy_gce_http_ingress_backends
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer may use this task to quickly identify and address
+    unhealthy backends that are causing CrashLoopBackoff events in a Kubernetes cluster.
+
+
+    2. Monitoring and alerting: This task can be used to set up automated monitoring
+    and alerting for unhealthy backends in a Kubernetes cluster, allowing the team
+    to proactively address any issues before they impact the system.
+
+
+    3. Incident response: In the event of a system outage or performance degradation,
+    a DevOps or SRE may use this task to quickly identify and address any unhealthy
+    backends that are contributing to the issue.
+
+
+    4. Capacity planning: This task can be used to analyze the health and status of
+    backends in a Kubernetes cluster, allowing the team to make informed decisions
+    about capacity planning and resource allocation.
+
+
+    5. Continuous improvement: By regularly using this task to monitor and analyze
+    the health of backends in a Kubernetes cluster, a DevOps or SRE can identify areas
+    for improvement and optimize the system for better performance and reliability.'
 - command: 'INGRESS_NAME=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT=${CONTEXT}; kubectl
     get ingress $INGRESS_NAME -n $NAMESPACE --context $CONTEXT -o=json | jq -r ''.metadata.annotations["ingress.kubernetes.io/backends"]
     | fromjson | to_entries[] | select(.value != "HEALTHY") | "Backend: " + .key +
@@ -107,6 +188,29 @@ commands:
     \ fromjson | to_entries[] | select(.value != \"HEALTHY\") | \"Backend: \" + .key\
     \ + \" Status: \" + .value'"
   name: identify_unhealthy_gce_http_ingress_backends
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer may use this task to quickly identify and address
+    unhealthy backends that are causing CrashLoopBackoff events in a Kubernetes cluster.
+
+
+    2. Monitoring and alerting: This task can be used to set up automated monitoring
+    and alerting for unhealthy backends in a Kubernetes cluster, allowing the team
+    to proactively address any issues before they impact the system.
+
+
+    3. Incident response: In the event of a system outage or performance degradation,
+    a DevOps or SRE may use this task to quickly identify and address any unhealthy
+    backends that are contributing to the issue.
+
+
+    4. Capacity planning: This task can be used to analyze the health and status of
+    backends in a Kubernetes cluster, allowing the team to make informed decisions
+    about capacity planning and resource allocation.
+
+
+    5. Continuous improvement: By regularly using this task to monitor and analyze
+    the health of backends in a Kubernetes cluster, a DevOps or SRE can identify areas
+    for improvement and optimize the system for better performance and reliability.'
 - command: 'INGRESS_NAME=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT=${CONTEXT}; GCP_PROJECT_ID=${GCP_PROJECT_ID};for
     backend in $(kubectl get ingress $INGRESS_NAME -n $NAMESPACE --context $CONTEXT
     -o=json | jq -r ''.metadata.annotations["ingress.kubernetes.io/backends"] | fromjson
@@ -154,6 +258,20 @@ commands:
     \ \" + (.ip // \"N/A\") + \" | Error: \" + .message) else \"No results found\"\
     \ end'; \ndone\n"
   name: fetch_network_error_logs_from_gcp_operations_manager_for_ingress_backends
+  when_is_it_useful: '1. Monitoring and troubleshooting an Ingress controller in Kubernetes
+    when it goes into CrashLoopBackoff due to unhealthy backends.
+
+    2. Investigating and resolving issues with backend services not responding or
+    returning errors within a Kubernetes cluster.
+
+    3. Troubleshooting and identifying the root cause of failures in Kubernetes pods
+    or deployments that result in CrashLoopBackoff events.
+
+    4. Analyzing GCP logging data for error messages related to Kubernetes workloads
+    and diagnosing issues such as connectivity problems or service outages.
+
+    5. Automating the process of identifying and retrieving error logs from GCP logging
+    for specific backends in an Ingress controller in Kubernetes.'
 - command: 'INGRESS_NAME=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT=${CONTEXT}; GCP_PROJECT_ID=${GCP_PROJECT_ID};for
     backend in $(kubectl get ingress $INGRESS_NAME -n $NAMESPACE --context $CONTEXT
     -o=json | jq -r ''.metadata.annotations["ingress.kubernetes.io/backends"] | fromjson
@@ -201,6 +319,20 @@ commands:
     \ \" + (.ip // \"N/A\") + \" | Error: \" + .message) else \"No results found\"\
     \ end'; \ndone\n"
   name: fetch_network_error_logs_from_gcp_operations_manager_for_ingress_backends
+  when_is_it_useful: '1. Monitoring and troubleshooting an Ingress controller in Kubernetes
+    when it goes into CrashLoopBackoff due to unhealthy backends.
+
+    2. Investigating and resolving issues with backend services not responding or
+    returning errors within a Kubernetes cluster.
+
+    3. Troubleshooting and identifying the root cause of failures in Kubernetes pods
+    or deployments that result in CrashLoopBackoff events.
+
+    4. Analyzing GCP logging data for error messages related to Kubernetes workloads
+    and diagnosing issues such as connectivity problems or service outages.
+
+    5. Automating the process of identifying and retrieving error logs from GCP logging
+    for specific backends in an Ingress controller in Kubernetes.'
 - command: INGRESS=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT=${CONTEXT}; FORWARDING_RULE=$(kubectl
     get ingress $INGRESS -n $NAMESPACE --context $CONTEXT -o=jsonpath='{.metadata.annotations.ingress\.kubernetes\.io/forwarding-rule}')
     && URL_MAP=$(kubectl get ingress $INGRESS -n $NAMESPACE --context $CONTEXT -o=jsonpath='{.metadata.annotations.ingress\.kubernetes\.io/url-map}')
@@ -240,6 +372,27 @@ commands:
     \ log query and the GCP project ID\nGCP_LOGS_URL=\"https://console.cloud.google.com/logs/query;query=$ENCODED_LOG_QUERY?project=$GCP_PROJECT_ID\"\
     \n\n# Printing the constructed GCP logs URL\necho $GCP_LOGS_URL"
   name: review_gcp_operations_logging_dashboard
+  when_is_it_useful: '1. Investigating and resolving issues with a Kubernetes deployment
+    that is experiencing CrashLoopBackoff events, in order to identify the root cause
+    and troubleshoot the underlying problems.
+
+
+    2. Debugging and troubleshooting networking issues within a Kubernetes cluster,
+    such as routing and connectivity problems, in order to ensure proper functioning
+    of the cluster''s ingress resources.
+
+
+    3. Monitoring and analyzing logs from Kubernetes pods, nodes, and network traffic
+    to identify performance bottlenecks, errors, or abnormal behavior within the cluster.
+
+
+    4. Automating the process of obtaining and encoding log queries for Google Cloud
+    Platform logs as part of a larger infrastructure monitoring and analysis workflow.
+
+
+    5. Collaborating with software developers and system administrators to design
+    and implement best practices for logging and monitoring in Kubernetes environments,
+    including setting up and configuring effective log query and analysis tools.'
 - command: INGRESS=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT=${CONTEXT}; FORWARDING_RULE=$(kubectl
     get ingress $INGRESS -n $NAMESPACE --context $CONTEXT -o=jsonpath='{.metadata.annotations.ingress\.kubernetes\.io/forwarding-rule}')
     && URL_MAP=$(kubectl get ingress $INGRESS -n $NAMESPACE --context $CONTEXT -o=jsonpath='{.metadata.annotations.ingress\.kubernetes\.io/url-map}')
@@ -279,6 +432,27 @@ commands:
     \ log query and the GCP project ID\nGCP_LOGS_URL=\"https://console.cloud.google.com/logs/query;query=$ENCODED_LOG_QUERY?project=$GCP_PROJECT_ID\"\
     \n\n# Printing the constructed GCP logs URL\necho $GCP_LOGS_URL"
   name: review_gcp_operations_logging_dashboard
+  when_is_it_useful: '1. Investigating and resolving issues with a Kubernetes deployment
+    that is experiencing CrashLoopBackoff events, in order to identify the root cause
+    and troubleshoot the underlying problems.
+
+
+    2. Debugging and troubleshooting networking issues within a Kubernetes cluster,
+    such as routing and connectivity problems, in order to ensure proper functioning
+    of the cluster''s ingress resources.
+
+
+    3. Monitoring and analyzing logs from Kubernetes pods, nodes, and network traffic
+    to identify performance bottlenecks, errors, or abnormal behavior within the cluster.
+
+
+    4. Automating the process of obtaining and encoding log queries for Google Cloud
+    Platform logs as part of a larger infrastructure monitoring and analysis workflow.
+
+
+    5. Collaborating with software developers and system administrators to design
+    and implement best practices for logging and monitoring in Kubernetes environments,
+    including setting up and configuring effective log query and analysis tools.'
 - command: INGRESS=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT=${CONTEXT}; QUERY="resource.type=\"gce_network\""
     && for backend in $(kubectl get ingress $INGRESS -n $NAMESPACE --context $CONTEXT
     -o=json | jq -r '.metadata.annotations["ingress.kubernetes.io/backends"] | fromjson
@@ -308,6 +482,26 @@ commands:
     \ ID\nDASHBOARD_URL=\"https://console.cloud.google.com/logs/query;query=$ENCODED_QUERY?project=$GCP_PROJECT_ID\"\
     \n\n# Output the complete dashboard URL\necho $DASHBOARD_URL\n"
   name: review_gcp_operations_logging_dashboard
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: The DevOps
+    or Site Reliability Engineer might use this command to quickly access and review
+    logs for unhealthy backends in order to identify the root cause of the CrashLoopBackoff
+    events.
+
+    2. Investigating high error rates in a specific GCP project or namespace: The
+    engineer might use the command to easily gather and analyze logs from specific
+    environments to identify patterns or issues causing high error rates.
+
+    3. Monitoring and analyzing traffic spikes or anomalies in a GCP ingress: The
+    command could be used to generate logs for a specific ingress and quickly review
+    them for unusual traffic patterns or anomalies.
+
+    4. Troubleshooting performance issues in a particular GCP context: The engineer
+    might utilize the command to gather and analyze logs for a specific context to
+    diagnose and resolve performance-related issues.
+
+    5. Investigating failures in a specific environment or application namespace:
+    The command could be used to quickly access and investigate logs for a specific
+    environment or application namespace experiencing failures or errors.'
 - command: INGRESS=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT=${CONTEXT}; QUERY="resource.type=\"gce_network\""
     && for backend in $(kubectl get ingress $INGRESS -n $NAMESPACE --context $CONTEXT
     -o=json | jq -r '.metadata.annotations["ingress.kubernetes.io/backends"] | fromjson
@@ -337,3 +531,23 @@ commands:
     \ ID\nDASHBOARD_URL=\"https://console.cloud.google.com/logs/query;query=$ENCODED_QUERY?project=$GCP_PROJECT_ID\"\
     \n\n# Output the complete dashboard URL\necho $DASHBOARD_URL\n"
   name: review_gcp_operations_logging_dashboard
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: The DevOps
+    or Site Reliability Engineer might use this command to quickly access and review
+    logs for unhealthy backends in order to identify the root cause of the CrashLoopBackoff
+    events.
+
+    2. Investigating high error rates in a specific GCP project or namespace: The
+    engineer might use the command to easily gather and analyze logs from specific
+    environments to identify patterns or issues causing high error rates.
+
+    3. Monitoring and analyzing traffic spikes or anomalies in a GCP ingress: The
+    command could be used to generate logs for a specific ingress and quickly review
+    them for unusual traffic patterns or anomalies.
+
+    4. Troubleshooting performance issues in a particular GCP context: The engineer
+    might utilize the command to gather and analyze logs for a specific context to
+    diagnose and resolve performance-related issues.
+
+    5. Investigating failures in a specific environment or application namespace:
+    The command could be used to quickly access and investigate logs for a specific
+    environment or application namespace experiencing failures or errors.'

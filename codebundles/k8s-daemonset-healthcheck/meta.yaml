@@ -33,6 +33,20 @@ commands:
 
     '
   name: get_daemonset_log_details_for_report
+  when_is_it_useful: '1. Monitoring the health and performance of a specific daemonset
+    in a Kubernetes cluster to troubleshoot any issues or anomalies.
+
+    2. Investigating frequent CrashLoopBackoff events for a particular daemonset to
+    identify the root cause and potential solutions.
+
+    3. Analyzing the logs of a specific daemonset to track down errors or issues related
+    to resource utilization, connectivity, or application functionality.
+
+    4. Troubleshooting networking problems or intermittent failures for a daemonset
+    by reviewing its recent log entries to identify patterns or recurring issues.
+
+    5. Performing regular maintenance or checks on a specific daemonset to proactively
+    identify and address any potential issues before they impact production environments.'
 - command: kubectl logs --tail=100 daemonset/${DAEMONSET_NAME} --context ${CONTEXT}
     -n ${NAMESPACE}
   doc_links: '
@@ -67,6 +81,20 @@ commands:
 
     '
   name: get_daemonset_log_details_for_report
+  when_is_it_useful: '1. Monitoring the health and performance of a specific daemonset
+    in a Kubernetes cluster to troubleshoot any issues or anomalies.
+
+    2. Investigating frequent CrashLoopBackoff events for a particular daemonset to
+    identify the root cause and potential solutions.
+
+    3. Analyzing the logs of a specific daemonset to track down errors or issues related
+    to resource utilization, connectivity, or application functionality.
+
+    4. Troubleshooting networking problems or intermittent failures for a daemonset
+    by reviewing its recent log entries to identify patterns or recurring issues.
+
+    5. Performing regular maintenance or checks on a specific daemonset to proactively
+    identify and address any potential issues before they impact production environments.'
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "${DAEMONSET_NAME}" || true
   doc_links: '
@@ -106,6 +134,19 @@ commands:
 
     '
   name: get_related_daemonset_events
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes cluster for potential
+    issues such as CrashLoopBackoff events
+
+    2. Investigating performance or stability issues within a specific Kubernetes
+    context and namespace
+
+    3. Troubleshooting errors related to a specific daemon set in a Kubernetes cluster
+
+    4. Conducting regular maintenance and auditing of Kubernetes clusters for potential
+    issues or misconfigurations
+
+    5. Investigating and resolving any potential security vulnerabilities or breaches
+    in a Kubernetes environment'
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "${DAEMONSET_NAME}" || true
   doc_links: '
@@ -145,6 +186,19 @@ commands:
 
     '
   name: get_related_daemonset_events
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes cluster for potential
+    issues such as CrashLoopBackoff events
+
+    2. Investigating performance or stability issues within a specific Kubernetes
+    context and namespace
+
+    3. Troubleshooting errors related to a specific daemon set in a Kubernetes cluster
+
+    4. Conducting regular maintenance and auditing of Kubernetes clusters for potential
+    issues or misconfigurations
+
+    5. Investigating and resolving any potential security vulnerabilities or breaches
+    in a Kubernetes environment'
 - command: kubectl describe daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
   doc_links: '
 
@@ -185,6 +239,20 @@ commands:
 
     '
   name: check_daemonset_replicas
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events in a production
+    environment to identify the root cause and resolve the issue.
+
+    2. Conducting a routine check on various daemonsets in a Kubernetes cluster to
+    ensure they are running as expected and have the correct configuration.
+
+    3. Investigating performance issues related to a specific daemonset in a Kubernetes
+    cluster and using the command to gather detailed information for analysis.
+
+    4. Auditing the status and configuration of all daemonsets in a Kubernetes cluster
+    as part of regular maintenance tasks.
+
+    5. Resolving connectivity or networking issues affecting a specific daemonset
+    by examining its current status and configuration with the command.'
 - command: kubectl describe daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
   doc_links: '
 
@@ -225,3 +293,17 @@ commands:
 
     '
   name: check_daemonset_replicas
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events in a production
+    environment to identify the root cause and resolve the issue.
+
+    2. Conducting a routine check on various daemonsets in a Kubernetes cluster to
+    ensure they are running as expected and have the correct configuration.
+
+    3. Investigating performance issues related to a specific daemonset in a Kubernetes
+    cluster and using the command to gather detailed information for analysis.
+
+    4. Auditing the status and configuration of all daemonsets in a Kubernetes cluster
+    as part of regular maintenance tasks.
+
+    5. Resolving connectivity or networking issues affecting a specific daemonset
+    by examining its current status and configuration with the command.'

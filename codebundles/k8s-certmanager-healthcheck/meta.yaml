@@ -34,6 +34,37 @@ commands:
     \ and expiration date. The comments provide explanations for each step to help\
     \ newer or less experienced devops engineers understand the command's functionality."
   name: get_namespace_certificate_summary_for_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: When
+    a pod is in a CrashLoopBackoff state, it indicates that the container in the pod
+    is constantly crashing and restarting. As a DevOps or Site Reliability Engineer,
+    you would use this command to retrieve certificate information from cert-manager
+    to check if any certificates have expired and are causing the CrashLoopBackoff
+    events.
+
+
+    2. Monitoring certificate renewals: As a part of regular maintenance tasks, DevOps
+    or Site Reliability Engineers may need to monitor certificate renewals within
+    their Kubernetes environment. This command can be used to quickly identify and
+    track certificates that are due for renewal or have expired.
+
+
+    3. Incident response: In the event of a security breach or incident, DevOps or
+    Site Reliability Engineers may need to review all active certificates within a
+    specific context and namespace to identify potential vulnerabilities. This command
+    can help in identifying any expired or vulnerable certificates that need immediate
+    attention.
+
+
+    4. Compliance checks: Organizations often have policies and regulations in place
+    regarding the expiration and renewal of certificates. DevOps or Site Reliability
+    Engineers may perform regular compliance checks using this command to ensure that
+    all certificates are up to date and in compliance with internal and external standards.
+
+
+    5. Debugging connectivity issues: When troubleshooting connectivity or SSL/TLS
+    handshake failures, DevOps or Site Reliability Engineers might use this command
+    to gather details about the certificates in use, including their renewal and expiration
+    times, to identify any potential causes of the issues.'
 - command: kubectl get certificates.cert-manager.io --context=${CONTEXT} -n ${NAMESPACE}
     -ojson | jq -r --arg now "$(date +%Y-%m-%dT%H:%M:%SZ)" '.items[] | select(.status.conditions[]
     | select(.type == "Ready" and .status == "True")) | select(.status.renewalTime)
@@ -69,6 +100,37 @@ commands:
     \ and expiration date. The comments provide explanations for each step to help\
     \ newer or less experienced devops engineers understand the command's functionality."
   name: get_namespace_certificate_summary_for_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: When
+    a pod is in a CrashLoopBackoff state, it indicates that the container in the pod
+    is constantly crashing and restarting. As a DevOps or Site Reliability Engineer,
+    you would use this command to retrieve certificate information from cert-manager
+    to check if any certificates have expired and are causing the CrashLoopBackoff
+    events.
+
+
+    2. Monitoring certificate renewals: As a part of regular maintenance tasks, DevOps
+    or Site Reliability Engineers may need to monitor certificate renewals within
+    their Kubernetes environment. This command can be used to quickly identify and
+    track certificates that are due for renewal or have expired.
+
+
+    3. Incident response: In the event of a security breach or incident, DevOps or
+    Site Reliability Engineers may need to review all active certificates within a
+    specific context and namespace to identify potential vulnerabilities. This command
+    can help in identifying any expired or vulnerable certificates that need immediate
+    attention.
+
+
+    4. Compliance checks: Organizations often have policies and regulations in place
+    regarding the expiration and renewal of certificates. DevOps or Site Reliability
+    Engineers may perform regular compliance checks using this command to ensure that
+    all certificates are up to date and in compliance with internal and external standards.
+
+
+    5. Debugging connectivity issues: When troubleshooting connectivity or SSL/TLS
+    handshake failures, DevOps or Site Reliability Engineers might use this command
+    to gather details about the certificates in use, including their renewal and expiration
+    times, to identify any potential causes of the issues.'
 - command: 'kubectl get certificaterequests.cert-manager.io --context=${CONTEXT} -n
     ${NAMESPACE} -o json | jq -r ''.items[] | select(.status.conditions[] | select(.type
     == "Ready" and .status != "True")) | {certRequest: .metadata.name, certificate:
@@ -108,6 +170,22 @@ commands:
     \ format, filters the output with jq to extract specific information, and formats\
     \ the results for display."
   name: find_failed_certificate_requests_and_identify_issues_for_namespace_namespace
+  when_is_it_useful: '1. Debugging and diagnosing issues with certificate requests
+    in a Kubernetes environment, such as identifying failed or pending certificate
+    issuance.
+
+    2. Monitoring and ensuring the health and readiness of certificates managed by
+    cert-manager.io in a specific Kubernetes context and namespace.
+
+    3. Troubleshooting CrashLoopBackoff events related to cert-manager.io or certificate
+    management in Kubernetes by checking the status of certificate requests.
+
+    4. Investigating and resolving issues with certificate approvals or rejections
+    within a specific Kubernetes namespace using data retrieved from the cert-manager.io
+    API.
+
+    5. Automating the retrieval and formatting of certificate request information
+    for reporting or auditing purposes within a Kubernetes environment.'
 - command: 'kubectl get certificaterequests.cert-manager.io --context=${CONTEXT} -n
     ${NAMESPACE} -o json | jq -r ''.items[] | select(.status.conditions[] | select(.type
     == "Ready" and .status != "True")) | {certRequest: .metadata.name, certificate:
@@ -147,3 +225,19 @@ commands:
     \ format, filters the output with jq to extract specific information, and formats\
     \ the results for display."
   name: find_failed_certificate_requests_and_identify_issues_for_namespace_namespace
+  when_is_it_useful: '1. Debugging and diagnosing issues with certificate requests
+    in a Kubernetes environment, such as identifying failed or pending certificate
+    issuance.
+
+    2. Monitoring and ensuring the health and readiness of certificates managed by
+    cert-manager.io in a specific Kubernetes context and namespace.
+
+    3. Troubleshooting CrashLoopBackoff events related to cert-manager.io or certificate
+    management in Kubernetes by checking the status of certificate requests.
+
+    4. Investigating and resolving issues with certificate approvals or rejections
+    within a specific Kubernetes namespace using data retrieved from the cert-manager.io
+    API.
+
+    5. Automating the retrieval and formatting of certificate request information
+    for reporting or auditing purposes within a Kubernetes environment.'

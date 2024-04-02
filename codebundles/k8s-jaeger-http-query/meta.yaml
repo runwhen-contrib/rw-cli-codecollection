@@ -144,3 +144,34 @@ commands:
     \ ]; then\n    echo -e \"\\nRecommended Next Steps: \\n\"\n    echo \"$issues\"\
     \nfi\n"
   name: query_traces_in_jaeger_for_unhealthy_http_response_codes_in_namespace_namespace
+  when_is_it_useful: '1. Investigating and resolving performance issues: DevOps or
+    Site Reliability Engineers may use this script to analyze Jaeger traces for the
+    Jaeger Query services to identify any performance bottlenecks or errors in different
+    service routes and status codes, and then take recommended actions to resolve
+    them.
+
+
+    2. Troubleshooting application errors: When an application running on Kubernetes
+    is experiencing frequent CrashLoopBackoff events, DevOps or SREs can use this
+    script to fetch and analyze traces of errors for different service routes and
+    status codes to identify the root cause of the issue and take necessary actions
+    to fix it.
+
+
+    3. Monitoring and optimizing service performance: DevOps or SREs might use this
+    script to regularly monitor and analyze the performance of Jaeger Query services
+    and other related services to proactively identify and address any potential performance
+    issues or errors.
+
+
+    4. Investigating and addressing user-reported errors: If users report specific
+    HTTP error responses while accessing a service running on Kubernetes, DevOps or
+    SREs can use this script to analyze Jaeger traces for the affected service and
+    recommend next steps or actions to address the reported errors.
+
+
+    5. Performing post-incident analysis: After a major incident or outage, DevOps
+    or SREs may use this script to analyze Jaeger traces for affected services to
+    understand the root cause of the incident and identify any errors or performance
+    issues that contributed to it. They can then take recommended actions to prevent
+    similar incidents in the future.'

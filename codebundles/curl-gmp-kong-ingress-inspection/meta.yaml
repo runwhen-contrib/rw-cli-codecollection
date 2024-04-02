@@ -42,6 +42,36 @@ commands:
     \ on certain conditions, outputting relevant information if HTTP error threshold\
     \ violations are found or a message indicating none were found."
   name: check_if_kong_ingress_http_error_rate_violates_http_error_threshold
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer may use this command to monitor HTTP error rates
+    for a specific service running on Google Cloud, in order to identify and resolve
+    any issues causing the CrashLoopBackoff events.
+
+
+    2. Investigating performance issues: If there are performance issues with a service
+    running on Google Cloud, the DevOps or Site Reliability Engineer may utilize this
+    command to monitor and analyze the HTTP error rates for the service, and identify
+    any potential bottlenecks or issues affecting performance.
+
+
+    3. Conducting routine monitoring and analysis: As part of regular maintenance
+    and monitoring tasks, the DevOps or Site Reliability Engineer may use this command
+    to periodically check and track HTTP error rates for specific services running
+    on Google Cloud, in order to ensure that they are operating efficiently and within
+    expected parameters.
+
+
+    4. Incident response and troubleshooting: In the event of an incident or outage
+    involving a specific service on Google Cloud, the DevOps or Site Reliability Engineer
+    can use this command to quickly gather information about HTTP error rates and
+    help diagnose the root cause of the issue.
+
+
+    5. Performance optimization and capacity planning: When optimizing the performance
+    of services running on Google Cloud or planning for future capacity needs, the
+    DevOps or Site Reliability Engineer may use this command to gather data on HTTP
+    error rates and make informed decisions about resource allocation and infrastructure
+    adjustments.'
 - command: 'gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
     && response=$(curl -s -d "query=rate(kong_http_requests_total{service=''${INGRESS_SERVICE}'',code=~''${HTTP_ERROR_CODES}''}[${TIME_SLICE}])
     > ${HTTP_ERROR_RATE_THRESHOLD}" -H "Authorization: Bearer $(gcloud auth print-access-token)"
@@ -85,6 +115,36 @@ commands:
     \ on certain conditions, outputting relevant information if HTTP error threshold\
     \ violations are found or a message indicating none were found."
   name: check_if_kong_ingress_http_error_rate_violates_http_error_threshold
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer may use this command to monitor HTTP error rates
+    for a specific service running on Google Cloud, in order to identify and resolve
+    any issues causing the CrashLoopBackoff events.
+
+
+    2. Investigating performance issues: If there are performance issues with a service
+    running on Google Cloud, the DevOps or Site Reliability Engineer may utilize this
+    command to monitor and analyze the HTTP error rates for the service, and identify
+    any potential bottlenecks or issues affecting performance.
+
+
+    3. Conducting routine monitoring and analysis: As part of regular maintenance
+    and monitoring tasks, the DevOps or Site Reliability Engineer may use this command
+    to periodically check and track HTTP error rates for specific services running
+    on Google Cloud, in order to ensure that they are operating efficiently and within
+    expected parameters.
+
+
+    4. Incident response and troubleshooting: In the event of an incident or outage
+    involving a specific service on Google Cloud, the DevOps or Site Reliability Engineer
+    can use this command to quickly gather information about HTTP error rates and
+    help diagnose the root cause of the issue.
+
+
+    5. Performance optimization and capacity planning: When optimizing the performance
+    of services running on Google Cloud or planning for future capacity needs, the
+    DevOps or Site Reliability Engineer may use this command to gather data on HTTP
+    error rates and make informed decisions about resource allocation and infrastructure
+    adjustments.'
 - command: 'gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
     && response=$(curl -s -d "query=histogram_quantile(0.99, sum(rate(kong_request_latency_ms_bucket{service=''${INGRESS_SERVICE}''}[${TIME_SLICE}]))
     by (le)) > ${REQUEST_LATENCY_THRESHOLD}" -H "Authorization: Bearer $(gcloud auth
@@ -137,6 +197,25 @@ commands:
 
     '
   name: check_if_kong_ingress_http_request_latency_violates_threshold
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event: DevOps
+    or SRE may need to use this command to monitor the request latency for services
+    running on Kubernetes to identify if any service is causing the crash loop.
+
+    2. Investigating performance issues in a microservices architecture: The command
+    can be used to check the HTTP request latency for different services and identify
+    any potential bottlenecks or performance issues.
+
+    3. Monitoring and alerting for SLA violations: DevOps or SRE may use this command
+    as part of their monitoring and alerting systems to detect if any service is not
+    meeting its Service Level Agreement (SLA) in terms of request latency.
+
+    4. Conducting regular performance checks and optimizations: This command can be
+    automated to run at regular intervals to proactively identify and optimize the
+    request latency for different services, improving overall system performance.
+
+    5. Investigating customer-reported performance complaints: If customers report
+    slow response times from a particular service, DevOps or SRE can use this command
+    to investigate and validate the reported performance issues.'
 - command: 'gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
     && response=$(curl -s -d "query=histogram_quantile(0.99, sum(rate(kong_request_latency_ms_bucket{service=''${INGRESS_SERVICE}''}[${TIME_SLICE}]))
     by (le)) > ${REQUEST_LATENCY_THRESHOLD}" -H "Authorization: Bearer $(gcloud auth
@@ -189,6 +268,25 @@ commands:
 
     '
   name: check_if_kong_ingress_http_request_latency_violates_threshold
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event: DevOps
+    or SRE may need to use this command to monitor the request latency for services
+    running on Kubernetes to identify if any service is causing the crash loop.
+
+    2. Investigating performance issues in a microservices architecture: The command
+    can be used to check the HTTP request latency for different services and identify
+    any potential bottlenecks or performance issues.
+
+    3. Monitoring and alerting for SLA violations: DevOps or SRE may use this command
+    as part of their monitoring and alerting systems to detect if any service is not
+    meeting its Service Level Agreement (SLA) in terms of request latency.
+
+    4. Conducting regular performance checks and optimizations: This command can be
+    automated to run at regular intervals to proactively identify and optimize the
+    request latency for different services, improving overall system performance.
+
+    5. Investigating customer-reported performance complaints: If customers report
+    slow response times from a particular service, DevOps or SRE can use this command
+    to investigate and validate the reported performance issues.'
 - command: 'gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
     && response=$(curl -s -d "query=kong_upstream_target_health{upstream=''${INGRESS_UPSTREAM}'',state=''healthchecks_off''}
     > 0" -H "Authorization: Bearer $(gcloud auth print-access-token)" ''https://monitoring.googleapis.com/v1/projects/runwhen-nonprod-sandbox/location/global/prometheus/api/v1/query'')
@@ -216,6 +314,20 @@ commands:
     \ | \"Service: ${INGRESS_UPSTREAM}\" + \" Healthchecks Disabled!' || echo \"${INGRESS_UPSTREAM}\
     \ has healthchecks enabled.\"\n"
   name: check_if_kong_ingress_controller_reports_upstream_errors
+  when_is_it_useful: '1. Monitoring and troubleshooting the health status of an application
+    deployed on Kubernetes cluster to ensure high availability and reliability.
+
+    2. Automating health checks for various upstream targets and services using Google
+    Cloud Monitoring API.
+
+    3. Identifying and resolving issues with service accounts or permissions related
+    to Google Cloud Monitoring API access.
+
+    4. Integrating health status information from Google Cloud Monitoring API into
+    a centralized monitoring and alerting system for proactive incident response.
+
+    5. Developing automated workflows and scripts for continuous monitoring and reporting
+    of health status of upstream targets and services in a Kubernetes environment.'
 - command: 'gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
     && response=$(curl -s -d "query=kong_upstream_target_health{upstream=''${INGRESS_UPSTREAM}'',state=''healthchecks_off''}
     > 0" -H "Authorization: Bearer $(gcloud auth print-access-token)" ''https://monitoring.googleapis.com/v1/projects/runwhen-nonprod-sandbox/location/global/prometheus/api/v1/query'')
@@ -243,6 +355,20 @@ commands:
     \ | \"Service: ${INGRESS_UPSTREAM}\" + \" Healthchecks Disabled!' || echo \"${INGRESS_UPSTREAM}\
     \ has healthchecks enabled.\"\n"
   name: check_if_kong_ingress_controller_reports_upstream_errors
+  when_is_it_useful: '1. Monitoring and troubleshooting the health status of an application
+    deployed on Kubernetes cluster to ensure high availability and reliability.
+
+    2. Automating health checks for various upstream targets and services using Google
+    Cloud Monitoring API.
+
+    3. Identifying and resolving issues with service accounts or permissions related
+    to Google Cloud Monitoring API access.
+
+    4. Integrating health status information from Google Cloud Monitoring API into
+    a centralized monitoring and alerting system for proactive incident response.
+
+    5. Developing automated workflows and scripts for continuous monitoring and reporting
+    of health status of upstream targets and services in a Kubernetes environment.'
 - command: 'gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
     && response=$(curl -s -d "query=kong_upstream_target_health{upstream=''${INGRESS_UPSTREAM}'',state=~''dns_error|unhealthy''}
     > 0" -H "Authorization: Bearer $(gcloud auth print-access-token)" ''https://monitoring.googleapis.com/v1/projects/runwhen-nonprod-sandbox/location/global/prometheus/api/v1/query'')
@@ -276,6 +402,21 @@ commands:
     \ explaining what the command does. This should help newer or less experienced\
     \ devops engineers understand the purpose of each step in the command."
   name: check_if_kong_ingress_controller_reports_upstream_errors
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
+    events to identify the root cause of application crashes and implement remediation
+    strategies.
+
+    2. Checking the health of a particular service in Google Cloud Platform and identifying
+    any issues or anomalies in its performance or availability.
+
+    3. Investigating and resolving issues with service accounts in Google Cloud Platform,
+    such as permissions errors or misconfigurations.
+
+    4. Automating the monitoring and health checks of multiple services in a Kubernetes
+    cluster to ensure continuous availability and performance.
+
+    5. Integrating this command into a larger incident response and alerting system
+    to proactively detect and address potential service disruptions or failures.'
 - command: 'gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
     && response=$(curl -s -d "query=kong_upstream_target_health{upstream=''${INGRESS_UPSTREAM}'',state=~''dns_error|unhealthy''}
     > 0" -H "Authorization: Bearer $(gcloud auth print-access-token)" ''https://monitoring.googleapis.com/v1/projects/runwhen-nonprod-sandbox/location/global/prometheus/api/v1/query'')
@@ -309,3 +450,18 @@ commands:
     \ explaining what the command does. This should help newer or less experienced\
     \ devops engineers understand the purpose of each step in the command."
   name: check_if_kong_ingress_controller_reports_upstream_errors
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
+    events to identify the root cause of application crashes and implement remediation
+    strategies.
+
+    2. Checking the health of a particular service in Google Cloud Platform and identifying
+    any issues or anomalies in its performance or availability.
+
+    3. Investigating and resolving issues with service accounts in Google Cloud Platform,
+    such as permissions errors or misconfigurations.
+
+    4. Automating the monitoring and health checks of multiple services in a Kubernetes
+    cluster to ensure continuous availability and performance.
+
+    5. Integrating this command into a larger incident response and alerting system
+    to proactively detect and address potential service disruptions or failures.'

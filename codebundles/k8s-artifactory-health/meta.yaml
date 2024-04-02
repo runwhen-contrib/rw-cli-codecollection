@@ -30,6 +30,32 @@ commands:
     \ the request to complete\nkubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT}\
     \ -n ${NAMESPACE} -- \\\n  curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/liveness\n"
   name: check_artifactory_liveness_and_readiness_endpoints
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event: A DevOps
+    or Site Reliability Engineer might use this command to check the liveness of an
+    application running in a specific statefulset to determine if it is causing the
+    CrashLoopBackoff event.
+
+
+    2. Investigating high latency or errors in an application: The engineer may use
+    this command to check the response time and health of an application running in
+    Kubernetes, to diagnose any potential issues causing high latency or errors.
+
+
+    3. Monitoring the health of a specific service or application in Kubernetes: This
+    command can be used to regularly monitor the liveness of a critical service or
+    application deployed in a Kubernetes cluster to ensure it is functioning properly.
+
+
+    4. Conducting routine health checks during deployment or updates: When rolling
+    out new changes or updates to an application in Kubernetes, the engineer may use
+    this command to perform health checks and ensure the new version is healthy before
+    making it live.
+
+
+    5. Verifying the proper functioning of SSL certificates in a Kubernetes environment:
+    The "-k" flag in the command can be used to ignore SSL certificate validation,
+    allowing the engineer to test and verify the functionality of SSL certificates
+    in a Kubernetes environment.'
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/liveness
   doc_links: '
@@ -61,6 +87,32 @@ commands:
     \ the request to complete\nkubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT}\
     \ -n ${NAMESPACE} -- \\\n  curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/liveness\n"
   name: check_artifactory_liveness_and_readiness_endpoints
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event: A DevOps
+    or Site Reliability Engineer might use this command to check the liveness of an
+    application running in a specific statefulset to determine if it is causing the
+    CrashLoopBackoff event.
+
+
+    2. Investigating high latency or errors in an application: The engineer may use
+    this command to check the response time and health of an application running in
+    Kubernetes, to diagnose any potential issues causing high latency or errors.
+
+
+    3. Monitoring the health of a specific service or application in Kubernetes: This
+    command can be used to regularly monitor the liveness of a critical service or
+    application deployed in a Kubernetes cluster to ensure it is functioning properly.
+
+
+    4. Conducting routine health checks during deployment or updates: When rolling
+    out new changes or updates to an application in Kubernetes, the engineer may use
+    this command to perform health checks and ensure the new version is healthy before
+    making it live.
+
+
+    5. Verifying the proper functioning of SSL certificates in a Kubernetes environment:
+    The "-k" flag in the command can be used to ignore SSL certificate validation,
+    allowing the engineer to test and verify the functionality of SSL certificates
+    in a Kubernetes environment.'
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/readiness
   doc_links: '
@@ -87,6 +139,23 @@ commands:
     \ timeout of 10 seconds. This can be useful for checking the readiness of an Artifactory\
     \ or similar service running within a Kubernetes cluster."
   name: check_artifactory_liveness_and_readiness_endpoints
+  when_is_it_useful: '1. Monitoring and troubleshooting the health and performance
+    of a Kubernetes statefulset hosting an artifactory API endpoint.
+
+    2. Investigating and resolving issues related to network connectivity or DNS resolution
+    within the Kubernetes cluster that may be affecting the readiness of the artifactory
+    API endpoint.
+
+    3. Identifying and mitigating potential resource constraints or bottlenecks in
+    the Kubernetes environment that could be causing the artifactory API endpoint
+    to become unresponsive.
+
+    4. Implementing automated alerting and remediation processes to proactively detect
+    and address any future readiness issues with the artifactory API endpoint.
+
+    5. Collaborating with developers to optimize the performance and resilience of
+    the artifactory API endpoint, potentially through changes to the underlying Kubernetes
+    deployment configuration or resource allocation.'
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/readiness
   doc_links: '
@@ -113,3 +182,20 @@ commands:
     \ timeout of 10 seconds. This can be useful for checking the readiness of an Artifactory\
     \ or similar service running within a Kubernetes cluster."
   name: check_artifactory_liveness_and_readiness_endpoints
+  when_is_it_useful: '1. Monitoring and troubleshooting the health and performance
+    of a Kubernetes statefulset hosting an artifactory API endpoint.
+
+    2. Investigating and resolving issues related to network connectivity or DNS resolution
+    within the Kubernetes cluster that may be affecting the readiness of the artifactory
+    API endpoint.
+
+    3. Identifying and mitigating potential resource constraints or bottlenecks in
+    the Kubernetes environment that could be causing the artifactory API endpoint
+    to become unresponsive.
+
+    4. Implementing automated alerting and remediation processes to proactively detect
+    and address any future readiness issues with the artifactory API endpoint.
+
+    5. Collaborating with developers to optimize the performance and resilience of
+    the artifactory API endpoint, potentially through changes to the underlying Kubernetes
+    deployment configuration or resource allocation.'

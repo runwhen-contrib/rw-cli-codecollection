@@ -22,6 +22,12 @@ commands:
 
     kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}'
   name: list_all_available_fluxcd_helmreleases_in_namespace_namespace
+  when_is_it_useful: "1. Troubleshooting a CrashLoopBackoff event in Kubernetes\n\
+    2. Investigating resource utilization and performance of a specific Kubernetes\
+    \ resource\n3. Analyzing logs and events for a particular pod or deployment\n\
+    4. Debugging connectivity issues between Kubernetes resources within a specific\
+    \ namespace \n5. Investigating the status and health of a specific Kubernetes\
+    \ resource within a specific context"
 - command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}
   doc_links: '
 
@@ -45,6 +51,12 @@ commands:
 
     kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}'
   name: list_all_available_fluxcd_helmreleases_in_namespace_namespace
+  when_is_it_useful: "1. Troubleshooting a CrashLoopBackoff event in Kubernetes\n\
+    2. Investigating resource utilization and performance of a specific Kubernetes\
+    \ resource\n3. Analyzing logs and events for a particular pod or deployment\n\
+    4. Debugging connectivity issues between Kubernetes resources within a specific\
+    \ namespace \n5. Investigating the status and health of a specific Kubernetes\
+    \ resource within a specific context"
 - command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} -o=jsonpath="{range .items[*]}{''\nName:
     ''}{@.metadata.name}{''\nlastAppliedRevision:''}{@.status.lastAppliedRevision}{''\nlastAttemptedRevision:''}{@.status.lastAttemptedRevision}{''\n---''}{end}"
     --context ${CONTEXT} || true'
@@ -72,6 +84,25 @@ commands:
     \ devops engineers can better understand what each part of the command does and\
     \ how to customize it for their specific needs."
   name: fetch_installed_fluxcd_helmrelease_versions_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events, where
+    the engineer needs to retrieve specific information about the crashed resource
+    in a particular namespace using kubectl and JSONPath to format the output.
+
+    2. Monitoring and alerting for high CPU or memory usage in a Kubernetes cluster,
+    requiring the engineer to use kubectl with JSONPath to retrieve resource utilization
+    data and set up automated alerts.
+
+    3. Managing application deployments and rollbacks in Kubernetes, where the engineer
+    needs to use kubectl with JSONPath to retrieve deployment status and history,
+    and potentially rollback to a previous version if necessary.
+
+    4. Scaling resources in a Kubernetes cluster based on performance metrics, involving
+    the use of kubectl with JSONPath to retrieve current resource utilization and
+    make informed decisions on scaling up or down.
+
+    5. Implementing RBAC (Role-Based Access Control) in a Kubernetes environment,
+    requiring the engineer to use kubectl with JSONPath to retrieve and modify user
+    access permissions within the cluster.'
 - command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} -o=jsonpath="{range .items[*]}{''\nName:
     ''}{@.metadata.name}{''\nlastAppliedRevision:''}{@.status.lastAppliedRevision}{''\nlastAttemptedRevision:''}{@.status.lastAttemptedRevision}{''\n---''}{end}"
     --context ${CONTEXT} || true'
@@ -99,6 +130,25 @@ commands:
     \ devops engineers can better understand what each part of the command does and\
     \ how to customize it for their specific needs."
   name: fetch_installed_fluxcd_helmrelease_versions_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events, where
+    the engineer needs to retrieve specific information about the crashed resource
+    in a particular namespace using kubectl and JSONPath to format the output.
+
+    2. Monitoring and alerting for high CPU or memory usage in a Kubernetes cluster,
+    requiring the engineer to use kubectl with JSONPath to retrieve resource utilization
+    data and set up automated alerts.
+
+    3. Managing application deployments and rollbacks in Kubernetes, where the engineer
+    needs to use kubectl with JSONPath to retrieve deployment status and history,
+    and potentially rollback to a previous version if necessary.
+
+    4. Scaling resources in a Kubernetes cluster based on performance metrics, involving
+    the use of kubectl with JSONPath to retrieve current resource utilization and
+    make informed decisions on scaling up or down.
+
+    5. Implementing RBAC (Role-Based Access Control) in a Kubernetes environment,
+    requiring the engineer to use kubectl with JSONPath to retrieve and modify user
+    access permissions within the cluster.'
 - command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} -o json --context ${CONTEXT}
     | jq -r ''.items[] | select(.status.lastAppliedRevision!=.status.lastAttemptedRevision)
     | "Name: " + .metadata.name + " Last Attempted Version: " + .status.lastAttemptedRevision
@@ -121,6 +171,33 @@ commands:
     \ or less experienced devops engineers can better understand what each part of\
     \ the command does."
   name: fetch_mismatched_fluxcd_helmrelease_version_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to identify any differences
+    in the last applied revision and last attempted revision of the resource causing
+    the CrashLoopBackoff.
+
+
+    2. Monitoring and analyzing resource changes: When trying to understand recent
+    changes in a Kubernetes resource, an engineer might use this command to filter
+    and display only the items with different last applied revisions, helping to troubleshoot
+    any unexpected behavior.
+
+
+    3. Investigating configuration drift: In a large Kubernetes environment, configuration
+    drift can occur over time. A DevOps or SRE might use this command to identify
+    any discrepancies between the last applied and last attempted revisions to ensure
+    consistency across resources.
+
+
+    4. Auditing and compliance checks: To ensure that Kubernetes resources are in
+    line with company policies and standards, an engineer might use this command to
+    quickly identify any discrepancies in the last applied revision and take necessary
+    actions to bring them into compliance.
+
+
+    5. Automated remediation: This command could be incorporated into automated monitoring
+    and remediation workflows, allowing for quick identification and resolution of
+    any discrepancies in last applied revisions within Kubernetes resources.'
 - command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} -o json --context ${CONTEXT}
     | jq -r ''.items[] | select(.status.lastAppliedRevision!=.status.lastAttemptedRevision)
     | "Name: " + .metadata.name + " Last Attempted Version: " + .status.lastAttemptedRevision
@@ -143,6 +220,33 @@ commands:
     \ or less experienced devops engineers can better understand what each part of\
     \ the command does."
   name: fetch_mismatched_fluxcd_helmrelease_version_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to identify any differences
+    in the last applied revision and last attempted revision of the resource causing
+    the CrashLoopBackoff.
+
+
+    2. Monitoring and analyzing resource changes: When trying to understand recent
+    changes in a Kubernetes resource, an engineer might use this command to filter
+    and display only the items with different last applied revisions, helping to troubleshoot
+    any unexpected behavior.
+
+
+    3. Investigating configuration drift: In a large Kubernetes environment, configuration
+    drift can occur over time. A DevOps or SRE might use this command to identify
+    any discrepancies between the last applied and last attempted revisions to ensure
+    consistency across resources.
+
+
+    4. Auditing and compliance checks: To ensure that Kubernetes resources are in
+    line with company policies and standards, an engineer might use this command to
+    quickly identify any discrepancies in the last applied revision and take necessary
+    actions to bring them into compliance.
+
+
+    5. Automated remediation: This command could be incorporated into automated monitoring
+    and remediation workflows, allowing for quick identification and resolution of
+    any discrepancies in last applied revisions within Kubernetes resources.'
 - command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} -o=jsonpath="{range .items[?(@.status.conditions[].status==''False'')]}{''-----\nName:
     ''}{@.metadata.name}{''\n''}{@.status.conditions[*].message}{''\n''}{end}" --context
     ${CONTEXT} || true'
@@ -190,6 +294,32 @@ commands:
 
     '
   name: fetch_fluxcd_helmrelease_error_messages_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event: When
+    a pod continuously crashes and restarts due to an error, a DevOps engineer may
+    use this command to retrieve the status of specific resources in the namespace
+    to identify the cause of the crash.
+
+
+    2. Monitoring the health of specific resources in a Kubernetes cluster: A Site
+    Reliability Engineer may use this command to regularly check the status of critical
+    resources in a namespace to ensure they are running properly and to proactively
+    address any issues.
+
+
+    3. Investigating network connectivity problems within a Kubernetes cluster: If
+    there are issues with networking between resources, a DevOps engineer can use
+    this command to check for any false status conditions related to network connectivity.
+
+
+    4. Verifying the status of newly deployed resources: After deploying new resources
+    to a namespace, a DevOps engineer may use this command to confirm that the resources
+    have been successfully created and are running without any false status conditions.
+
+
+    5. Performing routine health checks and diagnostics on specific resources: As
+    part of regular maintenance tasks, a Site Reliability Engineer may use this command
+    to conduct health checks and gather diagnostic information for specific resources
+    within a namespace to ensure their ongoing stability and performance.'
 - command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} -o=jsonpath="{range .items[?(@.status.conditions[].status==''False'')]}{''-----\nName:
     ''}{@.metadata.name}{''\n''}{@.status.conditions[*].message}{''\n''}{end}" --context
     ${CONTEXT} || true'
@@ -237,6 +367,32 @@ commands:
 
     '
   name: fetch_fluxcd_helmrelease_error_messages_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event: When
+    a pod continuously crashes and restarts due to an error, a DevOps engineer may
+    use this command to retrieve the status of specific resources in the namespace
+    to identify the cause of the crash.
+
+
+    2. Monitoring the health of specific resources in a Kubernetes cluster: A Site
+    Reliability Engineer may use this command to regularly check the status of critical
+    resources in a namespace to ensure they are running properly and to proactively
+    address any issues.
+
+
+    3. Investigating network connectivity problems within a Kubernetes cluster: If
+    there are issues with networking between resources, a DevOps engineer can use
+    this command to check for any false status conditions related to network connectivity.
+
+
+    4. Verifying the status of newly deployed resources: After deploying new resources
+    to a namespace, a DevOps engineer may use this command to confirm that the resources
+    have been successfully created and are running without any false status conditions.
+
+
+    5. Performing routine health checks and diagnostics on specific resources: As
+    part of regular maintenance tasks, a Site Reliability Engineer may use this command
+    to conduct health checks and gather diagnostic information for specific resources
+    within a namespace to ensure their ongoing stability and performance.'
 - command: 'namespace="${NAMESPACE}" context="${CONTEXT}"; helm_releases=$(kubectl
     get ${RESOURCE_NAME} -n "$namespace" --context "$context" -o json | jq -r ''.items[]
     | .metadata.name''); echo "$helm_releases" | while IFS= read -r release; do chart_details=$(kubectl
@@ -321,6 +477,20 @@ commands:
     \ Version: $chart_version | Available Update: $version_update_available | Available\
     \ Version: $available_version\"\n\ndone\n"
   name: check_for_available_helm_chart_updates_in_namespace_namespace
+  when_is_it_useful: '1. Monitoring and managing Helm releases in a Kubernetes cluster
+    to ensure that all applications are running smoothly and up-to-date.
+
+    2. Troubleshooting any issues or errors with Helm releases, such as CrashLoopBackoff
+    events, to identify and fix any issues affecting application performance.
+
+    3. Performing routine maintenance tasks, such as checking for available updates
+    for Helm charts and ensuring that applications are using the latest versions.
+
+    4. Investigating resource usage and performance metrics for Helm releases to optimize
+    overall cluster performance and efficiency.
+
+    5. Automating processes related to Helm release management, such as generating
+    reports on release status and update availability.'
 - command: 'namespace="${NAMESPACE}" context="${CONTEXT}"; helm_releases=$(kubectl
     get ${RESOURCE_NAME} -n "$namespace" --context "$context" -o json | jq -r ''.items[]
     | .metadata.name''); echo "$helm_releases" | while IFS= read -r release; do chart_details=$(kubectl
@@ -405,3 +575,17 @@ commands:
     \ Version: $chart_version | Available Update: $version_update_available | Available\
     \ Version: $available_version\"\n\ndone\n"
   name: check_for_available_helm_chart_updates_in_namespace_namespace
+  when_is_it_useful: '1. Monitoring and managing Helm releases in a Kubernetes cluster
+    to ensure that all applications are running smoothly and up-to-date.
+
+    2. Troubleshooting any issues or errors with Helm releases, such as CrashLoopBackoff
+    events, to identify and fix any issues affecting application performance.
+
+    3. Performing routine maintenance tasks, such as checking for available updates
+    for Helm charts and ensuring that applications are using the latest versions.
+
+    4. Investigating resource usage and performance metrics for Helm releases to optimize
+    overall cluster performance and efficiency.
+
+    5. Automating processes related to Helm release management, such as generating
+    reports on release status and update availability.'
