@@ -38,7 +38,7 @@ spec:
     - name: MAX_LOG_LINES
       value: '500'
     - name: WORKLOAD_NAME
-      value: {{ match_resource.resource.metadata.labels }}
+      value: {{ match_resource.resource.metadata.labels[runwhen.com/gitApplication] }}
   secretsProvided:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
