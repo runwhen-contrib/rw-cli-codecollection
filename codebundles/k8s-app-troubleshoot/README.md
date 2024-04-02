@@ -28,6 +28,14 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 - A kubeconfig with appropriate RBAC permissions to perform the desired command, particularly exec
 - A oauth token for github authentication, with read permissions on repositories(s) and write permissions on issues.
 
+## Automated Building
+Additionally you must have the following manifest changes in order for workspace builder to automatically setup this codebundle for you:
+
+- A deployment with the follow annotations and labels:
+    -   annotations.gitApplication: YOUR_GIT_URL
+    -   annotations.gitTokenName: THE_WORKSPACE_TOKEN_NAME
+    -   labels.app: app name that matches the container name in the pod to pull logs from
+
 ## TODO
 - [ ] New keywords for code inspection
 - [ ] SPIKE for potential genAI integration
