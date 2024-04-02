@@ -38,12 +38,14 @@ spec:
     - name: MAX_LOG_LINES
       value: '500'
     - name: WORKLOAD_NAME
-      value: {{ match_resource.resource.metadata.labels.gitApplication }}
+      value: {{ match_resource.resource.metadata.labels.app }}
     - name: REPO_URI
-      value: {{ custom.gitApplications[match_resource.resource.metadata.labels.gitApplication].git }}
+      value: {{ match_resource.resource.metadata.annotations.gitApplication }}
   secretsProvided:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
+    - name: REPO_AUTH_TOKEN
+      workspaceKey: {{ match_resource.resource.metadata.annotations.gitTokenName }}
   servicesProvided:
     - name: {{custom.kubernetes_distribution_binary}}
       locationServiceName: {{custom.kubernetes_distribution_binary}}-service.shared
