@@ -8,6 +8,7 @@ parse_robot_file written by Kyle Forster
 
 Author: Shea Stewart
 """
+
 import sys
 import os
 import json
@@ -217,7 +218,7 @@ def generate_metadata(directory_path):
     Returns:
         Object
     """
-    explainUrl=f'https://papi.beta.runwhen.com/bow/raw?'
+    explainUrl = f"https://papi.beta.runwhen.com/bow/raw?"
     headers = {"Content-Type": "application/json"}
     search_list = ["render_in_commandlist=true", "show_in_rwl_cheatsheet=true"]
     runbook_files = find_files(directory_path, "runbook.robot")
@@ -261,6 +262,28 @@ def generate_metadata(directory_path):
                     explanation_content = explanation["explanation"]
                 else:
                     explanation_content = "Explanation not available"
+                # When is it useful
+                when_is_it_useful_query = f"Provide up to 5 common scenarios, such as troubleshooting Kubernetes CrashLoopBackoff events,in which this task might be performed by a DevOps or Site Reliability Engineer:"
+                when_is_it_useful_query_with_command = (
+                    f"{when_is_it_useful_query} \n{explanation_content}"
+                )
+                print(f"generating usefulness for {name_snake_case}")
+                prompt_when_is_it_useful_query_with_command = {
+                    "prompt": when_is_it_useful_query_with_command
+                }
+                prompt_when_is_it_useful_query_with_command_json = json.dumps(
+                    prompt_when_is_it_useful_query_with_command
+                )
+                response_when_is_it_useful = requests.post(
+                    explainUrl,
+                    data=prompt_when_is_it_useful_query_with_command_json,
+                    headers=headers,
+                )
+                if response_when_is_it_useful.status_code == 200:
+                    usefulness = response_when_is_it_useful.json()
+                    usefulness_content = usefulness["explanation"]
+                else:
+                    usefulness_content = "Content not available"
                 # Generate multi-line explanation
                 query_multi_line_with_comments_prompt = f"Augment this script with comments (written it it's language) for newer or less experienced devops engineers:"
                 query_multi_line_with_command = (
@@ -289,6 +312,28 @@ def generate_metadata(directory_path):
                     explanation_content = explanation["explanation"]
                 else:
                     explanation_content = "Explanation not available"
+                # When is it useful
+                when_is_it_useful_query = f"Provide up to 5 common scenarios, such as troubleshooting Kubernetes CrashLoopBackoff events,in which this task might be performed by a DevOps or Site Reliability Engineer:"
+                when_is_it_useful_query_with_command = (
+                    f"{when_is_it_useful_query} \n{explanation_content}"
+                )
+                print(f"generating usefulness for {name_snake_case}")
+                prompt_when_is_it_useful_query_with_command = {
+                    "prompt": when_is_it_useful_query_with_command
+                }
+                prompt_when_is_it_useful_query_with_command_json = json.dumps(
+                    prompt_when_is_it_useful_query_with_command
+                )
+                response_when_is_it_useful = requests.post(
+                    explainUrl,
+                    data=prompt_when_is_it_useful_query_with_command_json,
+                    headers=headers,
+                )
+                if response_when_is_it_useful.status_code == 200:
+                    usefulness = response_when_is_it_useful.json()
+                    usefulness_content = usefulness["explanation"]
+                else:
+                    usefulness_content = "Content not available"
                 # Generate multi-line explanation
                 query_multi_line_with_comments_prompt = f"Convert this command to a multi-line command with helpful and educational comments for newer or less experienced devops engineers: "
                 query_multi_line_with_command = (
@@ -379,6 +424,7 @@ def generate_metadata(directory_path):
             command_meta = {
                 "name": name_snake_case,
                 "command": command,
+                "when_is_it_useful": usefulness_content,
                 "explanation": strip_md_codeblock_formatting(explanation_content),
                 "multi_line_details": strip_md_codeblock_formatting(multi_line_content),
                 "doc_links": f"\n{doc_links_content}",
