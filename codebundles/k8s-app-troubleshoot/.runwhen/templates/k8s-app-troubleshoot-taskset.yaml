@@ -39,15 +39,15 @@ spec:
       value: '500'
     - name: WORKLOAD_NAME
       value: {{ match_resource.resource.metadata.labels.runwhen.com/gitApplication }}
-    - name: REPO_URI
-      value: {{ custom.gitApplications[match_resource.resource.metadata.labels.runwhen.com/gitApplication].git }}
+    # - name: REPO_URI
+    #   value: {{ custom.gitApplications[match_resource.resource.metadata.labels.runwhen.com/gitApplication].git }}
     - LABELS:
       value: runwhen.com/gitApplication={{ match_resource.resource.metadata.labels.runwhen.com/gitApplication }}
   secretsProvided:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
-    - name: REPO_AUTH_TOKEN
-      workspaceKey: {{ custom.gitApplications[match_resource.resource.metadata.labels.runwhen.com/gitApplication].token_name }}
+    # - name: REPO_AUTH_TOKEN
+    #   workspaceKey: {{ custom.gitApplications[match_resource.resource.metadata.labels.runwhen.com/gitApplication].token_name }}
   servicesProvided:
     - name: {{custom.kubernetes_distribution_binary}}
       locationServiceName: {{custom.kubernetes_distribution_binary}}-service.shared
