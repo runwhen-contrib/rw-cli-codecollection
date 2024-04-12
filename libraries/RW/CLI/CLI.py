@@ -171,82 +171,42 @@ def run_bash_file(
     else:
         cwd = os.getcwd()
         runwhen_home=os.environ.get("RUNWHEN_HOME", None)
-
+        rw_path_to_robot = os.environ.get("RW_PATH_TO_ROBOT", None)
         ## Users will expect to run the command from within the current working directory
         ## Here we will rewrite the path so that it executes properly from the cwd
-        if cwd == runwhen_home:
-            rw_path_to_robot = os.environ.get("RW_PATH_TO_ROBOT", None)
-            if rw_path_to_robot:
-                # Split the path at the patterns you provided and join with the new prefix
-                for pattern in ["sli.robot", "runbook.robot"]:
-                    if pattern in rw_path_to_robot:
-                        path, _ = rw_path_to_robot.split(pattern)
+        if rw_path_to_robot:
+            # Split the path at the patterns you provided and join with the new prefix
+            for pattern in ["sli.robot", "runbook.robot"]:
+                if pattern in rw_path_to_robot:
+                    path, _ = rw_path_to_robot.split(pattern)
+                    if cwd == runwhen_home:
                         new_path = path
-                        # Modify the bash_file to point to the new directory
-                        local_bash_file = f"./{bash_file}"
-                        bash_file = os.path.join(new_path, bash_file)
-                        if os.path.exists(bash_file):
-                            logger.info(
-                                f"File '{bash_file}' found at derived path: {new_path}."
-                            )
-                            if cmd_override:
-                                cmd_override = cmd_override.replace(
-                                    f"{local_bash_file}", f"{bash_file}"
-                                )
-                            else:
-                                cmd_override = f"{bash_file}"
-                            break
-                        else:
-                            logger.warning(
-                                f"File '{bash_file}' not found at derived path: {new_path}."
-                            )
-            else:
-                logger.warning(
-                    f"Current directory is '{runwhen_home}', but 'RW_PATH_TO_ROBOT' is not set."
-                )
-        else:
-            logger.warning(
-                f"File '{bash_file}' not found in the current directory and current directory is '{runwhen_home}'."
-            )            
-        ## Keep this for backwards compatibility, though the new robot runtime
-        ## images should run out of /home/runwhen instead of /
-        # Check if the current working directory is the root or the /app
-        if cwd == "/" or cwd == "/app":
-            # Check if RW_PATH_TO_ROBOT environment variable exists
-            rw_path_to_robot = os.environ.get("RW_PATH_TO_ROBOT", None)
-            if rw_path_to_robot:
-                # Split the path at the patterns you provided and join with the new prefix
-                for pattern in ["sli.robot", "runbook.robot"]:
-                    if pattern in rw_path_to_robot:
-                        path, _ = rw_path_to_robot.split(pattern)
+                    else:
+                        # This for backwards compatibility for older images
+                        # that have /collection at the root 
                         new_path = os.path.join("/collection", path)
-                        # Modify the bash_file to point to the new directory
-                        local_bash_file = f"./{bash_file}"
-                        bash_file = os.path.join(new_path, bash_file)
-                        if os.path.exists(bash_file):
-                            logger.info(
-                                f"File '{bash_file}' found at derived path: {new_path}."
+                    # Modify the bash_file to point to the new directory
+                    local_bash_file = f"./{bash_file}"
+                    bash_file = os.path.join(new_path, bash_file)
+                    if os.path.exists(bash_file):
+                        logger.info(
+                            f"File '{bash_file}' found at derived path: {new_path}."
+                        )
+                        if cmd_override:
+                            cmd_override = cmd_override.replace(
+                                f"{local_bash_file}", f"{bash_file}"
                             )
-                            if cmd_override:
-                                cmd_override = cmd_override.replace(
-                                    f"{local_bash_file}", f"{bash_file}"
-                                )
-                            else:
-                                cmd_override = f"{bash_file}"
-                            break
                         else:
-                            logger.warning(
-                                f"File '{bash_file}' not found at derived path: {new_path}."
-                            )
-            else:
-                logger.warning(
-                    "Current directory is root, but 'RW_PATH_TO_ROBOT' is not set."
-                )
+                            cmd_override = f"{bash_file}"
+                        break
+                    else:
+                        logger.warning(
+                            f"File '{bash_file}' not found at derived path: {new_path}."
+                        )
         else:
             logger.warning(
-                f"File '{bash_file}' not found in the current directory and current directory is not root."
+                f"Current directory is '{cwd}', but 'RW_PATH_TO_ROBOT' is not set."
             )
-
     if not cmd_override:
         cmd_override = f"./{bash_file}"
     logger.info(f"Received kwargs: {kwargs}")
