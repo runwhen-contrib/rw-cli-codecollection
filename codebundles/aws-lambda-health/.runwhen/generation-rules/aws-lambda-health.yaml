@@ -4,7 +4,7 @@ spec:
   platform: aws
   generationRules:
     - resourceTypes:
-        -  aws_lambda_function
+        -  aws_lambda_functions
       matchRules:
         - type: pattern
           pattern: ".+"
@@ -12,7 +12,7 @@ spec:
           mode: substring
       slxs:
         - baseName: aws-lambda-health
-          qualifiers: ["project"]
+          qualifiers: ["resource"]
           baseTemplateName: aws-lambda-health
           levelOfDetail: basic
           outputItems:
