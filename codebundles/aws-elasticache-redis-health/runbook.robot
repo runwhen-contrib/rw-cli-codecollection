@@ -2,7 +2,7 @@
 Documentation       
 Metadata            Author    jon-funk
 Metadata            Display Name    ElastiCache Health Check
-Metadata            Supports    `AWS`, `Elasticache`, `Redis`, `Service Down`
+Metadata            Supports    AWS, Elasticache, Redis, Service Down
 Metadata            Builder
 
 Library             BuiltIn
@@ -17,7 +17,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Validate AWS Elasticache Redis Configuration
     [Documentation]   This script is used to retrieve and display the configuration details of an Amazon ElastiCache cluster. It fetches information such as the configuration endpoint, port, replication group ID, number of replicas, engine version, parameter group, and security groups.
-    [Tags]  bash script    AWS Elasticache    configuration endpoint    configuration
+    [Tags]  AWS Elasticache    configuration endpoint    configuration
     ${process}=    Run Process    ${CURDIR}/validate_aws_elasticache_redis_config.sh    env=${env}
     RW.Core.Add Pre To Report    ${process.stdout}
     IF    "Snapshot retention limit is set to 0" in ${process.stdout}
@@ -34,7 +34,7 @@ Validate AWS Elasticache Redis Configuration
 
 Analyze AWS Elasticache Redis Metrics
     [Documentation]   This script is used to analyze and monitor various aspects of an AWS ElastiCache Redis cluster. It retrieves and displays metrics related to CPU utilization, replication, persistence, performance, security, and overall cluster management.
-    [Tags]  aws    bash    script    cloudwatch    metrics    elasticache    redis    replication    persistence
+    [Tags]  aws    cloudwatch    metrics    elasticache    redis
     ${process}=    Run Process    ${CURDIR}/analyze_aws_elasticache_redis_metrics.sh    env=${env}
     RW.Core.Add Pre To Report    ${process.stdout}
     IF    "" in ${process.stdout}

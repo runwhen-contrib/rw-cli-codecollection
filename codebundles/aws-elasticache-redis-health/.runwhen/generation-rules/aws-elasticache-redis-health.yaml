@@ -1,0 +1,21 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: aws
+  generationRules:
+    - resourceTypes:
+        -  aws_elasticache_serverless_caches
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: aws-elasticache-redis-health
+          qualifiers: ["resource"]
+          baseTemplateName: aws-elasticache-redis-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: runbook
+              templateName: aws-elasticache-redis-health-taskset.yaml

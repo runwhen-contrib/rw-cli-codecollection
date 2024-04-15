@@ -8,13 +8,13 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/cloud_functions/cloud_functions.svg
-  alias: AWS Lambda Health For Project {{match_resource.resource.region}}
-  asMeasuredBy: The number of Failed AWS Lambdas in project {{match_resource.resource.region}}
+  alias: AWS Elastiache Caches in {{match_resource.resource.region}}
+  asMeasuredBy: The number of unavailable Elasticache serverless caches in {{match_resource.resource.region}}
   configProvided:
   - name: SLX_PLACEHOLDER
     value: SLX_PLACEHOLDER
   owners:
   - {{workspace.owner_email}}
-  statement: The total count of failing Lambdas should be 0.   
+  statement: The number of unavailable Elasticache serverless caches should be 0. 
   additionalContext:
-    region: "{{match_resource.resource.region}}"
+    project: "{{match_resource.resource.region}}"

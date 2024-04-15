@@ -2,7 +2,7 @@
 Documentation       
 Metadata            Author    jon-funk
 Metadata            Display Name    ElastiCache Health Monitor
-Metadata            Supports    `AWS`, `Elasticache`, `Redis`, `Service Down`, `Investigation`
+Metadata            Supports    AWS, Elasticache, Redis
 Metadata            Builder
 
 Library             BuiltIn

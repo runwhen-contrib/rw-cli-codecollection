@@ -9,7 +9,7 @@ metadata:
 spec:
   locations:
     - {{default_location}}
-  description: Runs tasks to triage unhealthy AWS Lambda functions.
+  description: Runs a set of tasks to triage elastiache serverless caches that are unavailable.
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -21,7 +21,7 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/aws-lambda-health/runbook.robot
+    pathToRobot: codebundles/aws-elasticache-redis-health/runbook.robot
   configProvided:
     - name: AWS_REGION
       value: {{match_resource.resource.region}}
