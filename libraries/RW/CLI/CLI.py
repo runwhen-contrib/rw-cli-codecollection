@@ -176,7 +176,11 @@ def resolve_path_to_robot():
     # Also check under commonly known directories
     common_paths = [
         os.path.join("/collection", repo_path_to_robot),
-        os.path.join("/", repo_path_to_robot)  # Root relative
+        os.path.join("/collection/", repo_path_to_robot),
+        os.path.join("/", repo_path_to_robot),
+        os.path.join("/home/runwhen/collection/", repo_path_to_robot),
+        os.path.join("/home/runwhen/collection/", repo_path_to_robot) 
+
     ]
 
     file_path = find_file(*common_paths)
