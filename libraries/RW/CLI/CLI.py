@@ -171,7 +171,9 @@ def resolve_path_to_robot():
     paths_to_check = set([
         repo_path_to_robot,  # Check the path as is (absolute or relative)
         os.path.join(runwhen_home, normalized_path),  # Path relative to RUNWHEN_HOME
+        os.path.join(runwhen_home, 'collection', normalized_path),  # Path relative to RUNWHEN_HOME
         os.path.join(home, normalized_path),          # Path relative to HOME
+        os.path.join(home, 'collection', normalized_path),          # Path relative to HOME
         os.path.join("/collection", normalized_path), # Common collection path
         os.path.join("/", normalized_path)            # Checking as absolute from root
     ])
