@@ -167,20 +167,20 @@ def resolve_path_to_robot():
         if file_path:
             return file_path
 
-    # Check relative to RUNWHEN_HOME if it exists
-    if runwhen_home:
-        file_path = find_file(os.path.join(runwhen_home, repo_path_to_robot))
-        if file_path:
-            return file_path
+    # # Check relative to RUNWHEN_HOME if it exists
+    # if runwhen_home:
+    #     os.path
+    #     file_path = find_file(os.path.join(runwhen_home, repo_path_to_robot))
+    #     if file_path:
+    #         return file_path
 
     # Also check under commonly known directories
     common_paths = [
         os.path.join("/collection", repo_path_to_robot),
         os.path.join("/collection/", repo_path_to_robot),
         os.path.join("/", repo_path_to_robot),
-        os.path.join("/home/runwhen/collection/", repo_path_to_robot),
-        os.path.join("/home/runwhen/collection", repo_path_to_robot) 
-
+        os.path.join(f"{runwhen_home}/collection", repo_path_to_robot),
+        os.path.join(f"{runwhen_home}/collection/", repo_path_to_robot)
     ]
 
     file_path = find_file(*common_paths)
