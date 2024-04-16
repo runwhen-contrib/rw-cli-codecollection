@@ -151,38 +151,26 @@ def find_file(*paths):
     return None
 
 def resolve_path_to_robot():
-    # Environment variable
-    runwhen_home = os.getenv("RUNWHEN_HOME", "")
-
-    # RW_PATH_TO_ROBOT might be set relative to RUNWHEN_HOME or it could be elsewhere
-    repo_path_to_robot = os.getenv("RW_PATH_TO_ROBOT", "")
-
-    # Substitute RUNWHEN_HOME in path if specified
-    if "$(RUNWHEN_HOME)" in repo_path_to_robot:
-        repo_path_to_robot = repo_path_to_robot.replace("$(RUNWHEN_HOME)", runwhen_home)
-
+    # Get and clean environment variables
+    runwhen_home = os.getenv("RUNWHEN_HOME", "").rstrip('/')
+    home = os.getenv("HOME", "").rstrip('/')
+    
+    # Get the path to the robot file, handling potential environment variable substitution
+    repo_path_to_robot = os.getenv("RW_PATH_TO_ROBOT", "").replace("$(RUNWHEN_HOME)", runwhen_home)
+    
     # Check if path is already absolute
-    if os.path.isabs(repo_path_to_robot):
-        file_path = find_file(repo_path_to_robot)
-        if file_path:
-            return file_path
-
-    # # Check relative to RUNWHEN_HOME if it exists
-    # if runwhen_home:
-    #     os.path
-    #     file_path = find_file(os.path.join(runwhen_home, repo_path_to_robot))
-    #     if file_path:
-    #         return file_path
-
-    # Also check under commonly known directories
+    if os.path.isabs(repo_path_to_robot) and os.path.isfile(repo_path_to_robot):
+        return repo_path_to_robot
+    
+    # Define common paths to check, based on likely directories
     common_paths = [
         os.path.join("/collection", repo_path_to_robot),
-        os.path.join("/collection/", repo_path_to_robot),
         os.path.join("/", repo_path_to_robot),
-        os.path.join(f"{runwhen_home}/collection", repo_path_to_robot),
-        os.path.join(f"{runwhen_home}/collection/", repo_path_to_robot)
+        os.path.join(runwhen_home, "collection", repo_path_to_robot),
+        os.path.join(home, "collection", repo_path_to_robot)
     ]
 
+    # Attempt to find the file in any of the common paths
     file_path = find_file(*common_paths)
     if file_path:
         return file_path
