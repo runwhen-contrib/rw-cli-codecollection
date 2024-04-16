@@ -155,14 +155,14 @@ def resolve_path_to_robot():
     runwhen_home = os.getenv("RUNWHEN_HOME", "").rstrip('/')
     home = os.getenv("HOME", "").rstrip('/')
 
+    # Get the path to the robot file, ensure it's clean for concatenation
+    repo_path_to_robot = os.getenv("RW_PATH_TO_ROBOT", "").lstrip('/')
+
     # Check if the path includes environment variable placeholders
     if "$(RUNWHEN_HOME)" in repo_path_to_robot:
         repo_path_to_robot = repo_path_to_robot.replace("$(RUNWHEN_HOME)", runwhen_home)
     if "$(HOME)" in repo_path_to_robot:
         repo_path_to_robot = repo_path_to_robot.replace("$(HOME)", home)
-
-    # Get the path to the robot file, ensure it's clean for concatenation
-    repo_path_to_robot = os.getenv("RW_PATH_TO_ROBOT", "").lstrip('/')
 
     # Prepare a list of paths to check
     paths_to_check = set([
