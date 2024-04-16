@@ -143,7 +143,7 @@ def _create_secrets_from_kwargs(**kwargs) -> list[platform.ShellServiceRequestSe
             )
     return request_secrets
 
-def resolve_rfile_path():
+def resolve_path_to_robot():
     # Get environment variables
     runwhen_home = os.getenv("RUNWHEN_HOME", "")
     repo_path_to_robot = os.getenv("RW_PATH_TO_ROBOT", "")
