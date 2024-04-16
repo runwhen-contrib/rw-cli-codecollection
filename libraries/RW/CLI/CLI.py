@@ -151,27 +151,28 @@ def find_file(*paths):
     return None
 
 def resolve_path_to_robot():
-    # Get and normalize environment variables by stripping any potential trailing slash
+    # Get and clean environment variables
     runwhen_home = os.getenv("RUNWHEN_HOME", "").rstrip('/')
     home = os.getenv("HOME", "").rstrip('/')
     
-    # Get the path to the robot file, handling potential environment variable substitution
+    # RW_PATH_TO_ROBOT might contain a path that needs to be checked both directly and relative to RUNWHEN_HOME
     repo_path_to_robot = os.getenv("RW_PATH_TO_ROBOT", "").replace("$(RUNWHEN_HOME)", runwhen_home)
     
-    # Check if path is already absolute
-    if os.path.isabs(repo_path_to_robot) and os.path.isfile(repo_path_to_robot):
-        return repo_path_to_robot
+    # Normalize path by stripping any leading slashes for relative checking
+    normalized_path = repo_path_to_robot.lstrip('/')
     
-    # Common paths to check, adjusted for various likely directory structures
-    common_paths = [
-        os.path.join("/collection", repo_path_to_robot.lstrip('/')), # Ensuring no double slashes
-        os.path.join("/", repo_path_to_robot.lstrip('/')), # Direct path under root
-        os.path.join(runwhen_home, "collection", repo_path_to_robot.lstrip('/')), # Nested under collection
-        os.path.join(home, "collection", repo_path_to_robot.lstrip('/')) # Nested under collection in HOME
-    ]
+    # Prepare paths to check
+    absolute_path = repo_path_to_robot if os.path.isabs(repo_path_to_robot) else None
+    relative_to_runwhen_home = os.path.join(runwhen_home, normalized_path)
+    relative_to_home = os.path.join(home, normalized_path)
+    common_path = os.path.join("/collection", normalized_path)  # Adjusted for common setup
+    root_path = os.path.join("/", normalized_path)
+    
+    # List of all possible paths to check
+    paths_to_check = [path for path in [absolute_path, relative_to_runwhen_home, relative_to_home, common_path, root_path] if path]
 
-    # Attempt to find the file in any of the common paths
-    file_path = find_file(*common_paths)
+    # Attempt to find the file in any of the paths listed
+    file_path = find_file(*paths_to_check)
     if file_path:
         return file_path
 
@@ -180,7 +181,7 @@ def resolve_path_to_robot():
     if os.path.isfile(default_robot_file):
         return default_robot_file
 
-    # If all fails, raise error
+    # If all fails, raise an error
     raise FileNotFoundError("Could not find the robot file in any known locations.")
 
 
