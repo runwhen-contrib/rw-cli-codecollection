@@ -143,6 +143,43 @@ def _create_secrets_from_kwargs(**kwargs) -> list[platform.ShellServiceRequestSe
             )
     return request_secrets
 
+def resolve_rfile_path():
+    # Get environment variables
+    runwhen_home = os.getenv("RUNWHEN_HOME", "")
+    repo_path_to_robot = os.getenv("RW_PATH_TO_ROBOT", "")
+
+    # Check if RW_PATH_TO_ROBOT is an absolute path
+    if repo_path_to_robot.startswith("/"):
+        # It's an absolute path
+        if os.path.isfile(repo_path_to_robot):
+            return repo_path_to_robot
+        else:
+            # It's an absolute path but file does not exist, try prepending RUNWHEN_HOME
+            alternative_path = os.path.join(runwhen_home, repo_path_to_robot.lstrip("/"))
+            if os.path.isfile(alternative_path):
+                return alternative_path
+
+    # Handle environment variable substitution in the path
+    if "$(RUNWHEN_HOME)" in repo_path_to_robot:
+        repo_path_to_robot = repo_path_to_robot.replace("$(RUNWHEN_HOME)", runwhen_home)
+
+    # Construct full path using RUNWHEN_HOME if not already absolute
+    if not os.path.isabs(repo_path_to_robot):
+        full_path = os.path.join(runwhen_home, repo_path_to_robot)
+    else:
+        full_path = repo_path_to_robot
+
+    # Check if the constructed or transformed path is a file
+    if os.path.isfile(full_path):
+        return full_path
+    else:
+        # If none of the above, return a default robot file or raise an error
+        default_robot_file = os.path.join("/", "sli.robot")  # Default file
+        if os.path.isfile(default_robot_file):
+            return default_robot_file
+        else:
+            raise FileNotFoundError("Could not resolve the robot file path based on environment settings.")
+  
 
 def run_bash_file(
     bash_file: str,
@@ -170,8 +207,7 @@ def run_bash_file(
         logger.info(f"File '{bash_file}' found in the current working directory.")
     else:
         cwd = os.getcwd()
-        runwhen_home=os.environ.get("RUNWHEN_HOME", None)
-        rw_path_to_robot = os.environ.get("RW_PATH_TO_ROBOT", None)
+        rw_path_to_robot = resolve_path_to_robot()
         ## Users will expect to run the command from within the current working directory
         ## Here we will rewrite the path so that it executes properly from the cwd
         if rw_path_to_robot:
