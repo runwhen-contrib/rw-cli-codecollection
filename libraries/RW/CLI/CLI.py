@@ -151,7 +151,7 @@ def find_file(*paths):
     return None
 
 def resolve_path_to_robot():
-    # Get and clean environment variables
+    # Get and normalize environment variables by stripping any potential trailing slash
     runwhen_home = os.getenv("RUNWHEN_HOME", "").rstrip('/')
     home = os.getenv("HOME", "").rstrip('/')
     
@@ -162,12 +162,12 @@ def resolve_path_to_robot():
     if os.path.isabs(repo_path_to_robot) and os.path.isfile(repo_path_to_robot):
         return repo_path_to_robot
     
-    # Define common paths to check, based on likely directories
+    # Common paths to check, adjusted for various likely directory structures
     common_paths = [
-        os.path.join("/collection", repo_path_to_robot),
-        os.path.join("/", repo_path_to_robot),
-        os.path.join(runwhen_home, "collection", repo_path_to_robot),
-        os.path.join(home, "collection", repo_path_to_robot)
+        os.path.join("/collection", repo_path_to_robot.lstrip('/')), # Ensuring no double slashes
+        os.path.join("/", repo_path_to_robot.lstrip('/')), # Direct path under root
+        os.path.join(runwhen_home, "collection", repo_path_to_robot.lstrip('/')), # Nested under collection
+        os.path.join(home, "collection", repo_path_to_robot.lstrip('/')) # Nested under collection in HOME
     ]
 
     # Attempt to find the file in any of the common paths
