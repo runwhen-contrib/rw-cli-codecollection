@@ -179,7 +179,7 @@ def resolve_path_to_robot():
         os.path.join("/collection/", repo_path_to_robot),
         os.path.join("/", repo_path_to_robot),
         os.path.join("/home/runwhen/collection/", repo_path_to_robot),
-        os.path.join("/home/runwhen/collection/", repo_path_to_robot) 
+        os.path.join("/home/runwhen/collection", repo_path_to_robot) 
 
     ]
 
