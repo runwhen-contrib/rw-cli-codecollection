@@ -144,7 +144,7 @@ def _create_secrets_from_kwargs(**kwargs) -> list[platform.ShellServiceRequestSe
     return request_secrets
 
 def find_file(*paths):
-    """ Helper function to check if file exists in given paths. """
+    """ Helper function to check if a file exists in the given paths. """
     for path in paths:
         if os.path.isfile(path):
             return path
@@ -155,27 +155,17 @@ def resolve_path_to_robot():
     runwhen_home = os.getenv("RUNWHEN_HOME", "").rstrip('/')
     home = os.getenv("HOME", "").rstrip('/')
     
-    # Get the path to the robot file
-    repo_path_to_robot = os.getenv("RW_PATH_TO_ROBOT", "")
-    
-    # Check if the path includes environment variable placeholders
-    if "$(RUNWHEN_HOME)" in repo_path_to_robot:
-        repo_path_to_robot = repo_path_to_robot.replace("$(RUNWHEN_HOME)", runwhen_home)
-    if "$(HOME)" in repo_path_to_robot:
-        repo_path_to_robot = repo_path_to_robot.replace("$(HOME)", home)
-
-    # Normalize path by removing a leading slash for relative path construction
-    normalized_path = repo_path_to_robot.lstrip('/')
+    # Get the path to the robot file, ensure it's clean for concatenation
+    repo_path_to_robot = os.getenv("RW_PATH_TO_ROBOT", "").lstrip('/')
 
     # Prepare a list of paths to check
     paths_to_check = set([
-        repo_path_to_robot,  # Check the path as is (absolute or relative)
-        os.path.join(runwhen_home, normalized_path),  # Path relative to RUNWHEN_HOME
-        os.path.join(runwhen_home, 'collection', normalized_path),  # Path relative to RUNWHEN_HOME
-        os.path.join(home, normalized_path),          # Path relative to HOME
-        os.path.join(home, 'collection', normalized_path),          # Path relative to HOME
-        os.path.join("/collection", normalized_path), # Common collection path
-        os.path.join("/", normalized_path)            # Checking as absolute from root
+        os.path.join('/', repo_path_to_robot),  # Check as absolute path
+        os.path.join(runwhen_home, repo_path_to_robot),  # Path relative to RUNWHEN_HOME
+        os.path.join(runwhen_home, 'collection', repo_path_to_robot),  # Further nested within RUNWHEN_HOME
+        os.path.join(home, repo_path_to_robot),  # Path relative to HOME
+        os.path.join(home, 'collection', repo_path_to_robot),  # Further nested within HOME
+        os.path.join("/collection", repo_path_to_robot), # Common collection path
     ])
 
     # Try to find the file in any of the specified paths
