@@ -215,18 +215,18 @@ def run_bash_file(
             for pattern in ["sli.robot", "runbook.robot"]:
                 if pattern in rw_path_to_robot:
                     path, _ = rw_path_to_robot.split(pattern)
-                    if cwd == runwhen_home:
-                        new_path = path
-                    else:
-                        # This for backwards compatibility for older images
-                        # that have /collection at the root 
-                        new_path = os.path.join("/collection", path)
-                    # Modify the bash_file to point to the new directory
+                    # if cwd == runwhen_home:
+                    #     new_path = path
+                    # else:
+                    #     # This for backwards compatibility for older images
+                    #     # that have /collection at the root 
+                    #     new_path = os.path.join("/collection", path)
+                    # # Modify the bash_file to point to the new directory
                     local_bash_file = f"./{bash_file}"
-                    bash_file = os.path.join(new_path, bash_file)
+                    bash_file = os.path.join(path, bash_file)
                     if os.path.exists(bash_file):
                         logger.info(
-                            f"File '{bash_file}' found at derived path: {new_path}."
+                            f"File '{bash_file}' found at derived path: {path}."
                         )
                         if cmd_override:
                             cmd_override = cmd_override.replace(
@@ -237,7 +237,7 @@ def run_bash_file(
                         break
                     else:
                         logger.warning(
-                            f"File '{bash_file}' not found at derived path: {new_path}."
+                            f"File '{bash_file}' not found at derived path: {path}."
                         )
         else:
             logger.warning(
