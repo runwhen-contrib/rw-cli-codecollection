@@ -1,3 +1,6 @@
+## 0.0.13 2024-04-17
+- Add aws cli to dev build 7366414
+
 ## 0.0.13 2024-4-17
 Version lock prior to bash/cli library adjustments.
 
