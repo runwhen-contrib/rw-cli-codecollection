@@ -20,13 +20,13 @@ for cluster in $eks_clusters; do
     for metric_name in $METRICS_LIST; do
         cloudwatch_results=$(aws cloudwatch get-metric-statistics \
             --region "$AWS_REGION" \
-            --namespace AWS/EKS/Fargate \
+            --namespace AWS/Usage \
             --metric-name "$metric_name" \
             --start-time "$START" \
             --end-time "$END" \
             --period $PERIOD \
             --statistics Maximum \
-            --dimensions Name=ClusterName,Value="$cluster")
+            --dimensions Name=Service,Value="Fargate")
         newest_data=$(echo "$cloudwatch_results" | jq -r '.Datapoints | sort_by(.Timestamp) | last')
         echo "$metric_name: $newest_data"
     done

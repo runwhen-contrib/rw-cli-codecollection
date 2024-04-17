@@ -1,32 +1,13 @@
 # eks-fargate-cluster-health-issue CodeBundle
-### Tags:`AWS`, `EKS Fargate`, `Cluster Health`, `Potential Issue`, `Developer Report`, `Investigation Required`, `Cloud Services`, `Incident Triage`, 
+### Tags:`AWS`, `EKS Fargate`, `Cluster Health`
 ## CodeBundle Objective:
 This runbook outlines the necessary steps to manage and troubleshoot an EKS Fargate Cluster using the AWS CLI. It provides instructions on how to check the health status of the EKS Fargate Cluster and examine the AWS VPC CNI plugin for potential networking issues. Additionally, it includes guidance on how to debug the EKS Fargate Pod Execution Role. This runbook is an essential guide for maintaining the smooth operation of EKS Fargate Clusters.
 
 ## CodeBundle Inputs:
 
-export CLUSTER_NAME="PLACEHOLDER"
-
-export FARGATE_PROFILE="PLACEHOLDER"
-
-export REGION="PLACEHOLDER"
-
 export AWS_REGION="PLACEHOLDER"
-
-export EKS_CLUSTER_NAME="PLACEHOLDER"
-
-export FARGATE_PROFILE_NAME="PLACEHOLDER"
-
-export PROFILE="PLACEHOLDER"
-
-export LOG_GROUP_NAME="PLACEHOLDER"
-
-export START_TIME="PLACEHOLDER"
-
-export END_TIME="PLACEHOLDER"
-
-export FILTER_PATTERN="PLACEHOLDER"
-
+export AWS_ACCESS_KEY_ID="PLACEHOLDER"
+export AWS_SECRET_ACCESS_KEY="PLACEHOLDER"
 
 ## CodeBundle Tasks:
 ### `Check EKS Fargate Cluster Health Status using aws CLI`
