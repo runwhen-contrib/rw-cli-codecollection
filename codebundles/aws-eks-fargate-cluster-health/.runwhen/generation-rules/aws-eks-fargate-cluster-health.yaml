@@ -1,0 +1,21 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: aws
+  generationRules:
+    - resourceTypes:
+        - aws_eks_fargate_profiles
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: aws-eks-fargate-cluster-health
+          qualifiers: ["resource"]
+          baseTemplateName: aws-eks-fargate-cluster-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: runbook
+              templateName: aws-eks-fargate-cluster-health-taskset.yaml
