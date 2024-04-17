@@ -1,3 +1,6 @@
+## 0.0.13 2024-4-17
+Version lock prior to bash/cli library adjustments.
+
 ## 0.0.12 2024-01-22
 
 ## 0.0.11 2023-12-15
