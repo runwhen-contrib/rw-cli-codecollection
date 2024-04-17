@@ -4,7 +4,8 @@ spec:
   platform: aws
   generationRules:
     - resourceTypes:
-        -  aws_elasticache_serverless_caches
+        - aws_elasticache_serverless_caches
+        - aws_elasticache_clusters 
       matchRules:
         - type: pattern
           pattern: ".+"
