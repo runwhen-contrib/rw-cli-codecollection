@@ -17,5 +17,5 @@ spec:
           levelOfDetail: basic
           outputItems:
             - type: slx
-            - type: runbook
-              templateName: aws-s3-bucket-storage-report-taskset.yaml
+            # - type: runbook
+            #   templateName: aws-s3-bucket-storage-report-taskset.yaml
