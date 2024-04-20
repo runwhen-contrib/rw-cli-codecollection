@@ -172,6 +172,8 @@ def resolve_path_to_robot():
         os.path.join(home, repo_path_to_robot),  # Path relative to HOME
         os.path.join(home, 'collection', repo_path_to_robot),  # Further nested within HOME
         os.path.join("/collection", repo_path_to_robot), # Common collection path
+        os.path.join("/root/", repo_path_to_robot), # Backwards compatible /root
+        os.path.join("/root/collection", repo_path_to_robot), # Backwards compatible /root
     ])
 
     # Try to find the file in any of the specified paths
