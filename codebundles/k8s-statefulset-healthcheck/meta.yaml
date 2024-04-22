@@ -507,23 +507,11 @@ commands:
     -o yaml
   doc_links: '
 
-    - [Retrieve StatefulSet Configuration](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
-
-    - [Labels and Selectors in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
-
-    - [Kubernetes Context](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}'
+    Documentation links not available'
   explanation: This command retrieves the configuration of a stateful set in Kubernetes,
     using specific labels and context, and outputs the details in YAML format within
     a specific namespace.
-  multi_line_details: "\n# This command retrieves the YAML definition of a stateful\
-    \ set in a Kubernetes cluster\n# Replace ${LABELS} with the labels of the stateful\
-    \ set you want to retrieve\n# Replace ${CONTEXT} with the context of your Kubernetes\
-    \ cluster\n# Replace ${NAMESPACE} with the namespace where the stateful set is\
-    \ located\n\nkubectl get statefulset ${LABELS} \\ # Using the kubectl get command\
-    \ to retrieve the stateful set\n  --context=${CONTEXT} \\            # Specifying\
-    \ the context of the Kubernetes cluster\n  -n ${NAMESPACE} \\                \
-    \ # Specifying the namespace where the stateful set is located\n  -o yaml    \
-    \                       # Outputting the result in YAML format\n"
+  multi_line_details: Multi-line script not available
   name: fetch_manifest_details_for_statefulset_statefulset_name
   when_is_it_useful: '1. Troubleshooting a database stateful set that is experiencing
     performance issues or other errors, and needing to review the configuration for

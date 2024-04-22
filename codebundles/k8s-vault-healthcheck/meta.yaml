@@ -397,7 +397,9 @@ commands:
 
     - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [Vault Documentation](https://www.vaultproject.io/docs){:target="_blank"}'
+    - [Vault Documentation](https://www.vaultproject.io/docs){:target="_blank"}
+
+    - [Ignoring Errors in Command Execution](https://tldp.org/LDP/Bash-Beginners-Guide/html/sect_06_02.html){:target="_blank"}'
   explanation: This command retrieves warning events related to the "vault" in a specific
     Kubernetes context and namespace, and it also ignores any errors that may occur
     during the execution.
@@ -437,7 +439,9 @@ commands:
 
     - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [Vault Documentation](https://www.vaultproject.io/docs){:target="_blank"}'
+    - [Vault Documentation](https://www.vaultproject.io/docs){:target="_blank"}
+
+    - [Ignoring Errors in Command Execution](https://tldp.org/LDP/Bash-Beginners-Guide/html/sect_06_02.html){:target="_blank"}'
   explanation: This command retrieves warning events related to the "vault" in a specific
     Kubernetes context and namespace, and it also ignores any errors that may occur
     during the execution.
