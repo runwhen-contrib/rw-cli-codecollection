@@ -214,8 +214,8 @@ Suite Initialization
     ...    type=string
     ...    description=The home path of the runner
     ...    pattern=\w*
-    ...    example=/root
-    ...    default=/root
+    ...    example=/home/runwhen
+    ...    default=/home/runwhen
     ${RW_TASK_TITLES}=    Get Environment Variable    RW_TASK_TITLES    "[]"
     ${RW_TASK_STRING}=    Evaluate    ${RW_TASK_TITLES}    json
     ${RW_TASK_STRING}=    Evaluate    ', '.join(${RW_TASK_STRING})    json
