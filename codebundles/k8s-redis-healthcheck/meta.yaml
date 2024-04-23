@@ -3,15 +3,8 @@ commands:
     -- redis-cli PING
   doc_links: '
 
-    - [redis-cli Command Documentation](https://redis.io/topics/rediscli){:target="_blank"}
-
-    - [Kubernetes kubectl Command Documentation](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
-
-    - [Redis Server Documentation](https://redis.io/documentation){:target="_blank"}'
-  explanation: This command allows you to execute the redis-cli PING command on a
-    specific deployment within a given namespace, using a specified context. It's
-    a way to check if the Redis server is running and responding within a Kubernetes
-    cluster.
+    '
+  explanation: Explanation not available
   multi_line_details: "\n# This command is using kubectl to execute a command inside\
     \ a running container in a Kubernetes deployment.\n# The command being executed\
     \ inside the container is 'redis-cli PING', which checks if the Redis server is\
@@ -19,21 +12,21 @@ commands:
     \ appropriate flags and parameters\nkubectl exec deployment/${DEPLOYMENT_NAME}\
     \ \\\n    --context=${CONTEXT} \\\n    -n ${NAMESPACE} \\\n    -- redis-cli PING\n"
   name: ping_deployment_name_redis_workload
-  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event for a
-    specific Redis deployment to see if the server is running properly and responding
-    to commands.
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events to identify
+    and fix issues related to application crashes or failures in the Kubernetes cluster.
 
-    2. Performing routine health checks on Redis deployments within the Kubernetes
-    cluster to ensure that the servers are operational and responsive.
+    2. Investigating high CPU or memory usage in a Kubernetes pod to optimize resource
+    allocation and improve performance.
 
-    3. Checking the status of the Redis server after a recent deployment or upgrade
-    to ensure that it is functioning as expected within the Kubernetes environment.
+    3. Resolving networking issues within the Kubernetes cluster, such as pod communication
+    or external connectivity problems.
 
-    4. Verifying the status of the Redis server in response to user-reported issues
-    or errors related to data storage or retrieval.
+    4. Analyzing and resolving persistent storage problems in Kubernetes, such as
+    issues with volume mounts or data corruption.
 
-    5. Investigating performance or latency issues within the Kubernetes cluster by
-    inspecting the responsiveness of the Redis servers using the redis-cli PING command.'
+    5. Investigating and addressing security vulnerabilities or compliance issues
+    within the Kubernetes environment, such as improper access controls or outdated
+    software versions.'
 - command: kubectl exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- redis-cli PING
   doc_links: '

@@ -606,141 +606,129 @@ commands:
     Kubernetes cluster, by examining the status and conditions of pods in a specific
     namespace and context.'
 - command: kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT}
-    | xargs -n 1 kubectl get --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}
+    | xargs -n 1 bash -c 'kubectl get $0 --show-kind --ignore-not-found -n ${NAMESPACE}
+    --context=${CONTEXT}'
   doc_links: '
 
-    - [Kubernetes API Concepts](https://kubernetes.io/docs/concepts/){:target="_blank"}
+    - [kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
 
-    - [Kubernetes Namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [Kubectl Command Reference](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
-
-    - [Kubernetes API Endpoints](https://kubernetes.io/docs/concepts/overview/kubernetes-api/){:target="_blank"}'
-  explanation: This command retrieves a list of API resources for a specific context,
-    and then gets the details of each resource in a specified namespace using that
-    context. It's a way to gather information about the available resources within
-    a Kubernetes environment.
+    - [Bash Guide for Beginners](http://tldp.org/LDP/Bash-Beginners-Guide/html/){:target="_blank"}'
+  explanation: This command uses kubectl to list all available API resources in the
+    current Kubernetes context, then it uses xargs and bash to get each resource in
+    the specified namespace.
   multi_line_details: '
 
-    # This command retrieves a list of Kubernetes resources in a specific namespace
-    and context
+    # First, use kubectl to list all the available API resources in the cluster that
+    support the "list" verb and are namespaced
+
+    api_resources=$(kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT})
 
 
-    # First, we use kubectl to list the available resources using the specified verbs
-    and namespace
+    # Then, for each of the listed resources, use xargs to iterate through them one
+    by one and execute the following command
 
-    # We output the resource names using the ''-o name'' flag and specify the context
-    to use
-
-    kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT} |
+    echo $api_resources | xargs -n 1 bash -c '' \
 
 
-    # Next, we use xargs to process each resource name and retrieve detailed information
-    about each resource
+    # Use kubectl to get information about the current resource being processed
 
-    # We use the ''get'' command to show the kind of each resource, ignoring any resources
-    that are not found
-
-    # We also specify the namespace and context to use for each resource
-
-    xargs -n 1 kubectl get --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}
+    kubectl get $0 --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}''
 
     '
   name: get_listing_of_resources_in_namespace_namespace
-  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
-    or Site Reliability Engineer may use this command to gather information about
-    the resources in a specific namespace in order to diagnose and address the root
-    cause of the CrashLoopBackoff events.
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: When
+    a Kubernetes pod enters into a CrashLoopBackoff state, it can indicate an issue
+    with the application''s code, configuration, or underlying infrastructure. DevOps
+    or Site Reliability Engineers may need to use the provided command to identify
+    and understand the resources in the affected namespace to diagnose and resolve
+    the issue.
 
 
-    2. Capacity planning: When planning for future resource needs within a Kubernetes
-    environment, a DevOps or Site Reliability Engineer may want to gather information
-    about the available resources to determine if additional capacity is necessary.
+    2. Monitoring and maintenance: DevOps or Site Reliability Engineers may want to
+    periodically review all available API resources in a specific namespace to ensure
+    that the deployment, services, and other resources are functioning as expected
+    and to identify any potential issues proactively.
 
 
-    3. Performance monitoring: By using this command, a DevOps or Site Reliability
-    Engineer can gather information about the resources in a specific namespace to
-    monitor their performance and identify any potential bottlenecks or inefficiencies.
+    3. Application deployment and updates: Before deploying a new application or updating
+    an existing one in Kubernetes, engineers may use this command to verify the availability
+    and status of all relevant API resources within the specified namespace to ensure
+    a smooth deployment process without any conflicts or disruptions.
 
 
-    4. Troubleshooting application issues: In the event of an application issue within
-    a Kubernetes environment, such as high latency or errors, a DevOps or Site Reliability
-    Engineer may use this command to gather information about the resources related
-    to the affected application for troubleshooting purposes.
+    4. Resource utilization and capacity planning: To monitor resource usage and plan
+    for capacity scaling in a Kubernetes cluster, DevOps or Site Reliability Engineers
+    may use the provided command to gain insights into the current state of API resources
+    within a specific namespace, allowing them to make informed decisions about resource
+    allocation and scaling.
 
 
-    5. Compliance and security auditing: DevOps or Site Reliability Engineers may
-    use this command to gather information about the resources within a Kubernetes
-    environment for compliance and security auditing purposes, ensuring that all resources
-    are properly configured and adhere to security best practices.'
+    5. Troubleshooting and debugging: In the event of unexpected errors or performance
+    issues within a particular namespace, engineers may use this command to quickly
+    inspect and analyze all available API resources, helping them to debug and troubleshoot
+    the problem efficiently.'
 - command: kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT}
-    | xargs -n 1 kubectl get --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}
+    | xargs -n 1 bash -c 'kubectl get $0 --show-kind --ignore-not-found -n ${NAMESPACE}
+    --context=${CONTEXT}'
   doc_links: '
 
-    - [Kubernetes API Concepts](https://kubernetes.io/docs/concepts/){:target="_blank"}
+    - [kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
 
-    - [Kubernetes Namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [Kubectl Command Reference](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
-
-    - [Kubernetes API Endpoints](https://kubernetes.io/docs/concepts/overview/kubernetes-api/){:target="_blank"}'
-  explanation: This command retrieves a list of API resources for a specific context,
-    and then gets the details of each resource in a specified namespace using that
-    context. It's a way to gather information about the available resources within
-    a Kubernetes environment.
+    - [Bash Guide for Beginners](http://tldp.org/LDP/Bash-Beginners-Guide/html/){:target="_blank"}'
+  explanation: This command uses kubectl to list all available API resources in the
+    current Kubernetes context, then it uses xargs and bash to get each resource in
+    the specified namespace.
   multi_line_details: '
 
-    # This command retrieves a list of Kubernetes resources in a specific namespace
-    and context
+    # First, use kubectl to list all the available API resources in the cluster that
+    support the "list" verb and are namespaced
+
+    api_resources=$(kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT})
 
 
-    # First, we use kubectl to list the available resources using the specified verbs
-    and namespace
+    # Then, for each of the listed resources, use xargs to iterate through them one
+    by one and execute the following command
 
-    # We output the resource names using the ''-o name'' flag and specify the context
-    to use
-
-    kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT} |
+    echo $api_resources | xargs -n 1 bash -c '' \
 
 
-    # Next, we use xargs to process each resource name and retrieve detailed information
-    about each resource
+    # Use kubectl to get information about the current resource being processed
 
-    # We use the ''get'' command to show the kind of each resource, ignoring any resources
-    that are not found
-
-    # We also specify the namespace and context to use for each resource
-
-    xargs -n 1 kubectl get --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}
+    kubectl get $0 --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}''
 
     '
   name: get_listing_of_resources_in_namespace_namespace
-  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
-    or Site Reliability Engineer may use this command to gather information about
-    the resources in a specific namespace in order to diagnose and address the root
-    cause of the CrashLoopBackoff events.
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: When
+    a Kubernetes pod enters into a CrashLoopBackoff state, it can indicate an issue
+    with the application''s code, configuration, or underlying infrastructure. DevOps
+    or Site Reliability Engineers may need to use the provided command to identify
+    and understand the resources in the affected namespace to diagnose and resolve
+    the issue.
 
 
-    2. Capacity planning: When planning for future resource needs within a Kubernetes
-    environment, a DevOps or Site Reliability Engineer may want to gather information
-    about the available resources to determine if additional capacity is necessary.
+    2. Monitoring and maintenance: DevOps or Site Reliability Engineers may want to
+    periodically review all available API resources in a specific namespace to ensure
+    that the deployment, services, and other resources are functioning as expected
+    and to identify any potential issues proactively.
 
 
-    3. Performance monitoring: By using this command, a DevOps or Site Reliability
-    Engineer can gather information about the resources in a specific namespace to
-    monitor their performance and identify any potential bottlenecks or inefficiencies.
+    3. Application deployment and updates: Before deploying a new application or updating
+    an existing one in Kubernetes, engineers may use this command to verify the availability
+    and status of all relevant API resources within the specified namespace to ensure
+    a smooth deployment process without any conflicts or disruptions.
 
 
-    4. Troubleshooting application issues: In the event of an application issue within
-    a Kubernetes environment, such as high latency or errors, a DevOps or Site Reliability
-    Engineer may use this command to gather information about the resources related
-    to the affected application for troubleshooting purposes.
+    4. Resource utilization and capacity planning: To monitor resource usage and plan
+    for capacity scaling in a Kubernetes cluster, DevOps or Site Reliability Engineers
+    may use the provided command to gain insights into the current state of API resources
+    within a specific namespace, allowing them to make informed decisions about resource
+    allocation and scaling.
 
 
-    5. Compliance and security auditing: DevOps or Site Reliability Engineers may
-    use this command to gather information about the resources within a Kubernetes
-    environment for compliance and security auditing purposes, ensuring that all resources
-    are properly configured and adhere to security best practices.'
+    5. Troubleshooting and debugging: In the event of unexpected errors or performance
+    issues within a particular namespace, engineers may use this command to quickly
+    inspect and analyze all available API resources, helping them to debug and troubleshoot
+    the problem efficiently.'
 - command: 'kubectl get events --field-selector type!=Warning --context ${CONTEXT}
     -n ${NAMESPACE} -o json > $HOME/events.json && cat $HOME/events.json | jq -r ''[.items[]
     | {namespace: .involvedObject.namespace, kind: .involvedObject.kind, name: ((if

@@ -52,6 +52,16 @@ Somewhat hacky as we're faking ShellResponses. Revisit this.
 
 - `ShellServiceResponse` - _description_
 
+<a id="libraries.RW.CLI.CLI.find_file"></a>
+
+#### find\_file
+
+```python
+def find_file(*paths)
+```
+
+Helper function to check if a file exists in the given paths.
+
 <a id="libraries.RW.CLI.CLI.run_bash_file"></a>
 
 #### run\_bash\_file
