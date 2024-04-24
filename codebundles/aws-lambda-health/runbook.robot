@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       
+Documentation       Scans for AWS Lambda invocation errors
 Metadata            Author    jon-funk
 Metadata            Display Name    AWS Lambda Health Check
 Metadata            Supports    AWS,AWS Lambda
@@ -26,6 +26,15 @@ Analyze AWS Lambda Invocation Errors
     [Tags]  AWS    Lambda    Error Analysis    Invocation Errors    CloudWatch    Logs 
     ${process}=    Run Process    ${CURDIR}/analyze_lambda_invocation_errors.sh    env=${env}
     RW.Core.Add Pre To Report    ${process.stdout}
+    IF    "ERROR" in """${process.stdout}"""
+        RW.Core.Add Issue    title=AWS Lambda Invocation Errors
+        ...    severity=2
+        ...    next_steps=Review Lambda logs for errors.
+        ...    expected=The Lambda function has no invocation errors.
+        ...    actual=The Lambda function has invocation errors.
+        ...    reproduce_hint=Check the AWS Management Console for the status of the Lambda function.
+        ...    details=${process.stdout}
+    END
 
 Monitor AWS Lambda Performance Metrics
     [Documentation]   This script is a bash utility for AWS Lambda functions the lists their notable metrics. This script requires AWS CLI and appropriate permissions to execute the commands.

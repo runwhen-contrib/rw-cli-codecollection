@@ -4,7 +4,7 @@ spec:
   platform: aws
   generationRules:
     - resourceTypes:
-        - aws_eks_fargate_profiles
+        - aws_regions
       matchRules:
         - type: pattern
           pattern: ".+"
@@ -17,5 +17,7 @@ spec:
           levelOfDetail: basic
           outputItems:
             - type: slx
+            - type: sli
+              templateName: aws-eks-fargate-cluster-health-sli.yaml
             - type: runbook
               templateName: aws-eks-fargate-cluster-health-taskset.yaml

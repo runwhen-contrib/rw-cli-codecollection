@@ -5,7 +5,7 @@ spec:
   generationRules:
     - resourceTypes:
         # - aws_elasticache_serverless_caches
-        - aws_elasticache_clusters 
+        - aws_regions 
       matchRules:
         - type: pattern
           pattern: ".+"
@@ -18,5 +18,7 @@ spec:
           levelOfDetail: basic
           outputItems:
             - type: slx
+            - type: sli
+              templateName: aws-elasticache-redis-health-sli.yaml
             - type: runbook
               templateName: aws-elasticache-redis-health-taskset.yaml

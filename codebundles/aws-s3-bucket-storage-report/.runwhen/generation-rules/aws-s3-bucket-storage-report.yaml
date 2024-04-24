@@ -4,7 +4,7 @@ spec:
   platform: aws
   generationRules:
     - resourceTypes:
-        -  aws_s3_buckets
+        -  aws_regions
       matchRules:
         - type: pattern
           pattern: ".+"
@@ -17,3 +17,5 @@ spec:
           levelOfDetail: basic
           outputItems:
             - type: slx
+            - type: runbook
+              templateName: aws-s3-bucket-storage-report-taskset.yaml

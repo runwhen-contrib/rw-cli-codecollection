@@ -7,7 +7,7 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/cloud_functions/cloud_functions.svg
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/aws/s3.png
   alias: AWS S3 in {{match_resource.resource.region}}
   asMeasuredBy: Availability of S3 in {{match_resource.resource.region}}
   configProvided:

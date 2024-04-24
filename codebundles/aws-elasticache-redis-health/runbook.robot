@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       
+Documentation       Checks the health status of Elasticache redis in the given region.
 Metadata            Author    jon-funk
 Metadata            Display Name    ElastiCache Health Check
 Metadata            Supports    AWS, Elasticache, Redis, Service Down
@@ -15,33 +15,28 @@ Library             Process
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Validate AWS Elasticache Redis Configuration
-    [Documentation]   This script is used to retrieve and display the configuration details of an Amazon ElastiCache cluster. It fetches information such as the configuration endpoint, port, replication group ID, number of replicas, engine version, parameter group, and security groups.
+Scan AWS Elasticache Redis Status
+    [Documentation]   Checks the high level metrics and status of the elasticache redis instances in the region.
     [Tags]  AWS Elasticache    configuration endpoint    configuration
-    ${process}=    Run Process    ${CURDIR}/validate_aws_elasticache_redis_config.sh    env=${env}
+    ${process}=    Run Process    ${CURDIR}/analyze_aws_elasticache_redis_metrics.sh    env=${env}
     RW.Core.Add Pre To Report    ${process.stdout}
-    IF    "Snapshot retention limit is set to 0" in ${process.stdout}
+    IF    "Snapshot retention limit is set to 0" in """${process.stdout}"""
         RW.Core.Add Issue    title=Snapshots not configured for Elasticache in region ${AWS_REGION}
         ...    severity=4
-        ...    next_steps=Update the configuration of the Elasticache instance(s) to include a retention limit for snapshots.        
+        ...    next_steps=Update the configuration of the Elasticache instance(s) to include a retention limit for snapshots.      
+        ...    expected=The Elasticache instance(s) should have a retention limit for snapshots.
+        ...    actual=The Elasticache instance(s) does not have a retention limit for snapshots.
+        ...    reproduce_hint=Check the AWS Management Console for the configuration of the Elasticache instance(s).
+        ...    details=${process.stdout}  
     END
-    IF    "is not available" in ${process.stdout}"
+    IF    "is not available" in """${process.stdout}"""
         RW.Core.Add Issue    title=Elasticache instance(s) not available in region ${AWS_REGION}
         ...    severity=2
         ...    next_steps=Review metrics of the Elasticache instance(s) to determine the cause of the issue.
-        
-    END
-
-Analyze AWS Elasticache Redis Metrics
-    [Documentation]   This script is used to analyze and monitor various aspects of an AWS ElastiCache Redis cluster. It retrieves and displays metrics related to CPU utilization, replication, persistence, performance, security, and overall cluster management.
-    [Tags]  aws    cloudwatch    metrics    elasticache    redis
-    ${process}=    Run Process    ${CURDIR}/analyze_aws_elasticache_redis_metrics.sh    env=${env}
-    RW.Core.Add Pre To Report    ${process.stdout}
-    IF    "" in ${process.stdout}
-        RW.Core.Add Issue
-        ...    title=ElastiCache Instance(s) in region ${AWS_REGION} have events occuring
-        ...    severity=3
-        ...    next_steps=Review ElastiCache event logs.
+        ...    expected=The Elasticache instance(s) should be available in the specified region.
+        ...    actual=The Elasticache instance(s) is not available in the specified region.
+        ...    reproduce_hint=Check the AWS Management Console for the status of the Elasticache instance(s).
+        ...    details=${process.stdout}
     END
 
 # TODO: discuss vpc topology and ec2 bastion access for aws redis elasticache

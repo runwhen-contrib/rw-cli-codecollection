@@ -1,8 +1,8 @@
 *** Settings ***
-Documentation       Monitors the health status of elasticache redis in the AWS region.
+Documentation       Monitor AWS Lambda Invocation Errors
 Metadata            Author    jon-funk
-Metadata            Display Name    ElastiCache Health Monitor
-Metadata            Supports    AWS, Elasticache, Redis
+Metadata            Display Name    AWS Lambda Health Monitor
+Metadata            Supports    AWS,AWS Lambda
 Metadata            Builder
 
 Library             BuiltIn
@@ -15,18 +15,15 @@ Library             Process
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Scan ElastiCaches
-    [Documentation]   Performs a broad health scan of all Elasticache instances in the region.
-    [Tags]  bash script    AWS Elasticache    Health
-    ${process}=    Run Process    ${CURDIR}/redis_status_scan.sh    env=${env}
-    Log    ${process.stdout}
-    Log    ${process.stderr}
-    IF    ${process.rc} != 0
+Analyze AWS Lambda Invocation Errors
+    [Documentation]   This bash script is designed to analyze AWS Lambda Invocation Errors for a specified function within a specified region. It fetches the last 50 invocation errors from the AWS CloudWatch logs and prints them. If no errors are found, it prints a message stating that no invocation errors were found for the function. It requires AWS CLI and jq to be installed and properly configured.
+    [Tags]  AWS    Lambda    Error Analysis    Invocation Errors    CloudWatch    Logs 
+    ${process}=    Run Process    ${CURDIR}/analyze_lambda_invocation_errors.sh    env=${env}
+    IF    "ERROR" in """${process.stdout}"""
         RW.Core.Push Metric    0
     ELSE
         RW.Core.Push Metric    1
     END
-
 
 *** Keywords ***
 Suite Initialization
