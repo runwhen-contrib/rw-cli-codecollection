@@ -4,7 +4,7 @@ spec:
   platform: aws
   generationRules:
     - resourceTypes:
-        - aws_regions
+        - aws_eks_fargate_profiles
       matchRules:
         - type: pattern
           pattern: ".+"

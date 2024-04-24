@@ -4,7 +4,7 @@ spec:
   platform: aws
   generationRules:
     - resourceTypes:
-        -  aws_regions
+        -  aws_lambda_functions
       matchRules:
         - type: pattern
           pattern: ".+"
@@ -17,5 +17,7 @@ spec:
           levelOfDetail: basic
           outputItems:
             - type: slx
+            - type: sli
+              templateName: aws-lambda-health-sli.yaml
             - type: runbook
               templateName: aws-lambda-health-taskset.yaml

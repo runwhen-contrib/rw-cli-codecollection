@@ -5,7 +5,7 @@ spec:
   generationRules:
     - resourceTypes:
         # - aws_elasticache_serverless_caches
-        - aws_regions 
+        - aws_elasticache_clusters 
       matchRules:
         - type: pattern
           pattern: ".+"
