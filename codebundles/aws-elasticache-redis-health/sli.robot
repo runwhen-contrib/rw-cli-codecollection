@@ -1,7 +1,7 @@
 *** Settings ***
 Documentation       Monitors the health status of elasticache redis in the AWS region.
 Metadata            Author    jon-funk
-Metadata            Display Name    ElastiCache Health Monitor
+Metadata            Display Name    AWS ElastiCache Health Monitor
 Metadata            Supports    AWS, Elasticache, Redis
 Metadata            Builder
 

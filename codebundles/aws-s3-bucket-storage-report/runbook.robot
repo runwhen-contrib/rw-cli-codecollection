@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       
+Documentation       Generates a report for S3 buckets in a AWS region
 Metadata            Author    jon-funk
 Metadata            Display Name    AWS S3 Bucket Info Report
 Metadata            Supports    AWS, S3 Bucket
