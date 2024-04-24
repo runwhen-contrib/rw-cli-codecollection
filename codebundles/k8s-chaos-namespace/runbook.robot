@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       
+Documentation       Provides chaos injection tasks for Kubernetes namespaces. These are destructive tasks and the expectation is that you can heal these changes by enabling your GitOps reconciliation.
 Metadata            Author    jon-funk
 Metadata            Display Name    Kubernetes Namespace Chaos Engineering
 Metadata            Supports    Kubernetes    Chaos Engineering    Namespace
