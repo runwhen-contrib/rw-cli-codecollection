@@ -13,6 +13,8 @@ for pod_name in $POD_NAMES; do
     if (( RANDOM % 2 == 0 )); then
         # Delete the pod
         kubectl delete $pod_name -n $NAMESPACE
+        echo "Waiting between deletions..."
+        sleep 3
         # Increment the deleted count
         ((deleted_count++))
     fi

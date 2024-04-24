@@ -27,13 +27,6 @@ Test Node Drain
     ${process}=    Run Process    ${CURDIR}/drain_node.sh    env=${env}
     RW.Core.Add Pre To Report    ${process.stdout}
 
-# TODO
-# Fill Empty Dir
-#     [Documentation]   Selects a random deployment and fills the emptyDir volume with random data
-#     [Tags]  Kubernetes    Volumes    EmptyDir    Data
-#     ${process}=    Run Process    ${CURDIR}/drain_node.sh    env=${env}
-#     RW.Core.Add Pre To Report    ${process.stdout}
-
 Mangle Service Selector
     [Documentation]   Breaks a service's label selector to cause a network disruption
     [Tags]  Kubernetes    networking    Services    Selector
@@ -47,6 +40,12 @@ Mangle Service Port
     Log    ${process.stderr}
     RW.Core.Add Pre To Report    ${process.stdout}
 
+Fill Pod Tmp
+    [Documentation]   Attaches to a pod and fills the /tmp directory with random data
+    [Tags]  Kubernetes    pods    volumes    tmp
+    ${process}=    Run Process    ${CURDIR}/expand_tmp.sh    env=${env}
+    Log    ${process.stderr}
+    RW.Core.Add Pre To Report    ${process.stdout}
 
 *** Keywords ***
 Suite Initialization
