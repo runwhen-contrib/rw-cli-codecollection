@@ -15,6 +15,6 @@ spec:
     value: SLX_PLACEHOLDER
   owners:
   - {{workspace.owner_email}}
-  statement: EKS Fargate Nodes {{match_resource.resource.region}} should be available.
+  statement: EKS Fargate Nodes in {{match_resource.resource.region}} should be available.
   additionalContext:
     region: "{{match_resource.resource.region}}"
