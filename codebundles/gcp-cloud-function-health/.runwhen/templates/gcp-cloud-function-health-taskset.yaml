@@ -7,8 +7,7 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  locations:
-    - {{default_location}}
+  location: {{default_location}}
   description: Runs tasks to triage unhealthy GCP Cloud Functions 
   codeBundle:
     {% if repo_url %}
