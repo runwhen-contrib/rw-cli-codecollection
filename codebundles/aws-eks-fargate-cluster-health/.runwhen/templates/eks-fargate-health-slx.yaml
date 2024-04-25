@@ -17,4 +17,4 @@ spec:
   - {{workspace.owner_email}}
   statement: EKS Fargate Nodes {{match_resource.resource.region}} should be available.
   additionalContext:
-    project: "{{match_resource.resource.region}}"
+    region: "{{match_resource.resource.region}}"
