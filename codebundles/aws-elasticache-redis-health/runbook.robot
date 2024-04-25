@@ -2,7 +2,7 @@
 Documentation       Checks the health status of Elasticache redis in the given region.
 Metadata            Author    jon-funk
 Metadata            Display Name    AWS ElastiCache Health Check
-Metadata            Supports    AWS, Elasticache, Redis
+Metadata            Supports    AWS Elasticache Redis
 Metadata            Builder
 
 Library             BuiltIn

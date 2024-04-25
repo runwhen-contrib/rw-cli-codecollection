@@ -2,7 +2,7 @@
 Documentation       Checks the health status of EKS / Fargate clusters in the given AWS region.
 Metadata            Author    jon-funk
 Metadata            Display Name    AWS EKS Fargate Cluster Health
-Metadata            Supports    AWS,EKS,Fargate
+Metadata            Supports    AWS EKS Fargate
 Metadata            Builder
 
 Library             BuiltIn
