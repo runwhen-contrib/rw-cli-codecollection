@@ -1,7 +1,7 @@
 *** Settings ***
-Documentation       Check the health of pods deployed by cert-manager.
-Metadata            Author    jon-funk
-Metadata            Display Name    Kubernetes CertManager Healthcheck
+Documentation       Counts the number of unhealthy cert-manager managed certificates in a namespace.
+Metadata            Author    stewartshea
+Metadata            Display Name    Kubernetes cert-manager Healthcheck
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 
 Library             BuiltIn
@@ -14,40 +14,24 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Get Health Score of CertManager Workloads
-    [Documentation]    Returns a score of 1 when all cert-manager pods are healthy, or 0 otherwise.
-    [Tags]    pods    containers    running    status    count    health    certmanager    cert
-    # count expired certs
+Count Unready and Expired Certificates
+    [Documentation]    Adds together the count of unready and expired certificates. A healthy SLI value is 0.
+    [Tags]    certificate    status    count    health    certmanager    cert
+
+    # Count expired certs
     ${expired_certs}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get --context=${CONTEXT} --all-namespaces certificates -ojson | jq '[.items[] | select(.status.notAfter != null) | {notAfter: .status.notAfter} | .notAfter |= (gsub("[-:TZ]"; "") | strptime("%Y%m%d%H%M%S") | mktime) | select(.notAfter < now)] | length'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get --context=${CONTEXT} -n ${NAMESPACE} certificates.cert-manager.io -ojson | jq '[.items[] | select(.status.notAfter != null) | {notAfter: .status.notAfter} | .notAfter |= (gsub("[-:TZ]"; "") | strptime("%Y%m%d%H%M%S") | mktime) | select(.notAfter < now)] | length'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ${ec_count}=    Set Variable    ${expired_certs.stdout}
-    ${ec_health_score}=    Set Variable    1
-    IF    isinstance($ec_count, int) and $ec_count > 0
-        ${ec_health_score}=    Evaluate    0.5 / ${ec_count}
-    ELSE
-        ${ec_health_score}=    Set Variable    0.5
-    END
-    # check certmanager workloads healthy
-    ${cm_pods}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} -ojson
+    ${expired_count}=    Convert To Number    ${expired_certs.stdout}
+    # Count unready certificates
+    ${unready_certs}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get --context=${CONTEXT} -n ${NAMESPACE} certificates.cert-manager.io -ojson | jq '[.items[] | select(.status.conditions[] | select(.type == "Ready" and .status == "False"))] | length'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ${not_ready_count}=    RW.CLI.Parse Cli Json Output
-    ...    rsp=${cm_pods}
-    ...    extract_path_to_var__cm_stats=items[].{name:metadata.name, containers_ready:status.containerStatuses[].ready, containers_started:status.containerStatuses[].started}
-    ...    from_var_with_path__cm_stats__to__not_ready_containers=length([].containers_ready[?@ == `false`][])
-    ...    assign_stdout_from_var=not_ready_containers
-    ${not_started_count}=    RW.CLI.Parse Cli Json Output
-    ...    rsp=${cm_pods}
-    ...    extract_path_to_var__cm_stats=items[].{name:metadata.name, containers_ready:status.containerStatuses[].ready, containers_started:status.containerStatuses[].started}
-    ...    from_var_with_path__cm_stats__to__not_started_containers=length([].containers_started[?@ == `false`][])
-    ...    assign_stdout_from_var=not_started_containers
-    ${not_ready_count}=    Convert to Number    ${not_ready_count.stdout}
-    ${not_started_count}=    Convert to Number    ${not_started_count.stdout}
-    ${cm_health_score}=    Evaluate    0.5 if ${not_ready_count} == 0 and ${not_started_count} == 0 else 0
-    ${metric}=    Evaluate    ${cm_health_score} + ${ec_health_score}
+    ${unready_count}=    Convert To Number    ${unready_certs.stdout}
+
+    ${metric}=    Evaluate    ${expired_count} + ${unready_count}
     RW.Core.Push Metric    ${metric}
 
 
@@ -59,10 +43,6 @@ Suite Initialization
     ...    description=The kubernetes kubeconfig yaml containing connection configuration used to connect to cluster(s).
     ...    pattern=\w*
     ...    example=For examples, start here https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
-    ${kubectl}=    RW.Core.Import Service    kubectl
-    ...    description=The location service used to interpret shell commands.
-    ...    default=kubectl-service.shared
-    ...    example=kubectl-service.shared
     ${NAMESPACE}=    RW.Core.Import User Variable
     ...    NAMESPACE
     ...    type=string
@@ -92,7 +72,6 @@ Suite Initialization
     ...    default=kubectl
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
-    Set Suite Variable    ${kubectl}    ${kubectl}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
