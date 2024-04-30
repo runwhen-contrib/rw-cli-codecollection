@@ -41,7 +41,7 @@ Get Namespace Certificate Summary for Namespace `${NAMESPACE}`
 
 Find Unhealthy Certificates in Namespace `${NAMESPACE}`
     [Documentation]    Gets a list of certmanager certificates are not available.
-    [Tags]    tls    certificates    kubernetes    certmanager
+    [Tags]    tls    certificates    kubernetes    certmanager    failed
     ${unready_certs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get --context=${CONTEXT} -n ${NAMESPACE} certificates.cert-manager.io -ojson | jq '[.items[] | select(.status.conditions[] | select(.type == "Ready" and .status == "False"))]'
     ...    env=${env}
