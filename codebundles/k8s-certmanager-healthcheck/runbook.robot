@@ -53,7 +53,7 @@ Find Unhealthy Certificates in Namespace `${NAMESPACE}`
             ...    severity=3
             ...    expected=Certificates should be ready `${NAMESPACE}`
             ...    actual=Certificates in namespace `${NAMESPACE}` are not ready.
-            ...    title= Certificate `${item["metadata"]["name"]}` is not ready in namespace `${NAMESPACE}`.
+            ...    title= Certificate `${item["metadata"]["name"]}` is not available in namespace `${NAMESPACE}`.
             ...    reproduce_hint=${unready_certs.cmd}
             ...    details=${item}
             ...    next_steps=Find Failed Certificate Requests and Identify Issues for Namespace `${NAMESPACE}` \nCheck Logs for Cert-Manager Deployment in Cluster `${CONTEXT}`
