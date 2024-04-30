@@ -131,6 +131,50 @@ commands:
     handshake failures, DevOps or Site Reliability Engineers might use this command
     to gather details about the certificates in use, including their renewal and expiration
     times, to identify any potential causes of the issues.'
+- command: kubectl get --context=${CONTEXT} -n ${NAMESPACE} certificates.cert-manager.io
+    -ojson | jq '[.items[] | select(.status.conditions[] | select(.type == "Ready"
+    and .status == "False"))]'
+  doc_links: '
+
+    - [Cert-manager documentation](https://cert-manager.io/docs/){:target="_blank"}
+
+    - [Kubernetes namespace documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+
+    - [Kubernetes context documentation](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}
+
+    - [jq documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command retrieves information about certificates managed by cert-manager
+    in the specified namespace and context, then uses jq to filter the results to
+    only show certificates that are not ready.
+  multi_line_details: "\n# Set the kubectl context to the specified value for better\
+    \ clarity\n# and if multiple contexts are available in the Kubernetes configuration\n\
+    # file, this ensures that we're working with the correct cluster\nCONTEXT=${CONTEXT}\n\
+    \n# Set the namespace where the certificates are located to perform \n# operations\
+    \ specific to that namespace without affecting other resources\nNAMESPACE=${NAMESPACE}\n\
+    \n# Utilize kubectl to fetch the certificate resources from the specified\n# context\
+    \ and namespace, and then output the result as JSON\ncertificatesJSON=$(kubectl\
+    \ get --context=${CONTEXT} -n ${NAMESPACE} certificates.cert-manager.io -ojson)\n\
+    \n# Parse the JSON output using jq to select only the items where the\n# status\
+    \ conditions indicate the certificate is not ready (status = \"False\")\nnotReadyCertificates=$(echo\
+    \ $certificatesJSON | jq '[.items[] | select(.status.conditions[] | select(.type\
+    \ == \"Ready\" and .status == \"False\"))]')\n"
+  name: find_unhealthy_certificates_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting issues with SSL/TLS certificates in a Kubernetes
+    cluster, such as expired or invalid certificates causing communication failures.
+
+    2. Investigating and resolving connectivity issues between pods or services within
+    a Kubernetes cluster, potentially related to network policies or routing problems.
+
+    3. Identifying and addressing performance issues within the Kubernetes cluster,
+    such as high resource utilization or slow response times for applications.
+
+    4. Monitoring and managing the overall health and availability of applications
+    running in the Kubernetes cluster, including identifying and addressing any CrashLoopBackoff
+    events.
+
+    5. Ensuring compliance with security and governance requirements by verifying
+    that all certificates managed by cert-manager are in a ready state and valid for
+    use.'
 - command: 'kubectl get certificaterequests.cert-manager.io --context=${CONTEXT} -n
     ${NAMESPACE} -o json | jq -r ''.items[] | select(.status.conditions[] | select(.type
     == "Ready" and .status != "True")) | {certRequest: .metadata.name, certificate:
