@@ -1,8 +1,8 @@
 *** Settings ***
 Documentation       This taskset checks that your cert manager certificates are renewing as expected, raising issues when they are past due in the configured namespace
-Metadata            Author    jon-funk
+Metadata            Author    stewartshea
 Metadata            Display Name    Kubernetes CertManager Healthcheck
-Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,CertManager
+Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,cert-manager
 
 Library             BuiltIn
 Library             RW.Core
@@ -19,7 +19,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Get Namespace Certificate Summary for Namespace `${NAMESPACE}`
     [Documentation]    Gets a list of certmanager certificates that are due for renewal and summarize their information for review.
-    [Tags]    tls    certificates    kubernetes    objects    expiration    summary    certmanager    ${namespace}
+    [Tags]    tls    certificates    kubernetes    objects    expiration    summary    certmanager
     ${cert_info}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get certificates.cert-manager.io --context=${CONTEXT} -n ${NAMESPACE} -ojson | jq -r --arg now "$(date +%Y-%m-%dT%H:%M:%SZ)" '.items[] | select(.status.conditions[] | select(.type == "Ready" and .status == "True")) | select(.status.renewalTime) | select((.status.notAfter | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime) <= ($now | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime)) | "Namespace:" + .metadata.namespace + " URL:" + .spec.dnsNames[0] + " Renews:" + .status.renewalTime + " Expires:" + .status.notAfter'
     ...    show_in_rwl_cheatsheet=true
@@ -40,6 +40,8 @@ Get Namespace Certificate Summary for Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Find Unhealthy Certificates in Namespace `${NAMESPACE}`
+    [Documentation]    Gets a list of certmanager certificates are not available.
+    [Tags]    tls    certificates    kubernetes    certmanager
     ${unready_certs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get --context=${CONTEXT} -n ${NAMESPACE} certificates.cert-manager.io -ojson | jq '[.items[] | select(.status.conditions[] | select(.type == "Ready" and .status == "False"))]'
     ...    env=${env}
