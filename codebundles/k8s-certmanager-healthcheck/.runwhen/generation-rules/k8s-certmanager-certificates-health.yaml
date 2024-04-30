@@ -17,5 +17,6 @@ spec:
         outputItems:
           - type: slx
           - type: sli
+          - type: slo
           - type: runbook
             templateName: k8s-certmanager-certificate-health-taskset.yaml
