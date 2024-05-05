@@ -10,6 +10,7 @@
 * [k8s-vault-healthcheck](codebundles/k8s-vault-healthcheck/README.md)
 * [k8s-ingress-gce-healthcheck](codebundles/k8s-ingress-gce-healthcheck/README.md)
 * [k8s-statefulset-healthcheck](codebundles/k8s-statefulset-healthcheck/README.md)
+* [k8s-cluster-resource-health](codebundles/k8s-cluster-resource-health/README.md)
 * [k8s-ingress-healthcheck](codebundles/k8s-ingress-healthcheck/README.md)
 * [azure-loadbalancer-triage](codebundles/azure-loadbalancer-triage/README.md)
 * [k8s-pvc-healthcheck](codebundles/k8s-pvc-healthcheck/README.md)
