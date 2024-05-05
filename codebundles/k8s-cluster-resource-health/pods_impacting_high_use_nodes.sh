@@ -35,8 +35,6 @@ process_nodes_and_usage() {
 
 
 # Fetch pod resource requests
-# ${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} --all-namespaces -o json | jq -r '.items[] | {namespace: .metadata.namespace, pod: .metadata.name, nodeName: .spec.nodeName, cpu_request: (.spec.containers[].resources.requests.cpu // "0"), memory_request: (.spec.containers[].resources.requests.memory // "0")} | select(.cpu_request or .memory_request)' | jq -s '.' > pod_requests.json
-# Fetch pod resource requests
 ${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} --all-namespaces -o json | jq -r '.items[] | {namespace: .metadata.namespace, pod: .metadata.name, nodeName: .spec.nodeName, cpu_request: (.spec.containers[].resources.requests.cpu // "0m"), memory_request: (.spec.containers[].resources.requests.memory // "0Mi")} | select(.cpu_request != "0m" and .memory_request != "0Mi")' | jq -s '.' > pod_requests.json
 
 
