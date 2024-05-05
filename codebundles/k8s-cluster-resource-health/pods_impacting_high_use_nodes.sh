@@ -35,39 +35,15 @@ process_nodes_and_usage() {
 
 
 # Fetch pod resource requests
-${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} --all-namespaces -o json | jq -r '.items[] | {namespace: .metadata.namespace, pod: .metadata.name, nodeName: .spec.nodeName, cpu_request: (.spec.containers[].resources.requests.cpu // "0"), memory_request: (.spec.containers[].resources.requests.memory // "0")} | select(.cpu_request or .memory_request)' | jq -s '.' > pod_requests.json
+# ${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} --all-namespaces -o json | jq -r '.items[] | {namespace: .metadata.namespace, pod: .metadata.name, nodeName: .spec.nodeName, cpu_request: (.spec.containers[].resources.requests.cpu // "0"), memory_request: (.spec.containers[].resources.requests.memory // "0")} | select(.cpu_request or .memory_request)' | jq -s '.' > pod_requests.json
+# Fetch pod resource requests
+${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} --all-namespaces -o json | jq -r '.items[] | {namespace: .metadata.namespace, pod: .metadata.name, nodeName: .spec.nodeName, cpu_request: (.spec.containers[].resources.requests.cpu // "0m"), memory_request: (.spec.containers[].resources.requests.memory // "0Mi")} | select(.cpu_request != "0m" and .memory_request != "0Mi")' | jq -s '.' > pod_requests.json
+
 
 
 # Fetch current pod metrics
 ${KUBERNETES_DISTRIBUTION_BINARY} top pods --context ${CONTEXT} --all-namespaces --containers | awk 'BEGIN { printf "[" } NR>1 { printf "%s{\"namespace\":\"%s\",\"pod\":\"%s\",\"container\":\"%s\",\"cpu_usage\":\"%s\",\"memory_usage\":\"%s\"}", (NR>2 ? "," : ""), $1, $2, $3, $4, $5 } END { printf "]" }' | jq '.' > pod_usage.json
 
-
-# # Read high-use nodes into an array
-# high_use_nodes=$(process_nodes_and_usage)
-
-# # Create or clear the output file
-# > output.json
-
-# # Loop through each high-use node
-# for node in "${high_use_nodes[@]}"
-# do
-
-#   # Use jq to filter matching pods and combine their request and usage data
-#   jq --arg node "$node" --slurpfile usage pod_usage.json '
-#     .[] | select(.nodeName == $node) as $pod |
-#     ($usage[0][] | select(.pod == $pod.pod and .namespace == $pod.namespace)) |
-#     {
-#       pod: $pod.pod,
-#       node: $node,
-#       namespace: $pod.namespace,
-#       cpuUsage: .cpu_usage,
-#       memoryUsage: .memory_usage,
-#       cpuRequest: $pod.cpu_request,
-#       memoryRequest: $pod.memory_request
-#     }
-#   ' pod_requests.json >> output.json
-
-# done
 
 
 # Normalize units and compare
@@ -120,56 +96,5 @@ jq -s '[
     }
     | select(.cpu_usage_exceeds or .memory_usage_exceeds)
 ] | group_by(.namespace) | map({(.[0].namespace): .}) | add' pod_usage.json pod_requests.json > pods_exceeding_requests.json
-
-# # Normalize units and compare
-# jq -s '[
-#     .[0][] as $usage | 
-#     .[1][] | 
-#     select(.pod == $usage.pod and .namespace == $usage.namespace) |
-#     {
-#         pod: .pod,
-#         namespace: .namespace,
-#         node: .nodeName,
-#         cpu_usage: $usage.cpu_usage,
-#         cpu_request: .cpu_request,
-#         cpu_usage_exceeds: (
-#             # Convert CPU usage to millicores, assuming all inputs need to be converted from milli-units if they end with 'm'
-#             ($usage.cpu_usage | 
-#                 if test("m$") then rtrimstr("m") | tonumber 
-#                 else tonumber * 1000 
-#                 end
-#             ) > (
-#                 # Convert CPU request to millicores, assuming it may already be in millicores if it ends with 'm'
-#                 .cpu_request | 
-#                 if test("m$") then rtrimstr("m") | tonumber 
-#                 else tonumber * 1000 
-#                 end
-#             )
-#         ),
-#         memory_usage: $usage.memory_usage,
-#         memory_request: .memory_request,
-#         memory_usage_exceeds: (
-#             # Normalize memory usage to MiB, handling MiB and GiB
-#             ($usage.memory_usage | 
-#                 if test("Gi$") then rtrimstr("Gi") | tonumber * 1024
-#                 elif test("G$") then rtrimstr("G") | tonumber * 1024
-#                 elif test("Mi$") then rtrimstr("Mi") | tonumber
-#                 elif test("M$") then rtrimstr("M") | tonumber
-#                 else tonumber
-#                 end
-#             ) > (
-#                 # Normalize memory request to MiB
-#                 .memory_request | 
-#                 if test("Gi$") then rtrimstr("Gi") | tonumber * 1024
-#                 elif test("G$") then rtrimstr("G") | tonumber * 1024
-#                 elif test("Mi$") then rtrimstr("Mi") | tonumber
-#                 elif test("M$") then rtrimstr("M") | tonumber
-#                 else tonumber
-#                 end
-#             )
-#         )
-#     }
-#     | select(.cpu_usage_exceeds or .memory_usage_exceeds)
-# ]' pod_usage.json pod_requests.json > pods_exceeding_requests.json
 
 cat pods_exceeding_requests.json
