@@ -3,7 +3,7 @@
 # Define Kubernetes binary and context with dynamic defaults
 KUBERNETES_DISTRIBUTION_BINARY="${KUBERNETES_DISTRIBUTION_BINARY:-kubectl}" # Default to 'kubectl' if not set in the environment
 DEFAULT_CONTEXT=$(${KUBERNETES_DISTRIBUTION_BINARY} config current-context)
-CONTEXT="${KUBE_CONTEXT:-$DEFAULT_CONTEXT}" # Use environment variable or the current context from kubectl
+CONTEXT="${CONTEXT:-$DEFAULT_CONTEXT}" # Use environment variable or the current context from kubectl
 
 process_nodes_and_usage() {
     # Get Node Details including allocatable resources
