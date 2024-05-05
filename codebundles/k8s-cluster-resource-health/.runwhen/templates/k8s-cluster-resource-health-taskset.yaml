@@ -19,12 +19,10 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/k8s-image-check/runbook.robot
+    pathToRobot: codebundles/k8s-cluster-resource-health/runbook.robot
   configProvided:
-    - name: NAMESPACE
-      value: '{{match_resource.resource.metadata.name}}'
     - name: CONTEXT
-      value: {{context}}
+      value: "{{cluster.context}}"
     - name: KUBERNETES_DISTRIBUTION_BINARY
       value: {{custom.kubernetes_distribution_binary}}
   secretsProvided:

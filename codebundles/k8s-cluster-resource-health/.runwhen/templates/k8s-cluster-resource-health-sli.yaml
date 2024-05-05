@@ -1,5 +1,5 @@
 apiVersion: runwhen.com/v1
-kind: Runbook
+kind: ServiceLevelIndicator
 metadata:
   name: {{slx_name}}
   labels:
@@ -7,7 +7,11 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  location: {{default_location}}
+  displayUnitsLong: OK
+  displayUnitsShort: ok
+  locations:
+    - {{ default_location }}
+  description: Measures the response code and latency to the AKS LoadBalancer Object.
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -19,12 +23,12 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/k8s-image-check/runbook.robot
+    pathToRobot: codebundles/k8s-cluster-resource-health/sli.robot
+  intervalStrategy: intermezzo
+  intervalSeconds: 30
   configProvided:
-    - name: NAMESPACE
-      value: '{{match_resource.resource.metadata.name}}'
     - name: CONTEXT
-      value: {{context}}
+      value: "{{cluster.context}}"
     - name: KUBERNETES_DISTRIBUTION_BINARY
       value: {{custom.kubernetes_distribution_binary}}
   secretsProvided:
