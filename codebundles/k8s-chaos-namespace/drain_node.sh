@@ -1,5 +1,4 @@
 #!/bin/bash
-source ./auth.sh
 
 # Check if the service account has the necessary permissions
 if ! kubectl auth can-i create nodes; then

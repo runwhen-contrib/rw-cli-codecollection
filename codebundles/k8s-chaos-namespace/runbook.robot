@@ -7,6 +7,7 @@ Metadata            Builder
 
 Library             BuiltIn
 Library             RW.Core
+Library             RW.CLI
 Library             RW.platform
 Library             OperatingSystem
 Library             String
@@ -18,38 +19,46 @@ Suite Setup         Suite Initialization
 Test Namespace Highly Available
     [Documentation]   Randomly selects up to 10 pods in a namespace to delete to test HA
     [Tags]  Kubernetes    Namespace    Deployments    Pods    Highly Available 
-    ${process}=    Run Process    ${CURDIR}/delete_random_pods.sh    env=${env}
+    ${process}=    RW.CLI.Run Bash File    delete_random_pods.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ${process.stdout}
 
 Test Node Drain
     [Documentation]   Drains a random node to check disruption handling
     [Tags]  Kubernetes    Nodes    Drain    Disruption
-    ${process}=    Run Process    ${CURDIR}/drain_node.sh    env=${env}
+    ${process}=    RW.CLI.Run Bash File    drain_node.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ${process.stdout}
 
 Mangle Service Selector
     [Documentation]   Breaks a service's label selector to cause a network disruption
     [Tags]  Kubernetes    networking    Services    Selector
-    ${process}=    Run Process    ${CURDIR}/change_service_selector.sh    env=${env}
+    ${process}=    RW.CLI.Run Bash File    change_service_selector.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ${process.stdout}
 
 Mangle Service Port
     [Documentation]   Changes a service's port to cause a network disruption
     [Tags]  Kubernetes    networking    Services    Port
-    ${process}=    Run Process    ${CURDIR}/change_service_port.sh    env=${env}
-    Log    ${process.stderr}
+    ${process}=    RW.CLI.Run Bash File    change_service_port.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ${process.stdout}
 
 Fill Pod Tmp
     [Documentation]   Attaches to a pod and fills the /tmp directory with random data
     [Tags]  Kubernetes    pods    volumes    tmp
-    ${process}=    Run Process    ${CURDIR}/expand_tmp.sh    env=${env}
-    Log    ${process.stderr}
+    ${process}=    RW.CLI.Run Bash File    expand_tmp.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ${process.stdout}
 
 *** Keywords ***
 Suite Initialization
-    ${KUBECONFIG}=    RW.Core.Import Secret     KUBECONFIG
+    ${kubeconfig}=    RW.Core.Import Secret     kubeconfig
     ...    type=string
     ...    description=The kubeconfig secret to use for authenticating with the cluster.
     ...    pattern=\w*
@@ -62,12 +71,11 @@ Suite Initialization
     ...    description=The namespace to target for scripts.
     ...    pattern=\w*
 
-    Set Suite Variable    ${KUBECONFIG}    ${KUBECONFIG.value}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
-
+    Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable
     ...    &{env}
-    ...    KUBECONFIG=${KUBECONFIG}
+    ...    KUBECONFIG=${kubeconfig.key}
     ...    CONTEXT=${CONTEXT}
     ...    NAMESPACE=${NAMESPACE}

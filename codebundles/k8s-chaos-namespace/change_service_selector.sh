@@ -1,5 +1,4 @@
 #!/bin/bash
-source ./auth.sh
 
 # Environment Variables:
 # NAMESPACE
