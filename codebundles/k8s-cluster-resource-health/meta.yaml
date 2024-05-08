@@ -2,6 +2,8 @@ commands:
 - command: bash 'get_high_use_nodes.sh'
   doc_links: '
 
+    - [Bash scripting tutorial](https://www.gnu.org/software/bash/manual/bash.html){:target="_blank"}
+
     - [Analyzing resource usage in Kubernetes](https://kubernetes.io/docs/tasks/debug-application-cluster/resource-usage-monitoring/){:target="_blank"}'
   explanation: This script is a bash script used to gather and analyze resource allocation
     and usage data for nodes in a Kubernetes cluster. It retrieves information about
