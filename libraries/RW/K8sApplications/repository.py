@@ -278,6 +278,7 @@ class Repository:
         # logger.info(f"{test.stdout}::{test.stderr}")
         if not os.path.exists(f"{self.clone_directory}/.git"):
             # Execute the Git clone command with the modified URI
+            gitcmd = None
             try:
                 gitcmd = subprocess.run(
                     [
