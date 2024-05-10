@@ -9,9 +9,8 @@ metadata:
 spec:
   displayUnitsLong: OK
   displayUnitsShort: ok
-  locations:
-    - {{default_location}}
-  description: Measures EKS Fargate status in the region.
+  location: {{default_location}}
+  description: Measures EKS status in the region.
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -23,7 +22,7 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/aws-eks-fargate-cluster-health/sli.robot
+    pathToRobot: codebundles/aws-eks-cluster-health/sli.robot
   intervalStrategy: intermezzo
   intervalSeconds: 300
   configProvided:

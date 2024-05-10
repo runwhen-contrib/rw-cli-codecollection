@@ -7,9 +7,8 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  locations:
-    - {{default_location}}
-  description: Generates a report for EKS Fargate profiles and a summary of their CloudWatch metrics.
+  location: {{default_location}}
+  description: Generates a report for EKS profiles and a summary of their CloudWatch metrics.
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -21,7 +20,7 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/aws-eks-fargate-cluster-health/runbook.robot
+    pathToRobot: codebundles/aws-eks-cluster-health/runbook.robot
   configProvided:
     - name: AWS_REGION
       value: {{match_resource.resource.region}}

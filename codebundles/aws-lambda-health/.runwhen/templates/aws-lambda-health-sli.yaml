@@ -9,8 +9,7 @@ metadata:
 spec:
   displayUnitsLong: OK
   displayUnitsShort: ok
-  locations:
-    - {{default_location}}
+  location: {{default_location}}
   description: Measures the presence of errors in lambda functions in the region.
   codeBundle:
     {% if repo_url %}

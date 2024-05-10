@@ -9,8 +9,7 @@ metadata:
 spec:
   displayUnitsLong: OK
   displayUnitsShort: ok
-  locations:
-    - {{default_location}}
+  location: {{default_location}}
   description: Measures elastiache serverless caches that are unavailable.
   codeBundle:
     {% if repo_url %}

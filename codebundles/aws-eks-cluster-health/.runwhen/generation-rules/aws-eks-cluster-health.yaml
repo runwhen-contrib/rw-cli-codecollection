@@ -4,20 +4,18 @@ spec:
   platform: aws
   generationRules:
     - resourceTypes:
-        - aws_eks_fargate_profiles
+        - aws_eks_clusters
       matchRules:
         - type: pattern
           pattern: ".+"
           properties: [name]
           mode: substring
       slxs:
-        - baseName: aws-eks-fargate-cluster-health
+        - baseName: aws-eks-cluster-health
           qualifiers: ["resource"]
-          baseTemplateName: aws-eks-fargate-cluster-health
+          baseTemplateName: aws-eks-cluster-health
           levelOfDetail: basic
           outputItems:
             - type: slx
-            - type: sli
-              templateName: aws-eks-fargate-cluster-health-sli.yaml
             - type: runbook
-              templateName: aws-eks-fargate-cluster-health-taskset.yaml
+              templateName: aws-eks-cluster-health-taskset.yaml

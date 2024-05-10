@@ -1,7 +1,7 @@
 *** Settings ***
 Documentation       Monitors the status of EKS / Fargate in the given AWS region.
 Metadata            Author    jon-funk
-Metadata            Display Name    AWS EKS Fargate Health Scan
+Metadata            Display Name    AWS EKS Health Scan
 Metadata            Supports    AWS, EKS, Fargate
 Metadata            Builder
 
@@ -17,9 +17,9 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 Check EKS Fargate Cluster Health Status
-    [Documentation]   This script checks the health status of an Amazon EKS Fargate cluster. It describes the Fargate profile, checks the status of all nodes and pods, and provides detailed information about each pod. The script requires the user to specify the cluster name, Fargate profile name, and AWS region.
-    [Tags]  EKS    Fargate    Cluster Health    AWS    Kubernetes    Pods    Nodes  
-    ${process}=    RW.CLI.Run Bash File    check_eks_fargate_cluster_health_status.sh
+    [Documentation]   This script checks the health status of an Amazon EKS cluster.
+    [Tags]  EKS    Cluster Health    AWS    Kubernetes    Pods    Nodes  
+    ${process}=    RW.CLI.Run Bash File    check_eks_cluster_health_status.sh
     ...    env=${env}
     ...    secret__AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
     ...    secret__AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}

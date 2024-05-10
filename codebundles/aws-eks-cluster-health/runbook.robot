@@ -1,8 +1,8 @@
 *** Settings ***
-Documentation       Checks the health status of EKS / Fargate clusters in the given AWS region.
+Documentation       Checks the health status of EKS and/or Fargate clusters in the given AWS region.
 Metadata            Author    jon-funk
-Metadata            Display Name    AWS EKS Fargate Cluster Health
-Metadata            Supports    AWS, EKS, EKS Fargate
+Metadata            Display Name    AWS EKS Cluster Health
+Metadata            Supports    AWS, EKS, Fargate
 Metadata            Builder
 
 Library             BuiltIn
@@ -17,16 +17,43 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 Check EKS Fargate Cluster Health Status
-    [Documentation]   This script checks the health status of an Amazon EKS Fargate cluster. It describes the Fargate profile, checks the status of all nodes and pods, and provides detailed information about each pod. The script requires the user to specify the cluster name, Fargate profile name, and AWS region.
+    [Documentation]   This script checks the health status of an Amazon EKS Fargate cluster.
     [Tags]  EKS    Fargate    Cluster Health    AWS    Kubernetes    Pods    Nodes  
     ${process}=    RW.CLI.Run Bash File    check_eks_fargate_cluster_health_status.sh
     ...    env=${env}
     ...    secret__AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
     ...    secret__AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    IF    "Error" in """${process.stdout}"""
+        RW.Core.Add Issue    title=EKS Fargate Cluster in ${AWS_REGION} is Unhealthy
+        ...    severity=3
+        ...    next_steps=Check the AWS Management Console for the health status of the EKS Fargate cluster.   
+        ...    expected=The EKS Fargate cluster is healthy.
+        ...    actual=The EKS Fargate cluster is unhealthy.
+        ...    reproduce_hint=Run the script check_eks_fargate_cluster_health_status.sh
+        ...    details=${process.stdout}
+    END
+    RW.Core.Add Pre To Report    ${process.stdout}
+
+Check EKS Cluster Health Status
+    [Documentation]   This script checks the health status of an Amazon EKS cluster. 
+    [Tags]  EKS       Cluster Health    AWS    Kubernetes    Pods    Nodes  
+    ${process}=    RW.CLI.Run Bash File    check_eks_cluster_health.sh
+    ...    env=${env}
+    ...    secret__AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+    ...    secret__AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    IF    "Error" in """${process.stdout}"""
+        RW.Core.Add Issue    title=EKS Cluster in ${AWS_REGION} is Unhealthy
+        ...    severity=3
+        ...    next_steps=Check the AWS Management Console for the health status of the EKS cluster.   
+        ...    expected=The EKS cluster is healthy.
+        ...    actual=The EKS cluster is unhealthy.
+        ...    reproduce_hint=Run the script check_eks_cluster_health.sh
+        ...    details=${process.stdout}
+    END
     RW.Core.Add Pre To Report    ${process.stdout}
 
 List EKS Cluster Metrics
-    [Documentation]   This bash script is designed to monitor the health and status of an Amazon EKS cluster. It fetches information about the Fargate profile, checks the health status of EKS nodes, verifies the status of all pods in all namespaces, and checks the CNI version. The script is intended to be run in an environment where AWS CLI and kubectl are installed and configured.
+    [Documentation]   This bash script is designed to monitor the health and status of an Amazon EKS cluster.
     [Tags]  AWS    EKS    Fargate    Bash Script    Node Health   
     ${process}=    RW.CLI.Run Bash File    list_eks_fargate_metrics.sh
     ...    env=${env}

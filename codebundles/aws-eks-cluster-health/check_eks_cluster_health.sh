@@ -25,22 +25,7 @@ for cluster in $eks_clusters; do
     if [[ "$status" != "ACTIVE" ]] || [[ $health_issues_count > 0 ]]; then
         echo "Error: cluster $cluster has status $status and $health_issues_count health issues: $health_issues"
     fi
-    # fargate
-    fargate_profiles=$(aws eks list-fargate-profiles --region $AWS_REGION --cluster-name $cluster --output text --query 'fargateProfileNames[*]')
-    # print status of each fargate profile
-    for profile in $fargate_profiles; do
-        fargate_profile_state=$(aws eks describe-fargate-profile --region $AWS_REGION --cluster-name $cluster --fargate-profile-name $profile --output json --query 'fargateProfile')
-        # echo fargate_profile_state: $fargate_profile_state
-        status=$(echo "$fargate_profile_state" | jq -r '.status')
-        echo "---"
-        echo "Fargate Profile: $profile"
-        echo "Status: $status"
-        if [[ $status != "ACTIVE" ]]; then
-            echo "Error: Fargate Profile $profile has non-active status: $status."
-        fi
-    done
     echo "----------------------------------"
 
 done
 echo "----------------------------------"
-

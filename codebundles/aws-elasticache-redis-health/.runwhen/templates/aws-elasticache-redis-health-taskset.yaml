@@ -7,8 +7,7 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  locations:
-    - {{default_location}}
+  location: {{default_location}}
   description: Runs a set of tasks to triage elastiache serverless caches that are unavailable.
   codeBundle:
     {% if repo_url %}

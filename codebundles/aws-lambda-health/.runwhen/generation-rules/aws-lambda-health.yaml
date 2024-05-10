@@ -17,7 +17,5 @@ spec:
           levelOfDetail: basic
           outputItems:
             - type: slx
-            - type: sli
-              templateName: aws-lambda-health-sli.yaml
             - type: runbook
               templateName: aws-lambda-health-taskset.yaml

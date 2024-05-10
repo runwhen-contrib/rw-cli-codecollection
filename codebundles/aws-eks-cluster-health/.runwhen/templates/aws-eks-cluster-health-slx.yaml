@@ -8,13 +8,13 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/aws/eks.png
-  alias: AWS EKS Fargate in {{match_resource.resource.region}}
-  asMeasuredBy: Availability of EKS Fargate in {{match_resource.resource.region}}
+  alias: AWS EKS in {{match_resource.resource.region}}
+  asMeasuredBy: Availability of EKS in {{match_resource.resource.region}}
   configProvided:
   - name: SLX_PLACEHOLDER
     value: SLX_PLACEHOLDER
   owners:
   - {{workspace.owner_email}}
-  statement: EKS Fargate Nodes {{match_resource.resource.region}} should be available.
+  statement: EKS Nodes {{match_resource.resource.region}} should be available.
   additionalContext:
     project: "{{match_resource.resource.region}}"
