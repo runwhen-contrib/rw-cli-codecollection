@@ -2,7 +2,7 @@
 Documentation       Monitor AWS Lambda Invocation Errors
 Metadata            Author    jon-funk
 Metadata            Display Name    AWS Lambda Health Monitor
-Metadata            Supports    AWS,AWS Lambda
+Metadata            Supports    AWS,Lambda
 Metadata            Builder
 
 Library             BuiltIn

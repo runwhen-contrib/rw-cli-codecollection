@@ -11,11 +11,12 @@ spec:
           properties: [name]
           mode: substring
       slxs:
-        - baseName: aws-eks-cluster-health
+        - baseName: aws-eks-health
           qualifiers: ["resource"]
-          baseTemplateName: aws-eks-cluster-health
+          baseTemplateName: aws-eks-health
           levelOfDetail: basic
           outputItems:
             - type: slx
+            - type: sli
             - type: runbook
-              templateName: aws-eks-cluster-health-taskset.yaml
+              templateName: aws-eks-health-taskset.yaml

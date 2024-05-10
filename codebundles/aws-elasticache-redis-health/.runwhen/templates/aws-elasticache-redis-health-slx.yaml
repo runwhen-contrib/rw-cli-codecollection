@@ -17,4 +17,4 @@ spec:
   - {{workspace.owner_email}}
   statement: The number of unavailable Elasticache serverless caches should be 0. 
   additionalContext:
-    project: "{{match_resource.resource.region}}"
+    region: "{{match_resource.resource.region}}"

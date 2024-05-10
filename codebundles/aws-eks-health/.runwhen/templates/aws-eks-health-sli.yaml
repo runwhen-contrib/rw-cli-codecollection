@@ -22,7 +22,7 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/aws-eks-cluster-health/sli.robot
+    pathToRobot: codebundles/aws-eks-health/sli.robot
   intervalStrategy: intermezzo
   intervalSeconds: 300
   configProvided:

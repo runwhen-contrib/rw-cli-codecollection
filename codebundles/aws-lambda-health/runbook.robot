@@ -2,7 +2,7 @@
 Documentation       Scans for AWS Lambda invocation errors
 Metadata            Author    jon-funk
 Metadata            Display Name    AWS Lambda Health Check
-Metadata            Supports    AWS,AWS Lambda
+Metadata            Supports    AWS,Lambda
 Metadata            Builder
 
 Library             BuiltIn

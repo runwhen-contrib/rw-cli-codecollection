@@ -18,5 +18,6 @@ spec:
           levelOfDetail: basic
           outputItems:
             - type: slx
+            - type: sli
             - type: runbook
               templateName: aws-elasticache-redis-health-taskset.yaml

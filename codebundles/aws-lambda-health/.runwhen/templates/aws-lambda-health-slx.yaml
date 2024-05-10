@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/aws/lambda.png
-  alias: AWS Lambda Health For Project {{match_resource.resource.region}}
+  alias: AWS Lambda Health For Region {{match_resource.resource.region}}
   asMeasuredBy: The number of Failed AWS Lambdas in project {{match_resource.resource.region}}
   configProvided:
   - name: SLX_PLACEHOLDER
