@@ -7,6 +7,7 @@ Metadata            Builder
 
 Library             BuiltIn
 Library             RW.Core
+Library             RW.CLI
 Library             RW.platform
 Library             OperatingSystem
 Library             String
@@ -18,7 +19,10 @@ Suite Setup         Suite Initialization
 Scan ElastiCaches
     [Documentation]   Performs a broad health scan of all Elasticache instances in the region.
     [Tags]  bash script    AWS Elasticache    Health
-    ${process}=    Run Process    ${CURDIR}/redis_status_scan.sh    env=${env}
+    ${process}=    RW.CLI.Run Bash File    redis_status_scan.sh
+    ...    env=${env}
+    ...    secret__AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+    ...    secret__AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
     Log    ${process.stdout}
     Log    ${process.stderr}
     IF    ${process.rc} != 0
@@ -30,7 +34,7 @@ Scan ElastiCaches
 
 *** Keywords ***
 Suite Initialization
-    ${AWS_REGION}=    RW.Core.Import Secret    AWS_REGION
+    ${AWS_REGION}=    RW.Core.Import User Variable    AWS_REGION
     ...    type=string
     ...    description=AWS Region
     ...    pattern=\w*
@@ -43,12 +47,10 @@ Suite Initialization
     ...    description=AWS Secret Access Key
     ...    pattern=\w*
 
-    Set Suite Variable    ${AWS_REGION}    ${AWS_REGION.value}
-    Set Suite Variable    ${AWS_ACCESS_KEY_ID}    ${AWS_ACCESS_KEY_ID.value}
-    Set Suite Variable    ${AWS_SECRET_ACCESS_KEY}    ${AWS_SECRET_ACCESS_KEY.value}
+    Set Suite Variable    ${AWS_REGION}    ${AWS_REGION}
+    Set Suite Variable    ${AWS_ACCESS_KEY_ID}    ${AWS_ACCESS_KEY_ID}
+    Set Suite Variable    ${AWS_SECRET_ACCESS_KEY}    ${AWS_SECRET_ACCESS_KEY}
 
     Set Suite Variable
     ...    &{env}
     ...    AWS_REGION=${AWS_REGION}
-    ...    AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-    ...    AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}

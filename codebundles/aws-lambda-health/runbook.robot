@@ -7,6 +7,7 @@ Metadata            Builder
 
 Library             BuiltIn
 Library             RW.Core
+Library             RW.CLI
 Library             RW.platform
 Library             OperatingSystem
 Library             String
@@ -17,14 +18,20 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 List Lambda Versions and Runtimes
     [Documentation]   This script is designed to list all the versions and runtimes of a specified AWS Lambda function.
-    [Tags]  AWS    Lambda    Versions    Runtimes
-    ${process}=    Run Process    ${CURDIR}/list_lambda_runtimes.sh    env=${env}
+    [Tags]  AWS    Lambda    Versions    Runtimes    
+    ${process}=    RW.CLI.Run Bash File    list_lambda_runtimes.sh
+    ...    env=${env}
+    ...    secret__AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+    ...    secret__AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
     RW.Core.Add Pre To Report    ${process.stdout}
 
 Analyze AWS Lambda Invocation Errors
     [Documentation]   This bash script is designed to analyze AWS Lambda Invocation Errors for a specified function within a specified region. It fetches the last 50 invocation errors from the AWS CloudWatch logs and prints them. If no errors are found, it prints a message stating that no invocation errors were found for the function. It requires AWS CLI and jq to be installed and properly configured.
     [Tags]  AWS    Lambda    Error Analysis    Invocation Errors    CloudWatch    Logs 
-    ${process}=    Run Process    ${CURDIR}/analyze_lambda_invocation_errors.sh    env=${env}
+    ${process}=    RW.CLI.Run Bash File    analyze_lambda_invocation_errors.sh
+    ...    env=${env}
+    ...    secret__AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+    ...    secret__AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
     RW.Core.Add Pre To Report    ${process.stdout}
     IF    "ERROR" in """${process.stdout}"""
         RW.Core.Add Issue    title=AWS Lambda Invocation Errors
@@ -39,7 +46,10 @@ Analyze AWS Lambda Invocation Errors
 Monitor AWS Lambda Performance Metrics
     [Documentation]   This script is a bash utility for AWS Lambda functions the lists their notable metrics. This script requires AWS CLI and appropriate permissions to execute the commands.
     [Tags]  AWS    Lambda    CloudWatch    Logs    Metrics
-    ${process}=    Run Process    ${CURDIR}/monitor_aws_lambda_performance_metrics.sh    env=${env}
+    ${process}=    RW.CLI.Run Bash File    monitor_aws_lambda_performance_metrics.sh
+    ...    env=${env}
+    ...    secret__AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+    ...    secret__AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
     RW.Core.Add Pre To Report    ${process.stdout}
 
 
@@ -60,11 +70,9 @@ Suite Initialization
     ...    pattern=\w*
 
     Set Suite Variable    ${AWS_REGION}    ${AWS_REGION}
-    Set Suite Variable    ${AWS_ACCESS_KEY_ID}    ${AWS_ACCESS_KEY_ID.value}
-    Set Suite Variable    ${AWS_SECRET_ACCESS_KEY}    ${AWS_SECRET_ACCESS_KEY.value}
+    Set Suite Variable    ${AWS_ACCESS_KEY_ID}    ${AWS_ACCESS_KEY_ID}
+    Set Suite Variable    ${AWS_SECRET_ACCESS_KEY}    ${AWS_SECRET_ACCESS_KEY}
 
     Set Suite Variable
     ...    &{env}
     ...    AWS_REGION=${AWS_REGION}
-    ...    AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-    ...    AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}

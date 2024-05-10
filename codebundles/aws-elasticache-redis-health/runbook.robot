@@ -6,6 +6,7 @@ Metadata            Supports    AWS, Elasticache, Redis
 Metadata            Builder
 
 Library             BuiltIn
+Library             RW.CLI
 Library             RW.Core
 Library             RW.platform
 Library             OperatingSystem
@@ -18,7 +19,10 @@ Suite Setup         Suite Initialization
 Scan AWS Elasticache Redis Status
     [Documentation]   Checks the high level metrics and status of the elasticache redis instances in the region.
     [Tags]  AWS Elasticache    configuration endpoint    configuration
-    ${process}=    Run Process    ${CURDIR}/analyze_aws_elasticache_redis_metrics.sh    env=${env}
+    ${process}=    RW.CLI.Run Bash File    analyze_aws_elasticache_redis_metrics.sh
+    ...    env=${env}
+    ...    secret__AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+    ...    secret__AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
     RW.Core.Add Pre To Report    ${process.stdout}
     IF    "Snapshot retention limit is set to 0" in """${process.stdout}"""
         RW.Core.Add Issue    title=Snapshots not configured for Elasticache in region ${AWS_REGION}
@@ -64,12 +68,10 @@ Suite Initialization
 
 
     Set Suite Variable    ${AWS_REGION}    ${AWS_REGION}
-    Set Suite Variable    ${AWS_ACCESS_KEY_ID}    ${AWS_ACCESS_KEY_ID.value}
-    Set Suite Variable    ${AWS_SECRET_ACCESS_KEY}    ${AWS_SECRET_ACCESS_KEY.value}
+    Set Suite Variable    ${AWS_ACCESS_KEY_ID}    ${AWS_ACCESS_KEY_ID}
+    Set Suite Variable    ${AWS_SECRET_ACCESS_KEY}    ${AWS_SECRET_ACCESS_KEY}
 
 
     Set Suite Variable
     ...    &{env}
     ...    AWS_REGION=${AWS_REGION}
-    ...    AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-    ...    AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
