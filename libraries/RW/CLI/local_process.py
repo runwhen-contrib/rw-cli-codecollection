@@ -48,7 +48,7 @@ def execute_local_command(
     errors = []
     tmpdir = None
     run_with_env = {}
-        # Define the keys we want to check in the current environment for proxy settings / ca settings
+    # Define the keys we want to check in the current environment for proxy settings / ca settings
     keys_to_check = [
         "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "REQUESTS_CA_BUNDLE",
         "CURL_CA_BUNDLE", "SSL_CERT_FILE", "NODE_EXTRA_CA_CERTS"
