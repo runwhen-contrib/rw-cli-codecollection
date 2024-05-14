@@ -19,7 +19,7 @@ for pod_name in $POD_NAMES; do
         ((killed_count++))
     fi
     # Check if we have deleted 10 pods
-    if (( killed_count >= MAX_DELETIONS )); then
+    if (( killed_count >= MAX_KILL )); then
         break
     fi
 done
