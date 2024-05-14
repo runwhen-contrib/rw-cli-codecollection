@@ -20,6 +20,19 @@ commands:
     \ \" + .lastTimestamp + \", Name: \" + .involvedObject.name + \", Message: \"\
     \ + .message'; \ndone"
   name: fetch_events_for_unhealthy_kubernetes_persistentvolumeclaims_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting server or application downtime in a Kubernetes
+    environment.
+
+    2. Investigating issues with persistent storage not being properly allocated to
+    pods.
+
+    3. Monitoring and resolving issues related to pod creation and termination.
+
+    4. Identifying and addressing resource constraints leading to CrashLoopBackoff
+    events for pods.
+
+    5. Analyzing and troubleshooting problems related to pod scheduling and placement
+    within a cluster.'
 - command: 'for pvc in $(kubectl get pvc -n ${NAMESPACE} --context ${CONTEXT} -o json
     | jq -r ''.items[] | select(.status.phase != "Bound") | .metadata.name''); do
     kubectl get events -n ${NAMESPACE} --context ${CONTEXT} --field-selector involvedObject.name=$pvc
@@ -41,6 +54,19 @@ commands:
     \ \" + .lastTimestamp + \", Name: \" + .involvedObject.name + \", Message: \"\
     \ + .message'; \ndone"
   name: fetch_events_for_unhealthy_kubernetes_persistentvolumeclaims_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting server or application downtime in a Kubernetes
+    environment.
+
+    2. Investigating issues with persistent storage not being properly allocated to
+    pods.
+
+    3. Monitoring and resolving issues related to pod creation and termination.
+
+    4. Identifying and addressing resource constraints leading to CrashLoopBackoff
+    events for pods.
+
+    5. Analyzing and troubleshooting problems related to pod scheduling and placement
+    within a cluster.'
 - command: 'namespace=${NAMESPACE}; context=${CONTEXT}; kubectl get pvc -n $namespace
     --context=$context -o json | jq -r ''.items[] | select(.metadata.deletionTimestamp
     != null) | .metadata.name as $name | .metadata.deletionTimestamp as $deletion_time
@@ -70,6 +96,22 @@ commands:
     \ is in Terminating state (Deletion started at: \\($deletion_time)). Finalizers:\
     \ \\($finalizers)\"'\n"
   name: list_persistentvolumeclaims_in_terminating_state_in_namespace_namespace
+  when_is_it_useful: '1. Investigating and troubleshooting persistent volume claim
+    (pvc) issues in a Kubernetes cluster, such as identifying and resolving "Terminating"
+    pvc states.
+
+    2. Monitoring and managing the lifecycle of persistent volumes and claims, ensuring
+    proper deletion and cleanup processes are followed.
+
+    3. Troubleshooting application or pod failures due to issues with persistent storage,
+    such as reclaim policies or finalizer conflicts.
+
+    4. Performing maintenance tasks related to persistent volume claims, such as identifying
+    and deleting orphaned or stuck pvc objects.
+
+    5. Auditing and validating the status of persistent volume claims in a specific
+    namespace to ensure proper resource utilization and management within the Kubernetes
+    environment.'
 - command: 'namespace=${NAMESPACE}; context=${CONTEXT}; kubectl get pvc -n $namespace
     --context=$context -o json | jq -r ''.items[] | select(.metadata.deletionTimestamp
     != null) | .metadata.name as $name | .metadata.deletionTimestamp as $deletion_time
@@ -99,6 +141,22 @@ commands:
     \ is in Terminating state (Deletion started at: \\($deletion_time)). Finalizers:\
     \ \\($finalizers)\"'\n"
   name: list_persistentvolumeclaims_in_terminating_state_in_namespace_namespace
+  when_is_it_useful: '1. Investigating and troubleshooting persistent volume claim
+    (pvc) issues in a Kubernetes cluster, such as identifying and resolving "Terminating"
+    pvc states.
+
+    2. Monitoring and managing the lifecycle of persistent volumes and claims, ensuring
+    proper deletion and cleanup processes are followed.
+
+    3. Troubleshooting application or pod failures due to issues with persistent storage,
+    such as reclaim policies or finalizer conflicts.
+
+    4. Performing maintenance tasks related to persistent volume claims, such as identifying
+    and deleting orphaned or stuck pvc objects.
+
+    5. Auditing and validating the status of persistent volume claims in a specific
+    namespace to ensure proper resource utilization and management within the Kubernetes
+    environment.'
 - command: 'for pv in $(kubectl get pv --context ${CONTEXT} -o json | jq -r ''.items[]
     | select(.status.phase == "Terminating") | .metadata.name''); do kubectl get events
     --all-namespaces --field-selector involvedObject.name=$pv --context ${CONTEXT}
@@ -124,6 +182,35 @@ commands:
     \ \" + .lastTimestamp + \" Name: \" + .involvedObject.name + \" Message: \" +\
     \ .message'; \n    # End of the loop for each pv\ndone\n"
   name: list_persistentvolumes_in_terminating_state_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to investigate and retrieve
+    information about events related to CrashLoopBackoff in a Kubernetes cluster,
+    in order to identify the cause of the issue and take corrective actions.
+
+
+    2. Investigating issues with persistent volumes: If there are issues with persistent
+    volumes terminating unexpectedly in a Kubernetes cluster, a DevOps or Site Reliability
+    Engineer might use this command to gather information about the events associated
+    with these terminations and analyze the data to understand the underlying causes.
+
+
+    3. Monitoring and debugging storage-related problems: When facing storage-related
+    problems in a Kubernetes environment, such as unexpected terminations or errors
+    with persistent volumes, a DevOps or Site Reliability Engineer could use this
+    command to gather event data and troubleshoot the issues effectively.
+
+
+    4. Revising and optimizing storage configurations: To assess and improve the configuration
+    of persistent volumes and their interactions within a Kubernetes deployment, a
+    DevOps or Site Reliability Engineer may use this command to collect relevant event
+    information and identify areas for optimization.
+
+
+    5. Auditing and compliance checks: In the context of compliance checks or auditing
+    processes, where it is necessary to review events related to persistent volume
+    terminations in a Kubernetes cluster, a DevOps or Site Reliability Engineer might
+    rely on this command to extract event data and ensure that all activities are
+    compliant with the required standards.'
 - command: 'for pv in $(kubectl get pv --context ${CONTEXT} -o json | jq -r ''.items[]
     | select(.status.phase == "Terminating") | .metadata.name''); do kubectl get events
     --all-namespaces --field-selector involvedObject.name=$pv --context ${CONTEXT}
@@ -149,6 +236,35 @@ commands:
     \ \" + .lastTimestamp + \" Name: \" + .involvedObject.name + \" Message: \" +\
     \ .message'; \n    # End of the loop for each pv\ndone\n"
   name: list_persistentvolumes_in_terminating_state_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to investigate and retrieve
+    information about events related to CrashLoopBackoff in a Kubernetes cluster,
+    in order to identify the cause of the issue and take corrective actions.
+
+
+    2. Investigating issues with persistent volumes: If there are issues with persistent
+    volumes terminating unexpectedly in a Kubernetes cluster, a DevOps or Site Reliability
+    Engineer might use this command to gather information about the events associated
+    with these terminations and analyze the data to understand the underlying causes.
+
+
+    3. Monitoring and debugging storage-related problems: When facing storage-related
+    problems in a Kubernetes environment, such as unexpected terminations or errors
+    with persistent volumes, a DevOps or Site Reliability Engineer could use this
+    command to gather event data and troubleshoot the issues effectively.
+
+
+    4. Revising and optimizing storage configurations: To assess and improve the configuration
+    of persistent volumes and their interactions within a Kubernetes deployment, a
+    DevOps or Site Reliability Engineer may use this command to collect relevant event
+    information and identify areas for optimization.
+
+
+    5. Auditing and compliance checks: In the context of compliance checks or auditing
+    processes, where it is necessary to review events related to persistent volume
+    terminations in a Kubernetes cluster, a DevOps or Site Reliability Engineer might
+    rely on this command to extract event data and ensure that all activities are
+    compliant with the required standards.'
 - command: 'for pod in $(kubectl get pods -n ${NAMESPACE} --field-selector=status.phase=Running
     --context ${CONTEXT} -o jsonpath=''{range .items[*]}{.metadata.name}{"\n"}{end}'');
     do for pvc in $(kubectl get pods $pod -n ${NAMESPACE} --context ${CONTEXT} -o
@@ -204,6 +320,38 @@ commands:
     \ storage-related issues and understanding the storage configuration of running\
     \ pods."
   name: list_pods_with_attached_volumes_and_related_persistentvolume_details_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to gather information about
+    the persistent volume claims and their associated storage volumes in order to
+    identify any issues with storage or access that could be causing pods to repeatedly
+    crash and restart.
+
+
+    2. Diagnosing slow performance or high latency: In cases where applications running
+    on Kubernetes are experiencing slow performance or high latency, a DevOps or SRE
+    might use this command to inspect the attributes of PVCs and associated resources
+    to determine if there are any storage-related bottlenecks contributing to the
+    performance issues.
+
+
+    3. Capacity planning and resource optimization: When planning for future resource
+    needs or optimizing existing infrastructure, a DevOps or SRE might use this command
+    to analyze the current status, location, access mode, and other attributes of
+    PVCs to determine how storage resources are being utilized and if there are any
+    opportunities to improve efficiency.
+
+
+    4. Troubleshooting application errors related to storage: If an application running
+    on Kubernetes is reporting errors related to storage access or availability, a
+    DevOps or SRE might use this command to investigate the status and attributes
+    of PVCs to identify any potential issues with the underlying storage infrastructure.
+
+
+    5. Auditing and compliance: As part of routine auditing or compliance efforts,
+    a DevOps or SRE might use this command to gather detailed information about PVCs
+    and their associated resources to ensure that storage configurations align with
+    security and compliance requirements, such as access control, data protection,
+    and retention policies.'
 - command: 'for pod in $(kubectl get pods -n ${NAMESPACE} --field-selector=status.phase=Running
     --context ${CONTEXT} -o jsonpath=''{range .items[*]}{.metadata.name}{"\n"}{end}'');
     do for pvc in $(kubectl get pods $pod -n ${NAMESPACE} --context ${CONTEXT} -o
@@ -259,6 +407,38 @@ commands:
     \ storage-related issues and understanding the storage configuration of running\
     \ pods."
   name: list_pods_with_attached_volumes_and_related_persistentvolume_details_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to gather information about
+    the persistent volume claims and their associated storage volumes in order to
+    identify any issues with storage or access that could be causing pods to repeatedly
+    crash and restart.
+
+
+    2. Diagnosing slow performance or high latency: In cases where applications running
+    on Kubernetes are experiencing slow performance or high latency, a DevOps or SRE
+    might use this command to inspect the attributes of PVCs and associated resources
+    to determine if there are any storage-related bottlenecks contributing to the
+    performance issues.
+
+
+    3. Capacity planning and resource optimization: When planning for future resource
+    needs or optimizing existing infrastructure, a DevOps or SRE might use this command
+    to analyze the current status, location, access mode, and other attributes of
+    PVCs to determine how storage resources are being utilized and if there are any
+    opportunities to improve efficiency.
+
+
+    4. Troubleshooting application errors related to storage: If an application running
+    on Kubernetes is reporting errors related to storage access or availability, a
+    DevOps or SRE might use this command to investigate the status and attributes
+    of PVCs to identify any potential issues with the underlying storage infrastructure.
+
+
+    5. Auditing and compliance: As part of routine auditing or compliance efforts,
+    a DevOps or SRE might use this command to gather detailed information about PVCs
+    and their associated resources to ensure that storage configurations align with
+    security and compliance requirements, such as access control, data protection,
+    and retention policies.'
 - command: 'for pod in $(kubectl get pods -n ${NAMESPACE} --field-selector=status.phase=Running
     --context ${CONTEXT} -o jsonpath=''{range .items[*]}{.metadata.name}{"\n"}{end}'');
     do for pvc in $(kubectl get pods $pod -n ${NAMESPACE} --context ${CONTEXT} -o
@@ -312,6 +492,41 @@ commands:
     \ $pod -n ${NAMESPACE} --context ${CONTEXT} -c $containerName -- df -h $mountPath;\
     \ \n    done;\n  done;\ndone;\n"
   name: fetch_the_storage_utilization_for_pvc_mounts_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: When
+    a pod enters a CrashLoopBackoff state, it means that the container in the pod
+    repeatedly crashed shortly after starting. DevOps or Site Reliability Engineers
+    may use this command to gather information about the pods, persistent volume claims,
+    and volumes associated with the crashing containers to identify any disk usage
+    issues or misconfigurations causing the crashes.
+
+
+    2. Investigating high disk usage in Kubernetes clusters: DevOps or Site Reliability
+    Engineers may use this command to gather information about the disk usage of pods
+    running in a specific namespace and context within a Kubernetes cluster. This
+    can help them identify which pods are consuming a large amount of disk space and
+    troubleshoot any potential storage-related issues.
+
+
+    3. Monitoring and optimizing resource utilization: By using this command to collect
+    information about mount paths, container names, and disk usage statistics for
+    running pods, DevOps or Site Reliability Engineers can gain insights into how
+    resources are being utilized within a Kubernetes cluster. They can then use this
+    information to optimize resource allocation and ensure efficient usage of storage
+    resources.
+
+
+    4. Identifying performance bottlenecks: If there are performance issues within
+    a Kubernetes cluster, DevOps or Site Reliability Engineers may use this command
+    to analyze the disk usage statistics of pods and identify any mount paths with
+    high resource consumption. This can help in pinpointing performance bottlenecks
+    and optimizing the cluster''s configuration for better performance.
+
+
+    5. Troubleshooting storage-related issues: In case of issues related to persistent
+    volume claims, volumes, or mount paths within a Kubernetes cluster, DevOps or
+    Site Reliability Engineers may use this command to gather comprehensive information
+    about these storage components and diagnose any problems affecting the proper
+    functioning of applications running in the cluster.'
 - command: 'for pod in $(kubectl get pods -n ${NAMESPACE} --field-selector=status.phase=Running
     --context ${CONTEXT} -o jsonpath=''{range .items[*]}{.metadata.name}{"\n"}{end}'');
     do for pvc in $(kubectl get pods $pod -n ${NAMESPACE} --context ${CONTEXT} -o
@@ -365,6 +580,41 @@ commands:
     \ $pod -n ${NAMESPACE} --context ${CONTEXT} -c $containerName -- df -h $mountPath;\
     \ \n    done;\n  done;\ndone;\n"
   name: fetch_the_storage_utilization_for_pvc_mounts_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: When
+    a pod enters a CrashLoopBackoff state, it means that the container in the pod
+    repeatedly crashed shortly after starting. DevOps or Site Reliability Engineers
+    may use this command to gather information about the pods, persistent volume claims,
+    and volumes associated with the crashing containers to identify any disk usage
+    issues or misconfigurations causing the crashes.
+
+
+    2. Investigating high disk usage in Kubernetes clusters: DevOps or Site Reliability
+    Engineers may use this command to gather information about the disk usage of pods
+    running in a specific namespace and context within a Kubernetes cluster. This
+    can help them identify which pods are consuming a large amount of disk space and
+    troubleshoot any potential storage-related issues.
+
+
+    3. Monitoring and optimizing resource utilization: By using this command to collect
+    information about mount paths, container names, and disk usage statistics for
+    running pods, DevOps or Site Reliability Engineers can gain insights into how
+    resources are being utilized within a Kubernetes cluster. They can then use this
+    information to optimize resource allocation and ensure efficient usage of storage
+    resources.
+
+
+    4. Identifying performance bottlenecks: If there are performance issues within
+    a Kubernetes cluster, DevOps or Site Reliability Engineers may use this command
+    to analyze the disk usage statistics of pods and identify any mount paths with
+    high resource consumption. This can help in pinpointing performance bottlenecks
+    and optimizing the cluster''s configuration for better performance.
+
+
+    5. Troubleshooting storage-related issues: In case of issues related to persistent
+    volume claims, volumes, or mount paths within a Kubernetes cluster, DevOps or
+    Site Reliability Engineers may use this command to gather comprehensive information
+    about these storage components and diagnose any problems affecting the proper
+    functioning of applications running in the cluster.'
 - command: 'NAMESPACE="${NAMESPACE}"; CONTEXT="${CONTEXT}"; PODS=$(kubectl get pods
     -n $NAMESPACE --context=$CONTEXT -o json); for pod in $(jq -r ''.items[] | @base64''
     <<< "$PODS"); do _jq() { jq -r \${1} <<< "$(base64 --decode <<< \${pod})"; };
@@ -425,6 +675,30 @@ commands:
     \         echo \"Node with Pod: $POD_NODE_NAME\"\n            echo \"Node with\
     \ Storage: $STORAGE_NODE_NAME\"\n            echo\n        fi\n    done\ndone\n"
   name: check_for_rwo_persistent_volume_node_attachment_issues_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer may need to use this command to check for any mismatch
+    between storage nodes and pod nodes, which could be causing the CrashLoopBackoff
+    events.
+
+
+    2. Investigating storage-related issues: If there are issues with persistent volume
+    claims not being properly mounted or accessed by pods, the engineer may use this
+    command to identify any mismatches between the storage and pod nodes.
+
+
+    3. Resolving performance problems: When experiencing poor performance in a Kubernetes
+    environment, checking for mismatches between storage and pod nodes can help identify
+    potential bottlenecks and aid in optimizing performance.
+
+
+    4. Debugging unexpected errors: In case of unexpected errors related to storage
+    operations in Kubernetes, such as file system errors or mount failures, using
+    this command can help pinpoint any discrepancies between storage and pod nodes.
+
+
+    5. Ensuring data consistency: To ensure data consistency and integrity within
+    a Kubernetes cluster, DevOps or SREs may use this command to verify that persistent
+    volume claims are correctly linked to their respective pods.'
 - command: 'NAMESPACE="${NAMESPACE}"; CONTEXT="${CONTEXT}"; PODS=$(kubectl get pods
     -n $NAMESPACE --context=$CONTEXT -o json); for pod in $(jq -r ''.items[] | @base64''
     <<< "$PODS"); do _jq() { jq -r \${1} <<< "$(base64 --decode <<< \${pod})"; };
@@ -485,3 +759,27 @@ commands:
     \         echo \"Node with Pod: $POD_NODE_NAME\"\n            echo \"Node with\
     \ Storage: $STORAGE_NODE_NAME\"\n            echo\n        fi\n    done\ndone\n"
   name: check_for_rwo_persistent_volume_node_attachment_issues_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer may need to use this command to check for any mismatch
+    between storage nodes and pod nodes, which could be causing the CrashLoopBackoff
+    events.
+
+
+    2. Investigating storage-related issues: If there are issues with persistent volume
+    claims not being properly mounted or accessed by pods, the engineer may use this
+    command to identify any mismatches between the storage and pod nodes.
+
+
+    3. Resolving performance problems: When experiencing poor performance in a Kubernetes
+    environment, checking for mismatches between storage and pod nodes can help identify
+    potential bottlenecks and aid in optimizing performance.
+
+
+    4. Debugging unexpected errors: In case of unexpected errors related to storage
+    operations in Kubernetes, such as file system errors or mount failures, using
+    this command can help pinpoint any discrepancies between storage and pod nodes.
+
+
+    5. Ensuring data consistency: To ensure data consistency and integrity within
+    a Kubernetes cluster, DevOps or SREs may use this command to verify that persistent
+    volume claims are correctly linked to their respective pods.'

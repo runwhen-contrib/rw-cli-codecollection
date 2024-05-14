@@ -340,7 +340,7 @@ Get Listing Of Resources In Namespace `${NAMESPACE}`
     [Documentation]    Simple fetch all to provide a snapshot of information about the workloads in the namespace for future review in a report.
     [Tags]    get all    resources    info    workloads    namespace    manifests    ${namespace}
     ${all_results}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} api-resources --verbs=list --namespaced -o name --context=${CONTEXT} | xargs -n 1 ${KUBERNETES_DISTRIBUTION_BINARY} get --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} api-resources --verbs=list --namespaced -o name --context=${CONTEXT} | xargs -n 1 bash -c '${KUBERNETES_DISTRIBUTION_BINARY} get $0 --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
@@ -541,8 +541,8 @@ Suite Initialization
     ...    type=string
     ...    description=The home path of the runner
     ...    pattern=\w*
-    ...    example=/root
-    ...    default=/root
+    ...    example=/home/runwhen
+    ...    default=/home/runwhen
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}

@@ -23,6 +23,19 @@ commands:
     \n  -w '{\"http_code\": %{http_code}, \"time_total\": %{time_total}}' \\\n  -s\
     \ ${URL}"
   name: checking_http_url_is_available_and_timely
+  when_is_it_useful: '1. Monitoring the uptime and response time of a web server or
+    service
+
+    2. Automating health checks and load testing for a microservices architecture
+
+    3. Integrating with a continuous integration/continuous deployment (CI/CD) pipeline
+    to verify deployments
+
+    4. Troubleshooting network connectivity and latency issues within a distributed
+    system
+
+    5. Generating performance reports and metrics for SLA compliance and capacity
+    planning'
 - command: 'curl -o /dev/null -w ''{"http_code": %{http_code}, "time_total": %{time_total}}''
     -s ${URL}'
   doc_links: '
@@ -47,3 +60,16 @@ commands:
     \n  -w '{\"http_code\": %{http_code}, \"time_total\": %{time_total}}' \\\n  -s\
     \ ${URL}"
   name: checking_http_url_is_available_and_timely
+  when_is_it_useful: '1. Monitoring the uptime and response time of a web server or
+    service
+
+    2. Automating health checks and load testing for a microservices architecture
+
+    3. Integrating with a continuous integration/continuous deployment (CI/CD) pipeline
+    to verify deployments
+
+    4. Troubleshooting network connectivity and latency issues within a distributed
+    system
+
+    5. Generating performance reports and metrics for SLA compliance and capacity
+    planning'

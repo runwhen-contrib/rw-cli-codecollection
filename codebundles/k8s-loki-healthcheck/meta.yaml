@@ -26,6 +26,20 @@ commands:
     Accept: application/json\" -O - http://localhost:3100/ring | jq -r '.shards[]\
     \ | select(.state != \"ACTIVE\") | {name: .id, state: .state}'\n"
   name: check_loki_ring_api
+  when_is_it_useful: '1. Investigating and troubleshooting the cause of Kubernetes
+    CrashLoopBackoff events in a specific pod or namespace.
+
+    2. Monitoring and identifying performance issues within a Kubernetes cluster,
+    such as high CPU or memory usage by certain pods.
+
+    3. Gathering specific data or logs from a pod in order to analyze and diagnose
+    an application or service issue.
+
+    4. Troubleshooting network connectivity problems or latency issues within a Kubernetes
+    environment.
+
+    5. Performing regular maintenance tasks or checks on pods, such as verifying the
+    status of specific services or configurations.'
 - command: 'kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath=''{.items[0].metadata.name}'')
     -- wget -q --header="Accept: application/json" -O - http://localhost:3100/ring
@@ -33,8 +47,6 @@ commands:
   doc_links: '
 
     - [kubectl command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
-
-    - [wget command](https://www.gnu.org/software/wget/manual/wget.html){:target="_blank"}
 
     - [JSON data retrieval](https://www.json.org/json-en.html){:target="_blank"}
 
@@ -53,6 +65,20 @@ commands:
     Accept: application/json\" -O - http://localhost:3100/ring | jq -r '.shards[]\
     \ | select(.state != \"ACTIVE\") | {name: .id, state: .state}'\n"
   name: check_loki_ring_api
+  when_is_it_useful: '1. Investigating and troubleshooting the cause of Kubernetes
+    CrashLoopBackoff events in a specific pod or namespace.
+
+    2. Monitoring and identifying performance issues within a Kubernetes cluster,
+    such as high CPU or memory usage by certain pods.
+
+    3. Gathering specific data or logs from a pod in order to analyze and diagnose
+    an application or service issue.
+
+    4. Troubleshooting network connectivity problems or latency issues within a Kubernetes
+    environment.
+
+    5. Performing regular maintenance tasks or checks on pods, such as verifying the
+    status of specific services or configurations.'
 - command: 'kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath=''{.items[0].metadata.name}'')
     -- wget -q --header="Accept: application/json" -O - http://localhost:3100/ready'
@@ -95,6 +121,30 @@ commands:
     newer or less experienced devops engineers understand the purpose and functionality
     of the original command.'
   name: check_loki_api_ready
+  when_is_it_useful: '1. Debugging a failing deployment: When a Kubernetes pod goes
+    into CrashLoopBackoff, a DevOps or SRE may need to use this command to run an
+    operation inside the container to troubleshoot and diagnose the issue.
+
+
+    2. Troubleshooting network connectivity issues: If there are issues with fetching
+    data from a local web server within a Kubernetes pod, a DevOps or SRE may use
+    this command to test and identify any network connectivity problems.
+
+
+    3. Performance tuning and optimization: DevOps or SREs may utilize this command
+    to run performance tests and collect data from a container running in a Kubernetes
+    pod to optimize resource allocation and improve the overall performance of the
+    application.
+
+
+    4. Monitoring and logging: This command can be used to fetch specific data from
+    a container for monitoring and logging purposes, allowing DevOps or SREs to gain
+    insights into the application''s behavior and performance.
+
+
+    5. Scaling and load testing: When scaling up or performing load testing on a Kubernetes
+    deployment, DevOps or SREs may use this command to fetch data from containers
+    to analyze the impact on the application''s performance and stability.'
 - command: 'kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
     -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath=''{.items[0].metadata.name}'')
     -- wget -q --header="Accept: application/json" -O - http://localhost:3100/ready'
@@ -137,3 +187,27 @@ commands:
     newer or less experienced devops engineers understand the purpose and functionality
     of the original command.'
   name: check_loki_api_ready
+  when_is_it_useful: '1. Debugging a failing deployment: When a Kubernetes pod goes
+    into CrashLoopBackoff, a DevOps or SRE may need to use this command to run an
+    operation inside the container to troubleshoot and diagnose the issue.
+
+
+    2. Troubleshooting network connectivity issues: If there are issues with fetching
+    data from a local web server within a Kubernetes pod, a DevOps or SRE may use
+    this command to test and identify any network connectivity problems.
+
+
+    3. Performance tuning and optimization: DevOps or SREs may utilize this command
+    to run performance tests and collect data from a container running in a Kubernetes
+    pod to optimize resource allocation and improve the overall performance of the
+    application.
+
+
+    4. Monitoring and logging: This command can be used to fetch specific data from
+    a container for monitoring and logging purposes, allowing DevOps or SREs to gain
+    insights into the application''s behavior and performance.
+
+
+    5. Scaling and load testing: When scaling up or performing load testing on a Kubernetes
+    deployment, DevOps or SREs may use this command to fetch data from containers
+    to analyze the impact on the application''s performance and stability.'

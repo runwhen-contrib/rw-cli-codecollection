@@ -1,0 +1,55 @@
+apiVersion: runwhen.com/v1
+kind: Runbook
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  location: {{default_location}}
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/k8s-app-troubleshoot/runbook.robot
+  configProvided:
+    - name: NAMESPACE
+      value: {{match_resource.resource.metadata.namespace}}
+    - name: CONTEXT
+      value: {{context}}
+    - name: KUBERNETES_DISTRIBUTION_BINARY
+      value: {{custom.kubernetes_distribution_binary}}
+    - name: NUM_OF_COMMITS
+      value: '10'
+    - name: CREATE_ISSUES
+      value: 'YES'
+    - name: LOGS_SINCE
+      value: 60m
+    - name: EXCLUDE_PATTERN
+      value: Placeholder
+    - name: MAX_LOG_LINES
+      value: '500'
+    - name: LABELS
+      value: app={{ match_resource.resource.metadata.labels.app }}
+    - name: CONTAINER_NAME
+      value: {{ match_resource.resource.metadata.labels.app }}
+    - name: WORKLOAD_NAME
+      value: deployment.apps/{{ match_resource.resource.metadata.name }}
+    - name: REPO_URI
+      value: {{ match_resource.resource.metadata.annotations.gitApplication }}
+  secretsProvided:
+    - name: kubeconfig
+      workspaceKey: {{custom.kubeconfig_secret_name}}
+    - name: REPO_AUTH_TOKEN
+      workspaceKey: {{ match_resource.resource.metadata.annotations.gitTokenName }}
+  servicesProvided:
+    - name: {{custom.kubernetes_distribution_binary}}
+      locationServiceName: {{custom.kubernetes_distribution_binary}}-service.shared

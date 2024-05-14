@@ -80,6 +80,20 @@ commands:
     \ comments should be added to further explain each step and provide insights or\
     \ tips for improving or troubleshooting the code."
   name: fetch_ingress_object_health_in_namespace_namespace
+  when_is_it_useful: '1. Investigating and troubleshooting a service outage or degradation
+    in a Kubernetes cluster.
+
+    2. Monitoring the health and performance of backend services and ingresses in
+    a Kubernetes environment.
+
+    3. Conducting regular health checks and maintenance to ensure the reliability
+    and availability of services.
+
+    4. Identifying and resolving issues related to pod, endpoint, deployment, statefulset,
+    or daemonset objects impacting service health.
+
+    5. Providing detailed reports on the overall health status of services to stakeholders
+    and management.'
 - command: 'NAMESPACE="${NAMESPACE}";CONTEXT="${CONTEXT}";ingresses=$(kubectl get
     ingress -n "$NAMESPACE" --context "$CONTEXT" -o jsonpath=''{range .items[*]}{.metadata.name}{"\n"}{end}'');for
     ingress in $ingresses;do echo "Ingress: $ingress";health_status="NA";backend_services=$(kubectl
@@ -161,6 +175,20 @@ commands:
     \ comments should be added to further explain each step and provide insights or\
     \ tips for improving or troubleshooting the code."
   name: fetch_ingress_object_health_in_namespace_namespace
+  when_is_it_useful: '1. Investigating and troubleshooting a service outage or degradation
+    in a Kubernetes cluster.
+
+    2. Monitoring the health and performance of backend services and ingresses in
+    a Kubernetes environment.
+
+    3. Conducting regular health checks and maintenance to ensure the reliability
+    and availability of services.
+
+    4. Identifying and resolving issues related to pod, endpoint, deployment, statefulset,
+    or daemonset objects impacting service health.
+
+    5. Providing detailed reports on the overall health status of services to stakeholders
+    and management.'
 - command: 'CONTEXT="${CONTEXT}"; NAMESPACE="${NAMESPACE}"; kubectl --context "${CONTEXT}"
     --namespace "${NAMESPACE}" get ingress -o json | jq -r ''.items[] | select(.status.loadBalancer.ingress)
     | .metadata.name as \$name | .status.loadBalancer.ingress[0].ip as \$ingress_ip
@@ -208,6 +236,34 @@ commands:
     \ - Service \\($service_name) is of type \\(.spec.type) on port \\($service_port)\"\
     \ end';\n  done\n"
   name: check_for_ingress_and_service_conflicts_in_namespace_namespace
+  when_is_it_useful: '1. Deploying a new application: When deploying a new application
+    in a Kubernetes cluster, a DevOps or Site Reliability Engineer may use this command
+    to ensure that the ingresses and services are correctly configured and that there
+    are no discrepancies between their IP addresses.
+
+
+    2. Troubleshooting network issues: If there are network connectivity issues between
+    ingresses and services in a Kubernetes cluster, a DevOps or Site Reliability Engineer
+    may use this command to identify any discrepancies in the IP addresses and troubleshoot
+    the issue.
+
+
+    3. Monitoring for potential security vulnerabilities: This command can be used
+    to regularly check for any discrepancies between ingresses and services in a Kubernetes
+    cluster, helping to identify potential security vulnerabilities or misconfigurations
+    that could pose a risk to the system.
+
+
+    4. Conducting regular health checks: As part of regular system maintenance, a
+    DevOps or Site Reliability Engineer may use this command to conduct routine health
+    checks on ingresses and services in a Kubernetes cluster, ensuring that everything
+    is functioning as expected.
+
+
+    5. Investigating CrashLoopBackoff events: In the event of CrashLoopBackoff events
+    occurring in a Kubernetes cluster, a DevOps or Site Reliability Engineer may use
+    this command to investigate any discrepancies between the IP addresses of ingresses
+    and services that could be contributing to the issue.'
 - command: 'CONTEXT="${CONTEXT}"; NAMESPACE="${NAMESPACE}"; kubectl --context "${CONTEXT}"
     --namespace "${NAMESPACE}" get ingress -o json | jq -r ''.items[] | select(.status.loadBalancer.ingress)
     | .metadata.name as \$name | .status.loadBalancer.ingress[0].ip as \$ingress_ip
@@ -255,3 +311,31 @@ commands:
     \ - Service \\($service_name) is of type \\(.spec.type) on port \\($service_port)\"\
     \ end';\n  done\n"
   name: check_for_ingress_and_service_conflicts_in_namespace_namespace
+  when_is_it_useful: '1. Deploying a new application: When deploying a new application
+    in a Kubernetes cluster, a DevOps or Site Reliability Engineer may use this command
+    to ensure that the ingresses and services are correctly configured and that there
+    are no discrepancies between their IP addresses.
+
+
+    2. Troubleshooting network issues: If there are network connectivity issues between
+    ingresses and services in a Kubernetes cluster, a DevOps or Site Reliability Engineer
+    may use this command to identify any discrepancies in the IP addresses and troubleshoot
+    the issue.
+
+
+    3. Monitoring for potential security vulnerabilities: This command can be used
+    to regularly check for any discrepancies between ingresses and services in a Kubernetes
+    cluster, helping to identify potential security vulnerabilities or misconfigurations
+    that could pose a risk to the system.
+
+
+    4. Conducting regular health checks: As part of regular system maintenance, a
+    DevOps or Site Reliability Engineer may use this command to conduct routine health
+    checks on ingresses and services in a Kubernetes cluster, ensuring that everything
+    is functioning as expected.
+
+
+    5. Investigating CrashLoopBackoff events: In the event of CrashLoopBackoff events
+    occurring in a Kubernetes cluster, a DevOps or Site Reliability Engineer may use
+    this command to investigate any discrepancies between the IP addresses of ingresses
+    and services that could be contributing to the issue.'

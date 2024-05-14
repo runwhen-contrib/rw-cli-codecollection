@@ -34,6 +34,25 @@ commands:
     \ | fromdateiso8601) | sort | .[0] | todateiso8601,\n     lastTimestamp: map(.lastTimestamp\
     \ | fromdateiso8601) | sort | reverse | .[0] | todateiso8601\n })'\n"
   name: troubleshoot_statefulset_warning_events_for_statefulset_name
+  when_is_it_useful: '1. Troubleshooting a recurring CrashLoopBackoff event in a Kubernetes
+    pod, where the engineer needs to gather events related to the pod''s StatefulSet
+    to identify potential issues.
+
+    2. Investigating performance concerns in a specific namespace by retrieving and
+    analyzing warning events for a particular StatefulSet within a specified time
+    frame.
+
+    3. Monitoring and troubleshooting an application deployment by filtering Kubernetes
+    events for a specific StatefulSet name to pinpoint any warning signs or errors
+    affecting the deployment.
+
+    4. Analyzing and diagnosing potential issues with a StatefulSet''s pods, such
+    as excessive restarts or failing readiness probes, by retrieving and parsing relevant
+    Kubernetes events using JSON formatting.
+
+    5. Identifying and addressing issues with a particular StatefulSet, such as failed
+    volume mounts or unexpected container terminations, by analyzing warning events
+    within the last hour using the jq tool for JSON output.'
 - command: 'kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq ''(now
     - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind
     == "StatefulSet" or .involvedObject.kind == "Pod") and (.involvedObject.name |
@@ -69,6 +88,25 @@ commands:
     \ | fromdateiso8601) | sort | .[0] | todateiso8601,\n     lastTimestamp: map(.lastTimestamp\
     \ | fromdateiso8601) | sort | reverse | .[0] | todateiso8601\n })'\n"
   name: troubleshoot_statefulset_warning_events_for_statefulset_name
+  when_is_it_useful: '1. Troubleshooting a recurring CrashLoopBackoff event in a Kubernetes
+    pod, where the engineer needs to gather events related to the pod''s StatefulSet
+    to identify potential issues.
+
+    2. Investigating performance concerns in a specific namespace by retrieving and
+    analyzing warning events for a particular StatefulSet within a specified time
+    frame.
+
+    3. Monitoring and troubleshooting an application deployment by filtering Kubernetes
+    events for a specific StatefulSet name to pinpoint any warning signs or errors
+    affecting the deployment.
+
+    4. Analyzing and diagnosing potential issues with a StatefulSet''s pods, such
+    as excessive restarts or failing readiness probes, by retrieving and parsing relevant
+    Kubernetes events using JSON formatting.
+
+    5. Identifying and addressing issues with a particular StatefulSet, such as failed
+    volume mounts or unexpected container terminations, by analyzing warning events
+    within the last hour using the jq tool for JSON output.'
 - command: 'kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq ''(now
     - (60*60)) as $time_limit | [ .items[] | select(.type != "Warning" and (.involvedObject.kind
     == "StatefulSet" or .involvedObject.kind == "Pod") and (.involvedObject.name |
@@ -120,6 +158,26 @@ commands:
     \ | sort | .[0] | todateiso8601, \n    lastTimestamp: map(.lastTimestamp | fromdateiso8601)\
     \ | sort | reverse | .[0] | todateiso8601\n  })'\n"
   name: check_statefulset_event_anomalies_for_statefulset_name
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
+    events in a specific StatefulSet, such as identifying the root cause of the continuous
+    crashing and restarting of pods within the set.
+
+
+    2. Investigating performance or availability issues by analyzing recent events
+    related to a specific StatefulSet in order to identify potential problems or disruptions.
+
+
+    3. Conducting routine maintenance or health checks on a particular StatefulSet
+    by reviewing recent events to ensure that all pods are running smoothly and without
+    errors.
+
+
+    4. Performing post-incident analysis after an outage or disruption to understand
+    the sequence of events and their impact on the StatefulSet.
+
+
+    5. Diagnosing and resolving resource constraints or stability issues within a
+    StatefulSet by analyzing recent events for any indicators of underlying issues.'
 - command: 'kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq ''(now
     - (60*60)) as $time_limit | [ .items[] | select(.type != "Warning" and (.involvedObject.kind
     == "StatefulSet" or .involvedObject.kind == "Pod") and (.involvedObject.name |
@@ -171,6 +229,26 @@ commands:
     \ | sort | .[0] | todateiso8601, \n    lastTimestamp: map(.lastTimestamp | fromdateiso8601)\
     \ | sort | reverse | .[0] | todateiso8601\n  })'\n"
   name: check_statefulset_event_anomalies_for_statefulset_name
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
+    events in a specific StatefulSet, such as identifying the root cause of the continuous
+    crashing and restarting of pods within the set.
+
+
+    2. Investigating performance or availability issues by analyzing recent events
+    related to a specific StatefulSet in order to identify potential problems or disruptions.
+
+
+    3. Conducting routine maintenance or health checks on a particular StatefulSet
+    by reviewing recent events to ensure that all pods are running smoothly and without
+    errors.
+
+
+    4. Performing post-incident analysis after an outage or disruption to understand
+    the sequence of events and their impact on the StatefulSet.
+
+
+    5. Diagnosing and resolving resource constraints or stability issues within a
+    StatefulSet by analyzing recent events for any indicators of underlying issues.'
 - command: kubectl logs --tail=100 statefulset/${STATEFULSET_NAME} --context ${CONTEXT}
     -n ${NAMESPACE}
   doc_links: '
@@ -203,6 +281,23 @@ commands:
 
     '
   name: fetch_statefulset_logs_for_statefulset_name
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event for a
+    specific StatefulSet in a critical production environment to identify the root
+    cause of the issue and minimize downtime.
+
+    2. Monitoring the performance and behavior of a StatefulSet in a Kubernetes cluster
+    by analyzing its logs to detect any abnormal patterns or errors.
+
+    3. Investigating a reported issue with a specific application running as a StatefulSet
+    in a Kubernetes cluster by examining its recent logs for potential error messages
+    or exceptions.
+
+    4. Analyzing the impact of recent changes or updates on a StatefulSet in a Kubernetes
+    cluster by reviewing its log data to assess any abnormalities or unexpected behaviors.
+
+    5. Performing routine maintenance or troubleshooting tasks related to a specific
+    StatefulSet in a Kubernetes cluster, such as identifying and resolving errors
+    or warnings in its logs.'
 - command: kubectl logs --tail=100 statefulset/${STATEFULSET_NAME} --context ${CONTEXT}
     -n ${NAMESPACE}
   doc_links: '
@@ -235,6 +330,23 @@ commands:
 
     '
   name: fetch_statefulset_logs_for_statefulset_name
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event for a
+    specific StatefulSet in a critical production environment to identify the root
+    cause of the issue and minimize downtime.
+
+    2. Monitoring the performance and behavior of a StatefulSet in a Kubernetes cluster
+    by analyzing its logs to detect any abnormal patterns or errors.
+
+    3. Investigating a reported issue with a specific application running as a StatefulSet
+    in a Kubernetes cluster by examining its recent logs for potential error messages
+    or exceptions.
+
+    4. Analyzing the impact of recent changes or updates on a StatefulSet in a Kubernetes
+    cluster by reviewing its log data to assess any abnormalities or unexpected behaviors.
+
+    5. Performing routine maintenance or troubleshooting tasks related to a specific
+    StatefulSet in a Kubernetes cluster, such as identifying and resolving errors
+    or warnings in its logs.'
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "${STATEFULSET_NAME}" || true
   doc_links: '
@@ -279,6 +391,21 @@ commands:
 
     '
   name: get_related_statefulset_statefulset_name_events
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event in a
+    production environment to ensure that the application is running smoothly and
+    efficiently.
+
+    2. Monitoring and managing resource utilization within a specific namespace to
+    optimize performance and prevent potential issues.
+
+    3. Investigating networking or connectivity issues within a Kubernetes cluster
+    to ensure seamless communication between pods and services.
+
+    4. Resolving deployment failures or errors within a statefulset to maintain the
+    availability and stability of the application.
+
+    5. Performing routine maintenance and checks on Kubernetes clusters to proactively
+    identify and address any potential issues before they escalate.'
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "${STATEFULSET_NAME}" || true
   doc_links: '
@@ -323,6 +450,21 @@ commands:
 
     '
   name: get_related_statefulset_statefulset_name_events
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event in a
+    production environment to ensure that the application is running smoothly and
+    efficiently.
+
+    2. Monitoring and managing resource utilization within a specific namespace to
+    optimize performance and prevent potential issues.
+
+    3. Investigating networking or connectivity issues within a Kubernetes cluster
+    to ensure seamless communication between pods and services.
+
+    4. Resolving deployment failures or errors within a statefulset to maintain the
+    availability and stability of the application.
+
+    5. Performing routine maintenance and checks on Kubernetes clusters to proactively
+    identify and address any potential issues before they escalate.'
 - command: kubectl get statefulset ${LABELS} --context=${CONTEXT} -n ${NAMESPACE}
     -o yaml
   doc_links: '
@@ -345,6 +487,22 @@ commands:
     \ # Specifying the namespace where the stateful set is located\n  -o yaml    \
     \                       # Outputting the result in YAML format\n"
   name: fetch_manifest_details_for_statefulset_statefulset_name
+  when_is_it_useful: '1. Troubleshooting a database stateful set that is experiencing
+    performance issues or other errors, and needing to review the configuration for
+    potential problems.
+
+    2. Creating documentation for a stateful set configuration in order to share it
+    with team members or for future reference.
+
+    3. Making changes to the configuration of a stateful set, such as updating labels
+    or changing context, and needing to review the current configuration as a reference
+    point.
+
+    4. Troubleshooting an application deployment issue related to a stateful set,
+    and needing to verify its configuration as part of the investigation.
+
+    5. Conducting a periodic review of stateful set configurations for compliance
+    or best practices, and needing to retrieve the details for analysis.'
 - command: kubectl get statefulset ${LABELS} --context=${CONTEXT} -n ${NAMESPACE}
     -o yaml
   doc_links: '
@@ -367,6 +525,22 @@ commands:
     \ # Specifying the namespace where the stateful set is located\n  -o yaml    \
     \                       # Outputting the result in YAML format\n"
   name: fetch_manifest_details_for_statefulset_statefulset_name
+  when_is_it_useful: '1. Troubleshooting a database stateful set that is experiencing
+    performance issues or other errors, and needing to review the configuration for
+    potential problems.
+
+    2. Creating documentation for a stateful set configuration in order to share it
+    with team members or for future reference.
+
+    3. Making changes to the configuration of a stateful set, such as updating labels
+    or changing context, and needing to review the current configuration as a reference
+    point.
+
+    4. Troubleshooting an application deployment issue related to a stateful set,
+    and needing to verify its configuration as part of the investigation.
+
+    5. Conducting a periodic review of stateful set configurations for compliance
+    or best practices, and needing to retrieve the details for analysis.'
 - command: 'kubectl get statefulset -n ${NAMESPACE} -o json --context ${CONTEXT} |
     jq -r ''.items[] | select(.status.availableReplicas < .status.replicas) | "---\nStatefulSet
     Name: " + (.metadata.name|tostring) + "\nDesired Replicas: " + (.status.replicas|tostring)
@@ -400,6 +574,20 @@ commands:
     \ useful for identifying any StatefulSets that may not have the correct number\
     \ of replicas running."
   name: list_statefulsets_with_unhealthy_replica_counts_in_namespace_namespace
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes stateful sets to
+    ensure that the desired number of replicas are running and available.
+
+    2. Checking for discrepancies between the desired and available replicas in a
+    specific namespace and context.
+
+    3. Investigating and resolving CrashLoopBackoff events in stateful sets to maintain
+    high availability and reliability of applications running on Kubernetes.
+
+    4. Identifying and addressing resource issues that may be causing shortage of
+    available replicas for stateful sets.
+
+    5. Implementing automation and alerting systems to proactively monitor and manage
+    stateful sets in order to prevent potential issues with replica availability.'
 - command: 'kubectl get statefulset -n ${NAMESPACE} -o json --context ${CONTEXT} |
     jq -r ''.items[] | select(.status.availableReplicas < .status.replicas) | "---\nStatefulSet
     Name: " + (.metadata.name|tostring) + "\nDesired Replicas: " + (.status.replicas|tostring)
@@ -433,3 +621,17 @@ commands:
     \ useful for identifying any StatefulSets that may not have the correct number\
     \ of replicas running."
   name: list_statefulsets_with_unhealthy_replica_counts_in_namespace_namespace
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes stateful sets to
+    ensure that the desired number of replicas are running and available.
+
+    2. Checking for discrepancies between the desired and available replicas in a
+    specific namespace and context.
+
+    3. Investigating and resolving CrashLoopBackoff events in stateful sets to maintain
+    high availability and reliability of applications running on Kubernetes.
+
+    4. Identifying and addressing resource issues that may be causing shortage of
+    available replicas for stateful sets.
+
+    5. Implementing automation and alerting systems to proactively monitor and manage
+    stateful sets in order to prevent potential issues with replica availability.'

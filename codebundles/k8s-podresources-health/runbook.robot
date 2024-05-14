@@ -154,7 +154,7 @@ Suite Initialization
     ...    type=string
     ...    description=Home directory to execute scripts from
     ...    example=/home
-    ...    default=/root
+    ...    default=/home/runwhen
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}

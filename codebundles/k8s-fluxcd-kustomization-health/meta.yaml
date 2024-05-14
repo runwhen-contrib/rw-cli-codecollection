@@ -22,6 +22,12 @@ commands:
 
     kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}'
   name: list_all_available_kustomization_objects_in_namespace_namespace
+  when_is_it_useful: "1. Troubleshooting a CrashLoopBackoff event in Kubernetes\n\
+    2. Investigating resource utilization and performance of a specific Kubernetes\
+    \ resource\n3. Analyzing logs and events for a particular pod or deployment\n\
+    4. Debugging connectivity issues between Kubernetes resources within a specific\
+    \ namespace \n5. Investigating the status and health of a specific Kubernetes\
+    \ resource within a specific context"
 - command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}
   doc_links: '
 
@@ -45,6 +51,12 @@ commands:
 
     kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}'
   name: list_all_available_kustomization_objects_in_namespace_namespace
+  when_is_it_useful: "1. Troubleshooting a CrashLoopBackoff event in Kubernetes\n\
+    2. Investigating resource utilization and performance of a specific Kubernetes\
+    \ resource\n3. Analyzing logs and events for a particular pod or deployment\n\
+    4. Debugging connectivity issues between Kubernetes resources within a specific\
+    \ namespace \n5. Investigating the status and health of a specific Kubernetes\
+    \ resource within a specific context"
 - command: 'kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json
     | jq ''[.items[] | select(.status.conditions[] | select(.type == "Ready" and .status
     == "False")) | {KustomizationName: .metadata.name, ReadyStatus: {ready: (.status.conditions[]
@@ -90,3 +102,31 @@ commands:
     \ newer or less experienced devops engineers can better understand the purpose\
     \ and functionality of each part of the command."
   name: get_details_for_unready_kustomizations_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: The DevOps
+    or SRE would use this command to retrieve information about the status of the
+    pods in the namespace and identify any resources that are not ready, and then
+    extract specific fields related to the ready and reconciling status conditions.
+
+
+    2. Monitoring and troubleshooting application deployments: When deploying new
+    applications or making changes to existing ones, the DevOps or SRE may use this
+    command to quickly identify any resources that are not ready and proactively address
+    any issues before they affect users.
+
+
+    3. Resolving performance issues: If there are performance issues with specific
+    Kubernetes resources, the DevOps or SRE can use this command to gather information
+    about their status and identify any components that are not ready, helping them
+    to troubleshoot and resolve the performance issues more efficiently.
+
+
+    4. Investigating network connectivity problems: If there are network connectivity
+    problems affecting Kubernetes resources, this command can be used to retrieve
+    information about the readiness and status of the affected resources, helping
+    the DevOps or SRE to pinpoint the root cause of the connectivity issues.
+
+
+    5. Managing upgrades and maintenance: During upgrades or maintenance activities,
+    the DevOps or SRE may use this command to monitor the status of Kubernetes resources
+    and ensure that all necessary components are ready and functioning properly before
+    and after the upgrade or maintenance window.'

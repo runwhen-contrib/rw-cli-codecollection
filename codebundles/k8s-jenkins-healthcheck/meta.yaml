@@ -18,6 +18,38 @@ commands:
     \ port 8080 and check the HTTP status code of a specific endpoint\n-- curl -s\
     \ -o /dev/null -w \"%{http_code}\" localhost:8080/login\n"
   name: query_the_jenkins_kubernetes_workload_http_endpoint
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event: When
+    a pod enters the CrashLoopBackoff state, a DevOps or Site Reliability Engineer
+    might use this command to investigate the issue by executing a command inside
+    the problematic pod and checking the HTTP response code to diagnose the root cause.
+
+
+    2. Monitoring and debugging application issues: If an application deployed in
+    a Kubernetes cluster is experiencing intermittent downtime or unexpected behavior,
+    a DevOps or Site Reliability Engineer might use this command to gain insights
+    into the specific pod''s behavior and troubleshoot potential issues related to
+    its internal functionality or network communication.
+
+
+    3. Conducting health checks and performance testing: As part of ongoing maintenance
+    and monitoring of a Kubernetes cluster, a DevOps or Site Reliability Engineer
+    might utilize this command to perform periodic health checks on the pods within
+    a stateful set, ensuring that they are responding correctly to HTTP requests and
+    verifying their overall performance.
+
+
+    4. Implementing rolling updates and canary deployments: During the process of
+    deploying new versions of an application across a Kubernetes environment, a DevOps
+    or Site Reliability Engineer might leverage this command to validate the responsiveness
+    and stability of specific pods within a stateful set after the update, helping
+    to ensure a smooth transition and minimize any potential impact on end users.
+
+
+    5. Resolving network connectivity issues: In the event of network-related problems
+    affecting communication between pods or services within a Kubernetes cluster,
+    a DevOps or Site Reliability Engineer might employ this command to verify the
+    connectivity and response codes within specific pods, assisting in identifying
+    and resolving any underlying networking issues.'
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -s -o /dev/null -w "%{http_code}" localhost:8080/login
   doc_links: '
@@ -37,6 +69,38 @@ commands:
     \ port 8080 and check the HTTP status code of a specific endpoint\n-- curl -s\
     \ -o /dev/null -w \"%{http_code}\" localhost:8080/login\n"
   name: query_the_jenkins_kubernetes_workload_http_endpoint
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event: When
+    a pod enters the CrashLoopBackoff state, a DevOps or Site Reliability Engineer
+    might use this command to investigate the issue by executing a command inside
+    the problematic pod and checking the HTTP response code to diagnose the root cause.
+
+
+    2. Monitoring and debugging application issues: If an application deployed in
+    a Kubernetes cluster is experiencing intermittent downtime or unexpected behavior,
+    a DevOps or Site Reliability Engineer might use this command to gain insights
+    into the specific pod''s behavior and troubleshoot potential issues related to
+    its internal functionality or network communication.
+
+
+    3. Conducting health checks and performance testing: As part of ongoing maintenance
+    and monitoring of a Kubernetes cluster, a DevOps or Site Reliability Engineer
+    might utilize this command to perform periodic health checks on the pods within
+    a stateful set, ensuring that they are responding correctly to HTTP requests and
+    verifying their overall performance.
+
+
+    4. Implementing rolling updates and canary deployments: During the process of
+    deploying new versions of an application across a Kubernetes environment, a DevOps
+    or Site Reliability Engineer might leverage this command to validate the responsiveness
+    and stability of specific pods within a stateful set after the update, helping
+    to ensure a smooth transition and minimize any potential impact on end users.
+
+
+    5. Resolving network connectivity issues: In the event of network-related problems
+    affecting communication between pods or services within a Kubernetes cluster,
+    a DevOps or Site Reliability Engineer might employ this command to verify the
+    connectivity and response codes within specific pods, assisting in identifying
+    and resolving any underlying networking issues.'
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -s localhost:8080/api/json?pretty=true --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}
   doc_links: '
@@ -58,6 +122,20 @@ commands:
     kubectl exec statefulset/${STATEFULSET_NAME} \\\n--context=${CONTEXT} \\\n-n ${NAMESPACE}\
     \ \\ \n-- curl -s localhost:8080/api/json?pretty=true \\\n--user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}\n"
   name: query_the_jenkins_kubernetes_workload_http_endpoint
+  when_is_it_useful: '1. Troubleshooting a CrashLoopBackoff event in a StatefulSet
+    to identify any issues with the container startup process.
+
+    2. Checking for connectivity issues or errors within a specific container in a
+    StatefulSet.
+
+    3. Monitoring and debugging the interaction between a Jenkins service account
+    and a specific container within a StatefulSet.
+
+    4. Gathering specific data or metrics from a container in a StatefulSet for analysis
+    or debugging purposes.
+
+    5. Verifying the response of a specific endpoint or API within a container in
+    a StatefulSet.'
 - command: kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -s localhost:8080/api/json?pretty=true --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}
   doc_links: '
@@ -79,6 +157,20 @@ commands:
     kubectl exec statefulset/${STATEFULSET_NAME} \\\n--context=${CONTEXT} \\\n-n ${NAMESPACE}\
     \ \\ \n-- curl -s localhost:8080/api/json?pretty=true \\\n--user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}\n"
   name: query_the_jenkins_kubernetes_workload_http_endpoint
+  when_is_it_useful: '1. Troubleshooting a CrashLoopBackoff event in a StatefulSet
+    to identify any issues with the container startup process.
+
+    2. Checking for connectivity issues or errors within a specific container in a
+    StatefulSet.
+
+    3. Monitoring and debugging the interaction between a Jenkins service account
+    and a specific container within a StatefulSet.
+
+    4. Gathering specific data or metrics from a container in a StatefulSet for analysis
+    or debugging purposes.
+
+    5. Verifying the response of a specific endpoint or API within a container in
+    a StatefulSet.'
 - command: 'kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -s localhost:8080/queue/api/json --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}
     | jq -r ''.items[] | select((.stuck == true) or (.blocked == true)) | "Why: "
@@ -104,6 +196,31 @@ commands:
     \ \"Why: \" + .why + \"\\nBlocked: \" + (.blocked|tostring) + \"\\nStuck: \" +\
     \ (.stuck|tostring)'\n"
   name: query_for_stuck_jenkins_jobs
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to investigate and gather
+    information about stuck or blocked items in a Jenkins job queue that could be
+    causing the CrashLoopBackoff.
+
+
+    2. Monitoring and debugging performance issues: If there are performance issues
+    with a specific statefulset within the Kubernetes cluster, the engineer might
+    use this command to retrieve information and identify any stuck or blocked items
+    impacting the performance.
+
+
+    3. Investigating job queue delays: In the event of delays in the Jenkins job queue,
+    the engineer may use this command to gather information on any stuck or blocked
+    items that could be causing the delays.
+
+
+    4. Identifying and resolving resource contention: This command could be used to
+    gather data on any resource contention within a statefulset, helping the engineer
+    to identify and address any stuck or blocked items contributing to the issue.
+
+
+    5. Troubleshooting job failures: If there are frequent job failures within a specific
+    statefulset, the engineer might use this command to retrieve information and pinpoint
+    any stuck or blocked items that could be causing the failures.'
 - command: 'kubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE}
     -- curl -s localhost:8080/queue/api/json --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}
     | jq -r ''.items[] | select((.stuck == true) or (.blocked == true)) | "Why: "
@@ -129,3 +246,28 @@ commands:
     \ \"Why: \" + .why + \"\\nBlocked: \" + (.blocked|tostring) + \"\\nStuck: \" +\
     \ (.stuck|tostring)'\n"
   name: query_for_stuck_jenkins_jobs
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to investigate and gather
+    information about stuck or blocked items in a Jenkins job queue that could be
+    causing the CrashLoopBackoff.
+
+
+    2. Monitoring and debugging performance issues: If there are performance issues
+    with a specific statefulset within the Kubernetes cluster, the engineer might
+    use this command to retrieve information and identify any stuck or blocked items
+    impacting the performance.
+
+
+    3. Investigating job queue delays: In the event of delays in the Jenkins job queue,
+    the engineer may use this command to gather information on any stuck or blocked
+    items that could be causing the delays.
+
+
+    4. Identifying and resolving resource contention: This command could be used to
+    gather data on any resource contention within a statefulset, helping the engineer
+    to identify and address any stuck or blocked items contributing to the issue.
+
+
+    5. Troubleshooting job failures: If there are frequent job failures within a specific
+    statefulset, the engineer might use this command to retrieve information and pinpoint
+    any stuck or blocked items that could be causing the failures.'

@@ -43,6 +43,27 @@ commands:
     \ making it easier for newer or less experienced devops engineers to understand\
     \ and learn from."
   name: troubleshoot_warning_events_in_namespace_namespace
+  when_is_it_useful: '1. Investigating a production incident where multiple pods in
+    a specific namespace are experiencing CrashLoopBackoff events, and determining
+    the root cause of the issue.
+
+
+    2. Monitoring and analyzing Kubernetes events for a particular service or application
+    that is displaying erratic behavior or performance issues.
+
+
+    3. Performing proactive analysis on Kubernetes events to identify any warning
+    signs or patterns that could indicate potential problems or failure points.
+
+
+    4. Troubleshooting a deployment failure or abnormal behavior of a specific pod
+    or service, by examining the Kubernetes events and extracting relevant information
+    for debugging.
+
+
+    5. Conducting a post-incident review to analyze Kubernetes events related to a
+    recent outage or disruption, in order to better understand what happened and how
+    to prevent similar incidents in the future.'
 - command: 'kubectl get events --field-selector type=Warning --context ${CONTEXT}
     -n ${NAMESPACE} -o json > $HOME/warning_events.json && cat $HOME/warning_events.json
     | jq -r ''[.items[] | {namespace: .involvedObject.namespace, kind: .involvedObject.kind,
@@ -87,6 +108,27 @@ commands:
     \ making it easier for newer or less experienced devops engineers to understand\
     \ and learn from."
   name: troubleshoot_warning_events_in_namespace_namespace
+  when_is_it_useful: '1. Investigating a production incident where multiple pods in
+    a specific namespace are experiencing CrashLoopBackoff events, and determining
+    the root cause of the issue.
+
+
+    2. Monitoring and analyzing Kubernetes events for a particular service or application
+    that is displaying erratic behavior or performance issues.
+
+
+    3. Performing proactive analysis on Kubernetes events to identify any warning
+    signs or patterns that could indicate potential problems or failure points.
+
+
+    4. Troubleshooting a deployment failure or abnormal behavior of a specific pod
+    or service, by examining the Kubernetes events and extracting relevant information
+    for debugging.
+
+
+    5. Conducting a post-incident review to analyze Kubernetes events related to a
+    recent outage or disruption, in order to better understand what happened and how
+    to prevent similar incidents in the future.'
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r
     --argjson exit_code_explanations ''{"0": "Success", "1": "Error", "2": "Misconfiguration",
     "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137":
@@ -132,6 +174,27 @@ commands:
     \ output using `jq`. It also includes comments throughout to explain each step\
     \ for clarity and understanding."
   name: troubleshoot_container_restarts_in_namespace_namespace
+  when_is_it_useful: '1. Debugging a production issue where a Kubernetes pod is constantly
+    restarting due to CrashLoopBackoff events, impacting the availability and performance
+    of an application.
+
+
+    2. Investigating a deployment rollout issue where pods are failing to start or
+    crashing frequently, causing downtime for the application.
+
+
+    3. Monitoring and analyzing the performance of pods in a development or testing
+    environment to ensure they are properly configured and not experiencing recurring
+    restarts.
+
+
+    4. Troubleshooting a scenario where certain containers within a pod are repeatedly
+    failing, leading to a continuous restart loop and potential service disruption.
+
+
+    5. Conducting proactive analysis and tuning of pod configurations to prevent potential
+    future issues related to container restarts and ensure the overall stability and
+    reliability of the Kubernetes environment.'
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r
     --argjson exit_code_explanations ''{"0": "Success", "1": "Error", "2": "Misconfiguration",
     "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137":
@@ -177,6 +240,27 @@ commands:
     \ output using `jq`. It also includes comments throughout to explain each step\
     \ for clarity and understanding."
   name: troubleshoot_container_restarts_in_namespace_namespace
+  when_is_it_useful: '1. Debugging a production issue where a Kubernetes pod is constantly
+    restarting due to CrashLoopBackoff events, impacting the availability and performance
+    of an application.
+
+
+    2. Investigating a deployment rollout issue where pods are failing to start or
+    crashing frequently, causing downtime for the application.
+
+
+    3. Monitoring and analyzing the performance of pods in a development or testing
+    environment to ensure they are properly configured and not experiencing recurring
+    restarts.
+
+
+    4. Troubleshooting a scenario where certain containers within a pod are repeatedly
+    failing, leading to a continuous restart loop and potential service disruption.
+
+
+    5. Conducting proactive analysis and tuning of pod configurations to prevent potential
+    future issues related to container restarts and ensure the overall stability and
+    reliability of the Kubernetes environment.'
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending
     --no-headers -o json | jq -r ''.items[] | "pod_name: \(.metadata.name)\nstatus:
     \(.status.phase // "N/A")\nmessage: \(.status.conditions[0].message // "N/A")\nreason:
@@ -211,6 +295,34 @@ commands:
     \ // \"N/A\")\\ncontainerReason: \\(.status.containerStatuses[0].state.waiting?.reason\
     \ // \"N/A\")\\n_______-\"' \n"
   name: troubleshoot_pending_pods_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: This
+    task might be performed by a DevOps or Site Reliability Engineer to identify the
+    cause of the CrashLoopBackoff events and resolve any issues with the pods causing
+    them.
+
+
+    2. Monitoring and troubleshooting pod status and container health: DevOps or Site
+    Reliability Engineers might use this command to regularly check the status and
+    health of pods in a Kubernetes cluster, as well as investigate any issues related
+    to container status or messages.
+
+
+    3. Investigating application errors or failures: If an application deployed in
+    a Kubernetes cluster is experiencing errors or failures, DevOps or Site Reliability
+    Engineers could use this command to gather detailed information about the affected
+    pods and containers to diagnose and address the issues.
+
+
+    4. Performing routine maintenance and health checks: During routine maintenance
+    tasks or periodic health checks of a Kubernetes cluster, DevOps or Site Reliability
+    Engineers may use this command to quickly retrieve and analyze relevant information
+    about specific pods to ensure they are running smoothly.
+
+
+    5. Diagnosing performance issues: When performance issues arise within a Kubernetes
+    cluster, DevOps or Site Reliability Engineers may utilize this command to gather
+    insights into the status and health of specific pods and containers, allowing
+    them to identify any potential bottlenecks or problems affecting performance.'
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending
     --no-headers -o json | jq -r ''.items[] | "pod_name: \(.metadata.name)\nstatus:
     \(.status.phase // "N/A")\nmessage: \(.status.conditions[0].message // "N/A")\nreason:
@@ -245,6 +357,34 @@ commands:
     \ // \"N/A\")\\ncontainerReason: \\(.status.containerStatuses[0].state.waiting?.reason\
     \ // \"N/A\")\\n_______-\"' \n"
   name: troubleshoot_pending_pods_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: This
+    task might be performed by a DevOps or Site Reliability Engineer to identify the
+    cause of the CrashLoopBackoff events and resolve any issues with the pods causing
+    them.
+
+
+    2. Monitoring and troubleshooting pod status and container health: DevOps or Site
+    Reliability Engineers might use this command to regularly check the status and
+    health of pods in a Kubernetes cluster, as well as investigate any issues related
+    to container status or messages.
+
+
+    3. Investigating application errors or failures: If an application deployed in
+    a Kubernetes cluster is experiencing errors or failures, DevOps or Site Reliability
+    Engineers could use this command to gather detailed information about the affected
+    pods and containers to diagnose and address the issues.
+
+
+    4. Performing routine maintenance and health checks: During routine maintenance
+    tasks or periodic health checks of a Kubernetes cluster, DevOps or Site Reliability
+    Engineers may use this command to quickly retrieve and analyze relevant information
+    about specific pods to ensure they are running smoothly.
+
+
+    5. Diagnosing performance issues: When performance issues arise within a Kubernetes
+    cluster, DevOps or Site Reliability Engineers may utilize this command to gather
+    insights into the status and health of specific pods and containers, allowing
+    them to identify any potential bottlenecks or problems affecting performance.'
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed
     --no-headers -o json | jq -r --argjson exit_code_explanations ''{"0": "Success",
     "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134":
@@ -290,6 +430,28 @@ commands:
     \ restart count, message, termination time, exit code, and an explanation for\
     \ the exit code based on a predefined lookup table."
   name: troubleshoot_failed_pods_in_namespace_namespace
+  when_is_it_useful: '1. Investigating and troubleshooting Kubernetes CrashLoopBackoff
+    events, such as identifying the root cause of the failure and determining the
+    appropriate action to rectify the issue.
+
+
+    2. Monitoring and analyzing pod failures in a specific namespace to identify any
+    recurring patterns or issues that may require further investigation or resolution.
+
+
+    3. Providing detailed information on failed pods, including restart count, termination
+    message, finished time, and exit code, to facilitate debugging and troubleshooting
+    efforts by development and operations teams.
+
+
+    4. Generating reports or logs of failed pods in a specific namespace for analysis
+    and review by the team responsible for managing and maintaining the Kubernetes
+    infrastructure.
+
+
+    5. Automating the retrieval and formatting of failed pod information for proactive
+    monitoring and alerting, allowing for timely intervention and resolution of issues
+    before they impact the overall system performance and availability.'
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed
     --no-headers -o json | jq -r --argjson exit_code_explanations ''{"0": "Success",
     "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134":
@@ -335,6 +497,28 @@ commands:
     \ restart count, message, termination time, exit code, and an explanation for\
     \ the exit code based on a predefined lookup table."
   name: troubleshoot_failed_pods_in_namespace_namespace
+  when_is_it_useful: '1. Investigating and troubleshooting Kubernetes CrashLoopBackoff
+    events, such as identifying the root cause of the failure and determining the
+    appropriate action to rectify the issue.
+
+
+    2. Monitoring and analyzing pod failures in a specific namespace to identify any
+    recurring patterns or issues that may require further investigation or resolution.
+
+
+    3. Providing detailed information on failed pods, including restart count, termination
+    message, finished time, and exit code, to facilitate debugging and troubleshooting
+    efforts by development and operations teams.
+
+
+    4. Generating reports or logs of failed pods in a specific namespace for analysis
+    and review by the team responsible for managing and maintaining the Kubernetes
+    infrastructure.
+
+
+    5. Automating the retrieval and formatting of failed pod information for proactive
+    monitoring and alerting, allowing for timely intervention and resolution of issues
+    before they impact the overall system performance and availability.'
 - command: 'kubectl get pods --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r
     ''.items[] | select(.status.conditions[]? | select(.type == "Ready" and .status
     == "False" and .reason != "PodCompleted")) | {kind: .kind, name: .metadata.name,
@@ -359,6 +543,25 @@ commands:
     \ or less experienced devops engineers who may not be familiar with all the commands\
     \ used."
   name: troubleshoot_workload_status_conditions_in_namespace_namespace
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
+    events to identify and fix any issues causing continuous pod restarts.
+
+
+    2. Identifying and resolving performance issues with pods that are not ready or
+    have not completed, to ensure smooth operation of the application.
+
+
+    3. Troubleshooting and diagnosing connectivity problems within the Kubernetes
+    cluster by examining pod conditions and statuses.
+
+
+    4. Investigating and resolving deployment failures by retrieving information about
+    pods that are not ready or have not completed.
+
+
+    5. Analyzing and troubleshooting resource constraints or bottlenecks within the
+    Kubernetes cluster, by examining the status and conditions of pods in a specific
+    namespace and context.'
 - command: 'kubectl get pods --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r
     ''.items[] | select(.status.conditions[]? | select(.type == "Ready" and .status
     == "False" and .reason != "PodCompleted")) | {kind: .kind, name: .metadata.name,
@@ -383,90 +586,149 @@ commands:
     \ or less experienced devops engineers who may not be familiar with all the commands\
     \ used."
   name: troubleshoot_workload_status_conditions_in_namespace_namespace
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
+    events to identify and fix any issues causing continuous pod restarts.
+
+
+    2. Identifying and resolving performance issues with pods that are not ready or
+    have not completed, to ensure smooth operation of the application.
+
+
+    3. Troubleshooting and diagnosing connectivity problems within the Kubernetes
+    cluster by examining pod conditions and statuses.
+
+
+    4. Investigating and resolving deployment failures by retrieving information about
+    pods that are not ready or have not completed.
+
+
+    5. Analyzing and troubleshooting resource constraints or bottlenecks within the
+    Kubernetes cluster, by examining the status and conditions of pods in a specific
+    namespace and context.'
 - command: kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT}
-    | xargs -n 1 kubectl get --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}
+    | xargs -n 1 bash -c 'kubectl get $0 --show-kind --ignore-not-found -n ${NAMESPACE}
+    --context=${CONTEXT}'
   doc_links: '
 
-    - [Kubernetes API Concepts](https://kubernetes.io/docs/concepts/){:target="_blank"}
+    - [kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
 
-    - [Kubernetes Namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [Kubectl Command Reference](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
-
-    - [Kubernetes API Endpoints](https://kubernetes.io/docs/concepts/overview/kubernetes-api/){:target="_blank"}'
-  explanation: This command retrieves a list of API resources for a specific context,
-    and then gets the details of each resource in a specified namespace using that
-    context. It's a way to gather information about the available resources within
-    a Kubernetes environment.
+    - [Bash Guide for Beginners](http://tldp.org/LDP/Bash-Beginners-Guide/html/){:target="_blank"}'
+  explanation: This command uses kubectl to list all available API resources in the
+    current Kubernetes context, then it uses xargs and bash to get each resource in
+    the specified namespace.
   multi_line_details: '
 
-    # This command retrieves a list of Kubernetes resources in a specific namespace
-    and context
+    # First, use kubectl to list all the available API resources in the cluster that
+    support the "list" verb and are namespaced
+
+    api_resources=$(kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT})
 
 
-    # First, we use kubectl to list the available resources using the specified verbs
-    and namespace
+    # Then, for each of the listed resources, use xargs to iterate through them one
+    by one and execute the following command
 
-    # We output the resource names using the ''-o name'' flag and specify the context
-    to use
-
-    kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT} |
+    echo $api_resources | xargs -n 1 bash -c '' \
 
 
-    # Next, we use xargs to process each resource name and retrieve detailed information
-    about each resource
+    # Use kubectl to get information about the current resource being processed
 
-    # We use the ''get'' command to show the kind of each resource, ignoring any resources
-    that are not found
-
-    # We also specify the namespace and context to use for each resource
-
-    xargs -n 1 kubectl get --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}
+    kubectl get $0 --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}''
 
     '
   name: get_listing_of_resources_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: When
+    a Kubernetes pod enters into a CrashLoopBackoff state, it can indicate an issue
+    with the application''s code, configuration, or underlying infrastructure. DevOps
+    or Site Reliability Engineers may need to use the provided command to identify
+    and understand the resources in the affected namespace to diagnose and resolve
+    the issue.
+
+
+    2. Monitoring and maintenance: DevOps or Site Reliability Engineers may want to
+    periodically review all available API resources in a specific namespace to ensure
+    that the deployment, services, and other resources are functioning as expected
+    and to identify any potential issues proactively.
+
+
+    3. Application deployment and updates: Before deploying a new application or updating
+    an existing one in Kubernetes, engineers may use this command to verify the availability
+    and status of all relevant API resources within the specified namespace to ensure
+    a smooth deployment process without any conflicts or disruptions.
+
+
+    4. Resource utilization and capacity planning: To monitor resource usage and plan
+    for capacity scaling in a Kubernetes cluster, DevOps or Site Reliability Engineers
+    may use the provided command to gain insights into the current state of API resources
+    within a specific namespace, allowing them to make informed decisions about resource
+    allocation and scaling.
+
+
+    5. Troubleshooting and debugging: In the event of unexpected errors or performance
+    issues within a particular namespace, engineers may use this command to quickly
+    inspect and analyze all available API resources, helping them to debug and troubleshoot
+    the problem efficiently.'
 - command: kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT}
-    | xargs -n 1 kubectl get --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}
+    | xargs -n 1 bash -c 'kubectl get $0 --show-kind --ignore-not-found -n ${NAMESPACE}
+    --context=${CONTEXT}'
   doc_links: '
 
-    - [Kubernetes API Concepts](https://kubernetes.io/docs/concepts/){:target="_blank"}
+    - [kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
 
-    - [Kubernetes Namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [Kubectl Command Reference](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
-
-    - [Kubernetes API Endpoints](https://kubernetes.io/docs/concepts/overview/kubernetes-api/){:target="_blank"}'
-  explanation: This command retrieves a list of API resources for a specific context,
-    and then gets the details of each resource in a specified namespace using that
-    context. It's a way to gather information about the available resources within
-    a Kubernetes environment.
+    - [Bash Guide for Beginners](http://tldp.org/LDP/Bash-Beginners-Guide/html/){:target="_blank"}'
+  explanation: This command uses kubectl to list all available API resources in the
+    current Kubernetes context, then it uses xargs and bash to get each resource in
+    the specified namespace.
   multi_line_details: '
 
-    # This command retrieves a list of Kubernetes resources in a specific namespace
-    and context
+    # First, use kubectl to list all the available API resources in the cluster that
+    support the "list" verb and are namespaced
+
+    api_resources=$(kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT})
 
 
-    # First, we use kubectl to list the available resources using the specified verbs
-    and namespace
+    # Then, for each of the listed resources, use xargs to iterate through them one
+    by one and execute the following command
 
-    # We output the resource names using the ''-o name'' flag and specify the context
-    to use
-
-    kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT} |
+    echo $api_resources | xargs -n 1 bash -c '' \
 
 
-    # Next, we use xargs to process each resource name and retrieve detailed information
-    about each resource
+    # Use kubectl to get information about the current resource being processed
 
-    # We use the ''get'' command to show the kind of each resource, ignoring any resources
-    that are not found
-
-    # We also specify the namespace and context to use for each resource
-
-    xargs -n 1 kubectl get --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}
+    kubectl get $0 --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}''
 
     '
   name: get_listing_of_resources_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: When
+    a Kubernetes pod enters into a CrashLoopBackoff state, it can indicate an issue
+    with the application''s code, configuration, or underlying infrastructure. DevOps
+    or Site Reliability Engineers may need to use the provided command to identify
+    and understand the resources in the affected namespace to diagnose and resolve
+    the issue.
+
+
+    2. Monitoring and maintenance: DevOps or Site Reliability Engineers may want to
+    periodically review all available API resources in a specific namespace to ensure
+    that the deployment, services, and other resources are functioning as expected
+    and to identify any potential issues proactively.
+
+
+    3. Application deployment and updates: Before deploying a new application or updating
+    an existing one in Kubernetes, engineers may use this command to verify the availability
+    and status of all relevant API resources within the specified namespace to ensure
+    a smooth deployment process without any conflicts or disruptions.
+
+
+    4. Resource utilization and capacity planning: To monitor resource usage and plan
+    for capacity scaling in a Kubernetes cluster, DevOps or Site Reliability Engineers
+    may use the provided command to gain insights into the current state of API resources
+    within a specific namespace, allowing them to make informed decisions about resource
+    allocation and scaling.
+
+
+    5. Troubleshooting and debugging: In the event of unexpected errors or performance
+    issues within a particular namespace, engineers may use this command to quickly
+    inspect and analyze all available API resources, helping them to debug and troubleshoot
+    the problem efficiently.'
 - command: 'kubectl get events --field-selector type!=Warning --context ${CONTEXT}
     -n ${NAMESPACE} -o json > $HOME/events.json && cat $HOME/events.json | jq -r ''[.items[]
     | {namespace: .involvedObject.namespace, kind: .involvedObject.kind, name: ((if
@@ -515,6 +777,20 @@ commands:
     \ | unique | join(\"; \")} | select(.events_per_minute > $threshold)' \n\n# Combine\
     \ results into a single JSON array\njq -s '.'\n"
   name: check_event_anomalies_in_namespace_namespace
+  when_is_it_useful: '1. Investigating frequent CrashLoopBackoff events in a Kubernetes
+    cluster that are causing application downtime.
+
+    2. Monitoring and analyzing network-related issues such as high traffic or connectivity
+    problems within a Kubernetes environment.
+
+    3. Identifying and addressing performance bottlenecks in a Kubernetes cluster,
+    such as high CPU or memory usage.
+
+    4. Troubleshooting and resolving persistent storage issues affecting the stability
+    and reliability of applications running on Kubernetes.
+
+    5. Analyzing and mitigating security-related events or alerts within a Kubernetes
+    cluster, such as unauthorized access attempts or potential breaches.'
 - command: 'kubectl get events --field-selector type!=Warning --context ${CONTEXT}
     -n ${NAMESPACE} -o json > $HOME/events.json && cat $HOME/events.json | jq -r ''[.items[]
     | {namespace: .involvedObject.namespace, kind: .involvedObject.kind, name: ((if
@@ -563,6 +839,20 @@ commands:
     \ | unique | join(\"; \")} | select(.events_per_minute > $threshold)' \n\n# Combine\
     \ results into a single JSON array\njq -s '.'\n"
   name: check_event_anomalies_in_namespace_namespace
+  when_is_it_useful: '1. Investigating frequent CrashLoopBackoff events in a Kubernetes
+    cluster that are causing application downtime.
+
+    2. Monitoring and analyzing network-related issues such as high traffic or connectivity
+    problems within a Kubernetes environment.
+
+    3. Identifying and addressing performance bottlenecks in a Kubernetes cluster,
+    such as high CPU or memory usage.
+
+    4. Troubleshooting and resolving persistent storage issues affecting the stability
+    and reliability of applications running on Kubernetes.
+
+    5. Analyzing and mitigating security-related events or alerts within a Kubernetes
+    cluster, such as unauthorized access attempts or potential breaches.'
 - command: context="${CONTEXT}"; namespace="${NAMESPACE}"; check_health() { local
     type=$1; local name=$2; local replicas=$3; local selector=$4; local pdbs=$(kubectl
     --context "$context" --namespace "$namespace" get pdb -o json | jq -c --arg selector
@@ -633,6 +923,31 @@ commands:
     =\" + .value)\"' | while read -r line; do \n    check_health \"StatefulSet\" $(echo\
     \ $line | tr -d '\"'); \ndone\n"
   name: check_missing_or_risky_poddisruptionbudget_policies_in_namepace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to check the health of deployments
+    and statefulsets in order to identify any issues causing the CrashLoopBackoff
+    events.
+
+
+    2. Assessing the impact of a recent cluster upgrade: After upgrading a Kubernetes
+    cluster, the engineer may use this command to evaluate the health of deployments
+    and statefulsets to ensure that all resources are still functioning as expected.
+
+
+    3. Investigating system-wide performance issues: In the event of system-wide performance
+    issues, the engineer could use this command to quickly assess the health of various
+    deployments and statefulsets in order to pinpoint any potential causes of the
+    performance degradation.
+
+
+    4. Conducting regular health checks: As part of routine maintenance, the engineer
+    may use this command to regularly check the health of deployments and statefulsets
+    to proactively identify any potential issues before they escalate.
+
+
+    5. Monitoring for compliance with best practices: The engineer may use this command
+    to regularly evaluate the health of deployments and statefulsets against established
+    best practices and guidelines to ensure the cluster is in compliance.'
 - command: context="${CONTEXT}"; namespace="${NAMESPACE}"; check_health() { local
     type=$1; local name=$2; local replicas=$3; local selector=$4; local pdbs=$(kubectl
     --context "$context" --namespace "$namespace" get pdb -o json | jq -c --arg selector
@@ -703,6 +1018,31 @@ commands:
     =\" + .value)\"' | while read -r line; do \n    check_health \"StatefulSet\" $(echo\
     \ $line | tr -d '\"'); \ndone\n"
   name: check_missing_or_risky_poddisruptionbudget_policies_in_namepace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to check the health of deployments
+    and statefulsets in order to identify any issues causing the CrashLoopBackoff
+    events.
+
+
+    2. Assessing the impact of a recent cluster upgrade: After upgrading a Kubernetes
+    cluster, the engineer may use this command to evaluate the health of deployments
+    and statefulsets to ensure that all resources are still functioning as expected.
+
+
+    3. Investigating system-wide performance issues: In the event of system-wide performance
+    issues, the engineer could use this command to quickly assess the health of various
+    deployments and statefulsets in order to pinpoint any potential causes of the
+    performance degradation.
+
+
+    4. Conducting regular health checks: As part of routine maintenance, the engineer
+    may use this command to regularly check the health of deployments and statefulsets
+    to proactively identify any potential issues before they escalate.
+
+
+    5. Monitoring for compliance with best practices: The engineer may use this command
+    to regularly evaluate the health of deployments and statefulsets against established
+    best practices and guidelines to ensure the cluster is in compliance.'
 - command: bash 'resource_quota_check.sh'
   doc_links: '
 
@@ -774,3 +1114,25 @@ commands:
     \n    echo \"[$recommendations]\" | jq .\nelse\n    echo \"No recommendations.\"\
     \nfi\n"
   name: check_resource_quota_utilization_in_namespace_namespace
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
+    events to identify the root cause of the crashes and provide recommendations for
+    adjusting resource quotas to prevent future occurrences.
+
+
+    2. Analyzing resource usage in a Kubernetes cluster to identify potential performance
+    bottlenecks and generate recommendations for optimizing resource allocation.
+
+
+    3. Assessing the impact of scaling up or down certain deployments in a Kubernetes
+    environment based on memory and CPU usage, and providing recommendations for adjusting
+    resource quotas accordingly.
+
+
+    4. Identifying and addressing resource contention issues in a Kubernetes cluster
+    by analyzing memory and CPU usage and generating recommendations for redistributing
+    resources among different deployments.
+
+
+    5. Evaluating the performance of applications running in a Kubernetes environment
+    and providing recommendations for fine-tuning resource quotas to improve overall
+    efficiency and stability.'
