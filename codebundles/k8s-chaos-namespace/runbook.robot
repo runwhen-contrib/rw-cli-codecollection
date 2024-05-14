@@ -20,8 +20,8 @@ Test Namespace Highly Available
     [Documentation]   Randomly selects up to 10 pods in a namespace to delete to test HA
     [Tags]  Kubernetes    Namespace    Deployments    Pods    Highly Available
     ${process}=    RW.CLI.Run Cli    ls && echo "SPLIT" && printenv
-    ${process}=    RW.CLI.Run Bash File    delete_random_pods.sh
-    ...    cmd_override=./delete_random_pods.sh
+    ${process}=    RW.CLI.Run Bash File
+    ...    bash_file=delete_random_pods.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ${process.stdout}
