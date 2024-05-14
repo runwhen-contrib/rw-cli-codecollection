@@ -20,22 +20,26 @@ Test Namespace Highly Available
     [Documentation]   Randomly selects up to 10 pods in a namespace to delete to test HA
     [Tags]  Kubernetes    Namespace    Deployments    Pods    Highly Available 
     ${process}=    RW.CLI.Run Bash File    delete_random_pods.sh
+    ...    cmd_override=./delete_random_pods.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ${process.stdout}
 
-Test Node Drain
-    [Documentation]   Drains a random node to check disruption handling
-    [Tags]  Kubernetes    Nodes    Drain    Disruption
-    ${process}=    RW.CLI.Run Bash File    drain_node.sh
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    RW.Core.Add Pre To Report    ${process.stdout}
+# TODO: discuss with team - may impact demos?
+# Test Node Drain
+#     [Documentation]   Drains a random node to check disruption handling
+#     [Tags]  Kubernetes    Nodes    Drain    Disruption
+#     ${process}=    RW.CLI.Run Bash File    drain_node.sh
+#     ...    cmd_override=./drain_node.sh
+#     ...    env=${env}
+#     ...    secret_file__kubeconfig=${kubeconfig}
+#     RW.Core.Add Pre To Report    ${process.stdout}
 
 Mangle Service Selector
     [Documentation]   Breaks a service's label selector to cause a network disruption
     [Tags]  Kubernetes    networking    Services    Selector
     ${process}=    RW.CLI.Run Bash File    change_service_selector.sh
+    ...    cmd_override=./change_service_selector.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ${process.stdout}
@@ -44,6 +48,7 @@ Mangle Service Port
     [Documentation]   Changes a service's port to cause a network disruption
     [Tags]  Kubernetes    networking    Services    Port
     ${process}=    RW.CLI.Run Bash File    change_service_port.sh
+    ...    cmd_override=./change_service_port.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ${process.stdout}
@@ -52,6 +57,7 @@ Fill Pod Tmp
     [Documentation]   Attaches to a pod and fills the /tmp directory with random data
     [Tags]  Kubernetes    pods    volumes    tmp
     ${process}=    RW.CLI.Run Bash File    expand_tmp.sh
+    ...    cmd_override=./expand_tmp.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ${process.stdout}
