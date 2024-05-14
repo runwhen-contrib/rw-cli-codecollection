@@ -15,6 +15,7 @@ for NAMESPACE_WORKLOAD in $NAMESPACE_WORKLOADS; do
     flux_object=$(echo "$manifest_json" | jq -r '.metadata.labels["kustomize.toolkit.fluxcd.io/name"]')
     suspend=$(echo "$manifest_json" | jq -r '.spec.suspend')
     if [[ $suspend == "true" ]]; then
-        kubectl patch $flux_object -n $flux_namespace --type='json' -p '[{"op": "remove", "path": "/spec/suspend"}]'
+        echo "Removing suspend from kustomizations.kustomize.toolkit.fluxcd.io/$flux_object in namespace $flux_namespace..."
+        kubectl patch kustomizations.kustomize.toolkit.fluxcd.io/$flux_object -n $flux_namespace --type='json' -p '[{"op": "remove", "path": "/spec/suspend"}]'
     fi
 done

@@ -20,8 +20,8 @@ for NAMESPACE_WORKLOAD in $NAMESPACE_WORKLOADS; do
     if [[ " ${processed_objects[@]} " =~ " ${flux_object} " ]]; then
         continue
     fi
-
-    kubectl patch $flux_object -n $flux_namespace --type='merge' -p "{\"spec\":{\"suspend\":true}}"
+    echo "Patching suspend onto kustomizations.kustomize.toolkit.fluxcd.io/$flux_object in namespace $flux_namespace..."
+    kubectl patch kustomizations.kustomize.toolkit.fluxcd.io/$flux_object -n $flux_namespace --type='merge' -p "{\"spec\":{\"suspend\":true}}"
 
     # Add the flux_object to the processed_objects array
     processed_objects+=("$flux_object")
