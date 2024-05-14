@@ -22,3 +22,6 @@ for pod_name in $POD_NAMES; do
         break
     fi
 done
+
+echo "Random deletions complete. Current Pod States:"
+kubectl get pods -n $NAMESPACE
