@@ -14,6 +14,7 @@ for pod_name in $POD_NAMES; do
         echo "Creating background process to OOMkill pod $pod_name by applying pressure to $MEMORY_PRESSURE_AMOUNT of memory..."
         kubectl exec --context $CONTEXT -n $NAMESPACE $pod_name -- /bin/sh -c 'for i in 1 2 3 4 5; do (while :; do dd if=/dev/zero of=/dev/null bs=10485760  count=100 & done) & done'
         echo "Checking on pod..."
+        sleep 3
         pod_state=$(kubectl describe $pod_name -n $NAMESPACE)
         # Increment the killed count
         ((killed_count++))
@@ -23,7 +24,5 @@ for pod_name in $POD_NAMES; do
         break
     fi
 done
-
-sleep 30
 echo "Current Pod States:"
 kubectl get pods -n $NAMESPACE
