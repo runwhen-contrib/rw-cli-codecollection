@@ -19,4 +19,5 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 
 ## TODO
 - [ ] Add additional documentation.
+- [ ] Add suspend support for other flux CRDs
 

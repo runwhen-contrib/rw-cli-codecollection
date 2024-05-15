@@ -21,5 +21,6 @@ kubectl patch service $SERVICE_NAME -n $NAMESPACE -p '{"spec":{"selector":{"'$KE
 echo "-----------------------------------"
 echo "Current services with chaos selector $CHAOS_LABEL:"
 SERVICE_JSON=$(kubectl get services -n $NAMESPACE -ojson)
-CHAOSED_SERVICES=$(kubectl get services -n $NAMESPACE -ojson | jq -r --arg CHAOS_LABEL "$CHAOS_LABEL" '.items[] | select(.spec.selector[] == $CHAOS_LABEL) | .metadata.name')
+CHAOSED_SERVICES=$(echo "$SERVICE_JSON" | jq -r '.items[] | select(.spec.selector == {"'$KEY'":"'$CHAOS_LABEL'"}) | .metadata.name')
+echo $CHAOSED_SERVICES
 echo "-----------------------------------"
