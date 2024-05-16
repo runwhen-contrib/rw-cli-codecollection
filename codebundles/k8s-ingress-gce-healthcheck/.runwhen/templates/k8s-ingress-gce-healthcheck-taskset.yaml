@@ -36,6 +36,3 @@ spec:
       workspaceKey: {{custom.kubeconfig_secret_name}}
     - name: gcp_credentials_json
       workspaceKey: {{custom.gcp_ops_suite_sa}}
-  servicesProvided:
-    - name: {{custom.kubernetes_distribution_binary}}
-      locationServiceName: {{custom.kubernetes_distribution_binary}}-service.shared

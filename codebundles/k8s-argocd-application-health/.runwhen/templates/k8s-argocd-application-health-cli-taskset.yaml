@@ -37,6 +37,3 @@ spec:
   secretsProvided:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
-  servicesProvided:
-    - name: {{custom.kubernetes_distribution_binary}}
-      locationServiceName: {{custom.kubernetes_distribution_binary}}-service.shared
