@@ -18,7 +18,6 @@ Raise Full Issue
     [Tags]    test
     ${issue}=    RW.CLI.Run Cli
     ...    cmd=echo "issue"
-    ...    target_service=${GCLOUD_SERVICE}
     RW.CLI.Parse Cli Output By Line
     ...    rsp=${issue}
     ...    set_severity_level=4
@@ -30,14 +29,3 @@ Raise Full Issue
     ...    _line__raise_issue_if_contains=issue
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
-
-
-*** Keywords ***
-Suite Initialization
-    ${GCLOUD_SERVICE}=    RW.Core.Import Service    gcloud
-    ...    type=string
-    ...    description=The selected RunWhen Service to use for accessing services within a network.
-    ...    pattern=\w*
-    ...    example=gcloud-service.shared
-    ...    default=gcloud-service.shared
-    Set Suite Variable    ${GCLOUD_SERVICE}    ${GCLOUD_SERVICE}

@@ -23,10 +23,6 @@ Suite Initialization
     ...    description=The kubernetes kubeconfig yaml containing connection configuration used to connect to cluster(s).
     ...    pattern=\w*
     ...    example=For examples, start here https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
-    ${kubectl}=    RW.Core.Import Service    kubectl
-    ...    description=The location service used to interpret shell commands.
-    ...    default=kubectl-service.shared
-    ...    example=kubectl-service.shared
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
