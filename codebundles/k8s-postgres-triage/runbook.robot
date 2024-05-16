@@ -18,7 +18,6 @@ Get Standard Postgres Resource Information
     [Tags]    postgres    resources    workloads    standard    information
     ${results}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get all -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
@@ -33,7 +32,6 @@ Describe Postgres Custom Resources
     [Tags]    postgres    resources    workloads    customer resource definitions    crd    information
     ${crd_list}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get crd -n ${NAMESPACE} --context ${CONTEXT} -o=jsonpath='{.items[*].metadata.name}'
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
@@ -45,14 +43,12 @@ Describe Postgres Custom Resources
     IF    len(${crd_list}) > 0
         ${crd_workloads}=    RW.CLI.Run Cli
         ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get {item} -n ${NAMESPACE} --context ${CONTEXT} -o=name
-        ...    target_service=${kubectl}
         ...    env=${env}
         ...    loop_with_items=${crd_list}
         ...    secret_file__kubeconfig=${KUBECONFIG}
         ${crd_workloads}=    Split String    ${crd_workloads.stdout}
         ${crd_descriptions}=    RW.CLI.Run Cli
         ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} describe {item} -n ${NAMESPACE} --context ${CONTEXT}
-        ...    target_service=${kubectl}
         ...    env=${env}
         ...    loop_with_items=${crd_workloads}
         ...    secret_file__kubeconfig=${KUBECONFIG}
@@ -67,7 +63,6 @@ Get Postgres Pod Logs & Events
     [Tags]    postgres    events    warnings    labels    logs    errors    pods
     ${labeled_pods}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT} -o=name --field-selector=status.phase=Running
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
@@ -78,7 +73,6 @@ Get Postgres Pod Logs & Events
     IF    len(${labeled_pod_names}) > 0
         ${temp_logs}=    RW.CLI.Run Cli
         ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs {item} -n ${NAMESPACE} --context ${CONTEXT} --tail=100
-        ...    target_service=${kubectl}
         ...    env=${env}
         ...    secret_file__kubeconfig=${KUBECONFIG}
         ...    loop_with_items=${labeled_pod_names}
@@ -86,7 +80,6 @@ Get Postgres Pod Logs & Events
         ${involved_pod_names}=    Evaluate    [full_name.split("/")[-1] for full_name in ${labeled_pod_names}]
         ${temp_events}=    RW.CLI.Run Cli
         ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events -n ${NAMESPACE} --context ${CONTEXT} --field-selector involvedObject.name={item}
-        ...    target_service=${kubectl}
         ...    env=${env}
         ...    secret_file__kubeconfig=${KUBECONFIG}
         ...    loop_with_items=${involved_pod_names}
@@ -106,7 +99,6 @@ Get Postgres Pod Resource Utilization
     [Tags]    top    resources    utilization    pods    workloads    cpu    memory    allocation    postgres
     ${labeled_pods}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT} -o=name --field-selector=status.phase=Running
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
@@ -117,7 +109,6 @@ Get Postgres Pod Resource Utilization
     IF    len(${labeled_pods}) > 0
         ${temp_top}=    RW.CLI.Run Cli
         ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} top pod {item} -n ${NAMESPACE} --context ${CONTEXT} --containers
-        ...    target_service=${kubectl}
         ...    env=${env}
         ...    secret_file__kubeconfig=${KUBECONFIG}
         ...    loop_with_items=${labeled_pods}
@@ -190,10 +181,6 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=For examples, start here https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
 
-    ${kubectl}=    RW.Core.Import Service    kubectl
-    ...    description=The location service used to interpret shell commands.
-    ...    default=kubectl-service.shared
-    ...    example=kubectl-service.shared
     ${CONTEXT}=    RW.Core.Import User Variable    CONTEXT
     ...    type=string
     ...    description=Which Kubernetes context to operate within.
@@ -243,7 +230,6 @@ Suite Initialization
     ...    default=kubectl
 
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
-    Set Suite Variable    ${kubectl}    ${kubectl}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
