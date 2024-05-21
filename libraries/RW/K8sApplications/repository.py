@@ -278,19 +278,23 @@ class Repository:
         # logger.info(f"{test.stdout}::{test.stderr}")
         if not os.path.exists(f"{self.clone_directory}/.git"):
             # Execute the Git clone command with the modified URI
-            gitcmd = subprocess.run(
-                [
-                    "git",
-                    "clone",
-                    "--branch",
-                    self.branch,
-                    "--single-branch",
-                    auth_uri,
-                    self.clone_directory,
-                ],
-                check=True,
-                env={"GIT_TERMINAL_PROMPT": "0"},
-            )
+            gitcmd = None
+            try:
+                gitcmd = subprocess.run(
+                    [
+                        "git",
+                        "clone",
+                        "--branch",
+                        self.branch,
+                        "--single-branch",
+                        auth_uri,
+                        self.clone_directory,
+                    ],
+                    check=True,
+                    env={"GIT_TERMINAL_PROMPT": "0"},
+                )
+            except:
+                logger.error(f"git clone failed, supressing exception for security, consider debugging locally")
         if not os.path.exists(f"{self.clone_directory}"):
             logger.error(
                 f"Could not create git repo, stdout: {gitcmd.stdout} stderr: {gitcmd.stderr}"

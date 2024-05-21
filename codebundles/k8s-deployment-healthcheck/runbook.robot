@@ -403,8 +403,8 @@ Suite Initialization
     ...    type=string
     ...    description=The home path of the runner
     ...    pattern=\w*
-    ...    example=/root
-    ...    default=/root    
+    ...    example=/home/runwhen
+    ...    default=/home/runwhen    
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}

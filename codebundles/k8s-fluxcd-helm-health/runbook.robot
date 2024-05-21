@@ -108,10 +108,6 @@ Suite Initialization
     ...    description=The kubernetes kubeconfig yaml containing connection configuration used to connect to cluster(s).
     ...    pattern=\w*
     ...    example=For examples, start here https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
-    ${kubectl}=    RW.Core.Import Service    kubectl
-    ...    description=The location service used to interpret shell commands.
-    ...    default=kubectl-service.shared
-    ...    example=kubectl-service.shared
     ${DISTRIBUTION}=    RW.Core.Import User Variable    DISTRIBUTION
     ...    type=string
     ...    description=Which distribution of Kubernetes to use for operations, such as: Kubernetes, OpenShift, etc.

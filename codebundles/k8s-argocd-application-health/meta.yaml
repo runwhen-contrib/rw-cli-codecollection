@@ -21,6 +21,20 @@ commands:
     \ lines with comments provides better context and explanation for newer or less\
     \ experienced devops engineers."
   name: fetch_argocd_application_sync_status_health_for_application
+  when_is_it_useful: '1. Troubleshooting an application experiencing performance issues
+    or outages in a Kubernetes cluster
+
+    2. Investigating and resolving CrashLoopBackoff events for specific applications
+    in the Kubernetes cluster
+
+    3. Monitoring the health and status of critical applications running in the Kubernetes
+    cluster
+
+    4. Performing routine maintenance or updates on specific applications deployed
+    in the Kubernetes cluster
+
+    5. Investigating and resolving synchronization issues for applications managed
+    by ArgoCD in the Kubernetes cluster.'
 - command: 'kubectl get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
     --context ${CONTEXT} -o jsonpath=''Application Name: {.metadata.name}, Sync Status:
     {.status.sync.status}, Health Status: {.status.health.status}, Message: {.status.conditions[].message}'''
@@ -43,6 +57,20 @@ commands:
     \ lines with comments provides better context and explanation for newer or less\
     \ experienced devops engineers."
   name: fetch_argocd_application_sync_status_health_for_application
+  when_is_it_useful: '1. Troubleshooting an application experiencing performance issues
+    or outages in a Kubernetes cluster
+
+    2. Investigating and resolving CrashLoopBackoff events for specific applications
+    in the Kubernetes cluster
+
+    3. Monitoring the health and status of critical applications running in the Kubernetes
+    cluster
+
+    4. Performing routine maintenance or updates on specific applications deployed
+    in the Kubernetes cluster
+
+    5. Investigating and resolving synchronization issues for applications managed
+    by ArgoCD in the Kubernetes cluster.'
 - command: 'kubectl get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
     --context ${CONTEXT} -o json | jq -r ''"Application Name: " + .metadata.name +
     "\nApplication Namespace: "+ .metadata.namespace + "\nLast Sync Start Time: "
@@ -74,6 +102,30 @@ commands:
     \ readability and comprehension, making it easier for them to learn and work with\
     \ the command."
   name: fetch_argocd_application_last_sync_operation_details_for_application
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: DevOps
+    or SREs may use this command to gather information about a specific application
+    deployed with ArgoCD in order to identify potential issues causing the CrashLoopBackoff
+    events.
+
+
+    2. Investigating deployment synchronization issues: If an application deployment
+    is not synchronizing properly with ArgoCD, DevOps or SREs can use this command
+    to retrieve details about the last synchronization and identify any discrepancies.
+
+
+    3. Monitoring application status: DevOps or SREs may use this command to regularly
+    check the status of applications deployed with ArgoCD, ensuring they are running
+    smoothly and have the correct configuration.
+
+
+    4. Auditing application deployments: This command can be used to audit and track
+    changes in application deployments managed by ArgoCD, providing valuable insights
+    for compliance and security purposes.
+
+
+    5. Automating reporting and alerting: DevOps or SREs can use this command to gather
+    information about ArgoCD-managed applications and automate reporting or alerting
+    mechanisms based on specific criteria or thresholds.'
 - command: 'kubectl get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
     --context ${CONTEXT} -o json | jq -r ''"Application Name: " + .metadata.name +
     "\nApplication Namespace: "+ .metadata.namespace + "\nLast Sync Start Time: "
@@ -105,6 +157,30 @@ commands:
     \ readability and comprehension, making it easier for them to learn and work with\
     \ the command."
   name: fetch_argocd_application_last_sync_operation_details_for_application
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: DevOps
+    or SREs may use this command to gather information about a specific application
+    deployed with ArgoCD in order to identify potential issues causing the CrashLoopBackoff
+    events.
+
+
+    2. Investigating deployment synchronization issues: If an application deployment
+    is not synchronizing properly with ArgoCD, DevOps or SREs can use this command
+    to retrieve details about the last synchronization and identify any discrepancies.
+
+
+    3. Monitoring application status: DevOps or SREs may use this command to regularly
+    check the status of applications deployed with ArgoCD, ensuring they are running
+    smoothly and have the correct configuration.
+
+
+    4. Auditing application deployments: This command can be used to audit and track
+    changes in application deployments managed by ArgoCD, providing valuable insights
+    for compliance and security purposes.
+
+
+    5. Automating reporting and alerting: DevOps or SREs can use this command to gather
+    information about ArgoCD-managed applications and automate reporting or alerting
+    mechanisms based on specific criteria or thresholds.'
 - command: kubectl get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
     --context ${CONTEXT} -o json | jq -r '[.status.resources[] | select(.health.status
     != null) | select(.health.status != "Healthy") | {name,kind,namespace,health}]'
@@ -131,6 +207,36 @@ commands:
     \           | select(.health.status != null) \n           | select(.health.status\
     \ != \"Healthy\") \n           | {name,kind,namespace,health}]'\n"
   name: fetch_unhealthy_argocd_application_resources_for_application
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to identify unhealthy resources
+    in a specific namespace, allowing them to determine the cause of the CrashLoopBackoff
+    and take appropriate action to rectify the issue.
+
+
+    2. Monitoring application health in a multi-tenant cluster: When managing multiple
+    applications within a single Kubernetes cluster, DevOps or SREs may utilize this
+    command to regularly check the health status of resources in different namespaces,
+    enabling them to proactively address any issues that arise.
+
+
+    3. Performing post-deployment validation: After deploying a new version of an
+    application using Argo CD, a DevOps or SRE might use this command to verify the
+    health of the resources in the namespace, ensuring that the deployment was successful
+    and that all components are functioning as expected.
+
+
+    4. Investigating intermittent performance issues: In the event of sporadic performance
+    problems with a specific application, a DevOps or Site Reliability Engineer may
+    leverage this command to assess the health status of resources in the relevant
+    namespace, aiding in the identification of potential causes for the fluctuations
+    in performance.
+
+
+    5. Ensuring high availability and reliability of critical services: For essential
+    services running on Kubernetes, such as databases or caching systems, DevOps or
+    SREs can employ this command to monitor the health of resources in their respective
+    namespaces, allowing them to maintain the reliability and availability of these
+    crucial components.'
 - command: kubectl get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
     --context ${CONTEXT} -o json | jq -r '[.status.resources[] | select(.health.status
     != null) | select(.health.status != "Healthy") | {name,kind,namespace,health}]'
@@ -157,6 +263,36 @@ commands:
     \           | select(.health.status != null) \n           | select(.health.status\
     \ != \"Healthy\") \n           | {name,kind,namespace,health}]'\n"
   name: fetch_unhealthy_argocd_application_resources_for_application
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to identify unhealthy resources
+    in a specific namespace, allowing them to determine the cause of the CrashLoopBackoff
+    and take appropriate action to rectify the issue.
+
+
+    2. Monitoring application health in a multi-tenant cluster: When managing multiple
+    applications within a single Kubernetes cluster, DevOps or SREs may utilize this
+    command to regularly check the health status of resources in different namespaces,
+    enabling them to proactively address any issues that arise.
+
+
+    3. Performing post-deployment validation: After deploying a new version of an
+    application using Argo CD, a DevOps or SRE might use this command to verify the
+    health of the resources in the namespace, ensuring that the deployment was successful
+    and that all components are functioning as expected.
+
+
+    4. Investigating intermittent performance issues: In the event of sporadic performance
+    problems with a specific application, a DevOps or Site Reliability Engineer may
+    leverage this command to assess the health status of resources in the relevant
+    namespace, aiding in the identification of potential causes for the fluctuations
+    in performance.
+
+
+    5. Ensuring high availability and reliability of critical services: For essential
+    services running on Kubernetes, such as databases or caching systems, DevOps or
+    SREs can employ this command to monitor the health of resources in their respective
+    namespaces, allowing them to maintain the reliability and availability of these
+    crucial components.'
 - command: 'for deployment_name in $(kubectl get deployments -l argocd.argoproj.io/instance=${APPLICATION_TARGET_NAMESPACE}_${APPLICATION}
     -o=custom-columns=NAME:.metadata.name --no-headers -n ${APPLICATION_TARGET_NAMESPACE});
     do echo "\nDEPLOYMENT NAME: $deployment_name \n" && kubectl logs deployment/$deployment_name
@@ -181,6 +317,25 @@ commands:
     \ understanding the purpose of each step and make it easier to troubleshoot and\
     \ modify the command as needed."
   name: scan_for_errors_in_pod_logs_related_to_argocd_application_application
+  when_is_it_useful: '1. Investigating sudden application crashes in a Kubernetes
+    cluster and identifying the root cause of the CrashLoopBackoff events.
+
+
+    2. Monitoring the health and performance of multiple deployments within a specific
+    namespace and troubleshooting any errors or issues that arise.
+
+
+    3. Troubleshooting and diagnosing issues related to application errors, spikes
+    in resource consumption, or unexpected behavior within Kubernetes deployments.
+
+
+    4. Analyzing and debugging log data to identify patterns or trends related to
+    specific errors or issues across multiple deployments in a namespace.
+
+
+    5. Proactively monitoring and investigating potential security or compliance-related
+    concerns within Kubernetes deployments by analyzing logs for any alarming patterns
+    or anomalies.'
 - command: 'for deployment_name in $(kubectl get deployments -l argocd.argoproj.io/instance=${APPLICATION_TARGET_NAMESPACE}_${APPLICATION}
     -o=custom-columns=NAME:.metadata.name --no-headers -n ${APPLICATION_TARGET_NAMESPACE});
     do echo "\nDEPLOYMENT NAME: $deployment_name \n" && kubectl logs deployment/$deployment_name
@@ -205,6 +360,25 @@ commands:
     \ understanding the purpose of each step and make it easier to troubleshoot and\
     \ modify the command as needed."
   name: scan_for_errors_in_pod_logs_related_to_argocd_application_application
+  when_is_it_useful: '1. Investigating sudden application crashes in a Kubernetes
+    cluster and identifying the root cause of the CrashLoopBackoff events.
+
+
+    2. Monitoring the health and performance of multiple deployments within a specific
+    namespace and troubleshooting any errors or issues that arise.
+
+
+    3. Troubleshooting and diagnosing issues related to application errors, spikes
+    in resource consumption, or unexpected behavior within Kubernetes deployments.
+
+
+    4. Analyzing and debugging log data to identify patterns or trends related to
+    specific errors or issues across multiple deployments in a namespace.
+
+
+    5. Proactively monitoring and investigating potential security or compliance-related
+    concerns within Kubernetes deployments by analyzing logs for any alarming patterns
+    or anomalies.'
 - command: kubectl describe applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
     --context ${CONTEXT}
   doc_links: '
@@ -226,6 +400,22 @@ commands:
     \ using the -n flag\n  --context ${CONTEXT} # Use the --context flag to specify\
     \ the Kubernetes context where the application is running\n"
   name: fully_describe_argocd_application_application
+  when_is_it_useful: '1. Investigating a Kubernetes CrashLoopBackoff event for the
+    ${APPLICATION} within the ${APPLICATION_APP_NAMESPACE} namespace to identify the
+    root cause of the issue.
+
+    2. Checking the status and configuration of the ${APPLICATION} after a recent
+    deployment or update to ensure it is running as expected.
+
+    3. Troubleshooting performance issues with the ${APPLICATION} by examining its
+    configuration and current status in the Kubernetes cluster.
+
+    4. Verifying that the resources and dependencies required by the ${APPLICATION}
+    are correctly configured and accessible within the Kubernetes cluster.
+
+    5. Understanding the overall health and status of the ${APPLICATION} within the
+    Kubernetes cluster to proactively identify any potential issues before they impact
+    users or services.'
 - command: kubectl describe applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE}
     --context ${CONTEXT}
   doc_links: '
@@ -247,3 +437,19 @@ commands:
     \ using the -n flag\n  --context ${CONTEXT} # Use the --context flag to specify\
     \ the Kubernetes context where the application is running\n"
   name: fully_describe_argocd_application_application
+  when_is_it_useful: '1. Investigating a Kubernetes CrashLoopBackoff event for the
+    ${APPLICATION} within the ${APPLICATION_APP_NAMESPACE} namespace to identify the
+    root cause of the issue.
+
+    2. Checking the status and configuration of the ${APPLICATION} after a recent
+    deployment or update to ensure it is running as expected.
+
+    3. Troubleshooting performance issues with the ${APPLICATION} by examining its
+    configuration and current status in the Kubernetes cluster.
+
+    4. Verifying that the resources and dependencies required by the ${APPLICATION}
+    are correctly configured and accessible within the Kubernetes cluster.
+
+    5. Understanding the overall health and status of the ${APPLICATION} within the
+    Kubernetes cluster to proactively identify any potential issues before they impact
+    users or services.'

@@ -46,6 +46,34 @@ commands:
 
     '
   name: check_image_rollover_times_for_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: DevOps
+    or Site Reliability Engineers may perform this task to analyze the container images
+    and start times of pods experiencing CrashLoopBackoff events in order to identify
+    and resolve the underlying issues.
+
+
+    2. Monitoring for abnormal pod behavior: DevOps or Site Reliability Engineers
+    may use this command to regularly check for any abnormal pod behavior, such as
+    excessive restarts or long-running pods, in order to proactively address potential
+    issues before they impact performance.
+
+
+    3. Investigating performance issues: When troubleshooting performance issues within
+    a specific context and namespace, DevOps or Site Reliability Engineers may use
+    this command to gather information on running pods and their container images
+    and start times to identify any patterns or outliers that could be impacting performance.
+
+
+    4. Conducting security audits: DevOps or Site Reliability Engineers may use this
+    command as part of regular security audits to ensure that only authorized container
+    images are running within a specific context and namespace, and to verify the
+    start times of pods to detect any unauthorized or suspicious activity.
+
+
+    5. Optimizing resource allocation: DevOps or Site Reliability Engineers may use
+    this command to gather insights into the container images and start times of running
+    pods in order to optimize resource allocation and ensure efficient utilization
+    of resources within the Kubernetes environment.'
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Running
     -o json | jq -r ''[.items[] | "Images: " + (.spec.containers[].image|tostring)
     + ", Last Started Times:" + (.status.containerStatuses[].state.running.startedAt|tostring)]'''
@@ -93,6 +121,34 @@ commands:
 
     '
   name: check_image_rollover_times_for_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: DevOps
+    or Site Reliability Engineers may perform this task to analyze the container images
+    and start times of pods experiencing CrashLoopBackoff events in order to identify
+    and resolve the underlying issues.
+
+
+    2. Monitoring for abnormal pod behavior: DevOps or Site Reliability Engineers
+    may use this command to regularly check for any abnormal pod behavior, such as
+    excessive restarts or long-running pods, in order to proactively address potential
+    issues before they impact performance.
+
+
+    3. Investigating performance issues: When troubleshooting performance issues within
+    a specific context and namespace, DevOps or Site Reliability Engineers may use
+    this command to gather information on running pods and their container images
+    and start times to identify any patterns or outliers that could be impacting performance.
+
+
+    4. Conducting security audits: DevOps or Site Reliability Engineers may use this
+    command as part of regular security audits to ensure that only authorized container
+    images are running within a specific context and namespace, and to verify the
+    start times of pods to detect any unauthorized or suspicious activity.
+
+
+    5. Optimizing resource allocation: DevOps or Site Reliability Engineers may use
+    this command to gather insights into the container images and start times of running
+    pods in order to optimize resource allocation and ensure efficient utilization
+    of resources within the Kubernetes environment.'
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Running
     -o=json | jq -r ''.items[] | "---", "pod_name: " + .metadata.name, "Status: "
     + .status.phase, "containers:", (.spec.containers[] | "- container_name: " + .name,
@@ -122,6 +178,29 @@ commands:
     \ kubectl and jq. This should make it easier for them to understand what the command\
     \ is doing."
   name: list_images_and_tags_for_every_container_in_running_pods_for_namespace_namespace
+  when_is_it_useful: '1. Investigating a service outage: When there is a service outage
+    in Kubernetes, a DevOps or Site Reliability Engineer may need to quickly gather
+    details about the status of running pods to identify any crashed or failing containers.
+
+
+    2. Debugging application errors: If an application deployed on Kubernetes is experiencing
+    errors or failures, the engineer may use this command to gather detailed information
+    about the pods and containers to help diagnose the issue.
+
+
+    3. Monitoring resource utilization: In order to monitor resource utilization and
+    performance of pods and containers, the engineer may regularly use this command
+    to retrieve and analyze the relevant information.
+
+
+    4. Troubleshooting CrashLoopBackoff events: A common issue in Kubernetes, CrashLoopBackoff
+    events occur when a container repeatedly crashes and restarts. The engineer may
+    use this command to investigate and troubleshoot such events.
+
+
+    5. Performing maintenance tasks: During routine maintenance or upgrades, the engineer
+    may use this command to ensure that all pods and containers are running as expected
+    and are not encountering any issues.'
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Running
     -o=json | jq -r ''.items[] | "---", "pod_name: " + .metadata.name, "Status: "
     + .status.phase, "containers:", (.spec.containers[] | "- container_name: " + .name,
@@ -151,6 +230,29 @@ commands:
     \ kubectl and jq. This should make it easier for them to understand what the command\
     \ is doing."
   name: list_images_and_tags_for_every_container_in_running_pods_for_namespace_namespace
+  when_is_it_useful: '1. Investigating a service outage: When there is a service outage
+    in Kubernetes, a DevOps or Site Reliability Engineer may need to quickly gather
+    details about the status of running pods to identify any crashed or failing containers.
+
+
+    2. Debugging application errors: If an application deployed on Kubernetes is experiencing
+    errors or failures, the engineer may use this command to gather detailed information
+    about the pods and containers to help diagnose the issue.
+
+
+    3. Monitoring resource utilization: In order to monitor resource utilization and
+    performance of pods and containers, the engineer may regularly use this command
+    to retrieve and analyze the relevant information.
+
+
+    4. Troubleshooting CrashLoopBackoff events: A common issue in Kubernetes, CrashLoopBackoff
+    events occur when a container repeatedly crashes and restarts. The engineer may
+    use this command to investigate and troubleshoot such events.
+
+
+    5. Performing maintenance tasks: During routine maintenance or upgrades, the engineer
+    may use this command to ensure that all pods and containers are running as expected
+    and are not encountering any issues.'
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Failed
     -o=json | jq -r ''.items[] | "---", "pod_name: " + .metadata.name, "Status: "
     + .status.phase, "containers:", (.spec.containers[] | "- container_name: " + .name,
@@ -177,6 +279,33 @@ commands:
     \ for better understanding. It also maintains the same functionality while making\
     \ it easier to read and comprehend for new or less experienced devops engineers."
   name: list_images_and_tags_for_every_container_in_failed_pods_for_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: The DevOps
+    or SRE may need to use this command to gather information about specific pods
+    experiencing the CrashLoopBackoff state in order to identify the root cause and
+    potential resolution.
+
+
+    2. Monitoring and investigating frequent pod failures: In a production environment,
+    frequent pod failures can be detrimental to the overall health and stability of
+    the cluster. Using this command, the DevOps or SRE can retrieve detailed information
+    about failing pods to analyze and take corrective actions.
+
+
+    3. Investigating performance issues: If there are performance degradation or resource
+    constraints within the Kubernetes cluster, the DevOps or SRE may need to use this
+    command to gather detailed information about failing pods and their resource utilization.
+
+
+    4. Identifying misbehaving applications: Certain applications or services running
+    within the Kubernetes cluster may exhibit abnormal behavior, such as excessive
+    restarting or crashing. This command can help the DevOps or SRE to pinpoint the
+    problematic pods and investigate the cause of their failure.
+
+
+    5. Troubleshooting application errors: When end users report errors or malfunctions
+    with specific applications or services within the Kubernetes environment, the
+    DevOps or SRE may use this command to retrieve detailed information about the
+    relevant pods and diagnose potential issues.'
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase==Failed
     -o=json | jq -r ''.items[] | "---", "pod_name: " + .metadata.name, "Status: "
     + .status.phase, "containers:", (.spec.containers[] | "- container_name: " + .name,
@@ -203,6 +332,33 @@ commands:
     \ for better understanding. It also maintains the same functionality while making\
     \ it easier to read and comprehend for new or less experienced devops engineers."
   name: list_images_and_tags_for_every_container_in_failed_pods_for_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: The DevOps
+    or SRE may need to use this command to gather information about specific pods
+    experiencing the CrashLoopBackoff state in order to identify the root cause and
+    potential resolution.
+
+
+    2. Monitoring and investigating frequent pod failures: In a production environment,
+    frequent pod failures can be detrimental to the overall health and stability of
+    the cluster. Using this command, the DevOps or SRE can retrieve detailed information
+    about failing pods to analyze and take corrective actions.
+
+
+    3. Investigating performance issues: If there are performance degradation or resource
+    constraints within the Kubernetes cluster, the DevOps or SRE may need to use this
+    command to gather detailed information about failing pods and their resource utilization.
+
+
+    4. Identifying misbehaving applications: Certain applications or services running
+    within the Kubernetes cluster may exhibit abnormal behavior, such as excessive
+    restarting or crashing. This command can help the DevOps or SRE to pinpoint the
+    problematic pods and investigate the cause of their failure.
+
+
+    5. Troubleshooting application errors: When end users report errors or malfunctions
+    with specific applications or services within the Kubernetes environment, the
+    DevOps or SRE may use this command to retrieve detailed information about the
+    relevant pods and diagnose potential issues.'
 - command: 'NAMESPACE=${NAMESPACE}; POD_NAME="skopeo-pod"; CONTEXT="${CONTEXT}"; events=$(kubectl
     get events -n $NAMESPACE --context=$CONTEXT -o json | jq --arg timestamp "$(date
     -u -v -5M +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d "-5 minutes" +"%Y-%m-%dT%H:%M:%SZ")"
@@ -281,6 +437,26 @@ commands:
     \ pod\"\nkubectl delete pod $POD_NAME -n $NAMESPACE --context=$CONTEXT\necho \"\
     Done\"\n"
   name: list_imagepullbackoff_events_and_test_path_and_tags_for_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: The DevOps
+    or Site Reliability Engineer may use this command to gather information about
+    recent events in a specific namespace and context to identify any issues causing
+    the CrashLoopBackoff events.
+
+    2. Investigating container image pulling issues: If there are issues related to
+    pulling container images, the engineer can use this command to deploy a new pod
+    using Skopeo to inspect the problematic container image and its available tags.
+
+    3. Checking for the existence of a specific container image: The engineer may
+    use this command to verify the existence of a specific container image, and if
+    it does not exist, list the available tags for that image.
+
+    4. Maintenance activities: This command could be used as part of regular maintenance
+    activities to ensure the availability and health of container images and their
+    related pods.
+
+    5. Resolving deployment issues: In the event of deployment issues, the engineer
+    may use this command to gather information about the container images being used
+    and take action to ensure successful deployment.'
 - command: 'NAMESPACE=${NAMESPACE}; POD_NAME="skopeo-pod"; CONTEXT="${CONTEXT}"; events=$(kubectl
     get events -n $NAMESPACE --context=$CONTEXT -o json | jq --arg timestamp "$(date
     -u -v -5M +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d "-5 minutes" +"%Y-%m-%dT%H:%M:%SZ")"
@@ -359,3 +535,23 @@ commands:
     \ pod\"\nkubectl delete pod $POD_NAME -n $NAMESPACE --context=$CONTEXT\necho \"\
     Done\"\n"
   name: list_imagepullbackoff_events_and_test_path_and_tags_for_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: The DevOps
+    or Site Reliability Engineer may use this command to gather information about
+    recent events in a specific namespace and context to identify any issues causing
+    the CrashLoopBackoff events.
+
+    2. Investigating container image pulling issues: If there are issues related to
+    pulling container images, the engineer can use this command to deploy a new pod
+    using Skopeo to inspect the problematic container image and its available tags.
+
+    3. Checking for the existence of a specific container image: The engineer may
+    use this command to verify the existence of a specific container image, and if
+    it does not exist, list the available tags for that image.
+
+    4. Maintenance activities: This command could be used as part of regular maintenance
+    activities to ensure the availability and health of container images and their
+    related pods.
+
+    5. Resolving deployment issues: In the event of deployment issues, the engineer
+    may use this command to gather information about the container images being used
+    and take action to ensure successful deployment.'

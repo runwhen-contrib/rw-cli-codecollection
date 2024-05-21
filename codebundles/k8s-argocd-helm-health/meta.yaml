@@ -62,6 +62,37 @@ commands:
     we use `jq` to filter and format the JSON data to display specific information
     about Helm charts. Finally, we print the formatted information to the console.'
   name: fetch_all_available_argocd_helm_releases_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: When
+    a Kubernetes pod enters a CrashLoopBackoff state, it means that the container
+    in the pod is repeatedly crashing and restarting. The DevOps or Site Reliability
+    Engineer might use the described command to gather information about the specific
+    deployment or service causing the issue and analyze its sync and health status.
+
+
+    2. Investigating resource sync and health status: In general, the DevOps or Site
+    Reliability Engineer might use this command to monitor and troubleshoot the sync
+    and health status of various resources within a Kubernetes cluster. This could
+    be part of regular monitoring and maintenance tasks, or in response to specific
+    incidents or alerts.
+
+
+    3. Checking for potential issues after deploying new resources: After deploying
+    new resources or making changes to existing ones, the engineer might use this
+    command to ensure that everything is syncing and healthy as expected. This can
+    help identify any issues early on and prevent potential downtime or performance
+    issues.
+
+
+    4. Verifying the status of critical services: For critical services or applications
+    running in a Kubernetes cluster, the engineer might use this command to regularly
+    verify their sync and health status. This proactive approach can help catch and
+    address potential problems before they impact users or operations.
+
+
+    5. Investigating user-reported issues: If users report issues with specific services
+    or deployments, the engineer might use this command to quickly retrieve and analyze
+    relevant information to understand the current status and identify any potential
+    problems that need to be addressed.'
 - command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json
     | jq -r '.items[] | select(.spec.source.helm != null) | "\nName:\t\t\t" + .metadata.name
     + "\nSync Status:\t\t" + .status.sync.status + "\nHealth Status:\t\t" + .status.health.status'
@@ -125,6 +156,37 @@ commands:
     we use `jq` to filter and format the JSON data to display specific information
     about Helm charts. Finally, we print the formatted information to the console.'
   name: fetch_all_available_argocd_helm_releases_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: When
+    a Kubernetes pod enters a CrashLoopBackoff state, it means that the container
+    in the pod is repeatedly crashing and restarting. The DevOps or Site Reliability
+    Engineer might use the described command to gather information about the specific
+    deployment or service causing the issue and analyze its sync and health status.
+
+
+    2. Investigating resource sync and health status: In general, the DevOps or Site
+    Reliability Engineer might use this command to monitor and troubleshoot the sync
+    and health status of various resources within a Kubernetes cluster. This could
+    be part of regular monitoring and maintenance tasks, or in response to specific
+    incidents or alerts.
+
+
+    3. Checking for potential issues after deploying new resources: After deploying
+    new resources or making changes to existing ones, the engineer might use this
+    command to ensure that everything is syncing and healthy as expected. This can
+    help identify any issues early on and prevent potential downtime or performance
+    issues.
+
+
+    4. Verifying the status of critical services: For critical services or applications
+    running in a Kubernetes cluster, the engineer might use this command to regularly
+    verify their sync and health status. This proactive approach can help catch and
+    address potential problems before they impact users or operations.
+
+
+    5. Investigating user-reported issues: If users report issues with specific services
+    or deployments, the engineer might use this command to quickly retrieve and analyze
+    relevant information to understand the current status and identify any potential
+    problems that need to be addressed.'
 - command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json
     | jq -r '.items[] | select(.spec.source.helm != null) | "\nName:\t\t\t" + .metadata.name
     + "\nTarget Revision:\t" + .spec.source.targetRevision + "\nAttempted Revision:\t"
@@ -153,6 +215,21 @@ commands:
     \ less experienced devops engineers understand what each part of the command does\
     \ and how it contributes to the overall functionality."
   name: fetch_installed_argocd_helm_release_versions_in_namespace_namespace
+  when_is_it_useful: '1. Investigating and troubleshooting Kubernetes CrashLoopBackoff
+    events to determine the root cause and resolve the issue
+
+    2. Monitoring and analyzing the performance and health of a specific resource
+    in a particular namespace and context to identify any anomalies or problems
+
+    3. Debugging and resolving deployment issues, such as failed updates or incorrect
+    configurations, by retrieving detailed information about the resource and its
+    status
+
+    4. Gathering insights into the synchronization and operational state of a resource
+    in order to ensure proper functioning and reliability within the Kubernetes cluster
+
+    5. Conducting regular audits and checks on resources to maintain the overall stability
+    and availability of the Kubernetes environment'
 - command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json
     | jq -r '.items[] | select(.spec.source.helm != null) | "\nName:\t\t\t" + .metadata.name
     + "\nTarget Revision:\t" + .spec.source.targetRevision + "\nAttempted Revision:\t"
@@ -181,3 +258,18 @@ commands:
     \ less experienced devops engineers understand what each part of the command does\
     \ and how it contributes to the overall functionality."
   name: fetch_installed_argocd_helm_release_versions_in_namespace_namespace
+  when_is_it_useful: '1. Investigating and troubleshooting Kubernetes CrashLoopBackoff
+    events to determine the root cause and resolve the issue
+
+    2. Monitoring and analyzing the performance and health of a specific resource
+    in a particular namespace and context to identify any anomalies or problems
+
+    3. Debugging and resolving deployment issues, such as failed updates or incorrect
+    configurations, by retrieving detailed information about the resource and its
+    status
+
+    4. Gathering insights into the synchronization and operational state of a resource
+    in order to ensure proper functioning and reliability within the Kubernetes cluster
+
+    5. Conducting regular audits and checks on resources to maintain the overall stability
+    and availability of the Kubernetes environment'

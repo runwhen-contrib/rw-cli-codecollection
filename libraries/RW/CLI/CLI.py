@@ -143,6 +143,52 @@ def _create_secrets_from_kwargs(**kwargs) -> list[platform.ShellServiceRequestSe
             )
     return request_secrets
 
+def find_file(*paths):
+    """ Helper function to check if a file exists in the given paths. """
+    for path in paths:
+        if os.path.isfile(path):
+            return path
+    return None
+
+def resolve_path_to_robot():
+    # Environment variables
+    runwhen_home = os.getenv("RUNWHEN_HOME", "").rstrip('/')
+    home = os.getenv("HOME", "").rstrip('/')
+
+    # Get the path to the robot file, ensure it's clean for concatenation
+    repo_path_to_robot = os.getenv("RW_PATH_TO_ROBOT", "").lstrip('/')
+
+    # Check if the path includes environment variable placeholders
+    if "$(RUNWHEN_HOME)" in repo_path_to_robot:
+        repo_path_to_robot = repo_path_to_robot.replace("$(RUNWHEN_HOME)", runwhen_home)
+    if "$(HOME)" in repo_path_to_robot:
+        repo_path_to_robot = repo_path_to_robot.replace("$(HOME)", home)
+
+    # Prepare a list of paths to check
+    paths_to_check = set([
+        os.path.join('/', repo_path_to_robot),  # Check as absolute path
+        os.path.join(runwhen_home, repo_path_to_robot),  # Path relative to RUNWHEN_HOME
+        os.path.join(runwhen_home, 'collection', repo_path_to_robot),  # Further nested within RUNWHEN_HOME
+        os.path.join(home, repo_path_to_robot),  # Path relative to HOME
+        os.path.join(home, 'collection', repo_path_to_robot),  # Further nested within HOME
+        os.path.join("/collection", repo_path_to_robot), # Common collection path
+        os.path.join("/root/", repo_path_to_robot), # Backwards compatible /root
+        os.path.join("/root/collection", repo_path_to_robot), # Backwards compatible /root
+    ])
+
+    # Try to find the file in any of the specified paths
+    file_path = find_file(*paths_to_check)
+    if file_path:
+        return file_path
+
+    # Final fallback to a default robot file or raise an error
+    default_robot_file = os.path.join("/", "sli.robot")  # Default file path
+    if os.path.isfile(default_robot_file):
+        return default_robot_file
+
+    raise FileNotFoundError("Could not find the robot file in any known locations.")
+
+
 
 def run_bash_file(
     bash_file: str,
@@ -170,44 +216,42 @@ def run_bash_file(
         logger.info(f"File '{bash_file}' found in the current working directory.")
     else:
         cwd = os.getcwd()
-
-        # Check if the current working directory is the root or the /app
-        if cwd == "/" or cwd == "/app":
-            # Check if RW_PATH_TO_ROBOT environment variable exists
-            rw_path_to_robot = os.environ.get("RW_PATH_TO_ROBOT", None)
-            if rw_path_to_robot:
-                # Split the path at the patterns you provided and join with the new prefix
-                for pattern in ["sli.robot", "runbook.robot"]:
-                    if pattern in rw_path_to_robot:
-                        path, _ = rw_path_to_robot.split(pattern)
-                        new_path = os.path.join("/collection", path)
-                        # Modify the bash_file to point to the new directory
-                        local_bash_file = f"./{bash_file}"
-                        bash_file = os.path.join(new_path, bash_file)
-                        if os.path.exists(bash_file):
-                            logger.info(
-                                f"File '{bash_file}' found at derived path: {new_path}."
+        rw_path_to_robot = resolve_path_to_robot()
+        ## Users will expect to run the command from within the current working directory
+        ## Here we will rewrite the path so that it executes properly from the cwd
+        if rw_path_to_robot:
+            # Split the path at the patterns you provided and join with the new prefix
+            for pattern in ["sli.robot", "runbook.robot"]:
+                if pattern in rw_path_to_robot:
+                    path, _ = rw_path_to_robot.split(pattern)
+                    # if cwd == runwhen_home:
+                    #     new_path = path
+                    # else:
+                    #     # This for backwards compatibility for older images
+                    #     # that have /collection at the root 
+                    #     new_path = os.path.join("/collection", path)
+                    # # Modify the bash_file to point to the new directory
+                    local_bash_file = f"./{bash_file}"
+                    bash_file = os.path.join(path, bash_file)
+                    if os.path.exists(bash_file):
+                        logger.info(
+                            f"File '{bash_file}' found at derived path: {path}."
+                        )
+                        if cmd_override:
+                            cmd_override = cmd_override.replace(
+                                f"{local_bash_file}", f"{bash_file}"
                             )
-                            if cmd_override:
-                                cmd_override = cmd_override.replace(
-                                    f"{local_bash_file}", f"{bash_file}"
-                                )
-                            else:
-                                cmd_override = f"{bash_file}"
-                            break
                         else:
-                            logger.warning(
-                                f"File '{bash_file}' not found at derived path: {new_path}."
-                            )
-            else:
-                logger.warning(
-                    "Current directory is root, but 'RW_PATH_TO_ROBOT' is not set."
-                )
+                            cmd_override = f"{bash_file}"
+                        break
+                    else:
+                        logger.warning(
+                            f"File '{bash_file}' not found at derived path: {path}."
+                        )
         else:
             logger.warning(
-                f"File '{bash_file}' not found in the current directory and current directory is not root."
+                f"Current directory is '{cwd}', but 'RW_PATH_TO_ROBOT' is not set."
             )
-
     if not cmd_override:
         cmd_override = f"./{bash_file}"
     logger.info(f"Received kwargs: {kwargs}")

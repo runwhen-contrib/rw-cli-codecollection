@@ -19,7 +19,6 @@ Checking whether the Terraform Cloud Workspace is in a locked state
     [Tags]    terraform    cloud    workspace    lock
     ${curl_rsp}=    RW.CLI.Run Cli
     ...    cmd=TERRAFORM_API_TOKEN_VALUE=$(cat $TERRAFORM_API_TOKEN) && curl --header "Authorization: Bearer $TERRAFORM_API_TOKEN_VALUE" --header "Content-Type: application/vnd.api+json" -s '${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}'
-    ...    target_service=${CURL_SERVICE}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
     ...    env=${env}
@@ -40,12 +39,6 @@ Checking whether the Terraform Cloud Workspace is in a locked state
 
 *** Keywords ***
 Suite Initialization
-    ${CURL_SERVICE}=    RW.Core.Import Service    curl
-    ...    type=string
-    ...    description=The selected RunWhen Service to use for accessing services within a network.
-    ...    pattern=\w*
-    ...    example=curl-service.shared
-    ...    default=curl-service.shared
 
     ${TERRAFORM_API_URL}=    RW.Core.Import User Variable    TERRAFORM_API_URL
     ...    type=string
@@ -73,7 +66,6 @@ Suite Initialization
     ...    default=
     ...    example=my-workspace
 
-    Set Suite Variable    ${CURL_SERVICE}    ${CURL_SERVICE}
     Set Suite Variable    ${TERRAFORM_API_URL}    ${TERRAFORM_API_URL}
     Set Suite Variable    ${TERRAFORM_API_TOKEN}    ${TERRAFORM_API_TOKEN}
     Set Suite Variable    ${TERRAFORM_ORGANIZATION_NAME}    ${TERRAFORM_ORGANIZATION_NAME}

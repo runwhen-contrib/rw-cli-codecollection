@@ -30,6 +30,28 @@ commands:
     \ engineers. It also includes comments to explain each option used in the `kubectl`\
     \ and `jq` commands."
   name: show_pods_without_resource_limit_or_resource_requests_set_in_namespace_namespace
+  when_is_it_useful: '1. Investigating performance issues in a Kubernetes cluster
+    by identifying pods without resource limits set, which could be causing them to
+    consume excessive resources and lead to CrashLoopBackoff events.
+
+
+    2. Troubleshooting application failures or instability by examining running pods
+    in a specific namespace with certain labels to identify any patterns or dependencies
+    between the affected pods.
+
+
+    3. Conducting a regular audit of resource allocation in a Kubernetes cluster to
+    ensure best practices are being followed and to optimize resource usage.
+
+
+    4. Monitoring and managing compliance and security requirements by identifying
+    pods without resource limits set, which could potentially pose a security risk
+    or violate organizational policies.
+
+
+    5. Performing capacity planning and resource management by analyzing the resource
+    limits and usage of pods in a specific namespace to determine if additional resources
+    are needed or if existing resources are being underutilized.'
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running
     -ojson | jq -r ''[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.limits
     == null) | {pod: $pod.metadata.name, container_without_limits: .name}]'''
@@ -61,6 +83,28 @@ commands:
     \ engineers. It also includes comments to explain each option used in the `kubectl`\
     \ and `jq` commands."
   name: show_pods_without_resource_limit_or_resource_requests_set_in_namespace_namespace
+  when_is_it_useful: '1. Investigating performance issues in a Kubernetes cluster
+    by identifying pods without resource limits set, which could be causing them to
+    consume excessive resources and lead to CrashLoopBackoff events.
+
+
+    2. Troubleshooting application failures or instability by examining running pods
+    in a specific namespace with certain labels to identify any patterns or dependencies
+    between the affected pods.
+
+
+    3. Conducting a regular audit of resource allocation in a Kubernetes cluster to
+    ensure best practices are being followed and to optimize resource usage.
+
+
+    4. Monitoring and managing compliance and security requirements by identifying
+    pods without resource limits set, which could potentially pose a security risk
+    or violate organizational policies.
+
+
+    5. Performing capacity planning and resource management by analyzing the resource
+    limits and usage of pods in a specific namespace to determine if additional resources
+    are needed or if existing resources are being underutilized.'
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running
     -ojson | jq -r ''[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.requests
     == null) | {pod: $pod.metadata.name, container_without_requests: .name}]'''
@@ -95,6 +139,33 @@ commands:
     \ better understand what each part of the command does and how it contributes\
     \ to the overall functionality."
   name: show_pods_without_resource_limit_or_resource_requests_set_in_namespace_namespace
+  when_is_it_useful: '1. Investigating performance issues: If there are performance
+    issues in a specific context and namespace, a DevOps or Site Reliability Engineer
+    may use this command to retrieve information about running pods and identify potential
+    resource request discrepancies causing the problem.
+
+
+    2. Monitoring resource utilization: The command can be used to monitor resource
+    utilization by filtering out pods with containers that have no resource requests
+    specified, allowing the engineer to better understand where resources are being
+    utilized and potentially optimize resource allocation.
+
+
+    3. Troubleshooting CrashLoopBackoff events: When faced with Kubernetes CrashLoopBackoff
+    events, the engineer may need to gather detailed information about running pods
+    to identify any issues with resource requests that could be contributing to the
+    recurring crashes.
+
+
+    4. Identifying non-compliant pods: In an environment where strict resource allocation
+    policies are enforced, the command can be used to identify non-compliant pods
+    that do not have resource requests specified, helping the engineer to ensure compliance
+    with resource allocation guidelines.
+
+
+    5. Capacity planning: For capacity planning purposes, the engineer may want to
+    analyze the resource requests of running pods to determine current resource usage
+    patterns and make informed decisions about future resource allocation.'
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running
     -ojson | jq -r ''[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.requests
     == null) | {pod: $pod.metadata.name, container_without_requests: .name}]'''
@@ -129,6 +200,33 @@ commands:
     \ better understand what each part of the command does and how it contributes\
     \ to the overall functionality."
   name: show_pods_without_resource_limit_or_resource_requests_set_in_namespace_namespace
+  when_is_it_useful: '1. Investigating performance issues: If there are performance
+    issues in a specific context and namespace, a DevOps or Site Reliability Engineer
+    may use this command to retrieve information about running pods and identify potential
+    resource request discrepancies causing the problem.
+
+
+    2. Monitoring resource utilization: The command can be used to monitor resource
+    utilization by filtering out pods with containers that have no resource requests
+    specified, allowing the engineer to better understand where resources are being
+    utilized and potentially optimize resource allocation.
+
+
+    3. Troubleshooting CrashLoopBackoff events: When faced with Kubernetes CrashLoopBackoff
+    events, the engineer may need to gather detailed information about running pods
+    to identify any issues with resource requests that could be contributing to the
+    recurring crashes.
+
+
+    4. Identifying non-compliant pods: In an environment where strict resource allocation
+    policies are enforced, the command can be used to identify non-compliant pods
+    that do not have resource requests specified, helping the engineer to ensure compliance
+    with resource allocation guidelines.
+
+
+    5. Capacity planning: For capacity planning purposes, the engineer may want to
+    analyze the resource requests of running pods to determine current resource usage
+    patterns and make informed decisions about future resource allocation.'
 - command: for pod in $(kubectl get pods ${LABELS} -n ${NAMESPACE} --context ${CONTEXT}
     -o custom-columns=":metadata.name" --field-selector=status.phase=Running); do
     kubectl top pod $pod -n ${NAMESPACE} --context ${CONTEXT} --containers; done
@@ -157,6 +255,17 @@ commands:
     \ for newer or less experienced devops engineers on how to modify the command\
     \ to suit their specific environment."
   name: get_pod_resource_utilization_with_top_in_namespace_namespace
+  when_is_it_useful: '1. Monitoring and optimizing resource usage in a Kubernetes
+    cluster
+
+    2. Investigating performance issues with specific pods or containers
+
+    3. Identifying potential bottlenecks and optimizing resource allocation
+
+    4. Troubleshooting CrashLoopBackoff events or other container restart issues
+
+    5. Analyzing and understanding the resource consumption patterns of different
+    pods and containers to inform scaling decisions'
 - command: for pod in $(kubectl get pods ${LABELS} -n ${NAMESPACE} --context ${CONTEXT}
     -o custom-columns=":metadata.name" --field-selector=status.phase=Running); do
     kubectl top pod $pod -n ${NAMESPACE} --context ${CONTEXT} --containers; done
@@ -185,6 +294,17 @@ commands:
     \ for newer or less experienced devops engineers on how to modify the command\
     \ to suit their specific environment."
   name: get_pod_resource_utilization_with_top_in_namespace_namespace
+  when_is_it_useful: '1. Monitoring and optimizing resource usage in a Kubernetes
+    cluster
+
+    2. Investigating performance issues with specific pods or containers
+
+    3. Identifying potential bottlenecks and optimizing resource allocation
+
+    4. Troubleshooting CrashLoopBackoff events or other container restart issues
+
+    5. Analyzing and understanding the resource consumption patterns of different
+    pods and containers to inform scaling decisions'
 - command: bash 'vpa_recommendations.sh'
   doc_links: '
 
@@ -212,3 +332,29 @@ commands:
     \   echo $(($cpu * 1000))  # Convert CPU cores to millicores\n    fi\n}\n\n# ...\n\
     # (Remaining script left for comment...)\n"
   name: identify_pod_resource_recommendations_in_namespace_namespace
+  when_is_it_useful: '1. Scaling a Kubernetes application: When a DevOps or SRE needs
+    to scale an application in Kubernetes, they may use this script to fetch VPA recommendations
+    and adjust pod resources accordingly in order to optimize performance and resource
+    utilization.
+
+
+    2. Performance optimization: If there are performance issues with an application
+    running on Kubernetes, the DevOps or SRE might use this script to analyze VPA
+    recommendations and make adjustments to pod resources to improve performance.
+
+
+    3. Resource management: To manage resource allocation within a Kubernetes cluster,
+    the script can be used to provide insights into current resource usage and make
+    recommendations for adjusting pod resources based on VPA suggestions.
+
+
+    4. Troubleshooting CrashLoopBackoff events: During troubleshooting of CrashLoopBackoff
+    events in Kubernetes, the script can be utilized to analyze VPA recommendations
+    and adjust pod resources to resolve the issue and prevent the recurrence of such
+    events.
+
+
+    5. Capacity planning: For capacity planning purposes, the script can be used to
+    analyze VPA recommendations and propose adjustments to pod resources in order
+    to efficiently utilize the available resources and ensure scalability for future
+    workloads.'

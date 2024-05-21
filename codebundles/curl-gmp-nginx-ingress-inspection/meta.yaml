@@ -28,6 +28,23 @@ commands:
     \ JSON response using jq and extract relevant data if an error is found, otherwise\
     \ return an empty string"
   name: fetch_nginx_http_errors_from_gmp_for_ingress_ingress_object_name
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes pods that are experiencing
+    CrashLoopBackoff events, potentially caused by configuration errors or resource
+    limitations.
+
+    2. Investigating application or service errors reported in Kubernetes logs and
+    metrics to identify potential issues with networking, services, or dependencies.
+
+    3. Analyzing Google Cloud Monitoring data for a specific nginx ingress controller
+    to identify any performance or availability issues impacting the application''s
+    availability and response times.
+
+    4. Identifying and resolving issues related to networking, load balancing, or
+    DNS resolution affecting communication between Kubernetes pods or with external
+    systems.
+
+    5. Troubleshooting and diagnosing errors or failures in Kubernetes deployments,
+    services, or controllers related to configuration, security, or resource management.'
 - command: 'gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
     && curl -d "query=rate(nginx_ingress_controller_requests{host=''${INGRESS_HOST}'',
     service=''${INGRESS_SERVICE}'', status=~''${ERROR_CODES}''}[${TIME_SLICE}]) >
@@ -57,6 +74,23 @@ commands:
     \ JSON response using jq and extract relevant data if an error is found, otherwise\
     \ return an empty string"
   name: fetch_nginx_http_errors_from_gmp_for_ingress_ingress_object_name
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes pods that are experiencing
+    CrashLoopBackoff events, potentially caused by configuration errors or resource
+    limitations.
+
+    2. Investigating application or service errors reported in Kubernetes logs and
+    metrics to identify potential issues with networking, services, or dependencies.
+
+    3. Analyzing Google Cloud Monitoring data for a specific nginx ingress controller
+    to identify any performance or availability issues impacting the application''s
+    availability and response times.
+
+    4. Identifying and resolving issues related to networking, load balancing, or
+    DNS resolution affecting communication between Kubernetes pods or with external
+    systems.
+
+    5. Troubleshooting and diagnosing errors or failures in Kubernetes deployments,
+    services, or controllers related to configuration, security, or resource management.'
 - command: 'namespace="${NAMESPACE}"; context="${CONTEXT}"; ingress="${INGRESS_OBJECT_NAME}";
     echo "Ingress: $ingress"; health_status="NA"; services=(); backend_services=$(kubectl
     get ingress "$ingress" -n "$namespace" --context "$context" -ojsonpath=''{range
@@ -168,6 +202,21 @@ commands:
     \ = \"Healthy\" ]; then\n  echo \"Health Status: $health_status\"\nfi\necho \"\
     ------------\"\n"
   name: find_owner_and_service_health_for_ingress_ingress_object_name
+  when_is_it_useful: '1. Monitoring the health status of backend services in a Kubernetes
+    cluster to ensure high availability and reliability of the application.
+
+    2. Troubleshooting CrashLoopBackoff events in Kubernetes by using the script to
+    identify any issues with the backend services or pods.
+
+    3. Performing routine health checks on backend services to proactively identify
+    and address any potential issues before they impact the application.
+
+    4. Investigating and resolving any incidents or alerts related to the unavailability
+    or instability of backend services within the Kubernetes cluster.
+
+    5. Conducting post-deployment validation of backend services to ensure that new
+    releases or updates have not caused any adverse effects on the overall health
+    and performance of the application.'
 - command: 'namespace="${NAMESPACE}"; context="${CONTEXT}"; ingress="${INGRESS_OBJECT_NAME}";
     echo "Ingress: $ingress"; health_status="NA"; services=(); backend_services=$(kubectl
     get ingress "$ingress" -n "$namespace" --context "$context" -ojsonpath=''{range
@@ -279,3 +328,18 @@ commands:
     \ = \"Healthy\" ]; then\n  echo \"Health Status: $health_status\"\nfi\necho \"\
     ------------\"\n"
   name: find_owner_and_service_health_for_ingress_ingress_object_name
+  when_is_it_useful: '1. Monitoring the health status of backend services in a Kubernetes
+    cluster to ensure high availability and reliability of the application.
+
+    2. Troubleshooting CrashLoopBackoff events in Kubernetes by using the script to
+    identify any issues with the backend services or pods.
+
+    3. Performing routine health checks on backend services to proactively identify
+    and address any potential issues before they impact the application.
+
+    4. Investigating and resolving any incidents or alerts related to the unavailability
+    or instability of backend services within the Kubernetes cluster.
+
+    5. Conducting post-deployment validation of backend services to ensure that new
+    releases or updates have not caused any adverse effects on the overall health
+    and performance of the application.'

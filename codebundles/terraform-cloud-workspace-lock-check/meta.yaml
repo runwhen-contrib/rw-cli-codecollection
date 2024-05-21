@@ -24,6 +24,25 @@ commands:
     \ devops engineers who may be unfamiliar with the syntax and behavior of the individual\
     \ commands used in the original command."
   name: checking_whether_the_terraform_cloud_workspace_is_in_a_locked_state
+  when_is_it_useful: '1. Deploying a new application or service to a Kubernetes cluster
+    and needing to retrieve information from the Terraform API to ensure the workspace
+    is correctly configured before deployment.
+
+    2. Troubleshooting issues with infrastructure provisioning using Terraform and
+    needing to gather information about workspaces and resources from the Terraform
+    API for debugging purposes.
+
+    3. Automating routine checks and updates for Terraform workspaces within an organization
+    by fetching information from the Terraform API and integrating it into a CI/CD
+    pipeline.
+
+    4. Performing regular audits and security checks on Terraform workspaces by fetching
+    information from the Terraform API and comparing it with predefined security standards
+    and policies.
+
+    5. Integrating Terraform with other tools and platforms within the organization
+    by fetching information from the Terraform API and using it to drive automation
+    and orchestration workflows.'
 - command: 'TERRAFORM_API_TOKEN_VALUE=$(cat $TERRAFORM_API_TOKEN) && curl --header
     "Authorization: Bearer $TERRAFORM_API_TOKEN_VALUE" --header "Content-Type: application/vnd.api+json"
     -s ''${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}'''
@@ -49,3 +68,22 @@ commands:
     \ devops engineers who may be unfamiliar with the syntax and behavior of the individual\
     \ commands used in the original command."
   name: checking_whether_the_terraform_cloud_workspace_is_in_a_locked_state
+  when_is_it_useful: '1. Deploying a new application or service to a Kubernetes cluster
+    and needing to retrieve information from the Terraform API to ensure the workspace
+    is correctly configured before deployment.
+
+    2. Troubleshooting issues with infrastructure provisioning using Terraform and
+    needing to gather information about workspaces and resources from the Terraform
+    API for debugging purposes.
+
+    3. Automating routine checks and updates for Terraform workspaces within an organization
+    by fetching information from the Terraform API and integrating it into a CI/CD
+    pipeline.
+
+    4. Performing regular audits and security checks on Terraform workspaces by fetching
+    information from the Terraform API and comparing it with predefined security standards
+    and policies.
+
+    5. Integrating Terraform with other tools and platforms within the organization
+    by fetching information from the Terraform API and using it to drive automation
+    and orchestration workflows.'

@@ -39,6 +39,21 @@ commands:
 
     '
   name: fetch_vault_csi_driver_logs
+  when_is_it_useful: '1. Investigating a Kubernetes CrashLoopBackoff event for the
+    daemonset "vault-csi-provider" to identify the root cause of the issue and fix
+    it.
+
+    2. Monitoring and analyzing the performance and behavior of the "vault-csi-provider"
+    daemonset in a production environment to ensure smooth operation.
+
+    3. Troubleshooting user-reported issues related to the "vault-csi-provider" daemonset
+    by reviewing its logs to determine any potential errors or anomalies.
+
+    4. Auditing and investigating security incidents or compliance violations related
+    to the "vault-csi-provider" daemonset by examining its logs for suspicious activities.
+
+    5. Performing routine maintenance and oversight of the "vault-csi-provider" daemonset,
+    such as checking for any operational errors or warnings in its logs.'
 - command: kubectl logs --tail=100 daemonset.apps/vault-csi-provider --context ${CONTEXT}
     -n ${NAMESPACE}
   doc_links: '
@@ -79,6 +94,21 @@ commands:
 
     '
   name: fetch_vault_csi_driver_logs
+  when_is_it_useful: '1. Investigating a Kubernetes CrashLoopBackoff event for the
+    daemonset "vault-csi-provider" to identify the root cause of the issue and fix
+    it.
+
+    2. Monitoring and analyzing the performance and behavior of the "vault-csi-provider"
+    daemonset in a production environment to ensure smooth operation.
+
+    3. Troubleshooting user-reported issues related to the "vault-csi-provider" daemonset
+    by reviewing its logs to determine any potential errors or anomalies.
+
+    4. Auditing and investigating security incidents or compliance violations related
+    to the "vault-csi-provider" daemonset by examining its logs for suspicious activities.
+
+    5. Performing routine maintenance and oversight of the "vault-csi-provider" daemonset,
+    such as checking for any operational errors or warnings in its logs.'
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "vault-csi-provider" || true
   doc_links: '
@@ -98,6 +128,20 @@ commands:
     \ returns a success status, even if the grep command does not find a match\n||\
     \ true"
   name: get_vault_csi_driver_warning_events
+  when_is_it_useful: '1. Monitoring and troubleshooting the Kubernetes cluster for
+    potential issues related to the "vault-csi-provider" in a specific namespace.
+
+    2. Investigating and addressing crash loop events that are affecting the performance
+    of the "vault-csi-provider" in the Kubernetes context.
+
+    3. Identifying and resolving warning events that may impact the stability and
+    reliability of the "vault-csi-provider" in the specified namespace.
+
+    4. Analyzing and debugging errors or warnings related to the "vault-csi-provider"
+    in the Kubernetes environment to ensure smooth operation.
+
+    5. Troubleshooting and resolving any potential issues with the "vault-csi-provider"
+    that could lead to a CrashLoopBackoff event in the Kubernetes context.'
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "vault-csi-provider" || true
   doc_links: '
@@ -117,6 +161,20 @@ commands:
     \ returns a success status, even if the grep command does not find a match\n||\
     \ true"
   name: get_vault_csi_driver_warning_events
+  when_is_it_useful: '1. Monitoring and troubleshooting the Kubernetes cluster for
+    potential issues related to the "vault-csi-provider" in a specific namespace.
+
+    2. Investigating and addressing crash loop events that are affecting the performance
+    of the "vault-csi-provider" in the Kubernetes context.
+
+    3. Identifying and resolving warning events that may impact the stability and
+    reliability of the "vault-csi-provider" in the specified namespace.
+
+    4. Analyzing and debugging errors or warnings related to the "vault-csi-provider"
+    in the Kubernetes environment to ensure smooth operation.
+
+    5. Troubleshooting and resolving any potential issues with the "vault-csi-provider"
+    that could lead to a CrashLoopBackoff event in the Kubernetes context.'
 - command: kubectl describe daemonset.apps/vault-csi-provider --context ${CONTEXT}
     -n ${NAMESPACE}
   doc_links: '
@@ -153,6 +211,20 @@ commands:
 
     '
   name: check_vault_csi_driver_replicas
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events for the
+    "vault-csi-provider" daemonset.
+
+    2. Investigating why the "vault-csi-provider" daemonset is not running or experiencing
+    errors in a specific context and namespace.
+
+    3. Monitoring and understanding the resource utilization and scheduling of the
+    "vault-csi-provider" daemonset in the Kubernetes cluster.
+
+    4. Debugging issues related to the deployment and scaling of the "vault-csi-provider"
+    daemonset.
+
+    5. Verifying the configuration and settings of the "vault-csi-provider" daemonset
+    to ensure it meets the desired specifications and requirements.'
 - command: kubectl describe daemonset.apps/vault-csi-provider --context ${CONTEXT}
     -n ${NAMESPACE}
   doc_links: '
@@ -189,6 +261,20 @@ commands:
 
     '
   name: check_vault_csi_driver_replicas
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events for the
+    "vault-csi-provider" daemonset.
+
+    2. Investigating why the "vault-csi-provider" daemonset is not running or experiencing
+    errors in a specific context and namespace.
+
+    3. Monitoring and understanding the resource utilization and scheduling of the
+    "vault-csi-provider" daemonset in the Kubernetes cluster.
+
+    4. Debugging issues related to the deployment and scaling of the "vault-csi-provider"
+    daemonset.
+
+    5. Verifying the configuration and settings of the "vault-csi-provider" daemonset
+    to ensure it meets the desired specifications and requirements.'
 - command: kubectl logs --tail=100 statefulset.apps/vault --context ${CONTEXT} -n
     ${NAMESPACE}
   doc_links: '
@@ -230,6 +316,22 @@ commands:
 
     '
   name: fetch_vault_logs
+  when_is_it_useful: '1. Investigating an issue with the "vault" statefulset where
+    it is reporting CrashLoopBackoff events, and troubleshooting possible reasons
+    for the failures by inspecting the last 100 lines of logs.
+
+    2. Monitoring the performance of the "vault" statefulset and identifying any potential
+    errors or issues by periodically checking the logs.
+
+    3. Debugging an incident where the "vault" statefulset is not functioning as expected,
+    and using the logs to pinpoint the root cause of the problem.
+
+    4. Troubleshooting a deployment issue with the "vault" statefulset, such as pods
+    not starting up properly, by examining the logs for any error messages or warnings.
+
+    5. Conducting routine maintenance or debugging tasks on the "vault" statefulset,
+    such as during an upgrade or scaling operation, to ensure that the system is running
+    smoothly and identify any potential issues before they become critical.'
 - command: kubectl logs --tail=100 statefulset.apps/vault --context ${CONTEXT} -n
     ${NAMESPACE}
   doc_links: '
@@ -271,6 +373,22 @@ commands:
 
     '
   name: fetch_vault_logs
+  when_is_it_useful: '1. Investigating an issue with the "vault" statefulset where
+    it is reporting CrashLoopBackoff events, and troubleshooting possible reasons
+    for the failures by inspecting the last 100 lines of logs.
+
+    2. Monitoring the performance of the "vault" statefulset and identifying any potential
+    errors or issues by periodically checking the logs.
+
+    3. Debugging an incident where the "vault" statefulset is not functioning as expected,
+    and using the logs to pinpoint the root cause of the problem.
+
+    4. Troubleshooting a deployment issue with the "vault" statefulset, such as pods
+    not starting up properly, by examining the logs for any error messages or warnings.
+
+    5. Conducting routine maintenance or debugging tasks on the "vault" statefulset,
+    such as during an upgrade or scaling operation, to ensure that the system is running
+    smoothly and identify any potential issues before they become critical.'
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "vault" || true
   doc_links: '
@@ -294,6 +412,25 @@ commands:
     \ that the overall command returns a successful exit code even if grep does not\
     \ find any matches\n| grep -i \"vault\" || true\n"
   name: get_related_vault_events
+  when_is_it_useful: '1. Troubleshooting a critical production issue where the Kubernetes
+    CrashLoopBackoff events are causing an application to fail or become unresponsive.
+
+    2. Investigating and resolving recurring warning events related to the "vault"
+    in a specific Kubernetes context and namespace that may be affecting the performance
+    or availability of the environment.
+
+    3. Monitoring and analyzing the error logs related to the "vault" in a Kubernetes
+    context and namespace to proactively identify and address any potential issues
+    before they impact the system.
+
+    4. Conducting a post-incident analysis to understand the root cause of a recent
+    outage or disruption in the Kubernetes environment, involving the exploration
+    of warning events related to the "vault".
+
+    5. Performing routine maintenance and system health checks to ensure the stability
+    and reliability of the Kubernetes deployment, including addressing any warning
+    events related to the "vault" that may have been flagged during regular monitoring
+    activities.'
 - command: kubectl get events --field-selector type=Warning --context ${CONTEXT} -n
     ${NAMESPACE} | grep -i "vault" || true
   doc_links: '
@@ -317,6 +454,25 @@ commands:
     \ that the overall command returns a successful exit code even if grep does not\
     \ find any matches\n| grep -i \"vault\" || true\n"
   name: get_related_vault_events
+  when_is_it_useful: '1. Troubleshooting a critical production issue where the Kubernetes
+    CrashLoopBackoff events are causing an application to fail or become unresponsive.
+
+    2. Investigating and resolving recurring warning events related to the "vault"
+    in a specific Kubernetes context and namespace that may be affecting the performance
+    or availability of the environment.
+
+    3. Monitoring and analyzing the error logs related to the "vault" in a Kubernetes
+    context and namespace to proactively identify and address any potential issues
+    before they impact the system.
+
+    4. Conducting a post-incident analysis to understand the root cause of a recent
+    outage or disruption in the Kubernetes environment, involving the exploration
+    of warning events related to the "vault".
+
+    5. Performing routine maintenance and system health checks to ensure the stability
+    and reliability of the Kubernetes deployment, including addressing any warning
+    events related to the "vault" that may have been flagged during regular monitoring
+    activities.'
 - command: kubectl get statefulset.apps/vault --context=${CONTEXT} -n ${NAMESPACE}
     -o yaml
   doc_links: '
@@ -347,6 +503,24 @@ commands:
 
     '
   name: fetch_vault_statefulset_manifest_details
+  when_is_it_useful: '1. Troubleshooting an issue with the statefulset named "vault"
+    not starting properly in a particular namespace, and needing to investigate its
+    configuration to identify any potential misconfigurations.
+
+    2. Debugging a Kubernetes CrashLoopBackoff event for the "vault" statefulset and
+    needing to review its configuration to identify any potential issues causing the
+    crash loops.
+
+    3. Implementing changes or updates to the configuration of the "vault" statefulset
+    in the specified namespace and needing to verify the current configuration before
+    making any modifications.
+
+    4. Conducting a review of the current statefulset configuration for "vault" in
+    order to ensure compliance with best practices or security standards.
+
+    5. Analyzing the configuration of the "vault" statefulset in the context of a
+    specific Kubernetes cluster as part of a broader investigation into performance
+    or stability issues.'
 - command: kubectl get statefulset.apps/vault --context=${CONTEXT} -n ${NAMESPACE}
     -o yaml
   doc_links: '
@@ -377,6 +551,24 @@ commands:
 
     '
   name: fetch_vault_statefulset_manifest_details
+  when_is_it_useful: '1. Troubleshooting an issue with the statefulset named "vault"
+    not starting properly in a particular namespace, and needing to investigate its
+    configuration to identify any potential misconfigurations.
+
+    2. Debugging a Kubernetes CrashLoopBackoff event for the "vault" statefulset and
+    needing to review its configuration to identify any potential issues causing the
+    crash loops.
+
+    3. Implementing changes or updates to the configuration of the "vault" statefulset
+    in the specified namespace and needing to verify the current configuration before
+    making any modifications.
+
+    4. Conducting a review of the current statefulset configuration for "vault" in
+    order to ensure compliance with best practices or security standards.
+
+    5. Analyzing the configuration of the "vault" statefulset in the context of a
+    specific Kubernetes cluster as part of a broader investigation into performance
+    or stability issues.'
 - command: kubectl get daemonset.apps/vault-csi-provider --context=${CONTEXT} -n ${NAMESPACE}
     -o yaml
   doc_links: '
@@ -397,6 +589,32 @@ commands:
     \ and options\nkubectl get daemonset.apps/vault-csi-provider \\\n  --context=${CONTEXT}\
     \ \\\n  -n ${NAMESPACE} \\\n  -o yaml\n"
   name: fetch_vault_daemonset_manifest_details
+  when_is_it_useful: '1. Troubleshooting CrashLoopBackoff events: DevOps or SREs might
+    use this command to retrieve the configuration for a specific daemonset in order
+    to debug and diagnose issues causing CrashLoopBackoff events in the Kubernetes
+    cluster.
+
+
+    2. Updating or modifying configuration: When making changes to the configuration
+    of a specific daemonset, DevOps or SREs might use this command to retrieve the
+    current configuration as a reference and then make necessary modifications before
+    applying the changes to the cluster.
+
+
+    3. Auditing and compliance checks: DevOps or SREs might use this command to audit
+    the configuration of a specific daemonset to ensure it meets security and compliance
+    standards.
+
+
+    4. Disaster recovery: In the event of a disaster or unexpected outage, DevOps
+    or SREs might use this command to quickly retrieve the configuration of a specific
+    daemonset in order to rebuild or restore the cluster to its previous state.
+
+
+    5. Investigating performance issues: When investigating performance issues within
+    the Kubernetes cluster, DevOps or SREs might use this command to analyze the configuration
+    of a specific daemonset to identify any potential bottlenecks or optimization
+    opportunities.'
 - command: kubectl get daemonset.apps/vault-csi-provider --context=${CONTEXT} -n ${NAMESPACE}
     -o yaml
   doc_links: '
@@ -417,6 +635,32 @@ commands:
     \ and options\nkubectl get daemonset.apps/vault-csi-provider \\\n  --context=${CONTEXT}\
     \ \\\n  -n ${NAMESPACE} \\\n  -o yaml\n"
   name: fetch_vault_daemonset_manifest_details
+  when_is_it_useful: '1. Troubleshooting CrashLoopBackoff events: DevOps or SREs might
+    use this command to retrieve the configuration for a specific daemonset in order
+    to debug and diagnose issues causing CrashLoopBackoff events in the Kubernetes
+    cluster.
+
+
+    2. Updating or modifying configuration: When making changes to the configuration
+    of a specific daemonset, DevOps or SREs might use this command to retrieve the
+    current configuration as a reference and then make necessary modifications before
+    applying the changes to the cluster.
+
+
+    3. Auditing and compliance checks: DevOps or SREs might use this command to audit
+    the configuration of a specific daemonset to ensure it meets security and compliance
+    standards.
+
+
+    4. Disaster recovery: In the event of a disaster or unexpected outage, DevOps
+    or SREs might use this command to quickly retrieve the configuration of a specific
+    daemonset in order to rebuild or restore the cluster to its previous state.
+
+
+    5. Investigating performance issues: When investigating performance issues within
+    the Kubernetes cluster, DevOps or SREs might use this command to analyze the configuration
+    of a specific daemonset to identify any potential bottlenecks or optimization
+    opportunities.'
 - command: curl ${VAULT_URL}
   doc_links: '
 
@@ -432,6 +676,30 @@ commands:
     \ where ${VAULT_URL} is the URL of the vault server we want to access\n\ncurl\
     \ ${VAULT_URL}\n"
   name: verify_vault_availability
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use the cURL tool to send requests to various
+    endpoints in order to diagnose the cause of the crash loop and identify any issues
+    with the server or application.
+
+
+    2. Testing API endpoints: The engineer might use cURL to test the functionality
+    of different API endpoints within the system, ensuring that data is being retrieved
+    and manipulated correctly.
+
+
+    3. Debugging network connectivity issues: If there are issues with network connectivity
+    between servers or services, the engineer might use cURL to check for connectivity
+    and diagnose any problems.
+
+
+    4. Monitoring vault operations: The engineer might use cURL to monitor and manage
+    operations on a secure repository, such as fetching secrets from Vault or updating
+    configurations.
+
+
+    5. Automating tasks: The engineer might use cURL in scripts or automation tools
+    to perform routine tasks, such as regularly retrieving data from a server at the
+    specified VAULT_URL and processing it for further analysis or storage.'
 - command: curl ${VAULT_URL}
   doc_links: '
 
@@ -447,6 +715,30 @@ commands:
     \ where ${VAULT_URL} is the URL of the vault server we want to access\n\ncurl\
     \ ${VAULT_URL}\n"
   name: verify_vault_availability
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use the cURL tool to send requests to various
+    endpoints in order to diagnose the cause of the crash loop and identify any issues
+    with the server or application.
+
+
+    2. Testing API endpoints: The engineer might use cURL to test the functionality
+    of different API endpoints within the system, ensuring that data is being retrieved
+    and manipulated correctly.
+
+
+    3. Debugging network connectivity issues: If there are issues with network connectivity
+    between servers or services, the engineer might use cURL to check for connectivity
+    and diagnose any problems.
+
+
+    4. Monitoring vault operations: The engineer might use cURL to monitor and manage
+    operations on a secure repository, such as fetching secrets from Vault or updating
+    configurations.
+
+
+    5. Automating tasks: The engineer might use cURL in scripts or automation tools
+    to perform routine tasks, such as regularly retrieving data from a server at the
+    specified VAULT_URL and processing it for further analysis or storage.'
 - command: kubectl get statefulset.apps/vault --context=${CONTEXT} -n ${NAMESPACE}
     -o json
   doc_links: '
@@ -477,6 +769,25 @@ commands:
 
     '
   name: check_vault_statefulset_replicas
+  when_is_it_useful: '1. Investigating and troubleshooting issues related to the StatefulSet
+    ''vault'' in a Kubernetes cluster, such as CrashLoopBackoff events, high resource
+    utilization, or deployment failures.
+
+    2. Monitoring and analyzing the performance and availability of the ''vault''
+    StatefulSet in order to make informed decisions about scaling, updates, or other
+    operational tasks.
+
+    3. Automating the retrieval and analysis of StatefulSet information for ''vault''
+    as part of a larger monitoring and alerting system to proactively address potential
+    issues.
+
+    4. Integrating the StatefulSet information retrieval into a larger DevOps or SRE
+    workflow for managing and maintaining the ''vault'' application within the Kubernetes
+    environment.
+
+    5. Troubleshooting and resolving any unintended changes or discrepancies in the
+    ''vault'' StatefulSet configuration or deployment within the specified namespace
+    and context.'
 - command: kubectl get statefulset.apps/vault --context=${CONTEXT} -n ${NAMESPACE}
     -o json
   doc_links: '
@@ -507,3 +818,22 @@ commands:
 
     '
   name: check_vault_statefulset_replicas
+  when_is_it_useful: '1. Investigating and troubleshooting issues related to the StatefulSet
+    ''vault'' in a Kubernetes cluster, such as CrashLoopBackoff events, high resource
+    utilization, or deployment failures.
+
+    2. Monitoring and analyzing the performance and availability of the ''vault''
+    StatefulSet in order to make informed decisions about scaling, updates, or other
+    operational tasks.
+
+    3. Automating the retrieval and analysis of StatefulSet information for ''vault''
+    as part of a larger monitoring and alerting system to proactively address potential
+    issues.
+
+    4. Integrating the StatefulSet information retrieval into a larger DevOps or SRE
+    workflow for managing and maintaining the ''vault'' application within the Kubernetes
+    environment.
+
+    5. Troubleshooting and resolving any unintended changes or discrepancies in the
+    ''vault'' StatefulSet configuration or deployment within the specified namespace
+    and context.'

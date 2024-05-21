@@ -21,6 +21,30 @@ commands:
     \ \\\n  -n ${NAMESPACE} \\\n  get daemonset,deployment,statefulset \\\n  -l ${LABELS}\
     \ \\\n  -oyaml\n"
   name: get_current_resource_state
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or SRE would use the command to examine the configuration of daemonsets, deployments,
+    and statefulsets with specific labels to identify any misconfigurations or errors
+    causing the CrashLoopBackoff events.
+
+
+    2. Scaling up or down of specific workloads: When a DevOps or SRE needs to scale
+    specific workloads within a namespace, they can use this command to review the
+    YAML configuration before making any adjustments.
+
+
+    3. Rolling out updates or changes: Before rolling out updates or changes to specific
+    workloads in Kubernetes, a DevOps or SRE may want to review the current configuration
+    using this command to ensure everything is set up correctly.
+
+
+    4. Investigating performance issues: If there are performance issues with specific
+    workloads, a DevOps or SRE can use this command to examine the configuration and
+    potentially identify any bottlenecks or issues impacting performance.
+
+
+    5. Auditing and compliance checks: To ensure that workloads are compliant with
+    organizational policies and best practices, a DevOps or SRE may use this command
+    to review the configuration and make any necessary adjustments.'
 - command: kubectl --context=${CONTEXT} -n ${NAMESPACE} get daemonset,deployment,statefulset
     -l ${LABELS} -oyaml
   doc_links: '
@@ -43,6 +67,30 @@ commands:
     \ \\\n  -n ${NAMESPACE} \\\n  get daemonset,deployment,statefulset \\\n  -l ${LABELS}\
     \ \\\n  -oyaml\n"
   name: get_current_resource_state
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or SRE would use the command to examine the configuration of daemonsets, deployments,
+    and statefulsets with specific labels to identify any misconfigurations or errors
+    causing the CrashLoopBackoff events.
+
+
+    2. Scaling up or down of specific workloads: When a DevOps or SRE needs to scale
+    specific workloads within a namespace, they can use this command to review the
+    YAML configuration before making any adjustments.
+
+
+    3. Rolling out updates or changes: Before rolling out updates or changes to specific
+    workloads in Kubernetes, a DevOps or SRE may want to review the current configuration
+    using this command to ensure everything is set up correctly.
+
+
+    4. Investigating performance issues: If there are performance issues with specific
+    workloads, a DevOps or SRE can use this command to examine the configuration and
+    potentially identify any bottlenecks or issues impacting performance.
+
+
+    5. Auditing and compliance checks: To ensure that workloads are compliant with
+    organizational policies and best practices, a DevOps or SRE may use this command
+    to review the configuration and make any necessary adjustments.'
 - command: kubectl --context=${CONTEXT} -n ${NAMESPACE} logs daemonset,deployment,statefulset
     -l ${LABELS} --tail=200 --limit-bytes=256000
   doc_links: '
@@ -96,6 +144,29 @@ commands:
 
     '
   name: get_resource_logs
+  when_is_it_useful: '1. Investigating and troubleshooting Kubernetes CrashLoopBackoff
+    events to identify the root cause and resolve them to ensure the stability and
+    reliability of the application.
+
+
+    2. Monitoring and analyzing the logs of daemonsets, deployments, and statefulsets
+    to detect any anomalies or errors that could impact the performance and availability
+    of the application.
+
+
+    3. Troubleshooting performance issues or unexpected behavior in specific namespaces
+    by reviewing the logs of relevant resources and identifying potential bottlenecks
+    or misconfigurations.
+
+
+    4. Debugging and diagnosing application failures or disruptions by examining the
+    logs of Kubernetes resources to understand the sequence of events leading up to
+    the issue.
+
+
+    5. Performing regular log analysis and monitoring as part of proactive maintenance
+    and optimization efforts to ensure the smooth operation of the Kubernetes environment
+    and applications running on it.'
 - command: kubectl --context=${CONTEXT} -n ${NAMESPACE} logs daemonset,deployment,statefulset
     -l ${LABELS} --tail=200 --limit-bytes=256000
   doc_links: '
@@ -149,6 +220,29 @@ commands:
 
     '
   name: get_resource_logs
+  when_is_it_useful: '1. Investigating and troubleshooting Kubernetes CrashLoopBackoff
+    events to identify the root cause and resolve them to ensure the stability and
+    reliability of the application.
+
+
+    2. Monitoring and analyzing the logs of daemonsets, deployments, and statefulsets
+    to detect any anomalies or errors that could impact the performance and availability
+    of the application.
+
+
+    3. Troubleshooting performance issues or unexpected behavior in specific namespaces
+    by reviewing the logs of relevant resources and identifying potential bottlenecks
+    or misconfigurations.
+
+
+    4. Debugging and diagnosing application failures or disruptions by examining the
+    logs of Kubernetes resources to understand the sequence of events leading up to
+    the issue.
+
+
+    5. Performing regular log analysis and monitoring as part of proactive maintenance
+    and optimization efforts to ensure the smooth operation of the Kubernetes environment
+    and applications running on it.'
 - command: kubectl --context=${CONTEXT} -n ${NAMESPACE} get daemonset,deployment,statefulset
     -l ${LABELS} -o=jsonpath='{.items[0].kind}/{.items[0].metadata.name}'
   doc_links: '
@@ -186,6 +280,20 @@ commands:
 
     '
   name: restart_resource
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
+    events to identify and resolve issues that are causing applications to fail.
+
+    2. Managing and monitoring the scaling and deployment of containers using Kubernetes,
+    including identifying and resolving any issues that may arise.
+
+    3. Implementing automation and orchestration for various tasks within a Kubernetes
+    environment to streamline operations and ensure efficient resource utilization.
+
+    4. Collaborating with developers to optimize and fine-tune Kubernetes configurations
+    for specific workloads or applications.
+
+    5. Handling and responding to alerts and incidents in a Kubernetes cluster, ensuring
+    fast resolution of any issues to minimize downtime and disruption to services.'
 - command: kubectl --context=${CONTEXT} -n ${NAMESPACE} get daemonset,deployment,statefulset
     -l ${LABELS} -o=jsonpath='{.items[0].kind}/{.items[0].metadata.name}'
   doc_links: '
@@ -223,6 +331,20 @@ commands:
 
     '
   name: restart_resource
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
+    events to identify and resolve issues that are causing applications to fail.
+
+    2. Managing and monitoring the scaling and deployment of containers using Kubernetes,
+    including identifying and resolving any issues that may arise.
+
+    3. Implementing automation and orchestration for various tasks within a Kubernetes
+    environment to streamline operations and ensure efficient resource utilization.
+
+    4. Collaborating with developers to optimize and fine-tune Kubernetes configurations
+    for specific workloads or applications.
+
+    5. Handling and responding to alerts and incidents in a Kubernetes cluster, ensuring
+    fast resolution of any issues to minimize downtime and disruption to services.'
 - command: kubectl rollout restart ${resource_name.stdout} --context=${CONTEXT} -n
     ${NAMESPACE}
   doc_links: '
@@ -251,6 +373,26 @@ commands:
 
     '
   name: restart_resource
+  when_is_it_useful: '1. A pod is experiencing a CrashLoopBackoff event due to an
+    application error or configuration issue, and the DevOps or SRE needs to restart
+    the pod to attempt a recovery.
+
+
+    2. A deployment is stuck in a failed state and restarting the resource is necessary
+    to try and resolve the issue and restore service functionality.
+
+
+    3. A new version of a container image has been deployed, and the DevOps or SRE
+    needs to restart the relevant pods to ensure they pick up the latest changes.
+
+
+    4. An environment update or configuration change has been made, and the DevOps
+    or SRE needs to restart specific resources to apply the changes without disrupting
+    the entire cluster.
+
+
+    5. An infrastructure upgrade or maintenance activity requires restarting certain
+    resources to ensure that they are running with the latest updates and patches.'
 - command: kubectl rollout restart ${resource_name.stdout} --context=${CONTEXT} -n
     ${NAMESPACE}
   doc_links: '
@@ -279,3 +421,23 @@ commands:
 
     '
   name: restart_resource
+  when_is_it_useful: '1. A pod is experiencing a CrashLoopBackoff event due to an
+    application error or configuration issue, and the DevOps or SRE needs to restart
+    the pod to attempt a recovery.
+
+
+    2. A deployment is stuck in a failed state and restarting the resource is necessary
+    to try and resolve the issue and restore service functionality.
+
+
+    3. A new version of a container image has been deployed, and the DevOps or SRE
+    needs to restart the relevant pods to ensure they pick up the latest changes.
+
+
+    4. An environment update or configuration change has been made, and the DevOps
+    or SRE needs to restart specific resources to apply the changes without disrupting
+    the entire cluster.
+
+
+    5. An infrastructure upgrade or maintenance activity requires restarting certain
+    resources to ensure that they are running with the latest updates and patches.'

@@ -21,6 +21,35 @@ commands:
     \ experienced devops engineers can better understand each part of the command\
     \ and how it contributes to the overall functionality of the kubectl command."
   name: get_standard_postgres_resource_information
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: When
+    a DevOps or Site Reliability Engineer needs to investigate and resolve issues
+    with pods repeatedly crashing and restarting in a Kubernetes cluster, they might
+    use this command to view the specific resources and labels related to the problematic
+    pods.
+
+
+    2. Monitoring resource utilization: To keep track of the resource usage and performance
+    of specific resources within a Kubernetes cluster, a DevOps or Site Reliability
+    Engineer might use this command to gather information on the current state of
+    those resources.
+
+
+    3. Debugging application deployment issues: When deploying a new application or
+    updating an existing one in a Kubernetes cluster, a DevOps or Site Reliability
+    Engineer might use this command to verify that the desired resources have been
+    created and are running as expected.
+
+
+    4. Investigating networking issues: If there are connectivity problems between
+    different components or services within a Kubernetes cluster, a DevOps or Site
+    Reliability Engineer might use this command to inspect the specific resources
+    and labels associated with the affected network endpoints.
+
+
+    5. Managing permissions and access control: When setting up or modifying access
+    controls for specific resources within a Kubernetes cluster, a DevOps or Site
+    Reliability Engineer might use this command to ensure that the correct labels
+    and namespaces are being targeted for the configuration changes.'
 - command: kubectl get all -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
   doc_links: '
 
@@ -43,6 +72,35 @@ commands:
     \ experienced devops engineers can better understand each part of the command\
     \ and how it contributes to the overall functionality of the kubectl command."
   name: get_standard_postgres_resource_information
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: When
+    a DevOps or Site Reliability Engineer needs to investigate and resolve issues
+    with pods repeatedly crashing and restarting in a Kubernetes cluster, they might
+    use this command to view the specific resources and labels related to the problematic
+    pods.
+
+
+    2. Monitoring resource utilization: To keep track of the resource usage and performance
+    of specific resources within a Kubernetes cluster, a DevOps or Site Reliability
+    Engineer might use this command to gather information on the current state of
+    those resources.
+
+
+    3. Debugging application deployment issues: When deploying a new application or
+    updating an existing one in a Kubernetes cluster, a DevOps or Site Reliability
+    Engineer might use this command to verify that the desired resources have been
+    created and are running as expected.
+
+
+    4. Investigating networking issues: If there are connectivity problems between
+    different components or services within a Kubernetes cluster, a DevOps or Site
+    Reliability Engineer might use this command to inspect the specific resources
+    and labels associated with the affected network endpoints.
+
+
+    5. Managing permissions and access control: When setting up or modifying access
+    controls for specific resources within a Kubernetes cluster, a DevOps or Site
+    Reliability Engineer might use this command to ensure that the correct labels
+    and namespaces are being targeted for the configuration changes.'
 - command: kubectl get crd -n ${NAMESPACE} --context ${CONTEXT} -o=jsonpath='{.items[*].metadata.name}'
   doc_links: '
 
@@ -77,6 +135,39 @@ commands:
 
     '
   name: describe_postgres_custom_resources
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer may use this command to retrieve a list of custom
+    resource definitions within the namespace and context where the CrashLoopBackoff
+    event is occurring. This information can help identify any potentially misconfigured
+    or faulty CRDs that could be causing the issue.
+
+
+    2. Investigating application performance issues: If there are performance issues
+    with an application running on Kubernetes, a DevOps or Site Reliability Engineer
+    may use this command to gather information about the custom resource definitions
+    being used by the application. This can help identify any CRDs that may be impacting
+    the application''s performance.
+
+
+    3. Debugging deployment failures: When troubleshooting deployment failures in
+    Kubernetes, a DevOps or Site Reliability Engineer may use this command to examine
+    the custom resource definitions in the relevant namespace and context. This can
+    provide insights into any CRD-related issues that could be causing the deployment
+    to fail.
+
+
+    4. Auditing CRDs for compliance and security: In order to ensure compliance and
+    security best practices are being followed, a DevOps or Site Reliability Engineer
+    may regularly use this command to audit the custom resource definitions in a Kubernetes
+    environment. They can use the output to verify that all CRDs are properly configured
+    and meet the necessary compliance and security requirements.
+
+
+    5. Continuous monitoring and maintenance: As part of ongoing monitoring and maintenance
+    tasks, a DevOps or Site Reliability Engineer may use this command to periodically
+    check the status of custom resource definitions in Kubernetes. By regularly reviewing
+    the CRDs, they can proactively identify and address any potential issues before
+    they lead to larger problems.'
 - command: kubectl get crd -n ${NAMESPACE} --context ${CONTEXT} -o=jsonpath='{.items[*].metadata.name}'
   doc_links: '
 
@@ -111,6 +202,39 @@ commands:
 
     '
   name: describe_postgres_custom_resources
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer may use this command to retrieve a list of custom
+    resource definitions within the namespace and context where the CrashLoopBackoff
+    event is occurring. This information can help identify any potentially misconfigured
+    or faulty CRDs that could be causing the issue.
+
+
+    2. Investigating application performance issues: If there are performance issues
+    with an application running on Kubernetes, a DevOps or Site Reliability Engineer
+    may use this command to gather information about the custom resource definitions
+    being used by the application. This can help identify any CRDs that may be impacting
+    the application''s performance.
+
+
+    3. Debugging deployment failures: When troubleshooting deployment failures in
+    Kubernetes, a DevOps or Site Reliability Engineer may use this command to examine
+    the custom resource definitions in the relevant namespace and context. This can
+    provide insights into any CRD-related issues that could be causing the deployment
+    to fail.
+
+
+    4. Auditing CRDs for compliance and security: In order to ensure compliance and
+    security best practices are being followed, a DevOps or Site Reliability Engineer
+    may regularly use this command to audit the custom resource definitions in a Kubernetes
+    environment. They can use the output to verify that all CRDs are properly configured
+    and meet the necessary compliance and security requirements.
+
+
+    5. Continuous monitoring and maintenance: As part of ongoing monitoring and maintenance
+    tasks, a DevOps or Site Reliability Engineer may use this command to periodically
+    check the status of custom resource definitions in Kubernetes. By regularly reviewing
+    the CRDs, they can proactively identify and address any potential issues before
+    they lead to larger problems.'
 - command: kubectl get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
     -o=name --field-selector=status.phase=Running
   doc_links: '
@@ -135,6 +259,20 @@ commands:
     \ pods\n  --field-selector=status.phase=Running  # Filters the pods based on their\
     \ running status\n"
   name: get_postgres_pod_logs_events
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events to identify
+    and resolve issues with running pods.
+
+    2. Monitoring pod resources to ensure efficient utilization and scaling within
+    a specific namespace and context.
+
+    3. Identifying running pods with specific resource labels for debugging or performance
+    optimization purposes.
+
+    4. Automating routine tasks related to managing and monitoring pods in a Kubernetes
+    environment.
+
+    5. Providing developers with information on currently running pods with specific
+    resource labels for application debugging and development purposes.'
 - command: kubectl get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
     -o=name --field-selector=status.phase=Running
   doc_links: '
@@ -159,6 +297,20 @@ commands:
     \ pods\n  --field-selector=status.phase=Running  # Filters the pods based on their\
     \ running status\n"
   name: get_postgres_pod_logs_events
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events to identify
+    and resolve issues with running pods.
+
+    2. Monitoring pod resources to ensure efficient utilization and scaling within
+    a specific namespace and context.
+
+    3. Identifying running pods with specific resource labels for debugging or performance
+    optimization purposes.
+
+    4. Automating routine tasks related to managing and monitoring pods in a Kubernetes
+    environment.
+
+    5. Providing developers with information on currently running pods with specific
+    resource labels for application debugging and development purposes.'
 - command: kubectl get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
     -o=name --field-selector=status.phase=Running
   doc_links: '
@@ -183,6 +335,20 @@ commands:
     \ pods\n  --field-selector=status.phase=Running  # Filters the pods based on their\
     \ running status\n"
   name: get_postgres_pod_resource_utilization
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events to identify
+    and resolve issues with running pods.
+
+    2. Monitoring pod resources to ensure efficient utilization and scaling within
+    a specific namespace and context.
+
+    3. Identifying running pods with specific resource labels for debugging or performance
+    optimization purposes.
+
+    4. Automating routine tasks related to managing and monitoring pods in a Kubernetes
+    environment.
+
+    5. Providing developers with information on currently running pods with specific
+    resource labels for application debugging and development purposes.'
 - command: kubectl get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
     -o=name --field-selector=status.phase=Running
   doc_links: '
@@ -207,6 +373,20 @@ commands:
     \ pods\n  --field-selector=status.phase=Running  # Filters the pods based on their\
     \ running status\n"
   name: get_postgres_pod_resource_utilization
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events to identify
+    and resolve issues with running pods.
+
+    2. Monitoring pod resources to ensure efficient utilization and scaling within
+    a specific namespace and context.
+
+    3. Identifying running pods with specific resource labels for debugging or performance
+    optimization purposes.
+
+    4. Automating routine tasks related to managing and monitoring pods in a Kubernetes
+    environment.
+
+    5. Providing developers with information on currently running pods with specific
+    resource labels for application debugging and development purposes.'
 - command: patronictl list
   doc_links: '
 
@@ -228,6 +408,30 @@ commands:
 
     '
   name: get_patroni_output
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to check the status of Patroni-managed
+    PostgreSQL clusters in order to identify any issues that may be causing CrashLoopBackoff
+    events in Kubernetes.
+
+
+    2. Monitoring for cluster failures: The engineer might use this command to regularly
+    monitor the status of Patroni-managed clusters and quickly identify any clusters
+    that have failed or are experiencing issues.
+
+
+    3. Checking for membership changes in clusters: The command can be used to keep
+    track of any changes in cluster membership, such as nodes being added or removed,
+    which is important for maintaining high availability and reliability.
+
+
+    4. Investigating performance issues: When troubleshooting performance issues with
+    PostgreSQL databases managed by Patroni, the engineer might use this command to
+    gather information about the status of the clusters and their members.
+
+
+    5. Automating cluster management tasks: This command can be incorporated into
+    automated monitoring and management scripts to proactively manage and troubleshoot
+    Patroni-managed PostgreSQL clusters.'
 - command: patronictl list
   doc_links: '
 
@@ -249,3 +453,27 @@ commands:
 
     '
   name: get_patroni_output
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to check the status of Patroni-managed
+    PostgreSQL clusters in order to identify any issues that may be causing CrashLoopBackoff
+    events in Kubernetes.
+
+
+    2. Monitoring for cluster failures: The engineer might use this command to regularly
+    monitor the status of Patroni-managed clusters and quickly identify any clusters
+    that have failed or are experiencing issues.
+
+
+    3. Checking for membership changes in clusters: The command can be used to keep
+    track of any changes in cluster membership, such as nodes being added or removed,
+    which is important for maintaining high availability and reliability.
+
+
+    4. Investigating performance issues: When troubleshooting performance issues with
+    PostgreSQL databases managed by Patroni, the engineer might use this command to
+    gather information about the status of the clusters and their members.
+
+
+    5. Automating cluster management tasks: This command can be incorporated into
+    automated monitoring and management scripts to proactively manage and troubleshoot
+    Patroni-managed PostgreSQL clusters.'

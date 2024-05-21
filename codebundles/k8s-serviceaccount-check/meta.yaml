@@ -62,6 +62,32 @@ commands:
 
     '
   name: test_service_account_access_to_kubernetes_api_server_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event: A DevOps
+    or Site Reliability Engineer might need to use the command to set up a pod in
+    Kubernetes to debug and troubleshoot an application that is continuously crashing
+    and restarting.
+
+
+    2. Testing connectivity and authentication to an external API: The engineer might
+    use the command to test the connectivity and authentication of a new external
+    API by making a curl request from within a Kubernetes pod using a specific service
+    account and namespace.
+
+
+    3. Monitoring and collecting data from an API endpoint: The engineer could use
+    the command to create a temporary pod in Kubernetes to make a curl request to
+    an API endpoint and collect specific data for monitoring and analysis purposes.
+
+
+    4. Troubleshooting network issues within a Kubernetes cluster: The engineer might
+    need to run the command to test network connectivity and troubleshoot any potential
+    issues within the Kubernetes cluster, such as DNS resolution problems or firewall
+    rules.
+
+
+    5. Performing ad-hoc testing of a new feature or service: The engineer may use
+    the command to quickly spin up a pod in Kubernetes for ad-hoc testing of a new
+    feature or service by making API requests and validating the expected behavior.'
 - command: 'apiserver=https://kubernetes.default.svc; namespace=${NAMESPACE}; context=${CONTEXT};
     resource=""; serviceaccount=${SERVICE_ACCOUNT}; kubectl run curl-pod --image=curlimages/curl:latest
     --restart=Never --overrides="{ \"spec\": { \"serviceAccountName\": \"$serviceaccount\"
@@ -125,3 +151,29 @@ commands:
 
     '
   name: test_service_account_access_to_kubernetes_api_server_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event: A DevOps
+    or Site Reliability Engineer might need to use the command to set up a pod in
+    Kubernetes to debug and troubleshoot an application that is continuously crashing
+    and restarting.
+
+
+    2. Testing connectivity and authentication to an external API: The engineer might
+    use the command to test the connectivity and authentication of a new external
+    API by making a curl request from within a Kubernetes pod using a specific service
+    account and namespace.
+
+
+    3. Monitoring and collecting data from an API endpoint: The engineer could use
+    the command to create a temporary pod in Kubernetes to make a curl request to
+    an API endpoint and collect specific data for monitoring and analysis purposes.
+
+
+    4. Troubleshooting network issues within a Kubernetes cluster: The engineer might
+    need to run the command to test network connectivity and troubleshoot any potential
+    issues within the Kubernetes cluster, such as DNS resolution problems or firewall
+    rules.
+
+
+    5. Performing ad-hoc testing of a new feature or service: The engineer may use
+    the command to quickly spin up a pod in Kubernetes for ad-hoc testing of a new
+    feature or service by making API requests and validating the expected behavior.'

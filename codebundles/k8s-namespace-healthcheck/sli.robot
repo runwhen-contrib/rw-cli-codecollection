@@ -17,10 +17,6 @@ Suite Initialization
     ...    description=The kubernetes kubeconfig yaml containing connection configuration used to connect to cluster(s).
     ...    pattern=\w*
     ...    example=For examples, start here https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
-    ${kubectl}=    RW.Core.Import Service    kubectl
-    ...    description=The location service used to interpret shell commands.
-    ...    default=kubectl-service.shared
-    ...    example=kubectl-service.shared
     ${NAMESPACE}=    RW.Core.Import User Variable    NAMESPACE
     ...    type=string
     ...    description=The name of the Kubernetes namespace to scope actions and searching to. Supports csv list of namespaces. 
@@ -62,7 +58,7 @@ Suite Initialization
     ...    example=kubectl
     ...    default=kubectl
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
-    Set Suite Variable    ${kubectl}    ${kubectl}
+    Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${EVENT_AGE}    ${EVENT_AGE}
     Set Suite Variable    ${EVENT_THRESHOLD}    ${EVENT_THRESHOLD}
     Set Suite Variable    ${CONTAINER_RESTART_AGE}    ${CONTAINER_RESTART_AGE}
@@ -76,7 +72,7 @@ Get Event Count and Score
     [Documentation]    Captures error events and counts them within a configurable timeframe.
     [Tags]    Event    Count    Warning
     ${error_events}=    RW.CLI.Run Cli
-    ...    cmd=kubectl get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${EVENT_AGE}=    RW.CLI.String To Datetime    ${EVENT_AGE}
@@ -93,7 +89,7 @@ Get Container Restarts and Score
     [Documentation]    Counts the total sum of container restarts within a timeframe and determines if they're beyond a threshold.
     [Tags]    Restarts    Pods    Containers    Count    Status
     ${pods}=    RW.CLI.Run Cli
-    ...    cmd=kubectl get pods --context ${CONTEXT} -n ${NAMESPACE} -o json
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -o json
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${CONTAINER_RESTART_AGE}=    RW.CLI.String To Datetime    ${CONTAINER_RESTART_AGE}
@@ -111,7 +107,7 @@ Get NotReady Pods
     [Documentation]    Fetches a count of unready pods.
     [Tags]    Pods    Status    Phase    Ready    Unready    Running
     ${unreadypods_results}=    RW.CLI.Run Cli
-    ...    cmd=kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --sort-by='status.containerStatuses[0].restartCount' --field-selector=status.phase!=Running -ojson
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --sort-by='status.containerStatuses[0].restartCount' --field-selector=status.phase!=Running -ojson
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${unready_pod_count}=    RW.CLI.Parse Cli Json Output

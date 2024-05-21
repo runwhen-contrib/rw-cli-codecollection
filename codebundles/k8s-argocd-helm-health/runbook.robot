@@ -17,7 +17,6 @@ Fetch all available ArgoCD Helm releases in namespace `${NAMESPACE}`
     [Tags]    argocd    helmrelease    available    list    health
     ${helmreleases}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json | jq -r '.items[] | select(.spec.source.helm != null) | "\\nName:\\t\\t\\t" + .metadata.name + "\\nSync Status:\\t\\t" + .status.sync.status + "\\nHealth Status:\\t\\t" + .status.health.status'
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
@@ -31,7 +30,6 @@ Fetch Installed ArgoCD Helm release versions in namespace `${NAMESPACE}`
     [Tags]    argocd    helmrelease    version    state
     ${argocd_helm_status}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json | jq -r '.items[] | select(.spec.source.helm != null) | "\\nName:\\t\\t\\t" + .metadata.name + "\\nTarget Revision:\\t" + .spec.source.targetRevision + "\\nAttempted Revision:\\t" + .status.sync.revision + "\\nSync Status:\\t\\t" + .status.sync.status + "\\nOperational State:\\t" + .status.operationState.message'
-    ...    target_service=${kubectl}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
@@ -49,11 +47,6 @@ Suite Initialization
     ...    description=The kubernetes kubeconfig yaml containing connection configuration used to connect to cluster(s).
     ...    pattern=\w*
     ...    example=For examples, start here https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
-
-    ${kubectl}=    RW.Core.Import Service    kubectl
-    ...    description=The location service used to interpret shell commands.
-    ...    default=kubectl-service.shared
-    ...    example=kubectl-service.shared
 
     ${DISTRIBUTION}=    RW.Core.Import User Variable    DISTRIBUTION
     ...    type=string
@@ -92,7 +85,6 @@ Suite Initialization
     ...    example=my-main-cluster
 
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
-    Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${RESOURCE_NAME}    ${RESOURCE_NAME}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}

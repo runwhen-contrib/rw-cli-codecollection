@@ -1,0 +1,151 @@
+commands:
+- command: bash 'get_high_use_nodes.sh'
+  doc_links: '
+
+    - [Bash scripting tutorial](https://www.gnu.org/software/bash/manual/bash.html){:target="_blank"}
+
+    - [Analyzing resource usage in Kubernetes](https://kubernetes.io/docs/tasks/debug-application-cluster/resource-usage-monitoring/){:target="_blank"}'
+  explanation: This script is a bash script used to gather and analyze resource allocation
+    and usage data for nodes in a Kubernetes cluster. It retrieves information about
+    node details, allocatable resources, and usage, and then processes and analyzes
+    the data to identify nodes with high CPU and memory utilization, outputting the
+    results to a JSON file called high_use_nodes.json.
+  multi_line_details: "\n#!/bin/bash\n\n# Define Kubernetes binary and context with\
+    \ dynamic defaults\nKUBERNETES_DISTRIBUTION_BINARY=\"${KUBERNETES_DISTRIBUTION_BINARY:-kubectl}\"\
+    \ # Default to 'kubectl' if not set in the environment\nDEFAULT_CONTEXT=$(${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ config current-context)\nCONTEXT=\"${CONTEXT:-$DEFAULT_CONTEXT}\" # Use environment\
+    \ variable or the current context from kubectl\n\n# Function to process nodes\
+    \ and their resource usage\nprocess_nodes_and_usage() {\n    # Get Node Details\
+    \ including allocatable resources\n    nodes=$(${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ get nodes --context ${CONTEXT} -o json | jq '[.items[] | {\n        name: .metadata.name,\n\
+    \        cpu_allocatable: (.status.allocatable.cpu | rtrimstr(\"m\") | tonumber),\n\
+    \        memory_allocatable: (.status.allocatable.memory | gsub(\"Ki\"; \"\")\
+    \ | tonumber / 1024)\n    }]')\n\n    # Fetch node usage details\n    usage=$(${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ top nodes --context ${CONTEXT} | awk 'BEGIN { printf \"[\" } NR>1 { printf \"\
+    %s{\\\"name\\\":\\\"%s\\\",\\\"cpu_usage\\\":\\\"%s\\\",\\\"memory_usage\\\":\\\
+    \"%s\\\"}\", (NR>2 ? \",\" : \"\"), $1, ($2 == \"<unknown>\" ? \"0\" : $2), ($4\
+    \ == \"<unknown>\" ? \"0\" : $4) } END { printf \"]\" }' | jq '.')\n\n    # Combine\
+    \ and process the data\n    jq -n --argjson nodes \"$nodes\" --argjson usage \"\
+    $usage\" '{\n        nodes: $nodes | map({name: .name, cpu_allocatable: .cpu_allocatable,\
+    \ memory_allocatable: .memory_allocatable}),\n        usage: $usage | map({name:\
+    \ .name, cpu_usage: (.cpu_usage | rtrimstr(\"m\") | tonumber // 0), memory_usage:\
+    \ (.memory_usage | rtrimstr(\"Mi\") | tonumber // 0)})\n    } | .nodes as $nodes\
+    \ | .usage as $usage | \n    $nodes | map(\n        . as $node | \n        $usage[]\
+    \ | \n        select(.name == $node.name) | \n        {\n            name: .name,\
+    \ \n            cpu_utilization_percentage: (.cpu_usage / $node.cpu_allocatable\
+    \ * 100),\n            memory_utilization_percentage: (.memory_usage / $node.memory_allocatable\
+    \ * 100)\n        }\n    ) | map(select(.cpu_utilization_percentage >= 90 or .memory_utilization_percentage\
+    \ >= 90))'\n}\n\n# Execute the function and save the output to a file\nprocess_nodes_and_usage\
+    \ > high_use_nodes.json\n\n# Output the contents of the generated file\ncat high_use_nodes.json\n"
+  name: identify_high_utilization_nodes_for_cluster_context
+  when_is_it_useful: '1. Identifying and troubleshooting performance issues in a Kubernetes
+    cluster, such as nodes with high CPU and memory utilization.
+
+
+    2. Optimizing resource allocation in a Kubernetes cluster to ensure efficient
+    use of resources and prevent overload on specific nodes.
+
+
+    3. Monitoring and maintaining the health and stability of a Kubernetes cluster
+    by identifying and addressing potential bottlenecks or capacity limitations.
+
+
+    4. Analyzing historical data on node usage to identify trends and patterns that
+    may indicate the need for scaling or rebalancing resources within the cluster.
+
+
+    5. Generating reports and insights on resource usage and allocation for stakeholders
+    and management to inform decision-making and resource planning within the Kubernetes
+    environment.'
+- command: bash 'pods_impacting_high_use_nodes.sh'
+  doc_links: '
+
+    - [CPU & Memory Allocations in Kubernetes](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/){:target="_blank"}
+
+    - [Normalizing Resource Metrics in Kubernetes](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/#step-2-run-the-hpa){:target="_blank"}
+
+    - [Configuring Resource Requests in Kubernetes](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-requests-and-limits-of-pod-and-container/){:target="_blank"}'
+  explanation: This script is designed to automate the monitoring of resource requests
+    in a Kubernetes cluster. It involves fetching details around CPU & memory allocations
+    for nodes and pods, computes actual utilization, normalizes these metrics, and
+    then compares them against configured settings in order to identify any excessive
+    resource usage.
+  multi_line_details: "\n#!/bin/bash\n\n# Define Kubernetes binary and context with\
+    \ dynamic defaults\nKUBERNETES_DISTRIBUTION_BINARY=\"${KUBERNETES_DISTRIBUTION_BINARY:-kubectl}\"\
+    \ # Default to 'kubectl' if not set in the environment\nDEFAULT_CONTEXT=$(${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ config current-context)\nCONTEXT=\"${CONTEXT:-$DEFAULT_CONTEXT}\" # Use environment\
+    \ variable or the current context from kubectl\n\nprocess_nodes_and_usage() {\n\
+    \    # Get Node Details including allocatable resources\n    nodes=$(${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ get nodes --context ${CONTEXT} -o json | jq '[.items[] | {\n        name: .metadata.name,\n\
+    \        cpu_allocatable: (.status.allocatable.cpu | rtrimstr(\"m\") | tonumber),\n\
+    \        memory_allocatable: (.status.allocatable.memory | gsub(\"Ki\"; \"\")\
+    \ | tonumber / 1024)\n    }]')\n\n    # Fetch node usage details\n    usage=$(${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ top nodes --context ${CONTEXT} | awk 'BEGIN { printf \"[\" } NR>1 { printf \"\
+    %s{\\\"name\\\":\\\"%s\\\",\\\"cpu_usage\\\":\\\"%s\\\",\\\"memory_usage\\\":\\\
+    \"%s\\\"}\", (NR>2 ? \",\" : \"\"), $1, ($2 == \"<unknown>\" ? \"0\" : $2), ($4\
+    \ == \"<unknown>\" ? \"0\" : $4) } END { printf \"]\" }' | jq '.')\n\n    # Combine\
+    \ and process the data\n    jq -n --argjson nodes \"$nodes\" --argjson usage \"\
+    $usage\" '{\n        nodes: $nodes | map({name: .name, cpu_allocatable: .cpu_allocatable,\
+    \ memory_allocatable: .memory_allocatable}),\n        usage: $usage | map({name:\
+    \ .name, cpu_usage: (.cpu_usage | rtrimstr(\"m\") | tonumber // 0), \n       \
+    \ memory_usage: (.memory_usage | rtrimstr(\"Mi\") | tonumber // 0)})\n    } |\
+    \ .nodes as $nodes | .usage as $usage | \n    $nodes | map(\n        . as $node\
+    \ | \n        $usage[] | \n        select(.name == $node.name) | \n        {\n\
+    \            name: .name, \n            cpu_utilization_percentage: (.cpu_usage\
+    \ / $node.cpu_allocatable * 100),\n            memory_utilization_percentage:\
+    \ (.memory_usage / $node.memory_allocatable * 100)\n        }\n    ) | map(select(.cpu_utilization_percentage\
+    \ >= 90 or .memory_utilization_percentage >= 90))'\n}\n\n\n# Fetch pod resource\
+    \ requests\n${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} --all-namespaces\
+    \ -o json | jq -r '.items[] | {namespace: .metadata.namespace, \npod: .metadata.name,\
+    \ nodeName: .spec.nodeName, cpu_request: (.spec.containers[].resources.requests.cpu\
+    \ // \"0m\"), memory_request: (.spec.containers[].resources.requests.memory //\
+    \ \"0Mi\")} \n| select(.cpu_request != \"0m\" and .memory_request != \"0Mi\")'\
+    \ | jq -s '.' > pod_requests.json\n\n\n# Fetch current pod metrics\n${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ top pods --context ${CONTEXT} --all-namespaces --containers | awk 'BEGIN { printf\
+    \ \"[\" } \nNR>1 { printf \"%s{\\\"namespace\\\":\\\"%s\\\",\\\"pod\\\":\\\"%s\\\
+    \",\\\"container\\\":\\\"%s\\\",\\\"cpu_usage\\\":\\\"%s\\\",\\\"memory_usage\\\
+    \":\\\"%s\\\"}\", (NR>2 ? \",\" : \"\"), $1, $2, $3, $4, $5 } \nEND { printf \"\
+    ]\" }' | jq '.' > pod_usage.json\n\n\n# Normalize units and compare\njq -s '[\n\
+    \    .[0][] as $usage | \n    .[1][] | \n    select(.pod == $usage.pod and .namespace\
+    \ == $usage.namespace) |\n    {\n        pod: .pod,\n        namespace: .namespace,\n\
+    \        node: .nodeName,\n        cpu_usage: $usage.cpu_usage,\n        cpu_request:\
+    \ .cpu_request,\n        cpu_usage_exceeds: (\n            # Convert CPU usage\
+    \ to millicores, assuming all inputs need to be converted from milli-units if\
+    \ they end with 'm'\n            ($usage.cpu_usage | \n                if test(\"\
+    m$\") then rtrimstr(\"m\") | tonumber \n                else tonumber * 1000 \n\
+    \                end\n            ) > (\n                # Convert CPU request\
+    \ to millicores, assuming it may already be in millicores if it ends with 'm'\n\
+    \                .cpu_request | \n                if test(\"m$\") then rtrimstr(\"\
+    m\") | tonumber \n                else tonumber * 1000 \n                end\n\
+    \            )\n        ),\n        memory_usage: $usage.memory_usage,\n     \
+    \   memory_request: .memory_request,\n        memory_usage_exceeds: (\n      \
+    \      # Normalize memory usage to MiB, handling MiB and GiB\n            ($usage.memory_usage\
+    \ | \n                if test(\"Gi$\") then rtrimstr(\"Gi\") | tonumber * 1024\n\
+    \                elif test(\"G$\") then rtrimstr(\"G\") | tonumber * 1024\n  \
+    \              elif test(\"Mi$\") then rtrimstr(\"Mi\") | tonumber\n         \
+    \       elif test(\"M$\") then rtrimstr(\"M\") | tonumber\n                else\
+    \ tonumber\n                end\n            ) > (\n                # Normalize\
+    \ memory request to MiB\n                .memory_request | \n                if\
+    \ test(\"Gi$\") then rtrimstr(\"Gi\") | tonumber * 1024\n                elif\
+    \ test(\"G$\") then rtrimstr(\"G\") | tonumber * 1024\n                elif test(\"\
+    Mi$\") then rtrimstr(\"Mi\") | tonumber\n                elif test(\"M$\") then\
+    \ rtrimstr(\"M\") | tonumber\n                else tonumber\n                end\n\
+    \            )\n        )\n    }\n    | select(.cpu_usage_exceeds or .memory_usage_exceeds)\n\
+    ] | group_by(.namespace) | map({(.[0].namespace): .}) | add' pod_usage.json pod_requests.json\
+    \ > pods_exceeding_requests.json\n\ncat pods_exceeding_requests.json\n"
+  name: identify_pods_causing_high_node_utilization_in_cluster_context
+  when_is_it_useful: '1. Identifying and troubleshooting performance issues in a Kubernetes
+    cluster, such as high CPU or memory usage, by monitoring resource requests and
+    utilization.
+
+    2. Automating the identification of pods or nodes causing CrashLoopBackoff events
+    in a Kubernetes cluster by comparing resource requests and actual utilization.
+
+    3. Implementing proactive resource monitoring and optimization strategies in a
+    Kubernetes environment to prevent potential outages or service disruptions.
+
+    4. Ensuring compliance with resource allocation policies and best practices within
+    a Kubernetes infrastructure by regularly monitoring resource utilization.
+
+    5. Streamlining the process of identifying and addressing resource-intensive workloads
+    within a Kubernetes cluster to optimize overall system performance.'
