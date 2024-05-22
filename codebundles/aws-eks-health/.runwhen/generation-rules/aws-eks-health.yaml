@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: aws
+  generationRules:
+    - resourceTypes:
+        - aws_eks_clusters
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: aws-eks-health
+          qualifiers: ["resource"]
+          baseTemplateName: aws-eks-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: aws-eks-health-taskset.yaml

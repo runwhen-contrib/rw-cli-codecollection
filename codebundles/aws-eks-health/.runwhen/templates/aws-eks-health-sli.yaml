@@ -1,5 +1,5 @@
 apiVersion: runwhen.com/v1
-kind: Runbook
+kind: ServiceLevelIndicator
 metadata:
   name: {{slx_name}}
   labels:
@@ -7,8 +7,10 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
+  displayUnitsLong: OK
+  displayUnitsShort: ok
   location: {{default_location}}
-  description: Runs tasks to triage unhealthy GCP Cloud Functions 
+  description: Measures EKS status in the region.
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -20,12 +22,14 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/gcp-cloud-function-health/runbook.robot
+    pathToRobot: codebundles/aws-eks-health/sli.robot
   intervalStrategy: intermezzo
   intervalSeconds: 300
   configProvided:
-    - name: GCP_PROJECT_ID
-      value: {{match_resource.resource.project_id}}
+    - name: AWS_REGION
+      value: {{match_resource.resource.region}}
   secretsProvided:
-    - name: gcp_credentials_json
-      workspaceKey: {{custom.gcp_ops_suite_sa}}
+    - name: AWS_ACCESS_KEY_ID
+      workspaceKey: {{custom.aws_access_key_id}}
+    - name: AWS_SECRET_ACCESS_KEY
+      workspaceKey: {{custom.aws_secret_access_key}}

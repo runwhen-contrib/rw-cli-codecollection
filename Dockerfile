@@ -9,11 +9,12 @@ RUN pip install -r /app/codecollection/requirements.txt
 
 # Install packages
 RUN apt-get update && \
-    apt install -y git dnsutils && \
+    apt install -y git dnsutils shellcheck && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     rm -rf /var/cache/apt
 
+# install aws cli
 RUN apt-get update && \
     apt-get install -y groff mandoc less && \
     curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
