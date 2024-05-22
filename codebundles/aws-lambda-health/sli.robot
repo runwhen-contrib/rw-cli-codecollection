@@ -17,7 +17,7 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 Analyze AWS Lambda Invocation Errors
-    [Documentation]   This bash script is designed to analyze AWS Lambda Invocation Errors for a specified function within a specified region. It fetches the last 50 invocation errors from the AWS CloudWatch logs and prints them. If no errors are found, it prints a message stating that no invocation errors were found for the function. It requires AWS CLI and jq to be installed and properly configured.
+    [Documentation]   This bash script is designed to analyze AWS Lambda Invocation Errors for a specified function within a specified region.
     [Tags]  AWS    Lambda    Error Analysis    Invocation Errors    CloudWatch    Logs 
     ${process}=    RW.CLI.Run Bash File    analyze_lambda_invocation_errors.sh
     ...    env=${env}

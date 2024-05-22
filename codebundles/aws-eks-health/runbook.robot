@@ -26,7 +26,7 @@ Check EKS Fargate Cluster Health Status
     IF    "Error" in """${process.stdout}"""
         RW.Core.Add Issue    title=EKS Fargate Cluster in ${AWS_REGION} is Unhealthy
         ...    severity=3
-        ...    next_steps=Check the AWS Management Console for the health status of the EKS Fargate cluster.   
+        ...    next_steps=Fetch the CloudWatch logs of available EKS clusters in ${AWS_REGION}.
         ...    expected=The EKS Fargate cluster is healthy.
         ...    actual=The EKS Fargate cluster is unhealthy.
         ...    reproduce_hint=Run the script check_eks_fargate_cluster_health_status.sh
@@ -44,7 +44,7 @@ Check EKS Cluster Health Status
     IF    "Error" in """${process.stdout}"""
         RW.Core.Add Issue    title=EKS Cluster in ${AWS_REGION} is Unhealthy
         ...    severity=3
-        ...    next_steps=Check the AWS Management Console for the health status of the EKS cluster.   
+        ...    next_steps=Fetch the CloudWatch logs of available EKS clusters in ${AWS_REGION}.  
         ...    expected=The EKS cluster is healthy.
         ...    actual=The EKS cluster is unhealthy.
         ...    reproduce_hint=Run the script check_eks_cluster_health.sh

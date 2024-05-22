@@ -43,14 +43,6 @@ Scan AWS Elasticache Redis Status
         ...    details=${process.stdout}
     END
 
-# TODO: discuss vpc topology and ec2 bastion access for aws redis elasticache
-# Monitor Redis Performance using INFO and SLOWLOG commands
-#     [Documentation]   This script is used to monitor the performance of a Redis instance hosted on AWS Elasticache. It first retrieves the details of the Redis instance using the AWS CLI. Then, it connects to the Redis instance and uses the Redis INFO and SLOWLOG commands to monitor its performance. The output of these commands is printed to the console for review.
-#     [Tags]  AWS    ElastiCache    Redis    Performance Monitoring    SLOWLOG    INFO    BASH    CLI    Script    Cloud Services    Database    
-#     ${process}=    Run Process    ${CURDIR}/monitor_redis_performance.sh    env=${env}
-#     RW.Core.Add Pre To Report    ${process.stdout}
-
-
 *** Keywords ***
 Suite Initialization
     ${AWS_REGION}=    RW.Core.Import User Variable    AWS_REGION
