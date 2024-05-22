@@ -6,3 +6,4 @@ report.html
 dist
 build
 *egg-info
+.kube
