@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+    - resourceTypes:
+        - namespace
+      matchRules:
+        - type: pattern
+          pattern: "flux-system"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: fluxcd-reconciliation
+          levelOfDetail: basic
+          qualifiers: ["namespace", "cluster"]
+          baseTemplateName: k8s-fluxcd-reconcile
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: slo
+            - type: runbook
+              templateName: k8s-fluxcd-reconcile-taskset.yaml
