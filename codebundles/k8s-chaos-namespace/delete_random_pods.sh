@@ -2,16 +2,17 @@
 
 # Environment Variables
 # NAMESPACE
+# CONTEXT
 
 MAX_DELETIONS=10
-POD_NAMES=$(kubectl get pods -oname -n $NAMESPACE)
+POD_NAMES=$(kubectl get --context $CONTEXT pods -oname -n $NAMESPACE)
 echo "Starting random pod deletions in namespace $NAMESPACE"
 deleted_count=0
 for pod_name in $POD_NAMES; do
     # Roll a 50/50 chance
     if (( RANDOM % 2 == 0 )); then
         # Delete the pod
-        kubectl delete $pod_name -n $NAMESPACE
+        kubectl delete --context $CONTEXT $pod_name -n $NAMESPACE
         echo "Waiting between deletions..."
         sleep 3
         # Increment the deleted count
@@ -24,4 +25,4 @@ for pod_name in $POD_NAMES; do
 done
 
 echo "Random deletions complete. Current Pod States:"
-kubectl get pods -n $NAMESPACE
+kubectl get --context $CONTEXT pods -n $NAMESPACE
