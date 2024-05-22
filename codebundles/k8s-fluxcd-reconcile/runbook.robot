@@ -43,11 +43,19 @@ Suite Initialization
     ...    type=string
     ...    description=The kubernetes context to use in the kubeconfig provided.
     ...    pattern=\w*
+    ${FLUX_NAMESPACE}=    RW.Core.Import User Variable   FLUX_NAMESPACE
+    ...    type=string
+    ...    description=The namespace where the flux controllers reside. Typically flux-system.
+    ...    pattern=\w*
+    ...    default=flux-system
+    ...    example=flux-system
 
 
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
+    Set Suite Variable    ${FLUX_NAMESPACE}    ${FLUX_NAMESPACE}
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable
     ...    &{env}
     ...    KUBECONFIG=${kubeconfig.key}
     ...    CONTEXT=${CONTEXT}
+    ...    FLUX_NAMESPACE=${FLUX_NAMESPACE}

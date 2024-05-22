@@ -1,12 +1,13 @@
 #!/bin/bash
 
-# Define the namespace
-FLUX_NAMESPACE="flux-system"
+# Environment Variables:
+# FLUX_NAMESPACE
+
 SINCE_TIME="1h"
 TRUNCATE_LINES=5
 MAX_LINES=500
 
-controllers=$(kubectl get deploy -oname --no-headers -n $FLUX_NAMESPACE | grep -i controller)
+controllers=$(kubectl get --context $CONTEXT deploy -oname --no-headers -n $FLUX_NAMESPACE | grep -i controller)
 
 echo "Generating reconcile report for Flux controllers in namespace $FLUX_NAMESPACE"
 echo "For controllers: $controllers"
@@ -15,7 +16,7 @@ total_errors=0
 echo "---------------------------------------------"
 for controller in $controllers; do
     echo "$controller Controller Summary"
-    recent_logs=$(kubectl logs $controller -n $FLUX_NAMESPACE --tail=$MAX_LINES --since=$SINCE_TIME)
+    recent_logs=$(kubectl logs --context $CONTEXT $controller -n $FLUX_NAMESPACE --tail=$MAX_LINES --since=$SINCE_TIME)
     error_logs=$(echo "$recent_logs" | grep -i "\"level\":\"error\"")
     info_logs=$(echo "$recent_logs" | grep -i "\"level\":\"info\"")
     error_count=$(echo "$error_logs" | grep -v '^$' | wc -l)
