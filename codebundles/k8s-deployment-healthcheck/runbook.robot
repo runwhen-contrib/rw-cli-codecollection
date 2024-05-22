@@ -157,20 +157,20 @@ Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
         FOR    ${item}    IN    @{object_list}
             ${message_string}=    Catenate    SEPARATOR;    @{item["messages"]}
             ${messages}=    Replace String    ${message_string}    "    ${EMPTY}
-            ${item_next_steps}=    RW.CLI.Run Bash File
-            ...    bash_file=workload_next_steps.sh
-            ...    cmd_override=./workload_next_steps.sh "${messages}" "Deployment" "${DEPLOYMENT_NAME}"
+            ${issue_list}=    RW.CLI.Run Bash File
+            ...    bash_file=workload_issues.sh
+            ...    cmd_override=./workload_issues.sh "${messages}" "Deployment" "${DEPLOYMENT_NAME}"
             ...    env=${env}
             ...    include_in_history=False
-            # FIXME - Should we add severity mappings in the next steps to make the issue more dynamic?
-            RW.Core.Add Issue
-            ...    severity=4
-            ...    expected=Warning events should not be present in namespace `${NAMESPACE}` for Deployment `${DEPLOYMENT_NAME}`
-            ...    actual=Warning events are found in namespace `${NAMESPACE}` for Deployment `${DEPLOYMENT_NAME}` which indicate potential issues.
-            ...    title= Deployment `${DEPLOYMENT_NAME}` generated warning events for ${item["kind"]} `${item["name"]}`.
-            ...    reproduce_hint=View Commands Used in Report Output
-            ...    details=${item["kind"]} `${item["name"]}` generated the following warning details:\n`${item}`
-            ...    next_steps=${item_next_steps.stdout}\n${related_resource_recommendations}
+            FOR    ${issue}    IN    @{issue_list}
+                RW.Core.Add Issue
+                ...    severity=${issue["severity"]}
+                ...    expected=Warning events should not be present in namespace `${NAMESPACE}` for Deployment `${DEPLOYMENT_NAME}`
+                ...    actual=Warning events are found in namespace `${NAMESPACE}` for Deployment `${DEPLOYMENT_NAME}` which indicate potential issues.
+                ...    title= ${issue["title"]}
+                ...    reproduce_hint=${events.cmd}
+                ...    details=${issue["details"]}
+                ...    next_steps=${issue["next_steps"]}\n${related_resource_recommendations}
         END
     END
     ${history}=    RW.CLI.Pop Shell History
