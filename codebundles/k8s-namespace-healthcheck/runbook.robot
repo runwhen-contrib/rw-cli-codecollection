@@ -7,6 +7,7 @@ Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
+Library             RW.K8sHelper
 Library             RW.NextSteps
 Library             RW.platform
 Library             OperatingSystem
@@ -48,7 +49,7 @@ Troubleshoot Warning Events in Namespace `${NAMESPACE}`
             ...    env=${env}
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
-            ${messages}=    Replace String    ${item["summary_messages"]}    "    ${EMPTY}
+            ${messages}=    RW.K8sHelper.Sanitize Messages    ${item["summary_messages"]}
             ${item_owner_output}=    RW.CLI.Run Cli
             ...    cmd=echo "${item_owner.stdout}" | sed 's/ *$//' | tr -d '\n'
             ...    env=${env}
@@ -60,20 +61,36 @@ Troubleshoot Warning Events in Namespace `${NAMESPACE}`
                 ${owner_kind}=    Set Variable    "Unknown"
                 ${owner_name}=    Set Variable    "Unknown"
             END
-            ${item_next_steps}=    RW.CLI.Run Bash File
-            ...    bash_file=workload_next_steps.sh
-            ...    cmd_override=./workload_next_steps.sh "${messages}" "${owner_kind}" "${owner_name}"
+            ${issues}=    RW.CLI.Run Bash File
+            ...    bash_file=workload_issues.sh
+            ...    cmd_override=./workload_issues.sh "${messages}" "${owner_kind}" "${owner_name}"
             ...    env=${env}
-            ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
-            RW.Core.Add Issue
-            ...    severity=3
-            ...    expected=Warning events should not be present in namespace `${NAMESPACE}` for ${owner_kind} `${owner_name}`
-            ...    actual=Warning events are found in namespace `${NAMESPACE}` for ${owner_kind} `${owner_name}` which indicate potential issues.
-            ...    title= ${owner_kind} `${owner_name}` generated ${item["total_events"]} **warning** events and should be reviewed.
-            ...    reproduce_hint=View Commands Used in Report Output
-            ...    details=Item `${item["object"]}` generated a total of ${item["total_events"]} events containing some of the following messages and types:\n`${item["summary_messages"]}`
-            ...    next_steps=${item_next_steps.stdout}
+            ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+            FOR    ${issue}    IN    @{issue_list}
+                RW.Core.Add Issue
+                ...    severity=${issue["severity"]}
+                ...    expected=Warning events should not be present in namespace `${NAMESPACE}` for ${owner_kind} `${owner_name}`
+                ...    actual=Warning events are found in namespace `${NAMESPACE}` for ${owner_kind} `${owner_name}` which indicate potential issues.
+                ...    title= ${issue["title"]}
+                ...    reproduce_hint=${warning_events_by_object.cmd}
+                ...    details=${issue["details"]}
+                ...    next_steps=${issue["next_steps"]}
+            END
+            # ${item_next_steps}=    RW.CLI.Run Bash File
+            # ...    bash_file=workload_next_steps.sh
+            # ...    cmd_override=./workload_next_steps.sh "${messages}" "${owner_kind}" "${owner_name}"
+            # ...    env=${env}
+            # ...    secret_file__kubeconfig=${kubeconfig}
+            # ...    include_in_history=False
+            # RW.Core.Add Issue
+            # ...    severity=3
+            # ...    expected=Warning events should not be present in namespace `${NAMESPACE}` for ${owner_kind} `${owner_name}`
+            # ...    actual=Warning events are found in namespace `${NAMESPACE}` for ${owner_kind} `${owner_name}` which indicate potential issues.
+            # ...    title= ${owner_kind} `${owner_name}` generated ${item["total_events"]} **warning** events and should be reviewed.
+            # ...    reproduce_hint=View Commands Used in Report Output
+            # ...    details=Item `${item["object"]}` generated a total of ${item["total_events"]} events containing some of the following messages and types:\n`${item["summary_messages"]}`
+            # ...    next_steps=${item_next_steps.stdout}
         END
     END
     ${history}=    RW.CLI.Pop Shell History
@@ -128,64 +145,64 @@ Troubleshoot Pending Pods In Namespace `${NAMESPACE}`
     [Documentation]    Fetches pods that are pending and provides details.
     [Tags]    namespace    pods    status    pending    ${NAMESPACE}
     ${pending_pods}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending --no-headers -o json | jq -r '.items[] | "pod_name: \\(.metadata.name)\\nstatus: \\(.status.phase // "N/A")\\nmessage: \\(.status.conditions[0].message // "N/A")\\nreason: \\(.status.conditions[0].reason // "N/A")\\ncontainerStatus: \\((.status.containerStatuses[0].state // "N/A"))\\ncontainerMessage: \\(.status.containerStatuses[0].state.waiting?.message // "N/A")\\ncontainerReason: \\(.status.containerStatuses[0].state.waiting?.reason // "N/A")\\n_______-"'
+    # ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending --no-headers -o json | jq -r '.items[] | "pod_name: \\(.metadata.name)\\nstatus: \\(.status.phase // "N/A")\\nmessage: \\(.status.conditions[0].message // "N/A")\\nreason: \\(.status.conditions[0].reason // "N/A")\\ncontainerStatus: \\((.status.containerStatuses[0].state // "N/A"))\\ncontainerMessage: \\(.status.containerStatuses[0].state.waiting?.message // "N/A")\\ncontainerReason: \\(.status.containerStatuses[0].state.waiting?.reason // "N/A")\\n_______-"'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending --no-headers -o json | jq -r '[.items[] | {pod_name: .metadata.name, status: (.status.phase // "N/A"), message: (.status.conditions[0].message // "N/A"), reason: (.status.conditions[0].reason // "N/A"), containerStatus: (.status.containerStatuses[0].state // "N/A"), containerMessage: (.status.containerStatuses[0].state.waiting?.message // "N/A"), containerReason: (.status.containerStatuses[0].state.waiting?.reason // "N/A")}]'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
-    ${pending_pod_list}=    Split String    ${pending_pods.stdout}    _______-
+    ${pending_pod_list}=    Evaluate    json.loads(r'''${pending_pods.stdout}''')    json
     IF    len($pending_pod_list) > 0
         FOR    ${item}    IN    @{pending_pod_list}
-            ${is_not_just_newline}=    Evaluate    '''${item}'''.strip() != ''
-            IF    ${is_not_just_newline}
-                ${pod_name}=    RW.CLI.Run Cli
-                ...    cmd=echo '${item}' | grep pod_name: | sed 's/^pod_name: //' | sed 's/ *$//' | tr -d '\n'
-                ...    env=${env}
-                ...    include_in_history=false
-                ${pod_message}=    RW.CLI.Run Cli
-                ...    cmd=echo '${item}' | grep message: | sed 's/^message: //' | sed 's/ *$//' | tr -d '\n'| sed 's/\"//g'
-                ...    env=${env}
-                ...    include_in_history=false
-                ${container_message}=    RW.CLI.Run Cli
-                ...    cmd=echo '${item}' | grep containerMessage: | sed 's/^containerMessage: //' | sed 's/ *$//' | tr -d '\n'| sed 's/\"//g'
-                ...    env=${env}
-                ...    include_in_history=false
-                ${container_reason}=    RW.CLI.Run Cli
-                ...    cmd=echo '${item}' | grep containerReason: | sed 's/^containerReason: //' | sed 's/ *$//' | tr -d '\n'| sed 's/\"//g'
-                ...    env=${env}
-                ...    include_in_history=false
-                ${item_owner}=    RW.CLI.Run Bash File
-                ...    bash_file=find_resource_owners.sh
-                ...    cmd_override=./find_resource_owners.sh Pod ${pod_name.stdout} ${NAMESPACE} ${CONTEXT}
-                ...    env=${env}
-                ...    secret_file__kubeconfig=${kubeconfig}
-                ...    include_in_history=False
-                ${item_owner_output}=    RW.CLI.Run Cli
-                ...    cmd=echo "${item_owner.stdout}" | sed 's/ *$//' | tr -d '\n'
-                ...    env=${env}
-                ...    include_in_history=False
-                IF    len($item_owner_output.stdout) > 0 and ($item_owner_output.stdout) != "No resource found"
-                    ${owner_kind}    ${owner_name}=    Split String    ${item_owner_output.stdout}    ${SPACE}
-                    ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
-                ELSE
-                    ${owner_kind}=    Set Variable    "Unknown"
-                    ${owner_name}=    Set Variable    "Unknown"
-                END
-                ${item_next_steps}=    RW.CLI.Run Bash File
-                ...    bash_file=workload_next_steps.sh
-                ...    cmd_override=./workload_next_steps.sh "${container_reason.stdout};${pod_message.stdout};${container_reason.stdout}" "${owner_kind}" "${owner_name}"
-                ...    env=${env}
-                ...    secret_file__kubeconfig=${kubeconfig}
-                ...    include_in_history=False
-                RW.Core.Add Issue
-                ...    severity=2
-                ...    expected=Pods should not be pending in `${NAMESPACE}`.
-                ...    actual=Pod `${pod_name.stdout}` in `${NAMESPACE}` is pending.
-                ...    title= Pod `${pod_name.stdout}` is pending with ${container_reason.stdout}
-                ...    reproduce_hint=View Commands Used in Report Output
-                ...    details=Pod `${pod_name.stdout}` is owned by ${owner_kind} `${owner_name}` and is pending with the following details:\n${item}
-                ...    next_steps=${item_next_steps.stdout}
+            ${item_owner}=    RW.CLI.Run Bash File
+            ...    bash_file=find_resource_owners.sh
+            ...    cmd_override=./find_resource_owners.sh Pod ${item["pod_name"]} ${NAMESPACE} ${CONTEXT}
+            ...    env=${env}
+            ...    secret_file__kubeconfig=${kubeconfig}
+            ...    include_in_history=False
+            ${item_owner_output}=    RW.CLI.Run Cli
+            ...    cmd=echo "${item_owner.stdout}" | sed 's/ *$//' | tr -d '\n'
+            ...    env=${env}
+            ...    include_in_history=False
+            IF    len($item_owner_output.stdout) > 0 and ($item_owner_output.stdout) != "No resource found"
+                ${owner_kind}    ${owner_name}=    Split String    ${item_owner_output.stdout}    ${SPACE}
+                ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
+            ELSE
+                ${owner_kind}=    Set Variable    "Unknown"
+                ${owner_name}=    Set Variable    "Unknown"
             END
+            ${message_string}=    Evaluate    "${item.get('message', '')};${item.get('containerMessage', '')};${item.get('containerReason', '')}"
+            ${messages}=    RW.K8sHelper.Sanitize Messages    ${message_string}
+            ${issues}=    RW.CLI.Run Bash File
+            ...    bash_file=workload_issues.sh
+            ...    cmd_override=./workload_issues.sh "${messages}" "${owner_kind}" "${owner_name}"
+            ...    env=${env}
+            ...    include_in_history=False
+            ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+            FOR    ${issue}    IN    @{issue_list}
+                RW.Core.Add Issue
+                ...    severity=${issue["severity"]}
+                ...    expected=Pods should not be pending in `${NAMESPACE}`.
+                ...    actual=Pod `${pod_name.stdout}` is pending with ${item["containerReason"]}
+                ...    title= ${issue["title"]}
+                ...    reproduce_hint=${pending_pods.cmd}
+                ...    details=${issue["details"]}
+                ...    next_steps=${issue["next_steps"]}
+            END
+            # ${item_next_steps}=    RW.CLI.Run Bash File
+            # ...    bash_file=workload_next_steps.sh
+            # ...    cmd_override=./workload_next_steps.sh "${container_reason.stdout};${pod_message.stdout};${container_reason.stdout}" "${owner_kind}" "${owner_name}"
+            # ...    env=${env}
+            # ...    secret_file__kubeconfig=${kubeconfig}
+            # ...    include_in_history=False
+            # RW.Core.Add Issue
+            # ...    severity=2
+            # ...    expected=Pods should not be pending in `${NAMESPACE}`.
+            # ...    actual=Pod `${pod_name.stdout}` in `${NAMESPACE}` is pending.
+            # ...    title= Pod `${pod_name.stdout}` is pending with ${container_reason.stdout}
+            # ...    reproduce_hint=View Commands Used in Report Output
+            # ...    details=Pod `${pod_name.stdout}` is owned by ${owner_kind} `${owner_name}` and is pending with the following details:\n${item}
+            # ...    next_steps=${item_next_steps.stdout}
         END
     END
     ${history}=    RW.CLI.Pop Shell History
@@ -197,63 +214,49 @@ Troubleshoot Failed Pods In Namespace `${NAMESPACE}`
     [Documentation]    Fetches all pods which are not running (unready) in the namespace and adds them to a report for future review.
     [Tags]    namespace    pods    status    unready    not starting    phase    failed    ${NAMESPACE}
     ${unreadypods_details}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed --no-headers -o json | jq -r --argjson exit_code_explanations '{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}' '.items[] | "pod_name: \\(.metadata.name)\\nrestart_count: \\(.status.containerStatuses[0].restartCount // "N/A")\\nmessage: \\(.status.message // "N/A")\\nterminated_finishedAt: \\(.status.containerStatuses[0].state.terminated.finishedAt // "N/A")\\nexit_code: \\(.status.containerStatuses[0].state.terminated.exitCode // "N/A")\\nexit_code_explanation: \\($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode | tostring] // "Unknown exit code")\\n_______-"'
+    # ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed --no-headers -o json | jq -r --argjson exit_code_explanations '{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}' '.items[] | "pod_name: \\(.metadata.name)\\nrestart_count: \\(.status.containerStatuses[0].restartCount // "N/A")\\nmessage: \\(.status.message // "N/A")\\nterminated_finishedAt: \\(.status.containerStatuses[0].state.terminated.finishedAt // "N/A")\\nexit_code: \\(.status.containerStatuses[0].state.terminated.exitCode // "N/A")\\nexit_code_explanation: \\($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode | tostring] // "Unknown exit code")\\n_______"'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed --no-headers -o json | jq -r --argjson exit_code_explanations '{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}' '[.items[] | {pod_name: .metadata.name, restart_count: (.status.containerStatuses[0].restartCount // "N/A"), message: (.status.message // "N/A"), terminated_finishedAt: (.status.containerStatuses[0].state.terminated.finishedAt // "N/A"), exit_code: (.status.containerStatuses[0].state.terminated.exitCode // "N/A"), exit_code_explanation: ($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode | tostring] // "Unknown exit code")}]'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
-    ${unready_pods_list}=    Split String    ${unreadypods_details.stdout}    _______-
+    ${unready_pods_list}=     Evaluate    json.loads(r'''${unreadypods_details.stdout}''')    json
     IF    len($unready_pods_list) > 0
         FOR    ${item}    IN    @{unready_pods_list}
-            ${is_not_just_newline}=    Evaluate    '''${item}'''.strip() != ''
-            IF    ${is_not_just_newline}
-                ${pod_name}=    RW.CLI.Run Cli
-                ...    cmd=echo '${item}' | grep pod_name: | sed 's/^pod_name: //' | sed 's/ *$//' | tr -d '\n'
-                ...    env=${env}
-                ...    include_in_history=false
-                ${pod_message}=    RW.CLI.Run Cli
-                ...    cmd=echo '${item}' | grep message: | sed 's/^message: //' | sed 's/ *$//' | tr -d '\n'| sed 's/\"//g'
-                ...    env=${env}
-                ...    include_in_history=false
-                ${container_message}=    RW.CLI.Run Cli
-                ...    cmd=echo '${item}' | grep containerMessage: | sed 's/^containerMessage: //' | sed 's/ *$//' | tr -d '\n'| sed 's/\"//g'
-                ...    env=${env}
-                ...    include_in_history=false
-                ${exit_code_explanation}=    RW.CLI.Run Cli
-                ...    cmd=echo '${item}' | grep exit_code_explanation: | sed 's/^exit_code_explanation: //' | sed 's/ *$//' | tr -d '\n'| sed 's/\"//g'
-                ...    env=${env}
-                ...    include_in_history=false
-                ${item_owner}=    RW.CLI.Run Bash File
-                ...    bash_file=find_resource_owners.sh
-                ...    cmd_override=./find_resource_owners.sh Pod ${pod_name.stdout} ${NAMESPACE} ${CONTEXT}
-                ...    env=${env}
-                ...    secret_file__kubeconfig=${kubeconfig}
-                ...    include_in_history=False
-                ${item_owner_output}=    RW.CLI.Run Cli
-                ...    cmd=echo "${item_owner.stdout}" | sed 's/ *$//' | tr -d '\n'
-                ...    env=${env}
-                ...    include_in_history=False
-                IF    len($item_owner_output.stdout) > 0 and ($item_owner_output.stdout) != "No resource found"
-                    ${owner_kind}    ${owner_name}=    Split String    ${item_owner_output.stdout}    ${SPACE}
-                    ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
-                ELSE
-                    ${owner_kind}=    Set Variable    "Unknown"
-                    ${owner_name}=    Set Variable    "Unknown"
-                END
-                ${item_next_steps}=    RW.CLI.Run Bash File
-                ...    bash_file=workload_next_steps.sh
-                ...    cmd_override=./workload_next_steps.sh "${container_message.stdout};${pod_message.stdout}" "${owner_kind}" "${owner_name}"
-                ...    env=${env}
-                ...    secret_file__kubeconfig=${kubeconfig}
-                ...    include_in_history=False
+            ${item_owner}=    RW.CLI.Run Bash File
+            ...    bash_file=find_resource_owners.sh
+            ...    cmd_override=./find_resource_owners.sh Pod ${item["pod_name"]} ${NAMESPACE} ${CONTEXT}
+            ...    env=${env}
+            ...    secret_file__kubeconfig=${kubeconfig}
+            ...    include_in_history=False
+            ${item_owner_output}=    RW.CLI.Run Cli
+            ...    cmd=echo "${item_owner.stdout}" | sed 's/ *$//' | tr -d '\n'
+            ...    env=${env}
+            ...    include_in_history=False
+            IF    len($item_owner_output.stdout) > 0 and ($item_owner_output.stdout) != "No resource found"
+                ${owner_kind}    ${owner_name}=    Split String    ${item_owner_output.stdout}    ${SPACE}
+                ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
+            ELSE
+                ${owner_kind}=    Set Variable    "Unknown"
+                ${owner_name}=    Set Variable    "Unknown"
+            END
+            ${message_string}=    Evaluate    "${item.get('message', '')};${item.get('containerMessage', '')}"
+            ${messages}=    RW.K8sHelper.Sanitize Messages    ${message_string}
+            ${issues}=    RW.CLI.Run Bash File
+            ...    bash_file=workload_issues.sh
+            ...    cmd_override=./workload_issues.sh "${messages}" "${owner_kind}" "${owner_name}"
+            ...    env=${env}
+            ...    include_in_history=False
+            ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+            FOR    ${issue}    IN    @{issue_list}
                 RW.Core.Add Issue
-                ...    severity=2
+                ...    severity=${issue["severity"]}
                 ...    expected=No pods should be in an unready state in namespace `${NAMESPACE}`.
-                ...    actual=Pod `${pod_name.stdout}` in `${NAMESPACE}` is NotReady or Failed.
-                ...    title= Pod `${pod_name.stdout}` exited with ${exit_code_explanation.stdout}
-                ...    reproduce_hint=View Commands Used in Report Output
-                ...    details=Pod `${pod_name.stdout}` is owned by ${owner_kind} `${owner_name}` and is pending with the following details:\n${item}
-                ...    next_steps=${item_next_steps.stdout}
+                ...    actual=Pod `${item["pod_name"]}` in `${NAMESPACE}` is NotReady or Failed.
+                ...    title= ${issue["title"]}
+                ...    reproduce_hint=${unreadypods_details.cmd}
+                ...    details=${issue["details"]}
+                ...    next_steps=${issue["next_steps"]}
             END
         END
     END
@@ -378,7 +381,7 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
             ...    env=${env}
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
-            ${messages}=    Replace String    ${item["summary_messages"]}    "    ${EMPTY}
+            ${messages}=    RW.K8sHelper.Sanitize Messages    ${item["summary_messages"]}
             ${item_owner_output}=    RW.CLI.Run Cli
             ...    cmd=echo "${item_owner.stdout}" | sed 's/ *$//' | tr -d '\n'
             ...    env=${env}

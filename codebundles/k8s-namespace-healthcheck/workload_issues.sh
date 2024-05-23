@@ -64,7 +64,7 @@ if [[ $messages =~ "is forbidden: [minimum cpu usage per Container" || $messages
     add_issue "2" "$owner_kind \`$owner_name\` has invalid resource configuration" "$messages" "Adjust resource configuration for $owner_kind \`$owner_name\` according to issue details."
 fi
 
-if [[ $messages =~ "No preemption victims found for incoming pod" || $messages =~ "Insufficient cpu" ]]; then
+if [[ $messages =~ "No preemption victims found for incoming pod" || $messages =~ "Insufficient cpu" || $messages =~ "The node was low on resource" ]]; then
     add_issue "2" "$owner_kind \`$owner_name\` cannot be scheduled - not enough cluster resources." "$messages" "Not enough node resources available to schedule pods. Escalate this issue to your cluster owner.\nIncrease Node Count in Cluster\nCheck for Quota Errors\nIdentify High Utilization Nodes for Cluster \`${CONTEXT}\`"
 fi
 
