@@ -42,7 +42,7 @@ commands:
     \ <= 30))'\n\nThis multi-line command includes comments to explain each step,\
     \ making it easier for newer or less experienced devops engineers to understand\
     \ and learn from."
-  name: troubleshoot_warning_events_in_namespace_namespace
+  name: inspect_warning_events_in_namespace_namespace
   when_is_it_useful: '1. Investigating a production incident where multiple pods in
     a specific namespace are experiencing CrashLoopBackoff events, and determining
     the root cause of the issue.
@@ -107,7 +107,7 @@ commands:
     \ <= 30))'\n\nThis multi-line command includes comments to explain each step,\
     \ making it easier for newer or less experienced devops engineers to understand\
     \ and learn from."
-  name: troubleshoot_warning_events_in_namespace_namespace
+  name: inspect_warning_events_in_namespace_namespace
   when_is_it_useful: '1. Investigating a production incident where multiple pods in
     a specific namespace are experiencing CrashLoopBackoff events, and determining
     the root cause of the issue.
@@ -173,7 +173,7 @@ commands:
     \ and namespace, interacting with the `kubectl` command, and processing the JSON\
     \ output using `jq`. It also includes comments throughout to explain each step\
     \ for clarity and understanding."
-  name: troubleshoot_container_restarts_in_namespace_namespace
+  name: inspect_container_restarts_in_namespace_namespace
   when_is_it_useful: '1. Debugging a production issue where a Kubernetes pod is constantly
     restarting due to CrashLoopBackoff events, impacting the availability and performance
     of an application.
@@ -239,7 +239,7 @@ commands:
     \ and namespace, interacting with the `kubectl` command, and processing the JSON\
     \ output using `jq`. It also includes comments throughout to explain each step\
     \ for clarity and understanding."
-  name: troubleshoot_container_restarts_in_namespace_namespace
+  name: inspect_container_restarts_in_namespace_namespace
   when_is_it_useful: '1. Debugging a production issue where a Kubernetes pod is constantly
     restarting due to CrashLoopBackoff events, impacting the availability and performance
     of an application.
@@ -262,263 +262,253 @@ commands:
     future issues related to container restarts and ensure the overall stability and
     reliability of the Kubernetes environment.'
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending
-    --no-headers -o json | jq -r ''.items[] | "pod_name: \(.metadata.name)\nstatus:
-    \(.status.phase // "N/A")\nmessage: \(.status.conditions[0].message // "N/A")\nreason:
-    \(.status.conditions[0].reason // "N/A")\ncontainerStatus: \((.status.containerStatuses[0].state
-    // "N/A"))\ncontainerMessage: \(.status.containerStatuses[0].state.waiting?.message
-    // "N/A")\ncontainerReason: \(.status.containerStatuses[0].state.waiting?.reason
-    // "N/A")\n_______-"'''
+    --no-headers -o json | jq -r ''[.items[] | {pod_name: .metadata.name, status:
+    (.status.phase // "N/A"), message: (.status.conditions[0].message // "N/A"), reason:
+    (.status.conditions[0].reason // "N/A"), containerStatus: (.status.containerStatuses[0].state
+    // "N/A"), containerMessage: (.status.containerStatuses[0].state.waiting?.message
+    // "N/A"), containerReason: (.status.containerStatuses[0].state.waiting?.reason
+    // "N/A")}]'''
   doc_links: '
 
-    - [kubectl overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+    - [kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
-    - [kubectl get pods](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+    - [kubectl Get Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
-    - [kubectl contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}
+    - [Kubectl Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [kubectl namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [jq manual](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command uses kubectl to retrieve information about specific pods
-    in a certain context and namespace, and then formats the output using jq to display
-    relevant details like pod name, status, message, reason, and container status.
-  multi_line_details: "\n# Set the Kubernetes context and namespace to use for the\
-    \ kubectl command\nCONTEXT=my-context\nNAMESPACE=my-namespace\n\n# Get pods from\
-    \ the specified context and namespace that are in a Pending state\nkubectl get\
-    \ pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending\
-    \ --no-headers -o json \\\n\n# Pipe the output to jq to format it as specified,\
-    \ printing the pod name, status, message, reason, and container status details\n\
-    | jq -r '.items[] | \"pod_name: \\(.metadata.name)\\nstatus: \\(.status.phase\
-    \ // \"N/A\")\\nmessage: \\(.status.conditions[0].message // \"N/A\")\\nreason:\
-    \ \\(.status.conditions[0].reason // \"N/A\")\\ncontainerStatus: \\((.status.containerStatuses[0].state\
-    \ // \"N/A\"))\\ncontainerMessage: \\(.status.containerStatuses[0].state.waiting?.message\
-    \ // \"N/A\")\\ncontainerReason: \\(.status.containerStatuses[0].state.waiting?.reason\
-    \ // \"N/A\")\\n_______-\"' \n"
-  name: troubleshoot_pending_pods_in_namespace_namespace
-  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: This
-    task might be performed by a DevOps or Site Reliability Engineer to identify the
-    cause of the CrashLoopBackoff events and resolve any issues with the pods causing
-    them.
-
-
-    2. Monitoring and troubleshooting pod status and container health: DevOps or Site
-    Reliability Engineers might use this command to regularly check the status and
-    health of pods in a Kubernetes cluster, as well as investigate any issues related
-    to container status or messages.
+    - [jq Manual](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command uses kubectl to get information about pods in a specific
+    context and namespace that are pending, and then uses jq to format the output
+    into a more readable JSON format with specific details about each pod's status
+    and containers.
+  multi_line_details: "\n# This command uses kubectl to get information about pods\
+    \ in a specific namespace that are in a Pending state\n# It then uses jq to format\
+    \ the output into a more readable and structured JSON format\n\n# Set the context\
+    \ and namespace for the kubectl command\nCONTEXT=\"your_context\" # replace with\
+    \ the actual context name\nNAMESPACE=\"your_namespace\" # replace with the actual\
+    \ namespace name\n\n# Get the pods in the specified context and namespace that\
+    \ are in a Pending state\nkubectl get pods --context=${CONTEXT} -n ${NAMESPACE}\
+    \ --field-selector=status.phase=Pending --no-headers -o json \\\n  | jq -r '[.items[]\
+    \ |\n  # Select relevant fields from pod metadata and status\n  {pod_name: .metadata.name,\n\
+    \   status: (.status.phase // \"N/A\"),\n   message: (.status.conditions[0].message\
+    \ // \"N/A\"),\n   reason: (.status.conditions[0].reason // \"N/A\"),\n   containerStatus:\
+    \ (.status.containerStatuses[0].state // \"N/A\"),\n   containerMessage: (.status.containerStatuses[0].state.waiting?.message\
+    \ // \"N/A\"),\n   containerReason: (.status.containerStatuses[0].state.waiting?.reason\
+    \ // \"N/A\")}]'\n\nIn this multi-line command, each step is explained with helpful\
+    \ comments to guide newer or less experienced devops engineers through the process\
+    \ and explain what each part of the command does."
+  name: inspect_pending_pods_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to gather detailed information
+    about pending pods to understand why they are continuously crashing and restarting,
+    causing the CrashLoopBackoff event.
 
 
-    3. Investigating application errors or failures: If an application deployed in
-    a Kubernetes cluster is experiencing errors or failures, DevOps or Site Reliability
-    Engineers could use this command to gather detailed information about the affected
-    pods and containers to diagnose and address the issues.
+    2. Investigating high resource utilization: If there is a sudden spike in resource
+    utilization within a specific namespace, the engineer might use this command to
+    drill down into the details of pending pods and their containers to identify any
+    rogue processes or misconfigured resources.
 
 
-    4. Performing routine maintenance and health checks: During routine maintenance
-    tasks or periodic health checks of a Kubernetes cluster, DevOps or Site Reliability
-    Engineers may use this command to quickly retrieve and analyze relevant information
-    about specific pods to ensure they are running smoothly.
+    3. Debugging deployment failures: When a deployment fails and pods remain in a
+    pending state, this command can be used to extract specific details about each
+    pod''s status and containers, helping the engineer diagnose the issue and troubleshoot
+    the deployment failure.
 
 
-    5. Diagnosing performance issues: When performance issues arise within a Kubernetes
-    cluster, DevOps or Site Reliability Engineers may utilize this command to gather
-    insights into the status and health of specific pods and containers, allowing
-    them to identify any potential bottlenecks or problems affecting performance.'
+    4. Monitoring and alerting: As part of a proactive monitoring and alerting system,
+    the engineer might use this command to regularly check on the status of pending
+    pods and capture detailed information for further analysis or triggering alerts
+    if necessary.
+
+
+    5. Performance optimization: In order to improve the overall performance of a
+    Kubernetes cluster, the engineer might use this command to analyze pending pods
+    and identify any inefficiencies or bottlenecks in order to optimize resource allocation
+    and scheduling.'
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending
-    --no-headers -o json | jq -r ''.items[] | "pod_name: \(.metadata.name)\nstatus:
-    \(.status.phase // "N/A")\nmessage: \(.status.conditions[0].message // "N/A")\nreason:
-    \(.status.conditions[0].reason // "N/A")\ncontainerStatus: \((.status.containerStatuses[0].state
-    // "N/A"))\ncontainerMessage: \(.status.containerStatuses[0].state.waiting?.message
-    // "N/A")\ncontainerReason: \(.status.containerStatuses[0].state.waiting?.reason
-    // "N/A")\n_______-"'''
+    --no-headers -o json | jq -r ''[.items[] | {pod_name: .metadata.name, status:
+    (.status.phase // "N/A"), message: (.status.conditions[0].message // "N/A"), reason:
+    (.status.conditions[0].reason // "N/A"), containerStatus: (.status.containerStatuses[0].state
+    // "N/A"), containerMessage: (.status.containerStatuses[0].state.waiting?.message
+    // "N/A"), containerReason: (.status.containerStatuses[0].state.waiting?.reason
+    // "N/A")}]'''
   doc_links: '
 
-    - [kubectl overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+    - [kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
-    - [kubectl get pods](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+    - [kubectl Get Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
-    - [kubectl contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}
+    - [Kubectl Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
 
-    - [kubectl namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [jq manual](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command uses kubectl to retrieve information about specific pods
-    in a certain context and namespace, and then formats the output using jq to display
-    relevant details like pod name, status, message, reason, and container status.
-  multi_line_details: "\n# Set the Kubernetes context and namespace to use for the\
-    \ kubectl command\nCONTEXT=my-context\nNAMESPACE=my-namespace\n\n# Get pods from\
-    \ the specified context and namespace that are in a Pending state\nkubectl get\
-    \ pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending\
-    \ --no-headers -o json \\\n\n# Pipe the output to jq to format it as specified,\
-    \ printing the pod name, status, message, reason, and container status details\n\
-    | jq -r '.items[] | \"pod_name: \\(.metadata.name)\\nstatus: \\(.status.phase\
-    \ // \"N/A\")\\nmessage: \\(.status.conditions[0].message // \"N/A\")\\nreason:\
-    \ \\(.status.conditions[0].reason // \"N/A\")\\ncontainerStatus: \\((.status.containerStatuses[0].state\
-    \ // \"N/A\"))\\ncontainerMessage: \\(.status.containerStatuses[0].state.waiting?.message\
-    \ // \"N/A\")\\ncontainerReason: \\(.status.containerStatuses[0].state.waiting?.reason\
-    \ // \"N/A\")\\n_______-\"' \n"
-  name: troubleshoot_pending_pods_in_namespace_namespace
-  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: This
-    task might be performed by a DevOps or Site Reliability Engineer to identify the
-    cause of the CrashLoopBackoff events and resolve any issues with the pods causing
-    them.
-
-
-    2. Monitoring and troubleshooting pod status and container health: DevOps or Site
-    Reliability Engineers might use this command to regularly check the status and
-    health of pods in a Kubernetes cluster, as well as investigate any issues related
-    to container status or messages.
+    - [jq Manual](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command uses kubectl to get information about pods in a specific
+    context and namespace that are pending, and then uses jq to format the output
+    into a more readable JSON format with specific details about each pod's status
+    and containers.
+  multi_line_details: "\n# This command uses kubectl to get information about pods\
+    \ in a specific namespace that are in a Pending state\n# It then uses jq to format\
+    \ the output into a more readable and structured JSON format\n\n# Set the context\
+    \ and namespace for the kubectl command\nCONTEXT=\"your_context\" # replace with\
+    \ the actual context name\nNAMESPACE=\"your_namespace\" # replace with the actual\
+    \ namespace name\n\n# Get the pods in the specified context and namespace that\
+    \ are in a Pending state\nkubectl get pods --context=${CONTEXT} -n ${NAMESPACE}\
+    \ --field-selector=status.phase=Pending --no-headers -o json \\\n  | jq -r '[.items[]\
+    \ |\n  # Select relevant fields from pod metadata and status\n  {pod_name: .metadata.name,\n\
+    \   status: (.status.phase // \"N/A\"),\n   message: (.status.conditions[0].message\
+    \ // \"N/A\"),\n   reason: (.status.conditions[0].reason // \"N/A\"),\n   containerStatus:\
+    \ (.status.containerStatuses[0].state // \"N/A\"),\n   containerMessage: (.status.containerStatuses[0].state.waiting?.message\
+    \ // \"N/A\"),\n   containerReason: (.status.containerStatuses[0].state.waiting?.reason\
+    \ // \"N/A\")}]'\n\nIn this multi-line command, each step is explained with helpful\
+    \ comments to guide newer or less experienced devops engineers through the process\
+    \ and explain what each part of the command does."
+  name: inspect_pending_pods_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to gather detailed information
+    about pending pods to understand why they are continuously crashing and restarting,
+    causing the CrashLoopBackoff event.
 
 
-    3. Investigating application errors or failures: If an application deployed in
-    a Kubernetes cluster is experiencing errors or failures, DevOps or Site Reliability
-    Engineers could use this command to gather detailed information about the affected
-    pods and containers to diagnose and address the issues.
+    2. Investigating high resource utilization: If there is a sudden spike in resource
+    utilization within a specific namespace, the engineer might use this command to
+    drill down into the details of pending pods and their containers to identify any
+    rogue processes or misconfigured resources.
 
 
-    4. Performing routine maintenance and health checks: During routine maintenance
-    tasks or periodic health checks of a Kubernetes cluster, DevOps or Site Reliability
-    Engineers may use this command to quickly retrieve and analyze relevant information
-    about specific pods to ensure they are running smoothly.
+    3. Debugging deployment failures: When a deployment fails and pods remain in a
+    pending state, this command can be used to extract specific details about each
+    pod''s status and containers, helping the engineer diagnose the issue and troubleshoot
+    the deployment failure.
 
 
-    5. Diagnosing performance issues: When performance issues arise within a Kubernetes
-    cluster, DevOps or Site Reliability Engineers may utilize this command to gather
-    insights into the status and health of specific pods and containers, allowing
-    them to identify any potential bottlenecks or problems affecting performance.'
+    4. Monitoring and alerting: As part of a proactive monitoring and alerting system,
+    the engineer might use this command to regularly check on the status of pending
+    pods and capture detailed information for further analysis or triggering alerts
+    if necessary.
+
+
+    5. Performance optimization: In order to improve the overall performance of a
+    Kubernetes cluster, the engineer might use this command to analyze pending pods
+    and identify any inefficiencies or bottlenecks in order to optimize resource allocation
+    and scheduling.'
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed
     --no-headers -o json | jq -r --argjson exit_code_explanations ''{"0": "Success",
     "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134":
     "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM",
-    "143":"Graceful Termination SIGTERM"}'' ''.items[] | "pod_name: \(.metadata.name)\nrestart_count:
-    \(.status.containerStatuses[0].restartCount // "N/A")\nmessage: \(.status.message
-    // "N/A")\nterminated_finishedAt: \(.status.containerStatuses[0].state.terminated.finishedAt
-    // "N/A")\nexit_code: \(.status.containerStatuses[0].state.terminated.exitCode
-    // "N/A")\nexit_code_explanation: \($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode
-    | tostring] // "Unknown exit code")\n_______-"'''
+    "143":"Graceful Termination SIGTERM"}'' ''[.items[] | {pod_name: .metadata.name,
+    restart_count: (.status.containerStatuses[0].restartCount // "N/A"), message:
+    (.status.message // "N/A"), terminated_finishedAt: (.status.containerStatuses[0].state.terminated.finishedAt
+    // "N/A"), exit_code: (.status.containerStatuses[0].state.terminated.exitCode
+    // "N/A"), exit_code_explanation: ($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode
+    | tostring] // "Unknown exit code")}]'''
   doc_links: '
 
-    - [kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
+    - [Kubernetes documentation on troubleshooting](https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/){:target="_blank"}
 
-    - [Kubernetes Namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+    - [Kubernetes official documentation for kubectl get pods](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
-    - [jq Manual](https://stedolan.github.io/jq/manual/){:target="_blank"}
-
-    - [Understanding Kubernetes Pods](https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/){:target="_blank"}'
-  explanation: This command uses kubectl to retrieve information about failed pods
-    in a specific namespace, then formats and prints the results in JSON using the
-    jq tool, including information like pod name, restart count, termination message,
-    finished time, exit code, and an explanation of the exit code based on common
-    values.
+    - [jq Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command retrieves information about failed pods in a Kubernetes
+    cluster, including the pod name, restart count, termination message, and exit
+    code explanation. It uses jq to map exit codes to human-readable explanations.
   multi_line_details: "\n# Set the context and namespace for the kubectl command\n\
-    CONTEXT=my-context\nNAMESPACE=my-namespace\n\n# Use kubectl to get pods with a\
-    \ failed status in the specified context and namespace, output as json\nkubectl\
-    \ get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed\
-    \ --no-headers -o json \n| \n# Pipe the output into jq to format and extract relevant\
-    \ information\njq -r --argjson exit_code_explanations '{\"0\": \"Success\", \"\
-    1\": \"Error\", \"2\": \"Misconfiguration\", \"130\": \"Pod terminated by SIGINT\"\
-    , \"134\": \"Abnormal Termination SIGABRT\", \"137\": \"Pod terminated by SIGKILL\
-    \ - Possible OOM\", \"143\":\"Graceful Termination SIGTERM\"}' \n'.items[] | \"\
-    pod_name: \\(.metadata.name)\\nrestart_count: \\(.status.containerStatuses[0].restartCount\
-    \ // \"N/A\")\\nmessage: \\(.status.message // \"N/A\")\\nterminated_finishedAt:\
-    \ \\(.status.containerStatuses[0].state.terminated.finishedAt // \"N/A\")\\nexit_code:\
-    \ \\(.status.containerStatuses[0].state.terminated.exitCode // \"N/A\")\\nexit_code_explanation:\
-    \ \\($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode\
-    \ | tostring] // \"Unknown exit code\")\\n_______-\"'\n\n\nIn this multi-line\
-    \ command, we set the desired context and namespace for the kubectl command before\
-    \ running it. We then pipe the output into the `jq` command, which formats the\
-    \ JSON output and extracts information about the failed pods, such as pod name,\
-    \ restart count, message, termination time, exit code, and an explanation for\
-    \ the exit code based on a predefined lookup table."
-  name: troubleshoot_failed_pods_in_namespace_namespace
-  when_is_it_useful: '1. Investigating and troubleshooting Kubernetes CrashLoopBackoff
-    events, such as identifying the root cause of the failure and determining the
-    appropriate action to rectify the issue.
+    context=${CONTEXT}\nnamespace=${NAMESPACE}\n\n# Use kubectl to get pods in a specific\
+    \ context and namespace that have failed\n# Then parse the output as JSON and\
+    \ store the data using jq\nkubectl get pods --context=${context} -n ${namespace}\
+    \ --field-selector=status.phase=Failed --no-headers -o json | \\\n\n  # Use jq\
+    \ to format the output for easier readability and understanding\n  jq -r --argjson\
+    \ exit_code_explanations '{\"0\": \"Success\", \"1\": \"Error\", \"2\": \"Misconfiguration\"\
+    , \"130\": \"Pod terminated by SIGINT\", \"134\": \"Abnormal Termination SIGABRT\"\
+    , \"137\": \"Pod terminated by SIGKILL - Possible OOM\", \"143\":\"Graceful Termination\
+    \ SIGTERM\"}' \\\n  '[.items[] | \n   {pod_name: .metadata.name, \n    restart_count:\
+    \ (.status.containerStatuses[0].restartCount // \"N/A\"), \n    message: (.status.message\
+    \ // \"N/A\"), \n    terminated_finishedAt: (.status.containerStatuses[0].state.terminated.finishedAt\
+    \ // \"N/A\"), \n    exit_code: (.status.containerStatuses[0].state.terminated.exitCode\
+    \ // \"N/A\"), \n    exit_code_explanation: ($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode\
+    \ | tostring] // \"Unknown exit code\")}]\n  '\n"
+  name: inspect_failed_pods_in_namespace_namespace
+  when_is_it_useful: '1. Monitoring and troubleshooting application failures in a
+    Kubernetes environment, where pods are repeatedly crashing and going into CrashLoopBackoff
+    due to various issues such as resource constraints, misconfigured containers,
+    or faulty application code.
 
 
-    2. Monitoring and analyzing pod failures in a specific namespace to identify any
-    recurring patterns or issues that may require further investigation or resolution.
+    2. Identifying and addressing issues with pod dependencies, where a pod may be
+    failing due to a dependency on another service or resource that is not available
+    or not functioning properly.
 
 
-    3. Providing detailed information on failed pods, including restart count, termination
-    message, finished time, and exit code, to facilitate debugging and troubleshooting
-    efforts by development and operations teams.
+    3. Investigating and resolving errors related to container startup or initialization,
+    such as incorrect command line arguments, missing environment variables, or permission
+    issues.
 
 
-    4. Generating reports or logs of failed pods in a specific namespace for analysis
-    and review by the team responsible for managing and maintaining the Kubernetes
-    infrastructure.
+    4. Analyzing and debugging issues with persistent storage, where a pod may fail
+    due to problems with accessing or mounting persistent volumes or data.
 
 
-    5. Automating the retrieval and formatting of failed pod information for proactive
-    monitoring and alerting, allowing for timely intervention and resolution of issues
-    before they impact the overall system performance and availability.'
+    5. Troubleshooting networking problems, such as DNS configuration issues, network
+    policy violations, or connectivity problems between pods or services within the
+    cluster.'
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed
     --no-headers -o json | jq -r --argjson exit_code_explanations ''{"0": "Success",
     "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134":
     "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM",
-    "143":"Graceful Termination SIGTERM"}'' ''.items[] | "pod_name: \(.metadata.name)\nrestart_count:
-    \(.status.containerStatuses[0].restartCount // "N/A")\nmessage: \(.status.message
-    // "N/A")\nterminated_finishedAt: \(.status.containerStatuses[0].state.terminated.finishedAt
-    // "N/A")\nexit_code: \(.status.containerStatuses[0].state.terminated.exitCode
-    // "N/A")\nexit_code_explanation: \($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode
-    | tostring] // "Unknown exit code")\n_______-"'''
+    "143":"Graceful Termination SIGTERM"}'' ''[.items[] | {pod_name: .metadata.name,
+    restart_count: (.status.containerStatuses[0].restartCount // "N/A"), message:
+    (.status.message // "N/A"), terminated_finishedAt: (.status.containerStatuses[0].state.terminated.finishedAt
+    // "N/A"), exit_code: (.status.containerStatuses[0].state.terminated.exitCode
+    // "N/A"), exit_code_explanation: ($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode
+    | tostring] // "Unknown exit code")}]'''
   doc_links: '
 
-    - [kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
+    - [Kubernetes documentation on troubleshooting](https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/){:target="_blank"}
 
-    - [Kubernetes Namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+    - [Kubernetes official documentation for kubectl get pods](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
 
-    - [jq Manual](https://stedolan.github.io/jq/manual/){:target="_blank"}
-
-    - [Understanding Kubernetes Pods](https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/){:target="_blank"}'
-  explanation: This command uses kubectl to retrieve information about failed pods
-    in a specific namespace, then formats and prints the results in JSON using the
-    jq tool, including information like pod name, restart count, termination message,
-    finished time, exit code, and an explanation of the exit code based on common
-    values.
+    - [jq Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command retrieves information about failed pods in a Kubernetes
+    cluster, including the pod name, restart count, termination message, and exit
+    code explanation. It uses jq to map exit codes to human-readable explanations.
   multi_line_details: "\n# Set the context and namespace for the kubectl command\n\
-    CONTEXT=my-context\nNAMESPACE=my-namespace\n\n# Use kubectl to get pods with a\
-    \ failed status in the specified context and namespace, output as json\nkubectl\
-    \ get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed\
-    \ --no-headers -o json \n| \n# Pipe the output into jq to format and extract relevant\
-    \ information\njq -r --argjson exit_code_explanations '{\"0\": \"Success\", \"\
-    1\": \"Error\", \"2\": \"Misconfiguration\", \"130\": \"Pod terminated by SIGINT\"\
-    , \"134\": \"Abnormal Termination SIGABRT\", \"137\": \"Pod terminated by SIGKILL\
-    \ - Possible OOM\", \"143\":\"Graceful Termination SIGTERM\"}' \n'.items[] | \"\
-    pod_name: \\(.metadata.name)\\nrestart_count: \\(.status.containerStatuses[0].restartCount\
-    \ // \"N/A\")\\nmessage: \\(.status.message // \"N/A\")\\nterminated_finishedAt:\
-    \ \\(.status.containerStatuses[0].state.terminated.finishedAt // \"N/A\")\\nexit_code:\
-    \ \\(.status.containerStatuses[0].state.terminated.exitCode // \"N/A\")\\nexit_code_explanation:\
-    \ \\($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode\
-    \ | tostring] // \"Unknown exit code\")\\n_______-\"'\n\n\nIn this multi-line\
-    \ command, we set the desired context and namespace for the kubectl command before\
-    \ running it. We then pipe the output into the `jq` command, which formats the\
-    \ JSON output and extracts information about the failed pods, such as pod name,\
-    \ restart count, message, termination time, exit code, and an explanation for\
-    \ the exit code based on a predefined lookup table."
-  name: troubleshoot_failed_pods_in_namespace_namespace
-  when_is_it_useful: '1. Investigating and troubleshooting Kubernetes CrashLoopBackoff
-    events, such as identifying the root cause of the failure and determining the
-    appropriate action to rectify the issue.
+    context=${CONTEXT}\nnamespace=${NAMESPACE}\n\n# Use kubectl to get pods in a specific\
+    \ context and namespace that have failed\n# Then parse the output as JSON and\
+    \ store the data using jq\nkubectl get pods --context=${context} -n ${namespace}\
+    \ --field-selector=status.phase=Failed --no-headers -o json | \\\n\n  # Use jq\
+    \ to format the output for easier readability and understanding\n  jq -r --argjson\
+    \ exit_code_explanations '{\"0\": \"Success\", \"1\": \"Error\", \"2\": \"Misconfiguration\"\
+    , \"130\": \"Pod terminated by SIGINT\", \"134\": \"Abnormal Termination SIGABRT\"\
+    , \"137\": \"Pod terminated by SIGKILL - Possible OOM\", \"143\":\"Graceful Termination\
+    \ SIGTERM\"}' \\\n  '[.items[] | \n   {pod_name: .metadata.name, \n    restart_count:\
+    \ (.status.containerStatuses[0].restartCount // \"N/A\"), \n    message: (.status.message\
+    \ // \"N/A\"), \n    terminated_finishedAt: (.status.containerStatuses[0].state.terminated.finishedAt\
+    \ // \"N/A\"), \n    exit_code: (.status.containerStatuses[0].state.terminated.exitCode\
+    \ // \"N/A\"), \n    exit_code_explanation: ($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode\
+    \ | tostring] // \"Unknown exit code\")}]\n  '\n"
+  name: inspect_failed_pods_in_namespace_namespace
+  when_is_it_useful: '1. Monitoring and troubleshooting application failures in a
+    Kubernetes environment, where pods are repeatedly crashing and going into CrashLoopBackoff
+    due to various issues such as resource constraints, misconfigured containers,
+    or faulty application code.
 
 
-    2. Monitoring and analyzing pod failures in a specific namespace to identify any
-    recurring patterns or issues that may require further investigation or resolution.
+    2. Identifying and addressing issues with pod dependencies, where a pod may be
+    failing due to a dependency on another service or resource that is not available
+    or not functioning properly.
 
 
-    3. Providing detailed information on failed pods, including restart count, termination
-    message, finished time, and exit code, to facilitate debugging and troubleshooting
-    efforts by development and operations teams.
+    3. Investigating and resolving errors related to container startup or initialization,
+    such as incorrect command line arguments, missing environment variables, or permission
+    issues.
 
 
-    4. Generating reports or logs of failed pods in a specific namespace for analysis
-    and review by the team responsible for managing and maintaining the Kubernetes
-    infrastructure.
+    4. Analyzing and debugging issues with persistent storage, where a pod may fail
+    due to problems with accessing or mounting persistent volumes or data.
 
 
-    5. Automating the retrieval and formatting of failed pod information for proactive
-    monitoring and alerting, allowing for timely intervention and resolution of issues
-    before they impact the overall system performance and availability.'
+    5. Troubleshooting networking problems, such as DNS configuration issues, network
+    policy violations, or connectivity problems between pods or services within the
+    cluster.'
 - command: 'kubectl get pods --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r
     ''.items[] | select(.status.conditions[]? | select(.type == "Ready" and .status
     == "False" and .reason != "PodCompleted")) | {kind: .kind, name: .metadata.name,
@@ -542,7 +532,7 @@ commands:
     \ command with comments explaining what each part does. It's useful for newer\
     \ or less experienced devops engineers who may not be familiar with all the commands\
     \ used."
-  name: troubleshoot_workload_status_conditions_in_namespace_namespace
+  name: inspect_workload_status_conditions_in_namespace_namespace
   when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
     events to identify and fix any issues causing continuous pod restarts.
 
@@ -585,7 +575,7 @@ commands:
     \ command with comments explaining what each part does. It's useful for newer\
     \ or less experienced devops engineers who may not be familiar with all the commands\
     \ used."
-  name: troubleshoot_workload_status_conditions_in_namespace_namespace
+  name: inspect_workload_status_conditions_in_namespace_namespace
   when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
     events to identify and fix any issues causing continuous pod restarts.
 

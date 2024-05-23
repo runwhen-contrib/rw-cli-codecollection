@@ -252,7 +252,7 @@ commands:
     \ \n     messages: map(.message) | unique, \n     firstTimestamp: map(.firstTimestamp\
     \ | fromdateiso8601) | sort | .[0] | todateiso8601, \n     lastTimestamp: map(.lastTimestamp\
     \ | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'\n"
-  name: troubleshoot_deployment_warning_events_for_deployment_name
+  name: inspect_deployment_warning_events_for_deployment_name
   when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes applications: A
     DevOps or Site Reliability Engineer might use this command to quickly identify
     and address warning events related to Deployments, ReplicaSets, or Pods within
@@ -326,7 +326,7 @@ commands:
     \ \n     messages: map(.message) | unique, \n     firstTimestamp: map(.firstTimestamp\
     \ | fromdateiso8601) | sort | .[0] | todateiso8601, \n     lastTimestamp: map(.lastTimestamp\
     \ | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'\n"
-  name: troubleshoot_deployment_warning_events_for_deployment_name
+  name: inspect_deployment_warning_events_for_deployment_name
   when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes applications: A
     DevOps or Site Reliability Engineer might use this command to quickly identify
     and address warning events related to Deployments, ReplicaSets, or Pods within
@@ -468,7 +468,7 @@ commands:
     ) then \n                                  (.conditions[] | select(.type == \"\
     Progressing\")) \n                                else \"Condition not available\"\
     \ end)\n    }'\n"
-  name: troubleshoot_deployment_replicas_for_deployment_name
+  name: inspect_deployment_replicas_for_deployment_name
   when_is_it_useful: '1. Monitoring the health and status of a specific deployment
     in a Kubernetes cluster to ensure that it is functioning as expected.
 
@@ -513,7 +513,7 @@ commands:
     ) then \n                                  (.conditions[] | select(.type == \"\
     Progressing\")) \n                                else \"Condition not available\"\
     \ end)\n    }'\n"
-  name: troubleshoot_deployment_replicas_for_deployment_name
+  name: inspect_deployment_replicas_for_deployment_name
   when_is_it_useful: '1. Monitoring the health and status of a specific deployment
     in a Kubernetes cluster to ensure that it is functioning as expected.
 

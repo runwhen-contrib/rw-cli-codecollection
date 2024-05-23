@@ -19,6 +19,7 @@
 * [k8s-gitops-gh-remediate](codebundles/k8s-gitops-gh-remediate/README.md)
 * [gcloud-log-inspection](codebundles/gcloud-log-inspection/README.md)
 * [k8s-artifactory-health](codebundles/k8s-artifactory-health/README.md)
+* [k8s-fluxcd-reconcile](codebundles/k8s-fluxcd-reconcile/README.md)
 * [gcp-cloud-function-health](codebundles/gcp-cloud-function-health/README.md)
 * [azure-monitor-event-triage](codebundles/azure-monitor-event-triage/README.md)
 * [k8s-jaeger-http-query](codebundles/k8s-jaeger-http-query/README.md)
