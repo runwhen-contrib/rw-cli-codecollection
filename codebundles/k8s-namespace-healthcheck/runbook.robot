@@ -77,20 +77,6 @@ Troubleshoot Warning Events in Namespace `${NAMESPACE}`
                 ...    details=${issue["details"]}
                 ...    next_steps=${issue["next_steps"]}
             END
-            # ${item_next_steps}=    RW.CLI.Run Bash File
-            # ...    bash_file=workload_next_steps.sh
-            # ...    cmd_override=./workload_next_steps.sh "${messages}" "${owner_kind}" "${owner_name}"
-            # ...    env=${env}
-            # ...    secret_file__kubeconfig=${kubeconfig}
-            # ...    include_in_history=False
-            # RW.Core.Add Issue
-            # ...    severity=3
-            # ...    expected=Warning events should not be present in namespace `${NAMESPACE}` for ${owner_kind} `${owner_name}`
-            # ...    actual=Warning events are found in namespace `${NAMESPACE}` for ${owner_kind} `${owner_name}` which indicate potential issues.
-            # ...    title= ${owner_kind} `${owner_name}` generated ${item["total_events"]} **warning** events and should be reviewed.
-            # ...    reproduce_hint=View Commands Used in Report Output
-            # ...    details=Item `${item["object"]}` generated a total of ${item["total_events"]} events containing some of the following messages and types:\n`${item["summary_messages"]}`
-            # ...    next_steps=${item_next_steps.stdout}
         END
     END
     ${history}=    RW.CLI.Pop Shell History
@@ -145,7 +131,6 @@ Troubleshoot Pending Pods In Namespace `${NAMESPACE}`
     [Documentation]    Fetches pods that are pending and provides details.
     [Tags]    namespace    pods    status    pending    ${NAMESPACE}
     ${pending_pods}=    RW.CLI.Run Cli
-    # ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending --no-headers -o json | jq -r '.items[] | "pod_name: \\(.metadata.name)\\nstatus: \\(.status.phase // "N/A")\\nmessage: \\(.status.conditions[0].message // "N/A")\\nreason: \\(.status.conditions[0].reason // "N/A")\\ncontainerStatus: \\((.status.containerStatuses[0].state // "N/A"))\\ncontainerMessage: \\(.status.containerStatuses[0].state.waiting?.message // "N/A")\\ncontainerReason: \\(.status.containerStatuses[0].state.waiting?.reason // "N/A")\\n_______-"'
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending --no-headers -o json | jq -r '[.items[] | {pod_name: .metadata.name, status: (.status.phase // "N/A"), message: (.status.conditions[0].message // "N/A"), reason: (.status.conditions[0].reason // "N/A"), containerStatus: (.status.containerStatuses[0].state // "N/A"), containerMessage: (.status.containerStatuses[0].state.waiting?.message // "N/A"), containerReason: (.status.containerStatuses[0].state.waiting?.reason // "N/A")}]'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -189,20 +174,6 @@ Troubleshoot Pending Pods In Namespace `${NAMESPACE}`
                 ...    details=${issue["details"]}
                 ...    next_steps=${issue["next_steps"]}
             END
-            # ${item_next_steps}=    RW.CLI.Run Bash File
-            # ...    bash_file=workload_next_steps.sh
-            # ...    cmd_override=./workload_next_steps.sh "${container_reason.stdout};${pod_message.stdout};${container_reason.stdout}" "${owner_kind}" "${owner_name}"
-            # ...    env=${env}
-            # ...    secret_file__kubeconfig=${kubeconfig}
-            # ...    include_in_history=False
-            # RW.Core.Add Issue
-            # ...    severity=2
-            # ...    expected=Pods should not be pending in `${NAMESPACE}`.
-            # ...    actual=Pod `${pod_name.stdout}` in `${NAMESPACE}` is pending.
-            # ...    title= Pod `${pod_name.stdout}` is pending with ${container_reason.stdout}
-            # ...    reproduce_hint=View Commands Used in Report Output
-            # ...    details=Pod `${pod_name.stdout}` is owned by ${owner_kind} `${owner_name}` and is pending with the following details:\n${item}
-            # ...    next_steps=${item_next_steps.stdout}
         END
     END
     ${history}=    RW.CLI.Pop Shell History
@@ -214,7 +185,6 @@ Troubleshoot Failed Pods In Namespace `${NAMESPACE}`
     [Documentation]    Fetches all pods which are not running (unready) in the namespace and adds them to a report for future review.
     [Tags]    namespace    pods    status    unready    not starting    phase    failed    ${NAMESPACE}
     ${unreadypods_details}=    RW.CLI.Run Cli
-    # ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed --no-headers -o json | jq -r --argjson exit_code_explanations '{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}' '.items[] | "pod_name: \\(.metadata.name)\\nrestart_count: \\(.status.containerStatuses[0].restartCount // "N/A")\\nmessage: \\(.status.message // "N/A")\\nterminated_finishedAt: \\(.status.containerStatuses[0].state.terminated.finishedAt // "N/A")\\nexit_code: \\(.status.containerStatuses[0].state.terminated.exitCode // "N/A")\\nexit_code_explanation: \\($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode | tostring] // "Unknown exit code")\\n_______"'
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed --no-headers -o json | jq -r --argjson exit_code_explanations '{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}' '[.items[] | {pod_name: .metadata.name, restart_count: (.status.containerStatuses[0].restartCount // "N/A"), message: (.status.message // "N/A"), terminated_finishedAt: (.status.containerStatuses[0].state.terminated.finishedAt // "N/A"), exit_code: (.status.containerStatuses[0].state.terminated.exitCode // "N/A"), exit_code_explanation: ($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode | tostring] // "Unknown exit code")}]'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
