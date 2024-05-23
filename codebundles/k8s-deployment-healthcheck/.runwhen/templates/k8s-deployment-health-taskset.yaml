@@ -32,7 +32,7 @@ spec:
     - name: EXPECTED_AVAILABILITY
       value: "1"
     - name: ANOMALY_THRESHOLD
-      value: "3"
+      value: "0.2"
     - name: LOGS_ERROR_PATTERN
       value: ""
     - name: LOGS_EXCLUDE_PATTERN

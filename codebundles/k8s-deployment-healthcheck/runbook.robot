@@ -137,7 +137,7 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${readiness_probe_health.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${readiness_probe_health.cmd}
 
-Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
+Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`
     [Documentation]    Fetches warning events related to the deployment workload in the namespace and triages any issues found in the events.
     [Tags]    events    workloads    errors    warnings    get    deployment    ${DEPLOYMENT_NAME}
     ${events}=    RW.CLI.Run Cli
@@ -156,21 +156,23 @@ Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
     IF    len(@{object_list}) > 0
         FOR    ${item}    IN    @{object_list}
             ${message_string}=    Catenate    SEPARATOR;    @{item["messages"]}
-            ${messages}=    Replace String    ${message_string}    "    ${EMPTY}
-            ${item_next_steps}=    RW.CLI.Run Bash File
-            ...    bash_file=workload_next_steps.sh
-            ...    cmd_override=./workload_next_steps.sh "${messages}" "Deployment" "${DEPLOYMENT_NAME}"
+            ${messages}=    RW.K8sHelper.Sanitize Messages    ${message_string}
+            ${issues}=    RW.CLI.Run Bash File
+            ...    bash_file=workload_issues.sh
+            ...    cmd_override=./workload_issues.sh "${messages}" "Deployment" "${DEPLOYMENT_NAME}"
             ...    env=${env}
             ...    include_in_history=False
-            # FIXME - Should we add severity mappings in the next steps to make the issue more dynamic?
-            RW.Core.Add Issue
-            ...    severity=4
-            ...    expected=Warning events should not be present in namespace `${NAMESPACE}` for Deployment `${DEPLOYMENT_NAME}`
-            ...    actual=Warning events are found in namespace `${NAMESPACE}` for Deployment `${DEPLOYMENT_NAME}` which indicate potential issues.
-            ...    title= Deployment `${DEPLOYMENT_NAME}` generated warning events for ${item["kind"]} `${item["name"]}`.
-            ...    reproduce_hint=View Commands Used in Report Output
-            ...    details=${item["kind"]} `${item["name"]}` generated the following warning details:\n`${item}`
-            ...    next_steps=${item_next_steps.stdout}\n${related_resource_recommendations}
+            ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+            FOR    ${issue}    IN    @{issue_list}
+                RW.Core.Add Issue
+                ...    severity=${issue["severity"]}
+                ...    expected=Warning events should not be present in namespace `${NAMESPACE}` for Deployment `${DEPLOYMENT_NAME}`
+                ...    actual=Warning events are found in namespace `${NAMESPACE}` for Deployment `${DEPLOYMENT_NAME}` which indicate potential issues.
+                ...    title= ${issue["title"]}
+                ...    reproduce_hint=${events.cmd}
+                ...    details=${issue["details"]}
+                ...    next_steps=${issue["next_steps"]}\n${related_resource_recommendations}
+            END
         END
     END
     ${history}=    RW.CLI.Pop Shell History
@@ -190,7 +192,7 @@ Get Deployment Workload Details For `${DEPLOYMENT_NAME}` and Add to Report
     RW.Core.Add Pre To Report    Snapshot of deployment state:\n\n${deployment.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Troubleshoot Deployment Replicas for `${DEPLOYMENT_NAME}`
+Inspect Deployment Replicas for `${DEPLOYMENT_NAME}`
     [Documentation]    Pulls the replica information for a given deployment and checks if it's highly available
     ...    , if the replica counts are the expected / healthy values, and raises issues if it is not progressing
     ...    and is missing pods.
@@ -235,7 +237,7 @@ Troubleshoot Deployment Replicas for `${DEPLOYMENT_NAME}`
         ...    title= Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` has less than the desired availability
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment `${DEPLOYMENT_NAME}` has minimum availability, but has unready pods:\n`${deployment_status}`
-        ...    next_steps=Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
+        ...    next_steps=Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`
     END
     IF    $deployment_status["desired_replicas"] == 1
         RW.Core.Add Issue
@@ -279,20 +281,23 @@ Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`
     IF    len($anomaly_list) > 0
         FOR    ${item}    IN    @{anomaly_list}
             IF    $item["average_events_per_minute"] > ${ANOMALY_THRESHOLD}
-                ${messages}=    Replace String    ${item["messages"][0]}    "    ${EMPTY}
-                ${item_next_steps}=    RW.CLI.Run Bash File
-                ...    bash_file=workload_next_steps.sh
-                ...    cmd_override=./workload_next_steps.sh "${messages}" "Deployment" "${DEPLOYMENT_NAME}"
+                ${messages}=    RW.K8sHelper.Sanitize Messages    ${item["messages"][0]}
+                ${issues}=    RW.CLI.Run Bash File
+                ...    bash_file=workload_issues.sh
+                ...    cmd_override=./workload_issues.sh "${messages}" "Deployment" "${DEPLOYMENT_NAME}"
                 ...    env=${env}
                 ...    include_in_history=False
-                RW.Core.Add Issue
-                ...    severity=3
-                ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` has generated an average events per minute above the threshold of ${ANOMALY_THRESHOLD}.
-                ...    actual=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should have less than ${ANOMALY_THRESHOLD} events per minute related to a specific object.
-                ...    title= ${item["kind"]} `${item["name"]}` has rapidly generated events that might warrant further investigation. 
-                ...    reproduce_hint=View Commands Used in Report Output
-                ...    details=${item["kind"]} `${item["name"]}` has an average of ${item["average_events_per_minute"]} events per minute (above the threshold of ${ANOMALY_THRESHOLD}):\n`${item}`
-                ...    next_steps=${item_next_steps.stdout}\n${related_resource_recommendations}
+                ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+                FOR    ${issue}    IN    @{issue_list}
+                    RW.Core.Add Issue
+                    ...    severity=${issue["severity"]}
+                    ...    expected=Warning events should not be present in namespace `${NAMESPACE}` for Deployment `${DEPLOYMENT_NAME}`
+                    ...    actual=Warning events are found in namespace `${NAMESPACE}` for Deployment `${DEPLOYMENT_NAME}` which indicate potential issues.
+                    ...    title= ${issue["title"]}
+                    ...    reproduce_hint=${events.cmd}
+                    ...    details=${issue["details"]}
+                    ...    next_steps=${issue["next_steps"]}\n${related_resource_recommendations}
+                END
             END
         END
         ${anomalies_report_output}=    Set Variable    ${recent_anomalies.stdout}
@@ -379,8 +384,8 @@ Suite Initialization
     ...    type=string
     ...    description=The rate of occurence per minute at which an Event becomes classified as an anomaly, even if Kubernetes considers it informational.
     ...    pattern=\d+(\.\d+)?
-    ...    example=5.0
-    ...    default=5.0
+    ...    example=1.0
+    ...    default=0.2
     ${LOGS_ERROR_PATTERN}=    RW.Core.Import User Variable    LOGS_ERROR_PATTERN
     ...    type=string
     ...    description=The error pattern to use when grep-ing logs.
