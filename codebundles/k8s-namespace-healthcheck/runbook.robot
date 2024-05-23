@@ -1,7 +1,7 @@
 *** Settings ***
 Documentation       This taskset runs general troubleshooting checks against all applicable objects in a namespace. Looks for warning events, odd or frequent normal events, restarting containers and failed or pending pods.
 Metadata            Author    stewartshea
-Metadata            Display Name    Kubernetes Namespace Troubleshoot
+Metadata            Display Name    Kubernetes Namespace Inspection
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 
 Library             BuiltIn
@@ -19,7 +19,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Troubleshoot Warning Events in Namespace `${NAMESPACE}`
+Inspect Warning Events in Namespace `${NAMESPACE}`
     [Documentation]    Queries all warning events in a given namespace within the last 30 minutes,
     ...    fetches the list of involved pod names, groups the events, collects event message details
     ...    and searches for a useful next step based on these details.
@@ -84,7 +84,7 @@ Troubleshoot Warning Events in Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    ${warning_events_by_object.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Troubleshoot Container Restarts In Namespace `${NAMESPACE}`
+Inspect Container Restarts In Namespace `${NAMESPACE}`
     [Documentation]    Fetches pods that have container restarts and provides a report of the restart issues.
     [Tags]    namespace    containers    status    restarts    ${NAMESPACE}
     ${container_restart_details}=    RW.CLI.Run Cli
@@ -127,7 +127,7 @@ Troubleshoot Container Restarts In Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    ${container_restart_analysis.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Troubleshoot Pending Pods In Namespace `${NAMESPACE}`
+Inspect Pending Pods In Namespace `${NAMESPACE}`
     [Documentation]    Fetches pods that are pending and provides details.
     [Tags]    namespace    pods    status    pending    ${NAMESPACE}
     ${pending_pods}=    RW.CLI.Run Cli
@@ -181,7 +181,7 @@ Troubleshoot Pending Pods In Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    ${pending_pods.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Troubleshoot Failed Pods In Namespace `${NAMESPACE}`
+Inspect Failed Pods In Namespace `${NAMESPACE}`
     [Documentation]    Fetches all pods which are not running (unready) in the namespace and adds them to a report for future review.
     [Tags]    namespace    pods    status    unready    not starting    phase    failed    ${NAMESPACE}
     ${unreadypods_details}=    RW.CLI.Run Cli
@@ -240,7 +240,7 @@ Troubleshoot Failed Pods In Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    ${unreadypods_details}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Troubleshoot Workload Status Conditions In Namespace `${NAMESPACE}`
+Inspect Workload Status Conditions In Namespace `${NAMESPACE}`
     [Documentation]    Parses all workloads in a namespace and inspects their status conditions for issues. Status conditions with a status value of False are considered an error.
     [Tags]    namespace    status    conditions    pods    reasons    workloads    ${NAMESPACE}
     ${workload_info}=    RW.CLI.Run Cli

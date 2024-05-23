@@ -137,7 +137,7 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${readiness_probe_health.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${readiness_probe_health.cmd}
 
-Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
+Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`
     [Documentation]    Fetches warning events related to the deployment workload in the namespace and triages any issues found in the events.
     [Tags]    events    workloads    errors    warnings    get    deployment    ${DEPLOYMENT_NAME}
     ${events}=    RW.CLI.Run Cli
@@ -192,7 +192,7 @@ Get Deployment Workload Details For `${DEPLOYMENT_NAME}` and Add to Report
     RW.Core.Add Pre To Report    Snapshot of deployment state:\n\n${deployment.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Troubleshoot Deployment Replicas for `${DEPLOYMENT_NAME}`
+Inspect Deployment Replicas for `${DEPLOYMENT_NAME}`
     [Documentation]    Pulls the replica information for a given deployment and checks if it's highly available
     ...    , if the replica counts are the expected / healthy values, and raises issues if it is not progressing
     ...    and is missing pods.
@@ -237,7 +237,7 @@ Troubleshoot Deployment Replicas for `${DEPLOYMENT_NAME}`
         ...    title= Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` has less than the desired availability
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment `${DEPLOYMENT_NAME}` has minimum availability, but has unready pods:\n`${deployment_status}`
-        ...    next_steps=Troubleshoot Deployment Warning Events for `${DEPLOYMENT_NAME}`
+        ...    next_steps=Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`
     END
     IF    $deployment_status["desired_replicas"] == 1
         RW.Core.Add Issue

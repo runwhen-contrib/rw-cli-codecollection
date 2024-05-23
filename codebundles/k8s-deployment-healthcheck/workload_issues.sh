@@ -25,7 +25,7 @@ add_issue() {
 
 # Check conditions and add issues to the array
 if [[ $messages =~ "ContainersNotReady" && $owner_kind == "Deployment" ]]; then
-    add_issue "2" "$owner_kind \`$owner_name\` has unready containers" "$messages" "Troubleshoot Deployment Replicas for \`$owner_name\`"
+    add_issue "2" "$owner_kind \`$owner_name\` has unready containers" "$messages" "Inspect Deployment Replicas for \`$owner_name\`"
 fi
 
 if [[ $messages =~ "Misconfiguration" && $owner_kind == "Deployment" ]]; then
@@ -33,7 +33,7 @@ if [[ $messages =~ "Misconfiguration" && $owner_kind == "Deployment" ]]; then
 fi
 
 if [[ $messages =~ "PodInitializing" ]]; then
-    add_issue "4" "$owner_kind \`$owner_name\` is initializing" "$messages" "Retry in a few minutes and verify that \`$owner_name\` is running.\nTroubleshoot $owner_kind Warning Events for \`$owner_name\`"
+    add_issue "4" "$owner_kind \`$owner_name\` is initializing" "$messages" "Retry in a few minutes and verify that \`$owner_name\` is running.\nInspect $owner_kind Warning Events for \`$owner_name\`"
 fi
 
 if [[ $messages =~ "Liveness probe failed" || $messages =~ "Liveness probe errored" ]]; then
@@ -53,7 +53,7 @@ if [[ $messages =~ "ImagePullBackOff" || $messages =~ "Back-off pulling image" |
 fi
 
 if [[ $messages =~ "Back-off restarting failed container" ]]; then
-    add_issue "2" "$owner_kind \`$owner_name\` has failing containers" "$messages" "Check $owner_kind Log for \`$owner_name\`\nTroubleshoot Warning Events for $owner_kind \`$owner_name\`"
+    add_issue "2" "$owner_kind \`$owner_name\` has failing containers" "$messages" "Check $owner_kind Log for \`$owner_name\`\nInspect Warning Events for $owner_kind \`$owner_name\`"
 fi
 
 if [[ $messages =~ "forbidden: failed quota" || $messages =~ "forbidden: exceeded quota" ]]; then
@@ -77,7 +77,7 @@ if [[ $messages =~ "Health check failed after" ]]; then
 fi
 
 if [[ $messages =~ "Deployment does not have minimum availability" ]]; then
-    add_issue "3" "$owner_kind \`$owner_name\` is not available." "$messages" "Troubleshoot Deployment Warning Events for \`$owner_name\`"
+    add_issue "3" "$owner_kind \`$owner_name\` is not available." "$messages" "Inspect Deployment Warning Events for \`$owner_name\`"
 fi
 
 

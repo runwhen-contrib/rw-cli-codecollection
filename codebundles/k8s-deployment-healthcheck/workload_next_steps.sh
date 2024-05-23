@@ -18,7 +18,7 @@ next_steps=()
 
 
 if [[ $messages =~ "ContainersNotReady" && $owner_kind == "Deployment" ]]; then
-    next_steps+=("Troubleshoot Deployment Replicas for \`$owner_name\`")
+    next_steps+=("Inspect Deployment Replicas for \`$owner_name\`")
 fi
 
 if [[ $messages =~ "Misconfiguration" && $owner_kind == "Deployment" ]]; then
@@ -33,7 +33,7 @@ fi
 
 if [[ $messages =~ "PodInitializing" ]]; then
     next_steps+=("Check $owner_kind Health for \`$owner_name\`")
-    next_steps+=("Troubleshoot $owner_kind Warning Events for \`$owner_name\`")
+    next_steps+=("Inspect $owner_kind Warning Events for \`$owner_name\`")
 fi
 
 if [[ $messages =~ "Liveness probe failed" || $messages =~ "Liveness probe errored" ]]; then
@@ -55,7 +55,7 @@ fi
 
 if [[ $messages =~ "Back-off restarting failed container" ]]; then
     next_steps+=("Check Log for $owner_kind \`$owner_name\`")
-    next_steps+=("Troubleshoot Warning Events for $owner_kind \`$owner_name\`")
+    next_steps+=("Inspect Warning Events for $owner_kind \`$owner_name\`")
 
 fi
 
@@ -85,7 +85,7 @@ if [[ $messages =~ "Health check failed after" ]]; then
 fi
 
 if [[ $messages =~ "Deployment does not have minimum availability" ]]; then
-    next_steps+=("Troubleshoot Deployment Warning Events for \`$owner_name\`")
+    next_steps+=("Inspect Deployment Warning Events for \`$owner_name\`")
 fi
 
 
