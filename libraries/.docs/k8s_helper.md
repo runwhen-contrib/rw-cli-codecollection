@@ -21,3 +21,22 @@ Parse a Kubernetes object JSON for specific annotations or labels and return rec
 
 - `str` - Recommendations based on the object's annotations or labels.
 
+<a id="libraries.RW.K8sHelper.k8s_helper.sanitize_messages"></a>
+
+#### sanitize\_messages
+
+```python
+def sanitize_messages(input_string)
+```
+
+Sanitize the message string by replacing ncharacters that can't be processed into json issue details.
+
+**Arguments**:
+
+  - input_string: The string to be sanitized.
+  
+
+**Returns**:
+
+  - The sanitized string.
+
