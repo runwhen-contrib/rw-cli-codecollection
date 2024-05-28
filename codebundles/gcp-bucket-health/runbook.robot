@@ -41,6 +41,17 @@ Fetch GCP Bucket Storage Utilization for `${PROJECT_IDS}`
     RW.Core.Add Pre To Report    GCP Bucket Usage:\n${bucket_usage.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${bucket_usage.cmd}
 
+Add GCP Bucket Storage Configuration for `${PROJECT_IDS}` to Report
+    [Documentation]    Fetches all GCP buckets in each project and obtains the total size.
+    [Tags]    gcloud    gcs    gcp    bucket
+    ${bucket_configuration}=    RW.CLI.Run Bash File
+    ...    bash_file=bucket_details.sh
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    show_in_rwl_cheatsheet=true
+    RW.Core.Add Pre To Report    GCP Bucket Configuration:\n${bucket_configuration.stdout}
+    RW.Core.Add Pre To Report    Commands Used:\n${bucket_configuration.cmd}
+
 *** Keywords ***
 Suite Initialization
     ${gcp_credentials_json}=    RW.Core.Import Secret    gcp_credentials_json
