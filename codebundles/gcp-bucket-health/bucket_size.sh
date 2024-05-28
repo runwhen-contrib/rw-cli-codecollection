@@ -92,6 +92,16 @@ get_all_bucket_sizes() {
     echo $response | jq -r '.data.result[] | {bucket_name: .metric.bucket_name, size_bytes: .value[1]}'
 }
 
+# Function to get bucket metadata (including location and storage class)
+get_bucket_metadata() {
+    local bucket_name=$1
+    local token=$2
+    local response=$(curl -s --header "Authorization: Bearer $token" \
+        "https://storage.googleapis.com/storage/v1/b/$bucket_name")
+
+    echo $response
+}
+
 # Check if PROJECT_IDS environment variable is set and valid
 if [ -z "$PROJECT_IDS" ]; then
     echo "Error: PROJECT_IDS environment variable is not set or empty."
@@ -111,7 +121,6 @@ IFS=',' read -r -a projects <<< "$PROJECT_IDS"
 
 # Get the access token using the service account key
 access_token=$(get_access_token "$SERVICE_ACCOUNT_KEY")
-export CLOUDSDK_AUTH_ACCESS_TOKEN=$access_token
 bucket_sizes=()
 
 # Iterate over each project ID provided
@@ -134,8 +143,12 @@ for project_id in "${projects[@]}"; do
 
             size_bytes=$(echo "$all_bucket_sizes" | jq -r --arg bucket_name "$bucket_name" '. | select(.bucket_name == $bucket_name) | .size_bytes')
             if [ -n "$size_bytes" ]; then
+                size_gb=$(bytes_to_gb $size_bytes)
+                metadata=$(get_bucket_metadata "$bucket_name" "$access_token")
+                region=$(echo "$metadata" | jq -r '.location')
+                storage_class=$(echo "$metadata" | jq -r '.storageClass')
                 size_tb=$(bytes_to_tb $size_bytes)
-                bucket_sizes+=("{\"project\": \"$project_id\", \"bucket\": \"$bucket_name\", \"size_tb\": $size_tb}")
+                bucket_sizes+=("{\"project\": \"$project_id\", \"bucket\": \"$bucket_name\", \"size_tb\": $size_tb, \"storage_class\": \"$storage_class\", \"region\": \"$region\"}")
             else
                 echo "No size data found for bucket: $bucket_name"
             fi
@@ -156,4 +169,5 @@ for project_id in "${projects[@]}"; do
 done
 
 # Output the result in JSON format
-echo "["$(IFS=,; echo "${bucket_sizes[*]}")"]" | jq .
+echo "["$(IFS=,; echo "${bucket_sizes[*]}")"]" > $HOME/bucket_report.json
+cat $HOME/bucket_report.json | jq 'sort_by(.size_tb) | reverse'
