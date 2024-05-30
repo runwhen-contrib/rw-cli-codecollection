@@ -70,34 +70,43 @@ if [ -z "$SELECTOR" ]; then
     exit 1
 fi
 
+fetch_logs() {
+    local POD=$1
+    local CONTAINER=$2
+    local PREVIOUS_FLAG=$3
+    
+    if [ -n "$LOGS_ERROR_PATTERN" ] && [ -n "$LOGS_EXCLUDE_PATTERN" ]; then
+        # Both error and exclusion patterns provided
+        LOGS=$($KUBERNETES_DISTRIBUTION_BINARY logs $POD -c $CONTAINER $PREVIOUS_FLAG --limit-bytes=256000 --since=3h --context=$CONTEXT -n $NAMESPACE | grep -Ei "$LOGS_ERROR_PATTERN" | grep -Eiv "$LOGS_EXCLUDE_PATTERN")
+    elif [ -n "$LOGS_ERROR_PATTERN" ]; then
+        # Only error pattern provided
+        LOGS=$($KUBERNETES_DISTRIBUTION_BINARY logs $POD -c $CONTAINER $PREVIOUS_FLAG --limit-bytes=256000 --since=3h --context=$CONTEXT -n $NAMESPACE | grep -Ei "$LOGS_ERROR_PATTERN")
+    elif [ -n "$LOGS_EXCLUDE_PATTERN" ]; then
+        # Only exclusion pattern provided
+        LOGS=$($KUBERNETES_DISTRIBUTION_BINARY logs $POD -c $CONTAINER $PREVIOUS_FLAG --limit-bytes=256000 --since=3h --context=$CONTEXT -n $NAMESPACE | grep -Eiv "$LOGS_EXCLUDE_PATTERN")
+    else
+        # Neither pattern provided
+        LOGS=$($KUBERNETES_DISTRIBUTION_BINARY logs $POD -c $CONTAINER $PREVIOUS_FLAG --limit-bytes=256000 --since=3h --context=$CONTEXT -n $NAMESPACE)
+    fi
+
+    # Check log format and store appropriately
+    FIRST_LINE=$(echo "$LOGS" | head -n 1)
+    EXT=$(echo "$FIRST_LINE" | jq -e . &>/dev/null && echo "json" || echo "txt")
+    FILENAME="${POD}_${CONTAINER}_logs${PREVIOUS_FLAG:+_previous}.$EXT"
+    LOG_FILES+=("$FILENAME")
+    echo "Fetching logs for Pod: $POD, Container: $CONTAINER. Saving to $FILENAME."
+    echo "$LOGS" > $FILENAME
+}
+
 # Iterate through the pods based on the selector and fetch logs
-LOG_FILES=() 
 while read POD; do
-    CONTAINERS=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $POD -n ${NAMESPACE} --context=${CONTEXT} -o=jsonpath='{range .spec.containers[*]}{.name}{"\n"}{end}')
+    CONTAINERS=$($KUBERNETES_DISTRIBUTION_BINARY get pod $POD -n $NAMESPACE --context=$CONTEXT -o=jsonpath='{range .spec.containers[*]}{.name}{"\n"}{end}')
     for CONTAINER in $CONTAINERS; do
-        if [ -n "$LOGS_ERROR_PATTERN" ] && [ -n "$LOGS_EXCLUDE_PATTERN" ]; then
-            # Both error and exclusion patterns provided
-            LOGS=$(${KUBERNETES_DISTRIBUTION_BINARY} logs $POD -c $CONTAINER --limit-bytes=256000 --since=3h --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${LOGS_ERROR_PATTERN}" | grep -Eiv "${LOGS_EXCLUDE_PATTERN}")
-        elif [ -n "$LOGS_ERROR_PATTERN" ]; then
-            # Only error pattern provided
-            LOGS=$(${KUBERNETES_DISTRIBUTION_BINARY} logs $POD -c $CONTAINER --limit-bytes=256000 --since=3h --context=${CONTEXT} -n ${NAMESPACE} | grep -Ei "${LOGS_ERROR_PATTERN}")
-        elif [ -n "$LOGS_EXCLUDE_PATTERN" ]; then
-            # Only exclusion pattern provided
-            LOGS=$(${KUBERNETES_DISTRIBUTION_BINARY} logs $POD -c $CONTAINER --limit-bytes=256000 --since=3h --context=${CONTEXT} -n ${NAMESPACE} | grep -Eiv "${LOGS_EXCLUDE_PATTERN}")
-        else
-            # Neither pattern provided
-            LOGS=$(${KUBERNETES_DISTRIBUTION_BINARY} logs $POD -c $CONTAINER --limit-bytes=256000 --since=3h --context=${CONTEXT} -n ${NAMESPACE})
-        fi
-        
-        # Check log format and store appropriately
-        FIRST_LINE=$(echo "$LOGS" | head -n 1)
-        EXT=$(echo "$FIRST_LINE" | jq -e . &>/dev/null && echo "json" || echo "txt")
-        FILENAME="${POD}_${CONTAINER}_logs.$EXT"
-        LOG_FILES+=("$FILENAME")
-        echo "Fetching logs for Pod: $POD, Container: $CONTAINER. Saving to $FILENAME."
-        echo "$LOGS" > $FILENAME
+        fetch_logs $POD $CONTAINER ""
+        fetch_logs $POD $CONTAINER "-p"
     done
-done < <(${KUBERNETES_DISTRIBUTION_BINARY} get pods --selector=$SELECTOR -n ${NAMESPACE} --context=${CONTEXT} -o=jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+done < <($KUBERNETES_DISTRIBUTION_BINARY get pods --selector=$SELECTOR -n $NAMESPACE --context=$CONTEXT -o=jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+
 
 # Initialize an issue description array
 issue_descriptions=()
