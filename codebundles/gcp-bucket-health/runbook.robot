@@ -82,7 +82,8 @@ Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
             ...    next_steps=Review IAM configuration for GCP storage bucket `${item["bucket"]}` in project `${item["project"]}`
         END
     END
-
+    RW.Core.Add Pre To Report    GCP Security Configuration Check:\n${bucket_security_configuration.stdout}
+    RW.Core.Add Pre To Report    Commands Used:\n${bucket_security_configuration.cmd}
 
 *** Keywords ***
 Suite Initialization
