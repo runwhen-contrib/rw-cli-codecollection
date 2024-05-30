@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       Inspect GCP Storage bucket usage and configuration.
+Documentation       This SLI uses the GCP API or gcloud to score bucket health. Produces a value between 0 (completely failing thet test) and 1 (fully passing the test). Looks for usage above a threshold and public buckets.
 Metadata            Author    stewartshea
 Metadata            Display Name    GCP Storage Bucket Health
 Metadata            Supports    GCP,GCS
@@ -21,7 +21,6 @@ Fetch GCP Bucket Storage Utilization for `${PROJECT_IDS}`
     ...    bash_file=bucket_size.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
-    ...    show_in_rwl_cheatsheet=true
     ...    timeout_seconds=240
     ${buckets_over_threshold}=    RW.CLI.Run Cli
     ...    cmd=cat $HOME/bucket_report.json | jq '[.[] | select(.size_tb > ${USAGE_THRESHOLD})] | length'
@@ -36,7 +35,6 @@ Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
     ...    bash_file=check_security.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
-    ...    show_in_rwl_cheatsheet=true
     ${bucket_security_output}=    RW.CLI.Run Cli
     ...    cmd=cat $HOME/bucket_security_issues.json | jq . 
     ...    env=${env}
@@ -68,7 +66,7 @@ Suite Initialization
     ...    description=The amount of storage, in TB, to generate an issue on. 
     ...    pattern=\w*
     ...    example=0.5
-    ...    default=00.5
+    ...    default=0.5
     ${PUBLIC_ACCESS_BUCKET_THRESHOLD}=    RW.Core.Import User Variable    PUBLIC_ACCESS_BUCKET_THRESHOLD
     ...    type=string
     ...    description=The amount of storage buckets that can be publicly accessible. 
