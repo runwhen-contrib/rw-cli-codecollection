@@ -24,7 +24,7 @@ spec:
   intervalStrategy: intermezzo
   intervalSeconds: 300
   configProvided:
-    - name: GCP_PROJECT_ID
+    - name: PROJECT_IDS
       value: {{match_resource.resource.project_id}}
   secretsProvided:
     - name: gcp_credentials_json

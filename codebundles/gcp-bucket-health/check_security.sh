@@ -1,6 +1,5 @@
 #!/bin/bash
 
-PROJECT_IDS=${PROJECT_IDS}
 ACCESS_TOKEN=$(gcloud auth application-default print-access-token)
 ISSUES=()
 

@@ -1,7 +1,6 @@
 #!/bin/bash
 
 SERVICE_ACCOUNT_KEY=$GOOGLE_APPLICATION_CREDENTIALS
-PROJECT_IDS=${PROJECT_IDS}
 
 # Function to convert bytes to terabytes using awk
 bytes_to_tb() {

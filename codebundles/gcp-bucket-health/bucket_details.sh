@@ -1,7 +1,6 @@
 #!/bin/bash
 
 SERVICE_ACCOUNT_KEY=$GOOGLE_APPLICATION_CREDENTIALS
-PROJECT_IDS=${PROJECT_IDS}
 
 # Function to get an access token using the service account key
 get_access_token() {
