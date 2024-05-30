@@ -1,0 +1,23 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: gcp
+  generationRules:
+    - resourceTypes:
+        -  gcp_storage_buckets
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: gcp-bucket-health
+          qualifiers: ["project"]
+          baseTemplateName: gcp-bucket-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: slo
+            - type: runbook
+              templateName: gcp-bucket-health-taskset.yaml

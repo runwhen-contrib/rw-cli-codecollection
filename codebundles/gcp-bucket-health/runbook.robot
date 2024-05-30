@@ -24,11 +24,11 @@ Fetch GCP Bucket Storage Utilization for `${PROJECT_IDS}`
     ...    show_in_rwl_cheatsheet=true
     ...    timeout_seconds=240
     ${bucket_output}=    RW.CLI.Run Cli
-    ...    cmd=cat $HOME/bucket_report.json | jq . 
+    ...    cmd=cat $HOME/bucket_report.json | jq .
     ...    env=${env}
     ${bucket_list}=    Evaluate    json.loads(r'''${bucket_output.stdout}''')    json
     FOR    ${item}    IN    @{bucket_list}
-        IF     ${item["size_tb"]} > ${USAGE_THRESHOLD}
+        IF    ${item["size_tb"]} > ${USAGE_THRESHOLD}
             RW.Core.Add Issue
             ...    severity=3
             ...    expected=Storage bucket should be below utilization threshold.
@@ -62,13 +62,15 @@ Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    show_in_rwl_cheatsheet=true
     ${bucket_security_output}=    RW.CLI.Run Cli
-    ...    cmd=cat $HOME/bucket_security_issues.json | jq . 
+    ...    cmd=cat $HOME/bucket_security_issues.json | jq .
     ...    env=${env}
     ${total_public_access_buckets}=    RW.CLI.Run Cli
-    ...    cmd=cat $HOME/bucket_security_issues.json | jq '[.[] | select(.issue_type == "public_access")]' 
+    ...    cmd=cat $HOME/bucket_security_issues.json | jq '[.[] | select(.issue_type == "public_access")]'
     ...    env=${env}
-    ${total_public_access_buckets_list}   Evaluate    json.loads(r'''${total_public_access_buckets.stdout}''')    json
-    IF     len(@{total_public_access_buckets_list}) > ${PUBLIC_ACCESS_BUCKET_THRESHOLD}
+    ${total_public_access_buckets_list}=    Evaluate
+    ...    json.loads(r'''${total_public_access_buckets.stdout}''')
+    ...    json
+    IF    len(@{total_public_access_buckets_list}) > ${PUBLIC_ACCESS_BUCKET_THRESHOLD}
         FOR    ${item}    IN    @{total_public_access_buckets_list}
             RW.Core.Add Issue
             ...    severity=2
@@ -80,6 +82,7 @@ Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
             ...    next_steps=Review IAM configuration for GCP storage bucket `${item["bucket"]}` in project `${item["project"]}`
         END
     END
+
 
 *** Keywords ***
 Suite Initialization
@@ -95,20 +98,20 @@ Suite Initialization
     ...    example=myproject-ID
     ${USAGE_THRESHOLD}=    RW.Core.Import User Variable    USAGE_THRESHOLD
     ...    type=string
-    ...    description=The amount of storage, in TB, to generate an issue on. 
+    ...    description=The amount of storage, in TB, to generate an issue on.
     ...    pattern=\w*
     ...    example=0.5
-    ...    default=0.1
+    ...    default=0.5
     ${PUBLIC_ACCESS_BUCKET_THRESHOLD}=    RW.Core.Import User Variable    PUBLIC_ACCESS_BUCKET_THRESHOLD
     ...    type=string
-    ...    description=The amount of storage buckets that can be publicly accessible. 
+    ...    description=The amount of storage buckets that can be publicly accessible.
     ...    pattern=\w*
     ...    example=1
     ...    default=0
     ${HOME}=    Get Environment Variable    HOME
     ${OS_PATH}=    Get Environment Variable    PATH
-    Set Suite Variable      ${USAGE_THRESHOLD}    ${USAGE_THRESHOLD}
-    Set Suite Variable      ${PUBLIC_ACCESS_BUCKET_THRESHOLD}    ${PUBLIC_ACCESS_BUCKET_THRESHOLD}
+    Set Suite Variable    ${USAGE_THRESHOLD}    ${USAGE_THRESHOLD}
+    Set Suite Variable    ${PUBLIC_ACCESS_BUCKET_THRESHOLD}    ${PUBLIC_ACCESS_BUCKET_THRESHOLD}
     Set Suite Variable    ${PROJECT_IDS}    ${PROJECT_IDS}
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
     Set Suite Variable
