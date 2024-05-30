@@ -52,19 +52,21 @@ if [ -z "$PROJECT_IDS" ]; then
     exit 1
 fi
 
-# Check if SERVICE_ACCOUNT_KEY environment variable is set
-if [ -z "$SERVICE_ACCOUNT_KEY" ]; then
-    echo "Error: SERVICE_ACCOUNT_KEY environment variable is not set."
-    echo "Usage: export SERVICE_ACCOUNT_KEY='/path/to/your/service_account_key.json'"
-    exit 1
-fi
-
 # Read the PROJECT_IDS environment variable into an array
 IFS=',' read -r -a projects <<< "$PROJECT_IDS"
 
-# Get the access token using the service account key
-access_token=$(get_access_token "$SERVICE_ACCOUNT_KEY")
-bucket_sizes=()
+# Get the access token using either the provided service account key or gcloud
+if [ -n "$SERVICE_ACCOUNT_KEY" ]; then
+    echo "SERVICE_ACCOUNT_KEY is set. Using it to get the access token."
+    access_token=$(get_access_token "$SERVICE_ACCOUNT_KEY")
+else
+    echo "SERVICE_ACCOUNT_KEY is not set. Attempting to set access token using gcloud."
+    access_token=$(gcloud auth application-default print-access-token)
+    if [ -z "$access_token" ]; then
+        echo "Failed to retrieve access token using gcloud. Exiting..."
+        exit 1
+    fi
+fi
 
 # Iterate over each project ID provided
 for project_id in "${projects[@]}"; do
