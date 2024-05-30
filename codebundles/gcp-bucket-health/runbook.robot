@@ -22,6 +22,7 @@ Fetch GCP Bucket Storage Utilization for `${PROJECT_IDS}`
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    show_in_rwl_cheatsheet=true
+    ...    timeout_seconds=240
     ${bucket_output}=    RW.CLI.Run Cli
     ...    cmd=cat $HOME/bucket_report.json | jq . 
     ...    env=${env}
@@ -32,7 +33,7 @@ Fetch GCP Bucket Storage Utilization for `${PROJECT_IDS}`
             ...    severity=3
             ...    expected=Storage bucket should be below utilization threshold.
             ...    actual=Storage bucket is above utilization threshold.
-            ...    title= GCP storage bucket `${item["bucket"]}` in project `${item["project"]}` is above utilization threshold.}
+            ...    title= GCP storage bucket `${item["bucket"]}` in project `${item["project"]}` is above utilization threshold.
             ...    reproduce_hint=${bucket_usage.cmd}
             ...    details=${item}
             ...    next_steps=Review Lifecycle configuration for GCP storage bucket `${item["bucket"]}` in project `${item["project"]}`
@@ -52,6 +53,34 @@ Add GCP Bucket Storage Configuration for `${PROJECT_IDS}` to Report
     RW.Core.Add Pre To Report    GCP Bucket Configuration:\n${bucket_configuration.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${bucket_configuration.cmd}
 
+Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
+    [Documentation]    Fetches all GCP buckets in each project and checks for public buckets, risky IAM permissions, and encryption configuration.
+    [Tags]    gcloud    gcs    gcp    bucket    security
+    ${bucket_security_configuration}=    RW.CLI.Run Bash File
+    ...    bash_file=check_security.sh
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    show_in_rwl_cheatsheet=true
+    ${bucket_security_output}=    RW.CLI.Run Cli
+    ...    cmd=cat $HOME/bucket_security_issues.json | jq . 
+    ...    env=${env}
+    ${total_public_access_buckets}=    RW.CLI.Run Cli
+    ...    cmd=cat $HOME/bucket_security_issues.json | jq '[.[] | select(.issue_type == "public_access")]' 
+    ...    env=${env}
+    ${total_public_access_buckets_list}   Evaluate    json.loads(r'''${total_public_access_buckets.stdout}''')    json
+    IF     len(@{total_public_access_buckets_list}) > ${PUBLIC_ACCESS_BUCKET_THRESHOLD}
+        FOR    ${item}    IN    @{total_public_access_buckets_list}
+            RW.Core.Add Issue
+            ...    severity=2
+            ...    expected=Storage bucket should not have public access enabled.
+            ...    actual=Storage bucket has public access enabled.
+            ...    title= GCP storage bucket `${item["bucket"]}` in project `${item["project"]}` is accessible to the public.
+            ...    reproduce_hint=${bucket_security_configuration.cmd}
+            ...    details=${item}
+            ...    next_steps=Review IAM configuration for GCP storage bucket `${item["bucket"]}` in project `${item["project"]}`
+        END
+    END
+
 *** Keywords ***
 Suite Initialization
     ${gcp_credentials_json}=    RW.Core.Import Secret    gcp_credentials_json
@@ -70,8 +99,16 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=0.5
     ...    default=0.1
+    ${PUBLIC_ACCESS_BUCKET_THRESHOLD}=    RW.Core.Import User Variable    PUBLIC_ACCESS_BUCKET_THRESHOLD
+    ...    type=string
+    ...    description=The amount of storage buckets that can be publicly accessible. 
+    ...    pattern=\w*
+    ...    example=1
+    ...    default=0
     ${HOME}=    Get Environment Variable    HOME
     ${OS_PATH}=    Get Environment Variable    PATH
+    Set Suite Variable      ${USAGE_THRESHOLD}    ${USAGE_THRESHOLD}
+    Set Suite Variable      ${PUBLIC_ACCESS_BUCKET_THRESHOLD}    ${PUBLIC_ACCESS_BUCKET_THRESHOLD}
     Set Suite Variable    ${PROJECT_IDS}    ${PROJECT_IDS}
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
     Set Suite Variable
