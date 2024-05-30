@@ -5,11 +5,7 @@
 # CONTEXT
 
 CPU_PERCENT_THRESHOLD=95
-MEM_PERCENT_THRESHOLD=100
-
-
-
-# TODO: mixin pod restarts check
+MEM_PERCENT_THRESHOLD=95
 
 # Function that converts memory resource units to pure bytes
 convert_memory_to_bytes() {
@@ -95,7 +91,8 @@ main() {
     util_limit_pods=()
     echo "Starting $NAMESPACE Namespace Scan For Overutilized Pods"
     top_stats=$(convert_top_to_json)
-    echo "$top_stats" | jq -c '.[]' | while read -r item; do
+    top_stats_array=($(echo "$top_stats" | jq -c '.[]'))
+    for item in "${top_stats_array[@]}"; do
         name=$(echo "$item" | jq -r '.name')
         pod_restarts=$(kubectl get pod $name -n $NAMESPACE -o jsonpath='{.status.containerStatuses[0].restartCount}')
         cpu=$(echo "$item" | jq -r '.cpu')
@@ -119,24 +116,43 @@ main() {
         limits_cpu_utilization=$(( used_cpu_millicpu * 100 / limits_mcpu ))
         limits_memory_utilization=$(( used_memory_bytes * 100 / limits_memory_bytes ))
 
-        echo "Name: $name, Restarts: $pod_restarts, CPU: $cpu, Memory: $memory , mCPU: $used_cpu_millicpu, Memory Bytes: $used_memory_bytes, CPU % Utilization: $requests_cpu_utilization%, Memory % Utilization: $requests_memory_utilization%"
+        echo "Name: $name, Restarts: $pod_restarts, CPU: $cpu, Memory: $memory , mCPU: $used_cpu_millicpu, Memory Bytes: $used_memory_bytes, CPU Utilization: $requests_cpu_utilization%, Memory Utilization: $requests_memory_utilization%"
         if [ $requests_cpu_utilization -gt $CPU_PERCENT_THRESHOLD ] && [ $pod_restarts -gt 0 ]; then
-            echo "Error: Pod $name has $requests_cpu_utilization% CPU utilization and restarts"
-            util_restarting_pods+=("$name")
+            echo "Error: Pod $name has $requests_cpu_utilization% CPU utilization and $pod_restarts restarts"
+            if [[ " ${util_restarting_pods[@]} " =~ " ${name} " ]]; then
+                : # noop
+            else
+                util_restarting_pods+=("$name")
+            fi
         fi
         if [ $requests_memory_utilization -gt $MEM_PERCENT_THRESHOLD ] && [ $pod_restarts -gt 0 ]; then
-            echo "Error: Pod $name has $requests_memory_utilization% memory utilization and restarts"
-            util_restarting_pods+=("$name")
+            echo "Error: Pod $name has $requests_memory_utilization% memory utilization and $pod_restarts restarts"
+            if [[ " ${util_restarting_pods[@]} " =~ " ${name} " ]]; then
+                : # noop
+            else
+                echo "add array $name"
+                util_restarting_pods+=("$name")
+                echo "array: ${util_restarting_pods[@]}"
+            fi
         fi
         if [ $limits_cpu_utilization -gt $CPU_PERCENT_THRESHOLD ]; then
             echo "Error: Pod $name is at CPU limit $limits_cpu"
-            util_limit_pods+=("$name")
+            if [[ " ${util_limit_pods[@]} " =~ " ${name} " ]]; then
+                : # noop
+            else
+                util_limit_pods+=("$name")
+            fi
         fi
         if [ $limits_memory_utilization -gt $MEM_PERCENT_THRESHOLD ]; then
             echo "Error: Pod $name is at memory limit $limits_memory"
-            util_limit_pods+=("$name")
+            if [[ " ${util_limit_pods[@]} " =~ " ${name} " ]]; then
+                : # noop
+            else
+                util_limit_pods+=("$name")
+            fi
         fi
     done
+
     if [ ${#util_restarting_pods[@]} -gt 0 ]; then
         echo ""
         echo "Pods overutilized and restarting:"

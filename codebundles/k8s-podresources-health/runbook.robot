@@ -127,20 +127,20 @@ Scan For Over Utilized Pods In Namespace `${NAMESPACE}`
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ${process.stdout}
     IF    "Pods overutilized and restarting" in """${process.stdout}"""
-        ${pod_names}=    RW.CLI.Run Cli    echo "${process.stdout}" | tail -n  3 | head -n 1
+        ${pod_names}=    RW.CLI.Run Cli    echo "${process.stdout}" | grep -A 1 "Pods overutilized and restarting" | tail -n 1 | head | tr -d '\n'
         RW.Core.Add Issue    title=Detected overutilized pods with restarts in namespace `${NAMESPACE}`
         ...    severity=3
-        ...    next_steps=Consider increasing the base requests of the following pods: `${pod_names}` in namesapce `${NAMESPACE}`
+        ...    next_steps=Consider increasing the base requests of the following pods: `${pod_names.stdout}` in namesapce `${NAMESPACE}`
         ...    expected=The pods should not be restarting and have reasonable utilization.
         ...    actual=The pods are restarting and may be overutilized.
         ...    reproduce_hint=Run scan_overutilized_pods.sh
         ...    details=${process.stdout}
     END
     IF    "Pods at limits" in """${process.stdout}"""
-        ${pod_names}=    RW.CLI.Run Cli    echo "${process.stdout}" | tail -n  1
+        ${pod_names}=    RW.CLI.Run Cli    echo "${process.stdout}" | tail -n 1
         RW.Core.Add Issue    title=Detected pods at their limits in namespace `${NAMESPACE}`
         ...    severity=3
-        ...    next_steps=Consider increasing the limits of the following pods: `${pod_names}` in namesapce `${NAMESPACE}`
+        ...    next_steps=Consider increasing the limits of the following pods: `${pod_names.stdout}` in namesapce `${NAMESPACE}`
         ...    expected=The pods should not be at their limits and have reasonable utilization.
         ...    actual=The pod is utilized to its limit.
         ...    reproduce_hint=Run scan_overutilized_pods.sh
