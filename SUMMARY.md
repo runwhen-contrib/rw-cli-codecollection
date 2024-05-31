@@ -3,6 +3,7 @@
 ## Codebundles
 * [k8s-redis-healthcheck](codebundles/k8s-redis-healthcheck/README.md)
 * [k8s-namespace-healthcheck](codebundles/k8s-namespace-healthcheck/README.md)
+* [gcp-bucket-health](codebundles/gcp-bucket-health/README.md)
 * [k8s-kubectl-cmd](codebundles/k8s-kubectl-cmd/README.md)
 * [k8s-serviceaccount-check](codebundles/k8s-serviceaccount-check/README.md)
 * [k8s-pvc-healthcheck](codebundles/k8s-pvc-healthcheck/README.md)
