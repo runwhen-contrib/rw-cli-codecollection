@@ -118,7 +118,7 @@ Identify VPA Pod Resource Recommendations in Namespace `${NAMESPACE}`
     END
     RW.Core.Add Pre To Report    ${vpa_usage.stdout}\n
 
-Scan For Over Utilized Pods In Namespace `${NAMESPACE}`
+Identify Overutilized Pods In Namespace `${NAMESPACE}`
     [Documentation]    Scans the namespace for pods that are over utilizing resources or may be experiencing resource problems like oomkills or restarts.
     [Tags]    overutilized    resources    utilization    pods    cpu    memory    allocation    ${NAMESPACE}    oomkill    restarts
     ${pod_usage_analysis}=    RW.CLI.Run Bash File    identify_resource_contrained_pods.sh
