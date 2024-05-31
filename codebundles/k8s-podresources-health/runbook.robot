@@ -118,6 +118,35 @@ Identify Pod Resource Recommendations in Namespace `${NAMESPACE}`
     END
     RW.Core.Add Pre To Report    ${vpa_usage.stdout}\n
 
+Scan For Over Utilized Pods In Namespace `${NAMESPACE}`
+    [Documentation]    Scans the namespace for pods that are over utilizing resources or may be experiencing resource problems like oomkills or restarts.
+    [Tags]    overutilized    resources    utilization    pods    cpu    memory    allocation    ${NAMESPACE}    oomkill    restarts
+    ${process}=    RW.CLI.Run Bash File    scan_overutilized_pods.sh
+    ...    cmd_override=./scan_overutilized_pods.sh 
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    RW.Core.Add Pre To Report    ${process.stdout}
+    IF    "Pods overutilized and restarting" in """${process.stdout}"""
+        ${pod_names}=    RW.CLI.Run Cli    echo "${process.stdout}" | grep -A 1 "Pods overutilized and restarting" | tail -n 1 | head | tr -d '\n'
+        RW.Core.Add Issue    title=Detected overutilized pods with restarts in namespace `${NAMESPACE}`
+        ...    severity=3
+        ...    next_steps=Consider increasing the base requests of the following pods: `${pod_names.stdout}` in namesapce `${NAMESPACE}`
+        ...    expected=The pods should not be restarting and have reasonable utilization.
+        ...    actual=The pods are restarting and may be overutilized.
+        ...    reproduce_hint=Run scan_overutilized_pods.sh
+        ...    details=${process.stdout}
+    END
+    IF    "Pods at limits" in """${process.stdout}"""
+        ${pod_names}=    RW.CLI.Run Cli    echo "${process.stdout}" | tail -n 1
+        RW.Core.Add Issue    title=Detected pods at their limits in namespace `${NAMESPACE}`
+        ...    severity=3
+        ...    next_steps=Consider increasing the limits of the following pods: `${pod_names.stdout}` in namesapce `${NAMESPACE}`
+        ...    expected=The pods should not be at their limits and have reasonable utilization.
+        ...    actual=The pod is utilized to its limit.
+        ...    reproduce_hint=Run scan_overutilized_pods.sh
+        ...    details=${process.stdout}
+    END
+
 *** Keywords ***
 Suite Initialization
     ${kubeconfig}=    RW.Core.Import Secret
