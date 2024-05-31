@@ -16,13 +16,14 @@ Library             Process
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Check EKS Fargate Cluster Health Status
+Check EKS Cluster Health Status
     [Documentation]   This script checks the health status of an Amazon EKS cluster.
     [Tags]  EKS    Cluster Health    AWS    Kubernetes    Pods    Nodes  
-    ${process}=    RW.CLI.Run Bash File    check_eks_cluster_health_status.sh
+    ${process}=    RW.CLI.Run Bash File    check_eks_cluster_health.sh
     ...    env=${env}
     ...    secret__AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
     ...    secret__AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    ...    secret__AWS_ROLE_ARN=${AWS_ROLE_ARN}
     IF    "Error" in """${process.stdout}"""
         RW.Core.Push Metric    0
     ELSE
@@ -43,10 +44,15 @@ Suite Initialization
     ...    type=string
     ...    description=AWS Secret Access Key
     ...    pattern=\w*
+    ${AWS_ROLE_ARN}=    RW.Core.Import Secret   AWS_ROLE_ARN
+    ...    type=string
+    ...    description=AWS Role ARN
+    ...    pattern=\w*
 
     Set Suite Variable    ${AWS_REGION}    ${AWS_REGION}
     Set Suite Variable    ${AWS_ACCESS_KEY_ID}    ${AWS_ACCESS_KEY_ID}
     Set Suite Variable    ${AWS_SECRET_ACCESS_KEY}    ${AWS_SECRET_ACCESS_KEY}
+    Set Suite Variable    ${AWS_ROLE_ARN}    ${AWS_ROLE_ARN}
 
     Set Suite Variable
     ...    &{env}
