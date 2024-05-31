@@ -23,6 +23,7 @@ Check EKS Fargate Cluster Health Status
     ...    env=${env}
     ...    secret__AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
     ...    secret__AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    ...    secret__AWS_ROLE_ARN=${AWS_ROLE_ARN}
     IF    "Error" in """${process.stdout}"""
         RW.Core.Add Issue    title=EKS Fargate Cluster in ${AWS_REGION} is Unhealthy
         ...    severity=3
@@ -41,6 +42,7 @@ Check EKS Cluster Health Status
     ...    env=${env}
     ...    secret__AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
     ...    secret__AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    ...    secret__AWS_ROLE_ARN=${AWS_ROLE_ARN}
     IF    "Error" in """${process.stdout}"""
         RW.Core.Add Issue    title=EKS Cluster in ${AWS_REGION} is Unhealthy
         ...    severity=3
@@ -59,6 +61,7 @@ List EKS Cluster Metrics
     ...    env=${env}
     ...    secret__AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
     ...    secret__AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    ...    secret__AWS_ROLE_ARN=${AWS_ROLE_ARN}
     RW.Core.Add Pre To Report    ${process.stdout}
 
 
@@ -76,10 +79,15 @@ Suite Initialization
     ...    type=string
     ...    description=AWS Secret Access Key
     ...    pattern=\w*
+    ${AWS_ROLE_ARN}=    RW.Core.Import Secret   AWS_ROLE_ARN
+    ...    type=string
+    ...    description=AWS Role ARN
+    ...    pattern=\w*
 
     Set Suite Variable    ${AWS_REGION}    ${AWS_REGION}
     Set Suite Variable    ${AWS_ACCESS_KEY_ID}    ${AWS_ACCESS_KEY_ID}
     Set Suite Variable    ${AWS_SECRET_ACCESS_KEY}    ${AWS_SECRET_ACCESS_KEY}
+    Set Suite Variable    ${AWS_ROLE_ARN}    ${AWS_ROLE_ARN}
 
 
     Set Suite Variable

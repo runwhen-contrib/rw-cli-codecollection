@@ -23,6 +23,7 @@ Analyze AWS Lambda Invocation Errors
     ...    env=${env}
     ...    secret__AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
     ...    secret__AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    ...    secret__AWS_ROLE_ARN=${AWS_ROLE_ARN}
     IF    "ERROR" in """${process.stdout}"""
         RW.Core.Push Metric    0
     ELSE
@@ -43,10 +44,15 @@ Suite Initialization
     ...    type=string
     ...    description=AWS Secret Access Key
     ...    pattern=\w*
+    ${AWS_ROLE_ARN}=    RW.Core.Import Secret   AWS_ROLE_ARN
+    ...    type=string
+    ...    description=AWS Role ARN
+    ...    pattern=\w*
 
     Set Suite Variable    ${AWS_REGION}    ${AWS_REGION}
     Set Suite Variable    ${AWS_ACCESS_KEY_ID}    ${AWS_ACCESS_KEY_ID}
     Set Suite Variable    ${AWS_SECRET_ACCESS_KEY}    ${AWS_SECRET_ACCESS_KEY}
+    Set Suite Variable    ${AWS_ROLE_ARN}    ${AWS_ROLE_ARN}
 
     Set Suite Variable
     ...    &{env}
