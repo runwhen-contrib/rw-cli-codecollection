@@ -29,6 +29,10 @@ spec:
       value: {{context}}
     - name: LABELS
       value: ''
+    - name: UTILIZATION_THRESHOLD
+      value: 95
+    - name: DEFAULT_INCREASE
+      value: 25
   secretsProvided:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
