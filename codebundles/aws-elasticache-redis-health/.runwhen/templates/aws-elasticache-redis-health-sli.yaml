@@ -33,3 +33,5 @@ spec:
       workspaceKey: {{custom.aws_access_key_id}}
     - name: AWS_SECRET_ACCESS_KEY
       workspaceKey: {{custom.aws_secret_access_key}}
+    - name: AWS_ROLE_ARN
+      workspaceKey: {{custom.aws_role_arn}}
