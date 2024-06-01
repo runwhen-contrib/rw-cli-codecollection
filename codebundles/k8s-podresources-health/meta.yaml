@@ -331,7 +331,7 @@ commands:
     \    if [[ $cpu =~ ^[0-9]+m$ ]]; then\n        echo ${cpu%m}\n    else\n     \
     \   echo $(($cpu * 1000))  # Convert CPU cores to millicores\n    fi\n}\n\n# ...\n\
     # (Remaining script left for comment...)\n"
-  name: identify_pod_resource_recommendations_in_namespace_namespace
+  name: identify_vpa_pod_resource_recommendations_in_namespace_namespace
   when_is_it_useful: '1. Scaling a Kubernetes application: When a DevOps or SRE needs
     to scale an application in Kubernetes, they may use this script to fetch VPA recommendations
     and adjust pod resources accordingly in order to optimize performance and resource
@@ -358,3 +358,52 @@ commands:
     analyze VPA recommendations and propose adjustments to pod resources in order
     to efficiently utilize the available resources and ensure scalability for future
     workloads.'
+- command: Could not render command
+  doc_links: '
+
+    - [Managing File and Directory Permissions in Linux](https://linuxize.com/post/linux-file-permissions/){:target="_blank"}'
+  explanation: It seems like the command you're trying to run isn't able to be processed
+    or executed properly. It could be due to a variety of factors, such as incorrect
+    syntax, missing software dependencies, or insufficient permissions.
+  multi_line_details: "# This command is used to create a multi-line command with\
+    \ helpful comments for newer or less experienced devops engineers\n# First, let's\
+    \ start by setting up a variable for the directory path \ndirectory_path=\"/path/to/directory\"\
+    \n\n# Next, change into the specified directory using the cd command\ncd $directory_path\n\
+    \n# Then, list all the files in the directory using the ls command\nls -l\n\n\
+    # Finally, check the disk usage of the files in the directory using the du command\n\
+    du -sh *"
+  name: identify_resource_constrained_pods_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might be tasked with identifying and resolving the
+    root cause of CrashLoopBackoff events in a Kubernetes cluster, which could be
+    caused by issues such as misconfigured pod settings, resource constraints, or
+    application errors.
+
+
+    2. Investigating and resolving high CPU or memory usage in a cluster: In this
+    scenario, a DevOps or Site Reliability Engineer may need to analyze and address
+    performance issues related to high CPU or memory usage within a Kubernetes cluster,
+    potentially caused by inefficient resource allocation, poorly optimized applications,
+    or excessive load.
+
+
+    3. Debugging network connectivity problems within a microservices architecture:
+    When encountering network connectivity issues between services in a microservices
+    architecture deployed on Kubernetes, a DevOps or Site Reliability Engineer might
+    need to troubleshoot and resolve issues related to service discovery, load balancing,
+    firewall rules, or communication protocols.
+
+
+    4. Investigating and addressing application failures or errors: If an application
+    deployed on Kubernetes is experiencing frequent failures, errors, or unexpected
+    behavior, a DevOps or Site Reliability Engineer might be responsible for diagnosing
+    and resolving the underlying issues, which could be related to compatibility problems,
+    configuration errors, or software bugs.
+
+
+    5. Managing container orchestration and scaling: As part of their responsibilities,
+    a DevOps or Site Reliability Engineer may need to oversee the orchestration and
+    scaling of containers within a Kubernetes cluster, ensuring that applications
+    are efficiently distributed across nodes, and scaling resources according to demand.
+    This could involve tasks such as configuring horizontal pod autoscaling, managing
+    replica sets, or optimizing resource utilization.'
