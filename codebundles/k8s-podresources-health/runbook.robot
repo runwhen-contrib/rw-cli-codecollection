@@ -158,7 +158,7 @@ Identify Resource Constrained Pods In Namespace `${NAMESPACE}`
             ...    title= ${item["reason"]} for pod `${item["pod"]}` in `${item["namespace"]}`
             ...    reproduce_hint=${pod_usage_analysis.cmd}
             ...    details=${item}
-            ...    next_steps=Increase CPU limits for ${owner_kind} `${owner_name}` to `${item["recommended_cpu_increase"]}` in namespace `${item["namespace"]}`
+            ...    next_steps=Increase CPU limits for ${owner_kind} `${owner_name}` to ${item["recommended_cpu_increase"]} in namespace `${item["namespace"]}`
         END
         IF    'Memory usage exceeds threshold' in $item['reason']
             RW.Core.Add Issue
@@ -168,7 +168,7 @@ Identify Resource Constrained Pods In Namespace `${NAMESPACE}`
             ...    title= ${item["reason"]} for pod `${item["pod"]}` in `${item["namespace"]}`
             ...    reproduce_hint=${pod_usage_analysis.cmd}
             ...    details=${item}
-            ...    next_steps=Increase memory limits for ${owner_kind} `${owner_name}` to `${item["recommended_mem_increase"]}` in namespace `${item["namespace"]}`
+            ...    next_steps=Increase memory limits for ${owner_kind} `${owner_name}` to ${item["recommended_mem_increase"]} in namespace `${item["namespace"]}`
         END
         IF    'OOMKilled or exit code 137' in $item['reason']
             RW.Core.Add Issue
@@ -178,7 +178,7 @@ Identify Resource Constrained Pods In Namespace `${NAMESPACE}`
             ...    title= Container restarts detected pod `${item["pod"]}` in `${item["namespace"]}` due to exceeded memory usage
             ...    reproduce_hint=${pod_usage_analysis.cmd}
             ...    details=${item}
-            ...    next_steps=Increase memory limits for ${owner_kind} `${owner_name}` to `${item["recommended_mem_increase"]}` in namespace `${item["namespace"]}`
+            ...    next_steps=Increase memory limits for ${owner_kind} `${owner_name}` to ${item["recommended_mem_increase"]} in namespace `${item["namespace"]}`
         END
     END
 *** Keywords ***
