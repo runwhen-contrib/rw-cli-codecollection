@@ -89,7 +89,7 @@ Get Pod Resource Utilization with Top in Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    Pod Resources:\n${resource_util_info}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Identify Pod Resource Recommendations in Namespace `${NAMESPACE}`
+Identify VPA Pod Resource Recommendations in Namespace `${NAMESPACE}`
     [Documentation]    Queries the namespace for any Vertical Pod Autoscaler resource recommendations. 
     [Tags]    recommendation    resources    utilization    pods    cpu    memory    allocation   vpa    ${NAMESPACE}
     ${vpa_usage}=    RW.CLI.Run Bash File
@@ -118,35 +118,69 @@ Identify Pod Resource Recommendations in Namespace `${NAMESPACE}`
     END
     RW.Core.Add Pre To Report    ${vpa_usage.stdout}\n
 
-Scan For Over Utilized Pods In Namespace `${NAMESPACE}`
+Identify Resource Constrained Pods In Namespace `${NAMESPACE}`
     [Documentation]    Scans the namespace for pods that are over utilizing resources or may be experiencing resource problems like oomkills or restarts.
     [Tags]    overutilized    resources    utilization    pods    cpu    memory    allocation    ${NAMESPACE}    oomkill    restarts
-    ${process}=    RW.CLI.Run Bash File    scan_overutilized_pods.sh
-    ...    cmd_override=./scan_overutilized_pods.sh 
+    ${pod_usage_analysis}=    RW.CLI.Run Bash File    identify_resource_contrained_pods.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    RW.Core.Add Pre To Report    ${process.stdout}
-    IF    "Pods overutilized and restarting" in """${process.stdout}"""
-        ${pod_names}=    RW.CLI.Run Cli    echo "${process.stdout}" | grep -A 1 "Pods overutilized and restarting" | tail -n 1 | head | tr -d '\n'
-        RW.Core.Add Issue    title=Detected overutilized pods with restarts in namespace `${NAMESPACE}`
-        ...    severity=3
-        ...    next_steps=Consider increasing the base requests of the following pods: `${pod_names.stdout}` in namesapce `${NAMESPACE}`
-        ...    expected=The pods should not be restarting and have reasonable utilization.
-        ...    actual=The pods are restarting and may be overutilized.
-        ...    reproduce_hint=Run scan_overutilized_pods.sh
-        ...    details=${process.stdout}
+    ...    show_in_rwl_cheatsheet=true
+    RW.Core.Add Pre To Report    ${pod_usage_analysis.stdout}
+    ${overutilized_pods}=    RW.CLI.Run Cli
+    ...    cmd=cat $HOME/overutilized_pods.json | jq .
+    ...    env=${env}
+    ${overutilized_pods_list}=    Evaluate
+    ...    json.loads(r'''${overutilized_pods.stdout}''')
+    ...    json
+    FOR    ${item}    IN    @{overutilized_pods_list}
+        ${item_owner}=    RW.CLI.Run Bash File
+        ...    bash_file=find_resource_owners.sh
+        ...    cmd_override=./find_resource_owners.sh Pod ${item["pod"]} ${NAMESPACE} ${CONTEXT}
+        ...    env=${env}
+        ...    secret_file__kubeconfig=${kubeconfig}
+        ...    include_in_history=False
+        ${item_owner_output}=    RW.CLI.Run Cli
+        ...    cmd=echo "${item_owner.stdout}" | sed 's/ *$//' | tr -d '\n'
+        ...    env=${env}
+        ...    include_in_history=False
+        IF    len($item_owner_output.stdout) > 0 and ($item_owner_output.stdout) != "No resource found"
+            ${owner_kind}    ${owner_name}=    Split String    ${item_owner_output.stdout}    ${SPACE}
+            ${owner_name}=    Replace String    ${owner_name}    \n    ${EMPTY}
+        ELSE
+            ${owner_kind}=    Set Variable    "Unknown"
+            ${owner_name}=    Set Variable    "Unknown"
+        END
+        IF    'CPU usage exceeds threshold' in $item['reason']
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Pods should be operating under their designated resource limits
+            ...    actual=Pods are above their designated resource limits
+            ...    title= ${item["reason"]} for pod `${item["pod"]}` in `${item["namespace"]}`
+            ...    reproduce_hint=${pod_usage_analysis.cmd}
+            ...    details=${item}
+            ...    next_steps=Increase CPU limits for ${owner_kind} `${owner_name}` to ${item["recommended_cpu_increase"]} in namespace `${item["namespace"]}`
+        END
+        IF    'Memory usage exceeds threshold' in $item['reason']
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Pods should be operating under their designated resource limits
+            ...    actual=Pods are above their designated resource limits
+            ...    title= ${item["reason"]} for pod `${item["pod"]}` in `${item["namespace"]}`
+            ...    reproduce_hint=${pod_usage_analysis.cmd}
+            ...    details=${item}
+            ...    next_steps=Increase memory limits for ${owner_kind} `${owner_name}` to ${item["recommended_mem_increase"]} in namespace `${item["namespace"]}`
+        END
+        IF    'OOMKilled or exit code 137' in $item['reason']
+            RW.Core.Add Issue
+            ...    severity=2
+            ...    expected=Pods should be operating under their designated resource limits
+            ...    actual=Pods are above their designated resource limits
+            ...    title= Container restarts detected pod `${item["pod"]}` in `${item["namespace"]}` due to exceeded memory usage
+            ...    reproduce_hint=${pod_usage_analysis.cmd}
+            ...    details=${item}
+            ...    next_steps=Increase memory limits for ${owner_kind} `${owner_name}` to ${item["recommended_mem_increase"]} in namespace `${item["namespace"]}`
+        END
     END
-    IF    "Pods at limits" in """${process.stdout}"""
-        ${pod_names}=    RW.CLI.Run Cli    echo "${process.stdout}" | tail -n 1
-        RW.Core.Add Issue    title=Detected pods at their limits in namespace `${NAMESPACE}`
-        ...    severity=3
-        ...    next_steps=Consider increasing the limits of the following pods: `${pod_names.stdout}` in namesapce `${NAMESPACE}`
-        ...    expected=The pods should not be at their limits and have reasonable utilization.
-        ...    actual=The pod is utilized to its limit.
-        ...    reproduce_hint=Run scan_overutilized_pods.sh
-        ...    details=${process.stdout}
-    END
-
 *** Keywords ***
 Suite Initialization
     ${kubeconfig}=    RW.Core.Import Secret
@@ -184,14 +218,28 @@ Suite Initialization
     ...    description=Home directory to execute scripts from
     ...    example=/home
     ...    default=/home/runwhen
+   ${UTILIZATION_THRESHOLD}=    RW.Core.Import User Variable    UTILIZATION_THRESHOLD
+    ...    type=string
+    ...    description=The resource usage threshold at which to identify issues. 
+    ...    pattern=\w*
+    ...    example=95
+    ...    default=95
+   ${DEFAULT_INCREASE}=    RW.Core.Import User Variable    DEFAULT_INCREASE
+    ...    type=string
+    ...    description=The percentage increase for resource recommendations.  
+    ...    pattern=\w*
+    ...    example=25
+    ...    default=25
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${HOME}    ${HOME}
+    Set Suite Variable    ${DEFAULT_INCREASE}    ${DEFAULT_INCREASE}
+    Set Suite Variable    ${UTILIZATION_THRESHOLD}    ${UTILIZATION_THRESHOLD}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    
     ...    ${env}    
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "HOME":"${HOME}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}","DEFAULT_INCREASE":"${DEFAULT_INCREASE}","UTILIZATION_THRESHOLD":"${UTILIZATION_THRESHOLD}", "HOME":"${HOME}"}
     IF    "${LABELS}" != ""
         ${LABELS}=    Set Variable    -l ${LABELS}
     END

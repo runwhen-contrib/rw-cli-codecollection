@@ -61,6 +61,9 @@ Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    show_in_rwl_cheatsheet=true
+    RW.Core.Add Pre To Report    GCP Security Configuration Check:\n${bucket_security_configuration.stdout}
+    RW.Core.Add Pre To Report    Commands Used:\n${bucket_security_configuration.cmd}
+
     ${bucket_security_output}=    RW.CLI.Run Cli
     ...    cmd=cat $HOME/bucket_security_issues.json | jq .
     ...    env=${env}
@@ -82,8 +85,6 @@ Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
             ...    next_steps=Review IAM configuration for GCP storage bucket `${item["bucket"]}` in project `${item["project"]}`
         END
     END
-    RW.Core.Add Pre To Report    GCP Security Configuration Check:\n${bucket_security_configuration.stdout}
-    RW.Core.Add Pre To Report    Commands Used:\n${bucket_security_configuration.cmd}
 
 *** Keywords ***
 Suite Initialization

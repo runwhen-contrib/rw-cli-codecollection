@@ -109,6 +109,8 @@ done
 echo "Security Issues:"
 if [ ${#ISSUES[@]} -eq 0 ]; then
   echo "No security issues found."
+  # Add empty json list to file so that json loads doesn't fail.
+  echo "[{}]" > $HOME/bucket_security_issues.json
 else
   echo "${ISSUES[@]}" | jq -s . > $HOME/bucket_security_issues.json
   cat $HOME/bucket_security_issues.json

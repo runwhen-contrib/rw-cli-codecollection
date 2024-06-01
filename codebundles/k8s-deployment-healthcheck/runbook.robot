@@ -61,7 +61,6 @@ Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
     ...    Recent logs from Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE}:\n\n${logs.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-# Fetch Previous Logs for Deployment `${DEPLOYMENT_NAME}`
 
 Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     [Documentation]    Validates if a Liveliness probe has possible misconfigurations
