@@ -110,7 +110,7 @@ Inspect Container Restarts In Namespace `${NAMESPACE}`
                 ...    severity=${item["severity"]}
                 ...    expected=Containers should not be restarting in namespace `${NAMESPACE}`
                 ...    actual=We found containers with restarts in namespace `${NAMESPACE}`
-                ...    title=Container Restarts Detected In Namespace `${NAMESPACE}`
+                ...    title=${item["title"]}
                 ...    reproduce_hint=${container_restart_details.cmd}
                 ...    details=${item["details"]}
                 ...    next_steps=${item["next_steps"]}
@@ -327,9 +327,8 @@ Get Listing Of Resources In Namespace `${NAMESPACE}`
 Check Event Anomalies in Namespace `${NAMESPACE}`
     [Documentation]    Fetches non warning events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
     [Tags]    namespace    events    info    state    anomolies    count    occurences    ${NAMESPACE}
-    ## FIXME - the calculation of events per minute is still wrong and needs deeper inspection, akin to something like a histogram
     ${recent_events_by_object}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json > $HOME/events.json && cat $HOME/events.json | jq -r '[.items[] | {namespace: .involvedObject.namespace, kind: .involvedObject.kind, name: ((if .involvedObject and .involvedObject.kind == "Pod" then (.involvedObject.name | split("-")[:-1] | join("-")) else .involvedObject.name end) // ""), count: .count, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, reason: .reason, message: .message}] | group_by(.namespace, .kind, .name) | .[] | {(.[0].namespace + "/" + .[0].kind + "/" + .[0].name): {events: .}}' | jq -r --argjson threshold "${ANOMALY_THRESHOLD}" 'to_entries[] | {object: .key, oldest_timestamp: ([.value.events[] | .firstTimestamp] | min), most_recent_timestamp: (reduce .value.events[] as $event (.value.firstTimestamp; if ($event.lastTimestamp > .) then $event.lastTimestamp else . end)), events_per_minute: (reduce .value.events[] as $event (0; . + ($event.count / (((($event.lastTimestamp | fromdateiso8601) - ($event.firstTimestamp | fromdateiso8601)) / 60) | if . == 0 then 1 else . end))) | floor), total_events: (reduce .value.events[] as $event (0; . + $event.count)), summary_messages: [.value.events[] | .message] | unique | join("; ")} | select(.events_per_minute > $threshold)' | jq -s '.'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json > $HOME/events.json && cat $HOME/events.json | jq -r '[.items[] | {namespace: .involvedObject.namespace, kind: .involvedObject.kind, name: ((if .involvedObject and .involvedObject.kind == "Pod" then (.involvedObject.name | split("-")[:-1] | join("-")) else .involvedObject.name end) // ""), count: .count, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, reason: .reason, message: .message}] | group_by(.namespace, .kind, .name) | .[] | {(.[0].namespace + "/" + .[0].kind + "/" + .[0].name): {events: .}}' | jq -r --argjson threshold "${ANOMALY_THRESHOLD}" 'to_entries[] | {object: .key, oldest_timestamp: ([.value.events[] | .firstTimestamp] | min), most_recent_timestamp: ([.value.events[] | .lastTimestamp] | max), events_per_minute: (reduce .value.events[] as $event (0; . + $event.count) / (((([.value.events[] | .lastTimestamp | fromdateiso8601] | max) - ([.value.events[] | .firstTimestamp | fromdateiso8601] | min)) / 60) | if . < 1 then 1 else . end)), total_events: (reduce .value.events[] as $event (0; . + $event.count)), summary_messages: [.value.events[] | .message] | unique | join("; ")} | select(.events_per_minute > $threshold)' | jq -s '.'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
@@ -363,20 +362,23 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
                 ${owner_kind}=    Set Variable    "Unknown"
                 ${owner_name}=    Set Variable    "Unknown"
             END
-            ${item_next_steps}=    RW.CLI.Run Bash File
-            ...    bash_file=anomaly_next_steps.sh
-            ...    cmd_override=./anomaly_next_steps.sh "${messages}" "${owner_kind}" "${owner_name}"
+            ${issues}=    RW.CLI.Run Bash File
+            ...    bash_file=workload_issues.sh
+            ...    cmd_override=./workload_issues.sh "${messages}" "${owner_kind}" "${owner_name}"
             ...    env=${env}
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
-            RW.Core.Add Issue
-            ...    severity=4
-            ...    expected=Normal events should not frequently repeat in `${NAMESPACE}`
-            ...    actual=Frequently events may be repeating in `${NAMESPACE}` which could indicate potential issues.
-            ...    title= ${owner_kind} `${owner_name}` generated ${item["events_per_minute"]} events within a 1m period and should be reviewed.
-            ...    reproduce_hint=View Commands Used in Report Output
-            ...    details=Item `${item["object"]}` generated a total of ${item["total_events"]} events, and up to ${item["events_per_minute"]} events within a 1m period.\nContaining some of the following messages and types:\n`${item["summary_messages"]}`
-            ...    next_steps=${item_next_steps.stdout}
+            ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+            FOR    ${issue}    IN    @{issue_list}
+                RW.Core.Add Issue
+                ...    severity=${issue["severity"]}
+                ...    expected=Normal events should not frequently repeat in `${NAMESPACE}`
+                ...    actual=Frequently events may be repeating in `${NAMESPACE}` which could indicate potential issues.
+                ...    title= ${issue["title"]}
+                ...    reproduce_hint=${recent_events_by_object.cmd}
+                ...    details=${issue["details"]}
+                ...    next_steps=${issue["next_steps"]}
+            END
         END
     END
 

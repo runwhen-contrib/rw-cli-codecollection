@@ -34,7 +34,7 @@ spec:
     - name: SERVICE_EXCLUDE_PATTERN
       value: (node_modules|opentelemetry)
     - name: ANOMALY_THRESHOLD
-      value: "5.0"
+      value: "3.0"
   secretsProvided:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
