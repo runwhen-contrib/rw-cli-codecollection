@@ -26,5 +26,5 @@ spec:
       activityVerbs:
       - ALERTS_STARTED
       slxs:
-      - {{slx}}
-    name: {{slx}}-ns-alert-workflow.yaml 
+      - {{slx_short_name}}
+    name: {{slx_short_name}}-ns-alert-workflow.yaml 
