@@ -1,0 +1,30 @@
+apiVersion: runwhen.com/v1
+kind: Workflow
+metadata:
+  name: {{slx_name}}-ns-alert-workflow
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  fromActivities:
+  - displayName: {{namespace.name}} Namespace SLO Alert Workflow
+    description: Start RunSession with Eager Edgar when SLO is alerting for {{namespace.name}} namespace health
+    actions:
+    - tasks:
+        slx: {{slx_name}}
+        persona: eager-edgar
+        titles:
+        - Inspect Warning Events in Namespace `${NAMESPACE}`
+        - Inspect Container Restarts In Namespace `${NAMESPACE}`
+        - Inspect Pending Pods In Namespace `${NAMESPACE}`
+        - Inspect Failed Pods In Namespace `${NAMESPACE}`
+        - Inspect Workload Status Conditions In Namespace `${NAMESPACE}`
+        - Check Event Anomalies in Namespace `${NAMESPACE}`
+        - Check Resource Quota Utilization in Namespace `${NAMESPACE}`
+    match:
+      activityVerbs:
+      - ALERTS_STARTED
+      slxs:
+      - {{slx_name}}
+    name: {{slx_name}}-ns-alert-workflow.yaml 
