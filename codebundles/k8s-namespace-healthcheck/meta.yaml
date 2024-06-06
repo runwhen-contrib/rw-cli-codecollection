@@ -10,60 +10,70 @@ commands:
     + $event.count)), summary_messages: (map(.message) | unique | join("; ")), oldest_timestamp:
     (map(.firstTimestamp) | sort | first), most_recent_timestamp: (map(.lastTimestamp)
     | sort | last)}) | map(select((now - ((.most_recent_timestamp | fromdateiso8601)))/60
-    <= 30))'''
+    <= ${EVENT_AGE} ))'''
   doc_links: '
 
-    - [kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
-
-    - [Kubectl Output Formats](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}
-
-    - [JSONPath Examples](https://goessner.net/articles/JsonPath/){:target="_blank"}'
-  explanation: This command is a complex kubectl query to get events of type Warning
-    from a specific context and namespace, format the output as JSON, and extract
-    specific information such as namespace, kind, base name, count, timestamps, reason,
-    and message for further analysis.
-  multi_line_details: "\n# Set the context and namespace for the kubectl command\n\
-    CONTEXT=\"example-context\"\nNAMESPACE=\"example-namespace\"\n\n# Get events of\
-    \ type Warning using kubectl and save them to a JSON file in the user's home directory\n\
-    kubectl get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE}\
-    \ -o json > $HOME/warning_events.json \n\n# Use jq to parse the JSON file, extract\
-    \ relevant information, and filter events that occurred within the last 30 minutes\n\
-    cat $HOME/warning_events.json | \\\njq -r '[.items[] | {namespace: .involvedObject.namespace,\
-    \ kind: .involvedObject.kind, \n    baseName: ((if .involvedObject.kind == \"\
-    Pod\" then (.involvedObject.name | split(\"-\")[:-1] | join(\"-\")) \n       \
-    \        else .involvedObject.name end) // \"\"), \n    count: .count, firstTimestamp:\
-    \ .firstTimestamp, lastTimestamp: .lastTimestamp, reason: .reason, message: .message}]\
-    \ \n    | group_by(.namespace, .kind, .baseName) \n    | map({object: (.[0].namespace\
-    \ + \"/\" + .[0].kind + \"/\" + .[0].baseName), \n           total_events: (reduce\
-    \ .[] as $event (0; . + $event.count)), \n           summary_messages: (map(.message)\
-    \ | unique | join(\"; \")), \n           oldest_timestamp: (map(.firstTimestamp)\
-    \ | sort | first), \n           most_recent_timestamp: (map(.lastTimestamp) |\
-    \ sort | last)}) \n    | map(select((now - ((.most_recent_timestamp | fromdateiso8601)))/60\
-    \ <= 30))'\n\nThis multi-line command includes comments to explain each step,\
-    \ making it easier for newer or less experienced devops engineers to understand\
-    \ and learn from."
+    '
+  explanation: This command uses kubectl to get events of type Warning from a specific
+    context and namespace and output the results in JSON format, then it filters and
+    processes the data using jq to group and summarize the events based on namespace,
+    kind, and base name, and filter them based on event age.
+  multi_line_details: "\n# Set the kubectl context and namespace variables\nexport\
+    \ CONTEXT=my-context\nexport NAMESPACE=my-namespace\n\n# Use kubectl to get events\
+    \ of type Warning in JSON format and save it to a file in the user's home directory\n\
+    kubectl get events --field-selector type=Warning --context $CONTEXT -n $NAMESPACE\
+    \ -o json > $HOME/warning_events.json\n\n# Use jq to parse and manipulate the\
+    \ JSON output from kubectl to extract relevant information\ncat $HOME/warning_events.json\
+    \ | jq -r '\n  # Create an array of objects containing selected fields from the\
+    \ original JSON\n  [.items[] |\n    {\n      namespace: .involvedObject.namespace,\n\
+    \      kind: .involvedObject.kind,\n      baseName: (\n        (if .involvedObject.kind\
+    \ == \"Pod\" then \n          (.involvedObject.name | split(\"-\")[:-1] | join(\"\
+    -\"))\n         else\n          .involvedObject.name\n        end) // \"\"\n \
+    \     ),\n      count: .count,\n      firstTimestamp: .firstTimestamp,\n     \
+    \ lastTimestamp: .lastTimestamp,\n      reason: .reason,\n      message: .message\n\
+    \    }\n  ] \n  # Group the objects by namespace, kind, and baseName\n  | group_by(.namespace,\
+    \ .kind, .baseName) \n  # Map the grouped objects into new objects with aggregated\
+    \ values\n  | map(\n      {\n        object: (.[0].namespace + \"/\" + .[0].kind\
+    \ + \"/\" + .[0].baseName),\n        total_events: (reduce .[] as $event (0; .\
+    \ + $event.count)),\n        summary_messages: (map(.message) | unique | join(\"\
+    ; \")),\n        oldest_timestamp: (map(.firstTimestamp) | sort | first),\n  \
+    \      most_recent_timestamp: (map(.lastTimestamp) | sort | last)\n      }\n \
+    \   )\n  # Filter out objects based on their most recent timestamp compared to\
+    \ a given event age\n  | map(select((now - ((.most_recent_timestamp | fromdateiso8601)))/60\
+    \ <= ${EVENT_AGE} ))\n'\n\nIn this multi-line command, we set the kubectl context\
+    \ and namespace, use kubectl to retrieve warning events in JSON format, and then\
+    \ use jq to manipulate the JSON data and extract relevant information according\
+    \ to specific criteria. Each step is accompanied by comments explaining its purpose.\
+    \ This should help newer or less experienced DevOps engineers understand and execute\
+    \ the command effectively."
   name: inspect_warning_events_in_namespace_namespace
-  when_is_it_useful: '1. Investigating a production incident where multiple pods in
-    a specific namespace are experiencing CrashLoopBackoff events, and determining
-    the root cause of the issue.
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events - As a
+    DevOps or Site Reliability Engineer, you may use this command to gather and analyze
+    warning events related to CrashLoopBackoff errors in a specific context and namespace,
+    in order to identify the root cause and potential solutions.
 
 
-    2. Monitoring and analyzing Kubernetes events for a particular service or application
-    that is displaying erratic behavior or performance issues.
+    2. Performance monitoring and analysis - The command can be used to collect and
+    process warning events related to performance issues, such as high CPU or memory
+    usage, in order to identify and address potential bottlenecks in the system.
 
 
-    3. Performing proactive analysis on Kubernetes events to identify any warning
-    signs or patterns that could indicate potential problems or failure points.
+    3. Security incident investigation - In the event of a security incident, the
+    command can be used to gather warning events related to unauthorized access attempts
+    or other suspicious activities, in order to assess the impact and take appropriate
+    remediation actions.
 
 
-    4. Troubleshooting a deployment failure or abnormal behavior of a specific pod
-    or service, by examining the Kubernetes events and extracting relevant information
-    for debugging.
+    4. Resource allocation and optimization - By using the command to analyze warning
+    events related to resource constraints, such as pods being evicted due to insufficient
+    resources, DevOps or Site Reliability Engineers can make informed decisions about
+    resource allocation and optimization.
 
 
-    5. Conducting a post-incident review to analyze Kubernetes events related to a
-    recent outage or disruption, in order to better understand what happened and how
-    to prevent similar incidents in the future.'
+    5. Application troubleshooting - When troubleshooting application issues, the
+    command can be used to gather and analyze warning events related to application
+    failures or errors, in order to understand the impact on the overall system and
+    identify potential fixes.'
 - command: 'kubectl get events --field-selector type=Warning --context ${CONTEXT}
     -n ${NAMESPACE} -o json > $HOME/warning_events.json && cat $HOME/warning_events.json
     | jq -r ''[.items[] | {namespace: .involvedObject.namespace, kind: .involvedObject.kind,
@@ -75,60 +85,70 @@ commands:
     + $event.count)), summary_messages: (map(.message) | unique | join("; ")), oldest_timestamp:
     (map(.firstTimestamp) | sort | first), most_recent_timestamp: (map(.lastTimestamp)
     | sort | last)}) | map(select((now - ((.most_recent_timestamp | fromdateiso8601)))/60
-    <= 30))'''
+    <= ${EVENT_AGE} ))'''
   doc_links: '
 
-    - [kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
-
-    - [Kubectl Output Formats](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}
-
-    - [JSONPath Examples](https://goessner.net/articles/JsonPath/){:target="_blank"}'
-  explanation: This command is a complex kubectl query to get events of type Warning
-    from a specific context and namespace, format the output as JSON, and extract
-    specific information such as namespace, kind, base name, count, timestamps, reason,
-    and message for further analysis.
-  multi_line_details: "\n# Set the context and namespace for the kubectl command\n\
-    CONTEXT=\"example-context\"\nNAMESPACE=\"example-namespace\"\n\n# Get events of\
-    \ type Warning using kubectl and save them to a JSON file in the user's home directory\n\
-    kubectl get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE}\
-    \ -o json > $HOME/warning_events.json \n\n# Use jq to parse the JSON file, extract\
-    \ relevant information, and filter events that occurred within the last 30 minutes\n\
-    cat $HOME/warning_events.json | \\\njq -r '[.items[] | {namespace: .involvedObject.namespace,\
-    \ kind: .involvedObject.kind, \n    baseName: ((if .involvedObject.kind == \"\
-    Pod\" then (.involvedObject.name | split(\"-\")[:-1] | join(\"-\")) \n       \
-    \        else .involvedObject.name end) // \"\"), \n    count: .count, firstTimestamp:\
-    \ .firstTimestamp, lastTimestamp: .lastTimestamp, reason: .reason, message: .message}]\
-    \ \n    | group_by(.namespace, .kind, .baseName) \n    | map({object: (.[0].namespace\
-    \ + \"/\" + .[0].kind + \"/\" + .[0].baseName), \n           total_events: (reduce\
-    \ .[] as $event (0; . + $event.count)), \n           summary_messages: (map(.message)\
-    \ | unique | join(\"; \")), \n           oldest_timestamp: (map(.firstTimestamp)\
-    \ | sort | first), \n           most_recent_timestamp: (map(.lastTimestamp) |\
-    \ sort | last)}) \n    | map(select((now - ((.most_recent_timestamp | fromdateiso8601)))/60\
-    \ <= 30))'\n\nThis multi-line command includes comments to explain each step,\
-    \ making it easier for newer or less experienced devops engineers to understand\
-    \ and learn from."
+    '
+  explanation: This command uses kubectl to get events of type Warning from a specific
+    context and namespace and output the results in JSON format, then it filters and
+    processes the data using jq to group and summarize the events based on namespace,
+    kind, and base name, and filter them based on event age.
+  multi_line_details: "\n# Set the kubectl context and namespace variables\nexport\
+    \ CONTEXT=my-context\nexport NAMESPACE=my-namespace\n\n# Use kubectl to get events\
+    \ of type Warning in JSON format and save it to a file in the user's home directory\n\
+    kubectl get events --field-selector type=Warning --context $CONTEXT -n $NAMESPACE\
+    \ -o json > $HOME/warning_events.json\n\n# Use jq to parse and manipulate the\
+    \ JSON output from kubectl to extract relevant information\ncat $HOME/warning_events.json\
+    \ | jq -r '\n  # Create an array of objects containing selected fields from the\
+    \ original JSON\n  [.items[] |\n    {\n      namespace: .involvedObject.namespace,\n\
+    \      kind: .involvedObject.kind,\n      baseName: (\n        (if .involvedObject.kind\
+    \ == \"Pod\" then \n          (.involvedObject.name | split(\"-\")[:-1] | join(\"\
+    -\"))\n         else\n          .involvedObject.name\n        end) // \"\"\n \
+    \     ),\n      count: .count,\n      firstTimestamp: .firstTimestamp,\n     \
+    \ lastTimestamp: .lastTimestamp,\n      reason: .reason,\n      message: .message\n\
+    \    }\n  ] \n  # Group the objects by namespace, kind, and baseName\n  | group_by(.namespace,\
+    \ .kind, .baseName) \n  # Map the grouped objects into new objects with aggregated\
+    \ values\n  | map(\n      {\n        object: (.[0].namespace + \"/\" + .[0].kind\
+    \ + \"/\" + .[0].baseName),\n        total_events: (reduce .[] as $event (0; .\
+    \ + $event.count)),\n        summary_messages: (map(.message) | unique | join(\"\
+    ; \")),\n        oldest_timestamp: (map(.firstTimestamp) | sort | first),\n  \
+    \      most_recent_timestamp: (map(.lastTimestamp) | sort | last)\n      }\n \
+    \   )\n  # Filter out objects based on their most recent timestamp compared to\
+    \ a given event age\n  | map(select((now - ((.most_recent_timestamp | fromdateiso8601)))/60\
+    \ <= ${EVENT_AGE} ))\n'\n\nIn this multi-line command, we set the kubectl context\
+    \ and namespace, use kubectl to retrieve warning events in JSON format, and then\
+    \ use jq to manipulate the JSON data and extract relevant information according\
+    \ to specific criteria. Each step is accompanied by comments explaining its purpose.\
+    \ This should help newer or less experienced DevOps engineers understand and execute\
+    \ the command effectively."
   name: inspect_warning_events_in_namespace_namespace
-  when_is_it_useful: '1. Investigating a production incident where multiple pods in
-    a specific namespace are experiencing CrashLoopBackoff events, and determining
-    the root cause of the issue.
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events - As a
+    DevOps or Site Reliability Engineer, you may use this command to gather and analyze
+    warning events related to CrashLoopBackoff errors in a specific context and namespace,
+    in order to identify the root cause and potential solutions.
 
 
-    2. Monitoring and analyzing Kubernetes events for a particular service or application
-    that is displaying erratic behavior or performance issues.
+    2. Performance monitoring and analysis - The command can be used to collect and
+    process warning events related to performance issues, such as high CPU or memory
+    usage, in order to identify and address potential bottlenecks in the system.
 
 
-    3. Performing proactive analysis on Kubernetes events to identify any warning
-    signs or patterns that could indicate potential problems or failure points.
+    3. Security incident investigation - In the event of a security incident, the
+    command can be used to gather warning events related to unauthorized access attempts
+    or other suspicious activities, in order to assess the impact and take appropriate
+    remediation actions.
 
 
-    4. Troubleshooting a deployment failure or abnormal behavior of a specific pod
-    or service, by examining the Kubernetes events and extracting relevant information
-    for debugging.
+    4. Resource allocation and optimization - By using the command to analyze warning
+    events related to resource constraints, such as pods being evicted due to insufficient
+    resources, DevOps or Site Reliability Engineers can make informed decisions about
+    resource allocation and optimization.
 
 
-    5. Conducting a post-incident review to analyze Kubernetes events related to a
-    recent outage or disruption, in order to better understand what happened and how
-    to prevent similar incidents in the future.'
+    5. Application troubleshooting - When troubleshooting application issues, the
+    command can be used to gather and analyze warning events related to application
+    failures or errors, in order to understand the impact on the overall system and
+    identify potential fixes.'
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r
     --argjson exit_code_explanations ''{"0": "Success", "1": "Error", "2": "Misconfiguration",
     "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137":
@@ -728,59 +748,61 @@ commands:
     message: .message}] | group_by(.namespace, .kind, .name) | .[] | {(.[0].namespace
     + "/" + .[0].kind + "/" + .[0].name): {events: .}}'' | jq -r --argjson threshold
     "${ANOMALY_THRESHOLD}" ''to_entries[] | {object: .key, oldest_timestamp: ([.value.events[]
-    | .firstTimestamp] | min), most_recent_timestamp: (reduce .value.events[] as $event
-    (.value.firstTimestamp; if ($event.lastTimestamp > .) then $event.lastTimestamp
-    else . end)), events_per_minute: (reduce .value.events[] as $event (0; . + ($event.count
-    / (((($event.lastTimestamp | fromdateiso8601) - ($event.firstTimestamp | fromdateiso8601))
-    / 60) | if . == 0 then 1 else . end))) | floor), total_events: (reduce .value.events[]
-    as $event (0; . + $event.count)), summary_messages: [.value.events[] | .message]
-    | unique | join("; ")} | select(.events_per_minute > $threshold)'' | jq -s ''.'''
+    | .firstTimestamp] | min), most_recent_timestamp: ([.value.events[] | .lastTimestamp]
+    | max), events_per_minute: (reduce .value.events[] as $event (0; . + $event.count)
+    / (((([.value.events[] | .lastTimestamp | fromdateiso8601] | max) - ([.value.events[]
+    | .firstTimestamp | fromdateiso8601] | min)) / 60) | if . < 1 then 1 else . end)),
+    total_events: (reduce .value.events[] as $event (0; . + $event.count)), summary_messages:
+    [.value.events[] | .message] | unique | join("; ")} | select(.events_per_minute
+    > $threshold)'' | jq -s ''.'''
   doc_links: '
 
-    '
-  explanation: This command gathers events from a Kubernetes cluster, filters out
-    all non-Warning events, and then formats the data into a JSON file. It then uses
-    a tool called `jq` to manipulate the JSON data further, grouping the events by
-    namespace, kind, and name, then calculating various statistics such as event frequency
-    and generating a summary of the events based on a given threshold.
-  multi_line_details: " \n# Set the context and namespace for the kubectl command\n\
-    CONTEXT=\"exampleContext\"\nNAMESPACE=\"exampleNamespace\"\n\n# Get events from\
-    \ the specified context and namespace in JSON format, then save to file\nkubectl\
-    \ get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE}\
-    \ -o json > $HOME/events.json\n\n# Use jq to extract relevant information from\
-    \ events JSON file and output as new formatted JSON\ncat $HOME/events.json | jq\
-    \ -r '[.items[] | {namespace: .involvedObject.namespace, kind: .involvedObject.kind,\
-    \ name: ((if .involvedObject and .involvedObject.kind == \"Pod\" then (.involvedObject.name\
-    \ | split(\"-\")[:-1] | join(\"-\")) else .involvedObject.name end) // \"\"),\
-    \ count: .count, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp,\
-    \ reason: .reason, message: .message}] | group_by(.namespace, .kind, .name) |\
-    \ .[] | {(.[0].namespace + \"/\" + .[0].kind + \"/\" + .[0].name): {events: .}}'\n\
-    \n# Use jq to aggregate event data, filtering for objects with events per minute\
-    \ exceeding a specified threshold\njq -r --argjson threshold \"${ANOMALY_THRESHOLD}\"\
-    \ 'to_entries[] | {object: .key, oldest_timestamp: ([.value.events[] | .firstTimestamp]\
-    \ | min), most_recent_timestamp: (reduce .value.events[] as $event (.value.firstTimestamp;\
-    \ if ($event.lastTimestamp > .) then $event.lastTimestamp else . end)), events_per_minute:\
-    \ (reduce .value.events[] as $event (0; . + ($event.count / (((($event.lastTimestamp\
-    \ | fromdateiso8601) - ($event.firstTimestamp | fromdateiso8601)) / 60) | if .\
-    \ == 0 then 1 else . end))) | floor), total_events: (reduce .value.events[] as\
-    \ $event (0; . + $event.count)), summary_messages: [.value.events[] | .message]\
-    \ | unique | join(\"; \")} | select(.events_per_minute > $threshold)' \n\n# Combine\
-    \ results into a single JSON array\njq -s '.'\n"
+    - [Kubernetes Event Retrieval](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+
+    - [Anomaly Detection in Data](https://towardsdatascience.com/anomaly-detection-for-dummies-15f148e559c1){:target="_blank"}
+
+    - [Formatting Results in JSON](https://www.json.org/json-en.html){:target="_blank"}'
+  explanation: This command retrieves events from a Kubernetes cluster, filters out
+    any warnings, and then processes the data to identify any anomalies based on a
+    specified threshold. The results are formatted in JSON for further analysis.
+  multi_line_details: "\n# Set the kubectl context and namespace to use for the command\n\
+    CONTEXT=\"example-context\"\nNAMESPACE=\"example-namespace\"\n\n# Retrieve events\
+    \ from the Kubernetes cluster using the specified context and namespace, and output\
+    \ the results to a JSON file\nkubectl get events --field-selector type!=Warning\
+    \ --context ${CONTEXT} -n ${NAMESPACE} -o json > $HOME/events.json\n\n# Process\
+    \ the JSON file with jq to extract relevant event information and format it into\
+    \ a new JSON structure\ncat $HOME/events.json | jq -r '[\n  .items[] | {\n   \
+    \ namespace: .involvedObject.namespace,\n    kind: .involvedObject.kind,\n   \
+    \ name: (\n      (if .involvedObject and .involvedObject.kind == \"Pod\" then\n\
+    \        (.involvedObject.name | split(\"-\")[:-1] | join(\"-\"))\n      else\n\
+    \        .involvedObject.name\n      end) // \"\"\n    ),\n    count: .count,\n\
+    \    firstTimestamp: .firstTimestamp,\n    lastTimestamp: .lastTimestamp,\n  \
+    \  reason: .reason,\n    message: .message\n  }\n] | group_by(.namespace, .kind,\
+    \ .name) | .[] | {(.[0].namespace + \"/\" + .[0].kind + \"/\" + .[0].name): {events:\
+    \ .}}'\n\n# Further process the formatted JSON data to calculate anomaly metrics\
+    \ based on specified threshold values\njq -r --argjson threshold \"${ANOMALY_THRESHOLD}\"\
+    \ 'to_entries[] | {\n  object: .key,\n  oldest_timestamp: ([.value.events[] |\
+    \ .firstTimestamp] | min),\n  most_recent_timestamp: ([.value.events[] | .lastTimestamp]\
+    \ | max),\n  events_per_minute: (\n    reduce .value.events[] as $event (0; .\
+    \ + $event.count) / (\n      (\n        (\n          ([.value.events[] | .lastTimestamp\
+    \ | fromdateiso8601] | max) - \n          ([.value.events[] | .firstTimestamp\
+    \ | fromdateiso8601] | min)\n        ) / 60\n      ) | if . < 1 then 1 else .\
+    \ end\n    )\n  ),\n  total_events: (reduce .value.events[] as $event (0; . +\
+    \ $event.count)),\n  summary_messages: [.value.events[] | .message] | unique |\
+    \ join(\"; \")\n} | select(.events_per_minute > $threshold)'\n\n# Combine all\
+    \ individual JSON objects into a single array and output the final processed data\n\
+    jq -s '.'\n"
   name: check_event_anomalies_in_namespace_namespace
-  when_is_it_useful: '1. Investigating frequent CrashLoopBackoff events in a Kubernetes
-    cluster that are causing application downtime.
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
+    events
 
-    2. Monitoring and analyzing network-related issues such as high traffic or connectivity
-    problems within a Kubernetes environment.
+    2. Identifying and resolving performance issues in a Kubernetes cluster
 
-    3. Identifying and addressing performance bottlenecks in a Kubernetes cluster,
-    such as high CPU or memory usage.
+    3. Investigating and addressing application downtime in a Kubernetes environment
 
-    4. Troubleshooting and resolving persistent storage issues affecting the stability
-    and reliability of applications running on Kubernetes.
+    4. Analyzing and optimizing resource utilization in a Kubernetes cluster
 
-    5. Analyzing and mitigating security-related events or alerts within a Kubernetes
-    cluster, such as unauthorized access attempts or potential breaches.'
+    5. Detecting and mitigating potential security incidents in a Kubernetes deployment'
 - command: 'kubectl get events --field-selector type!=Warning --context ${CONTEXT}
     -n ${NAMESPACE} -o json > $HOME/events.json && cat $HOME/events.json | jq -r ''[.items[]
     | {namespace: .involvedObject.namespace, kind: .involvedObject.kind, name: ((if
@@ -790,59 +812,61 @@ commands:
     message: .message}] | group_by(.namespace, .kind, .name) | .[] | {(.[0].namespace
     + "/" + .[0].kind + "/" + .[0].name): {events: .}}'' | jq -r --argjson threshold
     "${ANOMALY_THRESHOLD}" ''to_entries[] | {object: .key, oldest_timestamp: ([.value.events[]
-    | .firstTimestamp] | min), most_recent_timestamp: (reduce .value.events[] as $event
-    (.value.firstTimestamp; if ($event.lastTimestamp > .) then $event.lastTimestamp
-    else . end)), events_per_minute: (reduce .value.events[] as $event (0; . + ($event.count
-    / (((($event.lastTimestamp | fromdateiso8601) - ($event.firstTimestamp | fromdateiso8601))
-    / 60) | if . == 0 then 1 else . end))) | floor), total_events: (reduce .value.events[]
-    as $event (0; . + $event.count)), summary_messages: [.value.events[] | .message]
-    | unique | join("; ")} | select(.events_per_minute > $threshold)'' | jq -s ''.'''
+    | .firstTimestamp] | min), most_recent_timestamp: ([.value.events[] | .lastTimestamp]
+    | max), events_per_minute: (reduce .value.events[] as $event (0; . + $event.count)
+    / (((([.value.events[] | .lastTimestamp | fromdateiso8601] | max) - ([.value.events[]
+    | .firstTimestamp | fromdateiso8601] | min)) / 60) | if . < 1 then 1 else . end)),
+    total_events: (reduce .value.events[] as $event (0; . + $event.count)), summary_messages:
+    [.value.events[] | .message] | unique | join("; ")} | select(.events_per_minute
+    > $threshold)'' | jq -s ''.'''
   doc_links: '
 
-    '
-  explanation: This command gathers events from a Kubernetes cluster, filters out
-    all non-Warning events, and then formats the data into a JSON file. It then uses
-    a tool called `jq` to manipulate the JSON data further, grouping the events by
-    namespace, kind, and name, then calculating various statistics such as event frequency
-    and generating a summary of the events based on a given threshold.
-  multi_line_details: " \n# Set the context and namespace for the kubectl command\n\
-    CONTEXT=\"exampleContext\"\nNAMESPACE=\"exampleNamespace\"\n\n# Get events from\
-    \ the specified context and namespace in JSON format, then save to file\nkubectl\
-    \ get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE}\
-    \ -o json > $HOME/events.json\n\n# Use jq to extract relevant information from\
-    \ events JSON file and output as new formatted JSON\ncat $HOME/events.json | jq\
-    \ -r '[.items[] | {namespace: .involvedObject.namespace, kind: .involvedObject.kind,\
-    \ name: ((if .involvedObject and .involvedObject.kind == \"Pod\" then (.involvedObject.name\
-    \ | split(\"-\")[:-1] | join(\"-\")) else .involvedObject.name end) // \"\"),\
-    \ count: .count, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp,\
-    \ reason: .reason, message: .message}] | group_by(.namespace, .kind, .name) |\
-    \ .[] | {(.[0].namespace + \"/\" + .[0].kind + \"/\" + .[0].name): {events: .}}'\n\
-    \n# Use jq to aggregate event data, filtering for objects with events per minute\
-    \ exceeding a specified threshold\njq -r --argjson threshold \"${ANOMALY_THRESHOLD}\"\
-    \ 'to_entries[] | {object: .key, oldest_timestamp: ([.value.events[] | .firstTimestamp]\
-    \ | min), most_recent_timestamp: (reduce .value.events[] as $event (.value.firstTimestamp;\
-    \ if ($event.lastTimestamp > .) then $event.lastTimestamp else . end)), events_per_minute:\
-    \ (reduce .value.events[] as $event (0; . + ($event.count / (((($event.lastTimestamp\
-    \ | fromdateiso8601) - ($event.firstTimestamp | fromdateiso8601)) / 60) | if .\
-    \ == 0 then 1 else . end))) | floor), total_events: (reduce .value.events[] as\
-    \ $event (0; . + $event.count)), summary_messages: [.value.events[] | .message]\
-    \ | unique | join(\"; \")} | select(.events_per_minute > $threshold)' \n\n# Combine\
-    \ results into a single JSON array\njq -s '.'\n"
+    - [Kubernetes Event Retrieval](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+
+    - [Anomaly Detection in Data](https://towardsdatascience.com/anomaly-detection-for-dummies-15f148e559c1){:target="_blank"}
+
+    - [Formatting Results in JSON](https://www.json.org/json-en.html){:target="_blank"}'
+  explanation: This command retrieves events from a Kubernetes cluster, filters out
+    any warnings, and then processes the data to identify any anomalies based on a
+    specified threshold. The results are formatted in JSON for further analysis.
+  multi_line_details: "\n# Set the kubectl context and namespace to use for the command\n\
+    CONTEXT=\"example-context\"\nNAMESPACE=\"example-namespace\"\n\n# Retrieve events\
+    \ from the Kubernetes cluster using the specified context and namespace, and output\
+    \ the results to a JSON file\nkubectl get events --field-selector type!=Warning\
+    \ --context ${CONTEXT} -n ${NAMESPACE} -o json > $HOME/events.json\n\n# Process\
+    \ the JSON file with jq to extract relevant event information and format it into\
+    \ a new JSON structure\ncat $HOME/events.json | jq -r '[\n  .items[] | {\n   \
+    \ namespace: .involvedObject.namespace,\n    kind: .involvedObject.kind,\n   \
+    \ name: (\n      (if .involvedObject and .involvedObject.kind == \"Pod\" then\n\
+    \        (.involvedObject.name | split(\"-\")[:-1] | join(\"-\"))\n      else\n\
+    \        .involvedObject.name\n      end) // \"\"\n    ),\n    count: .count,\n\
+    \    firstTimestamp: .firstTimestamp,\n    lastTimestamp: .lastTimestamp,\n  \
+    \  reason: .reason,\n    message: .message\n  }\n] | group_by(.namespace, .kind,\
+    \ .name) | .[] | {(.[0].namespace + \"/\" + .[0].kind + \"/\" + .[0].name): {events:\
+    \ .}}'\n\n# Further process the formatted JSON data to calculate anomaly metrics\
+    \ based on specified threshold values\njq -r --argjson threshold \"${ANOMALY_THRESHOLD}\"\
+    \ 'to_entries[] | {\n  object: .key,\n  oldest_timestamp: ([.value.events[] |\
+    \ .firstTimestamp] | min),\n  most_recent_timestamp: ([.value.events[] | .lastTimestamp]\
+    \ | max),\n  events_per_minute: (\n    reduce .value.events[] as $event (0; .\
+    \ + $event.count) / (\n      (\n        (\n          ([.value.events[] | .lastTimestamp\
+    \ | fromdateiso8601] | max) - \n          ([.value.events[] | .firstTimestamp\
+    \ | fromdateiso8601] | min)\n        ) / 60\n      ) | if . < 1 then 1 else .\
+    \ end\n    )\n  ),\n  total_events: (reduce .value.events[] as $event (0; . +\
+    \ $event.count)),\n  summary_messages: [.value.events[] | .message] | unique |\
+    \ join(\"; \")\n} | select(.events_per_minute > $threshold)'\n\n# Combine all\
+    \ individual JSON objects into a single array and output the final processed data\n\
+    jq -s '.'\n"
   name: check_event_anomalies_in_namespace_namespace
-  when_is_it_useful: '1. Investigating frequent CrashLoopBackoff events in a Kubernetes
-    cluster that are causing application downtime.
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
+    events
 
-    2. Monitoring and analyzing network-related issues such as high traffic or connectivity
-    problems within a Kubernetes environment.
+    2. Identifying and resolving performance issues in a Kubernetes cluster
 
-    3. Identifying and addressing performance bottlenecks in a Kubernetes cluster,
-    such as high CPU or memory usage.
+    3. Investigating and addressing application downtime in a Kubernetes environment
 
-    4. Troubleshooting and resolving persistent storage issues affecting the stability
-    and reliability of applications running on Kubernetes.
+    4. Analyzing and optimizing resource utilization in a Kubernetes cluster
 
-    5. Analyzing and mitigating security-related events or alerts within a Kubernetes
-    cluster, such as unauthorized access attempts or potential breaches.'
+    5. Detecting and mitigating potential security incidents in a Kubernetes deployment'
 - command: context="${CONTEXT}"; namespace="${NAMESPACE}"; check_health() { local
     type=$1; local name=$2; local replicas=$3; local selector=$4; local pdbs=$(kubectl
     --context "$context" --namespace "$namespace" get pdb -o json | jq -c --arg selector
