@@ -21,6 +21,7 @@ function check_command_exists() {
         exit
     fi
 }
+
 # Tasks to perform when container exit code is "Error" or 1
 function exit_code_error() {
     logs=$(${KUBERNETES_DISTRIBUTION_BINARY} logs -p $1  --all-containers --context=${CONTEXT} -n ${NAMESPACE} )
@@ -28,6 +29,7 @@ function exit_code_error() {
 
     echo $escaped_log_data
 }
+
 # Tasks to perform when container exit code is "Success"
 function exit_code_success() {
     echo "The exit code returned was 'Success' for pod \`$1\`. This usually means that the container has successfully run to completion."
@@ -52,16 +54,16 @@ function exit_code_success() {
     elif [[ "$argocd_labels" ]]; then
         echo "Detected ArgoCD"
         argocd_labels=$(echo "$argocd_labels" | tr ' ' '\n')
-        instance=$(echo "$argocd_labels" | grep instance: | awk -F ":" '{print $2}') 
+        instance=$(echo "$argocd_labels" | grep instance: | awk -F ":" '{print $2}')
         issue_details="{\"severity\":\"4\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Check that the ArgoCD resources and manifests are accurate for app instance \`$instance\`\",\"details\":\"The exit code returned was 'Success' for pod \`$1\`. This usually means that the container has successfully run to completion.\"}"
     else
-      issue_details="{\"severity\":\"4\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Owner resources appear to be manually applied. Please review the manifest for \`$owner\` in \`$NAMESPACE\` for accuracy.\",\"details\":\"The exit code returned was 'Success' for pod \`$1\`. This usually means that the container has successfully run to completion.\"}"
+        issue_details="{\"severity\":\"4\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Owner resources appear to be manually applied. Please review the manifest for \`$owner\` in \`$NAMESPACE\` for accuracy.\",\"details\":\"The exit code returned was 'Success' for pod \`$1\`. This usually means that the container has successfully run to completion.\"}"
     fi
 }
 
 function find_resource_owner(){
     pod=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $1 --context=${CONTEXT} -n ${NAMESPACE} -o json )
-    pod_owner_kind=$(echo $pod |  jq -r '.metadata.ownerReferences[0].kind' )
+    pod_owner_kind=$(echo $pod | jq -r '.metadata.ownerReferences[0].kind' )
     pod_owner_name=$(echo $pod | jq -r '.metadata.ownerReferences[0].name' )
     resource_owner=$(${KUBERNETES_DISTRIBUTION_BINARY} get $pod_owner_kind/$pod_owner_name --context=${CONTEXT} -n ${NAMESPACE} -o json)
     resource_owner_kind=$(echo $resource_owner | jq -r '.metadata.ownerReferences[0].kind' )
@@ -86,6 +88,7 @@ function find_matching_labels() {
 
     echo "${matching_labels[*]}"
 }
+
 function check_manifest_configuration() {
     resource="$1"
     command_override_check=$(${KUBERNETES_DISTRIBUTION_BINARY} get $1 --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r '
@@ -95,16 +98,22 @@ function check_manifest_configuration() {
     ')
     echo $command_override_check
 }
+
 # ------------------------- Dependency Verification ---------------------------
 
 # Ensure all the required binaries are accessible
 check_command_exists ${KUBERNETES_DISTRIBUTION_BINARY}
 check_command_exists jq
 
-
 EXIT_CODE_EXPLANATIONS='{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}'
 
-container_restarts_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r --argjson exit_code_explanations "$EXIT_CODE_EXPLANATIONS" '
+# Fetch the label selector from the deployment
+DEPLOYMENT_LABEL_SELECTOR=$(${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.spec.selector.matchLabels | to_entries | map("\(.key)=\(.value)") | join(",")')
+
+# Fetch pods related to the specified deployment using the label selector
+pods_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} -l ${DEPLOYMENT_LABEL_SELECTOR} -o json)
+
+container_restarts_json=$(echo "$pods_json" | jq -r --argjson exit_code_explanations "$EXIT_CODE_EXPLANATIONS" '
 {
   "container_restarts": [
     .items[] | select(.status.containerStatuses != null) | select(any(.status.containerStatuses[]; .restartCount > 0)) | {
@@ -126,13 +135,12 @@ container_restarts_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=$
 )
 
 if [ "$(echo "$container_restarts_json" | jq '.container_restarts | length')" -eq 0 ]; then
-    echo "No containers with restarts found."
+    echo "No containers with restarts found for deployment ${DEPLOYMENT_NAME}."
     exit 0
 fi
 
 declare -A container_restarts_dict
 container_restarts_dict=$(echo "$container_restarts_json" | jq -r '.container_restarts[] | {"item": .}' | jq -s add)
-
 
 # Extract data and print in a clean text format
 container_details_dict=()
@@ -169,7 +177,6 @@ while read -r container; do
   container_details_dict+=("$container_text")
 done <<< "$containers"
 
-
 # Print the container restart details
 printf "\nContainer Restart Details: \n"
 for container_text in "${container_details_dict[@]}"; do
@@ -198,17 +205,15 @@ for item in "${container_restarts_dict[@]}"; do
             ;;
         "Misconfiguration")
             echo "Container stopped due to misconfiguration"
-            
             issue_details="{\"severity\":\"2\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Get $owner_kind \`$owner_name\` manifest and check configuration for any mistakes.\",\"details\":\"Container stopped due to misconfiguration\"}"
             ;;
         "Pod terminated by SIGINT")
             echo "Container received SIGINT signal, indicating an interrupted process."
-            issue_details="{\"severity\":\"3\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Check $owner_kind Event Anomalies for \`$owner_name\`\\nIf SIGINT is frequently occuring, escalate to the service or infrastructure owner for further investigation.\",\"details\":\"Container received SIGINT signal, indicating an interrupted process.\"}"           
-
+            issue_details="{\"severity\":\"3\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Check $owner_kind Event Anomalies for \`$owner_name\`\\nIf SIGINT is frequently occuring, escalate to the service or infrastructure owner for further investigation.\",\"details\":\"Container received SIGINT signal, indicating an interrupted process.\"}"
             ;;
         "Abnormal Termination SIGABRT")
             echo "Container terminated abnormally with SIGABRT signal."
-            issue_details="{\"severity\":\"2\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Check $owner_kind Log for Issues with \`$owner_name\`\\nSIGABRT is usually a serious error. If it doesn't appear application related, escalate to the service or infrastructure owner for further investigation.\",\"details\":\"Container terminated abnormally with SIGABRT signal.\"}"           
+            issue_details="{\"severity\":\"2\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Check $owner_kind Log for Issues with \`$owner_name\`\\nSIGABRT is usually a serious error. If it doesn't appear application related, escalate to the service or infrastructure owner for further investigation.\",\"details\":\"Container terminated abnormally with SIGABRT signal.\"}"
             ;;
         "Pod terminated by SIGKILL - Possible OOM")
             if [[ $message =~ "Pod was terminated in response to imminent node shutdown." ]]; then

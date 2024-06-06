@@ -168,7 +168,7 @@ Identify Resource Constrained Pods In Namespace `${NAMESPACE}`
             ...    title= ${item["reason"]} for pod `${item["pod"]}` in `${item["namespace"]}`
             ...    reproduce_hint=${pod_usage_analysis.cmd}
             ...    details=${item}
-            ...    next_steps=Increase memory limits for ${owner_kind} `${owner_name}` to ${item["recommended_mem_increase"]} in namespace `${item["namespace"]}`
+            ...    next_steps=Increase memory limits for ${owner_kind} `${owner_name}` to ${item["recommended_mem_increase"]} in namespace `${item["namespace"]}`\nInvestigate possible memory leaks with ${owner_kind} `${owner_name}`\nAdd or Adjust HorizontalPodAutoScaler or VerticalPodAutoscaler resources to ${owner_kind} `${owner_name}`
         END
         IF    'OOMKilled or exit code 137' in $item['reason']
             RW.Core.Add Issue
@@ -178,7 +178,7 @@ Identify Resource Constrained Pods In Namespace `${NAMESPACE}`
             ...    title= Container restarts detected pod `${item["pod"]}` in `${item["namespace"]}` due to exceeded memory usage
             ...    reproduce_hint=${pod_usage_analysis.cmd}
             ...    details=${item}
-            ...    next_steps=Increase memory limits for ${owner_kind} `${owner_name}` to ${item["recommended_mem_increase"]} in namespace `${item["namespace"]}`
+            ...    next_steps=Increase memory limits for ${owner_kind} `${owner_name}` to ${item["recommended_mem_increase"]} in namespace `${item["namespace"]}`\nInvestigate possible memory leaks with ${owner_kind} `${owner_name}`\nAdd or Adjust HorizontalPodAutoScaler or VerticalPodAutoscaler resources to ${owner_kind} `${owner_name}`
         END
     END
 *** Keywords ***
@@ -230,16 +230,23 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=25
     ...    default=25
+   ${RESTART_AGE}=    RW.Core.Import User Variable    RESTART_AGE
+    ...    type=string
+    ...    description=The age (in minutes) to consider when looking for container restarts.
+    ...    pattern=\w*
+    ...    example=10
+    ...    default=10
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${HOME}    ${HOME}
     Set Suite Variable    ${DEFAULT_INCREASE}    ${DEFAULT_INCREASE}
     Set Suite Variable    ${UTILIZATION_THRESHOLD}    ${UTILIZATION_THRESHOLD}
+    Set Suite Variable    ${RESTART_AGE}    ${RESTART_AGE}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    
     ...    ${env}    
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}","DEFAULT_INCREASE":"${DEFAULT_INCREASE}","UTILIZATION_THRESHOLD":"${UTILIZATION_THRESHOLD}", "HOME":"${HOME}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}","DEFAULT_INCREASE":"${DEFAULT_INCREASE}","UTILIZATION_THRESHOLD":"${UTILIZATION_THRESHOLD}", "HOME":"${HOME}", "RESTART_AGE": "${RESTART_AGE}"}
     IF    "${LABELS}" != ""
         ${LABELS}=    Set Variable    -l ${LABELS}
     END

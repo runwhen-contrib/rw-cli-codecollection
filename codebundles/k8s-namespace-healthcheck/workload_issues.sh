@@ -80,6 +80,23 @@ if [[ $messages =~ "Deployment does not have minimum availability" ]]; then
     add_issue "3" "$owner_kind \`$owner_name\` is not available." "$messages" "Inspect Deployment Warning Events for \`$owner_name\`"
 fi
 
+if [[ $messages =~ "failed to download archive" ]]; then
+    add_issue "3" "$owner_kind \`$owner_name\` has internal connectivity issues fetching source" "$messages" "Escalate connectivity issues to service owner if they continue."
+fi
+
+if [[ $messages =~ "connect: connection refused" ]]; then
+    add_issue "3" "Internal connectivity issues detected" "$messages" "Escalate connectivity issues to service owner if they continue."
+fi
+
+if [[ $messages =~ "OCI runtime exec failed: exec failed: unable to start container process" ]]; then
+    add_issue "2" "Possible node or container runtime issue" "$messages" "Escalate container runtime issue to service owner if they continue."
+fi
+
+if [[ $messages =~ "Created container server" || $messages =~ "no changes since last reconcilation" || $messages =~ "Reconciliation finished" ]]; then
+    # Don't generate any issue data, these are normal strings
+    echo "[]" | jq .
+    exit 0
+fi
 
 ### These are ChatGPT Generated and will require tuning. Please migrate above this line when tuned. 
 ## Removed for now - they were getting wildly off-base
