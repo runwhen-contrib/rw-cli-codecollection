@@ -12,7 +12,7 @@ spec:
     description: Start RunSession with Eager Edgar when SLO is alerting for {{namespace.name}} namespace health
     actions:
     - tasks:
-        slx: {{base_name}}
+        slx: {{slx_name.split('--')[1]}}
         persona: eager-edgar
         titles:
         - Inspect Warning Events in Namespace `${NAMESPACE}`
@@ -26,5 +26,5 @@ spec:
       activityVerbs:
       - ALERTS_STARTED
       slxs:
-      - {{slx_short_name}}
-    name: {{slx_short_name}}-ns-alert-workflow.yaml 
+      - {{slx_name.split('--')[1]}}
+    name: {{slx_name.split('--')[1]}}-slo-alert-workflow
