@@ -33,6 +33,8 @@ spec:
       value: "95"
     - name: DEFAULT_INCREASE
       value: "25"
+    - name: RESTART_AGE
+      value: "10"
   secretsProvided:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
