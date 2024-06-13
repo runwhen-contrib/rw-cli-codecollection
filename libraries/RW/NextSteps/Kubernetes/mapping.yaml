@@ -17,13 +17,12 @@
 # BEGIN NamespaceTroubleshooting
 NamespaceTroubleshooting: &nst
   - Trace And Troubleshoot Namespace Warning Events And Errors
-  - Troubleshoot Container Restarts In Namespace
-  - Troubleshoot Pending Pods In Namespace
-  - Troubleshoot Failed Pods In Namespace
-  - Troubleshoot Workload Status Conditions In Namespace
+  - Inspect Container Restarts In Namespace
+  - Inspect Pending Pods In Namespace
+  - Inspect Failed Pods In Namespace
+  - Inspect Workload Status Conditions In Namespace
   - Get Listing Of Resources In Namespace
   - Check For Namespace Event Anomalies
-  - Troubleshoot Namespace Services And Application Workloads
   - Check Missing or Risky PodDisruptionBudget Policies
   - Service:$service_name
   - Ingress:$ingress_name
