@@ -20,12 +20,18 @@ from .repository import (
 from RW import CLI
 from RW import platform
 from RW.Core import Core
+from enum import Enum
 
 logger = logging.getLogger(__name__)
 THIS_DIR: str = "/".join(__file__.split("/")[:-1])
 MAX_LOG_LINES: int = 1025
 
 RUNWHEN_ISSUE_KEYWORD: str = "[RunWhen]"
+
+
+class ParseMode(Enum):
+    SPLIT_INPUT = 0
+    MULTILINE_LOG = 1
 
 
 def format_process_list(proc_list: str) -> list:
@@ -58,9 +64,7 @@ def test(git_uri, git_token, k8s_env, process_list, *args, **kwargs):
     return report
 
 
-def test_search(
-    repo: Repository, exceptions: list[StackTraceData]
-) -> list[RepositorySearchResult]:
+def test_search(repo: Repository, exceptions: list[StackTraceData]) -> list[RepositorySearchResult]:
     rr = []
     for excep in exceptions:
         rr += repo.search(search_files=excep.files)
@@ -74,16 +78,20 @@ def get_test_data():
     return data
 
 
-def parse_exceptions(
+def parse_stacktraces(
     logs: str,
-    debug_info: bool = False,
-) -> [StackTraceData]:
-    logs = logs.split("\n")
+    parse_mode: ParseMode = ParseMode.SPLIT_INPUT,
+    show_debug: bool = False,
+) -> list[StackTraceData]:
     if len(logs) > MAX_LOG_LINES:
         logger.warning(
             f"Length of logs provided for parsing exceptions is greater than {MAX_LOG_LINES}, be aware this could effect performance"
         )
-    exception_data: list[StackTraceData] = []
+    if parse_mode == ParseMode.SPLIT_INPUT:
+        logs = logs.split("\n")
+    elif parse_mode == ParseMode.MULTILINE_LOG:
+        logs = [logs]
+    stacktrace_data: list[StackTraceData] = []
     # Add more parser types here and they will be attempted in-order until first success, per log line
     parsers: list[BaseStackTraceParse] = [
         GoogleDRFStackTraceParse,
@@ -94,14 +102,16 @@ def parse_exceptions(
     for log in logs:
         st_data: StackTraceData = None
         for parser in parsers:
-            st_data = parser.parse_log(log)
+            st_data = parser.parse_log(log, show_debug=show_debug)
+            logger.info(f"Attempting to parse log line: {log}, got result: {st_data}")
             if st_data and st_data.has_results:
-                exception_data.append(st_data)
+                stacktrace_data.append(st_data)
                 # got a successful parse, move onto next log line
                 break
-            elif debug_info:
-                logger.info(f"parser {parser} returned {st_data}")
-    return exception_data
+
+    if show_debug:
+        logger.info(f"Returning {len(stacktrace_data)} parsed stacktraces\n{stacktrace_data}")
+    return stacktrace_data
 
 
 def clone_repo(git_uri, git_token, number_of_commits_history: int = 10) -> Repository:
@@ -136,9 +146,7 @@ def troubleshoot_application(
                 search_words += excep.endpoints
                 search_words += excep.urls
                 search_words += excep.error_messages
-                results += repo.search(
-                    search_words=search_words, search_files=excep.files
-                )
+                results += repo.search(search_words=search_words, search_files=excep.files)
                 # we hash the exception strings to shorten them for dict searches
                 hashed_exception = _hash_string_md5(excep.raw)
                 if hashed_exception not in exception_occurences:
@@ -227,8 +235,10 @@ ___
         "found_exceptions": (True if most_common_exception else False),
     }
 
+
 def get_file_contents_peek(filename: str, st: StackTraceData) -> str:
-    return 
+    return
+
 
 def _get_workspace_url():
     workspace: str = os.getenv("RW_WORKSPACE", "")
@@ -238,6 +248,7 @@ def _get_workspace_url():
     else:
         return "https://app.beta.runwhen.com/"
 
+
 def _get_runsession_url():
     base_url: str = os.getenv("RW_FRONTEND_URL", "")
     workspace: str = os.getenv("RW_WORKSPACE", "")
@@ -246,6 +257,7 @@ def _get_runsession_url():
         return f"{base_url}/map/{workspace}#selectedRunSessions={session_id}"
     else:
         return "https://app.beta.runwhen.com/"
+
 
 def create_github_issue(
     repo: Repository,

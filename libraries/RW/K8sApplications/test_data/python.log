@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "main.py", line 10, in <module>
+    value = my_dict["missing_key"]
+KeyError: 'missing_key'

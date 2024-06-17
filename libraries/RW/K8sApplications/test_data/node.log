@@ -1,0 +1,11 @@
+Error: ENOENT: no such file or directory, open 'missing-file.txt'
+    at Object.openSync (fs.js:462:3)
+    at Object.readFileSync (fs.js:364:35)
+    at handleRequest (/server.js:15:18)
+    at Layer.handle [as handle_request] (/node_modules/express/lib/router/layer.js:95:5)
+    at next (/node_modules/express/lib/router/route.js:144:13)
+    at Route.dispatch (/node_modules/express/lib/router/route.js:114:3)
+    at Layer.handle [as handle_request] (/node_modules/express/lib/router/layer.js:95:5)
+    at /node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/node_modules/express/lib/router/index.js:346:12)
+    at next (/node_modules/express/lib/router/index.js:280:10)
