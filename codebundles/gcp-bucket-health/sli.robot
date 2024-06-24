@@ -23,7 +23,7 @@ Fetch GCP Bucket Storage Utilization for `${PROJECT_IDS}`
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    timeout_seconds=240
     ${buckets_over_threshold}=    RW.CLI.Run Cli
-    ...    cmd=cat $HOME/bucket_report.json | jq '[.[] | select(.size_tb > ${USAGE_THRESHOLD})] | length'
+    ...    cmd=cat $HOME/bucket_report.json | jq '[.[] | select(.size_tb | tonumber > ${USAGE_THRESHOLD})] | length'
     ...    env=${env}
     ${buckets_over_utilization}=    Evaluate    1 if int(${buckets_over_threshold.stdout}) == 0 else 0
     Set Global Variable    ${buckets_over_utilization}
@@ -44,8 +44,24 @@ Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
     ${public_bucket_score}=    Evaluate    1 if int(${total_public_access_buckets.stdout}) <= ${PUBLIC_ACCESS_BUCKET_THRESHOLD} else 0
     Set Global Variable    ${public_bucket_score}
 
+
+Fetch GCP Bucket Storage Operations Rate for `${PROJECT_IDS}`
+    [Documentation]    Fetches all GCP buckets in each project and obtains the read and write operations rate that incurrs cost.
+    [Tags]    gcloud    gcs    gcp    bucket
+    ${bucket_ops}=    RW.CLI.Run Bash File
+    ...    bash_file=bucket_ops_costs.sh
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    show_in_rwl_cheatsheet=true
+    ...    timeout_seconds=240
+    ${buckets_over_ops_threshold}=    RW.CLI.Run Cli
+    ...    cmd=cat $HOME/bucket_ops_report.json | jq '[.[] | select(.total_ops | tonumber > ${OPS_RATE_THRESHOLD})] | length'
+    ...    env=${env}
+    ${bucket_ops_rate_score}=    Evaluate    1 if int(${buckets_over_ops_threshold.stdout}) == 0 else 0
+    Set Global Variable    ${bucket_ops_rate_score}
+
 Generate Bucket Score
-    ${bucket_health_score}=      Evaluate  (${buckets_over_utilization} + ${public_bucket_score}) / 2
+    ${bucket_health_score}=      Evaluate  (${buckets_over_utilization} + ${public_bucket_score} + ${bucket_ops_rate_score}) / 3
     ${health_score}=      Convert to Number    ${bucket_health_score}  2
     RW.Core.Push Metric    ${health_score}
 
@@ -73,8 +89,15 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=1
     ...    default=0
+    ${OPS_RATE_THRESHOLD}=    RW.Core.Import User Variable    OPS_RATE_THRESHOLD
+    ...    type=string
+    ...    description=The rate of read+write operations, in ops/s, to generate an issue on.
+    ...    pattern=\w*
+    ...    example=10
+    ...    default=10
     ${HOME}=    Get Environment Variable    HOME
     ${OS_PATH}=    Get Environment Variable    PATH
+    Set Suite Variable    ${OPS_RATE_THRESHOLD}    ${OPS_RATE_THRESHOLD}
     Set Suite Variable      ${USAGE_THRESHOLD}    ${USAGE_THRESHOLD}
     Set Suite Variable      ${PUBLIC_ACCESS_BUCKET_THRESHOLD}    ${PUBLIC_ACCESS_BUCKET_THRESHOLD}
     Set Suite Variable    ${PROJECT_IDS}    ${PROJECT_IDS}
