@@ -86,6 +86,34 @@ Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
         END
     END
 
+Fetch GCP Bucket Storage Operations Rate for `${PROJECT_IDS}`
+    [Documentation]    Fetches all GCP buckets in each project and obtains the read and write operations rate that incurrs cost. Generates issues if the rate is above a specified threshold. 
+    [Tags]    gcloud    gcs    gcp    bucket
+    ${bucket_ops}=    RW.CLI.Run Bash File
+    ...    bash_file=bucket_ops_costs.sh
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    show_in_rwl_cheatsheet=true
+    ...    timeout_seconds=240
+    ${bucket_ops_output}=    RW.CLI.Run Cli
+    ...    cmd=cat $HOME/bucket_ops_report.json | jq .
+    ...    env=${env}
+    ${bucket_list}=    Evaluate    json.loads(r'''${bucket_ops_output.stdout}''')    json
+    FOR    ${item}    IN    @{bucket_list}
+        IF    ${item["total_ops"]} > ${OPS_RATE_THRESHOLD}
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Storage bucket should be below operations rate threshold.
+            ...    actual=Storage bucket is above operations rate threshold.
+            ...    title= GCP storage bucket `${item["bucket"]}` in project `${item["project"]}` has a rate of `${item["bucket"]}` read/write operations per second.
+            ...    reproduce_hint=${bucket_ops.cmd}
+            ...    details=${item}
+            ...    next_steps=Investigate storage operations for GCP storage bucket `${item["bucket"]}` in project `${item["project"]}` to avoid unnecessary cloud provider costs. 
+        END
+    END
+    RW.Core.Add Pre To Report    GCP Bucket Usage:\n${bucket_ops_output.stdout}
+    RW.Core.Add Pre To Report    Commands Used:\n${bucket_ops.cmd}
+
 *** Keywords ***
 Suite Initialization
     ${gcp_credentials_json}=    RW.Core.Import Secret    gcp_credentials_json
@@ -104,6 +132,12 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=0.5
     ...    default=0.5
+    ${OPS_RATE_THRESHOLD}=    RW.Core.Import User Variable    OPS_RATE_THRESHOLD
+    ...    type=string
+    ...    description=The rate of read+write operations, in ops/s, to generate an issue on.
+    ...    pattern=\w*
+    ...    example=10
+    ...    default=10
     ${PUBLIC_ACCESS_BUCKET_THRESHOLD}=    RW.Core.Import User Variable    PUBLIC_ACCESS_BUCKET_THRESHOLD
     ...    type=string
     ...    description=The amount of storage buckets that can be publicly accessible.
@@ -113,6 +147,7 @@ Suite Initialization
     ${HOME}=    Get Environment Variable    HOME
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${USAGE_THRESHOLD}    ${USAGE_THRESHOLD}
+    Set Suite Variable    ${OPS_RATE_THRESHOLD}    ${OPS_RATE_THRESHOLD}
     Set Suite Variable    ${PUBLIC_ACCESS_BUCKET_THRESHOLD}    ${PUBLIC_ACCESS_BUCKET_THRESHOLD}
     Set Suite Variable    ${PROJECT_IDS}    ${PROJECT_IDS}
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
