@@ -215,3 +215,136 @@ commands:
 
     5. Automating security checks for new Google Cloud Storage buckets during the
     deployment process'
+- command: bash 'bucket_ops_costs.sh'
+  doc_links: '
+
+    - [Google Cloud Platform APIs](https://cloud.google.com/apis){:target="_blank"}
+
+    - [Monitoring API](https://cloud.google.com/monitoring/api/v3){:target="_blank"}
+
+    - [Google Cloud Storage API - List Objects](https://cloud.google.com/storage/docs/listing-objects){:target="_blank"}
+
+    - [PromQL (Prometheus Query Language)](https://prometheus.io/docs/prometheus/latest/querying/basics/){:target="_blank"}'
+  explanation: This script is a bash shell script that uses Google Cloud Platform
+    APIs to get access tokens, check if the Monitoring API is enabled for certain
+    projects, list buckets in a project, and get the sizes of all buckets using PromQL.
+    It then outputs the results in JSON format.
+  multi_line_details: "\n#!/bin/bash\n\nSERVICE_ACCOUNT_KEY=$GOOGLE_APPLICATION_CREDENTIALS\n\
+    # Function to get an access token using the service account key\nget_access_token()\
+    \ {\n    local key_file=$1\n    local email=$(jq -r .client_email $key_file)\n\
+    \    local key=$(jq -r .private_key $key_file | sed 's/\\\\n/\\n/g')\n\n    local\
+    \ header=$(echo -n '{\"alg\":\"RS256\",\"typ\":\"JWT\"}' | openssl base64 -e -A\
+    \ | tr -d '=' | tr '/+' '_-' | tr -d '\\n')\n    local now=$(date +%s)\n    local\
+    \ exp=$(($now + 3600))\n    local payload=$(echo -n \"{\\\"iss\\\":\\\"$email\\\
+    \",\\\"scope\\\":\\\"https://www.googleapis.com/auth/cloud-platform\\\",\\\"aud\\\
+    \":\\\"https://oauth2.googleapis.com/token\\\",\\\"exp\\\":$exp,\\\"iat\\\":$now}\"\
+    \ | openssl base64 -e -A | tr -d '=' | tr '/+' '_-' | tr -d '\\n')\n\n    local\
+    \ sig=$(echo -n \"$header.$payload\" | openssl dgst -sha256 -sign <(echo -n \"\
+    $key\") | openssl base64 -e -A | tr -d '=' | tr '/+' '_-' | tr -d '\\n')\n\n \
+    \   local jwt=\"$header.$payload.$sig\"\n\n    local token=$(curl -s --request\
+    \ POST \\\n      --url https://oauth2.googleapis.com/token \\\n      --header\
+    \ \"Content-Type: application/x-www-form-urlencoded\" \\\n      --data \"grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=$jwt\"\
+    \ | jq -r .access_token)\n    echo $token\n}\n\n# Function to check if the Monitoring\
+    \ API is enabled\nis_monitoring_api_enabled() {\n    local project_id=$1\n   \
+    \ local token=$2\n    local response=$(curl -s -w \"\\nHTTP_STATUS:%{http_code}\"\
+    \ --header \"Authorization: Bearer $token\" \\\n        \"https://serviceusage.googleapis.com/v1/projects/$project_id/services/monitoring.googleapis.com\"\
+    )\n\n    local http_status=$(echo \"$response\" | sed -n 's/.*HTTP_STATUS:\\([0-9]*\\\
+    )$/\\1/p')\n    local response_body=$(echo \"$response\" | sed -n '1,/^HTTP_STATUS:/p'\
+    \ | sed '$d')\n\n    if [[ \"$http_status\" -ne 200 ]]; then\n        echo \"\
+    Error checking Monitoring API status for project $project_id:\"\n        echo\
+    \ \"HTTP Status: $http_status\"\n        echo \"Response: $response_body\"\n \
+    \       return 1\n    fi\n\n    local state=$(echo \"$response_body\" | jq -r\
+    \ '.state')\n    if [[ \"$state\" == \"ENABLED\" ]]; then\n        return 0\n\
+    \    else\n        echo \"Monitoring API is not enabled for project $project_id.\"\
+    \n        echo \"State: $state\"\n        return 1\n    fi\n}\n\n# Function to\
+    \ list buckets in a project\nlist_buckets() {\n    local project_id=$1\n    local\
+    \ token=$2\n    local response=$(curl -s --header \"Authorization: Bearer $token\"\
+    \ \\\n        \"https://storage.googleapis.com/storage/v1/b?project=$project_id\"\
+    )\n\n    echo $response | jq -r '.items[].name'\n}\n\n# Function to get the sizes\
+    \ of all buckets using PromQL\nget_bucket_read_ops() {\n    local project_id=$1\n\
+    \    local token=$2\n\n    local response=$(curl -s --header \"Authorization:\
+    \ Bearer $token\" \\\n        --header \"Content-Type: application/x-www-form-urlencoded\"\
+    \ \\\n        --data 'query=sum by (bucket_name)(rate(storage_googleapis_com:api_request_count{monitored_resource=\"\
+    gcs_bucket\",method=~\"Read.*|List.*|Get.*\"}[30m]))' \\\n        \"https://monitoring.googleapis.com/v1/projects/$project_id/location/global/prometheus/api/v1/query\"\
+    )\n\n    echo $response | jq -r '.data.result[] | {bucket_name: .metric.bucket_name,\
+    \ ops: .value[1]}'\n}\n\n# Function to get the sizes of all buckets using PromQL\n\
+    get_bucket_write_ops() {\n    local project_id=$1\n    local token=$2\n\n    local\
+    \ response=$(curl -s --header \"Authorization: Bearer $token\" \\\n        --header\
+    \ \"Content-Type: application/x-www-form-urlencoded\" \\\n        --data 'query=sum\
+    \ by (bucket_name)(rate(storage_googleapis_com:api_request_count{monitored_resource=\"\
+    gcs_bucket\",method=~\"Write.*\"}[30m]))' \\\n        \"https://monitoring.googleapis.com/v1/projects/$project_id/location/global/prometheus/api/v1/query\"\
+    )\n\n    echo $response | jq -r '.data.result[] | {bucket_name: .metric.bucket_name,\
+    \ ops: .value[1]}'\n}\n# Function to get bucket metadata (including location and\
+    \ storage class)\nget_bucket_metadata() {\n    local bucket_name=$1\n    local\
+    \ token=$2\n    local response=$(curl -s --header \"Authorization: Bearer $token\"\
+    \ \\\n        \"https://storage.googleapis.com/storage/v1/b/$bucket_name\")\n\n\
+    \    echo $response\n}\n\n# Check if PROJECT_IDS environment variable is set and\
+    \ valid\nif [ -z \"$PROJECT_IDS\" ]; then\n    echo \"Error: PROJECT_IDS environment\
+    \ variable is not set or empty.\"\n    echo \"Usage: export PROJECT_IDS='project_id1,project_id2,...'\"\
+    \n    exit 1\nfi\n\n# Read the PROJECT_IDS environment variable into an array\n\
+    IFS=',' read -r -a projects <<< \"$PROJECT_IDS\"\n\n# Get the access token using\
+    \ either the provided service account key or gcloud\nif [ -n \"$SERVICE_ACCOUNT_KEY\"\
+    \ ]; then\n    echo \"Using the SERVICE_ACCOUNT_KEY to get the access token.\"\
+    \n    access_token=$(get_access_token \"$SERVICE_ACCOUNT_KEY\")\nelse\n    echo\
+    \ \"SERVICE_ACCOUNT_KEY is not set. Attempting to set access token using gcloud.\"\
+    \n    access_token=$(gcloud auth application-default print-access-token)\n   \
+    \ if [ -z \"$access_token\" ]; then\n        echo \"Failed to retrieve access\
+    \ token using gcloud. Exiting...\"\n        exit 1\n    fi\nfi\n\nread_ops=()\n\
+    write_ops=()\n\n# Iterate over each project ID provided\nfor project_id in \"\
+    ${projects[@]}\"; do\n    echo \"Processing project: $project_id\"\n\n    # List\
+    \ all buckets in the project\n    buckets=$(list_buckets \"$project_id\" \"$access_token\"\
+    )\n\n        # Iterate over each bucket and match its size\n    if is_monitoring_api_enabled\
+    \ \"$project_id\" \"$access_token\"; then\n        echo \"Monitoring API is enabled\
+    \ for project: $project_id\"\n\n        # Get the read/write operations of all\
+    \ buckets\n        all_bucket_read_ops=$(get_bucket_read_ops \"$project_id\" \"\
+    $access_token\")\n        all_bucket_write_ops=$(get_bucket_write_ops \"$project_id\"\
+    \ \"$access_token\")\n\n        # Iterate over each bucket and match its size\n\
+    \        for bucket_name in $buckets; do\n            echo \"Processing bucket:\
+    \ $bucket_name\"\n            \n            # Initialize operations to zero\n\
+    \            read_ops=0\n            write_ops=0\n\n            # Get the read/write\
+    \ operations for the current bucket\n            read_ops=$(echo \"$all_bucket_read_ops\"\
+    \ | jq -r --arg bucket_name \"$bucket_name\" '. | select(.bucket_name == $bucket_name)\
+    \ | .ops // 0 | tonumber | round')\n            write_ops=$(echo \"$all_bucket_write_ops\"\
+    \ | jq -r --arg bucket_name \"$bucket_name\" '. | select(.bucket_name == $bucket_name)\
+    \ | .ops // 0 | tonumber | round')\n\n\n            # Calculate the total operations\
+    \ and cost using jq for arithmetic\n            total_ops=$(echo \"$write_ops\
+    \ $read_ops\" | jq -n '[inputs] | add')\n\n            # Print results\n     \
+    \       echo \"Read Rate: $read_ops ops/s, Write Rate: $write_ops ops/s, Total\
+    \ rate: $total_ops ops/s\"\n\n            # Get the region\n            region=$(echo\
+    \ \"$metadata\" | jq -r '.location')\n\n            # Add bucket operations to\
+    \ the list\n            bucket_ops+=(\"{\\\"project\\\": \\\"$project_id\\\",\
+    \ \\\"bucket\\\": \\\"$bucket_name\\\", \\\"write_ops\\\": \\\"$write_ops\\\"\
+    , \\\"read_ops\\\": \\\"$read_ops\\\", \\\"total_ops\\\": \\\"$total_ops\\\",\
+    \ \\\"region\\\": \\\"$region\\\"}\")\n        done\n    else\n        echo \"\
+    Monitoring API is not enabled for project: $project_id\"\n    fi\n\ndone\n\n#\
+    \ Output the result in JSON format\necho \"[\"$(IFS=,; echo \"${bucket_ops[*]}\"\
+    )\"]\" > $HOME/bucket_ops_report.json\ncat $HOME/bucket_ops_report.json | jq 'sort_by(.total_ops)\
+    \ | reverse'\n\n"
+  name: fetch_gcp_bucket_storage_operations_rate_for_project_ids
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this script to gather monitoring data from
+    Google Cloud Platform to investigate the cause of the CrashLoopBackoff events
+    and identify any issues with the containers running in the Kubernetes cluster.
+
+
+    2. Monitoring resource usage and performance: This script could be used to regularly
+    collect data on resource usage and performance metrics from Google Cloud Platform,
+    allowing DevOps or Site Reliability Engineers to analyze trends and identify potential
+    bottlenecks or areas for optimization.
+
+
+    3. Automating monitoring and reporting tasks: By using the script to access GCP
+    APIs, DevOps or Site Reliability Engineers can automate the process of generating
+    reports on resource usage, performance, and other key metrics, saving time and
+    effort in monitoring and analysis tasks.
+
+
+    4. Managing and analyzing cloud storage usage: The script can be utilized to list
+    and retrieve information about buckets in a GCP project, enabling DevOps or Site
+    Reliability Engineers to manage and analyze cloud storage usage more efficiently.
+
+
+    5. Incident response and post-incident analysis: In the event of an incident or
+    service disruption, the script can be used to quickly gather relevant monitoring
+    data from GCP, aiding the investigation and post-incident analysis conducted by
+    DevOps or Site Reliability Engineers.'
