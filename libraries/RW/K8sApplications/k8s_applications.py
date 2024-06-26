@@ -81,6 +81,7 @@ def get_test_data():
 def parse_stacktraces(
     logs: str,
     parse_mode: ParseMode = ParseMode.SPLIT_INPUT,
+    parser_override: BaseStackTraceParse = None,
     show_debug: bool = False,
 ) -> list[StackTraceData]:
     if len(logs) > MAX_LOG_LINES:
@@ -92,17 +93,22 @@ def parse_stacktraces(
     elif parse_mode == ParseMode.MULTILINE_LOG:
         logs = [logs]
     stacktrace_data: list[StackTraceData] = []
-    # Add more parser types here and they will be attempted in-order until first success, per log line
-    parsers: list[BaseStackTraceParse] = [
-        GoogleDRFStackTraceParse,
-        PythonStackTraceParse,
-        CSharpStackTraceParse,
-    ]
+    # allow keyword callers to override the parser used
+    if parser_override:
+        parsers = [parser_override]
+    else:
+        # Add more parser types here and they will be attempted in-order until first success, per log line
+        parsers: list[BaseStackTraceParse] = [
+            GoogleDRFStackTraceParse,
+            PythonStackTraceParse,
+            CSharpStackTraceParse,
+        ]
     # TODO: support multiline parsing
     for log in logs:
         st_data: StackTraceData = None
         for parser in parsers:
             st_data = parser.parse_log(log, show_debug=show_debug)
+            st_data.parser_used_type = parser.__name__
             logger.info(f"Attempting to parse log line: {log}, got result: {st_data}")
             if st_data and st_data.has_results:
                 stacktrace_data.append(st_data)

@@ -57,6 +57,13 @@ class StackTraceData:
 
 
 class BaseStackTraceParse:
+    """Base class for stacktrace parsing functions.
+    Should be stateless so it can be used as a utility class.
+
+    Note that the default behavior assumes python stack traces, and inheritors can override for other languages.
+
+    """
+
     # TODO: pull from a chatgpt generated path list instead?
     # TODO: revisit filtering approach
     exclude_file_paths: list[str] = ["site-packages", "/html"]
@@ -100,17 +107,20 @@ class BaseStackTraceParse:
         if exclude_paths is None:
             exclude_paths = BaseStackTraceParse.exclude_file_paths
         results = {}
-        regex = r"/[\w./_-]+\.[a-zA-Z0-9]+"
-        matches = re.findall(regex, text)
-        matches = [m for m in matches if not any(exclude_path in m for exclude_path in exclude_paths)]
-        for m in matches:
-            if m not in results.keys():
-                results[m] = []
-            regex = r"line (\d+)"
-            line_nums = re.findall(regex, text)
-            for line_num in line_nums:
-                if line_num not in results[m]:
-                    results[m].append(int(line_num))
+        regex = r"[\w./_-]+\.[a-zA-Z0-9]+"
+        split_text = text.split("\n")
+        for text_line in split_text:
+            matches = re.findall(regex, text_line)
+            matches = [m for m in matches if not any(exclude_path in m for exclude_path in exclude_paths)]
+            logger.debug(f"extract_line_nums matches: {matches} from text_line: {text_line}")
+            for m in matches:
+                if m not in results.keys():
+                    results[m] = []
+                regex = r"line (\d+)"
+                line_nums = re.findall(regex, text_line)
+                for line_num in line_nums:
+                    if line_num not in results[m]:
+                        results[m].append(int(line_num))
         return results
 
     @staticmethod
@@ -163,6 +173,9 @@ class BaseStackTraceParse:
         # note: must be at least 3 words to accept
         regex = r"\b[A-Z][a-z]*\s+[A-Za-z]+\s+[A-Za-z]+(?:\s+[A-Za-z]+)*[.,]?"
         results = re.findall(regex, text)
+        # if we did not get any results with a fine grained match, try a more general match
+        if not results:
+            results = re.findall(r".*error.*", text, re.IGNORECASE)
         deduplicated = []
         for r in results:
             if r not in deduplicated:
