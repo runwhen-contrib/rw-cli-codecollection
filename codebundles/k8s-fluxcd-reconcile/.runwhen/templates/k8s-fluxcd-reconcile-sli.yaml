@@ -9,7 +9,8 @@ metadata:
 spec:
   displayUnitsLong: OK
   displayUnitsShort: ok
-  locations: {{default_location}}
+  locations:
+    - {{default_location}}
   description: Measures the health of FluxCD controllers by scanning for errors in their logs.
   codeBundle:
     {% if repo_url %}

@@ -136,6 +136,38 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${readiness_probe_health.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${readiness_probe_health.cmd}
 
+Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` Namespace `${NAMESPACE}`
+    [Documentation]    Fetches pods that have container restarts and provides a report of the restart issues.
+    [Tags]    namespace    containers    status    restarts    ${DEPLOYMENT_NAME}    ${NAMESPACE}
+    ${container_restart_analysis}=    RW.CLI.Run Bash File
+    ...    bash_file=container_restarts.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=False
+    ${recommendations}=    RW.CLI.Run Cli
+    ...    cmd=echo '${container_restart_analysis.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+    ...    env=${env}
+    ...    include_in_history=false
+    IF    $recommendations.stdout != ""
+        ${recommendation_list}=    Evaluate    json.loads(r'''${recommendations.stdout}''')    json
+        IF    len(@{recommendation_list}) > 0
+            FOR    ${item}    IN    @{recommendation_list}
+                RW.Core.Add Issue
+                ...    severity=${item["severity"]}
+                ...    expected=Containers should not be restarting for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                ...    actual=We found containers with restarts for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                ...    title=${item["title"]}
+                ...    reproduce_hint=${container_restart_analysis.cmd}
+                ...    details=${item["details"]}
+                ...    next_steps=${item["next_steps"]}
+            END
+        END
+    END
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    Summary of container restarts for Deployment `${DEPLOYMENT_NAME}` in namespace: ${NAMESPACE}
+    RW.Core.Add Pre To Report    ${container_restart_analysis.stdout}
+    RW.Core.Add Pre To Report    Commands Used:\n${history}
+
 Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`
     [Documentation]    Fetches warning events related to the deployment workload in the namespace and triages any issues found in the events.
     [Tags]    events    workloads    errors    warnings    get    deployment    ${DEPLOYMENT_NAME}

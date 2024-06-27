@@ -6,14 +6,24 @@ if [[ -z "${KUBERNETES_DISTRIBUTION_BINARY}" || -z "${CONTEXT}" || -z "${NAMESPA
   exit 1
 fi
 
-# Function to check if a pod has OOMKilled status or exit code 137
+# Function to check if a pod has OOMKilled status or exit code 137 in the last RESTART_AGE minutes
 check_pod_status() {
   local pod_name=$1
 
-  pod_status=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod "$pod_name" -n "${NAMESPACE}" --context ${CONTEXT} -o jsonpath='{.status.containerStatuses[*].state.terminated.reason}')
-  exit_code=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod "$pod_name" -n "${NAMESPACE}" --context ${CONTEXT} -o jsonpath='{.status.containerStatuses[*].state.terminated.exitCode}')
+  current_time=$(date +%s)
+  restart_age_seconds=$RESTART_AGE*60
+  pod_status=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod "$pod_name" -n "${NAMESPACE}" --context ${CONTEXT} -o jsonpath='{.status.containerStatuses[*].lastState.terminated.reason}')
+  exit_code=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod "$pod_name" -n "${NAMESPACE}" --context ${CONTEXT} -o jsonpath='{.status.containerStatuses[*].lastState.terminated.exitCode}')
+  finished_time=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod "$pod_name" -n "${NAMESPACE}" --context ${CONTEXT} -o jsonpath='{.status.containerStatuses[*].lastState.terminated.finishedAt}')
+  
+  # Convert finished_time to epoch
+  finished_time_epoch=$(date -d "$finished_time" +%s)
+  
+  # Calculate the difference in seconds
+  time_diff=$((current_time - finished_time_epoch))
 
-  if [[ $pod_status == *"OOMKilled"* || $exit_code -eq 137 ]]; then
+  # Check if OOMKilled or exit code 137 occurred in the last restart_age_seconds
+  if [[ ($pod_status == *"OOMKilled"* || $exit_code -eq 137) && $time_diff -le $restart_age_seconds ]]; then
     echo true
   else
     echo false
@@ -97,7 +107,8 @@ for pod in $pods; do
 
   # Check if the pod has an exit code of 137 or OOMKilled status
   if [[ $(check_pod_status "$pod") == "true" ]]; then
-    overutilized_pods+=("{\"namespace\":\"${NAMESPACE}\", \"pod\":\"$pod\", \"reason\":\"OOMKilled or exit code 137\", \"cpu_usage\":\"$cpu_usage\", \"mem_usage\":\"$mem_usage\", \"cpu_limit\":\"$cpu_limit\", \"mem_limit\":\"$mem_limit\"}")
+    recommended_mem_increase=$(awk "BEGIN {printf \"%.0f\", $mem_limit * (1 + $DEFAULT_INCREASE / 100)}")
+    overutilized_pods+=("{\"namespace\":\"${NAMESPACE}\", \"pod\":\"$pod\", \"reason\":\"OOMKilled or exit code 137\", \"cpu_usage\":\"$cpu_usage\", \"mem_usage\":\"$mem_usage\", \"cpu_limit\":\"$cpu_limit\", \"mem_limit\":\"$mem_limit\", \"recommended_mem_increase\":\"$recommended_mem_increase (Mi)\"}")
   fi
 done
 

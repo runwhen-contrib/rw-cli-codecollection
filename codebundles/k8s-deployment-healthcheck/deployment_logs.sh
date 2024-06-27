@@ -305,10 +305,10 @@ if [[ -n "$INTERESTING_RESOURCES" ]]; then
         case "$type" in
         pod)
             if [[ "$status" != "Running" ]]; then
-                recommendations+=("Troubleshoot failed pods in namespace \`${NAMESPACE}\`")
+                recommendations+=("Inspect failed pods in namespace \`${NAMESPACE}\`")
             fi
             if ((restarts > 0)); then
-                recommendations+=("Troubleshoot container restarts in namespace \`${NAMESPACE}\`")
+                recommendations+=("Inspect container restarts in namespace \`${NAMESPACE}\`")
             fi
             ;;
         deployment|deployment.apps)
