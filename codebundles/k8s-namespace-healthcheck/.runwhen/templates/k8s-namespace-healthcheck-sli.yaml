@@ -40,9 +40,9 @@ spec:
     - name: DISTRIBUTION
       value: Kubernetes
     - name: EVENT_THRESHOLD
-      value: '0'
+      value: '3'
     - name: CONTAINER_RESTART_THRESHOLD
-      value: '0'
+      value: '2'
   secretsProvided:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
