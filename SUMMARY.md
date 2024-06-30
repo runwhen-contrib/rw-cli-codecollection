@@ -32,6 +32,7 @@
 * [k8s-fluxcd-kustomization-health](codebundles/k8s-fluxcd-kustomization-health/README.md)
 * [k8s-chaos-namespace](codebundles/k8s-chaos-namespace/README.md)
 * [k8s-deployment-healthcheck](codebundles/k8s-deployment-healthcheck/README.md)
+* [k8s-chaos-workload](codebundles/k8s-chaos-workload/README.md)
 * [curl-gmp-kong-ingress-inspection](codebundles/curl-gmp-kong-ingress-inspection/README.md)
 * [k8s-restart-resource](codebundles/k8s-restart-resource/README.md)
 * [k8s-ingress-gce-healthcheck](codebundles/k8s-ingress-gce-healthcheck/README.md)
