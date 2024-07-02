@@ -131,7 +131,8 @@ class BaseStackTraceParse:
             exclude_paths = BaseStackTraceParse.exclude_file_paths
         regex = r"[\w./_-]+\.[a-zA-Z0-9]+"
         results = re.findall(regex, text)
-        logger.debug(f"extract_files results: {results}")
+        if show_debug:
+            logger.debug(f"extract_files results: {results}")
         results = [r for r in results if not any(exclude_path in r for exclude_path in exclude_paths)]
         deduplicated = []
         for r in results:
@@ -227,3 +228,95 @@ class GoogleDRFStackTraceParse(DRFStackTraceParse):
             return st_data
         else:
             return st_data
+
+
+class GoLangStackTraceParse(BaseStackTraceParse):
+    accepted_file_types: list[str] = [".go"]
+
+    @staticmethod
+    def parse_log(log, show_debug: bool = False) -> StackTraceData:
+        file_paths: list[str] = GoLangStackTraceParse.extract_files(log, show_debug=show_debug)
+        line_nums: dict[str, list[int]] = GoLangStackTraceParse.extract_line_nums(log, show_debug=show_debug)
+        urls: list[str] = BaseStackTraceParse.extract_urls(log, show_debug=show_debug)
+        endpoints: list[str] = GoLangStackTraceParse.extract_endpoints(log, show_debug=show_debug)
+        error_messages: list[str] = GoLangStackTraceParse.extract_sentences(log, show_debug=show_debug)
+        st_data = StackTraceData(
+            urls=urls,
+            endpoints=endpoints,
+            files=file_paths,
+            line_nums=line_nums,
+            error_messages=error_messages,
+            raw=log,
+        )
+        return st_data
+
+    @staticmethod
+    def extract_files(text, show_debug: bool = False, exclude_paths: list[str] = None) -> list[str]:
+        results: list[str] = []
+        results = BaseStackTraceParse.extract_files(text, show_debug=show_debug, exclude_paths=exclude_paths)
+        results = [
+            r for r in results if any(r.endswith(file_type) for file_type in GoLangStackTraceParse.accepted_file_types)
+        ]
+        if show_debug:
+            logger.debug(f"extract_files golang results after filtering: {results}")
+        return results
+
+    @staticmethod
+    def extract_endpoints(text, show_debug: bool = False, exclude_paths: list[str] = None) -> list[str]:
+        results: list[str] = []
+        if "api/" in text:
+            results = BaseStackTraceParse.extract_endpoints(text, show_debug=show_debug, exclude_paths=exclude_paths)
+            results = [r for r in results if "api/" in r]
+        else:
+            return []
+
+    @staticmethod
+    def extract_sentences(
+        text,
+        show_debug: bool = False,
+    ) -> list[str]:
+        # TODO: create a new regex with a stop symbol for lines without spaces
+        # note: must be at least 3 words to accept
+        split_text: list[str] = text.split("\n")
+        filtered_result: list[str] = []
+        for line in split_text:
+            if ".go" not in line and " " in line:
+                filtered_result.append(line)
+        text = "\n".join(filtered_result)
+        deduplicated = []
+        for r in results:
+            if r not in deduplicated:
+                deduplicated.append(r)
+        results = deduplicated
+        logger.debug(f"extract_sentences results: {results}")
+        return results
+
+    @staticmethod
+    def extract_line_nums(text, show_debug: bool = False, exclude_paths: list[str] = None) -> dict[str, list[int]]:
+        if exclude_paths is None:
+            exclude_paths = BaseStackTraceParse.exclude_file_paths
+        results = {}
+        regex = r"([a-zA-Z/\.]+)"
+        split_text = text.split("\n")
+        for text_line in split_text:
+            text_line = text_line.strip()
+            if ".go" not in text_line:
+                continue
+            if not text_line:
+                continue
+            matches = re.findall(regex, text_line)
+            matches = [m for m in matches if not any(exclude_path in m for exclude_path in exclude_paths)]
+            matches = [m for m in matches if ".go" in m]
+            if not matches:
+                continue
+            if len(matches) != 1:
+                continue
+            go_file_match = matches[0]
+            if ":" in text_line:
+                line_num = text_line.split(":")[-1]
+                if go_file_match not in results.keys():
+                    results[go_file_match] = []
+                if line_num not in results[go_file_match]:
+                    results[go_file_match].append(int(line_num))
+        logger.debug(f"extract_line_nums results: {results}")
+        return results
