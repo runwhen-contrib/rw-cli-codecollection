@@ -20,7 +20,7 @@ Get `${CONTAINER_NAME}` Application Logs
     [Documentation]    Collects the last approximately 300 lines of logs from the workload
     [Tags]    resource    application    workload    logs    state    ${container_name}    ${workload_name}
     ${logs}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
+    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs ${WORKLOAD_NAME} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
     ...    env=${env}
