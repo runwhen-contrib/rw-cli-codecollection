@@ -19,7 +19,7 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
     [Documentation]    Tails logs and organizes output for measuring counts.
     [Tags]    resource    application    workload    logs    state    exceptions    errors
     ${cmd}=    Set Variable
-    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs ${WORKLOAD_NAME} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
+    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     IF    $EXCLUDE_PATTERN != ""
         ${cmd}=    Set Variable
         ...    ${cmd} | grep -Eiv "${EXCLUDE_PATTERN}" || true
@@ -62,10 +62,6 @@ Suite Initialization
     ...    enum=[kubectl,oc]
     ...    example=kubectl
     ...    default=kubectl
-    ${WORKLOAD_NAME}=    RW.Core.Import User Variable    WORKLOAD_NAME
-    ...    type=string
-    ...    description=The full name of the Kubernetes workload to tail.
-    ...    pattern=\w*
     ${LOGS_SINCE}=    RW.Core.Import User Variable
     ...    LOGS_SINCE
     ...    type=string
@@ -93,10 +89,14 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=300
     ...    default=300
+    ${LABELS}=    RW.Core.Import User Variable    LABELS
+    ...    type=string
+    ...    description=The Kubernetes labels used to select the resource for logs.
+    ...    pattern=\w*
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
-    Set Suite Variable    ${WORKLOAD_NAME}    ${WORKLOAD_NAME}
+    Set Suite Variable    ${LABELS}    ${LABELS}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${LOGS_SINCE}    ${LOGS_SINCE}
     Set Suite Variable    ${EXCLUDE_PATTERN}    ${EXCLUDE_PATTERN}
@@ -104,4 +104,4 @@ Suite Initialization
     Set Suite Variable    ${MAX_LOG_LINES}    ${MAX_LOG_LINES}
     Set Suite Variable
     ...    ${env}
-    ...    {"WORKLOAD_NAME":"${WORKLOAD_NAME}", "KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}"}
