@@ -145,9 +145,9 @@ def parse_stacktraces(
         st_data: StackTraceData = None
         for parser in parsers:
             st_data = parser.parse_log(log, show_debug=show_debug)
-            st_data.parser_used_type = parser.__name__
             logger.info(f"Attempting to parse log line: {log}, got result: {st_data}")
             if st_data and st_data.has_results:
+                st_data.parser_used_type = parser.__name__
                 stacktrace_data.append(st_data)
                 # got a successful parse, move onto next log line
                 break
