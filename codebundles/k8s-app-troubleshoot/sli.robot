@@ -31,7 +31,7 @@ Measure Application Exceptions
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ${parsed_exceptions}=    RW.K8sApplications.Parse Exceptions    ${logs.stdout}
+    ${parsed_exceptions}=    RW.K8sApplications.Parse Stacktraces    ${logs.stdout}
     ${count}=    Evaluate    len($parsed_exceptions)
     RW.Core.Push Metric    ${count}
 
