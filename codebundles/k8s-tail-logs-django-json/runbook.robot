@@ -55,7 +55,7 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
 
-    ${parsed_stacktraces}=    RW.K8sApplications.Parse Django Stacktraces    ${logs.stdout}
+    ${parsed_stacktraces}=    RW.K8sApplications.Parse Django Json Stacktraces    ${logs.stdout}
     ${report}=    RW.K8sApplications.Stacktrace Report    stacktraces=${parsed_stacktraces}
     ${history}=    RW.CLI.Pop Shell History
     IF    (len($parsed_stacktraces)) > 0
