@@ -111,6 +111,10 @@ def parse_django_stacktraces(logs: str) -> list[StackTraceData]:
     return parse_stacktraces(logs, parser_override=DRFStackTraceParse)
 
 
+def parse_django_json_stacktraces(logs: str) -> list[StackTraceData]:
+    return parse_stacktraces(logs, parser_override=GoogleDRFStackTraceParse)
+
+
 def parse_stacktraces(
     logs: str,
     parse_mode: ParseMode = ParseMode.SPLIT_INPUT,
