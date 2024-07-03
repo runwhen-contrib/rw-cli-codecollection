@@ -31,7 +31,7 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ${parsed_exceptions}=    RW.K8sApplications.Parse Django Stacktraces    ${logs.stdout}
+    ${parsed_exceptions}=    RW.K8sApplications.Parse Django Json Stacktraces    ${logs.stdout}
     ${count}=    Evaluate    len($parsed_exceptions)
     RW.Core.Push Metric    ${count}
 
