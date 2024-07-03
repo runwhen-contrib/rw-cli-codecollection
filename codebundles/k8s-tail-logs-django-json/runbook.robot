@@ -43,7 +43,7 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
     ...    ${container_name}
     ...    ${workload_name}
     ${cmd}=    Set Variable
-    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
+    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs ${WORKLOAD_NAME} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     IF    $EXCLUDE_PATTERN != ""
         ${cmd}=    Set Variable
         ...    ${cmd} | grep -Eiv "${EXCLUDE_PATTERN}" || true
@@ -100,34 +100,6 @@ Suite Initialization
     ...    enum=[kubectl,oc]
     ...    example=kubectl
     ...    default=kubectl
-    ${REPO_URI}=    RW.Core.Import User Variable    REPO_URI
-    ...    type=string
-    ...    description=Repo URI for the source code to inspect.
-    ...    pattern=\w*
-    ...    example=https://github.com/runwhen-contrib/runwhen-local
-    ...    default=https://github.com/runwhen-contrib/runwhen-local
-    ${REPO_AUTH_TOKEN}=    RW.Core.Import Secret
-    ...    REPO_AUTH_TOKEN
-    ...    type=string
-    ...    description=The oauth token to be used for authenticating to the repo during cloning.
-    ...    pattern=\w*
-    ${LABELS}=    RW.Core.Import User Variable    LABELS
-    ...    type=string
-    ...    description=The Kubernetes labels used to select the resource for logs.
-    ...    pattern=\w*
-    ${NUM_OF_COMMITS}=    RW.Core.Import User Variable
-    ...    NUM_OF_COMMITS
-    ...    type=string
-    ...    description=The number of commits to look through when troubleshooting. Adjust this based on your team's git usage and commit frequency.
-    ...    pattern=\w*
-    ...    example=50
-    ...    default=50
-    ${CREATE_ISSUES}=    RW.Core.Import User Variable    CREATE_ISSUES
-    ...    type=string
-    ...    description=Whether or not the taskset should create github issues when it finds problems.
-    ...    enum=[YES,NO]
-    ...    example=YES
-    ...    default=YES
     ${LOGS_SINCE}=    RW.Core.Import User Variable
     ...    LOGS_SINCE
     ...    type=string
@@ -164,17 +136,12 @@ Suite Initialization
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
-    Set Suite Variable    ${REPO_URI}    ${REPO_URI}
-    Set Suite Variable    ${LABELS}    ${LABELS}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
-    Set Suite Variable    ${REPO_AUTH_TOKEN}    ${REPO_AUTH_TOKEN}
-    Set Suite Variable    ${CREATE_ISSUES}    ${CREATE_ISSUES}
     Set Suite Variable    ${LOGS_SINCE}    ${LOGS_SINCE}
     Set Suite Variable    ${EXCLUDE_PATTERN}    ${EXCLUDE_PATTERN}
     Set Suite Variable    ${CONTAINER_NAME}    ${CONTAINER_NAME}
-    Set Suite Variable    ${NUM_OF_COMMITS}    ${NUM_OF_COMMITS}
     Set Suite Variable    ${MAX_LOG_LINES}    ${MAX_LOG_LINES}
     Set Suite Variable    ${WORKLOAD_NAME}    ${WORKLOAD_NAME}
     Set Suite Variable
     ...    ${env}
-    ...    {"NUM_OF_COMMITS":"${NUM_OF_COMMITS}", "REPO_URI":"${REPO_URI}", "LABELS":"${LABELS}", "KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}"}
