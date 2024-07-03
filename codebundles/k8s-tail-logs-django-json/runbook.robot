@@ -2,8 +2,8 @@
 Documentation       Performs application-level troubleshooting by inspecting the logs of a workload for parsable exceptions,
 ...                 and attempts to determine next steps.
 Metadata            Author    jon-funk
-Metadata            Display Name    Kubernetes Application Troubleshoot
-Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
+Metadata            Display Name    Kubernetes Tail Django Json Application Logs
+Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,Django,Python
 
 Library             BuiltIn
 Library             RW.Core
@@ -20,7 +20,7 @@ Get `${CONTAINER_NAME}` Application Logs
     [Documentation]    Collects the last approximately 300 lines of logs from the workload
     [Tags]    resource    application    workload    logs    state    ${container_name}    ${workload_name}
     ${logs}=    RW.CLI.Run Cli
-    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs ${WORKLOAD_NAME} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
+    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
     ...    env=${env}
@@ -43,7 +43,7 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
     ...    ${container_name}
     ...    ${workload_name}
     ${cmd}=    Set Variable
-    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs ${WORKLOAD_NAME} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
+    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     IF    $EXCLUDE_PATTERN != ""
         ${cmd}=    Set Variable
         ...    ${cmd} | grep -Eiv "${EXCLUDE_PATTERN}" || true
@@ -68,7 +68,8 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
         ...    details=Generated a report of the stacktraces we found to be reviewed.
         ...    next_steps=NEXTSTEP
     END
-
+    RW.Core.Add Pre To Report    ${report}
+    RW.Core.Add Pre To Report    Commands Used: ${history}
 #TODO: replicaset check
 #TODO: rollout workload
 #TODO: check if a service has a selector for this deployment
@@ -120,12 +121,6 @@ Suite Initialization
     ...    description=The name of the container within the selected pod that represents the application to troubleshoot.
     ...    pattern=\w*
     ...    example=myapp
-    ${WORKLOAD_NAME}=    RW.Core.Import User Variable
-    ...    WORKLOAD_NAME
-    ...    type=string
-    ...    description=The name of the workload, used for search quality.
-    ...    pattern=\w*
-    ...    example=Deployment/my-app
     ${MAX_LOG_LINES}=    RW.Core.Import User Variable
     ...    MAX_LOG_LINES
     ...    type=string
@@ -133,15 +128,19 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=300
     ...    default=300
+    ${LABELS}=    RW.Core.Import User Variable    LABELS
+    ...    type=string
+    ...    description=The Kubernetes labels used to select the resource for logs.
+    ...    pattern=\w*
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${LOGS_SINCE}    ${LOGS_SINCE}
     Set Suite Variable    ${EXCLUDE_PATTERN}    ${EXCLUDE_PATTERN}
+    Set Suite Variable    ${LABELS}    ${LABELS}
     Set Suite Variable    ${CONTAINER_NAME}    ${CONTAINER_NAME}
     Set Suite Variable    ${MAX_LOG_LINES}    ${MAX_LOG_LINES}
-    Set Suite Variable    ${WORKLOAD_NAME}    ${WORKLOAD_NAME}
     Set Suite Variable
     ...    ${env}
     ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}"}
