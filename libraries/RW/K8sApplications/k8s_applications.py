@@ -34,6 +34,7 @@ RUNWHEN_ISSUE_KEYWORD: str = "[RunWhen]"
 class ParseMode(Enum):
     SPLIT_INPUT = 0
     MULTILINE_LOG = 1
+    JSONLOG = 2
 
 
 def format_process_list(proc_list: str) -> list:
@@ -111,8 +112,10 @@ def parse_django_stacktraces(logs: str) -> list[StackTraceData]:
     return parse_stacktraces(logs, parser_override=DRFStackTraceParse)
 
 
-def parse_django_json_stacktraces(logs: str) -> list[StackTraceData]:
-    return parse_stacktraces(logs, parser_override=GoogleDRFStackTraceParse)
+def parse_django_json_stacktraces(logs: str, show_debug: bool = False) -> list[StackTraceData]:
+    return parse_stacktraces(
+        logs, parse_mode=ParseMode.SPLIT_INPUT, parser_override=GoogleDRFStackTraceParse, show_debug=show_debug
+    )
 
 
 def parse_stacktraces(

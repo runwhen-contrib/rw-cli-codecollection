@@ -209,10 +209,90 @@ class CSharpStackTraceParse(BaseStackTraceParse):
 
 
 class PythonStackTraceParse(BaseStackTraceParse):
+    accepted_file_types: list[str] = [".py"]
+
+    @staticmethod
+    def extract_sentences(
+        text,
+        show_debug: bool = False,
+    ) -> list[str]:
+        results = []
+        for line in text.split("\n"):
+            if len(line) < 2:
+                continue
+            if line[0] != " " and line[-1] != " " and "Traceback" not in line and "The above exception" not in line:
+                results.append(line)
+        deduplicated = []
+        for r in results:
+            if r not in deduplicated:
+                deduplicated.append(r)
+        results = deduplicated
+        return results
+
+    @staticmethod
+    def extract_line_nums(text, show_debug: bool = False, exclude_paths: list[str] = None) -> dict[str, list[int]]:
+        # if exclude_paths is None:
+        #     exclude_paths = BaseStackTraceParse.exclude_file_paths
+        results = {}
+        regex = r"([\.0-9-a-zA-Z/_]+\.py)"
+        split_text = text.split("\n")
+        for text_line in split_text:
+            matches = re.findall(regex, text_line)
+            if not matches:
+                continue
+            # matches = [m for m in matches if not any(exclude_path in m for exclude_path in exclude_paths)]
+            logger.debug(f"extract_line_nums matches: {matches} from text_line: {text_line}")
+            for m in matches:
+                if not m:
+                    continue
+                if m not in results.keys():
+                    results[m] = []
+                    num_regex = r"line (\d+)"
+                    line_nums = re.findall(num_regex, text_line)
+                    for line_num in line_nums:
+                        if line_num not in results[m]:
+                            results[m].append(int(line_num))
+        return results
+
+    @staticmethod
+    def extract_files(text, show_debug: bool = False, exclude_paths: list[str] = None) -> list[str]:
+        results: list[str] = []
+        if show_debug:
+            logger.debug(f"extract_files from text: {text}")
+        # if exclude_paths is None:
+        #     exclude_paths = BaseStackTraceParse.exclude_file_paths
+        regex = r"[\w./_-]+\.[a-zA-Z0-9]+"
+        results = re.findall(regex, text)
+        if show_debug:
+            logger.debug(f"extract_files results: {results}")
+        # results = [r for r in results if not any(exclude_path in r for exclude_path in exclude_paths)]
+        deduplicated = []
+        for r in results:
+            if r not in deduplicated:
+                deduplicated.append(r)
+        results = deduplicated
+        results = [
+            r for r in results if any(r.endswith(file_type) for file_type in PythonStackTraceParse.accepted_file_types)
+        ]
+        return results
+
     @staticmethod
     def parse_log(log, show_debug: bool = True) -> StackTraceData:
         if "stacktrace" in log or "Traceback" in log:
-            return BaseStackTraceParse.parse_log(log, show_debug=show_debug)
+            file_paths: list[str] = PythonStackTraceParse.extract_files(log, show_debug=show_debug)
+            line_nums: dict[str, list[int]] = PythonStackTraceParse.extract_line_nums(log, show_debug=show_debug)
+            urls: list[str] = BaseStackTraceParse.extract_urls(log, show_debug=show_debug)
+            endpoints: list[str] = BaseStackTraceParse.extract_endpoints(log, show_debug=show_debug)
+            error_messages: list[str] = PythonStackTraceParse.extract_sentences(log, show_debug=show_debug)
+            st_data = StackTraceData(
+                urls=urls,
+                endpoints=endpoints,
+                files=file_paths,
+                line_nums=line_nums,
+                error_messages=error_messages,
+                raw=log,
+            )
+            return st_data
         else:
             return None
 

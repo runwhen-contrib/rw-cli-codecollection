@@ -7,10 +7,16 @@
 
 ## Summary
 **Total Stack Traces:** {{ data.stacktraces|length }}
-**Most Common Stack Trace Occured {{ data.most_common_stacktrace.occurences }} Times:**
+
+**Most Common Stack Trace Occured {{ data.most_common_stacktrace.occurences }} Times**
+
+**Most Common Error Messages:**
+{{ format_list(data.most_common_stacktrace.error_messages) }}
+
 ```
 {{ data.most_common_stacktrace.raw }}
 ```
+
 {% if data.most_common_stacktrace.line_nums %}
 The problem might be occuring in this file: `{{ data.most_common_stacktrace.line_nums.keys()|first }}`
 
@@ -39,6 +45,7 @@ The most common stacktrace is related to these files:
 - **Error Messages:**
   {{ format_list(stacktrace.error_messages) }}{% endif %}
 - **Raw Stack Trace:**
+
 ```
 {{ stacktrace.raw }}
 ```
