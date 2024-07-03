@@ -1,6 +1,6 @@
 import os, logging
 from RW.K8sApplications.parsers import *
-from RW.K8sApplications.k8s_applications import parse_stacktraces, ParseMode
+from RW.K8sApplications.k8s_applications import parse_stacktraces, ParseMode, stacktrace_report
 from RW.K8sApplications.parsers import BaseStackTraceParse, PythonStackTraceParse, GoLangStackTraceParse
 
 logger = logging.getLogger(__name__)
@@ -45,6 +45,27 @@ def test_golang_parser():
         data, parse_mode=ParseMode.MULTILINE_LOG, parser_override=GoLangStackTraceParse, show_debug=True
     )
     print(f"Result: {results}")
+    assert len(results) > 0
+    assert results[0].urls == []
+    assert results[0].endpoints == []
+    assert "/src/handlers.go" in results[0].files
+    assert results[0].line_nums["/src/handlers.go"] == [69]
+    assert results[0].line_nums["/src/middleware.go"] == [82, 109]
+
+
+def test_golang_report():
+    logger.info("Testing Report")
+    with open(f"{THIS_DIR}/{TEST_DATA_DIR}/golang.log", "r") as f:
+        data = f.read()
+    if len(data) > MAX_LOG_LINES:
+        logger.warning(
+            f"Length of logs provided for parsing stacktraces is greater than {MAX_LOG_LINES}, be aware this could effect performance"
+        )
+    results = parse_stacktraces(
+        data, parse_mode=ParseMode.MULTILINE_LOG, parser_override=GoLangStackTraceParse, show_debug=True
+    )
+    r = stacktrace_report(results)
+    print(f"REPORT\n\n{r}\n\n")
 
 
 if __name__ == "__main__":

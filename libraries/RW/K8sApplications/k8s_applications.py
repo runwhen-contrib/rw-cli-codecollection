@@ -2,6 +2,8 @@ import logging, hashlib, yaml, os
 from dataclasses import dataclass, field
 from thefuzz import process as fuzzprocessor
 from datetime import datetime
+from jinja2 import Template
+
 
 from .parsers import (
     StackTraceData,
@@ -76,6 +78,37 @@ def get_test_data():
     with open(f"{THIS_DIR}/test_logs.txt", "r") as fh:
         data = fh.read()
     return data
+
+
+def stacktrace_report(stacktraces: list[StackTraceData]) -> str:
+    report = ""
+    with open(f"{THIS_DIR}/simple_stacktrace_report.jinja2", "r") as fh:
+        report_template = fh.read()
+    formated_stacktraces: list[StackTraceData] = []
+    for st in stacktraces:
+        if st in formated_stacktraces:
+            index = formated_stacktraces.index(st)
+            formated_stacktraces[index].occurences += 1
+        elif st not in formated_stacktraces:
+            formated_stacktraces.append(st)
+    mcst: StackTraceData = None
+    for st in formated_stacktraces:
+        if not mcst:
+            mcst = st
+        elif st.occurences > mcst.occurences:
+            mcst = st
+    data = {
+        "stacktraces": formated_stacktraces,
+        "datetime": datetime.now().strftime("%Y-%m-%d %   H:%M:%S"),
+        "most_common_stacktrace": mcst,
+    }
+    report = Template(report_template).render(data=data)
+    logger.debug(f"Stacktrace report: {report}")
+    return report
+
+
+def parse_django_stacktraces(logs: str) -> list[StackTraceData]:
+    return parse_stacktraces(logs, parser_override=DRFStackTraceParse)
 
 
 def parse_stacktraces(

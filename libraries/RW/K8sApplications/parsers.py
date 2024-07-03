@@ -14,9 +14,23 @@ class StackTraceData:
     error_messages: list[str]
     raw: str = field(default="", repr=False)
     parser_used_type: "BaseStackTraceParse" = None
+    occurences: int = 1
     # TODO: create a in-mem db of exception types
     # TODO: extract exception types and lookup in code
     # TODO: integration for generating log service URL
+
+    def __eq__(self, other):
+        if isinstance(other, StackTraceData):
+            return (
+                self.raw == other.raw
+                and self.error_messages == other.error_messages
+                and self.files == other.files
+                and self.endpoints == other.endpoints
+                and self.urls == other.urls
+                and self.parser_used_type == other.parser_used_type
+                and self.line_nums == other.line_nums
+            )
+        return False
 
     @property
     def has_results(self):
@@ -282,7 +296,7 @@ class GoLangStackTraceParse(BaseStackTraceParse):
         for line in split_text:
             if ".go" not in line and " " in line:
                 filtered_result.append(line)
-        text = "\n".join(filtered_result)
+        results = filtered_result
         deduplicated = []
         for r in results:
             if r not in deduplicated:
@@ -296,7 +310,7 @@ class GoLangStackTraceParse(BaseStackTraceParse):
         if exclude_paths is None:
             exclude_paths = BaseStackTraceParse.exclude_file_paths
         results = {}
-        regex = r"([a-zA-Z/\.]+)"
+        regex = r"([@0-9a-zA-Z/\.]+)"
         split_text = text.split("\n")
         for text_line in split_text:
             text_line = text_line.strip()
