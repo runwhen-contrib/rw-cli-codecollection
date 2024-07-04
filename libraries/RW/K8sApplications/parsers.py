@@ -303,7 +303,11 @@ class DRFStackTraceParse(PythonStackTraceParse):
         st_data = None
         if BaseStackTraceParse.is_json(log):
             log = json.loads(log)
-            if "detail" in log:
+            detail_lookup: dict = None
+            detail_lookup = log.get("detail", None)
+            while "detail" in detail_lookup.keys():
+                detail_lookup = detail_lookup["detail"]
+            if detail_lookup:
                 PythonStackTraceParse.parse_log(log["detail"], show_debug=show_debug)
         else:
             st_data = PythonStackTraceParse.parse_log(log, show_debug=show_debug)

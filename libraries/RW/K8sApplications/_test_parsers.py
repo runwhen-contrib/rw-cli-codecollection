@@ -81,6 +81,6 @@ def test_golang_report():
     print(f"REPORT\n\n{r}\n\n")
 
 
-if __name__ == "__main__":
-    test_python_parser()
-    test_golang_parser()
+def test_no_results():
+    r = stacktrace_report([])
+    logger.info(f"REPORT\n\n{r}\n\n")

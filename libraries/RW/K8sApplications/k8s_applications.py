@@ -83,6 +83,13 @@ def get_test_data():
 
 def stacktrace_report(stacktraces: list[StackTraceData]) -> str:
     report = ""
+    if not stacktraces or len(stacktraces) == 0:
+        with open(f"{THIS_DIR}/no_stacktraces_report.jinja2", "r") as fh:
+            report_template = fh.read()
+        data = {
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        return Template(report_template).render(data=data)
     with open(f"{THIS_DIR}/simple_stacktrace_report.jinja2", "r") as fh:
         report_template = fh.read()
     formated_stacktraces: list[StackTraceData] = []
@@ -100,7 +107,7 @@ def stacktrace_report(stacktraces: list[StackTraceData]) -> str:
             mcst = st
     data = {
         "stacktraces": formated_stacktraces,
-        "datetime": datetime.now().strftime("%Y-%m-%d %   H:%M:%S"),
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "most_common_stacktrace": mcst,
     }
     report = Template(report_template).render(data=data)
