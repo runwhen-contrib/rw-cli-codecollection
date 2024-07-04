@@ -12,6 +12,7 @@ from .parsers import (
     DRFStackTraceParse,
     GoogleDRFStackTraceParse,
     CSharpStackTraceParse,
+    GoLangJsonStackTraceParse,
 )
 from .repository import (
     Repository,
@@ -122,6 +123,12 @@ def parse_django_stacktraces(logs: str) -> list[StackTraceData]:
 def parse_django_json_stacktraces(logs: str, show_debug: bool = False) -> list[StackTraceData]:
     return parse_stacktraces(
         logs, parse_mode=ParseMode.SPLIT_INPUT, parser_override=GoogleDRFStackTraceParse, show_debug=show_debug
+    )
+
+
+def parse_golang_json_stacktraces(logs: str, show_debug: bool = False) -> list[StackTraceData]:
+    return parse_stacktraces(
+        logs, parse_mode=ParseMode.SPLIT_INPUT, parser_override=GoLangJsonStackTraceParse, show_debug=show_debug
     )
 
 
