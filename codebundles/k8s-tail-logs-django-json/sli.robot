@@ -1,8 +1,8 @@
 *** Settings ***
 Documentation       Measures the number of exception stacktraces present in an application's logs over a time period.
 Metadata            Author    jon-funk
-Metadata            Display Name    Kubernetes Application Monitor
-Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
+Metadata            Display Name    Kubernetes Tail Django Json Application Logs
+Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,Django,Json,Python
 
 Library             BuiltIn
 Library             RW.Core
@@ -19,10 +19,10 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
     [Documentation]    Tails logs and organizes output for measuring counts.
     [Tags]    resource    application    workload    logs    state    exceptions    errors
     ${cmd}=    Set Variable
-    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
+    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --max-log-requests=10 --limit-bytes=2560000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     IF    $EXCLUDE_PATTERN != ""
         ${cmd}=    Set Variable
-        ...    ${cmd} | grep -Eiv "${EXCLUDE_PATTERN}" || true
+        ...    ${cmd} | grep -Ev "${EXCLUDE_PATTERN}" || true
     END
 
     ${logs}=    RW.CLI.Run Cli
@@ -67,8 +67,8 @@ Suite Initialization
     ...    type=string
     ...    description=How far back to fetch logs from containers in Kubernetes. Making this too recent and running the codebundle often could cause adverse performance.
     ...    pattern=\w*
-    ...    example=15m
-    ...    default=15m
+    ...    example=30m
+    ...    default=30m
     ${EXCLUDE_PATTERN}=    RW.Core.Import User Variable
     ...    EXCLUDE_PATTERN
     ...    type=string
@@ -87,8 +87,8 @@ Suite Initialization
     ...    type=string
     ...    description=The max number of log lines to request from Kubernetes workloads to be parsed. Setting this too high can adversely effect performance.
     ...    pattern=\w*
-    ...    example=300
-    ...    default=300
+    ...    example=1500
+    ...    default=1500
     ${LABELS}=    RW.Core.Import User Variable    LABELS
     ...    type=string
     ...    description=The Kubernetes labels used to select the resource for logs.

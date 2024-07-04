@@ -3,7 +3,7 @@ Documentation       Performs application-level troubleshooting by inspecting the
 ...                 and attempts to determine next steps.
 Metadata            Author    jon-funk
 Metadata            Display Name    Kubernetes Tail Django Json Application Logs
-Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,Django,Python
+Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,Django,Python,Json
 
 Library             BuiltIn
 Library             RW.Core
@@ -20,7 +20,7 @@ Get `${CONTAINER_NAME}` Application Logs
     [Documentation]    Collects the last approximately 300 lines of logs from the workload
     [Tags]    resource    application    workload    logs    state    ${container_name}    ${workload_name}
     ${logs}=    RW.CLI.Run Cli
-    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
+    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --max-log-requests=10 --limit-bytes=2560000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
     ...    env=${env}
@@ -43,10 +43,10 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
     ...    ${container_name}
     ...    ${workload_name}
     ${cmd}=    Set Variable
-    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
+    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --max-log-requests=10 --limit-bytes=2560000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     IF    $EXCLUDE_PATTERN != ""
         ${cmd}=    Set Variable
-        ...    ${cmd} | grep -Eiv "${EXCLUDE_PATTERN}" || true
+        ...    ${cmd} | grep -Ev "${EXCLUDE_PATTERN}" || true
     END
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${cmd}
@@ -106,8 +106,8 @@ Suite Initialization
     ...    type=string
     ...    description=How far back to fetch logs from containers in Kubernetes. Making this too recent and running the codebundle often could cause adverse performance.
     ...    pattern=\w*
-    ...    example=15m
-    ...    default=15m
+    ...    example=30m
+    ...    default=30m
     ${EXCLUDE_PATTERN}=    RW.Core.Import User Variable
     ...    EXCLUDE_PATTERN
     ...    type=string
@@ -126,8 +126,8 @@ Suite Initialization
     ...    type=string
     ...    description=The max number of log lines to request from Kubernetes workloads to be parsed. Setting this too high can adversely effect performance.
     ...    pattern=\w*
-    ...    example=300
-    ...    default=300
+    ...    example=1500
+    ...    default=1500
     ${LABELS}=    RW.Core.Import User Variable    LABELS
     ...    type=string
     ...    description=The Kubernetes labels used to select the resource for logs.
