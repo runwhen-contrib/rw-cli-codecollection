@@ -394,7 +394,7 @@ class GoLangStackTraceParse(BaseStackTraceParse):
         if exclude_paths is None:
             exclude_paths = BaseStackTraceParse.exclude_file_paths
         results = {}
-        regex = r"([@0-9a-zA-Z/\.]+)"
+        regex = r"([_@0-9a-zA-Z/\.]+)"
         split_text = text.split("\n")
         for text_line in split_text:
             text_line = text_line.strip()
@@ -418,3 +418,17 @@ class GoLangStackTraceParse(BaseStackTraceParse):
                     results[go_file_match].append(int(line_num))
         logger.debug(f"extract_line_nums results: {results}")
         return results
+
+
+class GoLangJsonStackTraceParse(GoLangStackTraceParse):
+    @staticmethod
+    def parse_log(log, show_debug: bool = False) -> StackTraceData:
+        if BaseStackTraceParse.is_json(log):
+            log = json.loads(log)
+            stacktrace_error = log.get("error", None)
+            stacktrace_str = log.get("stacktrace", None)
+            log = f"{stacktrace_error}\n{stacktrace_str}"
+            st_data = GoLangStackTraceParse.parse_log(log, show_debug=show_debug)
+            return st_data
+        else:
+            return None

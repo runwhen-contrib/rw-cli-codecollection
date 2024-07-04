@@ -81,6 +81,16 @@ def test_golang_report():
     print(f"REPORT\n\n{r}\n\n")
 
 
+def test_golangjson_parse():
+    logger.info("Testing Golang Json Parser")
+    with open(f"{THIS_DIR}/{TEST_DATA_DIR}/golangjson.log", "r") as f:
+        data = f.read()
+    results = parse_stacktraces(
+        data, parse_mode=ParseMode.MULTILINE_LOG, parser_override=GoLangJsonStackTraceParse, show_debug=True
+    )
+    logger.info(f"Results: {results}")
+
+
 def test_no_results():
     r = stacktrace_report([])
     logger.info(f"REPORT\n\n{r}\n\n")
