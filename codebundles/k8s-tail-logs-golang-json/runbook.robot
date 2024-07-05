@@ -56,7 +56,10 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
     ...    secret_file__kubeconfig=${kubeconfig}
 
     ${parsed_stacktraces}=    RW.K8sApplications.Parse Golang Json Stacktraces    ${logs.stdout}
-    ${report}=    RW.K8sApplications.Stacktrace Report    stacktraces=${parsed_stacktraces}
+    ${report_data}=    RW.K8sApplications.Stacktrace Report Data   stacktraces=${parsed_stacktraces}
+    ${report}=    Set Variable    ${report_data["report"]}
+    ${mcst}=    Set Variable    ${report_data["most_common_stacktrace"]}
+    ${first_file}=    Set Variable    ${mcst.get_first_file_line_nums_as_str()}
     ${history}=    RW.CLI.Pop Shell History
     IF    (len($parsed_stacktraces)) > 0
         RW.Core.Add Issue
@@ -65,8 +68,8 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
         ...    actual=Found stacktraces in the application logs of ${CONTAINER_NAME}
         ...    reproduce_hint=Run:\n${cmd}\n view logs results for stacktraces.
         ...    title=Stacktraces Found In Tailed Logs Of `${CONTAINER_NAME}`
-        ...    details=Generated a report of the stacktraces we found to be reviewed.
-        ...    next_steps=NEXTSTEP
+        ...    details=Generated a report of the stacktraces found to be reviewed.
+        ...    next_steps=Check file: ${first_file} and review report.
     END
     RW.Core.Add Pre To Report    ${report}
     RW.Core.Add Pre To Report    Commands Used: ${history}

@@ -4,6 +4,7 @@ from RW.K8sApplications.k8s_applications import (
     parse_stacktraces,
     ParseMode,
     stacktrace_report,
+    stacktrace_report_data,
     parse_django_json_stacktraces,
 )
 from RW.K8sApplications.parsers import (
@@ -86,7 +87,7 @@ def test_golangjson_parse():
     with open(f"{THIS_DIR}/{TEST_DATA_DIR}/golangjson.log", "r") as f:
         data = f.read()
     results = parse_stacktraces(
-        data, parse_mode=ParseMode.MULTILINE_LOG, parser_override=GoLangJsonStackTraceParse, show_debug=True
+        data, parse_mode=ParseMode.SPLIT_INPUT, parser_override=GoLangJsonStackTraceParse, show_debug=True
     )
     logger.info(f"Results: {results}")
 
@@ -94,3 +95,16 @@ def test_golangjson_parse():
 def test_no_results():
     r = stacktrace_report([])
     logger.info(f"REPORT\n\n{r}\n\n")
+
+
+def test_platform():
+    logger.info("Testing Report")
+    with open(f"{THIS_DIR}/{TEST_DATA_DIR}/test.log", "r") as f:
+        data = f.read()
+    results = parse_stacktraces(
+        data, parse_mode=ParseMode.SPLIT_INPUT, parser_override=GoLangStackTraceParse, show_debug=True
+    )
+    r = stacktrace_report_data(results)
+    mcst = r["most_common_stacktrace"]
+    report = r["report"]
+    logger.info(f"REPORT\n\n{report}\n\n")

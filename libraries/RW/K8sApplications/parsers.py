@@ -60,6 +60,14 @@ class StackTraceData:
             return list(self.line_nums.values())[0]
         else:
             return []
+    
+    def get_first_file_line_nums_as_str(self) -> str:
+        if len(self.line_nums.keys()) > 0:
+            file_key = list(self.line_nums.keys())[0]
+            line_nums = self.line_nums[file_key]
+            return f"{', '.join([f"{file_key}:{str(l)}" for l in line_nums])}"
+        else:
+            return ""
 
     def __str__(self) -> str:
         urls_str: str = ", ".join(self.urls)
@@ -67,7 +75,7 @@ class StackTraceData:
         files_str: str = ", ".join(self.files)
         line_nums_str: str = ", ".join([f"{k}: {v}" for k, v in self.line_nums.items()])
         error_messages_str: str = ", ".join(self.error_messages)
-        return f"StackTraceData: urls: {urls_str}, endpoints: {endpoints_str}, files: {files_str}, line_nums: {line_nums_str}, error_messages: {error_messages_str}"
+        return f"StackTraceData: occurences: {self.occurences}, urls: {urls_str}, endpoints: {endpoints_str}, files: {files_str}, line_nums: {line_nums_str}, error_messages: {error_messages_str}\n\n{self.raw}"
 
 
 class BaseStackTraceParse:

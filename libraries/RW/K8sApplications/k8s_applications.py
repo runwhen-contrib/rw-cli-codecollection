@@ -35,7 +35,6 @@ RUNWHEN_ISSUE_KEYWORD: str = "[RunWhen]"
 class ParseMode(Enum):
     SPLIT_INPUT = 0
     MULTILINE_LOG = 1
-    JSONLOG = 2
 
 
 def format_process_list(proc_list: str) -> list:
@@ -82,8 +81,9 @@ def get_test_data():
     return data
 
 
-def stacktrace_report(stacktraces: list[StackTraceData]) -> str:
+def stacktrace_report_data(stacktraces: list[StackTraceData], max_report_stacktraces: int = 6) -> dict:
     report = ""
+    report_data = {}
     if not stacktraces or len(stacktraces) == 0:
         with open(f"{THIS_DIR}/no_stacktraces_report.jinja2", "r") as fh:
             report_template = fh.read()
@@ -107,13 +107,26 @@ def stacktrace_report(stacktraces: list[StackTraceData]) -> str:
         elif st.occurences > mcst.occurences:
             mcst = st
     data = {
-        "stacktraces": formated_stacktraces,
+        "stacktraces": formated_stacktraces[:max_report_stacktraces],
+        "stacktrace_count": len(stacktraces),
+        "max_report_stacktraces": max_report_stacktraces,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "most_common_stacktrace": mcst,
     }
     report = Template(report_template).render(data=data)
-    logger.debug(f"Stacktrace report: {report}")
-    return report
+    report_data = {
+        "report": report,
+        "most_common_stacktrace": mcst,
+        "stacktraces": formated_stacktraces,
+        "stacktrace_count": len(stacktraces),
+        "max_report_stacktraces": max_report_stacktraces,
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    return report_data
+
+
+def stacktrace_report(stacktraces: list[StackTraceData]) -> str:
+    return stacktrace_report_data(stacktraces)["report"]
 
 
 def parse_django_stacktraces(logs: str) -> list[StackTraceData]:
@@ -155,6 +168,7 @@ def parse_stacktraces(
         parsers: list[BaseStackTraceParse] = [
             GoogleDRFStackTraceParse,
             PythonStackTraceParse,
+            GoLangJsonStackTraceParse,
             CSharpStackTraceParse,
         ]
     # TODO: support multiline parsing
