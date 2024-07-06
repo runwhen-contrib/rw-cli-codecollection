@@ -93,21 +93,23 @@ def stacktrace_report_data(stacktraces: list[StackTraceData], max_report_stacktr
         return Template(report_template).render(data=data)
     with open(f"{THIS_DIR}/simple_stacktrace_report.jinja2", "r") as fh:
         report_template = fh.read()
-    formated_stacktraces: list[StackTraceData] = []
+    formatted_stacktraces: list[StackTraceData] = []
     for st in stacktraces:
-        if st in formated_stacktraces:
-            index = formated_stacktraces.index(st)
-            formated_stacktraces[index].occurences += 1
-        elif st not in formated_stacktraces:
-            formated_stacktraces.append(st)
-    mcst: StackTraceData = None
-    for st in formated_stacktraces:
-        if not mcst:
-            mcst = st
-        elif st.occurences > mcst.occurences:
+        if st in formatted_stacktraces:
+            index = formatted_stacktraces.index(st)
+            formatted_stacktraces[index].occurences += 1
+        elif st not in formatted_stacktraces:
+            formatted_stacktraces.append(st)
+    if len(formatted_stacktraces) == 0:
+        logger.warning(
+            f"No stacktraces formatted, review formatted: {formatted_stacktraces}\n\nvs\n\nunformatted: {stacktraces})"
+        )
+    mcst: StackTraceData = formatted_stacktraces[0]
+    for st in formatted_stacktraces:
+        if st.occurences > mcst.occurences:
             mcst = st
     data = {
-        "stacktraces": formated_stacktraces[:max_report_stacktraces],
+        "stacktraces": formatted_stacktraces[:max_report_stacktraces],
         "stacktrace_count": len(stacktraces),
         "max_report_stacktraces": max_report_stacktraces,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -117,7 +119,7 @@ def stacktrace_report_data(stacktraces: list[StackTraceData], max_report_stacktr
     report_data = {
         "report": report,
         "most_common_stacktrace": mcst,
-        "stacktraces": formated_stacktraces,
+        "stacktraces": formatted_stacktraces,
         "stacktrace_count": len(stacktraces),
         "max_report_stacktraces": max_report_stacktraces,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
