@@ -70,11 +70,11 @@ class StackTraceData:
             return ""
 
     def __str__(self) -> str:
-        urls_str: str = ", ".join(self.urls)
-        endpoints_str: str = ", ".join(self.endpoints)
-        files_str: str = ", ".join(self.files)
+        urls_str: str = ", ".join(self.urls if self.urls else [""])
+        endpoints_str: str = ", ".join(self.endpoints if self.endpoints else [""])
+        files_str: str = ", ".join(self.files if self.files else [""])
         line_nums_str: str = ", ".join([f"{k}: {v}" for k, v in self.line_nums.items()])
-        error_messages_str: str = ", ".join(self.error_messages)
+        error_messages_str: str = ", ".join(self.error_messages if self.error_messages else [""])
         return f"StackTraceData: occurences: {self.occurences}, urls: {urls_str}, endpoints: {endpoints_str}, files: {files_str}, line_nums: {line_nums_str}, error_messages: {error_messages_str}\n\n{self.raw}"
 
 
