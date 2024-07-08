@@ -19,8 +19,7 @@ Suite Setup         Suite Initialization
 Get `${CONTAINER_NAME}` Application Logs
     [Documentation]    Collects the last approximately 300 lines of logs from the workload
     [Tags]    resource    application    workload    logs    state    ${container_name}    ${workload_name}
-    ${logs}=    RW.CLI.Run Cli
-    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --max-log-requests=10 --limit-bytes=2560000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
+    ${logs}=    RW.CLI.Run Cli    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --max-log-requests=10 --limit-bytes=2560000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
     ...    env=${env}
