@@ -20,7 +20,7 @@ commands:
     \ labels using the value of the LABELS variable\nkubectl --context=${CONTEXT}\
     \ \\\n  -n ${NAMESPACE} \\\n  get daemonset,deployment,statefulset \\\n  -l ${LABELS}\
     \ \\\n  -oyaml\n"
-  name: get_current_resource_state
+  name: get_current_resource_state_with_labels_labels
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
     or SRE would use the command to examine the configuration of daemonsets, deployments,
     and statefulsets with specific labels to identify any misconfigurations or errors
@@ -66,7 +66,7 @@ commands:
     \ labels using the value of the LABELS variable\nkubectl --context=${CONTEXT}\
     \ \\\n  -n ${NAMESPACE} \\\n  get daemonset,deployment,statefulset \\\n  -l ${LABELS}\
     \ \\\n  -oyaml\n"
-  name: get_current_resource_state
+  name: get_current_resource_state_with_labels_labels
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
     or SRE would use the command to examine the configuration of daemonsets, deployments,
     and statefulsets with specific labels to identify any misconfigurations or errors
@@ -91,158 +91,120 @@ commands:
     5. Auditing and compliance checks: To ensure that workloads are compliant with
     organizational policies and best practices, a DevOps or SRE may use this command
     to review the configuration and make any necessary adjustments.'
-- command: kubectl --context=${CONTEXT} -n ${NAMESPACE} logs daemonset,deployment,statefulset
-    -l ${LABELS} --tail=200 --limit-bytes=256000
+- command: kubectl --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=200
+    --limit-bytes=256000
   doc_links: '
 
-    - [View logs using kubectl](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+    - [kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
-    - [Viewing DaemonSet logs](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/){:target="_blank"}
+    - [kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
 
-    - [Viewing Deployment logs](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
-
-    - [Viewing StatefulSet logs](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
-
-    - [Filtering logs by labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
-
-    - [Setting limits for log output](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs){:target="_blank"}'
-  explanation: This command uses kubectl to view the logs of daemonsets, deployments,
-    and statefulsets in a specific namespace, filtered by certain labels, with a limit
-    of 200 lines and 256 kilobytes of data. The context and namespace are specified
-    using variables for flexibility.
+    - [kubectl Logs Documentation](https://kubernetes.io/docs/concepts/cluster-administration/logging/){:target="_blank"}'
+  explanation: This command uses kubectl to access logs from a specific context and
+    namespace, filtered by specified labels, with a limit of 200 lines or 256 KB of
+    data.
   multi_line_details: '
 
-    # Set the kubectl context to the specified context
+    # Set the context to be used for the kubectl command
 
-    # -n specifies the namespace where the pods are located
-
-    # logs command is used to retrieve the logs of one or more pods
+    CONTEXT=mycontext
 
 
-    kubectl --context=${CONTEXT} -n ${NAMESPACE} \
+    # Set the namespace in which the pods are located
+
+    NAMESPACE=mynamespace
 
 
-    # Specify the resources whose logs need to be retrieved (daemonset, deployment,
-    statefulset)
+    # Set the labels to specify which pods to retrieve logs from
 
-    logs daemonset,deployment,statefulset \
-
-
-    # Select pods based on the specified labels
-
-    -l ${LABELS} \
+    LABELS=app=myapp,env=production
 
 
-    # Retrieve only the most recent 200 lines of logs
+    # Use kubectl to access the logs of the specified pods
 
-    --tail=200 \
+    # -n flag is used to specify the namespace
 
+    # -l flag is used to select pods based on labels
 
-    # Limit the number of bytes returned for each log stream
+    # --tail flag specifies the number of lines from the end of the logs to show
 
-    --limit-bytes=256000
+    # --limit-bytes flag sets a limit on the number of bytes to output
+
+    kubectl --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=200 --limit-bytes=256000
 
     '
-  name: get_resource_logs
-  when_is_it_useful: '1. Investigating and troubleshooting Kubernetes CrashLoopBackoff
-    events to identify the root cause and resolve them to ensure the stability and
-    reliability of the application.
+  name: get_resource_logs_with_labels_labels
+  when_is_it_useful: '1. Troubleshooting a CrashLoopBackoff event in Kubernetes for
+    a specific application or pod to identify the root cause of the issue.
 
+    2. Monitoring and analyzing logs for a specific microservice to identify any errors
+    or performance issues.
 
-    2. Monitoring and analyzing the logs of daemonsets, deployments, and statefulsets
-    to detect any anomalies or errors that could impact the performance and availability
-    of the application.
+    3. Investigating a spike in resource usage or high latency within a Kubernetes
+    cluster by analyzing logs from relevant pods and services.
 
+    4. Debugging an issue with a new deployment or update in Kubernetes by checking
+    the logs for any errors or inconsistencies.
 
-    3. Troubleshooting performance issues or unexpected behavior in specific namespaces
-    by reviewing the logs of relevant resources and identifying potential bottlenecks
-    or misconfigurations.
-
-
-    4. Debugging and diagnosing application failures or disruptions by examining the
-    logs of Kubernetes resources to understand the sequence of events leading up to
-    the issue.
-
-
-    5. Performing regular log analysis and monitoring as part of proactive maintenance
-    and optimization efforts to ensure the smooth operation of the Kubernetes environment
-    and applications running on it.'
-- command: kubectl --context=${CONTEXT} -n ${NAMESPACE} logs daemonset,deployment,statefulset
-    -l ${LABELS} --tail=200 --limit-bytes=256000
+    5. Conducting routine analysis of logs for a critical application or service to
+    ensure its stability and performance.'
+- command: kubectl --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=200
+    --limit-bytes=256000
   doc_links: '
 
-    - [View logs using kubectl](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+    - [kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
-    - [Viewing DaemonSet logs](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/){:target="_blank"}
+    - [kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
 
-    - [Viewing Deployment logs](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
-
-    - [Viewing StatefulSet logs](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
-
-    - [Filtering logs by labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
-
-    - [Setting limits for log output](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs){:target="_blank"}'
-  explanation: This command uses kubectl to view the logs of daemonsets, deployments,
-    and statefulsets in a specific namespace, filtered by certain labels, with a limit
-    of 200 lines and 256 kilobytes of data. The context and namespace are specified
-    using variables for flexibility.
+    - [kubectl Logs Documentation](https://kubernetes.io/docs/concepts/cluster-administration/logging/){:target="_blank"}'
+  explanation: This command uses kubectl to access logs from a specific context and
+    namespace, filtered by specified labels, with a limit of 200 lines or 256 KB of
+    data.
   multi_line_details: '
 
-    # Set the kubectl context to the specified context
+    # Set the context to be used for the kubectl command
 
-    # -n specifies the namespace where the pods are located
-
-    # logs command is used to retrieve the logs of one or more pods
+    CONTEXT=mycontext
 
 
-    kubectl --context=${CONTEXT} -n ${NAMESPACE} \
+    # Set the namespace in which the pods are located
+
+    NAMESPACE=mynamespace
 
 
-    # Specify the resources whose logs need to be retrieved (daemonset, deployment,
-    statefulset)
+    # Set the labels to specify which pods to retrieve logs from
 
-    logs daemonset,deployment,statefulset \
-
-
-    # Select pods based on the specified labels
-
-    -l ${LABELS} \
+    LABELS=app=myapp,env=production
 
 
-    # Retrieve only the most recent 200 lines of logs
+    # Use kubectl to access the logs of the specified pods
 
-    --tail=200 \
+    # -n flag is used to specify the namespace
 
+    # -l flag is used to select pods based on labels
 
-    # Limit the number of bytes returned for each log stream
+    # --tail flag specifies the number of lines from the end of the logs to show
 
-    --limit-bytes=256000
+    # --limit-bytes flag sets a limit on the number of bytes to output
+
+    kubectl --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=200 --limit-bytes=256000
 
     '
-  name: get_resource_logs
-  when_is_it_useful: '1. Investigating and troubleshooting Kubernetes CrashLoopBackoff
-    events to identify the root cause and resolve them to ensure the stability and
-    reliability of the application.
+  name: get_resource_logs_with_labels_labels
+  when_is_it_useful: '1. Troubleshooting a CrashLoopBackoff event in Kubernetes for
+    a specific application or pod to identify the root cause of the issue.
 
+    2. Monitoring and analyzing logs for a specific microservice to identify any errors
+    or performance issues.
 
-    2. Monitoring and analyzing the logs of daemonsets, deployments, and statefulsets
-    to detect any anomalies or errors that could impact the performance and availability
-    of the application.
+    3. Investigating a spike in resource usage or high latency within a Kubernetes
+    cluster by analyzing logs from relevant pods and services.
 
+    4. Debugging an issue with a new deployment or update in Kubernetes by checking
+    the logs for any errors or inconsistencies.
 
-    3. Troubleshooting performance issues or unexpected behavior in specific namespaces
-    by reviewing the logs of relevant resources and identifying potential bottlenecks
-    or misconfigurations.
-
-
-    4. Debugging and diagnosing application failures or disruptions by examining the
-    logs of Kubernetes resources to understand the sequence of events leading up to
-    the issue.
-
-
-    5. Performing regular log analysis and monitoring as part of proactive maintenance
-    and optimization efforts to ensure the smooth operation of the Kubernetes environment
-    and applications running on it.'
+    5. Conducting routine analysis of logs for a critical application or service to
+    ensure its stability and performance.'
 - command: kubectl --context=${CONTEXT} -n ${NAMESPACE} get daemonset,deployment,statefulset
     -l ${LABELS} -o=jsonpath='{.items[0].kind}/{.items[0].metadata.name}'
   doc_links: '
@@ -279,7 +241,7 @@ commands:
     -o=jsonpath=''{.items[0].kind}/{.items[0].metadata.name}''
 
     '
-  name: restart_resource
+  name: restart_resource_with_labels_labels
   when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
     events to identify and resolve issues that are causing applications to fail.
 
@@ -330,7 +292,7 @@ commands:
     -o=jsonpath=''{.items[0].kind}/{.items[0].metadata.name}''
 
     '
-  name: restart_resource
+  name: restart_resource_with_labels_labels
   when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
     events to identify and resolve issues that are causing applications to fail.
 
@@ -372,7 +334,7 @@ commands:
     kubectl rollout restart $resource --context=${CONTEXT} -n ${NAMESPACE}
 
     '
-  name: restart_resource
+  name: restart_resource_with_labels_labels
   when_is_it_useful: '1. A pod is experiencing a CrashLoopBackoff event due to an
     application error or configuration issue, and the DevOps or SRE needs to restart
     the pod to attempt a recovery.
@@ -420,7 +382,7 @@ commands:
     kubectl rollout restart $resource --context=${CONTEXT} -n ${NAMESPACE}
 
     '
-  name: restart_resource
+  name: restart_resource_with_labels_labels
   when_is_it_useful: '1. A pod is experiencing a CrashLoopBackoff event due to an
     application error or configuration issue, and the DevOps or SRE needs to restart
     the pod to attempt a recovery.
