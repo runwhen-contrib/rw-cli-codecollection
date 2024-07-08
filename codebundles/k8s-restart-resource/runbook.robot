@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Get Current Resource State
+Get Current Resource State with Labels `${LABELS}`
     [Documentation]    Gets the current state of the resource before applying the restart for report review.
     [Tags]    resource    application    restart    state    yaml
     ${resource}=    RW.CLI.Run Cli
@@ -29,11 +29,11 @@ Get Current Resource State
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Get Resource Logs
+Get Resource Logs with Labels `${LABELS}`
     [Documentation]    Collects the last approximately 200 lines of logs from the resource before restarting it.
     [Tags]    resource    application    workload    logs    state
     ${logs}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs daemonset,deployment,statefulset -l ${LABELS} --tail=200 --limit-bytes=256000
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=200 --limit-bytes=256000
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
     ...    env=${env}
@@ -42,7 +42,7 @@ Get Resource Logs
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Restart Resource
+Restart Resource with Labels `${LABELS}`
     [Documentation]    Restarts the labeled resource in an attempt to get it out of a bad state.
     [Tags]    resource    application    restart    pod    kill    rollout    revision
     ${resource_name}=    RW.CLI.Run Cli
@@ -91,6 +91,8 @@ Suite Initialization
     ...    type=string
     ...    description=The kubectl label string to use for selecting the resource.
     ...    pattern=\w*
+    ...    example=app=loadgenerator
+    ...    default=
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
