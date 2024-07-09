@@ -68,6 +68,7 @@ class StackTraceData:
             formatted_line_nums = f"{file_key}"
             for l in line_nums:
                 formatted_line_nums += f"\n\t{str(l)}"
+            return formatted_line_nums
         else:
             return ""
 
