@@ -164,6 +164,8 @@ def dynamic_parse_stacktraces(
         )
     # TODO: allow override for byop
     parser = DYNAMIC_PARSER_LOOKUP[parser_name]
+    if show_debug:
+        logger.debug(f"Using dynamic parser: {parser} based on gvien parser name: {parser_name}")
     if parser:
         return parse_stacktraces(logs, parse_mode=parse_mode, parser_override=parser, show_debug=show_debug)
     else:
