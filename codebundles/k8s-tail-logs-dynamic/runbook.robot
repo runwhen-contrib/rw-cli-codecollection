@@ -2,7 +2,7 @@
 Documentation       Performs application-level troubleshooting by inspecting the logs of a workload for parsable exceptions,
 ...                 and attempts to determine next steps.
 Metadata            Author    jon-funk
-Metadata            Display Name    Kubernetes Tail GoLang Json Application Logs
+Metadata            Display Name    Kubernetes Tail Application Logs
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,GoLang,Json,Python,CSharp,Django,Node,Java
 
 Library             BuiltIn
