@@ -56,6 +56,7 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
     ${parsed_stacktraces}=    RW.K8sApplications.Dynamic Parse Stacktraces    ${logs.stdout}
     ...    parser_name=${STACKTRACE_PARSER}
     ...    parse_mode=${INPUT_MODE}
+    ...    show_debug=True
     ${report_data}=    RW.K8sApplications.Stacktrace Report Data   stacktraces=${parsed_stacktraces}
     ${report}=    Set Variable    ${report_data["report"]}
     ${mcst}=    Set Variable    ${report_data["most_common_stacktrace"]}

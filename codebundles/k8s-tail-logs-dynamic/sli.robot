@@ -34,7 +34,7 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
     ${parsed_stacktraces}=    RW.K8sApplications.Dynamic Parse Stacktraces    ${logs.stdout}
     ...    parser_name=${STACKTRACE_PARSER}
     ...    parse_mode=${INPUT_MODE}
-   ${count}=    Evaluate    len($parsed_exceptions)
+   ${count}=    Evaluate    len($parsed_stacktraces)
     RW.Core.Push Metric    ${count}
 
 
