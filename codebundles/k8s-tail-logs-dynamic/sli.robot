@@ -19,7 +19,7 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
     [Documentation]    Tails logs and organizes output for measuring counts.
     [Tags]    resource    application    workload    logs    state    exceptions    errors
     ${cmd}=    Set Variable
-    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --max-log-requests=10 --limit-bytes=2560000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
+    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --max-log-requests=10 --limit-bytes=${MAX_LOG_BYTES} --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     IF    $EXCLUDE_PATTERN != ""
         ${cmd}=    Set Variable
         ...    ${cmd} | grep -Ev "${EXCLUDE_PATTERN}" || true
@@ -31,8 +31,10 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ${parsed_exceptions}=    RW.K8sApplications.Parse Golang Json Stacktraces    ${logs.stdout}
-    ${count}=    Evaluate    len($parsed_exceptions)
+    ${parsed_stacktraces}=    RW.K8sApplications.Dynamic Parse tacktraces    ${logs.stdout}
+    ...    parser_name=${STACKTRACE_PARSER}
+    ...    parse_mode=${INPUT_MODE}
+   ${count}=    Evaluate    len($parsed_exceptions)
     RW.Core.Push Metric    ${count}
 
 
@@ -93,6 +95,25 @@ Suite Initialization
     ...    type=string
     ...    description=The Kubernetes labels used to select the resource for logs.
     ...    pattern=\w*
+    ${STACKTRACE_PARSER}=    RW.Core.Import User Variable    STACKTRACE_PARSER
+    ...    type=string
+    ...    enum=[Dynamic,GoLang,GoLangJson,CSharp,Python,Django,DjangoJson]
+    ...    description=What parser implementation to use when going through logs. Dynamic will use the first successful parser which is more computationally expensive.
+    ...    default=Dynamic
+    ...    example=Dynamic
+    ${INPUT_MODE}=    RW.Core.Import User Variable    INPUT_MODE
+    ...    type=string
+    ...    enum=[SPLIT,MULTILINE]
+    ...    description=Changes ingestion style of logs, typically split (1 log per line) works best.
+    ...    default=SPLIT
+    ...    example=SPLIT
+    ${MAX_LOG_BYTES}=    RW.Core.Import User Variable
+    ...    MAX_LOG_BYTES
+    ...    type=string
+    ...    description=The maximum number of bytes to constrain the log fetch with. Setting this too high can adversely effect performance.
+    ...    pattern=\w*
+    ...    example=2560000
+    ...    default=2560000
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
@@ -102,6 +123,9 @@ Suite Initialization
     Set Suite Variable    ${EXCLUDE_PATTERN}    ${EXCLUDE_PATTERN}
     Set Suite Variable    ${CONTAINER_NAME}    ${CONTAINER_NAME}
     Set Suite Variable    ${MAX_LOG_LINES}    ${MAX_LOG_LINES}
+    Set Suite Variable    ${STACKTRACE_PARSER}    ${STACKTRACE_PARSER}
+    Set Suite Variable    ${INPUT_MODE}    ${INPUT_MODE}
+    Set Suite Variable    ${MAX_LOG_BYTES}    ${MAX_LOG_BYTES}
     Set Suite Variable
     ...    ${env}
     ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}"}
