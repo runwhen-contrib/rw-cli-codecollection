@@ -79,7 +79,15 @@ def stacktrace_report_data(stacktraces: list[StackTraceData], max_report_stacktr
         data = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
-        return Template(report_template).render(data=data)
+        report_data = {
+            "report": Template(report_template).render(data=data),
+            "most_common_stacktrace": None,
+            "stacktraces": [],
+            "stacktrace_count": 0,
+            "max_report_stacktraces": max_report_stacktraces,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        return report_data
     with open(f"{THIS_DIR}/simple_stacktrace_report.jinja2", "r") as fh:
         report_template = fh.read()
     formatted_stacktraces: list[StackTraceData] = []
