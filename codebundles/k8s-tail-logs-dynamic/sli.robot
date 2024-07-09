@@ -31,7 +31,7 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ${parsed_stacktraces}=    RW.K8sApplications.Dynamic Parse tacktraces    ${logs.stdout}
+    ${parsed_stacktraces}=    RW.K8sApplications.Dynamic Parse Stacktraces    ${logs.stdout}
     ...    parser_name=${STACKTRACE_PARSER}
     ...    parse_mode=${INPUT_MODE}
    ${count}=    Evaluate    len($parsed_exceptions)
