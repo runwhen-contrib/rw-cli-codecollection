@@ -60,12 +60,14 @@ class StackTraceData:
             return list(self.line_nums.values())[0]
         else:
             return []
-    
+
     def get_first_file_line_nums_as_str(self) -> str:
         if len(self.line_nums.keys()) > 0:
             file_key = list(self.line_nums.keys())[0]
             line_nums = self.line_nums[file_key]
-            return f"{', '.join([f"{file_key}:{str(l)}" for l in line_nums])}"
+            formatted_line_nums = f"{file_key}"
+            for l in line_nums:
+                formatted_line_nums += f"\n\t{str(l)}"
         else:
             return ""
 
@@ -440,3 +442,17 @@ class GoLangJsonStackTraceParse(GoLangStackTraceParse):
             return st_data
         else:
             return None
+
+
+# lookup map used for dynamic parser selection
+DYNAMIC_PARSER_LOOKUP = {
+    "dynamic": None,
+    "python": PythonStackTraceParse,
+    "golang": GoLangStackTraceParse,
+    "golangjson": GoLangJsonStackTraceParse,
+    "csharp": CSharpStackTraceParse,
+    "django": DRFStackTraceParse,
+    "djangojson": GoogleDRFStackTraceParse,
+    "java": None,
+    "node": None,
+}

@@ -6,6 +6,7 @@ from RW.K8sApplications.k8s_applications import (
     stacktrace_report,
     stacktrace_report_data,
     parse_django_json_stacktraces,
+    dynamic_parse_stacktraces,
 )
 from RW.K8sApplications.parsers import (
     BaseStackTraceParse,
@@ -97,14 +98,13 @@ def test_no_results():
     logger.info(f"REPORT\n\n{r}\n\n")
 
 
-def test_platform():
-    logger.info("Testing Report")
-    with open(f"{THIS_DIR}/{TEST_DATA_DIR}/test.log", "r") as f:
+def test_dynamic():
+    logger.info("Testing dynamic parser")
+    with open(f"{THIS_DIR}/{TEST_DATA_DIR}/djangojson.log", "r") as f:
         data = f.read()
-    results = parse_stacktraces(
-        data, parse_mode=ParseMode.SPLIT_INPUT, parser_override=GoLangStackTraceParse, show_debug=True
-    )
+    results = dynamic_parse_stacktraces(data, parser_name="Dynamic", parse_mode=ParseMode.SPLIT_INPUT, show_debug=True)
     r = stacktrace_report_data(results)
     mcst = r["most_common_stacktrace"]
     report = r["report"]
-    logger.info(f"REPORT\n\n{report}\n\n")
+    assert report
+    assert mcst

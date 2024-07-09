@@ -11,8 +11,10 @@ from .parsers import (
     PythonStackTraceParse,
     DRFStackTraceParse,
     GoogleDRFStackTraceParse,
+    GoLangStackTraceParse,
     CSharpStackTraceParse,
     GoLangJsonStackTraceParse,
+    DYNAMIC_PARSER_LOOKUP,
 )
 from .repository import (
     Repository,
@@ -52,19 +54,6 @@ def serialize_env(printenv: str) -> dict:
             key, value = line.split("=", 1)
             k8s_env[key] = value
     return k8s_env
-
-
-def test(git_uri, git_token, k8s_env, process_list, *args, **kwargs):
-    repo = Repository(source_uri=git_uri, auth_token=git_token)
-    repo.clone_repo()
-    logger.info(repo)
-    fake_excep = None
-    with open(f"{THIS_DIR}/test_logs.txt", "r") as fh:
-        fake_excep = fh.read()
-    repo_issues = repo.list_issues()
-    exceptions = parse_exceptions(fake_excep)
-    report = troubleshoot_application([repo], exceptions)
-    return report
 
 
 def test_search(repo: Repository, exceptions: list[StackTraceData]) -> list[RepositorySearchResult]:
@@ -147,6 +136,62 @@ def parse_golang_json_stacktraces(logs: str, show_debug: bool = False) -> list[S
     )
 
 
+def dynamic_parse_stacktraces(
+    logs: str,
+    parser_name: str = "",
+    parse_mode: str = "SPLIT",
+    show_debug: bool = False,
+) -> list[StackTraceData]:
+    """Allows for dynamic parsing of stacktraces based on the first log line
+    if no parser name is provided, the first log line will be used to determine the parser to use
+    based on a map lookup of parser types to their respective parsers
+
+    Args:
+        logs (str): the log data to parse
+        parser_name (str, optional): the name of the parser to lookup for use. Defaults to "".
+        parse_mode (ParseMode, optional): how to modify the ingested logs, typically we want to split them on newlines. Defaults to ParseMode.SPLIT_INPUT.
+        show_debug (bool, optional): Defaults to False.
+
+    Returns:
+        list[StackTraceData]: Returns a list of StackTraceData objects that contain the parsed stacktrace data to be leveraged by other functions
+    """
+    parse_mode = ParseMode.MULTILINE_LOG if parse_mode == "MULTILINE" else ParseMode.SPLIT_INPUT
+    parser_name = parser_name.lower() if isinstance(parser_name, str) else ""
+    parser_name = "dynamic" if not parser_name else parser_name
+    if parser_name not in DYNAMIC_PARSER_LOOKUP.keys():
+        raise Exception(
+            f"Parser name {parser_name} not found in dynamic parser lookup, should be one of {DYNAMIC_PARSER_LOOKUP.keys()}"
+        )
+    # TODO: allow override for byop
+    parser = DYNAMIC_PARSER_LOOKUP[parser_name]
+    if parser:
+        return parse_stacktraces(logs, parse_mode=parse_mode, parser_override=parser, show_debug=show_debug)
+    else:
+        return parse_stacktraces(logs, parse_mode=parse_mode, show_debug=show_debug)
+
+
+def determine_parser(first_line: str) -> BaseStackTraceParse:
+    parser_to_use: BaseStackTraceParse = None
+    # Add more parser types here and they will be attempted in-order until first success, per log line
+    parsers: list[BaseStackTraceParse] = [
+        GoogleDRFStackTraceParse,
+        PythonStackTraceParse,
+        GoLangJsonStackTraceParse,
+        GoLangStackTraceParse,
+        CSharpStackTraceParse,
+    ]
+    st_data: StackTraceData = None
+    for parser in parsers:
+        st_data = parser.parse_log(first_line, show_debug=True)
+        logger.debug(f"Attempting to parse log line: {first_line}, got result: {st_data}")
+        if st_data and st_data.has_results:
+            parser_to_use = parser
+            break
+    if not parser_to_use:
+        logger.warning(f"No parser found for log line: {first_line}")
+    return parser_to_use
+
+
 def parse_stacktraces(
     logs: str,
     parse_mode: ParseMode = ParseMode.SPLIT_INPUT,
@@ -157,36 +202,28 @@ def parse_stacktraces(
         logger.warning(
             f"Length of logs provided for parsing exceptions is greater than {MAX_LOG_LINES}, be aware this could effect performance"
         )
+    # allow keyword callers to override the parser used
+    parser_to_use: BaseStackTraceParse = parser_override if parser_override else None
+    first_log_line: str = ""
     if parse_mode == ParseMode.SPLIT_INPUT:
         logs = logs.split("\n")
     elif parse_mode == ParseMode.MULTILINE_LOG:
         logs = [logs]
+    first_log_line = logs[0]
     stacktrace_data: list[StackTraceData] = []
-    # allow keyword callers to override the parser used
-    if parser_override:
-        parsers = [parser_override]
-    else:
-        # Add more parser types here and they will be attempted in-order until first success, per log line
-        parsers: list[BaseStackTraceParse] = [
-            GoogleDRFStackTraceParse,
-            PythonStackTraceParse,
-            GoLangJsonStackTraceParse,
-            CSharpStackTraceParse,
-        ]
-    # TODO: support multiline parsing
+    # no override provided, determine parser to use based on first log line results
+    if not parser_to_use:
+        parser_to_use = determine_parser(first_log_line)
     for log in logs:
         st_data: StackTraceData = None
-        for parser in parsers:
-            st_data = parser.parse_log(log, show_debug=show_debug)
-            logger.info(f"Attempting to parse log line: {log}, got result: {st_data}")
-            if st_data and st_data.has_results:
-                st_data.parser_used_type = parser.__name__
-                stacktrace_data.append(st_data)
-                # got a successful parse, move onto next log line
-                break
-
+        st_data = parser_to_use.parse_log(log, show_debug=show_debug)
+        if show_debug:
+            logger.debug(f"Attempting to parse log line: {log}, got result: {st_data}")
+        if st_data and st_data.has_results:
+            st_data.parser_used_type = parser_to_use.__name__
+            stacktrace_data.append(st_data)
     if show_debug:
-        logger.info(f"Returning {len(stacktrace_data)} parsed stacktraces\n{stacktrace_data}")
+        logger.debug(f"Returning {len(stacktrace_data)} parsed stacktraces\n{stacktrace_data}")
     return stacktrace_data
 
 
