@@ -65,10 +65,10 @@ class StackTraceData:
         if len(self.line_nums.keys()) > 0:
             file_key = list(self.line_nums.keys())[0]
             line_nums = self.line_nums[file_key]
-            formatted_line_nums = f"{file_key}"
+            formatted_line_nums = f"{file_key} on lines:"
             for l in line_nums:
-                formatted_line_nums += f"\n\t{str(l)}"
-            return formatted_line_nums
+                formatted_line_nums += f"{str(l)}, "
+            return formatted_line_nums.rstrip(", ")
         else:
             return ""
 
