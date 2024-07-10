@@ -29,7 +29,8 @@ The most common stacktrace is related to these files:
 {% endif %}
 
 ### Detailed Report{% for stacktrace in data.stacktraces %}
-#### Stack Trace {{ loop.index }}{% if stacktrace.urls %}
+#### Stack Trace {{ loop.index }} Occured {{ stacktrace.occurences }} Times
+{% if stacktrace.urls %}
 - **URLs:**{{ format_list(stacktrace.urls) }}{% endif %}{% if stacktrace.endpoints %}
 - **Endpoints:**
   {{ format_list(stacktrace.endpoints) }}

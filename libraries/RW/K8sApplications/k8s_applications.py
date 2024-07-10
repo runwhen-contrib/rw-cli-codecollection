@@ -102,6 +102,8 @@ def stacktrace_report_data(stacktraces: list[StackTraceData], max_report_stacktr
             f"No stacktraces formatted, review formatted: {formatted_stacktraces}\n\nvs\n\nunformatted: {stacktraces})"
         )
     mcst: StackTraceData = formatted_stacktraces[0]
+    if not mcst.raw or not mcst.error_messages:
+        logger.warning(f"Most common stacktrace has empty content: {mcst}\n given list: {formatted_stacktraces}")
     for st in formatted_stacktraces:
         if st.occurences > mcst.occurences:
             mcst = st
