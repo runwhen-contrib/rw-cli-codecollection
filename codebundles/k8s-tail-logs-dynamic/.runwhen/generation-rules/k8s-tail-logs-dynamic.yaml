@@ -8,7 +8,7 @@ spec:
         - type: and
           matches:
             - type: pattern
-              pattern: "runwhenAppContainerName"
+              pattern: "kubectl.kubernetes.io//default-container"
               properties: [annotations]
               mode: substring
             - type: pattern

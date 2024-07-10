@@ -36,7 +36,7 @@ spec:
   - name: EXCLUDE_PATTERN
     value: Placeholder
   - name: CONTAINER_NAME
-    value: {{match_resource.resource.metadata.annotations.runwhenAppContainerName}}
+    value: {{match_resource.resource.metadata.annotations.get('kubectl.kubernetes.io/default-container')}}
   - name: MAX_LOG_LINES
     value: '500'
   - name: NAMESPACE
