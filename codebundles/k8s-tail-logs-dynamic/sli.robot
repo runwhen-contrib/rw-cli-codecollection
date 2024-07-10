@@ -2,7 +2,7 @@
 Documentation       Measures the number of exception stacktraces present in an application's logs over a time period.
 Metadata            Author    jon-funk
 Metadata            Display Name    Kubernetes Tail Application Logs
-Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,GoLang,Json,Python,CSharp,Django,Node,Java
+Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,GoLang,Json,Python,CSharp,Django,Node,Java,FastAPI
 
 Library             BuiltIn
 Library             RW.Core

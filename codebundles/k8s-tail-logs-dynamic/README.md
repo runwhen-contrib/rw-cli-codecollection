@@ -1,10 +1,6 @@
-# Kubernetes Application Troubleshoot
+# Kubernetes Tail Application Logs For Stacktraces
 
 This codebundle attempts to identify issues created in application code changes recently. 
-
-## Tasks
-`Get Resource Logs`
-`Troubleshoot Application Logs`
 
 ## Configuration
 The TaskSet requires initialization to import necessary secrets, services, and user variables. The following variables should be set:

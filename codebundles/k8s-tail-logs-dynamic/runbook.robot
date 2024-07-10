@@ -3,7 +3,7 @@ Documentation       Performs application-level troubleshooting by inspecting the
 ...                 and attempts to determine next steps.
 Metadata            Author    jon-funk
 Metadata            Display Name    Kubernetes Tail Application Logs
-Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,GoLang,Json,Python,CSharp,Django,Node,Java
+Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,GoLang,Json,Python,CSharp,Django,Node,Java,FastAPI
 
 Library             BuiltIn
 Library             RW.Core
@@ -71,7 +71,7 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
         ...    reproduce_hint=Run:\n${cmd}\n view logs results for stacktraces.
         ...    title=Stacktraces Found In Tailed Logs Of `${CONTAINER_NAME}`
         ...    details=Generated a report of the stacktraces found to be reviewed.
-        ...    next_steps=Check file: ${first_file} and review report.
+        ...    next_steps=Check this file ${first_file} for the most common stacktrace and review the full report for more details.
     END
     RW.Core.Add Pre To Report    ${report}
     RW.Core.Add Pre To Report    Commands Used: ${history}
