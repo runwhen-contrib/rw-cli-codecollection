@@ -1,0 +1,22 @@
+rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing dial tcp 10.107.253.212:7070: connect: connection refused"
+could not retrieve cart
+main.(*frontendServer).homeHandler
+	/src/handlers.go:69
+net/http.HandlerFunc.ServeHTTP
+	/usr/local/go/src/net/http/server.go:2109
+github.com/gorilla/mux.(*Router).ServeHTTP
+	/go/pkg/mod/github.com/gorilla/mux@v1.8.0/mux.go:210
+main.(*logHandler).ServeHTTP
+	/src/middleware.go:82
+main.ensureSessionID.func1
+	/src/middleware.go:109
+net/http.HandlerFunc.ServeHTTP
+	/usr/local/go/src/net/http/server.go:2109
+go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp.(*Handler).ServeHTTP
+	/go/pkg/mod/go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp@v0.37.0/handler.go:210
+net/http.serverHandler.ServeHTTP
+	/usr/local/go/src/net/http/server.go:2947
+net/http.(*conn).serve
+	/usr/local/go/src/net/http/server.go:1991
+runtime.goexit
+	/usr/local/go/src/runtime/asm_amd64.s:1594
