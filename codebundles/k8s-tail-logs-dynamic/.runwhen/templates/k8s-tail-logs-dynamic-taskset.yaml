@@ -28,7 +28,7 @@ spec:
   - name: LABELS
     value: app={{match_resource.resource.metadata.labels.app}}
   - name: EXCLUDE_PATTERN
-    value: Placeholder
+    value: INFO
   - name: CONTAINER_NAME
     value: {{match_resource.resource.metadata.annotations.get('kubectl.kubernetes.io/default-container')}}
   - name: MAX_LOG_LINES

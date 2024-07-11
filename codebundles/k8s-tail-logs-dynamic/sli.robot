@@ -27,8 +27,6 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
 
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${cmd}
-    ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${parsed_stacktraces}=    RW.K8sApplications.Dynamic Parse Stacktraces    ${logs.stdout}

@@ -21,8 +21,6 @@ Get `${CONTAINER_NAME}` Application Logs
     [Tags]    resource    application    workload    logs    state    ${container_name}    ${workload_name}
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --max-log-requests=10 --limit-bytes=${MAX_LOG_BYTES} --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
-    ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    Workload Logs:\n\n${logs.stdout}
@@ -50,8 +48,6 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
     END
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${cmd}
-    ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ${parsed_stacktraces}=    RW.K8sApplications.Dynamic Parse Stacktraces    ${logs.stdout}

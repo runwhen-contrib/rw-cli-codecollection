@@ -15,6 +15,10 @@ spec:
               pattern: "app"
               properties: [labels]
               mode: substring
+            - type: pattern
+              pattern: "codecollection.runwhen.com//app"
+              properties: [annotations]
+              mode: substring
       slxs:
         - baseName: k8s-tail-logs-dynamic
           qualifiers: ["resource", "namespace", "cluster"]
