@@ -112,7 +112,7 @@ commands:
 
 
     ${cmd}'
-  name: troubleshoot_container_name_application_logs
+  name: tail_container_name_application_logs_for_stacktraces
   when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event: A DevOps
     or Site Reliability Engineer might need to run specific system commands to investigate
     and resolve the underlying issues causing the CrashLoopBackoff.
@@ -164,7 +164,7 @@ commands:
 
 
     ${cmd}'
-  name: troubleshoot_container_name_application_logs
+  name: tail_container_name_application_logs_for_stacktraces
   when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event: A DevOps
     or Site Reliability Engineer might need to run specific system commands to investigate
     and resolve the underlying issues causing the CrashLoopBackoff.
@@ -261,7 +261,7 @@ commands:
     This multi-line command breaks down the original complex command into individual
     steps with explanatory comments, making it easier for newer or less experienced
     devops engineers to understand and modify as needed.'
-  name: troubleshoot_container_name_application_logs
+  name: tail_container_name_application_logs_for_stacktraces
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events
 
     2. Analyzing performance issues within a specific container in a deployment or
@@ -346,7 +346,7 @@ commands:
     This multi-line command breaks down the original complex command into individual
     steps with explanatory comments, making it easier for newer or less experienced
     devops engineers to understand and modify as needed.'
-  name: troubleshoot_container_name_application_logs
+  name: tail_container_name_application_logs_for_stacktraces
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events
 
     2. Analyzing performance issues within a specific container in a deployment or
