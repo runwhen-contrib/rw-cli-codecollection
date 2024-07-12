@@ -8,7 +8,7 @@ spec:
         - type: and
           matches:
             - type: pattern
-              pattern: "kubectl.kubernetes.io//default-container"
+              pattern: "kubectl.kubernetes.io/default-container"
               properties: ["spec/template/metadata/annotations"]
               mode: substring
             - type: pattern
