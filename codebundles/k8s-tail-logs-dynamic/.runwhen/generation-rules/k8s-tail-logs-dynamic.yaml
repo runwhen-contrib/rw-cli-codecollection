@@ -12,10 +12,6 @@ spec:
               properties: ["spec/template/metadata/annotations"]
               mode: substring
             - type: pattern
-              pattern: "app"
-              properties: [labels]
-              mode: substring
-            - type: pattern
               pattern: "codecollection.runwhen.com//app"
               properties: [annotations]
               mode: substring
