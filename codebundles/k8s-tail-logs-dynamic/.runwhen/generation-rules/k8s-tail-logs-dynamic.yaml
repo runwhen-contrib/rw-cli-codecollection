@@ -16,8 +16,8 @@ spec:
             #   properties: ["spec/template/metadata/annotations"]
             #   mode: substring
             - type: pattern
-              pattern: "codecollection.runwhen.com//app"
-              properties: ["metadata/labels"]
+              pattern: "codecollection.runwhen.com/app"
+              properties: [labels]
               mode: substring
       slxs:
         - baseName: k8s-tail-logs-dynamic
