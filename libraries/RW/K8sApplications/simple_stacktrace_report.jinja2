@@ -1,0 +1,55 @@
+{% macro format_list(items) %}
+{% for item in items %}
+- {{ item }}{% endfor %}
+{% endmacro %}
+
+# Stack Trace Report
+
+Report Created At: {{ data.timestamp }}
+
+
+## Summary
+**Total Stack Traces:** {{ data.stacktrace_count }}
+
+**Most Common Stack Trace Occured {{ data.most_common_stacktrace.occurences }} Times**
+
+**Most Common Error Messages:**
+{{ format_list(data.most_common_stacktrace.error_messages) }}
+
+```
+{{ data.most_common_stacktrace.raw }}
+```
+
+{% if data.most_common_stacktrace.line_nums %}
+The problem might be occuring in this file: `{{ data.most_common_stacktrace.line_nums.keys()|first }}`
+
+The most common stacktrace is related to these files:
+{% for file, lines in data.most_common_stacktrace.line_nums.items() %}{% for line in lines %}
+  - `{{ file }}:{{ line }}`{% endfor %}{% endfor %}
+{% endif %}
+
+### Detailed Report{% for stacktrace in data.stacktraces %}
+#### Stack Trace {{ loop.index }} Occured {{ stacktrace.occurences }} Times
+{% if stacktrace.urls %}
+- **URLs:**{{ format_list(stacktrace.urls) }}{% endif %}{% if stacktrace.endpoints %}
+- **Endpoints:**
+  {{ format_list(stacktrace.endpoints) }}
+{% endif %}{% if stacktrace.line_nums %}
+- **Files and Line Numbers:**
+{% for file, lines in stacktrace.line_nums.items() %}{% for line in lines %}
+  - `{{ file }}:{{ line }}`
+{% endfor %}{% endfor %}{% endif %}
+
+{% if stacktrace.error_messages %}
+- **Error Messages:**
+  {{ format_list(stacktrace.error_messages) }}{% endif %}
+- **Raw Stack Trace:**
+
+```
+{{ stacktrace.raw }}
+```
+- **Parser Used:** `{{ stacktrace.parser_used_type }}`
+{% endfor %}
+
+
+Note: Only up to {{ data.max_report_stacktraces }} stack traces are shown in this report to reduce noise.

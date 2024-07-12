@@ -1,0 +1,32 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+    - resourceTypes:
+        - deployment
+      matchRules:
+        - type: and
+          matches:
+            - type: pattern
+              pattern: "kubectl.kubernetes.io//default-container"
+              properties: ["spec/template/metadata/annotations"]
+              mode: substring
+            - type: pattern
+              pattern: "app"
+              properties: [labels]
+              mode: substring
+            - type: pattern
+              pattern: "codecollection.runwhen.com//app"
+              properties: [annotations]
+              mode: substring
+      slxs:
+        - baseName: k8s-tail-logs-dynamic
+          qualifiers: ["resource", "namespace", "cluster"]
+          baseTemplateName: k8s-tail-logs-dynamic
+          levelOfDetail: detailed
+          outputItems:
+            - type: slx
+            - type: slo
+            - type: runbook
+              templateName: k8s-tail-logs-dynamic-taskset.yaml
+            - type: sli

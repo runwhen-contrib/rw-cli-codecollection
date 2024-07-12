@@ -41,7 +41,7 @@ Scan `${CONTAINER_NAME}` Application For Misconfigured Environment
     RW.Core.Add Pre To Report    Stdout:\n\n${script_run.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Troubleshoot `${CONTAINER_NAME}` Application Logs
+Tail `${CONTAINER_NAME}` Application Logs For Stacktraces 
     [Documentation]    Performs an inspection on container logs for exceptions/stacktraces, parsing them and attempts to find relevant source code information
     [Tags]
     ...    application
@@ -84,7 +84,7 @@ Troubleshoot `${CONTAINER_NAME}` Application Logs
     # ${test_data}=    RW.K8sApplications.Get Test Data
     ${proc_list}=    RW.K8sApplications.Format Process List    ${proc_list.stdout}
     # ${serialized_env}=    RW.K8sApplications.Serialize env    ${printenv.stdout}
-    ${parsed_exceptions}=    RW.K8sApplications.Parse Exceptions    ${logs.stdout}
+    ${parsed_exceptions}=    RW.K8sApplications.Parse Stacktraces    ${logs.stdout}
     # ${parsed_exceptions}=    RW.K8sApplications.Parse Exceptions    ${test_data}
     ${repos}=    Create List    ${app_repo}
     ${ts_results}=    RW.K8sApplications.Troubleshoot Application
@@ -111,11 +111,11 @@ Troubleshoot `${CONTAINER_NAME}` Application Logs
     IF    (len($parsed_exceptions)) > 0
         RW.Core.Add Issue
         ...    severity=3
-        ...    expected=No exceptions were found in the application logs of ${CONTAINER_NAME}
-        ...    actual=Found exceptions in the application logs of ${CONTAINER_NAME}
+        ...    expected=No stacktraces were found in the application logs of ${CONTAINER_NAME}
+        ...    actual=Found stacktraces in the application logs of ${CONTAINER_NAME}
         ...    reproduce_hint=Run:\n${cmd}\n view logs results for exceptions.
-        ...    title=Application Exceptions detected in ${CONTAINER_NAME}
-        ...    details=This exception prompted the creation of a GitHub issue: ${most_common_exception}
+        ...    title=Application Stacktraces Detected In `${CONTAINER_NAME}`
+        ...    details=This stacktrace prompted the creation of a GitHub issue: ${most_common_exception}
         ...    next_steps=${nextsteps}
     END
 
