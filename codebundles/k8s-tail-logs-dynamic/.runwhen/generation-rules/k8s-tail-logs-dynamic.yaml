@@ -11,14 +11,14 @@ spec:
               pattern: ".+"
               properties: [name]
               mode: substring
-            # - type: pattern
-            #   pattern: "kubectl.kubernetes.io//default-container"
-            #   properties: ["spec/template/metadata/annotations"]
-            #   mode: substring
-            # - type: pattern
-            #   pattern: "codecollection.runwhen.com//app"
-            #   properties: [annotations]
-            #   mode: substring
+            - type: pattern
+              pattern: "kubectl.kubernetes.io//default-container"
+              properties: ["spec/template/metadata/annotations"]
+              mode: substring
+            - type: pattern
+              pattern: "codecollection.runwhen.com//app"
+              properties: [labels]
+              mode: substring
       slxs:
         - baseName: k8s-tail-logs-dynamic
           qualifiers: ["resource", "namespace", "cluster"]
