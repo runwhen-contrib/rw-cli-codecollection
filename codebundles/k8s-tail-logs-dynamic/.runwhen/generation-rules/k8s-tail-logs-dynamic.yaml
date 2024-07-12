@@ -8,8 +8,8 @@ spec:
         - type: and
           matches:
             - type: pattern
-              pattern: "kubectl.kubernetes.io/default-container"
-              properties: ["spec/template/metadata/annotations"]
+              pattern: ".+"
+              properties: ["spec/template/metadata/annotations/kubectl.kubernetes.io//default-container"]
               mode: substring
             - type: pattern
               pattern: "codecollection.runwhen.com/app"
