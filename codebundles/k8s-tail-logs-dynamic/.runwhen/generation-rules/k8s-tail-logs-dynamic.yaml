@@ -23,6 +23,6 @@ spec:
           outputItems:
             - type: slx
             - type: slo
-            # - type: runbook
-            #   templateName: k8s-tail-logs-dynamic-taskset.yaml
+            - type: runbook
+              templateName: k8s-tail-logs-dynamic-taskset.yaml
             - type: sli
