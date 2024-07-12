@@ -32,7 +32,7 @@ spec:
   - name: LOGS_SINCE
     value: 10m
   - name: LABELS
-    value: app={{match_resource.resource.metadata.labels.app}}
+    value: codecollection.runwhen.com/app={{match_resource.resource.metadata.labels.get('codecollection.runwhen.com/app')}}
   - name: EXCLUDE_PATTERN
     value: INFO
   - name: CONTAINER_NAME
