@@ -56,10 +56,10 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
     ...    show_debug=True
     ${report_data}=    RW.K8sApplications.Stacktrace Report Data   stacktraces=${parsed_stacktraces}
     ${report}=    Set Variable    ${report_data["report"]}
-    ${mcst}=    Set Variable    ${report_data["most_common_stacktrace"]}
-    ${first_file}=    Set Variable    ${mcst.get_first_file_line_nums_as_str()}
     ${history}=    RW.CLI.Pop Shell History
     IF    (len($parsed_stacktraces)) > 0
+        ${mcst}=    Set Variable    ${report_data["most_common_stacktrace"]}
+        ${first_file}=    Set Variable    ${mcst.get_first_file_line_nums_as_str()}
         RW.Core.Add Issue
         ...    severity=3
         ...    expected=No stacktraces were found in the application logs of ${CONTAINER_NAME}
