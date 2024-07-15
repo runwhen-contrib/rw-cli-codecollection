@@ -12,9 +12,9 @@ spec:
     slxs:
       - baseName: postgres-health
         qualifiers: ["resource", "namespace", "cluster"]
-        baseTemplateName: k8s-postgres-triage
+        baseTemplateName: k8s-postgres-triage-crunchy
         levelOfDetail: detailed
         outputItems:
           - type: slx
           - type: runbook
-            templateName: k8s-postgres-triage-taskset-crunchy.yaml
+            templateName: k8s-postgres-triage-crunchy-taskset.yaml
