@@ -1,13 +1,14 @@
 *** Settings ***
-Documentation       Runs multiple Kubernetes and psql commands to report on the health of a postgres cluster.
+Documentation       Runs a series of tasks and scores the health of a postgres cluster
 Metadata            Author    stewartshea
-Metadata            Display Name    Kubernetes Postgres Triage
+Metadata            Display Name    Kubernetes Postgres Healthcheck
 Metadata            Supports    AKS,EKS,GKE,Kubernetes,Patroni,Postgres,Crunchy
 
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
 Library             String
+Library             Collections
 
 Suite Setup         Suite Initialization
 
@@ -141,17 +142,43 @@ Get Running Postgres Configuration
     ...    File Path:\n${active_db_config_location[0]}\n--------\nFile Contents:\n${active_db_config_contents.stdout}\n--------
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Get Patroni Output
+Get Patroni Output and Add to Report
     [Documentation]    Attempts to run the patronictl CLI within the workload if it's available to check the current state of a patroni cluster, if applicable.
     [Tags]    patroni    patronictl    list    cluster    health    check    state    postgres
     ${rsp}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.items[0].metadata.name}') -n ${NAMESPACE} --context ${CONTEXT} -c database -- patronictl list
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec $(${KUBERNETES_DISTRIBUTION_BINARY} get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.items[0].metadata.name}') -n ${NAMESPACE} --context ${CONTEXT} -c database -- patronictl list
     ...    env=${env}
-    ...    run_in_workload_with_labels=${RESOURCE_LABELS}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${rsp.stdout}
+
+Fetch Patroni Database Lag
+    [Documentation]    Identifies the lag using patronictl and raises issues if necessary.
+    [Tags]    patroni    patronictl    list    cluster    health    check    state    postgres
+    ${patroni_output}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec $(${KUBERNETES_DISTRIBUTION_BINARY} get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.items[0].metadata.name}') -n ${NAMESPACE} --context ${CONTEXT} -c database -- patronictl list -f json
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${KUBECONFIG}
+    ${patroni_members}=    Evaluate    json.loads(r'''${patroni_output.stdout}''')    json
+    IF    len(@{patroni_members}) > 0
+        FOR    ${item}    IN    @{patroni_members}
+            IF    "Lag in MB" not in ${item}    CONTINUE
+            ${lag_in_mb}=    Get From Dictionary    ${item}    Lag in MB
+            IF    ${lag_in_mb} > ${DATABASE_LAG_THRESHOLD}
+                RW.Core.Add Issue
+                ...    severity=1
+                ...    expected=Database cluster `${item["Cluster"]}` in `${NAMESPACE}` should have a lag below ${DATABASE_LAG_THRESHOLD} MB
+                ...    actual=Database cluster `${item["Cluster"]}` in `${NAMESPACE}` has lag above ${DATABASE_LAG_THRESHOLD} MB
+                ...    title=Database member `${item["Member"]}` in Cluster `${item["Cluster"]}` has of ${lag_in_mb} MB in `${NAMESPACE}`
+                ...    reproduce_hint=${patroni_output.cmd}
+                ...    details=${patroni_output.stdout}
+                ...    next_steps=Remediate Lagging Patroni Database Member `${item["Member"]}` in Cluster `${item["Cluster"]}` in `${NAMESPACE}`
+            END
+        END
+    END
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    ${patroni_output.stdout}
 
 Run DB Queries
     [Documentation]    Runs a suite of configurable queries to check for index issues, slow-queries, etc and create a report.
@@ -193,6 +220,12 @@ Suite Initialization
     ...    description=Which workload to run the postgres query from. This workload should have the psql binary in its image and be able to access the database workload within its network constraints. Accepts namespace and container details if desired. Also accepts labels, such as `-l postgres-operator.crunchydata.com/role=primary`. If using labels, make sure NAMESPACE is set.
     ...    pattern=\w*
     ...    example=deployment/myapp
+    ${WORKLOAD_CONTAINER}=    RW.Core.Import User Variable
+    ...    WORKLOAD_CONTAINER
+    ...    type=string
+    ...    description=The container to target when executing commands.
+    ...    pattern=\w*
+    ...    example=database
     ${NAMESPACE}=    RW.Core.Import User Variable
     ...    NAMESPACE
     ...    type=string
@@ -224,15 +257,23 @@ Suite Initialization
     ...    enum=[kubectl,oc]
     ...    example=kubectl
     ...    default=kubectl
-
+    ${DATABASE_LAG_THRESHOLD}=    RW.Core.Import User Variable
+    ...    DATABASE_LAG_THRESHOLD
+    ...    type=string
+    ...    description=The acceptable Lag (in MB) as reported by patronictl before raising an issue
+    ...    pattern=\w*
+    ...    example=100
+    ...    default=100
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${RESOURCE_LABELS}    ${RESOURCE_LABELS}
     Set Suite Variable    ${WORKLOAD_NAME}    ${WORKLOAD_NAME}
+    Set Suite Variable    ${WORKLOAD_CONTAINER}    ${WORKLOAD_CONTAINER}
     Set Suite Variable    ${QUERY}    ${QUERY}
     Set Suite Variable    ${CRD_FILTER}    ${CRD_FILTER}
+    Set Suite Variable    ${DATABASE_LAG_THRESHOLD}    ${DATABASE_LAG_THRESHOLD}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
     IF    "${HOSTNAME}" != ""
         ${HOSTNAME}=    Set Variable    -h ${HOSTNAME}

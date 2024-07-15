@@ -30,9 +30,9 @@ spec:
     - name: KUBERNETES_DISTRIBUTION_BINARY
       value: {{custom.kubernetes_distribution_binary}}
     - name: WORKLOAD_NAME
-      value: 'statefulset.apps/{{match_resource.resource.metadata.name}}'
+      value: '-l postgres-operator.crunchydata.com/cluster={{match_resource.resource.metadata.namespace.name}},postgres-operator.crunchydata.com/role=master'
     - name: RESOURCE_LABELS
-      value: postgres-operator.crunchydata.com/role=master
+      value: postgres-operator.crunchydata.com/cluster={{match_resource.resource.metadata.namespace.name}}
   secretsProvided:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}

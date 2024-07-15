@@ -3,7 +3,7 @@ kind: GenerationRules
 spec:
   generationRules:
   - resourceTypes:
-      - postgresclusters.postgres-operator.crunchydata.com
+      - postgresql.acid.zalan.do
     matchRules:
     - type: pattern
       pattern: ".+"
@@ -12,9 +12,9 @@ spec:
     slxs:
       - baseName: postgres-health
         qualifiers: ["resource", "namespace", "cluster"]
-        baseTemplateName: k8s-postgres-triage-crunchy
+        baseTemplateName: k8s-postgres-healthcheck
         levelOfDetail: detailed
         outputItems:
           - type: slx
           - type: runbook
-            templateName: k8s-postgres-triage-crunchy-taskset.yaml
+            templateName: k8s-postgres-healthcheck-taskset.yaml
