@@ -25,18 +25,12 @@ spec:
       value: {{custom.kubernetes_distribution_binary}}
     - name: NAMESPACE
       value: {{match_resource.resource.metadata.name}}
-    - name: ERROR_PATTERN
-      value: (Error|Exception)
     - name: CONTEXT
       value: {{context}}
-    - name: SERVICE_ERROR_PATTERN
-      value: (Error:)
-    - name: SERVICE_EXCLUDE_PATTERN
-      value: (node_modules|opentelemetry)
     - name: ANOMALY_THRESHOLD
       value: "3.0"
     - name: EVENT_AGE
-      value: "30"
+      value: "5m"
   secretsProvided:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}

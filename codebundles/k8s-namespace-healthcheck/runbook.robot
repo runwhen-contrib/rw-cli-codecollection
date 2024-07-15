@@ -497,12 +497,6 @@ Suite Initialization
     ...    description=Which Kubernetes context to operate within.
     ...    pattern=\w*
     ...    example=my-main-cluster
-    ${ERROR_PATTERN}=    RW.Core.Import User Variable    ERROR_PATTERN
-    ...    type=string
-    ...    description=The error pattern to use when grep-ing logs.
-    ...    pattern=\w*
-    ...    example=(Error|Exception)
-    ...    default=(Error|Exception)
     ${ANOMALY_THRESHOLD}=    RW.Core.Import User Variable
     ...    ANOMALY_THRESHOLD
     ...    type=string
@@ -533,7 +527,6 @@ Suite Initialization
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${EVENT_AGE}    ${EVENT_AGE}
-    Set Suite Variable    ${ERROR_PATTERN}    ${ERROR_PATTERN}
     Set Suite Variable    ${ANOMALY_THRESHOLD}    ${ANOMALY_THRESHOLD}
     Set Suite Variable    ${HOME}    ${HOME}
     Set Suite Variable

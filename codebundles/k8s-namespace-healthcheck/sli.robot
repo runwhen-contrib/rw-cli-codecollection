@@ -38,7 +38,7 @@ Suite Initialization
     ...    description=The maximum total events to be still considered healthy. 
     ...    pattern=^\d+$
     ...    example=2
-    ...    default=0
+    ...    default=2
     ${CONTAINER_RESTART_AGE}=    RW.Core.Import User Variable    CONTAINER_RESTART_AGE
     ...    type=string
     ...    description=The time window in minutes as search for container restarts.
@@ -50,7 +50,7 @@ Suite Initialization
     ...    description=The maximum total container restarts to be still considered healthy. 
     ...    pattern=^\d+$
     ...    example=2
-    ...    default=0
+    ...    default=3
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
