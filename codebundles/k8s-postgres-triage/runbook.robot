@@ -145,7 +145,7 @@ Get Patroni Output
     [Documentation]    Attempts to run the patronictl CLI within the workload if it's available to check the current state of a patroni cluster, if applicable.
     [Tags]    patroni    patronictl    list    cluster    health    check    state    postgres
     ${rsp}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT} -- patronictl list
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}) -n ${NAMESPACE} --context ${CONTEXT} -c database -- patronictl list
     ...    env=${env}
     ...    run_in_workload_with_labels=${RESOURCE_LABELS}
     ...    secret_file__kubeconfig=${KUBECONFIG}
