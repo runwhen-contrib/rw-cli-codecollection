@@ -173,7 +173,7 @@ Fetch Patroni Database Lag
                 ...    title=Database member `${item["Member"]}` in Cluster `${item["Cluster"]}` has of ${lag_in_mb} MB in `${NAMESPACE}`
                 ...    reproduce_hint=${patroni_output.cmd}
                 ...    details=${patroni_output.stdout}
-                ...    next_steps=Remediate Lagging Patroni Database Member `${item["Member"]}` in Cluster `${item["Cluster"]}` in `${NAMESPACE}`
+                ...    next_steps=Remediate Lagging Patroni Database Member `${item["Member"]}` in Cluster `${item["Cluster"]}` in `${NAMESPACE}`\nFetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
             END
         END
     END
