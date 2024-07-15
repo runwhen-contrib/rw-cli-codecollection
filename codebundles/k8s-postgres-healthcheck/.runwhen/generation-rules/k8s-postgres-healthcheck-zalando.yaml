@@ -12,9 +12,10 @@ spec:
     slxs:
       - baseName: postgres-health
         qualifiers: ["resource", "namespace", "cluster"]
-        baseTemplateName: k8s-postgres-healthcheck
+        baseTemplateName: k8s-postgres-healthcheck-zalando
         levelOfDetail: detailed
         outputItems:
           - type: slx
+          - type: sli
           - type: runbook
             templateName: k8s-postgres-healthcheck-taskset.yaml
