@@ -27,38 +27,6 @@ Get Standard Postgres Resource Information
     RW.Core.Add Pre To Report    ${results.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Describe Postgres Custom Resources
-    [Documentation]    Runs a fetch all for the CRD types in the cluster and uses the type list after filtering it to fetch
-    ...    a list of live runnig CRD workloads of those types and describe them.
-    [Tags]    postgres    resources    workloads    customer resource definitions    crd    information
-    ${crd_list}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get crd -n ${NAMESPACE} --context ${CONTEXT} -o=jsonpath='{.items[*].metadata.name}'
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${KUBECONFIG}
-    ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
-    ${crd_list}=    Split String    ${crd_list.stdout}
-    ${crd_names_to_keep}=    Split String    ${CRD_FILTER}    seperator=,
-    ${crd_list}=    Evaluate    [crd_name for crd_name in ${crd_list} if crd_name in ${crd_names_to_keep}]
-    ${crd_descriptions}=    Set Variable    No Custom Resources found!
-    IF    len(${crd_list}) > 0
-        ${crd_workloads}=    RW.CLI.Run Cli
-        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get {item} -n ${NAMESPACE} --context ${CONTEXT} -o=name
-        ...    env=${env}
-        ...    loop_with_items=${crd_list}
-        ...    secret_file__kubeconfig=${KUBECONFIG}
-        ${crd_workloads}=    Split String    ${crd_workloads.stdout}
-        ${crd_descriptions}=    RW.CLI.Run Cli
-        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} describe {item} -n ${NAMESPACE} --context ${CONTEXT}
-        ...    env=${env}
-        ...    loop_with_items=${crd_workloads}
-        ...    secret_file__kubeconfig=${KUBECONFIG}
-        ${crd_descriptions}=    Set Variable    ${crd_descriptions.stdout}
-    END
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    ${crd_descriptions}
-    RW.Core.Add Pre To Report    Commands Used:\n${history}
-
 Get Postgres Pod Logs & Events
     [Documentation]    Queries Postgres-related pods for their recent logs and checks for any warning-type events.
     [Tags]    postgres    events    warnings    labels    logs    errors    pods
@@ -155,7 +123,7 @@ Get Patroni Output and Add to Report
 
 Fetch Patroni Database Lag
     [Documentation]    Identifies the lag using patronictl and raises issues if necessary.
-    [Tags]    patroni    patronictl    list    cluster    health    check    state    postgres
+    [Tags]    patroni    patronictl    list    cluster    health    postgres    lag
     ${patroni_output}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec $(${KUBERNETES_DISTRIBUTION_BINARY} get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.items[0].metadata.name}') -n ${NAMESPACE} --context ${CONTEXT} -c database -- patronictl list -f json
     ...    env=${env}
@@ -179,6 +147,12 @@ Fetch Patroni Database Lag
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${patroni_output.stdout}
+
+Check Database Backup Status
+    [Documentation]    Checks the status of backup operations on Kubernets Postgres clusters. Raises issues if backups have not been completed or appear unhealthy. 
+    [Tags]    patroni    cluster    health    backup    database    postgres
+
+
 
 Run DB Queries
     [Documentation]    Runs a suite of configurable queries to check for index issues, slow-queries, etc and create a report.
@@ -245,12 +219,6 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=localhost
     ...    default=
-    ${CRD_FILTER}=    RW.Core.Import User Variable
-    ...    CRD_FILTER
-    ...    type=string
-    ...    description=A csv of CRD names to use for triaging and collecting information.
-    ...    pattern=\w*
-    ...    default=
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
@@ -272,7 +240,6 @@ Suite Initialization
     Set Suite Variable    ${WORKLOAD_NAME}    ${WORKLOAD_NAME}
     Set Suite Variable    ${WORKLOAD_CONTAINER}    ${WORKLOAD_CONTAINER}
     Set Suite Variable    ${QUERY}    ${QUERY}
-    Set Suite Variable    ${CRD_FILTER}    ${CRD_FILTER}
     Set Suite Variable    ${DATABASE_LAG_THRESHOLD}    ${DATABASE_LAG_THRESHOLD}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
     IF    "${HOSTNAME}" != ""

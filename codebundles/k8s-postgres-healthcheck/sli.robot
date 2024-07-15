@@ -93,12 +93,6 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=localhost
     ...    default=
-    ${CRD_FILTER}=    RW.Core.Import User Variable
-    ...    CRD_FILTER
-    ...    type=string
-    ...    description=A csv of CRD names to use for triaging and collecting information.
-    ...    pattern=\w*
-    ...    default=
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
@@ -120,7 +114,6 @@ Suite Initialization
     Set Suite Variable    ${WORKLOAD_NAME}    ${WORKLOAD_NAME}
     Set Suite Variable    ${WORKLOAD_CONTAINER}    ${WORKLOAD_CONTAINER}
     Set Suite Variable    ${QUERY}    ${QUERY}
-    Set Suite Variable    ${CRD_FILTER}    ${CRD_FILTER}
     Set Suite Variable    ${DATABASE_LAG_THRESHOLD}    ${DATABASE_LAG_THRESHOLD}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
     IF    "${HOSTNAME}" != ""
