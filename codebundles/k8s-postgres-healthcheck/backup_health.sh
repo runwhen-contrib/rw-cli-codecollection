@@ -19,7 +19,7 @@ EOF
 
 # Function to check CrunchyDB PostgreSQL Operator backup
 check_crunchy_backup() {
-  POSTGRES_CLUSTER=$(${KUBERNETES_DISTRIBUTION_BINARY} describe -n "$NAMESPACE" postgresclusters.postgres-operator.crunchydata.com --context "$CONTEXT")
+  POSTGRES_CLUSTER=$(${KUBERNETES_DISTRIBUTION_BINARY} describe -n "$NAMESPACE" postgresclusters.postgres-operator.crunchydata.com $OBJECT_NAME --context "$CONTEXT")
   LATEST_BACKUP_TIME=$(echo "$POSTGRES_CLUSTER" | grep -A 5 "Scheduled Backups:" | grep "Completion Time:" | tail -1 | awk '{print $3}')
   LATEST_BACKUP_TIMESTAMP=$(date -d "$LATEST_BACKUP_TIME" +%s)
   CURRENT_TIMESTAMP=$(date +%s)
@@ -49,13 +49,13 @@ check_zalando_backup() {
   fi
 }
 
-# Determine which operator to check
-OPERATOR_TYPE=$1
+# Determine which operator to check based on partial API version
+API_VERSION=$1
 
-if [ "$OPERATOR_TYPE" == "crunchy" ]; then
+if [[ "$API_VERSION" == *"postgres-operator.crunchydata.com"* ]]; then
   check_crunchy_backup
-elif [ "$OPERATOR_TYPE" == "zalando" ]; then
+elif [[ "$API_VERSION" == *"acid.zalan.do"* ]]; then
   check_zalando_backup
 else
-  echo "Unsupported operator type. Please specify 'crunchy' or 'zalando'."
+  echo "Unsupported API version. Please specify a valid API version containing 'postgres-operator.crunchydata.com' or 'acid.zalan.do'."
 fi

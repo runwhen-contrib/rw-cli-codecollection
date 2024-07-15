@@ -33,6 +33,10 @@ spec:
       value: 'statefulset.apps/{{match_resource.resource.metadata.name}}'
     - name: RESOURCE_LABELS
       value: 'cluster-name={{match_resource.resource.metadata.name}}'
+    - name: OBJECT_API_VERSION
+      value: '{{match_resource.resource.apiVersion}}'
+    - name: OBJECT_NAME
+      value: '{{match_resource.resource.metadata.name}}'
   secretsProvided:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}

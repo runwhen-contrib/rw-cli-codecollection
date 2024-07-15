@@ -149,11 +149,13 @@ Fetch Patroni Database Lag
     RW.Core.Add Pre To Report    ${patroni_output.stdout}
 
 Check Database Backup Status
-    [Documentation]    Checks the status of backup operations on Kubernets Postgres clusters. Raises issues if backups have not been completed or appear unhealthy. 
+    [Documentation]    Checks the status of backup operations on Kubernets Postgres clusters. Raises issues if backups have not been completed or appear unhealthy.
     [Tags]    patroni    cluster    health    backup    database    postgres
-
-
-
+    ${backup_health}=    RW.CLI.Run Bash File
+    ...    bash_file=backup_health.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=False
 Run DB Queries
     [Documentation]    Runs a suite of configurable queries to check for index issues, slow-queries, etc and create a report.
     [Tags]    slow queries    index    health    triage    postgres    patroni    tables
@@ -183,6 +185,11 @@ Suite Initialization
     ...    description=Which Kubernetes context to operate within.
     ...    pattern=\w*
     ...    example=my-main-cluster
+    ${OBJECT_NAME}=    RW.Core.Import User Variable
+    ...    OBJECT_NAME
+    ...    type=string
+    ...    description=The name of the custom resource object. For example, a crunchdb databaase object named db1 would be "db1"
+    ...    example=main-db
     ${RESOURCE_LABELS}=    RW.Core.Import User Variable
     ...    RESOURCE_LABELS
     ...    type=string
@@ -232,6 +239,13 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=100
     ...    default=100
+    ${OBJECT_API_VERSION}=    RW.Core.Import User Variable
+    ...    OBJECT_API_VERSION
+    ...    type=string
+    ...    description=The api version of the Kubernetes object. Used to determine the type of checks to perform.
+    ...    pattern=\w*
+    ...    example=acid.zalan.do/v1
+    ...    default=
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
@@ -241,7 +255,9 @@ Suite Initialization
     Set Suite Variable    ${WORKLOAD_CONTAINER}    ${WORKLOAD_CONTAINER}
     Set Suite Variable    ${QUERY}    ${QUERY}
     Set Suite Variable    ${DATABASE_LAG_THRESHOLD}    ${DATABASE_LAG_THRESHOLD}
-    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
+    Set Suite Variable    ${OBJECT_API_VERSION}    ${OBJECT_API_VERSION}
+    Set Suite Variable    ${OBJECT_NAME}    ${OBJECT_NAME}
+    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "NAMESPACE": "${NAMESPACE}", "CONTEXT": "${CONTEXT}", "RESOURCE_LABELS": "${RESOURCE_LABELS}", "OBJECT_NAME":"${OBJECT_NAME}"}
     IF    "${HOSTNAME}" != ""
         ${HOSTNAME}=    Set Variable    -h ${HOSTNAME}
     END

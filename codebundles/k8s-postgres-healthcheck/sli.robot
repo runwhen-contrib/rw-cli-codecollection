@@ -51,7 +51,6 @@ Suite Initialization
     ...    description=The kubernetes kubeconfig yaml containing connection configuration used to connect to cluster(s).
     ...    pattern=\w*
     ...    example=For examples, start here https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
-
     ${CONTEXT}=    RW.Core.Import User Variable    CONTEXT
     ...    type=string
     ...    description=Which Kubernetes context to operate within.

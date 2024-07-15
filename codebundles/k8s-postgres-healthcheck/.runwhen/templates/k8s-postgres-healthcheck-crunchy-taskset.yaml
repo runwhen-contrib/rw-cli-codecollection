@@ -33,6 +33,10 @@ spec:
       value: '-l postgres-operator.crunchydata.com/cluster={{match_resource.resource.metadata.namespace.name}},postgres-operator.crunchydata.com/role=master'
     - name: RESOURCE_LABELS
       value: postgres-operator.crunchydata.com/cluster={{match_resource.resource.metadata.namespace.name}}
+    - name: OBJECT_API_VERSION
+      value: '{{match_resource.resource.apiVersion}}'
+    - name: OBJECT_NAME
+      value: '{{match_resource.resource.metadata.name}}'
   secretsProvided:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
