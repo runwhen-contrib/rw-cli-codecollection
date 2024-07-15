@@ -27,7 +27,7 @@ Get Standard Postgres Resource Information
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Describe Postgres Custom Resources
-    [Documentation]    Runs a ftech all for the CRD types in the cluster and uses the type list after filtering it to fetch
+    [Documentation]    Runs a fetch all for the CRD types in the cluster and uses the type list after filtering it to fetch
     ...    a list of live runnig CRD workloads of those types and describe them.
     [Tags]    postgres    resources    workloads    customer resource definitions    crd    information
     ${crd_list}=    RW.CLI.Run Cli

@@ -4,6 +4,7 @@ spec:
   generationRules:
   - resourceTypes:
       - postgresql.acid.zalan.do
+      - postgresclusters.postgres-operator.crunchydata.com
     matchRules:
     - type: pattern
       pattern: ".+"
@@ -11,7 +12,7 @@ spec:
       mode: substring
     slxs:
       - baseName: postgres-health
-        qualifiers: ["namespace", "cluster"]
+        qualifiers: ["resource", "namespace", "cluster"]
         baseTemplateName: k8s-postgres-triage
         levelOfDetail: detailed
         outputItems:
