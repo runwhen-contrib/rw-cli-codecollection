@@ -102,7 +102,6 @@ Get Postgres Pod Resource Utilization
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
     ${labeled_pods}=    Split String    ${labeled_pods.stdout}
     ${labeled_pods}=    Evaluate    [full_name.split("/")[-1] for full_name in ${labeled_pods}]
     ${resource_util_info}=    Set Variable    No resource utilization information could be found!
@@ -146,14 +145,11 @@ Get Patroni Output
     [Documentation]    Attempts to run the patronictl CLI within the workload if it's available to check the current state of a patroni cluster, if applicable.
     [Tags]    patroni    patronictl    list    cluster    health    check    state    postgres
     ${rsp}=    RW.CLI.Run Cli
-    ...    cmd=patronictl list
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT} -- patronictl list
     ...    env=${env}
     ...    run_in_workload_with_labels=${RESOURCE_LABELS}
-    ...    optional_namespace=${NAMESPACE}
-    ...    optional_context=${CONTEXT}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${rsp.stdout}
 
