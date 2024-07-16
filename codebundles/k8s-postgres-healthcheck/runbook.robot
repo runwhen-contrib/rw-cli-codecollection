@@ -247,6 +247,7 @@ Suite Initialization
     ...    description=The container to target when executing commands.
     ...    pattern=\w*
     ...    example=database
+    ...    default=database
     ${NAMESPACE}=    RW.Core.Import User Variable
     ...    NAMESPACE
     ...    type=string
