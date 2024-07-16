@@ -22,7 +22,6 @@ List Resources Related to Postgres Cluster `${OBJECT_NAME}` in Namespace `${NAME
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${results.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
@@ -94,6 +93,7 @@ Get Running Postgres Configuration for Cluster `${OBJECT_NAME}` in Namespace `${
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    include_in_history=False
+    ...    show_in_rwl_cheatsheet=true
     ${full_report}=    RW.CLI.Run CLI
     ...    cmd=cat ../config_report.out
     ${issues}=    RW.CLI.Run CLI
@@ -133,6 +133,7 @@ Fetch Patroni Database Lag for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPAC
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec $(${KUBERNETES_DISTRIBUTION_BINARY} get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.items[0].metadata.name}') -n ${NAMESPACE} --context ${CONTEXT} -c ${DATABASE_CONTAINER} -- patronictl list -f json
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
+    ...    show_in_rwl_cheatsheet=true
     ${patroni_members}=    Evaluate    json.loads(r'''${patroni_output.stdout}''')    json
     IF    len(@{patroni_members}) > 0
         FOR    ${item}    IN    @{patroni_members}
@@ -161,6 +162,7 @@ Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESP
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    include_in_history=False
+    ...    show_in_rwl_cheatsheet=true
     ${full_report}=    RW.CLI.Run CLI
     ...    cmd=cat ../backup_report.out
     ${issues}=    RW.CLI.Run CLI
@@ -188,6 +190,7 @@ Run DB Queries for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    include_in_history=False
+    ...    show_in_rwl_cheatsheet=true
     ${full_report}=    RW.CLI.Run CLI
     ...    cmd=cat ../health_query_report.out
     ${issues}=    RW.CLI.Run CLI
