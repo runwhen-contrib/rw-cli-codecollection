@@ -23,7 +23,7 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/k8s-postgres-triage/sli.robot
+    pathToRobot: codebundles/k8s-postgres-healthcheck/sli.robot
   intervalStrategy: intermezzo
   intervalSeconds: 60
   configProvided:

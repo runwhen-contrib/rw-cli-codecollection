@@ -19,7 +19,7 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/k8s-postgres-triage/runbook.robot
+    pathToRobot: codebundles/k8s-postgres-healthcheck/runbook.robot
   configProvided:
     - name: DISTRIBUTION
       value: {{custom.kubernetes_distribution}}
