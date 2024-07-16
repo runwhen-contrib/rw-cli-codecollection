@@ -18,4 +18,4 @@ spec:
           - type: slx
           - type: sli
           - type: runbook
-            templateName: k8s-postgres-healthcheck-taskset.yaml
+            templateName: k8s-postgres-healthcheck-zalando-taskset.yaml
