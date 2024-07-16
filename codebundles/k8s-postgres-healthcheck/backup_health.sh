@@ -1,18 +1,23 @@
 #!/bin/bash
 
+# Clean up report file
+rm ../backup_report.out || true
+
 # Set the maximum acceptable age of the backup (in seconds) - here it's 1 day (86400 seconds)
 MAX_AGE=86400
+
+# Arrays to store backup reports and issues
+BACKUP_REPORTS=()
+ISSUES=()
 
 # Function to generate an issue in JSON format
 generate_issue() {
   cat <<EOF
 {
-  "issue": {
-    "title": "Backup Health Issue",
+    "title": "Backup health issue for Postgres Cluster `${OBJECT_NAME}` in `${NAMESPACE}`",
     "description": "$1",
     "backup_completion_time": "$2",
     "backup_age_seconds": "$3"
-  }
 }
 EOF
 }
@@ -25,10 +30,12 @@ check_crunchy_backup() {
   CURRENT_TIMESTAMP=$(date +%s)
   BACKUP_AGE=$((CURRENT_TIMESTAMP - LATEST_BACKUP_TIMESTAMP))
 
+  BACKUP_REPORTS+=("CrunchyDB Backup completed at $LATEST_BACKUP_TIME with age $BACKUP_AGE seconds.")
+
   if [ "$BACKUP_AGE" -gt "$MAX_AGE" ]; then
-    generate_issue "The latest backup for the CrunchyDB PostgreSQL cluster is older than the acceptable limit." "$LATEST_BACKUP_TIME" "$BACKUP_AGE"
+    ISSUES+=("$(generate_issue "The latest backup for the CrunchyDB PostgreSQL cluster is older than the acceptable limit." "$LATEST_BACKUP_TIME" "$BACKUP_AGE")")
   else
-    echo "CrunchyDB Backup is healthy. Latest backup completed at $LATEST_BACKUP_TIME."
+    BACKUP_REPORTS+=("CrunchyDB Backup is healthy. Latest backup completed at $LATEST_BACKUP_TIME.")
   fi
 }
 
@@ -42,20 +49,40 @@ check_zalando_backup() {
   CURRENT_TIMESTAMP=$(date +%s)
   BACKUP_AGE=$((CURRENT_TIMESTAMP - LATEST_BACKUP_TIMESTAMP))
 
+  BACKUP_REPORTS+=("Zalando Backup completed at $LATEST_BACKUP_TIME with age $BACKUP_AGE seconds.")
+
   if [ "$BACKUP_AGE" -gt "$MAX_AGE" ]; then
-    generate_issue "The latest backup for the Zalando PostgreSQL cluster is older than the acceptable limit." "$LATEST_BACKUP_TIME" "$BACKUP_AGE"
+    ISSUES+=("$(generate_issue "The latest backup for the Zalando PostgreSQL cluster is older than the acceptable limit." "$LATEST_BACKUP_TIME" "$BACKUP_AGE")")
   else
-    echo "Zalando Backup is healthy. Latest backup completed at $LATEST_BACKUP_TIME."
+    BACKUP_REPORTS+=("Zalando Backup is healthy. Latest backup completed at $LATEST_BACKUP_TIME.")
   fi
 }
 
-# Determine which operator to check based on partial API version
-API_VERSION=$1
-
-if [[ "$API_VERSION" == *"postgres-operator.crunchydata.com"* ]]; then
+# Check the backup based on API version
+if [[ "$OBJECT_API_VERSION" == *"crunchydata.com"* ]]; then
   check_crunchy_backup
-elif [[ "$API_VERSION" == *"acid.zalan.do"* ]]; then
+elif [[ "$OBJECT_API_VERSION" == *"zalan.do"* ]]; then
   check_zalando_backup
 else
-  echo "Unsupported API version. Please specify a valid API version containing 'postgres-operator.crunchydata.com' or 'acid.zalan.do'."
+  echo "Unsupported API version: $OBJECT_API_VERSION. Please specify a valid API version containing 'postgres-operator.crunchydata.com' or 'acid.zalan.do'."
 fi
+
+
+OUTPUT_FILE="../backup_report.out"
+rm $OUTPUT_FILE
+
+# Print the backup reports and issues
+echo "Backup Report:" > "$OUTPUT_FILE"
+for report in "${BACKUP_REPORTS[@]}"; do
+  echo "$report" >> "$OUTPUT_FILE"
+done
+
+echo "" >> ."$OUTPUT_FILE"
+echo "Issues:" >> "$OUTPUT_FILE"
+echo "[" >> "$OUTPUT_FILE"
+for issue in "${ISSUES[@]}"; do
+  echo "$issue," >> "$OUTPUT_FILE"
+done
+# Remove the last comma and close the JSON array
+sed -i '$ s/,$//' "$OUTPUT_FILE"
+echo "]" >> "$OUTPUT_FILE"

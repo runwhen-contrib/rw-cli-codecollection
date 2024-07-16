@@ -14,7 +14,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Get Standard Postgres Resource Information
+List Resources Related to Postgres Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Runs a simple fetch all for the resources in the given workspace under the configured labels.
     [Tags]    postgres    resources    workloads    standard    information
     ${results}=    RW.CLI.Run Cli
@@ -27,7 +27,7 @@ Get Standard Postgres Resource Information
     RW.Core.Add Pre To Report    ${results.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Get Postgres Pod Logs & Events
+Get Postgres Pod Logs & Events for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Queries Postgres-related pods for their recent logs and checks for any warning-type events.
     [Tags]    postgres    events    warnings    labels    logs    errors    pods
     ${labeled_pods}=    RW.CLI.Run Cli
@@ -41,7 +41,7 @@ Get Postgres Pod Logs & Events
     ${found_pod_events}=    Set Variable    No events found!
     IF    len(${labeled_pod_names}) > 0
         ${temp_logs}=    RW.CLI.Run Cli
-        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs {item} -n ${NAMESPACE} --context ${CONTEXT} --tail=100
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs {item} -n ${NAMESPACE} --context ${CONTEXT} -c ${DATABASE_CONTAINER} --tail=100
         ...    env=${env}
         ...    secret_file__kubeconfig=${KUBECONFIG}
         ...    loop_with_items=${labeled_pod_names}
@@ -63,9 +63,9 @@ Get Postgres Pod Logs & Events
     RW.Core.Add Pre To Report    Event Results:\n${found_pod_events}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Get Postgres Pod Resource Utilization
+Get Postgres Pod Resource Utilization for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Performs and a top command on list of labeled postgres-related workloads to check pod resources.
-    [Tags]    top    resources    utilization    pods    workloads    cpu    memory    allocation    postgres
+    [Tags]    top    resources    utilization    database    workloads    cpu    memory    allocation    postgres
     ${labeled_pods}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT} -o=name --field-selector=status.phase=Running
     ...    env=${env}
@@ -86,46 +86,51 @@ Get Postgres Pod Resource Utilization
     RW.Core.Add Pre To Report    Pod Resources:\n${resource_util_info}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Get Running Postgres Configuration
+Get Running Postgres Configuration for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches the postgres instance's configuration information.
     [Tags]    config    postgres    file    show    path    setup    configuration
-    ${config_query}=    Set Variable    SHOW config_file
-    ${config_rsp}=    RW.CLI.K8s Postgres Query    query=${config_query}
-    ...    context=${CONTEXT}
-    ...    namespace=${NAMESPACE}
-    ...    kubeconfig=${kubeconfig}
+    ${config_health}=    RW.CLI.Run Bash File
+    ...    bash_file=config_health.sh
     ...    env=${env}
-    ...    labels=${RESOURCE_LABELS}
-    ...    workload_name=${WORKLOAD_NAME}
-    ${active_db_config_location}=    Split String    ${config_rsp.stdout}
-    ${active_db_config_contents}=    RW.CLI.Run Cli
-    ...    cmd=cat ${active_db_config_location[0]}
-    ...    env=${env}
-    ...    run_in_workload_with_labels=${RESOURCE_LABELS}
-    ...    optional_namespace=${NAMESPACE}
-    ...    optional_context=${CONTEXT}
-    ...    secret_file__kubeconfig=${KUBECONFIG}
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report
-    ...    File Path:\n${active_db_config_location[0]}\n--------\nFile Contents:\n${active_db_config_contents.stdout}\n--------
-    RW.Core.Add Pre To Report    Commands Used:\n${history}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=False
+    ${full_report}=    RW.CLI.Run CLI
+    ...    cmd=cat ../config_report.out
+    ${issues}=    RW.CLI.Run CLI
+    ...    cmd=awk '/Issues:/ {flag=1; next} /Backup Report:/ {flag=0} flag {print}' ../config_report.out
+    ${issues_json}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issues_json}) > 0
+        FOR    ${item}    IN    @{issues_json}
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    expected=Configuration issues for `${OBJECT_NAME}` in `${NAMESPACE}` should not be present.
+            ...    actual=${item["description"]}
+            ...    title=${item["title"]}
+            ...    reproduce_hint=${config_health.cmd}
+            ...    details=${item}
+            ...    next_steps=Escalate database configuraiton issues to service owner of `${OBJECT_NAME}` in namespace `${NAMESPACE}`
+        END
+    END
+    RW.Core.Add Pre To Report    Commands Used:\n${config_health.cmd}
+    RW.Core.Add Pre To Report    ${config_health.stdout}
 
-Get Patroni Output and Add to Report
+Get Patroni Output and Add to Report for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Attempts to run the patronictl CLI within the workload if it's available to check the current state of a patroni cluster, if applicable.
     [Tags]    patroni    patronictl    list    cluster    health    check    state    postgres
-    ${rsp}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec $(${KUBERNETES_DISTRIBUTION_BINARY} get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.items[0].metadata.name}') -n ${NAMESPACE} --context ${CONTEXT} -c database -- patronictl list
+    ${patroni_output}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec $(${KUBERNETES_DISTRIBUTION_BINARY} get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.items[0].metadata.name}') -n ${NAMESPACE} --context ${CONTEXT} -c ${DATABASE_CONTAINER} -- patronictl list
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    ${rsp.stdout}
+    RW.Core.Add Pre To Report    Patroni Output:\n${patroni_output.stdout}
+    RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Fetch Patroni Database Lag
+Fetch Patroni Database Lag for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Identifies the lag using patronictl and raises issues if necessary.
     [Tags]    patroni    patronictl    list    cluster    health    postgres    lag
     ${patroni_output}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec $(${KUBERNETES_DISTRIBUTION_BINARY} get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.items[0].metadata.name}') -n ${NAMESPACE} --context ${CONTEXT} -c database -- patronictl list -f json
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec $(${KUBERNETES_DISTRIBUTION_BINARY} get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.items[0].metadata.name}') -n ${NAMESPACE} --context ${CONTEXT} -c ${DATABASE_CONTAINER} -- patronictl list -f json
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ${patroni_members}=    Evaluate    json.loads(r'''${patroni_output.stdout}''')    json
@@ -148,7 +153,7 @@ Fetch Patroni Database Lag
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${patroni_output.stdout}
 
-Check Database Backup Status
+Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Checks the status of backup operations on Kubernets Postgres clusters. Raises issues if backups have not been completed or appear unhealthy.
     [Tags]    patroni    cluster    health    backup    database    postgres
     ${backup_health}=    RW.CLI.Run Bash File
@@ -156,19 +161,51 @@ Check Database Backup Status
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    include_in_history=False
-Run DB Queries
+    ${full_report}=    RW.CLI.Run CLI
+    ...    cmd=cat ../backup_report.out
+    ${issues}=    RW.CLI.Run CLI
+    ...    cmd=awk '/Issues:/ {flag=1; next} /Backup Report:/ {flag=0} flag {print}' ../backup_report.out
+    ${issues_json}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issues_json}) > 0
+        FOR    ${item}    IN    @{issues_json}
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Database backups for `${OBJECT_NAME}` in `${NAMESPACE}` should be completed in the last 24 hours
+            ...    actual=${item["description"]}
+            ...    title=${item["title"]}
+            ...    reproduce_hint=${backup_health.cmd}
+            ...    details=${item}
+            ...    next_steps=Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
+        END
+    END
+    RW.Core.Add Pre To Report    ${full_report.stdout}
+
+Run DB Queries for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Runs a suite of configurable queries to check for index issues, slow-queries, etc and create a report.
     [Tags]    slow queries    index    health    triage    postgres    patroni    tables
-    ${rsp}=    RW.CLI.K8s Postgres Query    query=${QUERY}
-    ...    context=${CONTEXT}
-    ...    namespace=${NAMESPACE}
-    ...    kubeconfig=${kubeconfig}
+    ${dbquery}=    RW.CLI.Run Bash File
+    ...    bash_file=dbquery.sh
     ...    env=${env}
-    ...    labels=${RESOURCE_LABELS}
-    ...    workload_name=${WORKLOAD_NAME}
-    ...    opt_flags=\t off \\ \a \\ \timing on \\
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    ${rsp.stdout}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=False
+    ${full_report}=    RW.CLI.Run CLI
+    ...    cmd=cat ../health_query_report.out
+    ${issues}=    RW.CLI.Run CLI
+    ...    cmd=awk '/Issues:/ {flag=1; next} /Backup Report:/ {flag=0} flag {print}' ../health_query_report.out
+    ${issues_json}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issues_json}) > 0
+        FOR    ${item}    IN    @{issues_json}
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Datbase Query for `${OBJECT_NAME}` in `${NAMESPACE}` should execute successfully.
+            ...    actual=${item["description"]}
+            ...    title=${item["title"]}
+            ...    reproduce_hint=${dbquery.cmd}
+            ...    details=${item}
+            ...    next_steps=Verify the database query for postgres cluster`${OBJECT_NAME}` in `${NAMESPACE}`\Check Deployment or StatefulSet Health for `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
+        END
+    END
+    RW.Core.Add Pre To Report    ${full_report.stdout}
 
 
 *** Keywords ***
@@ -189,7 +226,7 @@ Suite Initialization
     ...    OBJECT_NAME
     ...    type=string
     ...    description=The name of the custom resource object. For example, a crunchdb databaase object named db1 would be "db1"
-    ...    example=main-db
+    ...    example=db1
     ${RESOURCE_LABELS}=    RW.Core.Import User Variable
     ...    RESOURCE_LABELS
     ...    type=string
@@ -201,8 +238,8 @@ Suite Initialization
     ...    description=Which workload to run the postgres query from. This workload should have the psql binary in its image and be able to access the database workload within its network constraints. Accepts namespace and container details if desired. Also accepts labels, such as `-l postgres-operator.crunchydata.com/role=primary`. If using labels, make sure NAMESPACE is set.
     ...    pattern=\w*
     ...    example=deployment/myapp
-    ${WORKLOAD_CONTAINER}=    RW.Core.Import User Variable
-    ...    WORKLOAD_CONTAINER
+    ${DATABASE_CONTAINER}=    RW.Core.Import User Variable
+    ...    DATABASE_CONTAINER
     ...    type=string
     ...    description=The container to target when executing commands.
     ...    pattern=\w*
@@ -217,7 +254,7 @@ Suite Initialization
     ...    type=string
     ...    description=The postgres queries to run on the workload. These should return helpful details to triage your database.
     ...    pattern=\w*
-    ...    default=SELECT (total_exec_time / 1000 / 60) as total, (total_exec_time/calls) as avg, query FROM pg_stat_statements ORDER BY 1 DESC LIMIT 100;SELECT pg_stat_activity.pid, pg_locks.relation::regclass, pg_locks.mode, pg_locks.granted FROM pg_stat_activity, pg_locks WHERE pg_stat_activity.pid = pg_locks.pid; SELECT pg_database.datname, pg_size_pretty(pg_database_size(pg_database.datname)) AS size FROM pg_database; SELECT query, count(*) as total_executions, avg(total_exec_time) as avg_execution_time FROM pg_stat_statements GROUP BY query ORDER BY total_executions DESC; SELECT schemaname, relname, last_autovacuum, last_autoanalyze FROM pg_stat_user_tables WHERE last_autovacuum IS NOT NULL OR last_autoanalyze IS NOT NULL;
+    ...    default=SELECT d.datname AS database_name, pg_size_pretty(pg_database_size(d.datname)) AS database_size, (SELECT count(*) FROM pg_stat_activity WHERE datname = d.datname) AS active_connections FROM pg_database d;
     ...    example=SELECT (total_exec_time / 1000 / 60) as total, (total_exec_time/calls) as avg, query FROM pg_stat_statements ORDER BY 1 DESC LIMIT 100;
     ${HOSTNAME}=    RW.Core.Import User Variable
     ...    HOSTNAME
@@ -252,12 +289,14 @@ Suite Initialization
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${RESOURCE_LABELS}    ${RESOURCE_LABELS}
     Set Suite Variable    ${WORKLOAD_NAME}    ${WORKLOAD_NAME}
-    Set Suite Variable    ${WORKLOAD_CONTAINER}    ${WORKLOAD_CONTAINER}
+    Set Suite Variable    ${DATABASE_CONTAINER}    ${DATABASE_CONTAINER}
     Set Suite Variable    ${QUERY}    ${QUERY}
     Set Suite Variable    ${DATABASE_LAG_THRESHOLD}    ${DATABASE_LAG_THRESHOLD}
     Set Suite Variable    ${OBJECT_API_VERSION}    ${OBJECT_API_VERSION}
     Set Suite Variable    ${OBJECT_NAME}    ${OBJECT_NAME}
-    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "NAMESPACE": "${NAMESPACE}", "CONTEXT": "${CONTEXT}", "RESOURCE_LABELS": "${RESOURCE_LABELS}", "OBJECT_NAME":"${OBJECT_NAME}"}
+    Set Suite Variable
+    ...    ${env}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "NAMESPACE": "${NAMESPACE}", "CONTEXT": "${CONTEXT}", "RESOURCE_LABELS": "${RESOURCE_LABELS}", "OBJECT_NAME":"${OBJECT_NAME}", "OBJECT_API_VERSION": "${OBJECT_API_VERSION}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "DATABASE_CONTAINER": "${DATABASE_CONTAINER}", "QUERY":"${QUERY}"}
     IF    "${HOSTNAME}" != ""
         ${HOSTNAME}=    Set Variable    -h ${HOSTNAME}
     END

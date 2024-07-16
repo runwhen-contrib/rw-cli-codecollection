@@ -67,8 +67,8 @@ Suite Initialization
     ...    description=Which workload to run the postgres query from. This workload should have the psql binary in its image and be able to access the database workload within its network constraints. Accepts namespace and container details if desired. Also accepts labels, such as `-l postgres-operator.crunchydata.com/role=primary`. If using labels, make sure NAMESPACE is set.
     ...    pattern=\w*
     ...    example=deployment/myapp
-    ${WORKLOAD_CONTAINER}=    RW.Core.Import User Variable
-    ...    WORKLOAD_CONTAINER
+    ${DATABASE_CONTAINER}=    RW.Core.Import User Variable
+    ...    DATABASE_CONTAINER
     ...    type=string
     ...    description=The container to target when executing commands.
     ...    pattern=\w*
@@ -111,7 +111,7 @@ Suite Initialization
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${RESOURCE_LABELS}    ${RESOURCE_LABELS}
     Set Suite Variable    ${WORKLOAD_NAME}    ${WORKLOAD_NAME}
-    Set Suite Variable    ${WORKLOAD_CONTAINER}    ${WORKLOAD_CONTAINER}
+    Set Suite Variable    ${DATABASE_CONTAINER}    ${DATABASE_CONTAINER}
     Set Suite Variable    ${QUERY}    ${QUERY}
     Set Suite Variable    ${DATABASE_LAG_THRESHOLD}    ${DATABASE_LAG_THRESHOLD}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
