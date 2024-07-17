@@ -26,7 +26,7 @@ EOF
 display_crunchy_config() {
   POD_NAME=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n "$NAMESPACE" --context "$CONTEXT" -l postgres-operator.crunchydata.com/role=master -o jsonpath="{.items[0].metadata.name}")
   
-  CONFIG=$(${KUBERNETES_DISTRIBUTION_BINARY} exec -n "$NAMESPACE" "$POD_NAME" --context "$CONTEXT" -- psql -U postgres -c "SHOW ALL")
+  CONFIG=$(${KUBERNETES_DISTRIBUTION_BINARY} exec -n "$NAMESPACE" "$POD_NAME" --context "$CONTEXT" -c "$DATABASE_CONTAINER" -- psql -U postgres -c "SHOW ALL")
   
   echo "CrunchyDB PostgreSQL Configuration:"
   echo "$CONFIG"
@@ -60,10 +60,10 @@ display_crunchy_config() {
 display_zalando_config() {
   POD_NAME=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n "$NAMESPACE" --context "$CONTEXT" -l application=spilo -o jsonpath="{.items[0].metadata.name}")
   
-  CONFIG=$(${KUBERNETES_DISTRIBUTION_BINARY} exec -n "$NAMESPACE" "$POD_NAME" --context "$CONTEXT" -- psql -U postgres -c "SHOW ALL")
+  CONFIG=$(${KUBERNETES_DISTRIBUTION_BINARY} exec -n "$NAMESPACE" "$POD_NAME" --context "$CONTEXT" -c "$DATABASE_CONTAINER" -- psql -U postgres -c "SHOW ALL")
   
   echo "Zalando PostgreSQL Configuration:"
-  echo "$CONFIG" &2>1
+  echo "$CONFIG"
 
   CONFIG_REPORTS+=("Zalando PostgreSQL Configuration:\n$CONFIG")
 

@@ -65,24 +65,13 @@ Get Postgres Pod Logs & Events for Cluster `${OBJECT_NAME}` in Namespace `${NAME
 Get Postgres Pod Resource Utilization for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Performs and a top command on list of labeled postgres-related workloads to check pod resources.
     [Tags]    top    resources    utilization    database    workloads    cpu    memory    allocation    postgres
-    ${labeled_pods}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT} -o=name --field-selector=status.phase=Running
+    ${container_resource_utilization}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} top pods -l ${RESOURCE_LABELS} --containers -n ${NAMESPACE} --context ${CONTEXT}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
-    ${labeled_pods}=    Split String    ${labeled_pods.stdout}
-    ${labeled_pods}=    Evaluate    [full_name.split("/")[-1] for full_name in ${labeled_pods}]
-    ${resource_util_info}=    Set Variable    No resource utilization information could be found!
-    IF    len(${labeled_pods}) > 0
-        ${temp_top}=    RW.CLI.Run Cli
-        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} top pod {item} -n ${NAMESPACE} --context ${CONTEXT} --containers
-        ...    env=${env}
-        ...    secret_file__kubeconfig=${KUBECONFIG}
-        ...    loop_with_items=${labeled_pods}
-        ${resource_util_info}=    Set Variable    ${temp_top.stdout}
-    END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Pod Resources:\n${resource_util_info}
+    RW.Core.Add Pre To Report    Pod Resource Utilization:\n${container_resource_utilization.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Get Running Postgres Configuration for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
