@@ -30,7 +30,7 @@ spec:
     - name: KUBERNETES_DISTRIBUTION_BINARY
       value: {{custom.kubernetes_distribution_binary}}
     - name: WORKLOAD_NAME
-      value: 'statefulset.apps/{{match_resource.resource.metadata.name}}'
+      value: '-l application=spilo,cluster-name={{match_resource.resource.metadata.name}}'
     - name: RESOURCE_LABELS
       value: 'cluster-name={{match_resource.resource.metadata.name}}'
     - name: OBJECT_API_VERSION
