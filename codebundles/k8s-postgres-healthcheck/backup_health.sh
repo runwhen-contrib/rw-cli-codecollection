@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# Clean up report file
-rm ../backup_report.out || true
 
 # Set the maximum acceptable age of the backup (in seconds) - here it's 1 day (86400 seconds)
 MAX_AGE=86400

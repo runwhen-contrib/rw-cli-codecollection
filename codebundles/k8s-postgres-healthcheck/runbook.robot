@@ -17,13 +17,18 @@ Suite Setup         Suite Initialization
 List Resources Related to Postgres Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Runs a simple fetch all for the resources in the given workspace under the configured labels.
     [Tags]    postgres    resources    workloads    standard    information
-    ${results}=    RW.CLI.Run Cli
+    ${resources}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get all -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
+    ${crd_description}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} describe ${OBJECT_API_VERSION} ${OBJECT_NAME} -n ${NAMESPACE} --context ${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${KUBECONFIG}
+    ...    show_in_rwl_cheatsheet=true
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    ${results.stdout}
+    RW.Core.Add Pre To Report    ${resources.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Get Postgres Pod Logs & Events for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
@@ -276,6 +281,13 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=acid.zalan.do/v1
     ...    default=
+    ${OBJECT_KIND}=    RW.Core.Import User Variable
+    ...    OBJECT_KIND
+    ...    type=string
+    ...    description=The crd kind of the Kubernetes object.
+    ...    pattern=\w*
+    ...    example=postgresqls
+    ...    default=
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
@@ -286,6 +298,7 @@ Suite Initialization
     Set Suite Variable    ${QUERY}    ${QUERY}
     Set Suite Variable    ${DATABASE_LAG_THRESHOLD}    ${DATABASE_LAG_THRESHOLD}
     Set Suite Variable    ${OBJECT_API_VERSION}    ${OBJECT_API_VERSION}
+    Set Suite Variable    ${OBJECT_KIND}    ${OBJECT_KIND}
     Set Suite Variable    ${OBJECT_NAME}    ${OBJECT_NAME}
     Set Suite Variable
     ...    ${env}
