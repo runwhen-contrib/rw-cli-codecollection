@@ -166,7 +166,7 @@ Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESP
             ...    title=${item["title"]}
             ...    reproduce_hint=${backup_health.cmd}
             ...    details=${item}
-            ...    next_steps=Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
+            ...    next_steps=Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`\nCheck Postgres archive settings from running configuration in Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
         END
     END
     RW.Core.Add Pre To Report    ${full_report.stdout}
