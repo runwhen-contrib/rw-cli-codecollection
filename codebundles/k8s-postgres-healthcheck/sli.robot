@@ -37,8 +37,28 @@ Fetch Patroni Database Lag
     END
     Set Global Variable    ${database_lag_score}
 
+Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
+    [Documentation]    Ensure that backups are current and not stale.
+    [Tags]    patroni    cluster    health    backup    database    postgres
+    ${database_backup_score}=    Set Variable    1
+    ${backup_health}=    RW.CLI.Run Bash File
+    ...    bash_file=backup_health.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=False
+    ${full_report}=    RW.CLI.Run CLI
+    ...    cmd=cat ../backup_report.out
+    ${issues}=    RW.CLI.Run CLI
+    ...    cmd=awk '/Issues:/ {flag=1; next} /Backup Report:/ {flag=0} flag {print}' ../backup_report.out
+    ${issues_json}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issues_json}) > 0
+        Log    ${issues_json[0]["description"]}
+        ${database_backup_score}=    Set Variable    0
+    END
+    Set Global Variable    ${database_backup_score}
+
 Generate Namspace Score
-    ${postgres_health_score}=    Evaluate    (${database_lag_score} ) / 1
+    ${postgres_health_score}=    Evaluate    (${database_lag_score} + ${database_backup_score}) / 2
     ${health_score}=    Convert to Number    ${postgres_health_score}    2
     RW.Core.Push Metric    ${postgres_health_score}
 
@@ -99,6 +119,32 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=100
     ...    default=100
+    ${OBJECT_API_VERSION}=    RW.Core.Import User Variable
+    ...    OBJECT_API_VERSION
+    ...    type=string
+    ...    description=The api version of the Kubernetes object. Used to determine the type of checks to perform.
+    ...    pattern=\w*
+    ...    example=acid.zalan.do/v1
+    ...    default=
+    ${OBJECT_KIND}=    RW.Core.Import User Variable
+    ...    OBJECT_KIND
+    ...    type=string
+    ...    description=The fully qualified custom resource of the Kubernetes object.
+    ...    pattern=\w*
+    ...    example=postgresql.acid.zalan.do
+    ...    default=
+    ${OBJECT_NAME}=    RW.Core.Import User Variable
+    ...    OBJECT_NAME
+    ...    type=string
+    ...    description=The name of the custom resource object. For example, a crunchdb databaase object named db1 would be "db1"
+    ...    example=db1
+    ${BACKUP_MAX_AGE}=    RW.Core.Import User Variable
+    ...    BACKUP_MAX_AGE
+    ...    type=string
+    ...    description=The maximum age (in hours) of the last backup before an issue is generated.
+    ...    pattern=\w*
+    ...    example=26
+    ...    default=26
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
@@ -107,7 +153,13 @@ Suite Initialization
     Set Suite Variable    ${WORKLOAD_NAME}    ${WORKLOAD_NAME}
     Set Suite Variable    ${DATABASE_CONTAINER}    ${DATABASE_CONTAINER}
     Set Suite Variable    ${DATABASE_LAG_THRESHOLD}    ${DATABASE_LAG_THRESHOLD}
+    Set Suite Variable    ${OBJECT_KIND}    ${OBJECT_KIND}
+    Set Suite Variable    ${OBJECT_NAME}    ${OBJECT_NAME}
+    Set Suite Variable    ${BACKUP_MAX_AGE}    ${BACKUP_MAX_AGE}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
+    Set Suite Variable
+    ...    ${env}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "NAMESPACE": "${NAMESPACE}", "CONTEXT": "${CONTEXT}", "RESOURCE_LABELS": "${RESOURCE_LABELS}", "OBJECT_NAME":"${OBJECT_NAME}", "OBJECT_API_VERSION": "${OBJECT_API_VERSION}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "DATABASE_CONTAINER": "${DATABASE_CONTAINER}", "BACKUP_MAX_AGE": "${BACKUP_MAX_AGE}"}
     IF    "${HOSTNAME}" != ""
         ${HOSTNAME}=    Set Variable    -h ${HOSTNAME}
     END

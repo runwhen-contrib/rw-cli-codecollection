@@ -18,12 +18,7 @@ List Resources Related to Postgres Cluster `${OBJECT_NAME}` in Namespace `${NAME
     [Documentation]    Runs a simple fetch all for the resources in the given workspace under the configured labels.
     [Tags]    postgres    resources    workloads    standard    information
     ${resources}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get all -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${KUBECONFIG}
-    ...    show_in_rwl_cheatsheet=true
-    ${crd_description}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} describe ${OBJECT_API_VERSION} ${OBJECT_NAME} -n ${NAMESPACE} --context ${CONTEXT}
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get all -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT} && ${KUBERNETES_DISTRIBUTION_BINARY} describe ${OBJECT_KIND} ${OBJECT_NAME} -n ${NAMESPACE} --context ${CONTEXT}
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
@@ -284,10 +279,17 @@ Suite Initialization
     ${OBJECT_KIND}=    RW.Core.Import User Variable
     ...    OBJECT_KIND
     ...    type=string
-    ...    description=The crd kind of the Kubernetes object.
+    ...    description=The fully qualified custom resource of the Kubernetes object.
     ...    pattern=\w*
-    ...    example=postgresqls
+    ...    example=postgresql.acid.zalan.do
     ...    default=
+    ${BACKUP_MAX_AGE}=    RW.Core.Import User Variable
+    ...    BACKUP_MAX_AGE
+    ...    type=string
+    ...    description=The maximum age (in hours) of the last backup before an issue is generated.
+    ...    pattern=\w*
+    ...    example=26
+    ...    default=26
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
@@ -300,9 +302,10 @@ Suite Initialization
     Set Suite Variable    ${OBJECT_API_VERSION}    ${OBJECT_API_VERSION}
     Set Suite Variable    ${OBJECT_KIND}    ${OBJECT_KIND}
     Set Suite Variable    ${OBJECT_NAME}    ${OBJECT_NAME}
+    Set Suite Variable    ${BACKUP_MAX_AGE}    ${BACKUP_MAX_AGE}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "NAMESPACE": "${NAMESPACE}", "CONTEXT": "${CONTEXT}", "RESOURCE_LABELS": "${RESOURCE_LABELS}", "OBJECT_NAME":"${OBJECT_NAME}", "OBJECT_API_VERSION": "${OBJECT_API_VERSION}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "DATABASE_CONTAINER": "${DATABASE_CONTAINER}", "QUERY":"${QUERY}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "NAMESPACE": "${NAMESPACE}", "CONTEXT": "${CONTEXT}", "RESOURCE_LABELS": "${RESOURCE_LABELS}", "OBJECT_NAME":"${OBJECT_NAME}", "OBJECT_API_VERSION": "${OBJECT_API_VERSION}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "DATABASE_CONTAINER": "${DATABASE_CONTAINER}", "QUERY":"${QUERY}", "BACKUP_MAX_AGE": "${BACKUP_MAX_AGE}"}
     IF    "${HOSTNAME}" != ""
         ${HOSTNAME}=    Set Variable    -h ${HOSTNAME}
     END

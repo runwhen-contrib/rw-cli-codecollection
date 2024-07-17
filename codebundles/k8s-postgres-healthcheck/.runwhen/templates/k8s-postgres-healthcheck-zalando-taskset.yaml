@@ -39,7 +39,7 @@ spec:
       value: '{{match_resource.resource.metadata.name}}'
     - name: DATABASE_CONTAINER
       value: 'postgres'
-    - name: OBJECT
+    - name: OBJECT_KIND
       value: {{match_resource.resource.kind}}.{{match_resource.resource.apiVersion.split('/')[0]}}
   secretsProvided:
     - name: kubeconfig
