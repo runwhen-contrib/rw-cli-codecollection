@@ -17,3 +17,16 @@ class StackTraceData()
 
 line numbers associated with exceptions per file
 
+<a id="libraries.RW.K8sApplications.parsers.BaseStackTraceParse"></a>
+
+## BaseStackTraceParse Objects
+
+```python
+class BaseStackTraceParse()
+```
+
+Base class for stacktrace parsing functions.
+Should be stateless so it can be used as a utility class.
+
+Note that the default behavior assumes python stack traces, and inheritors can override for other languages.
+
