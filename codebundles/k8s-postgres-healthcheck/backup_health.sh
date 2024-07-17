@@ -20,8 +20,9 @@ EOF
 
 # Function to check CrunchyDB PostgreSQL Operator backup
 check_crunchy_backup() {
-  POSTGRES_CLUSTER=$(${KUBERNETES_DISTRIBUTION_BINARY} describe -n "$NAMESPACE" postgresclusters.postgres-operator.crunchydata.com $OBJECT_NAME --context "$CONTEXT")
-  LATEST_BACKUP_TIME=$(echo "$POSTGRES_CLUSTER" | grep -A 5 "Scheduled Backups:" | grep "Completion Time:" | tail -1 | awk '{print $3}')
+  POSTGRES_CLUSTER_JSON=$(${KUBERNETES_DISTRIBUTION_BINARY} get postgresclusters.postgres-operator.crunchydata.com $OBJECT_NAME -n "$NAMESPACE" --context "$CONTEXT" -o json)
+  LATEST_BACKUP_TIME=$(echo "$POSTGRES_CLUSTER_JSON" | jq -r '.status.pgbackrest.scheduledBackups | max_by(.completionTime) | .completionTime')
+  
   LATEST_BACKUP_TIMESTAMP=$(date -d "$LATEST_BACKUP_TIME" +%s)
   CURRENT_TIMESTAMP=$(date +%s)
   BACKUP_AGE=$((CURRENT_TIMESTAMP - LATEST_BACKUP_TIMESTAMP))
@@ -66,7 +67,7 @@ else
 fi
 
 OUTPUT_FILE="../backup_report.out"
-rm $OUTPUT_FILE
+rm -f $OUTPUT_FILE
 
 # Print the backup reports and issues
 echo "Backup Report:" > "$OUTPUT_FILE"
