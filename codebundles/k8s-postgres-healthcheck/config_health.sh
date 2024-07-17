@@ -63,7 +63,7 @@ display_zalando_config() {
   CONFIG=$(${KUBERNETES_DISTRIBUTION_BINARY} exec -n "$NAMESPACE" "$POD_NAME" --context "$CONTEXT" -- psql -U postgres -c "SHOW ALL")
   
   echo "Zalando PostgreSQL Configuration:"
-  echo "$CONFIG"
+  echo "$CONFIG" &2>1
 
   CONFIG_REPORTS+=("Zalando PostgreSQL Configuration:\n$CONFIG")
 

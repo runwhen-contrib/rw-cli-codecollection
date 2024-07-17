@@ -3,7 +3,7 @@ kind: GenerationRules
 spec:
   generationRules:
   - resourceTypes:
-      - postgresql.acid.zalan.do
+      - postgresqls.acid.zalan.do
     matchRules:
     - type: pattern
       pattern: ".+"
