@@ -108,7 +108,7 @@ Get Running Postgres Configuration for Cluster `${OBJECT_NAME}` in Namespace `${
             ...    title=${item["title"]}
             ...    reproduce_hint=${config_health.cmd}
             ...    details=${item}
-            ...    next_steps=Escalate database configuraiton issues to service owner of `${OBJECT_NAME}` in namespace `${NAMESPACE}`
+            ...    next_steps=Escalate database configuration issues to service owner of `${OBJECT_NAME}` in namespace `${NAMESPACE}`
         END
     END
     RW.Core.Add Pre To Report    Commands Used:\n${config_health.cmd}
