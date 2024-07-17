@@ -40,7 +40,7 @@ spec:
     - name: DATABASE_CONTAINER
       value: 'postgres'
     - name: match-details
-      value: '{{match_resource}}'
+      value: '{{match_resource.metadata.kind}}'
   secretsProvided:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
