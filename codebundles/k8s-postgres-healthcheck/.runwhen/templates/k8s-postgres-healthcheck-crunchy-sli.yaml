@@ -38,7 +38,7 @@ spec:
     - name: WORKLOAD_NAME
       value: '-l postgres-operator.crunchydata.com/cluster={{match_resource.resource.metadata.namespace.name}},postgres-operator.crunchydata.com/role=master'
     - name: RESOURCE_LABELS
-      value: postgres-operator.crunchydata.com/cluster={{match_resource.resource.metadata.namespace.name}}
+      value: postgres-operator.crunchydata.com/cluster={{match_resource.resource.metadata.name}}
     - name: OBJECT_API_VERSION
       value: '{{match_resource.resource.apiVersion}}'
     - name: OBJECT_NAME
