@@ -12,7 +12,7 @@ spec:
   asMeasuredBy: Node cpu and memory utilization.    
   configProvided:
   - name: OBJECT_NAME
-    value: {{cluster.namee}}
+    value: {{cluster.name}}
   owners:
   - {{workspace.owner_email}}
   statement: Cluster resources for {{cluster.context}} should be less than 90% utilization. 
