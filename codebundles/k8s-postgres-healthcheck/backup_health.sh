@@ -14,7 +14,7 @@ ISSUES=()
 generate_issue() {
   cat <<EOF
 {
-    "title": "Backup health issue for Postgres Cluster `${OBJECT_NAME}` in `${NAMESPACE}`",
+    "title": "Backup health issue for Postgres Cluster \`$OBJECT_NAME\` in \`$NAMESPACE\`",
     "description": "$1",
     "backup_completion_time": "$2",
     "backup_age_seconds": "$3"
@@ -33,7 +33,7 @@ check_crunchy_backup() {
   BACKUP_REPORTS+=("CrunchyDB Backup completed at $LATEST_BACKUP_TIME with age $BACKUP_AGE seconds.")
 
   if [ "$BACKUP_AGE" -gt "$MAX_AGE" ]; then
-    ISSUES+=("$(generate_issue "The latest backup for the CrunchyDB PostgreSQL cluster is older than the acceptable limit." "$LATEST_BACKUP_TIME" "$BACKUP_AGE")")
+    ISSUES+=("$(generate_issue "The latest backup for the CrunchyDB PostgreSQL cluster \`$OBJECT_NAME\` is older than the acceptable limit." "$LATEST_BACKUP_TIME" "$BACKUP_AGE")")
   else
     BACKUP_REPORTS+=("CrunchyDB Backup is healthy. Latest backup completed at $LATEST_BACKUP_TIME.")
   fi
