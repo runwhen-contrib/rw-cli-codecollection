@@ -2,7 +2,7 @@
 Documentation       Runs multiple Kubernetes and psql commands to report on the health of a postgres cluster. Produces a value between 0 (completely failing thet test) and 1 (fully passing the test). Looks for container restarts, events, and pods not ready.
 Metadata            Author    stewartshea
 Metadata            Display Name    Kubernetes Postgres Healthcheck
-Metadata            Supports    AKS,EKS,GKE,Kubernetes,Patroni,Postgres,Crunchy
+Metadata            Supports    AKS,EKS,GKE,Kubernetes,Patroni,Postgres,Crunchy,Zalando
 
 Library             RW.Core
 Library             RW.CLI

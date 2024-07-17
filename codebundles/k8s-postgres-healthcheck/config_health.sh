@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# Set the maximum acceptable age of the backup (in seconds) - here it's 1 day (86400 seconds)
-MAX_AGE=86400
-
 # Arrays to collect reports and issues
 CONFIG_REPORTS=()
 ISSUES=()
@@ -54,6 +51,15 @@ display_crunchy_config() {
   else
     echo "max_connections setting is adequate."
   fi
+
+  # Check if PgBouncer is deployed in the status
+  PGB_READY=$(${KUBERNETES_DISTRIBUTION_BINARY} get postgresclusters.postgres-operator.crunchydata.com "$OBJECT_NAME" -n "$NAMESPACE" --context "$CONTEXT" -o jsonpath="{.status.proxy.pgBouncer.readyReplicas}")
+  if [[ "$PGB_READY" -gt 0 ]]; then
+    PGB_CONFIGMAP_NAME=$(${KUBERNETES_DISTRIBUTION_BINARY} get configmap -l postgres-operator.crunchydata.com/role=pgbouncer  -n "$NAMESPACE" --context "$CONTEXT" -o jsonpath="{.items[0].metadata.name}")
+    display_pgbouncer_config "$PGB_CONFIGMAP_NAME"
+  else
+    echo "PgBouncer is not deployed for CrunchyDB in the namespace $NAMESPACE."
+  fi
 }
 
 # Function to display configuration and perform sanity checks for Zalando PostgreSQL Operator
@@ -87,6 +93,43 @@ display_zalando_config() {
     generate_issue "max_connections is set to less than 100" "max_connections" "$MAX_CONNECTIONS" ">= 100"
   else
     echo "max_connections setting is adequate."
+  fi
+
+  # Check for PgBouncer
+  PGB_LABEL="application=pgbouncer"
+  display_pgbouncer_config "$PGB_LABEL"
+}
+
+# Function to display configuration and perform sanity checks for PgBouncer
+display_pgbouncer_config() {
+  CONFIGMAP_NAME=$1
+  
+  if [ -z "$CONFIGMAP_NAME" ]; then
+    echo "PgBouncer ConfigMap is not found in the namespace $NAMESPACE."
+    return
+  fi
+  
+  CONFIG=$(${KUBERNETES_DISTRIBUTION_BINARY} get configmap "$CONFIGMAP_NAME" -n "$NAMESPACE" --context "$CONTEXT" -o jsonpath='{.data.pgbouncer\.ini}')
+  
+  echo "PgBouncer Configuration:"
+  echo "$CONFIG"
+
+  CONFIG_REPORTS+=("PgBouncer Configuration:\n$CONFIG")
+
+  # Sanity Checks
+  echo "Performing sanity checks..."
+  if grep -q "max_client_conn" <<< "$CONFIG"; then
+    echo "max_client_conn setting is present."
+  else
+    generate_issue "Missing critical configuration parameter" "max_client_conn" "None" "Expected to be present"
+  fi
+
+  # Example additional sanity check for max_client_conn
+  MAX_CLIENT_CONN=$(grep -i max_client_conn <<< "$CONFIG" | awk -F'=' '{print $2}' | tr -d ' ')
+  if (( MAX_CLIENT_CONN < 100 )); then
+    generate_issue "max_client_conn is set to less than 100" "max_client_conn" "$MAX_CLIENT_CONN" ">= 100"
+  else
+    echo "max_client_conn setting is adequate."
   fi
 }
 

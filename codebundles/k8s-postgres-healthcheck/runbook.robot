@@ -2,7 +2,7 @@
 Documentation       Runs a series of tasks and scores the health of a postgres cluster
 Metadata            Author    stewartshea
 Metadata            Display Name    Kubernetes Postgres Healthcheck
-Metadata            Supports    AKS,EKS,GKE,Kubernetes,Patroni,Postgres,Crunchy
+Metadata            Supports    AKS,EKS,GKE,Kubernetes,Patroni,Postgres,Crunchy,Zalando
 
 Library             RW.Core
 Library             RW.CLI
