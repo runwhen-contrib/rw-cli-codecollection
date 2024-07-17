@@ -11,7 +11,7 @@ ISSUES=()
 generate_issue() {
   issue=$(cat <<EOF
 {
-  "title": "Configuration Health Issue",
+  "title": "Configuration issue for Postgres Cluster \`$OBJECT_NAME\` in \`$NAMESPACE\`",
   "description": "$1",
   "parameter": "$2",
   "current_value": "$3",
