@@ -19,7 +19,7 @@ Fetch Patroni Database Lag
     [Tags]    patroni    patronictl    list    cluster    health    check    state    postgres
     ${database_lag_score}=    Set Variable    1
     ${patroni_output}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec $(${KUBERNETES_DISTRIBUTION_BINARY} get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.items[0].metadata.name}') -n ${NAMESPACE} --context ${CONTEXT} -c database -- patronictl list -f json
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec $(${KUBERNETES_DISTRIBUTION_BINARY} get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.items[0].metadata.name}') -n ${NAMESPACE} --context ${CONTEXT} -c ${DATABASE_CONTAINER} -- patronictl list -f json
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ${patroni_members}=    Evaluate    json.loads(r'''${patroni_output.stdout}''')    json
@@ -73,18 +73,12 @@ Suite Initialization
     ...    description=The container to target when executing commands.
     ...    pattern=\w*
     ...    example=database
+    ...    default=database
     ${NAMESPACE}=    RW.Core.Import User Variable
     ...    NAMESPACE
     ...    type=string
     ...    description=Which namespace the workload is in.
     ...    example=my-database-namespace
-    ${QUERY}=    RW.Core.Import User Variable
-    ...    QUERY
-    ...    type=string
-    ...    description=The postgres queries to run on the workload. These should return helpful details to triage your database.
-    ...    pattern=\w*
-    ...    default=SELECT (total_exec_time / 1000 / 60) as total, (total_exec_time/calls) as avg, query FROM pg_stat_statements ORDER BY 1 DESC LIMIT 100;SELECT pg_stat_activity.pid, pg_locks.relation::regclass, pg_locks.mode, pg_locks.granted FROM pg_stat_activity, pg_locks WHERE pg_stat_activity.pid = pg_locks.pid; SELECT pg_database.datname, pg_size_pretty(pg_database_size(pg_database.datname)) AS size FROM pg_database; SELECT query, count(*) as total_executions, avg(total_exec_time) as avg_execution_time FROM pg_stat_statements GROUP BY query ORDER BY total_executions DESC; SELECT schemaname, relname, last_autovacuum, last_autoanalyze FROM pg_stat_user_tables WHERE last_autovacuum IS NOT NULL OR last_autoanalyze IS NOT NULL;
-    ...    example=SELECT (total_exec_time / 1000 / 60) as total, (total_exec_time/calls) as avg, query FROM pg_stat_statements ORDER BY 1 DESC LIMIT 100;
     ${HOSTNAME}=    RW.Core.Import User Variable
     ...    HOSTNAME
     ...    type=string
@@ -112,7 +106,6 @@ Suite Initialization
     Set Suite Variable    ${RESOURCE_LABELS}    ${RESOURCE_LABELS}
     Set Suite Variable    ${WORKLOAD_NAME}    ${WORKLOAD_NAME}
     Set Suite Variable    ${DATABASE_CONTAINER}    ${DATABASE_CONTAINER}
-    Set Suite Variable    ${QUERY}    ${QUERY}
     Set Suite Variable    ${DATABASE_LAG_THRESHOLD}    ${DATABASE_LAG_THRESHOLD}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
     IF    "${HOSTNAME}" != ""
