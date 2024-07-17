@@ -36,7 +36,7 @@ spec:
     - name: KUBERNETES_DISTRIBUTION_BINARY
       value: {{custom.kubernetes_distribution_binary}}
     - name: WORKLOAD_NAME
-      value: '-l postgres-operator.crunchydata.com/cluster={{match_resource.resource.metadata.namespace.name}},postgres-operator.crunchydata.com/role=master'
+      value: '-l postgres-operator.crunchydata.com/cluster={{match_resource.resource.metadata.name}},postgres-operator.crunchydata.com/role=master'
     - name: RESOURCE_LABELS
       value: 'cluster-name={{match_resource.resource.metadata.name}}'
     - name: OBJECT_API_VERSION
