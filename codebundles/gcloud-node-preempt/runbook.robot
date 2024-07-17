@@ -53,8 +53,8 @@ Suite Initialization
     ...    type=string
     ...    description=The age, in minutes, since the preempt event.
     ...    pattern=\d+
-    ...    default=15
-    ...    example=15
+    ...    default=30
+    ...    example=30
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
