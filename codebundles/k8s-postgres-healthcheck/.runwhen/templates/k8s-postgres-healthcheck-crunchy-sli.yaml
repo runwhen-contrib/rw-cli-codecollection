@@ -43,6 +43,8 @@ spec:
       value: '{{match_resource.resource.apiVersion}}'
     - name: OBJECT_NAME
       value: '{{match_resource.resource.metadata.name}}'
+    - name: DATABASE_CONTAINER
+      value: 'database'
   secretsProvided:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
