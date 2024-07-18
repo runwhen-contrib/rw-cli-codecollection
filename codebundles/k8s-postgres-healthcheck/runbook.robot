@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       Runs a series of tasks and scores the health of a postgres cluster
+Documentation       Runs a series of tasks to check the overall health of a postgres cluster and to provide detailed information useful for debugging or reviewing configurations. 
 Metadata            Author    stewartshea
 Metadata            Display Name    Kubernetes Postgres Healthcheck
 Metadata            Supports    AKS,EKS,GKE,Kubernetes,Patroni,Postgres,Crunchy,Zalando
