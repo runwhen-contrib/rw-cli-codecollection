@@ -133,7 +133,7 @@ Fetch Patroni Database Lag for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPAC
                 ...    severity=1
                 ...    expected=Database cluster `${item["Cluster"]}` in `${NAMESPACE}` should have a lag below ${DATABASE_LAG_THRESHOLD} MB
                 ...    actual=Database cluster `${item["Cluster"]}` in `${NAMESPACE}` has lag above ${DATABASE_LAG_THRESHOLD} MB
-                ...    title=Database member `${item["Member"]}` in Cluster `${item["Cluster"]}` has of ${lag_in_mb} MB in `${NAMESPACE}`
+                ...    title=Database member `${item["Member"]}` in Cluster `${item["Cluster"]}` has lag of ${lag_in_mb} MB in `${NAMESPACE}`
                 ...    reproduce_hint=${patroni_output.cmd}
                 ...    details=${patroni_output.stdout}
                 ...    next_steps=Remediate Lagging Patroni Database Member `${item["Member"]}` in Cluster `${item["Cluster"]}` in `${NAMESPACE}`\nFetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
