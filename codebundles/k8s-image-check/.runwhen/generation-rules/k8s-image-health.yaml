@@ -12,7 +12,7 @@ spec:
       slxs:
         - baseName: image-check
           levelOfDetail: detailed
-          qualifiers: ["resource", "namespace", "cluster"]
+          qualifiers: ["namespace", "cluster"]
           baseTemplateName: k8s-image-check
           outputItems:
             - type: slx
