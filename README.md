@@ -6,12 +6,13 @@
   </a>
 </p>
 
-# RunWhen CLI Codecollection
-This repository is **one of many** CodeCollections that is used with the [RunWhen Platform](www.runwhen.com) and [RunWhen Local](https://docs.runwhen.com/public/v/runwhen-local). It contains CodeBundles that are maintained by the RunWhen team and perform health, operational, and troubleshooting tasks. 
-
+# CodeCollection Registry
 To explore all CodeCollections and tasks, please visit the [CodeCollection Registry](https://registry.runwhen.com/).  
 
 [![Explore CodeCollection Registry](https://storage.googleapis.com/runwhen-nonprod-shared-images/screenshots/registry.png)](https://registry.runwhen.com)
+
+## RunWhen CLI Codecollection
+This repository is **one of many** CodeCollections that is used with the [RunWhen Platform](https://www.runwhen.com){:target="_blank"} and [RunWhen Local](https://docs.runwhen.com/public/v/runwhen-local){:target="_blank"}. It contains CodeBundles that are maintained by the RunWhen team and perform health, operational, and troubleshooting tasks. 
 
 Please see the **[contributing](CONTRIBUTING.md)** and **[code of conduct](CODE_OF_CONDUCT.md)** for details on adding your contributions to this project. 
 
