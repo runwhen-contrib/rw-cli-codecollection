@@ -36,6 +36,11 @@ if [[ $messages =~ "PodInitializing" ]]; then
     add_issue "4" "$owner_kind \`$owner_name\` is initializing" "$messages" "Retry in a few minutes and verify that \`$owner_name\` is running.\nInspect $owner_kind Warning Events for \`$owner_name\`"
 fi
 
+if [[ $messages =~ "Startup probe failed" ]]; then
+    add_issue "2" "$owner_kind \`$owner_name\` is unable to start" "$messages" "Check Deployment Logs for $owner_kind \`$owner_name\`\nReview Startup Probe Configuration for $owner_kind \`$owner_name\`\nIncrease Startup Probe Timeout and Threshold for $owner_kind \`$owner_name\`\nIdentify Resource Constrained Pods In Namespace \`$NAMESPACE\`"
+fi
+
+
 if [[ $messages =~ "Liveness probe failed" || $messages =~ "Liveness probe errored" ]]; then
     add_issue "3" "$owner_kind \`$owner_name\` is restarting" "$messages" "Check Liveliness Probe Configuration for $owner_kind \`$owner_name\`"
 fi
