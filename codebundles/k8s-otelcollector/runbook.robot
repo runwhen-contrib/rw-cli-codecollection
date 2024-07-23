@@ -25,7 +25,7 @@ Query Collector Queued Spans in Namespace `${NAMESPACE}`
     IF    ${process.returncode} > 0
         RW.Core.Add Issue    title=OpenTelemetry Span Queue Growing
         ...    severity=3
-        ...    next_steps=Check OpenTelemetry backend is available and that the collector has enough resources.
+        ...    next_steps=Check OpenTelemetry backend is available in `${NAMESPACE}` and that the collector has enough resources, and that the collector's configmap is up-to-date.
         ...    expected=Queue size for spans should not be past threshold of 500
         ...    actual=Queue size of 500 or larger found
         ...    reproduce_hint=Run otel_metrics_check.sh
@@ -45,7 +45,7 @@ Check OpenTelemetry Collector Logs For Errors In Namespace `${NAMESPACE}`
     IF    ${process.returncode} > 0
         RW.Core.Add Issue    title=OpenTelemetry Collector Has Error Logs
         ...    severity=3
-        ...    next_steps=Tail OpenTelemetry Collector Logs In Namespace For Stacktraces
+        ...    next_steps=Tail OpenTelemetry Collector Logs In Namespace `${NAMESPACE}` For Stacktraces
         ...    expected=Logs do not contain errors
         ...    actual=Found error logs
         ...    reproduce_hint=Run otel_error_check.sh
@@ -65,7 +65,7 @@ Scan OpenTelemetry Logs For Dropped Spans In Namespace `${NAMESPACE}`
     IF    ${process.returncode} > 0
         RW.Core.Add Issue    title=OpenTelemetry Collector Logs Have Dropped Spans
         ...    severity=3
-        ...    next_steps=Tail OpenTelemetry Collector Logs In Namespace For Stacktraces
+        ...    next_steps=Tail OpenTelemetry Collector Logs In Namespace `${NAMESPACE}` For Stacktraces
         ...    expected=Logs do not contain dropped span entries
         ...    actual=Found dropped span entries
         ...    reproduce_hint=Run otel_dropped_check.sh
