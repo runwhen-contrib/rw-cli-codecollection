@@ -1,0 +1,28 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+    - resourceTypes:
+        - deployment
+        - daemonset
+        - statefulset
+      matchRules:
+        - type: and
+          matches:
+            - type: pattern
+              pattern: "opentelemetry-collector"
+              properties: [label-values]
+              mode: substring
+            - type: pattern
+              pattern: "col"
+              properties: [name]
+              mode: substring
+      slxs:
+        - baseName: k8s-otelcollector
+          levelOfDetail: detailed
+          qualifiers: ["resource", "namespace", "cluster"]
+          baseTemplateName: k8s-otelcollector
+          outputItems:
+            - type: slx
+            - type: runbook
+              templateName: k8s-otelcollector-taskset.yaml

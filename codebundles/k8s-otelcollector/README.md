@@ -1,11 +1,15 @@
-# Kubernetes Jaeger HTTP Query
-This codebundle is used for searching in a Jaeger instance for trace data that indicates issues with services.
+# Kubernetes OpenTelemetry Health Check
+Checks the OTEL collector's logs and metrics to determine its health, such as large queues or errors.
+
+Note: if you're having trouble connecting to your otel collector, change the
+ deployment name to another workload in the namespace
 
 ## Tasks
+`Scan OpenTelemetry Logs For Dropped Spans In Namespace `
 
-`Query Traces in Jaeger instance for Unhealthy HTTP Response Codes in Namespace`  
-Locates the Jaeger query service in the configured namespace, port-forwards the service, and queries for all traces within the LOOKBACK period (5m by default) for every available service. Then processes the results and generates issues and next steps for non 200 http error codes. 
+`Check OpenTelemetry Collector Logs For Errors In Namespace`
 
+`Query Collector Queued Spans in Namespace`
 
 ## Configuration
 The TaskSet requires initialization to import necessary secrets, services, and user variables. The following variables should be set:
@@ -14,8 +18,10 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 - `KUBERNETES_DISTRIBUTION_BINARY`: Which binary to use for Kubernetes CLI commands. Default value is `kubectl`.
 - `CONTEXT`: The Kubernetes context to operate within.
 - `NAMESPACE`: The name of the namespace to search. Leave it blank to search in all namespaces.
-- `SERVICE_EXCLUSIONS`: Optional. Services in Jaegar to ignore during trace analysis.
-- `LOOKBACK`: Optional. The age of traces to include in the query. Defaults to 5m (5 Minutes)
+- `WORKLOAD_SERVICE`: Service name to curl against for metrics.
+- `WORKLOAD_NAME`: Workload used for exec requests.
+- `METRICS_PORT`: The port to use to request metrics from.
+
 
 ## Requirements
 - A kubeconfig with appropriate RBAC permissions to perform the desired command.
