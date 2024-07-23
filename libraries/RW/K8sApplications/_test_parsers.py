@@ -13,6 +13,7 @@ from RW.K8sApplications.parsers import (
     PythonStackTraceParse,
     GoLangStackTraceParse,
     GoogleDRFStackTraceParse,
+    CSharpStackTraceParse,
 )
 
 logger = logging.getLogger(__name__)
@@ -66,6 +67,17 @@ def test_golang_parser():
     assert "/src/handlers.go" in results[0].files
     assert results[0].line_nums["/src/handlers.go"] == [69]
     assert results[0].line_nums["/src/middleware.go"] == [82, 109]
+
+
+def test_csharp_parser():
+    logger.info("Testing C# parser")
+    with open(f"{THIS_DIR}/{TEST_DATA_DIR}/csharp.log", "r") as f:
+        data = f.read()
+    print(f"Log data: {data}")
+    results = parse_stacktraces(
+        data, parse_mode=ParseMode.MULTILINE_LOG, parser_override=CSharpStackTraceParse, show_debug=True
+    )
+    print(f"Result: {results}")
 
 
 def test_golang_report():
