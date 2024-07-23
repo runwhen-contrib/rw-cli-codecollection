@@ -107,7 +107,7 @@ Get NotReady Pods
     [Documentation]    Fetches a count of unready pods.
     [Tags]    Pods    Status    Phase    Ready    Unready    Running
     ${unreadypods_results}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select(.status.conditions[]? | select(.type == "Ready" and .status == "False" and .reason != "PodCompleted")) | {kind: .kind, name: .metadata.name, conditions: .status.conditions}' | jq -s '. | length'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select(.status.conditions[]? | select(.type == "Ready" and .status == "False" and .reason != "PodCompleted")) | {kind: .kind, name: .metadata.name, conditions: .status.conditions}' | jq -s '. | length' | tr -d '\n'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     Log    ${unreadypods_results.stdout} total unready pods
