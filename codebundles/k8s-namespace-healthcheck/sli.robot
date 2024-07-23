@@ -107,15 +107,11 @@ Get NotReady Pods
     [Documentation]    Fetches a count of unready pods.
     [Tags]    Pods    Status    Phase    Ready    Unready    Running
     ${unreadypods_results}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --sort-by='status.containerStatuses[0].restartCount' --field-selector=status.phase!=Running -ojson
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select(.status.conditions[]? | select(.type == "Ready" and .status == "False" and .reason != "PodCompleted")) | {kind: .kind, name: .metadata.name, conditions: .status.conditions}' | jq -s '. | length'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ${unready_pod_count}=    RW.CLI.Parse Cli Json Output
-    ...    rsp=${unreadypods_results}
-    ...    extract_path_to_var__unready_pods_count=length(items[])
-    ...    assign_stdout_from_var=unready_pods_count
-    Log    ${unready_pod_count.stdout} total unready pods
-    ${pods_notready_score}=    Evaluate    1 if ${unready_pod_count.stdout} == 0 else 0
+    Log    ${unreadypods_results.stdout} total unready pods
+    ${pods_notready_score}=    Evaluate    1 if ${unreadypods_results.stdout} == 0 else 0
     Set Global Variable    ${pods_notready_score}
 
 Generate Namspace Score
