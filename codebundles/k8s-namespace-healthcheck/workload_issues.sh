@@ -93,7 +93,7 @@ if [[ $messages =~ "OCI runtime exec failed: exec failed: unable to start contai
     add_issue "2" "Possible node or container runtime issue" "$messages" "Escalate container runtime issue to service owner if they continue."
 fi
 
-if [[ $messages =~ "Created container server" || $messages =~ "no changes since last reconcilation" || $messages =~ "Reconciliation finished" ]]; then
+if [[ $messages =~ "Created container server" || $messages =~ "no changes since last reconcilation" || $messages =~ "Reconciliation finished" || "successfully rotated K8s secret" ]]; then
     # Don't generate any issue data, these are normal strings
     echo "[]" | jq .
     exit 0
