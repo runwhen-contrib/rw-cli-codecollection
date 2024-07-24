@@ -85,6 +85,11 @@ if [[ $messages =~ "Deployment does not have minimum availability" ]]; then
     add_issue "3" "$owner_kind \`$owner_name\` is not available." "$messages" "Inspect Deployment Warning Events for \`$owner_name\`"
 fi
 
+if [[ $messages =~ "Created container server" || $messages =~ "no changes since last reconcilation" || $messages =~ "Reconciliation finished" || "successfully rotated K8s secret" ]]; then
+    # Don't generate any issue data, these are normal strings
+    echo "[]" | jq .
+    exit 0
+fi
 
 ### These are ChatGPT Generated and will require tuning. Please migrate above this line when tuned. 
 ## Removed for now - they were getting wildly off-base

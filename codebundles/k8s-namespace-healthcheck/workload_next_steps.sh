@@ -92,6 +92,14 @@ if [[ $messages =~ "Deployment does not have minimum availability" ]]; then
     next_steps+=("Inspect Deployment Warning Events for \`$owner_name\`")
 fi
 
+
+##Exit on normal strings
+if [[ $messages =~ "Created container server" || $messages =~ "no changes since last reconcilation" || $messages =~ "Reconciliation finished" || "successfully rotated K8s secret" ]]; then
+    # Don't generate any issue data, these are normal strings
+    exit 0
+fi
+
+## Catch All
 if [[ ${#next_steps[@]} -eq 0 ]]; then
     next_steps+=("Please review the report logs and escalate the issue if necessary.")
 fi
