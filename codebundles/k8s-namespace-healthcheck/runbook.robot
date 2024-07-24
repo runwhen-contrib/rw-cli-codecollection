@@ -392,7 +392,7 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`
-    [Documentation]    Searches through deployemnts and statefulsets to determine if PodDistruptionBudgets are missing and/or are configured in a risky way that operational maintenance.
+    [Documentation]    Searches through deployemnts and statefulsets to determine if PodDistruptionBudgets are missing and/or are configured in a risky way that might affect maintenance activities.
     [Tags]
     ...    poddisruptionbudget
     ...    pdb
@@ -410,14 +410,14 @@ Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
     ${risky_pdbs}=    RW.CLI.Run Cli
-    ...    cmd=echo "${pdb_check.stdout}" | grep 'Risky' | cut -f 1 -d ' ' | sed 's/^ *//; s/ *$//' | awk -F'/' '{ gsub(/^ *| *$/, "", $1); gsub(/^ *| *$/, "", $2); print $1 "/" $2 }' | sed 's/ *$//' | tr -d '\n'
+    ...    cmd=echo "${pdb_check.stdout}" | grep 'Risky' | cut -f 1 -d ' ' | sed 's/^ *//; s/ *$//' | awk -F'/' '{ gsub(/^ *| *$/, "", $1); gsub(/^ *| *$/, "", $2); print $1 "/" $2 }' | sed 's/ *$//' 
     ...    include_in_history=False
     ${missing_pdbs}=    RW.CLI.Run Cli
-    ...    cmd=echo "${pdb_check.stdout}" | grep 'Missing' | cut -f 1 -d ' ' | sed 's/^ *//; s/ *$//' | awk -F'/' '{ gsub(/^ *| *$/, "", $1); gsub(/^ *| *$/, "", $2); print $1 "/" $2 }' | sed 's/ *$//' | tr -d '\n'
+    ...    cmd=echo "${pdb_check.stdout}" | grep 'Missing' | cut -f 1 -d ' ' | sed 's/^ *//; s/ *$//' | awk -F'/' '{ gsub(/^ *| *$/, "", $1); gsub(/^ *| *$/, "", $2); print $1 "/" $2 }' | sed 's/ *$//' 
     ...    include_in_history=False
     # Raise Issues on Missing PDBS
     IF    len($missing_pdbs.stdout) > 0
-        @{missing_pdb_list}=    Create List    ${missing_pdbs.stdout}
+        @{missing_pdb_list}=    Split To Lines    ${missing_pdbs.stdout}
         FOR    ${missing_pdb}    IN    @{missing_pdb_list}
             RW.Core.Add Issue
             ...    severity=4
@@ -426,12 +426,12 @@ Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`
             ...    title=PodDisruptionBudget missing for `${missing_pdb}` in namespace `${NAMESPACE}`
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=${pdb_check.stdout}
-            ...    next_steps=Create missing PodDistruptionBudgets for `${missing_pdb}`
+            ...    next_steps=Create missing [PodDisruptionBudget](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/#pod-disruption-budgets) for `${missing_pdb}`
         END
     END
     # Raise issues on Risky PDBS
     IF    len($risky_pdbs.stdout) > 0
-        @{risky_pdb_list}=    Create List    ${risky_pdbs.stdout}
+        @{risky_pdb_list}=    Split To Lines    ${risky_pdbs.stdout}
         FOR    ${risky_pdb}    IN    @{risky_pdb_list}
             RW.Core.Add Issue
             ...    severity=4
@@ -440,7 +440,7 @@ Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`
             ...    title=PodDisruptionBudget configured for `${risky_pdb}` in namespace `${NAMESPACE}` could be a risk.
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=${pdb_check.stdout}
-            ...    next_steps=Review PodDisruptionBudget for `${risky_pdb}` to ensure it allows pods to be evacuated and rescheduled during maintenance periods.
+            ...    next_steps=Review [PodDisruptionBudget](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/#pod-disruption-budgets) for `${risky_pdb}` to ensure it allows pods to be evacuated and rescheduled during maintenance periods.
         END
     END
     ${history}=    RW.CLI.Pop Shell History
