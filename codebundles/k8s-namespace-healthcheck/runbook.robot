@@ -291,6 +291,7 @@ Inspect Workload Status Conditions In Namespace `${NAMESPACE}`
             ELSE
                 ${owner_kind}=    Set Variable    "Unknown"
                 ${owner_name}=    Set Variable    "Unknown"
+                Exit For Loop
             END
             ${item_next_steps}=    RW.CLI.Run Bash File
             ...    bash_file=workload_next_steps.sh
