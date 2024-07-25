@@ -24,10 +24,14 @@ function check_command_exists() {
 
 # Tasks to perform when container exit code is "Error" or 1
 function exit_code_error() {
-    logs=$(${KUBERNETES_DISTRIBUTION_BINARY} logs -p $1 --all-containers --context=${CONTEXT} -n ${NAMESPACE} )
-    escaped_log_data=$(echo "$logs" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+    logs=$(${KUBERNETES_DISTRIBUTION_BINARY} logs -p $1 -c $2 --tail=50 --context=${CONTEXT} -n ${NAMESPACE})
+    if [ -z "$logs" ]; then
+        logs="Previous container logs could not be found."
+    else
+        logs=$(echo "$logs" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed 's/\x00-\x1F/\\u&/g' | sed ':a;N;$!ba;s/\n/\\n/g')
 
-    echo $escaped_log_data
+    fi
+    echo "$logs"
 }
 
 # Tasks to perform when container exit code is "Success"
@@ -99,6 +103,30 @@ function check_manifest_configuration() {
     echo $command_override_check
 }
 
+# Function to convert time duration (e.g., 24h or 30m) to seconds
+function duration_to_seconds() {
+    local duration=$1
+    local seconds=0
+
+    if [[ $duration =~ ^([0-9]+)h$ ]]; then
+        seconds=$((BASH_REMATCH[1] * 3600))
+    elif [[ $duration =~ ^([0-9]+)m$ ]]; then
+        seconds=$((BASH_REMATCH[1] * 60))
+    else
+        echo "Invalid duration format. Please use format like 24h or 30m."
+        exit 1
+    fi
+
+    echo $seconds
+}
+
+# Get the current time in seconds since epoch
+current_time=$(date +%s)
+
+# Specify the time window for considering restarts (e.g., "24h" for 24 hours or "30m" for 30 minutes)
+time_window=$CONTAINER_RESTART_AGE
+time_window_seconds=$(duration_to_seconds $time_window)
+
 # ------------------------- Dependency Verification ---------------------------
 
 # Ensure all the required binaries are accessible
@@ -156,65 +184,73 @@ while read -r container; do
     exit_code_explanation=$(echo "$c" | jq -r '.exit_code_explanation')
 
     if [ "$exit_code_explanation" != "Unknown exit code" ] && [ "$terminated_exitCode" != "N/A" ]; then
-      container_text+="Containers:\n"
-      container_text+="Name: $name\n"
-      container_text+="Restart Count: $restart_count\n"
-      container_text+="Message: $message\n"
-      container_text+="Terminated Reason: $terminated_reason\n"
-      container_text+="Terminated FinishedAt: $terminated_finishedAt\n"
-      container_text+="Terminated ExitCode: $terminated_exitCode\n"
-      container_text+="Exit Code Explanation: $exit_code_explanation\n\n"
+      # Calculate the age of the restart
+      terminated_time=$(date -d "$terminated_finishedAt" +%s)
+      restart_age=$((current_time - terminated_time))
 
-      owner=$(find_resource_owner "$pod_name")
-      owner_kind=$(jq -r '.kind' <<< "$owner")
-      owner_name=$(jq -r '.metadata.name' <<< "$owner")
+      # Filter out restarts older than the specified time window
+      if [ $restart_age -le $time_window_seconds ]; then
+        container_text+="Containers:\n"
+        container_text+="Name: $name\n"
+        container_text+="Restart Count: $restart_count\n"
+        container_text+="Message: $message\n"
+        container_text+="Terminated Reason: $terminated_reason\n"
+        container_text+="Terminated FinishedAt: $terminated_finishedAt\n"
+        container_text+="Terminated ExitCode: $terminated_exitCode\n"
+        container_text+="Exit Code Explanation: $exit_code_explanation\n\n"
 
-      # Use a case statement to check the exit code and perform actions or recommendations
-      case "$exit_code_explanation" in
-          "Success")
-              exit_code_success "$pod_name"
-              ;;
-          "Error")
-              echo "Container exited with an error code for pod \`$pod_name\`."
-              details=$(exit_code_error "$pod_name")
-              issue_details="{\"severity\":\"2\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Check $owner_kind Log for Issues with \`$owner_name\`\\nView issue details in report for container log details\",\"details\":\"Container exited with an error code. Log Details: \\n$details\"}"
-              ;;
-          "Misconfiguration")
-              echo "Container stopped due to misconfiguration for pod \`$pod_name\`"
-              
-              issue_details="{\"severity\":\"2\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Get $owner_kind \`$owner_name\` manifest and check configuration for any mistakes.\",\"details\":\"Container stopped due to misconfiguration\"}"
-              ;;
-          "Pod terminated by SIGINT")
-              echo "Container received SIGINT signal, indicating an interrupted process for pod \`$pod_name\`."
-              issue_details="{\"severity\":\"3\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Check $owner_kind Event Anomalies for \`$owner_name\`\\nIf SIGINT is frequently occuring, escalate to the service or infrastructure owner for further investigation.\",\"details\":\"Container received SIGINT signal, indicating an interrupted process.\"}"           
-              ;;
-          "Abnormal Termination SIGABRT")
-              echo "Container terminated abnormally with SIGABRT signal for pod \`$pod_name\`."
-              issue_details="{\"severity\":\"2\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Check $owner_kind Log for Issues with \`$owner_name\`\\nSIGABRT is usually a serious error. If it doesn't appear application related, escalate to the service or infrastructure owner for further investigation.\",\"details\":\"Container terminated abnormally with SIGABRT signal.\"}"           
-              ;;
-          "Pod terminated by SIGKILL - Possible OOM")
-              if [[ $message =~ "Pod was terminated in response to imminent node shutdown." ]]; then
-                  echo "Container terminated by SIGKILL related to node shutdown for pod \`$pod_name\`."
-                  issue_details="{\"severity\":\"4\",\"title\":\"$owner_kind \`$owner_name\` in namespace \`${NAMESPACE}\` was evicted due to node shutdown\",\"next_steps\":\"Inspect $owner_kind replicas for \`$owner_name\`\"}"
-              else
-                  echo "Container terminated by SIGKILL, possibly due to Out Of Memory, for pod \`$pod_name\`. Check if the container exceeded its memory limit. Consider increasing memory allocation or optimizing the application for better memory usage."
-                  issue_details="{\"severity\":\"2\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Check $owner_kind Log for Issues with \`$owner_name\`\\nGet Pod Resource Utilization with Top in Namespace \`$NAMESPACE\`\\nShow Pods Without Resource Limit or Resource Requests Set in Namespace \`$NAMESPACE\`\\nIdentify Resource Constrained Pods In Namespace \`$NAMESPACE\`\",\"details\":\"Container terminated by SIGKILL, possibly due to Out Of Memory. Check if the container exceeded its memory limit. Consider increasing memory allocation or optimizing the application for better memory usage.\"}"
-              fi
-              ;;
-          "Graceful Termination SIGTERM")
-              echo "Container received SIGTERM signal for graceful termination for pod \`$pod_name\`. Ensure that the container's shutdown process is handling SIGTERM correctly. This may be a normal part of the pod lifecycle."
-              issue_details="{\"severity\":\"4\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"If SIGTERM is frequently occuring, escalate to the service or infrastructure owner for further investigation.\",\"details\":\"Container received SIGTERM signal for graceful termination. Ensure that the container's shutdown process is handling SIGTERM correctly. This may be a normal part of the pod lifecycle.\"}"
-              ;;
-          *)
-              echo "Unknown exit code for pod \`$pod_name\`: $exit_code_explanation"
-              echo "$item"
-              # Handle unknown exit codes here
-              issue_details="{\"severity\":\"3\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Unknown exit code for pod \`$pod_name\`. Escalate to the service or infrastructure owner for further investigation.\",\"details\":\"Unknown exit code for pod \`$pod_name\`: $exit_code_explanation\"}"
-              ;;
-      esac
+        owner=$(find_resource_owner "$pod_name")
+        owner_kind=$(jq -r '.kind' <<< "$owner")
+        owner_name=$(jq -r '.metadata.name' <<< "$owner")
 
-      # Add issue detail to the list of recommendations
-      recommendations+=("$issue_details")
+        # Use a case statement to check the exit code and perform actions or recommendations
+        case "$exit_code_explanation" in
+            "Success")
+                exit_code_success "$pod_name"
+                ;;
+            "Error")
+                echo "Container exited with an error code for pod \`$pod_name\`."
+                details=$(exit_code_error "$pod_name" "$name")
+                issue_details="{\"severity\":\"2\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\` in the last $CONTAINER_RESTART_AGE\",\"next_steps\":\"Check $owner_kind Log for Issues with \`$owner_name\`\\nView issue details in report for container log details\",\"details\":\"Container exited with an error code. Log Details: \\n$details\"}"
+                ;;
+            "Misconfiguration")
+                echo "Container stopped due to misconfiguration for pod \`$pod_name\`"
+                
+                issue_details="{\"severity\":\"2\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\` in the last $CONTAINER_RESTART_AGE\",\"next_steps\":\"Get $owner_kind \`$owner_name\` manifest and check configuration for any mistakes.\",\"details\":\"Container stopped due to misconfiguration\"}"
+                ;;
+            "Pod terminated by SIGINT")
+                echo "Container received SIGINT signal, indicating an interrupted process for pod \`$pod_name\`."
+                issue_details="{\"severity\":\"3\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\` in the last $CONTAINER_RESTART_AGE\",\"next_steps\":\"Check $owner_kind Event Anomalies for \`$owner_name\`\\nIf SIGINT is frequently occuring, escalate to the service or infrastructure owner for further investigation.\",\"details\":\"Container received SIGINT signal, indicating an interrupted process.\"}"           
+                ;;
+            "Abnormal Termination SIGABRT")
+                echo "Container terminated abnormally with SIGABRT signal for pod \`$pod_name\`."
+                issue_details="{\"severity\":\"2\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\` in the last $CONTAINER_RESTART_AGE\",\"next_steps\":\"Check $owner_kind Log for Issues with \`$owner_name\`\\nSIGABRT is usually a serious error. If it doesn't appear application related, escalate to the service or infrastructure owner for further investigation.\",\"details\":\"Container terminated abnormally with SIGABRT signal.\"}"           
+                ;;
+            "Pod terminated by SIGKILL - Possible OOM")
+                if [[ $message =~ "Pod was terminated in response to imminent node shutdown." ]]; then
+                    echo "Container terminated by SIGKILL related to node shutdown for pod \`$pod_name\`."
+                    issue_details="{\"severity\":\"4\",\"title\":\"$owner_kind \`$owner_name\` in namespace \`${NAMESPACE}\` was evicted due to node shutdown in the last $CONTAINER_RESTART_AGE\",\"next_steps\":\"Inspect $owner_kind replicas for \`$owner_name\`\"}"
+                else
+                    echo "Container terminated by SIGKILL, possibly due to Out Of Memory, for pod \`$pod_name\`. Check if the container exceeded its memory limit. Consider increasing memory allocation or optimizing the application for better memory usage."
+                    issue_details="{\"severity\":\"2\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\` in the last $CONTAINER_RESTART_AGE\",\"next_steps\":\"Check $owner_kind Log for Issues with \`$owner_name\`\\nGet Pod Resource Utilization with Top in Namespace \`$NAMESPACE\`\\nShow Pods Without Resource Limit or Resource Requests Set in Namespace \`$NAMESPACE\`\\nIdentify Resource Constrained Pods In Namespace \`$NAMESPACE\`\",\"details\":\"Container terminated by SIGKILL, possibly due to Out Of Memory. Check if the container exceeded its memory limit. Consider increasing memory allocation or optimizing the application for better memory usage.\"}"
+                fi
+                ;;
+            "Graceful Termination SIGTERM")
+                echo "Container received SIGTERM signal for graceful termination for pod \`$pod_name\` in the last $CONTAINER_RESTART_AGE. Ensure that the container's shutdown process is handling SIGTERM correctly. This may be a normal part of the pod lifecycle."
+                issue_details="{\"severity\":\"4\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\`\",\"next_steps\":\"If SIGTERM is frequently occuring, escalate to the service or infrastructure owner for further investigation.\",\"details\":\"Container received SIGTERM signal for graceful termination. Ensure that the container's shutdown process is handling SIGTERM correctly. This may be a normal part of the pod lifecycle.\"}"
+                ;;
+            *)
+                echo "Unknown exit code for pod \`$pod_name\`: $exit_code_explanation"
+                echo "$item"
+                # Handle unknown exit codes here
+                issue_details="{\"severity\":\"3\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\` in the last $CONTAINER_RESTART_AGE\",\"next_steps\":\"Unknown exit code for pod \`$pod_name\`. Escalate to the service or infrastructure owner for further investigation.\",\"details\":\"Unknown exit code for pod \`$pod_name\`: $exit_code_explanation\"}"
+                ;;
+        esac
+
+        # Add issue detail to the list of recommendations
+        recommendations+=("$issue_details")
+      fi
+
     fi
 
   done <<< "$container_list"
@@ -235,4 +271,5 @@ recommendations_json=$(printf '%s\n' "${recommendations[@]}" | jq -s 'unique_by(
 if [ -n "$recommendations_json" ]; then
     echo -e "\nRecommended Next Steps: \n"
     echo "$recommendations_json"
+    echo "$recommendations_json" > $HOME/container_restart_issues.json
 fi
