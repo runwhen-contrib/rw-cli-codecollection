@@ -172,7 +172,7 @@ Inspect Pending Pods In Namespace `${NAMESPACE}`
                 RW.Core.Add Issue
                 ...    severity=${issue["severity"]}
                 ...    expected=Pods should not be pending in `${NAMESPACE}`.
-                ...    actual=Pod `${pod_name.stdout}` is pending with ${item["containerReason"]}
+                ...    actual=Pod `${item["pod_name"]}` is pending with ${item["containerReason"]}
                 ...    title= ${issue["title"]}
                 ...    reproduce_hint=${pending_pods.cmd}
                 ...    details=${issue["details"]}
