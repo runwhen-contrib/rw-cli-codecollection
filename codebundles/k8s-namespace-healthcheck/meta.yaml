@@ -149,12 +149,20 @@ commands:
     command can be used to gather and analyze warning events related to application
     failures or errors, in order to understand the impact on the overall system and
     identify potential fixes.'
-- command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r
-    --argjson exit_code_explanations ''{"0": "Success", "1": "Error", "2": "Misconfiguration",
-    "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137":
-    "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}''
-    ''.items[] | select(.status.containerStatuses != null) | select(any(.status.containerStatuses[];
-    .restartCount > 0)) | "---\npod_name: \(.metadata.name)\n" + (.status.containerStatuses[]
+- command: 'TIME_PERIOD="${CONTAINER_RESTART_AGE}"; TIME_PERIOD_UNIT=$(echo $TIME_PERIOD
+    | awk ''{print substr($0,length($0),1)}''); TIME_PERIOD_VALUE=$(echo $TIME_PERIOD
+    | awk ''{print substr($0,1,length($0)-1)}''); if [[ $TIME_PERIOD_UNIT == "m" ]];
+    then DATE_CMD_ARG="$TIME_PERIOD_VALUE minutes ago"; elif [[ $TIME_PERIOD_UNIT
+    == "h" ]]; then DATE_CMD_ARG="$TIME_PERIOD_VALUE hours ago"; else echo "Unsupported
+    time period unit. Use ''m'' for minutes or ''h'' for hours."; exit 1; fi; THRESHOLD_TIME=$(date
+    -u --date="$DATE_CMD_ARG" +"%Y-%m-%dT%H:%M:%SZ"); $KUBERNETES_DISTRIBUTION_BINARY
+    get pods --context=$CONTEXT -n $NAMESPACE -o json | jq -r --argjson exit_code_explanations
+    ''{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated
+    by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL
+    - Possible OOM", "143":"Graceful Termination SIGTERM"}'' --arg threshold_time
+    "$THRESHOLD_TIME" ''.items[] | select(.status.containerStatuses != null) | select(any(.status.containerStatuses[];
+    .restartCount > 0 and (.lastState.terminated.finishedAt // "1970-01-01T00:00:00Z")
+    > $threshold_time)) | "---\npod_name: \(.metadata.name)\n" + (.status.containerStatuses[]
     | "containers: \(.name)\nrestart_count: \(.restartCount)\nmessage: \(.state.waiting.message
     // "N/A")\nterminated_reason: \(.lastState.terminated.reason // "N/A")\nterminated_finishedAt:
     \(.lastState.terminated.finishedAt // "N/A")\nterminated_exitCode: \(.lastState.terminated.exitCode
@@ -162,65 +170,84 @@ commands:
     | tostring] // "Unknown exit code")") + "\n---\n"'''
   doc_links: '
 
-    - [kubectl get pods](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+    - [Kubernetes Documentation on `kubectl get events` Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events){:target="_blank"}
 
-    - [kubectl contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}
+    - [Understanding Container Restart Policies in Kubernetes](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy){:target="_blank"}
 
-    - [kubectl namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [jq documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command uses kubectl to get information about pods in a specific
-    context and namespace, then uses jq to format the output and provide detailed
-    explanations for different exit codes related to container restarts.
-  multi_line_details: "\n# Set the context and namespace for the Kubernetes cluster\n\
-    CONTEXT=my-context\nNAMESPACE=my-namespace\n\n# Get a list of pods in JSON format\
-    \ and use jq to extract relevant information\nkubectl get pods --context=${CONTEXT}\
-    \ -n ${NAMESPACE} -o json | jq -r --argjson exit_code_explanations '{\"0\": \"\
-    Success\", \"1\": \"Error\", \"2\": \"Misconfiguration\", \"130\": \"Pod terminated\
-    \ by SIGINT\", \"134\": \"Abnormal Termination SIGABRT\", \"137\": \"Pod terminated\
-    \ by SIGKILL - Possible OOM\", \"143\":\"Graceful Termination SIGTERM\"}' '.items[]\
-    \ | select(.status.containerStatuses != null) | select(any(.status.containerStatuses[];\
-    \ .restartCount > 0)) | \n    # Print a separator to distinguish different pods\n\
-    \    \"---\\npod_name: \\(.metadata.name)\\n\" + (.status.containerStatuses[]\
-    \ | \"containers: \\(.name)\\nrestart_count: \\(.restartCount)\\nmessage: \\(.state.waiting.message\
-    \ // \"N/A\")\\nterminated_reason: \\(.lastState.terminated.reason // \"N/A\"\
-    )\\nterminated_finishedAt: \\(.lastState.terminated.finishedAt // \"N/A\")\\nterminated_exitCode:\
-    \ \\(.lastState.terminated.exitCode // \"N/A\")\\n\n    # Map the exit code to\
-    \ an explanation using $exit_code_explanations\n    exit_code_explanation: \\\
-    ($exit_code_explanations[.lastState.terminated.exitCode | tostring] // \"Unknown\
-    \ exit code\")\") + \"\\n---\\n\"'\n\nThis multi-line command breaks down the\
-    \ process of getting pods from a Kubernetes cluster, including setting the context\
-    \ and namespace, interacting with the `kubectl` command, and processing the JSON\
-    \ output using `jq`. It also includes comments throughout to explain each step\
-    \ for clarity and understanding."
+    - [Logging and Monitoring in Kubernetes](https://kubernetes.io/docs/concepts/cluster-administration/logging/){:target="_blank"}'
+  explanation: This command is pulling container restart data from a Kubernetes cluster
+    and formatting it into a readable output, using a specific time period as a threshold
+    for the restart data. It also includes exit code explanations for various scenarios.
+  multi_line_details: "\n# Set the variable TIME_PERIOD to the value of CONTAINER_RESTART_AGE\n\
+    TIME_PERIOD=\"${CONTAINER_RESTART_AGE}\"\n\n# Get the unit of time from the TIME_PERIOD:\
+    \ 'm' for minutes or 'h' for hours\nTIME_PERIOD_UNIT=$(echo $TIME_PERIOD | awk\
+    \ '{print substr($0,length($0),1)}')\n\n# Extract the numerical value from TIME_PERIOD\n\
+    TIME_PERIOD_VALUE=$(echo $TIME_PERIOD | awk '{print substr($0,1,length($0)-1)}')\n\
+    \n# Depending on the unit of time, create the argument for the date command\n\
+    if [[ $TIME_PERIOD_UNIT == \"m\" ]]; then \n  DATE_CMD_ARG=\"$TIME_PERIOD_VALUE\
+    \ minutes ago\"\nelif [[ $TIME_PERIOD_UNIT == \"h\" ]]; then \n  DATE_CMD_ARG=\"\
+    $TIME_PERIOD_VALUE hours ago\"\nelse \n  echo \"Unsupported time period unit.\
+    \ Use 'm' for minutes or 'h' for hours.\"\n  exit 1\nfi\n\n# Calculate the threshold\
+    \ time based on the DATE_CMD_ARG\nTHRESHOLD_TIME=$(date -u --date=\"$DATE_CMD_ARG\"\
+    \ +\"%Y-%m-%dT%H:%M:%SZ\")\n\n# Use the Kubernetes distribution binary to get\
+    \ pods in JSON format\n$KUBERNETES_DISTRIBUTION_BINARY get pods --context=$CONTEXT\
+    \ -n $NAMESPACE -o json | \\\n  jq -r --argjson exit_code_explanations '{\"0\"\
+    : \"Success\", \"1\": \"Error\", \"2\": \"Misconfiguration\", \\\n    \"130\"\
+    : \"Pod terminated by SIGINT\", \"134\": \"Abnormal Termination SIGABRT\", \\\n\
+    \    \"137\": \"Pod terminated by SIGKILL - Possible OOM\", \"143\":\"Graceful\
+    \ Termination SIGTERM\"}' \\\n    --arg threshold_time \"$THRESHOLD_TIME\" '.items[]\
+    \ | select(.status.containerStatuses != null) | \\\n      select(any(.status.containerStatuses[];\
+    \ .restartCount > 0 and (.lastState.terminated.finishedAt // \"1970-01-01T00:00:00Z\"\
+    ) > $threshold_time)) | \\\n      \"---\\npod_name: \\(.metadata.name)\\n\" +\
+    \ \\\n      (.status.containerStatuses[] | \"containers: \\(.name)\\nrestart_count:\
+    \ \\(.restartCount)\\nmessage: \\(.state.waiting.message // \"N/A\")\\nterminated_reason:\
+    \ \\(.lastState.terminated.reason // \"N/A\")\\nterminated_finishedAt: \\(.lastState.terminated.finishedAt\
+    \ // \"N/A\")\\nterminated_exitCode: \\(.lastState.terminated.exitCode // \"N/A\"\
+    )\\nexit_code_explanation: \\($exit_code_explanations[.lastState.terminated.exitCode\
+    \ | tostring] // \"Unknown exit code\")\") + \"\\n---\\n\"'\n"
   name: inspect_container_restarts_in_namespace_namespace
-  when_is_it_useful: '1. Debugging a production issue where a Kubernetes pod is constantly
-    restarting due to CrashLoopBackoff events, impacting the availability and performance
-    of an application.
+  when_is_it_useful: '1. Monitoring and troubleshooting application performance: A
+    DevOps or SRE might use this command to track and analyze container restarts in
+    a Kubernetes cluster, identifying potential performance issues and making adjustments
+    to improve stability.
 
 
-    2. Investigating a deployment rollout issue where pods are failing to start or
-    crashing frequently, causing downtime for the application.
+    2. Investigating deployment failures: When a new deployment fails and containers
+    are continually restarting, this command can be used to gather detailed information
+    about the restart events, including exit codes, in order to diagnose and resolve
+    the issue.
 
 
-    3. Monitoring and analyzing the performance of pods in a development or testing
-    environment to ensure they are properly configured and not experiencing recurring
-    restarts.
+    3. Ensuring availability and reliability: By regularly running this command, DevOps
+    or SREs can proactively monitor container restarts in the Kubernetes cluster,
+    aiming to prevent potential downtime by addressing any recurring issues before
+    they escalate.
 
 
-    4. Troubleshooting a scenario where certain containers within a pod are repeatedly
-    failing, leading to a continuous restart loop and potential service disruption.
+    4. Conducting root cause analysis: After an incident or outage, this command can
+    be used to examine container restart data, helping DevOps or SREs to identify
+    the underlying causes and implement necessary improvements to prevent similar
+    occurrences in the future.
 
 
-    5. Conducting proactive analysis and tuning of pod configurations to prevent potential
-    future issues related to container restarts and ensure the overall stability and
-    reliability of the Kubernetes environment.'
-- command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r
-    --argjson exit_code_explanations ''{"0": "Success", "1": "Error", "2": "Misconfiguration",
-    "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137":
-    "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}''
-    ''.items[] | select(.status.containerStatuses != null) | select(any(.status.containerStatuses[];
-    .restartCount > 0)) | "---\npod_name: \(.metadata.name)\n" + (.status.containerStatuses[]
+    5. Optimizing resource utilization: This command can provide valuable insights
+    into container restarts and exit codes, enabling DevOps or SREs to optimize resource
+    allocation and make informed decisions about scaling and capacity planning within
+    the Kubernetes infrastructure.'
+- command: 'TIME_PERIOD="${CONTAINER_RESTART_AGE}"; TIME_PERIOD_UNIT=$(echo $TIME_PERIOD
+    | awk ''{print substr($0,length($0),1)}''); TIME_PERIOD_VALUE=$(echo $TIME_PERIOD
+    | awk ''{print substr($0,1,length($0)-1)}''); if [[ $TIME_PERIOD_UNIT == "m" ]];
+    then DATE_CMD_ARG="$TIME_PERIOD_VALUE minutes ago"; elif [[ $TIME_PERIOD_UNIT
+    == "h" ]]; then DATE_CMD_ARG="$TIME_PERIOD_VALUE hours ago"; else echo "Unsupported
+    time period unit. Use ''m'' for minutes or ''h'' for hours."; exit 1; fi; THRESHOLD_TIME=$(date
+    -u --date="$DATE_CMD_ARG" +"%Y-%m-%dT%H:%M:%SZ"); $KUBERNETES_DISTRIBUTION_BINARY
+    get pods --context=$CONTEXT -n $NAMESPACE -o json | jq -r --argjson exit_code_explanations
+    ''{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated
+    by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL
+    - Possible OOM", "143":"Graceful Termination SIGTERM"}'' --arg threshold_time
+    "$THRESHOLD_TIME" ''.items[] | select(.status.containerStatuses != null) | select(any(.status.containerStatuses[];
+    .restartCount > 0 and (.lastState.terminated.finishedAt // "1970-01-01T00:00:00Z")
+    > $threshold_time)) | "---\npod_name: \(.metadata.name)\n" + (.status.containerStatuses[]
     | "containers: \(.name)\nrestart_count: \(.restartCount)\nmessage: \(.state.waiting.message
     // "N/A")\nterminated_reason: \(.lastState.terminated.reason // "N/A")\nterminated_finishedAt:
     \(.lastState.terminated.finishedAt // "N/A")\nterminated_exitCode: \(.lastState.terminated.exitCode
@@ -228,59 +255,70 @@ commands:
     | tostring] // "Unknown exit code")") + "\n---\n"'''
   doc_links: '
 
-    - [kubectl get pods](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+    - [Kubernetes Documentation on `kubectl get events` Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events){:target="_blank"}
 
-    - [kubectl contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context){:target="_blank"}
+    - [Understanding Container Restart Policies in Kubernetes](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy){:target="_blank"}
 
-    - [kubectl namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
-
-    - [jq documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
-  explanation: This command uses kubectl to get information about pods in a specific
-    context and namespace, then uses jq to format the output and provide detailed
-    explanations for different exit codes related to container restarts.
-  multi_line_details: "\n# Set the context and namespace for the Kubernetes cluster\n\
-    CONTEXT=my-context\nNAMESPACE=my-namespace\n\n# Get a list of pods in JSON format\
-    \ and use jq to extract relevant information\nkubectl get pods --context=${CONTEXT}\
-    \ -n ${NAMESPACE} -o json | jq -r --argjson exit_code_explanations '{\"0\": \"\
-    Success\", \"1\": \"Error\", \"2\": \"Misconfiguration\", \"130\": \"Pod terminated\
-    \ by SIGINT\", \"134\": \"Abnormal Termination SIGABRT\", \"137\": \"Pod terminated\
-    \ by SIGKILL - Possible OOM\", \"143\":\"Graceful Termination SIGTERM\"}' '.items[]\
-    \ | select(.status.containerStatuses != null) | select(any(.status.containerStatuses[];\
-    \ .restartCount > 0)) | \n    # Print a separator to distinguish different pods\n\
-    \    \"---\\npod_name: \\(.metadata.name)\\n\" + (.status.containerStatuses[]\
-    \ | \"containers: \\(.name)\\nrestart_count: \\(.restartCount)\\nmessage: \\(.state.waiting.message\
-    \ // \"N/A\")\\nterminated_reason: \\(.lastState.terminated.reason // \"N/A\"\
-    )\\nterminated_finishedAt: \\(.lastState.terminated.finishedAt // \"N/A\")\\nterminated_exitCode:\
-    \ \\(.lastState.terminated.exitCode // \"N/A\")\\n\n    # Map the exit code to\
-    \ an explanation using $exit_code_explanations\n    exit_code_explanation: \\\
-    ($exit_code_explanations[.lastState.terminated.exitCode | tostring] // \"Unknown\
-    \ exit code\")\") + \"\\n---\\n\"'\n\nThis multi-line command breaks down the\
-    \ process of getting pods from a Kubernetes cluster, including setting the context\
-    \ and namespace, interacting with the `kubectl` command, and processing the JSON\
-    \ output using `jq`. It also includes comments throughout to explain each step\
-    \ for clarity and understanding."
+    - [Logging and Monitoring in Kubernetes](https://kubernetes.io/docs/concepts/cluster-administration/logging/){:target="_blank"}'
+  explanation: This command is pulling container restart data from a Kubernetes cluster
+    and formatting it into a readable output, using a specific time period as a threshold
+    for the restart data. It also includes exit code explanations for various scenarios.
+  multi_line_details: "\n# Set the variable TIME_PERIOD to the value of CONTAINER_RESTART_AGE\n\
+    TIME_PERIOD=\"${CONTAINER_RESTART_AGE}\"\n\n# Get the unit of time from the TIME_PERIOD:\
+    \ 'm' for minutes or 'h' for hours\nTIME_PERIOD_UNIT=$(echo $TIME_PERIOD | awk\
+    \ '{print substr($0,length($0),1)}')\n\n# Extract the numerical value from TIME_PERIOD\n\
+    TIME_PERIOD_VALUE=$(echo $TIME_PERIOD | awk '{print substr($0,1,length($0)-1)}')\n\
+    \n# Depending on the unit of time, create the argument for the date command\n\
+    if [[ $TIME_PERIOD_UNIT == \"m\" ]]; then \n  DATE_CMD_ARG=\"$TIME_PERIOD_VALUE\
+    \ minutes ago\"\nelif [[ $TIME_PERIOD_UNIT == \"h\" ]]; then \n  DATE_CMD_ARG=\"\
+    $TIME_PERIOD_VALUE hours ago\"\nelse \n  echo \"Unsupported time period unit.\
+    \ Use 'm' for minutes or 'h' for hours.\"\n  exit 1\nfi\n\n# Calculate the threshold\
+    \ time based on the DATE_CMD_ARG\nTHRESHOLD_TIME=$(date -u --date=\"$DATE_CMD_ARG\"\
+    \ +\"%Y-%m-%dT%H:%M:%SZ\")\n\n# Use the Kubernetes distribution binary to get\
+    \ pods in JSON format\n$KUBERNETES_DISTRIBUTION_BINARY get pods --context=$CONTEXT\
+    \ -n $NAMESPACE -o json | \\\n  jq -r --argjson exit_code_explanations '{\"0\"\
+    : \"Success\", \"1\": \"Error\", \"2\": \"Misconfiguration\", \\\n    \"130\"\
+    : \"Pod terminated by SIGINT\", \"134\": \"Abnormal Termination SIGABRT\", \\\n\
+    \    \"137\": \"Pod terminated by SIGKILL - Possible OOM\", \"143\":\"Graceful\
+    \ Termination SIGTERM\"}' \\\n    --arg threshold_time \"$THRESHOLD_TIME\" '.items[]\
+    \ | select(.status.containerStatuses != null) | \\\n      select(any(.status.containerStatuses[];\
+    \ .restartCount > 0 and (.lastState.terminated.finishedAt // \"1970-01-01T00:00:00Z\"\
+    ) > $threshold_time)) | \\\n      \"---\\npod_name: \\(.metadata.name)\\n\" +\
+    \ \\\n      (.status.containerStatuses[] | \"containers: \\(.name)\\nrestart_count:\
+    \ \\(.restartCount)\\nmessage: \\(.state.waiting.message // \"N/A\")\\nterminated_reason:\
+    \ \\(.lastState.terminated.reason // \"N/A\")\\nterminated_finishedAt: \\(.lastState.terminated.finishedAt\
+    \ // \"N/A\")\\nterminated_exitCode: \\(.lastState.terminated.exitCode // \"N/A\"\
+    )\\nexit_code_explanation: \\($exit_code_explanations[.lastState.terminated.exitCode\
+    \ | tostring] // \"Unknown exit code\")\") + \"\\n---\\n\"'\n"
   name: inspect_container_restarts_in_namespace_namespace
-  when_is_it_useful: '1. Debugging a production issue where a Kubernetes pod is constantly
-    restarting due to CrashLoopBackoff events, impacting the availability and performance
-    of an application.
+  when_is_it_useful: '1. Monitoring and troubleshooting application performance: A
+    DevOps or SRE might use this command to track and analyze container restarts in
+    a Kubernetes cluster, identifying potential performance issues and making adjustments
+    to improve stability.
 
 
-    2. Investigating a deployment rollout issue where pods are failing to start or
-    crashing frequently, causing downtime for the application.
+    2. Investigating deployment failures: When a new deployment fails and containers
+    are continually restarting, this command can be used to gather detailed information
+    about the restart events, including exit codes, in order to diagnose and resolve
+    the issue.
 
 
-    3. Monitoring and analyzing the performance of pods in a development or testing
-    environment to ensure they are properly configured and not experiencing recurring
-    restarts.
+    3. Ensuring availability and reliability: By regularly running this command, DevOps
+    or SREs can proactively monitor container restarts in the Kubernetes cluster,
+    aiming to prevent potential downtime by addressing any recurring issues before
+    they escalate.
 
 
-    4. Troubleshooting a scenario where certain containers within a pod are repeatedly
-    failing, leading to a continuous restart loop and potential service disruption.
+    4. Conducting root cause analysis: After an incident or outage, this command can
+    be used to examine container restart data, helping DevOps or SREs to identify
+    the underlying causes and implement necessary improvements to prevent similar
+    occurrences in the future.
 
 
-    5. Conducting proactive analysis and tuning of pod configurations to prevent potential
-    future issues related to container restarts and ensure the overall stability and
-    reliability of the Kubernetes environment.'
+    5. Optimizing resource utilization: This command can provide valuable insights
+    into container restarts and exit codes, enabling DevOps or SREs to optimize resource
+    allocation and make informed decisions about scaling and capacity planning within
+    the Kubernetes infrastructure.'
 - command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending
     --no-headers -o json | jq -r ''[.items[] | {pod_name: .metadata.name, status:
     (.status.phase // "N/A"), message: (.status.conditions[0].message // "N/A"), reason:
