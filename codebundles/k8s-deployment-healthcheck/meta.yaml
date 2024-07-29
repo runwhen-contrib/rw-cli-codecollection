@@ -532,8 +532,6 @@ commands:
 - command: bash 'event_anomalies.sh'
   doc_links: '
 
-    - [Bash Shell Documentation](https://www.gnu.org/software/bash/manual/bash.html){:target="_blank"}
-
     - [Kubernetes Events API Reference](https://kubernetes.io/docs/reference/using-api/api-concepts/#kubernetes-events){:target="_blank"}
 
     - [jq Manual](https://stedolan.github.io/jq/manual/){:target="_blank"}

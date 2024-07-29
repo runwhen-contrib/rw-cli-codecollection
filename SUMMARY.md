@@ -18,6 +18,7 @@
 * [k8s-certmanager-healthcheck](codebundles/k8s-certmanager-healthcheck/README.md)
 * [aws-eks-health](codebundles/aws-eks-health/README.md)
 * [k8s-kubectl-cmd](codebundles/k8s-kubectl-cmd/README.md)
+* [k8s-otelcollector](codebundles/k8s-otelcollector/README.md)
 * [aws-elasticache-redis-health](codebundles/aws-elasticache-redis-health/README.md)
 * [k8s-jenkins-healthcheck](codebundles/k8s-jenkins-healthcheck/README.md)
 * [k8s-fluxcd-kustomization-health](codebundles/k8s-fluxcd-kustomization-health/README.md)
