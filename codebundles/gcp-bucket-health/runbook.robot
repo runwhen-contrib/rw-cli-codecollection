@@ -105,7 +105,7 @@ Fetch GCP Bucket Storage Operations Rate for `${PROJECT_IDS}`
             ...    severity=3
             ...    expected=Storage bucket should be below operations rate threshold.
             ...    actual=Storage bucket is above operations rate threshold.
-            ...    title= GCP storage bucket `${item["bucket"]}` in project `${item["project"]}` has a rate of `${item["bucket"]}` read/write operations per second.
+            ...    title= GCP storage bucket `${item["bucket"]}` in project `${item["project"]}` has a rate of `${item["total_ops"]}` read/write operations per second.
             ...    reproduce_hint=${bucket_ops.cmd}
             ...    details=${item}
             ...    next_steps=Investigate storage operations for GCP storage bucket `${item["bucket"]}` in project `${item["project"]}` to avoid unnecessary cloud provider costs. 
