@@ -32,7 +32,7 @@ spec:
     - name: WORKLOAD_SERVICE
       value: {{match_resource.resource.metadata.name}}
     - name: METRICS_PORT
-      value: 8888
+      value: '8888'
   secretsProvided:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
