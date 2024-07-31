@@ -14,4 +14,4 @@ spec:
   sloSpecType: simple-mwmb
   objective: 99
   threshold: 1
-  operand: eq
+  operand: lt
