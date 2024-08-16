@@ -12,11 +12,6 @@ spec:
               pattern: ".+"
               properties: [name]
               mode: substring
-            - resourceType: variables
-              type: pattern
-              pattern: ".+"
-              properties: [custom/azure_credentials_secret_name]
-              mode: exact
       slxs:
         - baseName: az-lb-health
           levelOfDetail: basic
