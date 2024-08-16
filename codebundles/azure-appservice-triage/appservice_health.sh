@@ -17,8 +17,6 @@ ALLOWED_MIN=95
 az login --service-principal --username $AZ_USERNAME --password $AZ_SECRET_VALUE --tenant $AZ_TENANT > /dev/null
 # Set the subscription
 az account set --subscription $AZ_SUBSCRIPTION
-# add the application-insights extension
-# az extension add --name application-insights
 
 # Get the health status of the App Service web app
 health_status=$(az monitor metrics list --resource $APPSERVICE --resource-group $AZ_RESOURCE_GROUP  --resource-type Microsoft.Web/sites --metric "HealthCheckStatus" --interval 5m --aggregation minimum --top $METRIC_TOP)
