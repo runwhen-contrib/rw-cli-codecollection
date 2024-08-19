@@ -1,8 +1,8 @@
 *** Settings ***
-Documentation       Triages an azure appservice and its workloads, checking its status and logs.
+Documentation       Triages an Azure App Service and its workloads, checking its status and logs and verifying key metrics.
 Metadata            Author    jon-funk
-Metadata            Display Name    Azure AppService Triage
-Metadata            Supports    Azure    AppService    Health
+Metadata            Display Name    Azure App Service Triage
+Metadata            Supports    Azure    App Service    Health
 
 Library             BuiltIn
 Library             RW.Core
@@ -13,71 +13,80 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check AppService `${APPSERVICE}` Health Status In Resource Group `${RESOURCE_GROUP}`
+Check AppService `${APPSERVICE}` Health Status In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks the health status of a appservice workload.
     [Tags]    
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_health.sh
     ...    env=${env}
-    ...    secret__az_username=${AZ_USERNAME}
-    ...    secret__az_client_secret=${AZ_CLIENT_SECRET}
-    ...    secret__az_tenant=${AZ_TENANT}
+    ...    secret__AZ_USERNAME=${AZ_USERNAME}
+    ...    secret__AZ_SECRET_VALUE=${AZ_SECRET_VALUE}
+    ...    secret__AZ_TENANT=${AZ_TENANT}
+    ...    secret__AZ_SUBSCRIPTION=${AZ_SUBSCRIPTION}
     ...    timeout_seconds=180
     ...    include_in_history=false
-    # IF    ${process.returncode} > 0
-    #     RW.Core.Add Issue    title=OpenTelemetry Span Queue Growing
-    #     ...    severity=3
-    #     ...    next_steps=Check OpenTelemetry backend is available in `${NAMESPACE}` and that the collector has enough resources, and that the collector's configmap is up-to-date.
-    #     ...    expected=Queue size for spans should not be past threshold of 500
-    #     ...    actual=Queue size of 500 or larger found
-    #     ...    reproduce_hint=Run otel_metrics_check.sh
-    #     ...    details=${process.stdout}
-    # END
-    RW.Core.Add Pre To Report    ${process.stdout}\n
+    IF    ${process.returncode} > 0
+        RW.Core.Add Issue    title=App Service `${APPSERVICE}` In Resource Group `${AZ_RESOURCE_GROUP}` Failing Health Check
+        ...    severity=2
+        ...    next_steps=Tail the logs of the App Service `${APPSERVICE}` in resource group `${AZ_RESOURCE_GROUP}`\nReview resource usage metrics of App Service `${APPSERVICE}` in resource group `${AZ_RESOURCE_GROUP}`
+        ...    expected=App Service `${APPSERVICE}` in resource group `${AZ_RESOURCE_GROUP}` should not be failing its health check
+        ...    actual=App Service `${APPSERVICE}` in resource group `${AZ_RESOURCE_GROUP}` is failing its health check
+        ...    reproduce_hint=Run appservice_health.sh
+        ...    details=${process.stdout}
+    END
+    RW.Core.Add Pre To Report    ${process.stdout}
 
-Get AppService `${APPSERVICE}` Logs In Resource Group `${RESOURCE_GROUP}`
+Check AppService `${APPSERVICE}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Reviews key metrics for the app service and generates a report
+    [Tags]    
+    ${process}=    RW.CLI.Run Bash File
+    ...    bash_file=appservice_metrics.sh
+    ...    env=${env}
+    ...    secret__AZ_USERNAME=${AZ_USERNAME}
+    ...    secret__AZ_SECRET_VALUE=${AZ_SECRET_VALUE}
+    ...    secret__AZ_TENANT=${AZ_TENANT}
+    ...    secret__AZ_SUBSCRIPTION=${AZ_SUBSCRIPTION}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${next_steps}=    RW.CLI.Run Cli    cmd=echo -e "${process.stdout}" | grep "Next Steps" -A 20 | tail -n +2
+    IF    ${process.returncode} > 0
+        RW.Core.Add Issue    title=App Service `${APPSERVICE}` In Resource Group `${AZ_RESOURCE_GROUP}` Failed Metric Check
+        ...    severity=2
+        ...    next_steps=${next_steps.stdout}
+        ...    expected=App Service `${APPSERVICE}` in resource group `${AZ_RESOURCE_GROUP}` has no unusual metrics
+        ...    actual=App Service `${APPSERVICE}` in resource group `${AZ_RESOURCE_GROUP}` metric check did not pass
+        ...    reproduce_hint=Run appservice_metrics.sh
+        ...    details=${process.stdout}
+    END
+    RW.Core.Add Pre To Report    ${process.stdout}
+
+Get AppService `${APPSERVICE}` Logs In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch logs of appservice workload
     [Tags]    appservice    logs    tail
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_logs.sh
     ...    env=${env}
-    ...    secret__az_username=${AZ_USERNAME}
-    ...    secret__az_client_secret=${AZ_CLIENT_SECRET}
-    ...    secret__az_tenant=${AZ_TENANT}
+    ...    secret__AZ_USERNAME=${AZ_USERNAME}
+    ...    secret__AZ_SECRET_VALUE=${AZ_SECRET_VALUE}
+    ...    secret__AZ_TENANT=${AZ_TENANT}
+    ...    secret__AZ_SUBSCRIPTION=${AZ_SUBSCRIPTION}
     ...    timeout_seconds=180
     ...    include_in_history=false
-    # IF    ${process.returncode} > 0
-    #     RW.Core.Add Issue    title=OpenTelemetry Collector Has Error Logs
-    #     ...    severity=3
-    #     ...    next_steps=Tail OpenTelemetry Collector Logs In Namespace `${NAMESPACE}` For Stacktraces
-    #     ...    expected=Logs do not contain errors
-    #     ...    actual=Found error logs
-    #     ...    reproduce_hint=Run otel_error_check.sh
-    #     ...    details=${process.stdout}
-    # END
     RW.Core.Add Pre To Report    ${process.stdout}\n
 
-Scan AppService `${APPSERVICE}` Event Errors In Resource Group `${RESOURCE_GROUP}`
+Scan AppService `${APPSERVICE}` Event Errors In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events of appservice and checks for errors
     [Tags]    appservice    monitor    events    errors
     ${process}=    RW.CLI.Run Bash File
-    ...    bash_file=appservice_events.sh
+    ...    bash_file=appservice_activities.sh
     ...    env=${env}
-    ...    secret__az_username=${AZ_USERNAME}
-    ...    secret__az_client_secret=${AZ_CLIENT_SECRET}
-    ...    secret__az_tenant=${AZ_TENANT}
+    ...    secret__AZ_USERNAME=${AZ_USERNAME}
+    ...    secret__AZ_SECRET_VALUE=${AZ_SECRET_VALUE}
+    ...    secret__AZ_TENANT=${AZ_TENANT}
+    ...    secret__AZ_SUBSCRIPTION=${AZ_SUBSCRIPTION}
     ...    timeout_seconds=180
     ...    include_in_history=false
-    # IF    ${process.returncode} > 0
-    #     RW.Core.Add Issue    title=OpenTelemetry Collector Logs Have Dropped Spans
-    #     ...    severity=3
-    #     ...    next_steps=Tail OpenTelemetry Collector Logs In Namespace `${NAMESPACE}` For Stacktraces
-    #     ...    expected=Logs do not contain dropped span entries
-    #     ...    actual=Found dropped span entries
-    #     ...    reproduce_hint=Run otel_dropped_check.sh
-    #     ...    details=${process.stdout}
-    # END
-    RW.Core.Add Pre To Report    ${process.stdout}\n
+    RW.Core.Add Pre To Report    ${process.stdout}
 
 *** Keywords ***
 Suite Initialization
@@ -111,11 +120,11 @@ Suite Initialization
     ...    pattern=\w*
 
     Set Suite Variable    ${APPSERVICE}    ${APPSERVICE}
-    Set Suite Variable    ${RESOURCE_GROUP}    ${RESOURCE_GROUP}
+    Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable    ${AZ_USERNAME}    ${AZ_USERNAME}
     Set Suite Variable    ${AZ_SECRET_VALUE}    ${AZ_SECRET_VALUE}
     Set Suite Variable    ${AZ_TENANT}    ${AZ_TENANT}
     Set Suite Variable    ${AZ_SUBSCRIPTION}    ${AZ_SUBSCRIPTION}
     Set Suite Variable
     ...    ${env}
-    ...    {"APPSERVICE":"${APPSERVICE}", "RESOURCE_GROUP":"${RESOURCE_GROUP}"}
+    ...    {"APPSERVICE":"${APPSERVICE}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}"}

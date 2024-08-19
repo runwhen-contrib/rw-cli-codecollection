@@ -9,6 +9,7 @@
 # AZ_RESOURCE_GROUP
 
 LOG_PATH="/tmp/_rw_logs_$APPSERVICE.zip"
+NUM_LINES=300
 
 # Log in to Azure CLI
 az login --service-principal --username $AZ_USERNAME --password $AZ_SECRET_VALUE --tenant $AZ_TENANT > /dev/null
@@ -21,4 +22,4 @@ log_contents=$(unzip -qq -c $LOG_PATH)
 echo "Azure App Service $APPSERVICE logs:"
 echo ""
 echo ""
-echo -e "$log_contents"
+echo -e "$log_contents" | tail -n $NUM_LINES
