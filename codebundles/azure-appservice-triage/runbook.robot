@@ -72,7 +72,21 @@ Get AppService `${APPSERVICE}` Logs In Resource Group `${AZ_RESOURCE_GROUP}`
     ...    secret__AZ_SUBSCRIPTION=${AZ_SUBSCRIPTION}
     ...    timeout_seconds=180
     ...    include_in_history=false
-    RW.Core.Add Pre To Report    ${process.stdout}\n
+    RW.Core.Add Pre To Report    ${process.stdout}
+
+Fetch App Service `${APPSERVICE}` Config In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Fetch logs of appservice workload
+    [Tags]    appservice    logs    tail
+    ${process}=    RW.CLI.Run Bash File
+    ...    bash_file=appservice_config.sh
+    ...    env=${env}
+    ...    secret__AZ_USERNAME=${AZ_USERNAME}
+    ...    secret__AZ_SECRET_VALUE=${AZ_SECRET_VALUE}
+    ...    secret__AZ_TENANT=${AZ_TENANT}
+    ...    secret__AZ_SUBSCRIPTION=${AZ_SUBSCRIPTION}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${process.stdout}
 
 Scan AppService `${APPSERVICE}` Event Errors In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events of appservice and checks for errors
