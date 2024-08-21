@@ -28,10 +28,10 @@ spec:
       value: {{match_resource.resource.name}}
   secretsProvided:
     - name: AZ_USERNAME
-      workspaceKey: {{custom.az_username}}
+      workspaceKey: {{custom.clientId}}
     - name: AZ_SECRET_VALUE
-      workspaceKey: {{custom.az_secret_value}}
+      workspaceKey: {{custom.clientSecret}}
     - name: AZ_TENANT
-      workspaceKey: {{custom.az_tenant}}
+      workspaceKey: {{custom.tenantId}}
     - name: AZ_SUBSCRIPTION
-      workspaceKey: {{custom.az_subscription}}
+      workspaceKey: {{custom.subscriptionId}}
