@@ -4,19 +4,19 @@ spec:
   platform: azure
   generationRules:
     - resourceTypes:
-        - azure_appservice_web_apps
+        - azure_compute_virtual_machine_scale_sets
       matchRules:
         - type: pattern
           pattern: ".+"
           properties: [name]
           mode: substring
       slxs:
-        - baseName: azure-appservice-triage
+        - baseName: azure-vm-triage
           qualifiers: ["resource"]
-          baseTemplateName: azure-appservice-triage
+          baseTemplateName: azure-vm-triage
           levelOfDetail: basic
           outputItems:
             - type: slx
             - type: sli
             - type: runbook
-              templateName: azure-appservice-triage-taskset.yaml
+              templateName: azure-vm-triage-taskset.yaml
