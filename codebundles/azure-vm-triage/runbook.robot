@@ -13,7 +13,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check Scaled Set `${VMSCALEDSET}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Check Scaled Set `${VMSCALEDSET}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks key metrics of VM Scaled Set for issues.
     [Tags]    Scaled Set    VM    Azure    Metrics    Health
     ${process}=    RW.CLI.Run Bash File

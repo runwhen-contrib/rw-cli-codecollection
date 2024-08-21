@@ -88,7 +88,7 @@ Fetch App Service `${APPSERVICE}` Config In Resource Group `${AZ_RESOURCE_GROUP}
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${process.stdout}
 
-Scan AppService `${APPSERVICE}` Event Errors In Resource Group `${AZ_RESOURCE_GROUP}`
+Scan AppService `${APPSERVICE}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events of appservice and checks for errors
     [Tags]    appservice    monitor    events    errors
     ${process}=    RW.CLI.Run Bash File
