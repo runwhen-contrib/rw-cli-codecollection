@@ -7,7 +7,7 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/aws/eks.png
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/networking/10076-icon-service-Application-Gateways.svg
   alias: Azure Application Gateway {{match_resource.resource.name}}
   asMeasuredBy: Availability of Application Gateway {{match_resource.resource.name}} and its backend pools.
   configProvided:

@@ -7,7 +7,7 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/aws/eks.png
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/compute/10034-icon-service-VM-Scale-Sets.svg
   alias: Azure VM Scaled Set {{match_resource.resource.name}}
   asMeasuredBy: Health of {{match_resource.resource.name}} VM Scaled Set.
   configProvided:
