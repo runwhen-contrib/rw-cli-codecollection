@@ -24,7 +24,7 @@ spec:
   configProvided:
     - name: AZ_RESOURCE_GROUP
       value: {{custom.az_resource_group}}
-    - name: APPSERVICE
+    - name: VMSCALEDSET
       value: {{match_resource.resource.name}}
   secretsProvided:
     - name: AZ_USERNAME
