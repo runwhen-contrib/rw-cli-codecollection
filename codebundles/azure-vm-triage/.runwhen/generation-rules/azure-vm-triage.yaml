@@ -6,10 +6,16 @@ spec:
     - resourceTypes:
         - azure_compute_virtual_machine_scale_sets
       matchRules:
-        - type: pattern
-          pattern: ".+"
-          properties: [name]
-          mode: substring
+        - type: and
+          matches:
+            - type: pattern
+              pattern: ".+"
+              properties: [resource_group]
+              mode: substring
+            - type: pattern
+              pattern: ".+"
+              properties: [name]
+              mode: substring
       slxs:
         - baseName: azure-vm-triage
           qualifiers: ["resource"]
