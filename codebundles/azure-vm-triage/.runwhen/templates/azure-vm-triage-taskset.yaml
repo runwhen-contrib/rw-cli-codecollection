@@ -23,7 +23,7 @@ spec:
     pathToRobot: codebundles/azure-vm-triage/runbook.robot
   configProvided:
     - name: AZ_RESOURCE_GROUP
-      value: {{match_resource.resource.resource_group}}
+      value: {{match_resource.resource_group}}
     - name: VMSCALEDSET
       value: {{match_resource.resource.name}}
   secretsProvided:
