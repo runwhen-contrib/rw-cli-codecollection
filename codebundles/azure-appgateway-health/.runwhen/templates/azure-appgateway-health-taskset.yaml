@@ -23,7 +23,7 @@ spec:
     pathToRobot: codebundles/azure-appgateway-health/runbook.robot
   configProvided:
     - name: AZ_RESOURCE_GROUP
-      value: {{custom.az_resource_group}}
+      value: {{resource_group.name}}
     - name: APPGATEWAY
       value: {{match_resource.resource.name}}
   secretsProvided:

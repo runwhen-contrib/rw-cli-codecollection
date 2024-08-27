@@ -27,7 +27,7 @@ spec:
   intervalSeconds: 300
   configProvided:
     - name: AZ_RESOURCE_GROUP
-      value: {{match_resource.resource.resource_group}}
+      value: {{resource_group.name}}
     - name: VMSCALEDSET
       value: {{match_resource.resource.name}}
   secretsProvided:

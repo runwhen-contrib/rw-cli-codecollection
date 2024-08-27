@@ -23,7 +23,7 @@ spec:
     pathToRobot: codebundles/azure-appservice-triage/runbook.robot
   configProvided:
     - name: AZ_RESOURCE_GROUP
-      value: {{custom.az_resource_group}}
+      value: {{resource_group.name}}
     - name: APPSERVICE
       value: {{match_resource.resource.name}}
   secretsProvided:
