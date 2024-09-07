@@ -15,16 +15,16 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 Analyze artifact output from GitHub Workflow `${WORKFLOW_NAME}` in repository `${GITHUB_REPO}`
-    [Documentation]    Check GitHub workflow status and analyze artifact.
+    [Documentation]    Check GitHub workflow status and analyze artifact with a user provided command.
     [Tags]    github    workflow    actions    artifact    report
-    ${ESCAPED_ANALYSIS_COMMAND}=     RW.CLI.Escape Bash Command    ${ANALYSIS_COMMAND}
+    ${ESCAPED_ANALYSIS_COMMAND}=    RW.CLI.Escape Bash Command    ${ANALYSIS_COMMAND}
     Log    ${ESCAPED_ANALYSIS_COMMAND}
     ${rsp}=    RW.CLI.Run Bash File
     ...    bash_file=gh_actions_artifact_analysis.sh
-    ...    cmd_override=ANALYSIS_COMMAND=${ESCAPED_ANALYSIS_COMMAND} ./gh_actions_artifact_analysis.sh 
+    ...    cmd_override=ANALYSIS_COMMAND=${ESCAPED_ANALYSIS_COMMAND} ./gh_actions_artifact_analysis.sh
     ...    secret__GITHUB_TOKEN=${GITHUB_TOKEN}
     ...    env=${env}
-    ${report}=    RW.CLI.Run CLI    cat ${SCRIPT_TMP_DIR}/report.txt 
+    ${report}=    RW.CLI.Run CLI    cat ${SCRIPT_TMP_DIR}/report.txt
     RW.Core.Add Pre To Report    Command Stdout:\n${report.stdout}
 
 
@@ -50,10 +50,10 @@ Suite Initialization
     ...    example=trivy_aggregated_results
     ${ANALYSIS_COMMAND}=    RW.Core.Import User Variable    ANALYSIS_COMMAND
     ...    type=string
-    ...    description=A command to run against the output report. Tools like jq and awk are available. 
+    ...    description=A command to run against the output report. Tools like jq and awk are available.
     ...    pattern=\w*
     ...    default=''
-    ...    example=jq . 
+    ...    example=jq .
     ${RESULT_FILE}=    RW.Core.Import User Variable    RESULT_FILE
     ...    type=string
     ...    description=The artifact to inspect.
@@ -76,7 +76,7 @@ Suite Initialization
     ...    description=The home path of the runner
     ...    pattern=\w*
     ...    example=/home/runwhen
-    ...    default=/home/runwhen   
+    ...    default=/home/runwhen
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${GITHUB_REPO}    ${GITHUB_REPO}
     Set Suite Variable    ${WORKFLOW_NAME}    ${WORKFLOW_NAME}
@@ -93,4 +93,4 @@ Suite Initialization
     ...    {"RESULT_FILE":"${RESULT_FILE}","ARTIFACT_NAME":"${ARTIFACT_NAME}","WORKFLOW_NAME":"${WORKFLOW_NAME}","GITHUB_REPO":"${GITHUB_REPO}","PERIOD_HOURS":"${PERIOD_HOURS}", "SCRIPT_TMP_DIR":"${SCRIPT_TMP_DIR}", "PATH":"$PATH:${OS_PATH}"}
 
 Suite Teardown
-     RW.CLI.Run Cli    cmd=rm -rf ${SCRIPT_TMP_DIR}
+    RW.CLI.Run Cli    cmd=rm -rf ${SCRIPT_TMP_DIR}
