@@ -24,7 +24,8 @@ Analyze artifact output from GitHub Workflow `${WORKFLOW_NAME}` in repository `$
     ...    cmd_override=ANALYSIS_COMMAND=${ANALYSIS_COMMAND} ./gh_actions_artifact_analysis.sh
     ...    secret__GITHUB_TOKEN=${GITHUB_TOKEN}
     ...    env=${env}
-    ${metric}=    RW.CLI.Run CLI    cat ${SCRIPT_TMP_DIR}/report.txt
+    ${output}=    RW.CLI.Run CLI    cat ${SCRIPT_TMP_DIR}/report.txt
+    ${metric}=    Convert to Number    ${output.stdout}  2
     RW.Core.Push Metric    ${metric}
 
 
