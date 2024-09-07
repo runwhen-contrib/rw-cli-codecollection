@@ -28,7 +28,6 @@ Analyze artifact output from GitHub Workflow `${WORKFLOW_NAME}` in repository `$
     ${metric}=    Convert to Number    ${output.stdout}    2
     RW.Core.Push Metric    ${metric}
 
-
 *** Keywords ***
 Suite Initialization
     ${GITHUB_REPO}=    RW.Core.Import User Variable    GITHUB_REPO
