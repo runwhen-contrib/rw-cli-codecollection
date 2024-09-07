@@ -91,6 +91,6 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"RESULT_FILE":"${RESULT_FILE}","ARTIFACT_NAME":"${ARTIFACT_NAME}","WORKFLOW_NAME":"${WORKFLOW_NAME}","GITHUB_REPO":"${GITHUB_REPO}","PERIOD_HOURS":"${PERIOD_HOURS}", "SCRIPT_TMP_DIR":"${SCRIPT_TMP_DIR}", "PATH":"$PATH:${OS_PATH}"}
-    ...    
+
 Suite Teardown
     RW.CLI.Run Cli    cmd=rm -rf ${SCRIPT_TMP_DIR}
