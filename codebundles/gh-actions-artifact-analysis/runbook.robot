@@ -21,7 +21,7 @@ Analyze artifact output from GitHub Workflow `${WORKFLOW_NAME}` in repository `$
     Log    ${ESCAPED_ANALYSIS_COMMAND}
     ${rsp}=    RW.CLI.Run Bash File
     ...    bash_file=gh_actions_artifact_analysis.sh
-    ...    cmd_override=ANALYSIS_COMMAND=${ESCAPED_ANALYSIS_COMMAND} ./gh_actions_artifact_analysis.sh 
+    ...    cmd_override=ANALYSIS_COMMAND=${ANALYSIS_COMMAND} ./gh_actions_artifact_analysis.sh 
     ...    secret__GITHUB_TOKEN=${GITHUB_TOKEN}
     ...    env=${env}
     ${report}=    RW.CLI.Run CLI    cat ${SCRIPT_TMP_DIR}/report.txt 
