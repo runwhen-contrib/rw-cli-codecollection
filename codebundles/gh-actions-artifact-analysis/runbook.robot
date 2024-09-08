@@ -34,6 +34,8 @@ Analyze artifact output from GitHub workflow `${WORKFLOW_NAME}` in repository `$
         RW.Core.Add Issue
         ...    severity=${ISSUE_SEVERITY}
         ...    title=${ISSUE_TITLE}
+        ...    expected=''
+        ...    actual=''
         ...    reproduce_hint=${workflow_analysis.cmd}
         ...    details=${report.stdout}
         ...    next_steps=${ISSUE_NEXT_STEPS}
@@ -43,6 +45,8 @@ Analyze artifact output from GitHub workflow `${WORKFLOW_NAME}` in repository `$
         RW.Core.Add Issue
         ...    severity=3
         ...    title=GitHub Workflow `${WORKFLOW_NAME}` in repository `${GITHUB_REPO}` is unhealthy
+        ...    expected=''
+        ...    actual=''
         ...    reproduce_hint=${workflow_analysis.cmd}
         ...    details=${last_run_health_issue_details.stdout}
         ...    next_steps=Inspect Logs for GitHub workflow `${WORKFLOW_NAME}` in repository `${GITHUB_REPO}` 
