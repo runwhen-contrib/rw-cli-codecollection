@@ -14,12 +14,12 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Analyze artifact output from GitHub Workflow `${WORKFLOW_NAME}` in repository `${GITHUB_REPO}`
+Analyze artifact output from GitHub workflow `${WORKFLOW_NAME}` in repository `${GITHUB_REPO}`
     [Documentation]    Check GitHub workflow status and analyze artifact with a user provided command.
     [Tags]    github    workflow    actions    artifact    report
     ${ESCAPED_ANALYSIS_COMMAND}=    RW.CLI.Escape Bash Command    ${ANALYSIS_COMMAND}
     Log    ${ESCAPED_ANALYSIS_COMMAND}
-    ${rsp}=    RW.CLI.Run Bash File
+    ${workflow_analysis}=    RW.CLI.Run Bash File
     ...    bash_file=gh_actions_artifact_analysis.sh
     ...    cmd_override=ANALYSIS_COMMAND=${ESCAPED_ANALYSIS_COMMAND} ./gh_actions_artifact_analysis.sh
     ...    secret__GITHUB_TOKEN=${GITHUB_TOKEN}
@@ -27,6 +27,26 @@ Analyze artifact output from GitHub Workflow `${WORKFLOW_NAME}` in repository `$
     ${report}=    RW.CLI.Run CLI    cat ${SCRIPT_TMP_DIR}/report.txt
     RW.Core.Add Pre To Report    Command Stdout:\n${report.stdout}
 
+    # Raise an Issue if needed
+    ${issue_details}=    RW.CLI.Run CLI     grep -E '${ISSUE_SEARCH_STRING}' ${SCRIPT_TMP_DIR}/report.txt
+    RW.Core.Add Pre To Report    Searching for the string '${ISSUE_SEARCH_STRING}':\n${issue_details.stdout}
+    IF    $issue_details.stdout != ""
+        RW.Core.Add Issue
+        ...    severity=${ISSUE_SEVERITY}
+        ...    title=${ISSUE_TITLE}
+        ...    reproduce_hint=${workflow_analysis.cmd}
+        ...    details=${report.stdout}
+        ...    next_steps=${ISSUE_NEXT_STEPS}
+    END
+    ${last_run_health_issue_details}=    RW.CLI.Run CLI     echo "${workflow_analysis.stderr}" | grep -E 'did not complete successfully|run is older than'
+    IF    $last_run_health_issue_details.stdout != ""
+        RW.Core.Add Issue
+        ...    severity=3
+        ...    title=GitHub Workflow `${WORKFLOW_NAME}` in repository `${GITHUB_REPO}` is unhealthy
+        ...    reproduce_hint=${workflow_analysis.cmd}
+        ...    details=${last_run_health_issue_details.stdout}
+        ...    next_steps=Inspect Logs for GitHub workflow `${WORKFLOW_NAME}` in repository `${GITHUB_REPO}` 
+    END
 
 *** Keywords ***
 Suite Initialization
@@ -71,6 +91,30 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=24
     ...    default=24
+    ${ISSUE_SEARCH_STRING}=    RW.Core.Import User Variable    ISSUE_SEARCH_STRING
+    ...    type=string
+    ...    description=A string that, if found in the analysis output, will generate an Issue. 
+    ...    pattern=\w*
+    ...    default=ERROR|Error
+    ...    example=CRITICAL
+    ${ISSUE_SEVERITY}=    RW.Core.Import User Variable    ISSUE_SEVERITY
+    ...    type=string
+    ...    description=The severity of the issue. 1 = Critical, 2=Major, 3=Minor, 4=Informational 
+    ...    pattern=\w*
+    ...    default=4
+    ...    example=2
+    ${ISSUE_TITLE}=    RW.Core.Import User Variable    ISSUE_TITLE
+    ...    type=string
+    ...    description=The title of the issue. 
+    ...    pattern=\w*
+    ...    default=The text `${ISSUE_SEARCH_STRING}` was found in GitHub Workflow `${WORKFLOW_NAME}` in repo `${GITHUB_REPO}`
+    ...    example=Critical and Fixable Vulnerabilities Found in GitHub Workflow `${WORKFLOW_NAME}`
+    ${ISSUE_NEXT_STEPS}=    RW.Core.Import User Variable    ISSUE_NEXT_STEPS
+    ...    type=string
+    ...    description=A list of next steps to take when the Issue is raised. Use `\n` to separate items in the list.'
+    ...    pattern=\w*
+    ...    default=Review the log output or escalate to the service owner. 
+    ...    example=Remediate security issues with container images and update Helm Chart image versions 
     ${HOME}=    RW.Core.Import User Variable    HOME
     ...    type=string
     ...    description=The home path of the runner
@@ -85,6 +129,11 @@ Suite Initialization
     Set Suite Variable    ${GITHUB_TOKEN}    ${GITHUB_TOKEN}
     Set Suite Variable    ${PERIOD_HOURS}    ${PERIOD_HOURS}
     Set Suite Variable    ${ANALYSIS_COMMAND}    ${ANALYSIS_COMMAND}
+    Set Suite Variable    ${ISSUE_SEARCH_STRING}    ${ISSUE_SEARCH_STRING}
+    Set Suite Variable    ${ISSUE_SEVERITY}    ${ISSUE_SEVERITY}
+    Set Suite Variable    ${ISSUE_TITLE}    ${ISSUE_TITLE}
+    Set Suite Variable    ${ISSUE_NEXT_STEPS}    ${ISSUE_NEXT_STEPS}
+
     Set Suite Variable    ${HOME}    ${HOME}
     ${temp_dir}=    RW.CLI.Run Cli    cmd=mktemp -d ${HOME}/gh-actions-artifact-analysis-XXXXXXXXXX | tr -d '\n'
     Set Suite Variable    ${SCRIPT_TMP_DIR}    ${temp_dir.stdout}

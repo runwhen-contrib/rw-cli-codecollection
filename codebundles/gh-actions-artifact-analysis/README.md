@@ -1,0 +1,2 @@
+# GitHub Actions Artifact Analysis
+This codebundle is highly configurable and integrates with GitHub Actions and workflow artifacts. It downloads a specified artifact from the last workflow run, analyzes a artifact with a user provided command (typically using linux / bash tools like jq) 
