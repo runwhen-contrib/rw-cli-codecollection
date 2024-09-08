@@ -1,6 +1,6 @@
 # Kubernetes Application Troubleshoot
+This codebundle attempts to identify issues created in application code changes recently. 
 
-x
 ## Tasks
 `Get Resource Logs`
 `Scan For Misconfigured Environment`
