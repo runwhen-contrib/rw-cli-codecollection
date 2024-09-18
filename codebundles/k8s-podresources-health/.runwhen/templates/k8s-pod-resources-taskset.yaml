@@ -36,5 +36,4 @@ spec:
     - name: RESTART_AGE
       value: "10"
   secretsProvided:
-    - name: kubeconfig
-      workspaceKey: {{custom.kubeconfig_secret_name}}
+    {% include "kubernetes-auth.yaml" %}

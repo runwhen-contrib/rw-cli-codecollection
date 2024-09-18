@@ -32,7 +32,6 @@ spec:
     - name: INGRESS
       value: {{match_resource.resource.metadata.name}}   
   secretsProvided:
-    - name: kubeconfig
-      workspaceKey: {{custom.kubeconfig_secret_name}}
+    {% include "kubernetes-auth.yaml" %}
     - name: gcp_credentials_json
       workspaceKey: {{custom.gcp_ops_suite_sa}}

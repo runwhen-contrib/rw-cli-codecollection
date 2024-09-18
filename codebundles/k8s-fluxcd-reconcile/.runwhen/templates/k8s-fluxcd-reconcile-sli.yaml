@@ -32,5 +32,4 @@ spec:
     - name: DISTRIBUTION
       value: Kubernetes
   secretsProvided:
-    - name: kubeconfig
-      workspaceKey: {{custom.kubeconfig_secret_name}}
+    {% include "kubernetes-auth.yaml" %}

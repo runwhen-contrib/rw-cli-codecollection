@@ -38,5 +38,4 @@ spec:
     - name: LOGS_EXCLUDE_PATTERN
       value: "info"
   secretsProvided:
-    - name: kubeconfig
-      workspaceKey: {{custom.kubeconfig_secret_name}}
+    {% include "kubernetes-auth.yaml" %}

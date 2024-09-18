@@ -32,5 +32,4 @@ spec:
     - name: REDIS_HEALTHCHECK_KEY
       value: runwhen_task_rw_healthcheck
   secretsProvided:
-    - name: kubeconfig
-      workspaceKey: {{custom.kubeconfig_secret_name}}
+    {% include "kubernetes-auth.yaml" %}

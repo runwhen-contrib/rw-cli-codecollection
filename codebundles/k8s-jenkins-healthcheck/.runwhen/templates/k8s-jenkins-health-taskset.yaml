@@ -30,8 +30,7 @@ spec:
     - name: CONTEXT
       value: {{context}}
   secretsProvided:
-    - name: kubeconfig
-      workspaceKey: {{custom.kubeconfig_secret_name}}
+    {% include "kubernetes-auth.yaml" %}
     - name: JENKINS_SA_USERNAME
 {% if custom.jenkins_sa_username_secret_name is defined %}
       workspaceKey: {{custom.jenkins_sa_username_secret_name}}

@@ -35,5 +35,4 @@ spec:
     - name: CONTEXT
       value: {{context}}
   secretsProvided:
-    - name: kubeconfig
-      workspaceKey: {{custom.kubeconfig_secret_name}}
+    {% include "kubernetes-auth.yaml" %}
