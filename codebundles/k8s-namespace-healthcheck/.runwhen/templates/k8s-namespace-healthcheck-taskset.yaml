@@ -32,4 +32,10 @@ spec:
     - name: EVENT_AGE
       value: "5m"
   secretsProvided:
-    {% include "kubernetes-auth.yaml" %}
+  {% if wb_version %}
+    {{ wb_version }}
+    {% include "kubernetes-auth.yaml" ignore missing %}
+  {% else %}
+    - name: KUBE_AUTH_DEFAULT
+      value: "default-auth-value"
+  {% endif %}
