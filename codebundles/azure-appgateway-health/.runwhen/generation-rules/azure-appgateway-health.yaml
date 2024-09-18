@@ -11,8 +11,8 @@ spec:
           properties: [name]
           mode: substring
       slxs:
-        - baseName: azure-appgateway-health
-          qualifiers: ["resource"]
+        - baseName: az-appgw-health
+          qualifiers: ["resource", "resource_group"]
           baseTemplateName: azure-appgateway-health
           levelOfDetail: basic
           outputItems:

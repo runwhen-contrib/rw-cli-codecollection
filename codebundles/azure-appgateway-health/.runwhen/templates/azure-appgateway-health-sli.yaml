@@ -31,11 +31,4 @@ spec:
     - name: APPGATEWAY
       value: {{match_resource.resource.name}}
   secretsProvided:
-    - name: AZ_USERNAME
-      workspaceKey: {{custom.az_username}}
-    - name: AZ_SECRET_VALUE
-      workspaceKey: {{custom.az_secret_value}}
-    - name: AZ_TENANT
-      workspaceKey: {{custom.az_tenant}}
-    - name: AZ_SUBSCRIPTION
-      workspaceKey: {{custom.az_subscription}}
+    {% include "azure-auth.yaml" %}

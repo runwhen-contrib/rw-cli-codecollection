@@ -9,10 +9,10 @@
 # APPGATEWAY
 
 
-# Log in to Azure CLI
-az login --service-principal --username $AZ_USERNAME --password $AZ_SECRET_VALUE --tenant $AZ_TENANT > /dev/null
-# Set the subscription
-az account set --subscription $AZ_SUBSCRIPTION
+# # Log in to Azure CLI
+# az login --service-principal --username $AZ_USERNAME --password $AZ_SECRET_VALUE --tenant $AZ_TENANT > /dev/null
+# # Set the subscription
+# az account set --subscription $AZ_SUBSCRIPTION
 
 config=$(az network application-gateway show -n $APPGATEWAY --resource-group $AZ_RESOURCE_GROUP)
 echo "$config"

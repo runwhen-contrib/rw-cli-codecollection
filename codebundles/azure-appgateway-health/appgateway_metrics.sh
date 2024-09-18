@@ -12,10 +12,10 @@
 
 METRIC_TOP=100
 
-# Log in to Azure CLI
-az login --service-principal --username $AZ_USERNAME --password $AZ_SECRET_VALUE --tenant $AZ_TENANT > /dev/null
-# Set the subscription
-az account set --subscription $AZ_SUBSCRIPTION
+# # Log in to Azure CLI
+# az login --service-principal --username $AZ_USERNAME --password $AZ_SECRET_VALUE --tenant $AZ_TENANT > /dev/null
+# # Set the subscription
+# az account set --subscription $AZ_SUBSCRIPTION
 
 ok=0
 next_steps=()
