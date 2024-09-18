@@ -6,6 +6,16 @@ CLI Generic keyword library for running and parsing CLI stdout
 
 Scope: Global
 
+<a id="libraries.RW.CLI.CLI.escape_bash_command"></a>
+
+#### escape\_bash\_command
+
+```python
+def escape_bash_command(command)
+```
+
+Escapes a command for safe execution in bash.
+
 <a id="libraries.RW.CLI.CLI.pop_shell_history"></a>
 
 #### pop\_shell\_history

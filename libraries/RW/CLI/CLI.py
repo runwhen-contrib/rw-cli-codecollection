@@ -6,7 +6,8 @@ Scope: Global
 import re, logging, json, jmespath, os
 from datetime import datetime
 from robot.libraries.BuiltIn import BuiltIn
-
+import shlex
+ 
 from RW import platform
 from RW.Core import Core
 
@@ -24,6 +25,14 @@ SHELL_HISTORY: list[str] = []
 SECRET_PREFIX = "secret__"
 SECRET_FILE_PREFIX = "secret_file__"
 
+def escape_string(string):
+    return repr(string)
+
+def escape_bash_command(command):
+    """
+    Escapes a command for safe execution in bash.
+    """
+    return shlex.quote(command)
 
 def pop_shell_history() -> str:
     """Deletes the shell history up to this point and returns it as a string for display.

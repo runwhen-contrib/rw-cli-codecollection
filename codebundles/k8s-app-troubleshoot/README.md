@@ -1,5 +1,4 @@
 # Kubernetes Application Troubleshoot
-
 This codebundle attempts to identify issues created in application code changes recently. 
 
 ## Tasks

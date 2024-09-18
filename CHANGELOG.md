@@ -1,3 +1,12 @@
+## 0.0.14 2024-09-18
+- Add GitHub Actions Artifact Analysis Task (#418) 9c30aeb
+- Add resource check task for namespace pods (#374) 0a8536b
+- Add/gcloud bucket health (#375) c92db8b
+- Add fluxcd reconcile codebundle (#364) d041e5d
+- Add starter k8s namespace chaos codebundle (#356) c7d0068
+- Adds new set of AWS codebundles (#355) b72340c
+- Add/cluster-resource-health-cb (#359) 7d30f67
+
 ## 0.0.13 2024-4-17
 Version lock prior to bash/cli library adjustments.
 
