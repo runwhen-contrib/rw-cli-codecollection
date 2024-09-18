@@ -6,12 +6,10 @@ spec:
     - resourceTypes:
         - azure_network_load_balancers
       matchRules:
-        - type: and
-          matches:
-            - type: pattern
-              pattern: ".+"
-              properties: [name]
-              mode: substring
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
       slxs:
         - baseName: az-lb-health
           levelOfDetail: basic
