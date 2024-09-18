@@ -33,9 +33,8 @@ spec:
       value: "5m"
   secretsProvided:
   {% if wb_version %}
-    {{ wb_version }}
     {% include "kubernetes-auth.yaml" ignore missing %}
   {% else %}
-    - name: KUBE_AUTH_DEFAULT
-      value: "default-auth-value"
+    - name: kubeconfig
+      workspaceKey: {{custom.kubeconfig_secret_name}}
   {% endif %}

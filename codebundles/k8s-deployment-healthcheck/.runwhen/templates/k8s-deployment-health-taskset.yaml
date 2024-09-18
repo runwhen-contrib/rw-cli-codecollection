@@ -38,4 +38,9 @@ spec:
     - name: LOGS_EXCLUDE_PATTERN
       value: "info"
   secretsProvided:
-    {% include "kubernetes-auth.yaml" %}
+  {% if wb_version %}
+    {% include "kubernetes-auth.yaml" ignore missing %}
+  {% else %}
+    - name: kubeconfig
+      workspaceKey: {{custom.kubeconfig_secret_name}}
+  {% endif %}

@@ -44,4 +44,9 @@ spec:
   - name: MAX_LOG_BYTES
     value: '2560000'
   secretsProvided:
-    {% include "kubernetes-auth.yaml" %}
+  {% if wb_version %}
+    {% include "kubernetes-auth.yaml" ignore missing %}
+  {% else %}
+    - name: kubeconfig
+      workspaceKey: {{custom.kubeconfig_secret_name}}
+  {% endif %}
