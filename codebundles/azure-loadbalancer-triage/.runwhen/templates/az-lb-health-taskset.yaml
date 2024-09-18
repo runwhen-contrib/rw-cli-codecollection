@@ -25,10 +25,8 @@ spec:
     - name: AZ_HISTORY_RANGE
       value: '24'
     - name: AZ_LB_NAME
-      value: {{match_resource.name}}
+      value: {{match_resource.resource.name}}
     - name: AZ_LB_ID
-      value: {{match_resource.id}}
+      value: {{match_resource.resource.id}}
   secretsProvided:
-    - name: azure_credentials
-      workspaceKey: {{custom.azure_credentials_secret_name}}
-  servicesProvided: []
+    {% include "azure-auth.yaml" %}
