@@ -27,4 +27,9 @@ spec:
     - name: VMSCALEDSET
       value: {{match_resource.resource.name}}
   secretsProvided:
-    {% include "azure-auth.yaml" %}
+  {% if wb_version >= "0.7.0" %}
+    {% include "azure-auth.yaml" ignore missing %}
+  {% else %}
+    - name: azure_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}
