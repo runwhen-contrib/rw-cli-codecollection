@@ -27,7 +27,7 @@ spec:
     - name: VMSCALEDSET
       value: {{match_resource.resource.name}}
   secretsProvided:
-  {% if wb_version %}
+  {% if wb_version and wb_version > "0.6.3" %}
     {% include "azure-auth.yaml" ignore missing %}
   {% else %}
     - name: azure_credentials
