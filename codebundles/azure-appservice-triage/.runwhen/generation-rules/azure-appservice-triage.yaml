@@ -11,8 +11,8 @@ spec:
           properties: [name]
           mode: substring
       slxs:
-        - baseName: azure-appservice-triage
-          qualifiers: ["resource"]
+        - baseName: az-appsvc-triage
+          qualifiers: ["resource", "resource_group"]
           baseTemplateName: azure-appservice-triage
           levelOfDetail: basic
           outputItems:

@@ -33,26 +33,6 @@ Check AppService `${APPSERVICE}` Health Status In Resource Group `${AZ_RESOURCE_
 
 *** Keywords ***
 Suite Initialization
-    ${AZ_USERNAME}=    RW.Core.Import Secret
-    ...    AZ_USERNAME
-    ...    type=string
-    ...    description=The azure service principal client ID on the app registration.
-    ...    pattern=\w*
-    ${AZ_SECRET_VALUE}=    RW.Core.Import Secret
-    ...    AZ_SECRET_VALUE
-    ...    type=string
-    ...    description=The service principal secret value on the associated credential for the app registration.
-    ...    pattern=\w*
-    ${AZ_TENANT}=    RW.Core.Import Secret
-    ...    AZ_TENANT
-    ...    type=string
-    ...    description=The azure tenant ID used by the service principal to authenticate with azure.
-    ...    pattern=\w*
-    ${AZ_SUBSCRIPTION}=    RW.Core.Import Secret
-    ...    AZ_SUBSCRIPTION
-    ...    type=string
-    ...    description=The azure tenant ID used by the service principal to authenticate with azure.
-    ...    pattern=\w*
     ${AZ_RESOURCE_GROUP}=    RW.Core.Import User Variable    AZ_RESOURCE_GROUP
     ...    type=string
     ...    description=The resource group to perform actions against.
@@ -61,13 +41,14 @@ Suite Initialization
     ...    type=string
     ...    description=The Azure AppService to triage.
     ...    pattern=\w*
-
+    ${azure_credentials}=    RW.Core.Import Secret
+    ...    azure_credentials
+    ...    type=string
+    ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
+    ...    pattern=\w*
     Set Suite Variable    ${APPSERVICE}    ${APPSERVICE}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
-    Set Suite Variable    ${AZ_USERNAME}    ${AZ_USERNAME}
-    Set Suite Variable    ${AZ_SECRET_VALUE}    ${AZ_SECRET_VALUE}
-    Set Suite Variable    ${AZ_TENANT}    ${AZ_TENANT}
-    Set Suite Variable    ${AZ_SUBSCRIPTION}    ${AZ_SUBSCRIPTION}
+    Set Suite Variable    ${azure_credentials}    ${azure_credentials}
     Set Suite Variable
     ...    ${env}
     ...    {"APPSERVICE":"${APPSERVICE}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}"}
