@@ -48,7 +48,6 @@ Suite Initialization
     ...    pattern=\w*
     Set Suite Variable    ${APPSERVICE}    ${APPSERVICE}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
-    Set Suite Variable    ${azure_credentials}    ${azure_credentials}
     Set Suite Variable
     ...    ${env}
     ...    {"APPSERVICE":"${APPSERVICE}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}"}

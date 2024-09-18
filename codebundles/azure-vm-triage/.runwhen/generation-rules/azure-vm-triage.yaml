@@ -11,8 +11,8 @@ spec:
           properties: [name]
           mode: substring
       slxs:
-        - baseName: azure-vm-triage
-          qualifiers: ["resource"]
+        - baseName: az-vm-triage
+          qualifiers: ["resource", "resource_group"]
           baseTemplateName: azure-vm-triage
           levelOfDetail: basic
           outputItems:
