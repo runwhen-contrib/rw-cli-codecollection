@@ -9,7 +9,8 @@ metadata:
 spec:
   displayUnitsLong: OK
   displayUnitsShort: ok
-  location: {{default_location}}
+  locations:
+    - {{default_location}}
   description: Measures the health of a Azure VM Scaled Set.
   codeBundle:
     {% if repo_url %}
