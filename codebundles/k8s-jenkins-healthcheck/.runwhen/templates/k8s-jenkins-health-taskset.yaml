@@ -30,8 +30,12 @@ spec:
     - name: CONTEXT
       value: {{context}}
   secretsProvided:
+  {% if wb_version %}
+    {% include "kubernetes-auth.yaml" ignore missing %}
+  {% else %}
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
+  {% endif %}
     - name: JENKINS_SA_USERNAME
 {% if custom.jenkins_sa_username_secret_name is defined %}
       workspaceKey: {{custom.jenkins_sa_username_secret_name}}

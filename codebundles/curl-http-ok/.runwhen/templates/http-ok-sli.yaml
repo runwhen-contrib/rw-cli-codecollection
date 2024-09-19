@@ -34,4 +34,3 @@ spec:
     - name: DESIRED_RESPONSE_CODE
       value: '200'
   secretsProvided: []
-  servicesProvided: []

@@ -26,5 +26,9 @@ spec:
     - name: KUBERNETES_DISTRIBUTION_BINARY
       value: {{custom.kubernetes_distribution_binary}}
   secretsProvided:
+  {% if wb_version %}
+    {% include "kubernetes-auth.yaml" ignore missing %}
+  {% else %}
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
+  {% endif %}

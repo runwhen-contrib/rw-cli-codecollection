@@ -28,7 +28,11 @@ spec:
     - name: KUBERNETES_DISTRIBUTION_BINARY
       value: {{custom.kubernetes_distribution_binary}}
   secretsProvided:
+  {% if wb_version %}
+    {% include "kubernetes-auth.yaml" ignore missing %}
+  {% else %}
     - name: kubeconfig
-      workspaceKey: {{custom.kubeconfig_secret_name | default('no-secret-provided')}}
+      workspaceKey: {{custom.kubeconfig_secret_name}}
+  {% endif %}    
     - name: github_token
       workspaceKey: {{custom.github_token_secret_name | default('no-secret-provided')}}

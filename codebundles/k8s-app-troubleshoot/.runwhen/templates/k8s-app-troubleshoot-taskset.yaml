@@ -46,10 +46,11 @@ spec:
     - name: REPO_URI
       value: {{ match_resource.resource.metadata.annotations.gitApplication }}
   secretsProvided:
+  {% if wb_version %}
+    {% include "kubernetes-auth.yaml" ignore missing %}
+  {% else %}
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
+  {% endif %}
     - name: REPO_AUTH_TOKEN
       workspaceKey: {{ match_resource.resource.metadata.annotations.gitTokenName }}
-  servicesProvided:
-    - name: {{custom.kubernetes_distribution_binary}}
-      locationServiceName: {{custom.kubernetes_distribution_binary}}-service.shared

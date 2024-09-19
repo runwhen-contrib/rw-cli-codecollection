@@ -30,5 +30,9 @@ spec:
     - name: SEARCH_FILTER
       value: status.replicas != status.availableReplicas && metadata.name == `{{ match_resource.resource.metadata.name }}`
   secretsProvided:
+  {% if wb_version %}
+    {% include "kubernetes-auth.yaml" ignore missing %}
+  {% else %}
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
+  {% endif %}

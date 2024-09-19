@@ -44,8 +44,9 @@ spec:
   - name: CONTEXT
     value: {{context}}
   secretsProvided:
+  {% if wb_version %}
+    {% include "kubernetes-auth.yaml" ignore missing %}
+  {% else %}
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
-  servicesProvided:
-    - name: {{custom.kubernetes_distribution_binary}}
-      locationServiceName: {{custom.kubernetes_distribution_binary}}-service.shared
+  {% endif %}

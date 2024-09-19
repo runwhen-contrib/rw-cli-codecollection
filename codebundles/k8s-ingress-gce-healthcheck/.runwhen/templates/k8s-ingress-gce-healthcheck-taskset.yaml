@@ -32,7 +32,11 @@ spec:
     - name: INGRESS
       value: {{match_resource.resource.metadata.name}}   
   secretsProvided:
+  {% if wb_version %}
+    {% include "kubernetes-auth.yaml" ignore missing %}
+  {% else %}
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
+  {% endif %}
     - name: gcp_credentials_json
       workspaceKey: {{custom.gcp_ops_suite_sa}}

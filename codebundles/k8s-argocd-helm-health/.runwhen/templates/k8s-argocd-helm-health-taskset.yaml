@@ -33,5 +33,9 @@ spec:
     - name: RESOURCE_NAME
       value: "applications.argoproj.io"
   secretsProvided:
+  {% if wb_version %}
+    {% include "kubernetes-auth.yaml" ignore missing %}
+  {% else %}
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
+  {% endif %}

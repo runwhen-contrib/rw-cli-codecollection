@@ -30,4 +30,3 @@ spec:
     - name: OWNER_DETAILS
       value: '{"name":"{{match_resource.resource.metadata.name}}", "kind":"Ingress","namespace":"{{match_resource.resource.metadata.namespace}}"}'
   secretsProvided: []
-  servicesProvided: []
