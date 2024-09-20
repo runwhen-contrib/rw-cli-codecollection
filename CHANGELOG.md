@@ -1,3 +1,5 @@
+## 0.0.15 2024-09-19
+
 ## 0.0.14 2024-09-18
 - Add GitHub Actions Artifact Analysis Task (#418) 9c30aeb
 - Add resource check task for namespace pods (#374) 0a8536b
