@@ -60,11 +60,13 @@ Suite Initialization
     ...    type=string
     ...    description=Docker username to use if rate limited by Docker.
     ...    pattern=\w*
+    ...    default=""
     ${DOCKER_TOKEN}=    RW.Core.Import Secret
     ...    DOCKER_TOKEN
     ...    type=string
     ...    description=Docker token to use if rate limited by Docker.
     ...    pattern=\w*
+    ...    default=""
     ${azure_credentials}=    RW.Core.Import Secret
     ...    azure_credentials
     ...    type=string
