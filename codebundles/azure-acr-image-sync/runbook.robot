@@ -36,7 +36,8 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=myacr.azurecr.io
     ...    default=myacr.azurecr.io
-    ${IMAGE_MAPPINGS=}=    RW.Core.Import User Variable    IMAGE_MAPPINGS
+    ${IMAGE_MAPPINGS=}=    RW.Core.Import User Variable
+    ...    IMAGE_MAPPINGS
     ...    type=string
     ...    description=Append the date to the image tag
     ...    pattern=\w*
@@ -46,13 +47,14 @@ Suite Initialization
     ...    enum=[True,False]
     ...    description=Change the image tag to use the current date and time. Useful when importing 'latest' tags
     ...    pattern=\w*
+    ...    default=False
     ${TAG_CONFLICT_HANDLING}=    RW.Core.Import User Variable
     ...    TAG_CONFLICT_HANDLING
     ...    type=string
     ...    enum=[overwrite,rename]
     ...    description=How to handle tags that already exist. Options are: overwrite (delete the tag and write a new copy), rename (append the date to the tag)
     ...    pattern=\w*
-
+    ...    default=rename
     ${DOCKER_USERNAME}=    RW.Core.Import Secret
     ...    DOCKER_USERNAME
     ...    type=string
