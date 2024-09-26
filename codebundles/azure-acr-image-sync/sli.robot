@@ -32,13 +32,6 @@ Suite Initialization
     ...    description=Change the image tag to use the current date and time. Useful when importing 'latest' tags
     ...    pattern=\w*
     ...    default=false
-    ${TAG_CONFLICT_HANDLING}=    RW.Core.Import User Variable
-    ...    TAG_CONFLICT_HANDLING
-    ...    type=string
-    ...    enum=[overwrite,rename]
-    ...    description=How to handle tags that already exist. Options are: overwrite (delete the tag and write a new copy), rename (append the date to the tag)
-    ...    pattern=\w*
-    ...    default=rename
     ${DOCKER_USERNAME}=    RW.Core.Import Secret
     ...    DOCKER_USERNAME
     ...    type=string
@@ -57,7 +50,9 @@ Suite Initialization
 
     # Escape double quotes for IMAGE_MAPPINGS to properly set it in the environment variable
     ${escaped_image_mappings}=    Replace String Using Regexp    ${IMAGE_MAPPINGS}    "    \\\"
-
+    Set Suite Variable    ${ACR_REGISTRY}    ${ACR_REGISTRY}
+    Set Suite Variable    ${IMAGE_MAPPINGS}    ${IMAGE_MAPPINGS}
+    Set Suite Variable    ${USE_DATE_TAG_PATTERN}    ${USE_DATE_TAG_PATTERN}
     Set Suite Variable
     ...    ${env}
     ...    {"ACR_REGISTRY":"${ACR_REGISTRY}", "IMAGE_MAPPINGS":"${escaped_image_mappings}", "USE_DATE_TAG_PATTERN":"${USE_DATE_TAG_PATTERN}", "TAG_CONFLICT_HANDLING":"${TAG_CONFLICT_HANDLING}"}
