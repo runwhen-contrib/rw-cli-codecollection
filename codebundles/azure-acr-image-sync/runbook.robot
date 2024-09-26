@@ -29,7 +29,6 @@ Suite Initialization
     ...    type=String
     ...    enum=[True,False]
     ...    description=Change the image tag to use the current date and time. Useful when importing 'latest' tags
-    ...    default=False
     ${TAG_CONFLICT_HANDLING}=    RW.Core.Import User Variable    TAG_CONFLICT_HANDLING
     ...    type=string
     ...    enum=[overwrite,rename]
