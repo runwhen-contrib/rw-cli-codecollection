@@ -1,0 +1,21 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: azure
+  generationRules:
+    - resourceTypes:
+        - azure_appservice_web_apps
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: az-appsvc-remediate
+          qualifiers: ["resource", "resource_group"]
+          baseTemplateName: azure-appservice-remediate
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: runbook
+              templateName: azure-appservice-remediate-taskset.yaml
