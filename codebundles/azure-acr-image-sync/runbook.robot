@@ -42,7 +42,7 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=""
     ${USE_DATE_TAG_PATTERN}=    RW.Core.Import User Variable    USE_DATE_TAG_PATTERN
-    ...    type=String
+    ...    type=string
     ...    enum=[True,False]
     ...    description=Change the image tag to use the current date and time. Useful when importing 'latest' tags
     ...    pattern=\w*
