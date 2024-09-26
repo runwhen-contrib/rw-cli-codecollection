@@ -43,7 +43,7 @@ Suite Initialization
     ...    pattern=\w*
     ...    example='[ {"source": "docker.io/library/nginx:latest", "destination": "test/nginx"}, {"source": "docker.io/library/alpine:3.14", "destination": "test2/alpine"} ]'
     ${USE_DATE_TAG_PATTERN}=    RW.Core.Import User Variable    USE_DATE_TAG_PATTERN
-    ...    type=string
+    ...    type=bool
     ...    enum=[True,False]
     ...    description=Change the image tag to use the current date and time. Useful when importing 'latest' tags
     ...    pattern=\w*
