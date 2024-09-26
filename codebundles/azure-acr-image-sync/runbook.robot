@@ -41,7 +41,7 @@ Suite Initialization
     ...    type=string
     ...    description=Append the date to the image tag
     ...    pattern=\w*
-    ...    default=[ {"source": "docker.io/library/nginx:latest", "destination": "test/nginx"}, {"source": "docker.io/library/alpine:3.14", "destination": "test2/alpine"} ]
+    ...    example='[ {"source": "docker.io/library/nginx:latest", "destination": "test/nginx"}, {"source": "docker.io/library/alpine:3.14", "destination": "test2/alpine"} ]'
     ${USE_DATE_TAG_PATTERN}=    RW.Core.Import User Variable    USE_DATE_TAG_PATTERN
     ...    type=string
     ...    enum=[True,False]
