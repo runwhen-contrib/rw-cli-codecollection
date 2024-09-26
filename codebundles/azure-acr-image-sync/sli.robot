@@ -1,8 +1,8 @@
 *** Settings ***
 Metadata          Author    stewartshea
-Documentation     This CodeBundle syncs images from public repostitories into an Azure Container Registry.  
+Documentation     This CodeBundle counts the number of container images (from a configured list) outdated. It compares upstream images with those in the registry and counts the number that are outdated. 
 Metadata          Supports     Azure,ACR
-Metadata          Display Name     Azure ACR Image Sync
+Metadata          Display Name     Outdated Azure Container Registry Image Count
 Suite Setup       Suite Initialization
 Library           BuiltIn
 Library           RW.Core
@@ -58,14 +58,16 @@ Suite Initialization
 
 
 *** Tasks ***
-Sync Container Images into Azure Container Registry `${ACR_REGISTRY}`
-    [Documentation]    Synchronizes the latest container images into an ACR repository
+Count Outdated Images in Azure Container Registry `${ACR_REGISTRY}`
+    [Documentation]    Counts the number of images that need updating in ACR from the upstream source. 
     [Tags]    azure    acr    registry    runwhen
-    ${az_acr_image_sync}=    RW.CLI.Run Bash File
-    ...    bash_file=acr_sync_images.sh
+    ${az_acr_image_check}=    RW.CLI.Run Bash File
+    ...    bash_file=check_for_image_updates.sh
     ...    env=${env}
     ...    secret__DOCKER_USERNAME=${DOCKER_USERNAME}
     ...    secret__DOCKER_TOKEN=${DOCKER_TOKEN}
     ...    include_in_history=False
     ...    timeout_seconds=1200
-    RW.Core.Add Pre To Report    ACR Sync Output:\n${az_acr_image_sync.stdout}
+    ${total_outdated_images}=    RW.CLI.Run CLI
+    ...    cmd=echo "${az_acr_image_check.stdout}" | grep "Total images requiring an update" | awk '{print $NF}'
+    RW.Core.Push Metric    ${total_outdated_images.stdout}

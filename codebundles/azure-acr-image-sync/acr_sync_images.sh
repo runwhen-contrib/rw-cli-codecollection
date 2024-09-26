@@ -10,6 +10,10 @@ IMAGE_MAPPINGS="${IMAGE_MAPPINGS:-"[]"}"
 USE_DATE_TAG_PATTERN="${USE_DATE_TAG_PATTERN:-false}"
 # Conflict handling strategy: "overwrite" or "rename"
 TAG_CONFLICT_HANDLING="${TAG_CONFLICT_HANDLING:-overwrite}"
+# Optional Docker credentials for avoiding throttling
+DOCKER_USERNAME="${DOCKER_USERNAME:-""}"  # Docker Hub username
+DOCKER_TOKEN="${DOCKER_TOKEN:-""}"  # Docker Hub token
+
 # Get current date and time in a format suitable for tags (e.g., YYYYMMDDHHMM)
 if [[ "$USE_DATE_TAG_PATTERN" == "true" || "$TAG_CONFLICT_HANDLING" == "rename" ]]; then
   TAG_PATTERN=$(date +"%Y%m%d%H%M")
@@ -76,12 +80,25 @@ for i in "${!SOURCES[@]}"; do
     fi
   fi
 
-  # Import the image into the ACR
+  # Initialize the command with the basic az acr import structure
+  cmd="az acr import --name $ACR_REGISTRY --source $SOURCE_IMAGE --image $IMAGE_NAME_WITH_TAG"
+
+  # Conditionally add Docker authentication if the repository is from Docker Hub and credentials are set
+  if [[ $SOURCE_IMAGE == docker.io/* ]]; then
+    if [[ -n "$DOCKER_USERNAME" && -n "$DOCKER_TOKEN" ]]; then
+      echo "Docker Hub image detected. Using Docker credentials for import..."
+      cmd+=" --username ${DOCKER_USERNAME} --password ${DOCKER_TOKEN}"
+    else
+      echo "Warning: Docker Hub image detected but credentials are not set. Throttling might occur."
+    fi
+  else
+    echo "Non-Docker Hub image detected. No Docker credentials needed."
+  fi
+
+  # Execute the import command
   echo "Importing $SOURCE_IMAGE as $IMAGE_NAME_WITH_TAG into $ACR_REGISTRY..."
   
-  az acr import --name "$ACR_REGISTRY" \
-    --source "$SOURCE_IMAGE" \
-    --image "$IMAGE_NAME_WITH_TAG"
+  eval "$cmd"
 
   if [[ $? -ne 0 ]]; then
     echo "Failed to import $SOURCE_IMAGE"
