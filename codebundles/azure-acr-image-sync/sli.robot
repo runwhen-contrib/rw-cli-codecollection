@@ -26,8 +26,9 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=[ {"source": "docker.io/library/nginx:latest", "destination": "test/nginx"}, {"source": "docker.io/library/alpine:3.14", "destination": "test2/alpine"} ]
     ${USE_DATE_TAG_PATTERN}=    RW.Core.Import User Variable    USE_DATE_TAG_PATTERN
-    ...    type=bool
-    ...    description=Json List of image source and destination mappings
+    ...    type=string
+    ...    enum=[True,False]
+    ...    description=Change the image tag to use the current date and time. Useful when importing 'latest' tags
     ...    default=False
     ${TAG_CONFLICT_HANDLING}=    RW.Core.Import User Variable    TAG_CONFLICT_HANDLING
     ...    enum=overwrite,rename
