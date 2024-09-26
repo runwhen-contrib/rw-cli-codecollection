@@ -15,7 +15,8 @@
 # az account set --subscription $AZ_SUBSCRIPTION
 
 echo "Azure VM Scaled Set $VMSCALEDSET activity logs (recent):"
-# Get the activity logs of the web app
-az monitor activity-log list --resource-group $AZ_RESOURCE_GROUP --query "[].{level: level, description: description, time: eventTimestamp, resourceId: resourceId}" --output table
+# Get the activity logs of the vm scaled set
+resource_id=$(az vmss show --name $VMSCALEDSET --resource-group $AZ_RESOURCE_GROUP --subscription $AZ_SUBSCRIPTION --query "id")
+az monitor activity-log list --resource-id $resource_id --resource-group $AZ_RESOURCE_GROUP --output table
 
 # TODO: hook into various activities to create suggestions

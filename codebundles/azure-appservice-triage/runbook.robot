@@ -13,7 +13,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check AppService `${APPSERVICE}` Health Status In Resource Group `${AZ_RESOURCE_GROUP}`
+Check App Service `${APPSERVICE}` Health Status In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks the health status of a appservice workload.
     [Tags]    
     ${process}=    RW.CLI.Run Bash File
@@ -32,7 +32,7 @@ Check AppService `${APPSERVICE}` Health Status In Resource Group `${AZ_RESOURCE_
     END
     RW.Core.Add Pre To Report    ${process.stdout}
 
-Check AppService `${APPSERVICE}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
+Check App Service `${APPSERVICE}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Reviews key metrics for the app service and generates a report
     [Tags]    
     ${process}=    RW.CLI.Run Bash File
@@ -52,7 +52,7 @@ Check AppService `${APPSERVICE}` Key Metrics In Resource Group `${AZ_RESOURCE_GR
     END
     RW.Core.Add Pre To Report    ${process.stdout}
 
-Get AppService `${APPSERVICE}` Logs In Resource Group `${AZ_RESOURCE_GROUP}`
+Get App Service `${APPSERVICE}` Logs In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch logs of appservice workload
     [Tags]    appservice    logs    tail
     ${process}=    RW.CLI.Run Bash File
@@ -72,7 +72,7 @@ Fetch App Service `${APPSERVICE}` Config In Resource Group `${AZ_RESOURCE_GROUP}
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${process.stdout}
 
-Scan AppService `${APPSERVICE}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
+Scan App Service `${APPSERVICE}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events of appservice and checks for errors
     [Tags]    appservice    monitor    events    errors
     ${process}=    RW.CLI.Run Bash File
