@@ -32,18 +32,16 @@ Suite Initialization
     ...    description=Change the image tag to use the current date and time. Useful when importing 'latest' tags
     ...    pattern=\w*
     ...    default=false
-    ${DOCKER_USERNAME}=    RW.Core.Import Secret
-    ...    DOCKER_USERNAME
+    ${USE_DOCKER_AUTH}=    RW.Core.Import User Variable
+    ...    USE_DOCKER_AUTH
     ...    type=string
-    ...    description=Docker username to use if rate limited by Docker. 
+    ...    enum=[true,false]
+    ...    description=Import the docker secret for authentication. Useful in bypassing rate limits. 
     ...    pattern=\w*
-    ...    default=""
-    ${DOCKER_TOKEN}=    RW.Core.Import Secret
-    ...    DOCKER_TOKEN
-    ...    type=string
-    ...    description=Docker token to use if rate limited by Docker.
-    ...    pattern=\w*
-    ...    default=""
+    ...    default=false
+    Set Suite Variable    ${USE_DOCKER_AUTH}    ${USE_DOCKER_AUTH}
+    Run Keyword If    "${USE_DOCKER_AUTH}" == "true"    Import Docker Secrets
+
     ${azure_credentials}=    RW.Core.Import Secret
     ...    azure_credentials
     ...    type=string
@@ -59,6 +57,17 @@ Suite Initialization
     ...    ${env}
     ...    {"ACR_REGISTRY":"${ACR_REGISTRY}", "IMAGE_MAPPINGS":"${escaped_image_mappings}", "USE_DATE_TAG_PATTERN":"${USE_DATE_TAG_PATTERN}", "TAG_CONFLICT_HANDLING":"${TAG_CONFLICT_HANDLING}"}
 
+Import Docker Secrets
+    ${DOCKER_USERNAME}=    RW.Core.Import Secret
+    ...    DOCKER_USERNAME
+    ...    type=string
+    ...    description=Docker username to use if rate limited by Docker.
+    ...    pattern=\w*
+    ${DOCKER_TOKEN}=    RW.Core.Import Secret
+    ...    DOCKER_TOKEN
+    ...    type=string
+    ...    description=Docker token to use if rate limited by Docker.
+    ...    pattern=\w*
 
 *** Tasks ***
 Count Outdated Images in Azure Container Registry `${ACR_REGISTRY}`
