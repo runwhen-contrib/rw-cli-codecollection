@@ -33,7 +33,6 @@ Suite Initialization
     ...    type=string
     ...    enum=[overwrite,rename]
     ...    description=How to handle tags that already exist. Options are: overwrite (delete the tag and write a new copy), rename (append the date to the tag)
-    ...    default=rename
     ${DOCKER_USERNAME}=    RW.Core.Import Secret
     ...    DOCKER_USERNAME
     ...    type=string
