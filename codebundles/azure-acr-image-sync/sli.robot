@@ -55,7 +55,7 @@ Suite Initialization
     Set Suite Variable    ${USE_DATE_TAG_PATTERN}    ${USE_DATE_TAG_PATTERN}
     Set Suite Variable
     ...    ${env}
-    ...    {"ACR_REGISTRY":"${ACR_REGISTRY}", "IMAGE_MAPPINGS":"${escaped_image_mappings}", "USE_DATE_TAG_PATTERN":"${USE_DATE_TAG_PATTERN}", "TAG_CONFLICT_HANDLING":"${TAG_CONFLICT_HANDLING}"}
+    ...    {"ACR_REGISTRY":"${ACR_REGISTRY}", "IMAGE_MAPPINGS":"${escaped_image_mappings}", "USE_DATE_TAG_PATTERN":"${USE_DATE_TAG_PATTERN}"}
 
 Import Docker Secrets
     ${DOCKER_USERNAME}=    RW.Core.Import Secret
