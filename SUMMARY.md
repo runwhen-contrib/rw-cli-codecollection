@@ -3,6 +3,7 @@
 ## Codebundles
 * [k8s-vault-healthcheck](codebundles/k8s-vault-healthcheck/README.md)
 * [k8s-namespace-healthcheck](codebundles/k8s-namespace-healthcheck/README.md)
+* [azure-acr-image-sync](codebundles/azure-acr-image-sync/README.md)
 * [k8s-statefulset-healthcheck](codebundles/k8s-statefulset-healthcheck/README.md)
 * [k8s-otelcollector](codebundles/k8s-otelcollector/README.md)
 * [aws-eks-node-reboot](codebundles/aws-eks-node-reboot/README.md)
