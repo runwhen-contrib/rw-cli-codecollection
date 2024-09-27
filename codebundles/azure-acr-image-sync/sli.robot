@@ -32,6 +32,8 @@ Suite Initialization
     ...    description=Change the image tag to use the current date and time. Useful when importing 'latest' tags
     ...    pattern=\w*
     ...    default=false
+    Set Suite Variable    ${DOCKER_USERNAME}    ""
+    Set Suite Variable    ${DOCKER_TOKEN}    ""
     ${USE_DOCKER_AUTH}=    RW.Core.Import User Variable
     ...    USE_DOCKER_AUTH
     ...    type=string
