@@ -32,7 +32,7 @@ Check Application Gateway `${APPGATEWAY}` Health Status In Resource Group `${AZ_
     END
     RW.Core.Add Pre To Report    ${process.stdout}
 
-Check Application Gateway `${APPGATEWAY}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
+Check AppService `${APPGATEWAY}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Reviews key metrics for the application gateway and generates a report
     [Tags]    
     ${process}=    RW.CLI.Run Bash File

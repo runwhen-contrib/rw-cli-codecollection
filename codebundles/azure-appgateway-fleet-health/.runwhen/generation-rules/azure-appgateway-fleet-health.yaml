@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: azure
+  generationRules:
+    - resourceTypes:
+        - azure_resources_resource_groups
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: az-appgw-fleet-health
+          qualifiers: ["resource", "resource_group"]
+          baseTemplateName: azure-appgateway-fleet-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: azure-appgateway-health-taskset.yaml

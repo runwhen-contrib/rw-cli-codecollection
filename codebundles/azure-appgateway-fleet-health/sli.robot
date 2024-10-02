@@ -13,8 +13,8 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check Application Gateway `${APPGATEWAY}` Health Status In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Checks the health status of a application gateway and its backend pools.
+Check Application Gateway Fleet Health Status In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Checks the health status of all application gateways in a resource group.
     [Tags]    
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=appgateway_health.sh
@@ -34,17 +34,12 @@ Suite Initialization
     ...    type=string
     ...    description=The resource group to perform actions against.
     ...    pattern=\w*
-    ${APPGATEWAY}=    RW.Core.Import User Variable    APPGATEWAY
-    ...    type=string
-    ...    description=The Azure Application Gateway to health check.
-    ...    pattern=\w*
     ${azure_credentials}=    RW.Core.Import Secret
     ...    azure_credentials
     ...    type=string
     ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
     ...    pattern=\w*
-    Set Suite Variable    ${APPGATEWAY}    ${APPGATEWAY}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable
     ...    ${env}
-    ...    {"APPGATEWAY":"${APPGATEWAY}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}"}
+    ...    {"AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}"}
