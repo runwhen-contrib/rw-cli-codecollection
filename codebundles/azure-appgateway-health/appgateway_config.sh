@@ -49,3 +49,4 @@ else
   echo "Issues found in the scan related to resource $resource_id"
   echo -e "${report[@]}"
 fi
+exit $ok

@@ -21,6 +21,15 @@ Fetch ADB `${ADB}` Config In Resource Group `${AZ_RESOURCE_GROUP}`
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
+    IF    ${process.returncode} > 0
+        RW.Core.Add Issue    title=Azure Resource `${ADB}` In Resource Group `${AZ_RESOURCE_GROUP}` Has Errors In Activities
+        ...    severity=3
+        ...    next_steps=Review the report details produced by the configuration scan
+        ...    expected=Azure Resource `${ADB}` in resource group `${AZ_RESOURCE_GROUP}` has no misconfiguration(s)
+        ...    actual=Azure Resource `${ADB}` in resource group `${AZ_RESOURCE_GROUP}` has misconfiguration(s)
+        ...    reproduce_hint=Run config.sh
+        ...    details=${process.stdout}
+    END
     RW.Core.Add Pre To Report    ${process.stdout}
 
 Scan ADB `${ADB}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`

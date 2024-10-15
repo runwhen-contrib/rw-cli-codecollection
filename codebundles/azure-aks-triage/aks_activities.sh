@@ -45,3 +45,4 @@ if [ $ok -eq 1 ]; then
     echo "Next Steps:"
     echo -e "${next_steps[@]}"
 fi
+exit $ok

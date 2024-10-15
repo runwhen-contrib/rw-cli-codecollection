@@ -70,6 +70,15 @@ Fetch App Service `${APPSERVICE}` Config In Resource Group `${AZ_RESOURCE_GROUP}
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
+    IF    ${process.returncode} > 0
+        RW.Core.Add Issue    title=Azure Resource `${APPSERVICE}` In Resource Group `${AZ_RESOURCE_GROUP}` Has Errors In Activities
+        ...    severity=3
+        ...    next_steps=Review the report details produced by the configuration scan
+        ...    expected=Azure Resource `${APPSERVICE}` in resource group `${AZ_RESOURCE_GROUP}` has no misconfiguration(s)
+        ...    actual=Azure Resource `${APPSERVICE}` in resource group `${AZ_RESOURCE_GROUP}` has misconfiguration(s)
+        ...    reproduce_hint=Run config.sh
+        ...    details=${process.stdout}
+    END
     RW.Core.Add Pre To Report    ${process.stdout}
 
 Scan App Service `${APPSERVICE}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`

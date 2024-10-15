@@ -42,6 +42,15 @@ Fetch API Management Service`${API}` Config In Resource Group `${AZ_RESOURCE_GRO
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
+    IF    ${process.returncode} > 0
+        RW.Core.Add Issue    title=Azure Resource `${API}` In Resource Group `${AZ_RESOURCE_GROUP}` Has Errors In Activities
+        ...    severity=3
+        ...    next_steps=Review the report details produced by the configuration scan
+        ...    expected=Azure Resource `${API}` in resource group `${AZ_RESOURCE_GROUP}` has no misconfiguration(s)
+        ...    actual=Azure Resource `${API}` in resource group `${AZ_RESOURCE_GROUP}` has misconfiguration(s)
+        ...    reproduce_hint=Run config.sh
+        ...    details=${process.stdout}
+    END
     RW.Core.Add Pre To Report    ${process.stdout}
 
 Scan API Management Service`${API}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
