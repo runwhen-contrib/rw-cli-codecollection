@@ -31,6 +31,16 @@ Scan ADF `${ADF}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
+    ${next_steps}=    RW.CLI.Run Cli    cmd=echo -e "${process.stdout}" | grep "Next Steps" -A 20 | tail -n +2
+    IF    ${process.returncode} > 0
+        RW.Core.Add Issue    title=Azure Resource `${ADF}` In Resource Group `${AZ_RESOURCE_GROUP}` Has Errors In Activities
+        ...    severity=3
+        ...    next_steps=${next_steps.stdout}
+        ...    expected=Azure Resource `${ADF}` in resource group `${AZ_RESOURCE_GROUP}` has no errors or criticals in activity logs
+        ...    actual=Azure Resource `${ADF}` in resource group `${AZ_RESOURCE_GROUP}` has errors or critical events in activity logs
+        ...    reproduce_hint=Run activities.sh
+        ...    details=${process.stdout}
+    END
     RW.Core.Add Pre To Report    ${process.stdout}
 
 Health Check `${ADF}` Key ADF Metrics Configuration In Resource Group `${AZ_RESOURCE_GROUP}`

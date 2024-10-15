@@ -31,9 +31,9 @@ Suite Initialization
     ...    type=string
     ...    description=The resource group to perform actions against.
     ...    pattern=\w*
-    ${AKS_CLUSTER}=    RW.Core.Import User Variable    AKS_CLUSTER
+    ${ADF}=    RW.Core.Import User Variable    ADF
     ...    type=string
-    ...    description=The Azure AKS cluster to triage.
+    ...    description=The Azure data factory to triage.
     ...    pattern=\w*
     ${azure_credentials}=    RW.Core.Import Secret
     ...    azure_credentials

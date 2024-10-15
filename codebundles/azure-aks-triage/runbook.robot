@@ -31,6 +31,16 @@ Scan AKS `${AKS_CLUSTER}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
+    ${next_steps}=    RW.CLI.Run Cli    cmd=echo -e "${process.stdout}" | grep "Next Steps" -A 20 | tail -n +2
+    IF    ${process.returncode} > 0
+        RW.Core.Add Issue    title=Azure Resource `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}` Has Errors In Activities
+        ...    severity=3
+        ...    next_steps=${next_steps.stdout}
+        ...    expected=Azure Resource `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has no errors or criticals in activity logs
+        ...    actual=Azure Resource `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has errors or critical events in activity logs
+        ...    reproduce_hint=Run activities.sh
+        ...    details=${process.stdout}
+    END
     RW.Core.Add Pre To Report    ${process.stdout}
 
 Validate Cluster `${AKS_CLUSTER}` Configuration In Resource Group `${AZ_RESOURCE_GROUP}`
