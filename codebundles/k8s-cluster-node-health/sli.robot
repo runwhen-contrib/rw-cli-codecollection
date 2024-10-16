@@ -1,7 +1,7 @@
 *** Settings ***
 Documentation       Evaluate cluster node health using kubectl.
 Metadata            Author    stewartshea
-Metadata            Display Name    Kubernetes Cluster Resource Health
+Metadata            Display Name    Kubernetes Cluster Node Health
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 
 Library             RW.Core
