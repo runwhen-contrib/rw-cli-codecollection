@@ -3,13 +3,13 @@
 context=$CONTEXT
 
 # Set the time interval (e.g., 24 hours)
-INTERVAL="24 hours"
+interval=$INTERVAL
 
 # Get the current date and time (ISO 8601 format)
 CURRENT_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Calculate the time for the start of the interval using GNU date
-START_DATE=$(date -u -d "$INTERVAL ago" +"%Y-%m-%dT%H:%M:%SZ")
+START_DATE=$(date -u -d "$interval ago" +"%Y-%m-%dT%H:%M:%SZ")
 
 # Fetch all node-related events within the time range
 kubectl get events -A --context $context \
@@ -41,6 +41,7 @@ check_preemptible_node() {
 # Track unique nodes started and stopped
 declare -A nodes_started
 declare -A nodes_stopped
+declare -A total_node_events
 
 # Read the node events and summarize by node
 while read -r line; do
@@ -72,8 +73,10 @@ done < node_events.txt
 # Summary of unique nodes started and stopped
 unique_nodes_started=${#nodes_started[@]}
 unique_nodes_stopped=${#nodes_stopped[@]}
+total_node_events=$((unique_nodes_started + unique_nodes_stopped))
 
 echo ""
 echo "Summary:"
 echo "Unique nodes started: $unique_nodes_started"
 echo "Unique nodes stopped: $unique_nodes_stopped"
+echo "Total start/stop events: $total_node_events"

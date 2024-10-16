@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       Counts the number of nodes above 90% CPU or Memory Utilization from kubectl top.
+Documentation       Evaluate cluster node health using kubectl. 
 Metadata            Author    stewartshea
 Metadata            Display Name    Kubernetes Cluster Resource Health
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
@@ -16,19 +16,24 @@ Suite Setup         Suite Initialization
 Check for Node Restarts in Cluster `${CONTEXT}`
     [Documentation]    Count preempt / spot node restarts within the configured time interval.
     [Tags]    cluster    preempt    spot    node    restart
-    ${node_usage_details}=    RW.CLI.Run Bash File
+    ${node_restart_details}=    RW.CLI.Run Bash File
     ...    bash_file=node_restart_check.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    include_in_history=False
-    ${node_list}=    Evaluate    json.loads(r'''${node_usage_details.stdout}''')    json
-    ${metric}=    Evaluate    len(@{node_list})
+    ${node_events}=    RW.CLI.Run CLI
+    ...    cmd= grep "Total start/stop events" <<< "${node_restart_details.stdout}"| awk -F ":" '{print $2}'
+    ${events}=    Convert To Number    ${node_events.stdout}
+    RW.Core.Push Metric    ${events}
+    Log    ${events} total start/stop events for nodes within the last ${INTERVAL}
+    ${event_score}=    Evaluate    1 if ${events} == 0 else 0
+    Set Global Variable    ${event_score}
 
-    RW.Core.Add Pre To Report    Commands Used:\n${node_usage_details.cmd}
-    RW.Core.Add Pre To Report    Nodes with High Utilization:\n${node_usage_details.stdout}
 
-    RW.Core.Push Metric    ${metric}
-
+Generate Namspace Score
+    ${cluster_node_score}=      Evaluate  (${event_score} / 1)
+    ${health_score}=      Convert to Number    ${cluster_node_score}  2
+    RW.Core.Push Metric    ${health_score}
 
 *** Keywords ***
 Suite Initialization
@@ -50,7 +55,16 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=default
     ...    example=my-main-cluster
+    ${INTERVAL}=    RW.Core.Import User Variable    INTERVAL
+    ...    type=string
+    ...    description=The time interval in which to look back for node events.
+    ...    pattern=\w*
+    ...    default=5 minutes
+    ...    example=4 hours, 5 minutes, etc.
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
-    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "CONTEXT":"${CONTEXT}"}
+    Set Suite Variable    ${INTERVAL}    ${INTERVAL}
+    Set Suite Variable
+    ...    ${env}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "CONTEXT":"${CONTEXT}", "INTERVAL":"${INTERVAL}"}

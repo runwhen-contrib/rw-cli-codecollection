@@ -1,5 +1,5 @@
 apiVersion: runwhen.com/v1
-kind: ServiceLevelIndicator
+kind: Runbook
 metadata:
   name: {{slx_name}}
   labels:
@@ -7,11 +7,7 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  displayUnitsLong: OK
-  displayUnitsShort: ok
-  locations:
-    - {{ default_location }}
-  description: Measures the response code and latency to the AKS LoadBalancer Object.
+  location: {{default_location}}
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -23,14 +19,14 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/k8s-cluster-resource-health/sli.robot
-  intervalStrategy: intermezzo
-  intervalSeconds: 30
+    pathToRobot: codebundles/k8s-cluster-node-health/runbook.robot
   configProvided:
     - name: CONTEXT
       value: "{{cluster.context}}"
     - name: KUBERNETES_DISTRIBUTION_BINARY
       value: {{custom.kubernetes_distribution_binary}}
+    - name: INTERVAL
+      value: "5 minutes"
   secretsProvided:
   {% if wb_version %}
     {% include "kubernetes-auth.yaml" ignore missing %}

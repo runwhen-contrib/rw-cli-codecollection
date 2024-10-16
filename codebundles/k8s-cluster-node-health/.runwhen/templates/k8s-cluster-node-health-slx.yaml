@@ -7,15 +7,15 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/kubernetes-icon-color.svg
-  alias: {{ cluster.name }} Cluster Resource Health
-  asMeasuredBy: Node cpu and memory utilization.    
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/kubernetes/infrastructure_components/labeled/node.svg
+  alias: {{ cluster.name }} Cluster Node Health
+  asMeasuredBy: Node restarts, ready status, and other error or pressure conditions.     
   configProvided:
   - name: OBJECT_NAME
     value: {{cluster.name}}
   owners:
   - {{workspace.owner_email}}
-  statement: Cluster resources for {{cluster.context}} should be less than 90% utilization. 
+  statement: Cluster nodes for {{cluster.context}} should be ready and available 100% of the time. 
   additionalContext:  
     cluster: "{{ cluster.name }}"
     context: "{{ cluster.context }}"

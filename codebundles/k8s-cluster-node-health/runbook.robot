@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       Identify resource constraints or issues in a cluster.
+Documentation       Evaluate cluster node health using kubectl
 Metadata            Author    stewartshea
 Metadata            Display Name    Kubernetes Cluster Resource Health
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 Check for Node Restarts in Cluster `${CONTEXT}`
-    [Documentation]    Identify nodes that are restarting due to a preempt / spot node restart event.
+    [Documentation]    Identify nodes that are starting and stopping within the time interval.
     [Tags]    cluster    preempt    spot    reboot    utilization    saturation    exhaustion    starvation
     ${node_restart_details}=    RW.CLI.Run Bash File
     ...    bash_file=node_restart_check.sh
@@ -24,20 +24,18 @@ Check for Node Restarts in Cluster `${CONTEXT}`
     ...    include_in_history=False
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    Node Restart Details:\n${node_restart_details.stdout}
-
-    # ${node_list}=    Evaluate    json.loads(r'''${node_restart_details.stdout}''')    json
-    # IF    len(@{node_list}) > 0
-    #    RW.Core.Add Issue
-    #    ...    severity=2
-    #    ...    expected=Nodes in Cluster Context `${CONTEXT}` should have available CPU and Memory resources.
-    #    ...    actual=Nodes in Cluster Context `${CONTEXT}` should have available CPU and Memory resources.
-    #    ...    title= Node usage is too high in Cluster Context `${CONTEXT}`.
-    #    ...    reproduce_hint=View Commands Used in Report Output
-    #    ...    details=Node CPU and Memory Utilization: ${node_list}
-    #    ...    next_steps=Identify Pods Causing High Node Utilization in Cluster `${CONTEXT}` \nAdd Nodes to Cluster Context `${CONTEXT}`
-    # END
-    # RW.Core.Add Pre To Report    Node Usage Details:\n${node_usage_details.stdout}
-    # RW.Core.Add Pre To Report    Commands Used:\n${node_usage_details.cmd}
+    ${node_events}=    RW.CLI.Run CLI
+    ...    cmd= grep "Total start/stop events" <<< "${node_restart_details.stdout}"| awk -F ":" '{print $2}'
+    ${events}=    Convert To Number    ${node_events.stdout}
+    IF    ${events} > 0
+       RW.Core.Add Issue
+       ...    severity=4
+       ...    expected=Nodes in Cluster Context `${CONTEXT}` are not starting/stopping frequently.
+       ...    actual=Nodes in Cluster Context `${CONTEXT}` are starting/stopping in the last ${INTERVAL}.
+       ...    title= Nodes in Cluster Context `${CONTEXT}` are starting/stopping in the last ${INTERVAL}.
+       ...    reproduce_hint=View Commands Used in Report Output
+       ...    details=${node_restart_details.stdout}
+    END
 
 
 *** Keywords ***
@@ -60,7 +58,14 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=default
     ...    example=my-main-cluster
+    ${INTERVAL}=    RW.Core.Import User Variable    INTERVAL
+    ...    type=string
+    ...    description=The time interval in which to look back for node events. 
+    ...    pattern=\w*
+    ...    default=5 minutes
+    ...    example=4 hours, 5 minutes, etc. 
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
-    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "CONTEXT":"${CONTEXT}"}
+    Set Suite Variable    ${INTERVAL}    ${INTERVAL}
+    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "CONTEXT":"${CONTEXT}", "INTERVAL":"${INTERVAL}"}

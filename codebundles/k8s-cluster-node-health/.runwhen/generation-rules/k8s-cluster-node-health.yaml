@@ -13,12 +13,12 @@ spec:
               properties: [name]
               mode: substring
       slxs:
-        - baseName: cluster-health
+        - baseName: cluster-node-health
           qualifiers: ["cluster"]
-          baseTemplateName: k8s-cluster-health
+          baseTemplateName: k8s-cluster-node-health
           levelOfDetail: basic
           outputItems:
             - type: slx
             - type: sli
             - type: runbook
-              templateName: k8s-cluster-health-taskset.yaml
+              templateName: k8s-cluster-node-health-taskset.yaml
