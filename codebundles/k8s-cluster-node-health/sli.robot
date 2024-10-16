@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       Evaluate cluster node health using kubectl. 
+Documentation       Evaluate cluster node health using kubectl.
 Metadata            Author    stewartshea
 Metadata            Display Name    Kubernetes Cluster Resource Health
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
@@ -24,16 +24,15 @@ Check for Node Restarts in Cluster `${CONTEXT}`
     ${node_events}=    RW.CLI.Run CLI
     ...    cmd= grep "Total start/stop events" <<< "${node_restart_details.stdout}"| awk -F ":" '{print $2}'
     ${events}=    Convert To Number    ${node_events.stdout}
-    RW.Core.Push Metric    ${events}
     Log    ${events} total start/stop events for nodes within the last ${INTERVAL}
     ${event_score}=    Evaluate    1 if ${events} == 0 else 0
     Set Global Variable    ${event_score}
 
-
 Generate Namspace Score
-    ${cluster_node_score}=      Evaluate  (${event_score} / 1)
-    ${health_score}=      Convert to Number    ${cluster_node_score}  2
+    ${cluster_node_score}=    Evaluate    (${event_score} / 1)
+    ${health_score}=    Convert to Number    ${cluster_node_score}    2
     RW.Core.Push Metric    ${health_score}
+
 
 *** Keywords ***
 Suite Initialization
