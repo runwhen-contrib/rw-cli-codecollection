@@ -35,6 +35,7 @@ Check for Node Restarts in Cluster `${CONTEXT}`
        ...    title= Nodes in Cluster Context `${CONTEXT}` are starting/stopping in the last ${INTERVAL}.
        ...    reproduce_hint=View Commands Used in Report Output
        ...    details=${node_restart_details.stdout}
+       ...    next_steps=Escalate the issue to the service owner if this is behaviour unexpected.  
     END
 
 
