@@ -16,7 +16,7 @@ kubectl get events -A --context $context \
   --field-selector involvedObject.kind=Node \
   --output=jsonpath='{range .items[*]}{.lastTimestamp}{" "}{.involvedObject.name}{" "}{.reason}{" "}{.message}{"\n"}{end}' \
   | awk -v start="$START_DATE" -v end="$CURRENT_DATE" '$1 >= start && $1 <= end' \
-  | grep -E "(Preempt|Shutdown|Drain|Termination|Removed|Deleted|NodeReady|RegisteredNode)" \
+  | grep -E "(Preempt|Shutdown|Drain|Termination|Removed|RemovingNode|Deleted|NodeReady|RegisteredNode)" \
   | sort | uniq > node_events.txt
 
 # Function to check if a node is preemptible/spot based on annotations or labels
