@@ -32,7 +32,7 @@ Check Application Gateway `${APPGATEWAY}` Health Status In Resource Group `${AZ_
     END
     RW.Core.Add Pre To Report    ${process.stdout}
 
-Check AppService `${APPGATEWAY}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
+Check Application Gateway `${APPGATEWAY}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Reviews key metrics for the application gateway and generates a report
     [Tags]    
     ${process}=    RW.CLI.Run Bash File
@@ -60,6 +60,15 @@ Fetch Application Gateway `${APPGATEWAY}` Config In Resource Group `${AZ_RESOURC
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
+    IF    ${process.returncode} > 0
+        RW.Core.Add Issue    title=Azure Resource `${APPGATEWAY}` In Resource Group `${AZ_RESOURCE_GROUP}` Has Errors In Activities
+        ...    severity=3
+        ...    next_steps=Review the report details produced by the configuration scan
+        ...    expected=Azure Resource `${APPGATEWAY}` in resource group `${AZ_RESOURCE_GROUP}` has no misconfiguration(s)
+        ...    actual=Azure Resource `${APPGATEWAY}` in resource group `${AZ_RESOURCE_GROUP}` has misconfiguration(s)
+        ...    reproduce_hint=Run config.sh
+        ...    details=${process.stdout}
+    END
     RW.Core.Add Pre To Report    ${process.stdout}
 
 *** Keywords ***

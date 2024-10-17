@@ -13,7 +13,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check AppService `${APPSERVICE}` Health Status In Resource Group `${AZ_RESOURCE_GROUP}`
+Check App Service `${APPSERVICE}` Health Status In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks the health status of a appservice workload.
     [Tags]    
     ${process}=    RW.CLI.Run Bash File

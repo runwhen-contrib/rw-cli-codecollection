@@ -5,18 +5,20 @@
 # AZ_SECRET_VALUE
 # AZ_SUBSCRIPTION
 # AZ_TENANT
-# APPSERVICE
+# ADB
 # AZ_RESOURCE_GROUP
 
 # # Log in to Azure CLI
 # az login --service-principal --username $AZ_USERNAME --password $AZ_SECRET_VALUE --tenant $AZ_TENANT > /dev/null
+
 # # Set the subscription
 # az account set --subscription $AZ_SUBSCRIPTION
 
-az webapp show --name  $APPSERVICE --resource-group $AZ_RESOURCE_GROUP --subscription $AZ_SUBSCRIPTION
-resource_id=$(az webapp show --name  $APPSERVICE --resource-group $AZ_RESOURCE_GROUP --subscription $AZ_SUBSCRIPTION --query id -o tsv)
+az databricks workspace show --resource-group $AZ_RESOURCE_GROUP --name $ADB
+
+resource_id=$(az databricks workspace show --resource-group $AZ_RESOURCE_GROUP --name $ADB --query id -o tsv)
 echo "Scanning configuration of resource $resource_id"
-prowler azure --az-cli-auth --service app --output-directory /tmp/prowler --output-filename prowler_azure_scan > /dev/null
+prowler azure --az-cli-auth --service vm --output-directory /tmp/prowler --output-filename prowler_azure_scan > /dev/null
 report_json=$(cat /tmp/prowler/prowler_azure_scan.ocsf.json)
 report_csv=$(cat /tmp/prowler/prowler_azure_scan.csv)
 report=()
