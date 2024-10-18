@@ -63,7 +63,7 @@ Suite Initialization
     ...    type=string
     ...    description=The time interval in which to look back for node events. 
     ...    pattern=\w*
-    ...    default=5 minutes
+    ...    default=10 minutes
     ...    example=4 hours, 5 minutes, etc. 
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}

@@ -44,4 +44,4 @@ spec:
     warning:
       operator: <
       threshold: '1'
-      for: '5m'
+      for: '2m'
