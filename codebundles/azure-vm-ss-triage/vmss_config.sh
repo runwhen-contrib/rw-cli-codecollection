@@ -13,7 +13,7 @@
 # # Set the subscription
 # az account set --subscription $AZ_SUBSCRIPTION
 
-az vmss show --name $VMSCALEDSET --resource-group $AZ_RESOURCE_GROUP --subscription $AZ_SUBSCRIPTION
+az vmss show --name $VMSCALEDSET --resource-group $AZ_RESOURCE_GROUP
 
 resource_id=$(az vmss show --resource-group $AZ_RESOURCE_GROUP --name $VMSCALEDSET --query id -o tsv)
 echo "Scanning configuration of resource $resource_id"

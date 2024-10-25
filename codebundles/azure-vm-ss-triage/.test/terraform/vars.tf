@@ -3,7 +3,7 @@ variable "resource_group" {
 }
 
 variable "location" {
-  type = string
+  type    = string
   default = "East US"
 }
 

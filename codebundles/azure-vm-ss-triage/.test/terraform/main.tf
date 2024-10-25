@@ -38,26 +38,40 @@ resource "azurerm_network_interface" "test" {
   }
 }
 
-# Virtual Machine
-resource "azurerm_linux_virtual_machine" "test" {
-  name                = "test-vm"
-  resource_group_name = azurerm_resource_group.test.name
-  location            = azurerm_resource_group.test.location
-  size                = "Standard_DC1s_v2"
-
-  admin_username = "husker"
-  admin_password = random_password.admin_password.result
+# VM Scaled Set
+resource "azurerm_linux_virtual_machine_scale_set" "test" {
+  name                            = "test-vmss"
+  resource_group_name             = azurerm_resource_group.test.name
+  location                        = azurerm_resource_group.test.location
+  sku                             = "Standard_DC1s_v2"
+  instances                       = 2 # Number of VMs in the scale set, adjust as needed
+  admin_username                  = "husker"
+  admin_password                  = random_password.admin_password.result
   disable_password_authentication = false
 
-  network_interface_ids = [
-    azurerm_network_interface.test.id,
-  ]
+  # Spot setup
+  priority        = "Spot"
+  eviction_policy = "Deallocate"
 
+  # Network Profile
+  network_interface {
+    name    = "test-vmss-nic"
+    primary = true
+
+    ip_configuration {
+      name                          = "internal"
+      subnet_id                     = azurerm_subnet.test.id
+      primary                       = true
+    }
+  }
+
+  # OS Disk configuration
   os_disk {
     caching              = "ReadWrite"
     storage_account_type = "Standard_LRS"
   }
 
+  # Image configuration
   source_image_reference {
     publisher = "Canonical"
     offer     = "ubuntu-24_04-lts"
@@ -65,18 +79,16 @@ resource "azurerm_linux_virtual_machine" "test" {
     version   = "24.04.202410170"
   }
 
-  # Spot setup
-  priority        = "Spot"
-  eviction_policy = "Deallocate"
 
   tags = var.tags
 }
+
 
 # Random Password Generator
 resource "random_password" "admin_password" {
   length           = 16
   special          = true
-  override_special = "!@#$%&*()-_=+[]{}<>?"  # Customize special characters if needed
+  override_special = "!@#$%&*()-_=+[]{}<>?" # Customize special characters if needed
 }
 
 # Outputs

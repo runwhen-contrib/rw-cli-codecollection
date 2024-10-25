@@ -8,6 +8,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library    String
 
 Suite Setup         Suite Initialization
 
@@ -33,12 +34,11 @@ Check Scaled Set `${VMSCALEDSET}` Key Metrics In Resource Group `${AZ_RESOURCE_G
     END
     RW.Core.Add Pre To Report    ${process.stdout}
 
-
 Fetch VM Scaled Set `${VMSCALEDSET}` Config In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the config of the scaled set in azure
     [Tags]    VM    Scaled Set    logs    tail
     ${process}=    RW.CLI.Run Bash File
-    ...    bash_file=vmss_activities.sh
+    ...    bash_file=vmss_config.sh
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -52,8 +52,24 @@ Scan VM Scaled Set `${VMSCALEDSET}` Activities In Resource Group `${AZ_RESOURCE_
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
+
     RW.Core.Add Pre To Report    ${process.stdout}
 
+    ${issues}=    RW.CLI.Run Cli    cmd=cat ${OUTPUT DIR}/issues.json 
+    Log    ${issues.stdout}
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            RW.Core.Add Issue    
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_step"]}
+            ...    expected=VM Scaled Set `${VMSCALEDSET}` in resource group `${AZ_RESOURCE_GROUP}` has no Warning/Error/Critical activities
+            ...    actual=VM Scaled Set `${VMSCALEDSET}` in resource group `${AZ_RESOURCE_GROUP}` has Warning/Error/Critical activities
+            ...    reproduce_hint=Run vmss_metrics.sh
+            ...    details=${item["details"]}        
+        END
+    END
 
 
 *** Keywords ***
@@ -75,4 +91,4 @@ Suite Initialization
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable
     ...    ${env}
-    ...    {"VMSCALEDSET":"${VMSCALEDSET}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}"}
+    ...    {"VMSCALEDSET":"${VMSCALEDSET}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "OUTPUT_DIR":"${OUTPUT DIR}"}

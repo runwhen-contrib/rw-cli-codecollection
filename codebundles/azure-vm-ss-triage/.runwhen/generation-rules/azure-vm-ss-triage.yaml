@@ -11,12 +11,12 @@ spec:
           properties: [name]
           mode: substring
       slxs:
-        - baseName: az-vm-triage
+        - baseName: az-vm-ss-triage
           qualifiers: ["resource", "resource_group"]
-          baseTemplateName: azure-vm-triage
+          baseTemplateName: azure-vm-ss-triage
           levelOfDetail: basic
           outputItems:
             - type: slx
             - type: sli
             - type: runbook
-              templateName: azure-vm-triage-taskset.yaml
+              templateName: azure-vm-ss-triage-taskset.yaml
