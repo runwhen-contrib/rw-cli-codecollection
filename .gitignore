@@ -35,3 +35,8 @@ build
 # Ignore CLI config file
 **/.terraformrc
 **/terraform.rc
+
+
+# Ignore workspaceInfo testing files
+**/workspaceInfo.yaml**
+**kubeconfig**

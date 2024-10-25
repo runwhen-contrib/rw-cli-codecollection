@@ -1,0 +1,52 @@
+version: '3'
+
+tasks:
+  default:
+    cmds:
+      - task: generate-rwl-config
+  generate-rwl-config:
+    env: 
+      ARM_SUBSCRIPTION_ID: '{{.ARM_SUBSCRIPTION_ID}}'
+      AZ_TENANT_ID: '{{.AZ_TENANT_ID}}'
+      AZ_CLIENT_SECRET: '{{.AZ_CLIENT_SECRET}}'
+      AZ_CLIENT_ID: '{{.AZ_CLIENT_ID}}'
+      AZ_SECRET_ID: '{{.AZ_SECRET_ID}}'
+    cmds:
+      - |
+        # Get current Git repository remote URL
+        repo_url=$(git config --get remote.origin.url)
+        # Get current Git branch name
+        branch_name=$(git rev-parse --abbrev-ref HEAD)
+
+        # Get codebundle name
+        codebundle=$(basename "$(dirname "$PWD")")
+        # Create the config file with substituted values
+        cat <<EOF > workspaceInfo.yaml
+        # Information about the RunWhen workspace
+        workspaceName: my-workspace
+        # More workspace config
+        # Information about cloud platforms to scan to discover resources
+        cloudConfig:
+          kubernetes: null
+          azure:
+            subscriptionId: "$ARM_SUBSCRIPTION_ID"
+            tenantId: "$AZ_TENANT_ID"
+            clientId: "$AZ_CLIENT_ID"
+            clientSecret: "$AZ_CLIENT_SECRET"
+            # Azure config
+          # Other platform configs
+          
+        # Information about which code collections to scan for code bundles
+        codeCollections:
+        - repoURL: "$repo_url"
+          branch: "$branch_name"
+          codeBundles: ["$codebundle"]
+
+        EOF
+
+    silent: true
+
+  run-rwl-workspace-builder:
+    cmds:
+      - | 
+        docker run --name RunWhenLocal -p 8081:8081 -v $(pwd):/shared -d ghcr.io/runwhen-contrib/runwhen-local:0.7.1
