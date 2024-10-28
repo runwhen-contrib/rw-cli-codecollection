@@ -35,6 +35,8 @@ tasks:
         cat <<EOF > workspaceInfo.yaml
         # Information about the RunWhen workspace
         workspaceName: my-workspace
+        workspaceOwnerEmail: authors@runwhen.com
+        defaultLocation: local
         # More workspace config
         # Information about cloud platforms to scan to discover resources
         cloudConfig:
@@ -60,5 +62,10 @@ tasks:
   run-rwl-workspace-builder:
     cmds:
       - | 
+        docker kill RunWhenLocal; docker rm RunWhenLocal
+        sudo rm -rf output
+        mkdir output
+        chmod 777 output
         # docker run --name RunWhenLocal -p 8081:8081 -v $(pwd):/shared -d ghcr.io/runwhen-contrib/runwhen-local:0.7.1
-        docker run --name RunWhenLocal -p 8081:8081 -v $(pwd):/shared -d us-docker.pkg.dev/runwhen-nonprod-shared/public-images/runwhen-local:534-merge-1a65d20a
+        docker run --name RunWhenLocal -p 8081:8081 -v $(pwd):/shared -d us-docker.pkg.dev/runwhen-nonprod-shared/public-images/runwhen-local:534-merge-c00e1063
+        docker exec -w /workspace-builder -- RunWhenLocal ./run.sh $1 --verbose

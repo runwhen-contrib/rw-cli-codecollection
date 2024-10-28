@@ -11,3 +11,7 @@ variable "location" {
 variable "tags" {
   type = map(string)
 }
+
+variable "sp_principal_id" {
+  type = string
+}

@@ -9,6 +9,13 @@ resource "azurerm_resource_group" "test" {
   location = var.location
 }
 
+# Assign "Reader" role to the service account for the resource group
+resource "azurerm_role_assignment" "reader" {
+  scope                = azurerm_resource_group.test.id
+  role_definition_name = "Reader"
+  principal_id         = var.sp_principal_id
+}
+
 # Virtual Network
 resource "azurerm_virtual_network" "test" {
   name                = "test-vnet"
@@ -44,7 +51,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "test" {
   resource_group_name             = azurerm_resource_group.test.name
   location                        = azurerm_resource_group.test.location
   sku                             = "Standard_DC1s_v2"
-  instances                       = 2 # Number of VMs in the scale set, adjust as needed
+  instances                       = 1 # Number of VMs in the scale set, adjust as needed
   admin_username                  = "husker"
   admin_password                  = random_password.admin_password.result
   disable_password_authentication = false

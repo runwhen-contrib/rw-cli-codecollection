@@ -37,6 +37,7 @@ build
 **/terraform.rc
 
 
-# Ignore workspaceInfo testing files
+# Ignore RunWhen Local test files
 **/workspaceInfo.yaml**
 **kubeconfig**
+**.test/output/**

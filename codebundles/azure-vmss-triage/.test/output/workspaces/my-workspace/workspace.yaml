@@ -1,0 +1,14 @@
+kind: Workspace
+apiVersion: runwhen.com/v1
+metadata:
+  name: my-workspace
+  labels:
+    workspace: my-workspace
+spec:
+  permissions:
+  - user: authors@runwhen.com
+    role: admin
+  enabledLocation: []
+  configProvided:
+  - name: WORKSPACE_PLACEHOLDER
+    value: my-workspace-placeholder

@@ -1,0 +1,37 @@
+apiVersion: runwhen.com/v1
+kind: Runbook
+metadata:
+  name: my-workspace--tv-avt-az-vmss-triage-19a1288a
+  labels:
+    slx: my-workspace--tv-avt-az-vmss-triage-19a1288a
+    workspace: my-workspace
+  annotations:
+    fullSlxName: test-vmss-azure-vm-triage-az-vmss-triage-19a1288a
+    sourceGenerationRuleRepoURL: https://github.com/stewartshea/rw-cli-codecollection
+    sourceGenerationRuleRepoRef: azure-vm-triage
+    sourceGenerationRulePath: codebundles/azure-vmss-triage/.runwhen/generation-rules/azure-vmss-triage.yaml
+    config.runwhen.com/last-updated-by: workspace-builder
+    qualifiers: "{'resource': 'test-vmss', 'resource_group': 'azure-vm-triage'}"
+spec:
+  location: local
+  description: Generates a report for Azure VM Scaled Sets and surfaces issues to be actioned.
+  codeBundle:
+    repoUrl: https://github.com/stewartshea/rw-cli-codecollection
+    ref: azure-vm-triage
+    pathToRobot: codebundles/azure-vm-triage/runbook.robot
+  configProvided:
+    - name: AZ_RESOURCE_GROUP
+      value: azure-vm-triage
+    - name: VMSCALEDSET
+      value: test-vmss
+  secretsProvided:
+    - name: azure_credentials
+      workspaceKey: azure:sp@cli
+    - name: az_subscriptionId
+      workspaceKey: k8s:file@secret/missing_workspaceInfo_custom_variable:subscriptionId
+    - name: az_clientId
+      workspaceKey: k8s:file@secret/missing_workspaceInfo_custom_variable:clientId
+    - name: az_tenantId
+      workspaceKey: k8s:file@secret/missing_workspaceInfo_custom_variable:tenantId
+    - name: az_clientSecret
+      workspaceKey: k8s:file@secret/missing_workspaceInfo_custom_variable:clientSecret
