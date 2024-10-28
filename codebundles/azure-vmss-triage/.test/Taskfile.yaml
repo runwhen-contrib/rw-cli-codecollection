@@ -3,7 +3,18 @@ version: '3'
 tasks:
   default:
     cmds:
+      - task: check-unpushed-commits
       - task: generate-rwl-config
+  check-unpushed-commits:
+    desc: "Check if all commits have been pushed"
+    cmds:
+      - |
+        if [ -n "$(git log origin/$(git rev-parse --abbrev-ref HEAD)..HEAD)" ]; then
+          echo "There are unpushed commits. Please push all commits before proceeding."
+          exit 1
+        else
+          echo "All commits have been pushed."
+        fi
   generate-rwl-config:
     env: 
       ARM_SUBSCRIPTION_ID: '{{.ARM_SUBSCRIPTION_ID}}'
@@ -49,4 +60,5 @@ tasks:
   run-rwl-workspace-builder:
     cmds:
       - | 
-        docker run --name RunWhenLocal -p 8081:8081 -v $(pwd):/shared -d ghcr.io/runwhen-contrib/runwhen-local:0.7.1
+        # docker run --name RunWhenLocal -p 8081:8081 -v $(pwd):/shared -d ghcr.io/runwhen-contrib/runwhen-local:0.7.1
+        docker run --name RunWhenLocal -p 8081:8081 -v $(pwd):/shared -d us-docker.pkg.dev/runwhen-nonprod-shared/public-images/runwhen-local:534-merge-1a65d20a
