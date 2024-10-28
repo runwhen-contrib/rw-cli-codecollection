@@ -69,3 +69,44 @@ tasks:
         # docker run --name RunWhenLocal -p 8081:8081 -v $(pwd):/shared -d ghcr.io/runwhen-contrib/runwhen-local:0.7.1
         docker run --name RunWhenLocal -p 8081:8081 -v $(pwd):/shared -d us-docker.pkg.dev/runwhen-nonprod-shared/public-images/runwhen-local:534-merge-c00e1063
         docker exec -w /workspace-builder -- RunWhenLocal ./run.sh $1 --verbose
+        echo "Review the config files generated under output/workspaces/"
+
+  validate-generation-rules:
+    desc: Validate YAML files in ../.runwhen/generation-rules against the JSON schema using ajv-cli
+    cmds:
+      - |
+        # Check prerequisites
+        for cmd in curl yq ajv; do
+          if ! command -v $cmd &> /dev/null; then
+            echo "Error: $cmd is required but not installed. Please install it to continue."
+            exit 1
+          fi
+        done
+
+        # Set up temporary directory for converted JSON files
+        temp_dir=$(mktemp -d)
+        
+        # Download the JSON schema once
+        curl -s -o "$temp_dir/generation-rule-schema.json" https://raw.githubusercontent.com/runwhen-contrib/runwhen-local/refs/heads/main/src/generation-rule-schema.json
+
+        # Convert each YAML file to JSON and validate
+        for yaml_file in ../.runwhen/generation-rules/*.yaml; do
+          echo "Validating $yaml_file"
+          
+          # Convert YAML to JSON and save it in temp directory
+          json_file="$temp_dir/$(basename "${yaml_file%.*}.json")"
+          yq -o=json "$yaml_file" > "$json_file"
+          
+          # Validate the JSON file with ajv-cli, using local schema
+          ajv validate -s "$temp_dir/generation-rule-schema.json" -d "$json_file" --spec=draft2020 --strict=false \
+          && echo "$yaml_file is valid." || echo "$yaml_file is invalid."
+        done
+
+        # Clean up temporary directory
+        rm -rf "$temp_dir"
+    silent: true
+
+  upload-slxs-to-workspace:
+    cmds: 
+      - |
+        echo "Beginning upload of slxs to workspace"
