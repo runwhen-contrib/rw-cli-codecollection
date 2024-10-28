@@ -40,4 +40,5 @@ build
 # Ignore RunWhen Local test files
 **/workspaceInfo.yaml**
 **kubeconfig**
-**.test/output/**
+**/.test/output/
+**/.test/.task/**
