@@ -8,13 +8,13 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/compute/10034-icon-service-VM-Scale-Sets.svg
-  alias: Azure VM Scaled Set {{match_resource.resource.name}}
-  asMeasuredBy: Health of {{match_resource.resource.name}} VM Scaled Set.
+  alias: Azure VM Scale Set {{match_resource.resource.name}}
+  asMeasuredBy: Composite health score of resources & activities. 
   configProvided:
   - name: SLX_PLACEHOLDER
     value: SLX_PLACEHOLDER
   owners:
   - {{workspace.owner_email}}
-  statement: VM Scaled Set should be available.
+  statement: VM Scale Set should be available.
   additionalContext:
     name: "{{match_resource.resource.name}}"

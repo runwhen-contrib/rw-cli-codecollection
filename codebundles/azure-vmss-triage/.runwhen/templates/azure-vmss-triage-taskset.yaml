@@ -1,5 +1,5 @@
 apiVersion: runwhen.com/v1
-kind: ServiceLevelIndicator
+kind: Runbook
 metadata:
   name: {{slx_name}}
   labels:
@@ -7,11 +7,8 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  displayUnitsLong: OK
-  displayUnitsShort: ok
-  locations:
-    - {{default_location}}
-  description: Measures the health of a Azure VM Scaled Set.
+  location: {{default_location}}
+  description: Generates a report for Azure VM Scale Sets and surfaces issues to be actioned.
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -23,14 +20,14 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/azure-vm-triage/sli.robot
-  intervalStrategy: intermezzo
-  intervalSeconds: 300
+    pathToRobot: codebundles/azure-vmss-triage/runbook.robot
   configProvided:
     - name: AZ_RESOURCE_GROUP
       value: {{resource_group.name}}
-    - name: VMSCALEDSET
+    - name: VMSCALESET
       value: {{match_resource.resource.name}}
+    - name: TIME_PERIOD_MINUTES
+      value: 60
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}
