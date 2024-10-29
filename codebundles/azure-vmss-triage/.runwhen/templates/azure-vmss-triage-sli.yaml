@@ -29,7 +29,7 @@ spec:
   configProvided:
     - name: AZ_RESOURCE_GROUP
       value: {{resource_group.name}}
-    - name: VMSCALEDSET
+    - name: VMSCALESET
       value: {{match_resource.resource.name}}
   secretsProvided:
   {% if wb_version %}
