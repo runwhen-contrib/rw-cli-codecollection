@@ -18,8 +18,11 @@ TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-60}"
 
 # Calculate the start time based on TIME_PERIOD_MINUTES
 start_time=$(date -u -d "$TIME_PERIOD_MINUTES minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
+end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
-echo "Activity Start Time: $start_time"
+tenant_id=$(az account show --query "tenantId" -o tsv)
+subscription_id=$(az account show --query "id" -o tsv)
+
 
 # Log in to Azure CLI (uncomment if needed)
 # az login --service-principal --username "$AZ_USERNAME" --password "$AZ_SECRET_VALUE" --tenant "$AZ_TENANT" > /dev/null
@@ -31,9 +34,13 @@ echo "Activity Start Time: $start_time"
 # Fetch the resource ID
 resource_id=$(az vmss show --name "$VMSCALESET" --resource-group "$AZ_RESOURCE_GROUP" --query "id" -o tsv)
 
+# Generate the event log URL
+event_log_url="https://portal.azure.com/#@$tenant_id/resource/subscriptions/$subscription_id/resourceGroups/$AZ_RESOURCE_GROUP/providers/Microsoft.Compute/virtualMachineScaleSets/$VMSCALESET/eventlogs"
+
 # Display recent activity logs within the time range in table format
 echo "Azure VM Scale Set $VMSCALESET activity logs (last $TIME_PERIOD_MINUTES minutes):"
-az monitor activity-log list --resource-id "$resource_id" --start-time "$start_time" --output table
+az monitor activity-log list --resource-id "$resource_id" --start-time "$start_time" --end-time "$end_time" --output table
+
 
 # Initialize the JSON object to store issues only
 issues_json=$(jq -n '{issues: []}')
@@ -44,7 +51,7 @@ declare -A log_levels=( ["Critical"]="1" ["Error"]="2" ["Warning"]="4" )
 # Check for each log level in activity logs and add structured issues to issues_json
 for level in "${!log_levels[@]}"; do
     # Use a refined query to gather detailed log entries within the time range
-    details=$(az monitor activity-log list --resource-id "$resource_id" --start-time "$start_time" --query "[?level=='$level']" -o json | jq -c "[.[] | {
+    details=$(az monitor activity-log list --resource-id "$resource_id" --start-time "$start_time" --end-time "$end_time" --query "[?level=='$level']" -o json | jq -c "[.[] | {
         eventTimestamp,
         caller,
         level,
@@ -68,7 +75,7 @@ for level in "${!log_levels[@]}"; do
         # Build the issue entry and add it to the issues array in issues_json
         issues_json=$(echo "$issues_json" | jq \
             --arg title "$level level issues detected" \
-            --arg nextStep "Check the $level-level activity logs for Azure resource \`$resource_id\` in resource group \`$AZ_RESOURCE_GROUP\`" \
+            --arg nextStep "Check the $level-level activity logs for Azure resource \`$VMSCALESET\` in resource group \`$AZ_RESOURCE_GROUP\`. [Event log URL]($event_log_url)" \
             --arg severity "${log_levels[$level]}" \
             --argjson logs "$details" \
             '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $logs}]'
