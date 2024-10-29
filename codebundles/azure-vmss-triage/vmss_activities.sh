@@ -59,7 +59,7 @@ for level in "${!log_levels[@]}"; do
         # Build the issue entry and add it to the issues array in issues_json
         issues_json=$(echo "$issues_json" | jq \
             --arg title "$level level issues detected" \
-            --arg nextStep "Check the $level-level activity logs for Azure resource $resource_id in $AZ_RESOURCE_GROUP" \
+            --arg nextStep "Check the $level-level activity logs for Azure resource \`$resource_id\` in resource group \`$AZ_RESOURCE_GROUP\`" \
             --arg severity "${log_levels[$level]}" \
             --argjson logs "$details" \
             '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $logs}]'
