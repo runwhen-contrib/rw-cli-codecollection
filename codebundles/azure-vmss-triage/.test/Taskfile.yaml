@@ -13,6 +13,7 @@ tasks:
     cmds: 
       - task: check-and-cleanup-terraform
       - task: delete-slxs
+      - task: clean-rwl-discovery
 
   check-unpushed-commits:
     vars:
@@ -277,3 +278,12 @@ tasks:
           echo "No deployed infrastructure found; no cleanup required."
         fi
     silent: true
+
+  clean-rwl-discovery:
+    desc: "Check and clean up RunWhen Local discovery output"
+    cmds:
+      - |
+        sudo rm -rf output
+        rm workspaceInfo.yaml
+    silent: true
+
