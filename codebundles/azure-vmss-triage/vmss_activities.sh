@@ -5,12 +5,21 @@
 # AZ_SECRET_VALUE
 # AZ_SUBSCRIPTION
 # AZ_TENANT
-# VMSCALEDSET
+# VMSCALESET
 # AZ_RESOURCE_GROUP
 # OUTPUT_DIR
+# TIME_PERIOD_MINUTES (Optional, default is 60)
 
 # Ensure OUTPUT_DIR is set
 : "${OUTPUT_DIR:?OUTPUT_DIR variable is not set}"
+
+# Set the default time period to 60 minutes if not provided
+TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-60}"
+
+# Calculate the start time based on TIME_PERIOD_MINUTES
+start_time=$(date -u -d "$TIME_PERIOD_MINUTES minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
+
+echo "Activity Start Time: $start_time"
 
 # Log in to Azure CLI (uncomment if needed)
 # az login --service-principal --username "$AZ_USERNAME" --password "$AZ_SECRET_VALUE" --tenant "$AZ_TENANT" > /dev/null
@@ -20,11 +29,11 @@
 [ -f "$OUTPUT_DIR/issues.json" ] && rm "$OUTPUT_DIR/issues.json"
 
 # Fetch the resource ID
-resource_id=$(az vmss show --name "$VMSCALEDSET" --resource-group "$AZ_RESOURCE_GROUP" --query "id" -o tsv)
+resource_id=$(az vmss show --name "$VMSCALESET" --resource-group "$AZ_RESOURCE_GROUP" --query "id" -o tsv)
 
-# Display all recent activity logs in table format
-echo "Azure VM Scale Set $VMSCALEDSET activity logs (recent):"
-az monitor activity-log list --resource-id "$resource_id" --output table
+# Display recent activity logs within the time range in table format
+echo "Azure VM Scale Set $VMSCALESET activity logs (last $TIME_PERIOD_MINUTES minutes):"
+az monitor activity-log list --resource-id "$resource_id" --start-time "$start_time" --output table
 
 # Initialize the JSON object to store issues only
 issues_json=$(jq -n '{issues: []}')
@@ -34,8 +43,8 @@ declare -A log_levels=( ["Critical"]="1" ["Error"]="2" ["Warning"]="4" )
 
 # Check for each log level in activity logs and add structured issues to issues_json
 for level in "${!log_levels[@]}"; do
-    # Use a refined query to gather detailed log entries
-    details=$(az monitor activity-log list --resource-id "$resource_id" --query "[?level=='$level']" -o json | jq -c "[.[] | {
+    # Use a refined query to gather detailed log entries within the time range
+    details=$(az monitor activity-log list --resource-id "$resource_id" --start-time "$start_time" --query "[?level=='$level']" -o json | jq -c "[.[] | {
         eventTimestamp,
         caller,
         level,

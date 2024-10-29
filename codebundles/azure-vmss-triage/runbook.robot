@@ -1,8 +1,8 @@
 *** Settings ***
 Documentation       Runs diagnostic checks against virtual machine scaled sets and generates reports from key metrics.
 Metadata            Author    jon-funk
-Metadata            Display Name    Azure VM Scaled Set Triage
-Metadata            Supports    Azure    Virtual Machine    Scaled Set    Triage    Health
+Metadata            Display Name    Azure VM Scale Set Triage
+Metadata            Supports    Azure    Virtual Machine    Scale Set    Triage    Health
 
 Library             BuiltIn
 Library             RW.Core
@@ -14,9 +14,9 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check Scaled Set `${VMSCALEDSET}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Checks key metrics of VM Scaled Set for issues.
-    [Tags]    Scaled Set    VM    Azure    Metrics    Health
+Check Scale Set `${VMSCALESET}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Checks key metrics of VM Scale Set for issues.
+    [Tags]    Scale Set    VM    Azure    Metrics    Health
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=vmss_metrics.sh
     ...    env=${env}
@@ -24,19 +24,19 @@ Check Scaled Set `${VMSCALEDSET}` Key Metrics In Resource Group `${AZ_RESOURCE_G
     ...    include_in_history=false
     ${next_steps}=    RW.CLI.Run Cli    cmd=echo -e "${process.stdout}" | grep "Next Steps" -A 20 | tail -n +2
     IF    ${process.returncode} > 0
-        RW.Core.Add Issue    title=VM Scaled Set `${VMSCALEDSET}` In Resource Group `${AZ_RESOURCE_GROUP}` Failed Metric Check
+        RW.Core.Add Issue    title=VM Scale Set `${VMSCALESET}` In Resource Group `${AZ_RESOURCE_GROUP}` Failed Metric Check
         ...    severity=2
         ...    next_steps=${next_steps.stdout}
-        ...    expected=VM Scaled Set `${VMSCALEDSET}` in resource group `${AZ_RESOURCE_GROUP}` has no unusual metrics
-        ...    actual=VM Scaled Set `${VMSCALEDSET}` in resource group `${AZ_RESOURCE_GROUP}` metric check did not pass
+        ...    expected=VM Scale Set `${VMSCALESET}` in resource group `${AZ_RESOURCE_GROUP}` has no unusual metrics
+        ...    actual=VM Scale Set `${VMSCALESET}` in resource group `${AZ_RESOURCE_GROUP}` metric check did not pass
         ...    reproduce_hint=Run vmss_metrics.sh
         ...    details=${process.stdout}
     END
     RW.Core.Add Pre To Report    ${process.stdout}
 
-Fetch VM Scaled Set `${VMSCALEDSET}` Config In Resource Group `${AZ_RESOURCE_GROUP}`
+Fetch VM Scale Set `${VMSCALESET}` Config In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the config of the scaled set in azure
-    [Tags]    VM    Scaled Set    logs    tail
+    [Tags]    VM    Scale Set    logs    tail
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=vmss_config.sh
     ...    env=${env}
@@ -44,9 +44,9 @@ Fetch VM Scaled Set `${VMSCALEDSET}` Config In Resource Group `${AZ_RESOURCE_GRO
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${process.stdout}
 
-Scan VM Scaled Set `${VMSCALEDSET}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
+Scan VM Scale Set `${VMSCALESET}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events for the scaled set and checks for errors
-    [Tags]    VM    Scaled Set    monitor    events    errors
+    [Tags]    VM    Scale Set    monitor    events    errors
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=vmss_activities.sh
     ...    env=${env}
@@ -64,8 +64,8 @@ Scan VM Scaled Set `${VMSCALEDSET}` Activities In Resource Group `${AZ_RESOURCE_
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
             ...    next_steps=${item["next_step"]}
-            ...    expected=VM Scaled Set `${VMSCALEDSET}` in resource group `${AZ_RESOURCE_GROUP}` has no Warning/Error/Critical activities
-            ...    actual=VM Scaled Set `${VMSCALEDSET}` in resource group `${AZ_RESOURCE_GROUP}` has Warning/Error/Critical activities
+            ...    expected=VM Scale Set `${VMSCALESET}` in resource group `${AZ_RESOURCE_GROUP}` has no Warning/Error/Critical activities
+            ...    actual=VM Scale Set `${VMSCALESET}` in resource group `${AZ_RESOURCE_GROUP}` has Warning/Error/Critical activities
             ...    reproduce_hint=Run vmss_metrics.sh
             ...    details=${item["details"]}        
         END
@@ -78,17 +78,23 @@ Suite Initialization
     ...    type=string
     ...    description=The resource group to perform actions against.
     ...    pattern=\w*
-    ${VMSCALEDSET}=    RW.Core.Import User Variable    VMSCALEDSET
+    ${VMSCALESET}=    RW.Core.Import User Variable    VMSCALESET
     ...    type=string
-    ...    description=The Azure Virtual Machine Scaled Set to triage.
+    ...    description=The Azure Virtual Machine Scale Set to triage.
     ...    pattern=\w*
+    ${TIME_PERIOD_MINUTES}=    RW.Core.Import User Variable    TIME_PERIOD_MINUTES
+    ...    type=string
+    ...    description=The time period, in minutes, to look back for activites/events. 
+    ...    pattern=\w*
+    ...    default=60
     ${azure_credentials}=    RW.Core.Import Secret
     ...    azure_credentials
     ...    type=string
     ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
     ...    pattern=\w*
-    Set Suite Variable    ${VMSCALEDSET}    ${VMSCALEDSET}
+    Set Suite Variable    ${VMSCALESET}    ${VMSCALESET}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
+    Set Suite Variable    ${TIME_PERIOD_MINUTES}    ${TIME_PERIOD_MINUTES}
     Set Suite Variable
     ...    ${env}
-    ...    {"VMSCALEDSET":"${VMSCALEDSET}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "OUTPUT_DIR":"${OUTPUT DIR}"}
+    ...    {"VMSCALESET":"${VMSCALESET}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "OUTPUT_DIR":"${OUTPUT DIR}", "TIME_PERIOD_MINUTES": "${TIME_PERIOD_MINUTES}"}

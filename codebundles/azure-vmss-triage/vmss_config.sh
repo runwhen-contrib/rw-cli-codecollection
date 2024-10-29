@@ -5,7 +5,7 @@
 # AZ_SECRET_VALUE
 # AZ_SUBSCRIPTION
 # AZ_TENANT
-# VMSCALEDSET
+# VMSCALESET
 # AZ_RESOURCE_GROUP
 
 # # Log in to Azure CLI
@@ -13,9 +13,9 @@
 # # Set the subscription
 # az account set --subscription $AZ_SUBSCRIPTION
 
-az vmss show --name $VMSCALEDSET --resource-group $AZ_RESOURCE_GROUP
+az vmss show --name $VMSCALESET --resource-group $AZ_RESOURCE_GROUP
 
-resource_id=$(az vmss show --resource-group $AZ_RESOURCE_GROUP --name $VMSCALEDSET --query id -o tsv)
+resource_id=$(az vmss show --resource-group $AZ_RESOURCE_GROUP --name $VMSCALESET --query id -o tsv)
 echo "Scanning configuration of resource $resource_id"
 prowler azure --az-cli-auth --service vm --output-directory /tmp/prowler --output-filename prowler_azure_scan > /dev/null
 report_json=$(cat /tmp/prowler/prowler_azure_scan.ocsf.json)
