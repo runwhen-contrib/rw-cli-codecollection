@@ -103,6 +103,7 @@ tasks:
         }
 
         echo "Review the config files generated under output/workspaces/"
+    silent: true
 
   validate-generation-rules:
     desc: Validate YAML files in ../.runwhen/generation-rules against the JSON schema using ajv-cli
@@ -189,6 +190,7 @@ tasks:
           fi
         done
         echo "Please add appropriate secrets to your workspace before validating SLX function"
+    silent: true
 
   delete-slxs:
     desc: "Delete each SLX object from the appropriate URL"
@@ -220,3 +222,4 @@ tasks:
             echo "Deleted SLX: $SLX_NAME from $URL"
           fi
         done
+    silent: true
