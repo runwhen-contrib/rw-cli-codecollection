@@ -16,6 +16,7 @@ tasks:
       - task: clean-rwl-discovery
 
   check-unpushed-commits:
+    desc: Check if outstanding commits or file updates need to be pushed before testing. 
     vars:
       # Specify the base directory relative to your Taskfile location
       BASE_DIR: "../"
