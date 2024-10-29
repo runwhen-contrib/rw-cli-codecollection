@@ -14,3 +14,8 @@ ro runbook.robot
 
 
 # RunWhen Local Discovery Testing
+
+
+export RW_PAT=[]
+export RW_WORKSPACE=[]
+export RW_API_URL=[]
