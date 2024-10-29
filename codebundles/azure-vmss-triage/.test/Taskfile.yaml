@@ -2,74 +2,83 @@ version: '3'
 
 tasks:
   default:
+    desc: "Run all tasks"
     cmds:
       - task: check-unpushed-commits
       - task: generate-rwl-config
-      - task: run-rwl-workspace-builder
+      - task: run-rwl-discovery
+
   check-unpushed-commits:
-    desc: "Check if all commits have been pushed"
+    vars:
+      # Specify the base directory relative to your Taskfile location
+      BASE_DIR: "../"
     cmds:
       - |
-        if [ -n "$(git log origin/$(git rev-parse --abbrev-ref HEAD)..HEAD)" ]; then
-          echo "There are unpushed commits. Please push all commits before proceeding."
-          exit 1
+        echo "Checking for uncommitted changes in $BASE_DIR and $BASE_DIR.runwhen, excluding '.test'..."
+        UNCOMMITTED_FILES=$(git diff --name-only HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNCOMMITTED_FILES" ]; then
+          echo "✗"
+          echo "Uncommitted changes found:"
+          echo "$UNCOMMITTED_FILES"
+          echo "Remember to commit & push changes before executing the `run-rwl-discovery` task."
+          echo "------------"        
         else
-          echo "All commits have been pushed."
+          echo "√"
+          echo "No uncommitted changes in specified directories."
+          echo "------------"        
         fi
+      - |
+        echo "Checking for unpushed commits in $BASE_DIR and $BASE_DIR.runwhen, excluding '.test'..."
+        git fetch origin
+        UNPUSHED_FILES=$(git diff --name-only origin/$(git rev-parse --abbrev-ref HEAD) HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNPUSHED_FILES" ]; then
+          echo "✗"
+          echo "Unpushed commits found:"
+          echo "$UNPUSHED_FILES"
+          echo "Remember to push changes before executing the `run-rwl-discovery` task."
+          echo "------------"        
+        else
+          echo "√"
+          echo "No unpushed commits in specified directories."
+          echo "------------"        
+        fi
+    silent: true
   generate-rwl-config:
-    desc: Create RunWhen Local test confguration (workspaceInfo.yaml)
+    desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
     env: 
       ARM_SUBSCRIPTION_ID: '{{.ARM_SUBSCRIPTION_ID}}'
       AZ_TENANT_ID: '{{.AZ_TENANT_ID}}'
       AZ_CLIENT_SECRET: '{{.AZ_CLIENT_SECRET}}'
       AZ_CLIENT_ID: '{{.AZ_CLIENT_ID}}'
-      AZ_SECRET_ID: '{{.AZ_SECRET_ID}}'
       RW_WORKSPACE: '{{.RW_WORKSPACE}}'
     cmds:
       - |
-        # Get current Git repository remote URL
         repo_url=$(git config --get remote.origin.url)
-        # Get current Git branch name
         branch_name=$(git rev-parse --abbrev-ref HEAD)
-
-        # Get codebundle name
         codebundle=$(basename "$(dirname "$PWD")")
-        # Create the config file with substituted values
         cat <<EOF > workspaceInfo.yaml
-        # Information about the RunWhen workspace
         workspaceName: "$RW_WORKSPACE"
         workspaceOwnerEmail: authors@runwhen.com
-        defaultLocation: local
-        # More workspace config
-        # Information about cloud platforms to scan to discover resources
+        defaultLocation: location-01
         cloudConfig:
-          kubernetes: null
           azure:
             subscriptionId: "$ARM_SUBSCRIPTION_ID"
             tenantId: "$AZ_TENANT_ID"
             clientId: "$AZ_CLIENT_ID"
             clientSecret: "$AZ_CLIENT_SECRET"
-            # Azure config
-          # Other platform configs
-          
-        # Information about which code collections to scan for code bundles
         codeCollections:
         - repoURL: "$repo_url"
           branch: "$branch_name"
           codeBundles: ["$codebundle"]
-
         EOF
 
     silent: true
 
-  run-rwl-workspace-builder:
-    desc: Run RunWhen Local Discovery against test infrastructure 
+  run-rwl-discovery:
+    desc: "Run RunWhen Local Discovery on test infrastructure"
     cmds:
       - |
-        # Define container name
         CONTAINER_NAME="RunWhenLocal"
-
-        # Stop and remove the container if it is running
         if docker ps -q --filter "name=$CONTAINER_NAME" | grep -q .; then
           echo "Stopping and removing existing container $CONTAINER_NAME..."
           docker stop $CONTAINER_NAME && docker rm $CONTAINER_NAME
@@ -80,96 +89,66 @@ tasks:
           echo "No existing container named $CONTAINER_NAME found."
         fi
 
-        # Clean up and prepare output directory
-        echo "Cleaning up and preparing output directory..."
+        echo "Cleaning up output directory..."
         sudo rm -rf output || { echo "Failed to remove output directory"; exit 1; }
-        mkdir output && chmod 777 output || { echo "Failed to create and set permissions for output directory"; exit 1; }
+        mkdir output && chmod 777 output || { echo "Failed to set permissions"; exit 1; }
 
-        # Run the Docker container
         echo "Starting new container $CONTAINER_NAME..."
-        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d us-docker.pkg.dev/runwhen-nonprod-shared/public-images/runwhen-local:534-merge-c00e1063 || {
-          echo "Failed to start the Docker container"; exit 1;
+        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d ghcr.io/runwhen-contrib/runwhen-local:latest || {
+          echo "Failed to start container"; exit 1;
         }
 
-        # Ensure container is running before executing commands inside it
-        if ! docker ps -q --filter "name=$CONTAINER_NAME" | grep -q .; then
-          echo "Error: Container $CONTAINER_NAME is not running."; exit 1;
-        fi
-
-        # Run the workspace builder script inside the container
         echo "Running workspace builder script in container..."
         docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh $1 --verbose || {
-          echo "Error: Failed to execute the workspace builder script inside the container"; exit 1;
+          echo "Error executing script in container"; exit 1;
         }
 
-        echo "Review the config files generated under output/workspaces/"
+        echo "Review generated config files under output/workspaces/"
     silent: true
 
   validate-generation-rules:
-    desc: Validate YAML files in ../.runwhen/generation-rules against the JSON schema using ajv-cli
+    desc: "Validate YAML files in .runwhen/generation-rules"
     cmds:
       - |
-        # Check prerequisites
         for cmd in curl yq ajv; do
           if ! command -v $cmd &> /dev/null; then
-            echo "Error: $cmd is required but not installed. Please install it to continue."
+            echo "Error: $cmd is required but not installed."
             exit 1
           fi
         done
 
-        # Set up temporary directory for converted JSON files
         temp_dir=$(mktemp -d)
-        
-        # Download the JSON schema once
         curl -s -o "$temp_dir/generation-rule-schema.json" https://raw.githubusercontent.com/runwhen-contrib/runwhen-local/refs/heads/main/src/generation-rule-schema.json
 
-        # Convert each YAML file to JSON and validate
         for yaml_file in ../.runwhen/generation-rules/*.yaml; do
           echo "Validating $yaml_file"
-          
-          # Convert YAML to JSON and save it in temp directory
           json_file="$temp_dir/$(basename "${yaml_file%.*}.json")"
           yq -o=json "$yaml_file" > "$json_file"
-          
-          # Validate the JSON file with ajv-cli, using local schema
           ajv validate -s "$temp_dir/generation-rule-schema.json" -d "$json_file" --spec=draft2020 --strict=false \
           && echo "$yaml_file is valid." || echo "$yaml_file is invalid."
         done
 
-        # Clean up temporary directory
         rm -rf "$temp_dir"
     silent: true
 
   upload-slxs:
-    desc: "Upload each SLX set (slx, runbook, sli) to the appropriate URL"
+    desc: "Upload SLX files to the appropriate URL"
     env: 
       RW_WORKSPACE: '{{.RW_WORKSPACE}}'
       RW_API_URL: '{{.RW_API}}'
       RW_PAT: '{{.RW_PAT}}'
     cmds:
       - |
-        # Define the base directory
         BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
-
-        # Check if the base directory exists
         if [ ! -d "$BASE_DIR" ]; then
           echo "Directory $BASE_DIR does not exist."
           exit 1
         fi
 
-        # Loop through each SLX directory
         for dir in "$BASE_DIR"/*; do
           if [ -d "$dir" ]; then
-            # Extract the SLX name from the directory name
             SLX_NAME=$(basename "$dir")
-
-            # Initialize JSON structure with commit message
-            PAYLOAD=$(jq -n \
-              --arg commitMsg "Creating new SLX $SLX_NAME" \
-              '{ commitMsg: $commitMsg, files: {} }'
-            )
-
-            # Add each YAML file to the payload if it exists
+            PAYLOAD=$(jq -n --arg commitMsg "Creating new SLX $SLX_NAME" '{ commitMsg: $commitMsg, files: {} }')
             for file in slx.yaml runbook.yaml sli.yaml; do
               if [ -f "$dir/$file" ]; then
                 CONTENT=$(cat "$dir/$file")
@@ -177,48 +156,33 @@ tasks:
               fi
             done
 
-            # Define the API endpoint URL for this SLX
             URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/${SLX_NAME}"
-
-            # Perform the POST request
             curl -X POST "$URL" \
               -H "Authorization: Bearer $RW_PAT" \
               -H "Content-Type: application/json" \
               -d "$PAYLOAD"
-
             echo "Uploaded SLX: $SLX_NAME to $URL"
           fi
         done
-        echo "Please add appropriate secrets to your workspace before validating SLX function"
     silent: true
 
   delete-slxs:
-    desc: "Delete each SLX object from the appropriate URL"
+    desc: "Delete SLX objects from the appropriate URL"
     cmds:
       - |
-        # Define the base directory
         BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
-
-        # Check if the base directory exists
         if [ ! -d "$BASE_DIR" ]; then
           echo "Directory $BASE_DIR does not exist."
           exit 1
         fi
 
-        # Loop through each SLX directory to delete
         for dir in "$BASE_DIR"/*; do
           if [ -d "$dir" ]; then
-            # Extract the SLX name from the directory name
             SLX_NAME=$(basename "$dir")
-
-            # Define the API endpoint URL for this SLX
             URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/${SLX_NAME}"
-
-            # Perform the DELETE request
             curl -X DELETE "$URL" \
               -H "Authorization: Bearer $RW_PAT" \
               -H "Content-Type: application/json"
-
             echo "Deleted SLX: $SLX_NAME from $URL"
           fi
         done
