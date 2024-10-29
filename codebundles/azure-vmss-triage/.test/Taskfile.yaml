@@ -141,7 +141,7 @@ tasks:
       - |
         BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
         if [ ! -d "$BASE_DIR" ]; then
-          echo "Directory $BASE_DIR does not exist."
+          echo "Directory $BASE_DIR does not exist. Upload aborted."
           exit 1
         fi
 
@@ -157,22 +157,32 @@ tasks:
             done
 
             URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/${SLX_NAME}"
-            curl -X POST "$URL" \
+            echo "Uploading SLX: $SLX_NAME to $URL"
+            response=$(curl -v -X POST "$URL" \
               -H "Authorization: Bearer $RW_PAT" \
               -H "Content-Type: application/json" \
-              -d "$PAYLOAD"
-            echo "Uploaded SLX: $SLX_NAME to $URL"
+              -d "$PAYLOAD" -w "%{http_code}" -o /dev/null -s 2>&1)
+            
+            if [[ "$response" =~ 200|201 ]]; then
+              echo "Successfully uploaded SLX: $SLX_NAME to $URL"
+            else
+              echo "Failed to upload SLX: $SLX_NAME to $URL. Response:"
+              echo "$response"
+            fi
           fi
         done
     silent: true
-
   delete-slxs:
     desc: "Delete SLX objects from the appropriate URL"
+    env:
+      RW_WORKSPACE: '{{.RW_WORKSPACE}}'
+      RW_API_URL: '{{.RW_API}}'
+      RW_PAT: '{{.RW_PAT}}'
     cmds:
       - |
         BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
         if [ ! -d "$BASE_DIR" ]; then
-          echo "Directory $BASE_DIR does not exist."
+          echo "Directory $BASE_DIR does not exist. Deletion aborted."
           exit 1
         fi
 
@@ -180,10 +190,17 @@ tasks:
           if [ -d "$dir" ]; then
             SLX_NAME=$(basename "$dir")
             URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/${SLX_NAME}"
-            curl -X DELETE "$URL" \
+            echo "Deleting SLX: $SLX_NAME from $URL"
+            response=$(curl -v -X DELETE "$URL" \
               -H "Authorization: Bearer $RW_PAT" \
-              -H "Content-Type: application/json"
-            echo "Deleted SLX: $SLX_NAME from $URL"
+              -H "Content-Type: application/json" -w "%{http_code}" -o /dev/null -s 2>&1)
+
+            if [[ "$response" =~ 200|204 ]]; then
+              echo "Successfully deleted SLX: $SLX_NAME from $URL"
+            else
+              echo "Failed to delete SLX: $SLX_NAME from $URL. Response:"
+              echo "$response"
+            fi
           fi
         done
     silent: true

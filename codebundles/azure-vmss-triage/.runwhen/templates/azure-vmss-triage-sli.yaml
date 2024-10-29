@@ -11,7 +11,7 @@ spec:
   displayUnitsShort: ok
   locations:
     - {{default_location}}
-  description: Measures the health of a Azure VM Scaled Set.
+  description: Measures the health of a Azure VM Scale Set.
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
