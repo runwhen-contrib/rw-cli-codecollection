@@ -7,14 +7,14 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/compute/10034-icon-service-VM-Scale-Sets.svg
-  alias: Azure API Management Service {{match_resource.resource.name}}
-  asMeasuredBy: Health of {{match_resource.resource.name}} API Management service.
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/containers/10023-icon-service-Kubernetes-Services.svg
+  alias: "{{match_resource.name}} AKS Cluster Health"
+  asMeasuredBy: "Querying the Azure AKS health for incidents or critical activities."
   configProvided:
   - name: SLX_PLACEHOLDER
     value: SLX_PLACEHOLDER
   owners:
   - {{workspace.owner_email}}
-  statement: APIM Service should be available.
+  statement: AKS Clusters should not have CRITICAL or ERROR events.
   additionalContext:
-    name: "{{match_resource.resource.name}}"
+    name: "{{match_resource.name}}"
