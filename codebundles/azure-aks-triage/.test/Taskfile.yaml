@@ -29,7 +29,8 @@ tasks:
           echo "Uncommitted changes found:"
           echo "$UNCOMMITTED_FILES"
           echo "Remember to commit & push changes before executing the `run-rwl-discovery` task."
-          echo "------------"        
+          echo "------------"
+          exit 1    
         else
           echo "√"
           echo "No uncommitted changes in specified directories."
@@ -44,7 +45,8 @@ tasks:
           echo "Unpushed commits found:"
           echo "$UNPUSHED_FILES"
           echo "Remember to push changes before executing the `run-rwl-discovery` task."
-          echo "------------"        
+          echo "------------"
+          exit 1        
         else
           echo "√"
           echo "No unpushed commits in specified directories."
@@ -64,9 +66,31 @@ tasks:
         repo_url=$(git config --get remote.origin.url)
         branch_name=$(git rev-parse --abbrev-ref HEAD)
         codebundle=$(basename "$(dirname "$PWD")")
+        
+        # Fetch individual cluster details from Terraform state
+        pushd terraform > /dev/null
+        cluster_name=$(terraform show -json terraform.tfstate | jq -r '
+          .values.root_module.resources[] | 
+          select(.type == "azurerm_kubernetes_cluster") | .values.name')
+        cluster_server=$(terraform show -json terraform.tfstate | jq -r '
+          .values.root_module.resources[] | 
+          select(.type == "azurerm_kubernetes_cluster") | .values.fqdn')
+        cluster_resource_group=$(terraform show -json terraform.tfstate | jq -r '
+          .values.root_module.resources[] | 
+          select(.type == "azurerm_kubernetes_cluster") | .values.resource_group_name')
+        popd > /dev/null
+
+        # Check if any of the required cluster variables are empty
+        if [ -z "$cluster_name" ] || [ -z "$cluster_server" ] || [ -z "$cluster_resource_group" ]; then
+          echo "Error: Missing cluster details. Ensure Terraform plan has been applied."
+          exit 1
+        fi
+
+        # Generate workspaceInfo.yaml with fetched cluster details
         cat <<EOF > workspaceInfo.yaml
         workspaceName: "$RW_WORKSPACE"
         workspaceOwnerEmail: authors@runwhen.com
+        defaultLOD: detailed
         defaultLocation: location-01
         cloudConfig:
           azure:
@@ -74,12 +98,18 @@ tasks:
             tenantId: "$AZ_TENANT_ID"
             clientId: "$AZ_CLIENT_ID"
             clientSecret: "$AZ_CLIENT_SECRET"
+            resourceGroupLevelOfDetails:
+              $cluster_resource_group: detailed
+            aksClusters: 
+              clusters: 
+                - name: $cluster_name
+                  server: https://$cluster_server:443
+                  resource_group: $cluster_resource_group
         codeCollections:
         - repoURL: "$repo_url"
           branch: "$branch_name"
           codeBundles: ["$codebundle"]
         EOF
-
     silent: true
 
   run-rwl-discovery:

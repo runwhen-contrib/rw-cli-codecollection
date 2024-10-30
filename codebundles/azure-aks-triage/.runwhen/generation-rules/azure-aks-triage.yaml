@@ -11,9 +11,9 @@ spec:
           properties: [name]
           mode: substring
       slxs:
-        - baseName: az-aks-trg
+        - baseName: az-aks-triage
           qualifiers: ["resource", "resource_group"]
-          baseTemplateName: az-aks-trg
+          baseTemplateName: azure-aks-triage
           levelOfDetail: basic
           outputItems:
             - type: slx
