@@ -12,11 +12,11 @@ spec:
           mode: substring
       slxs:
         - baseName: az-aks-triage
-          qualifiers: ["resource", "resource_group"]
+          qualifiers: [resource, resource_group]
           baseTemplateName: azure-aks-triage
           levelOfDetail: basic
-          outputItems:
-            - type: slx
+          outputItems: []
+            # - type: slx
             # - type: sli
             # - type: runbook
             #   templateName: azure-aks-triage-taskset.yaml
