@@ -91,6 +91,7 @@ tasks:
         workspaceName: "$RW_WORKSPACE"
         workspaceOwnerEmail: authors@runwhen.com
         defaultLocation: location-01
+        defaultLOD: detailed
         cloudConfig:
           azure:
             subscriptionId: "$ARM_SUBSCRIPTION_ID"
@@ -102,6 +103,8 @@ tasks:
                 - name: $cluster_name
                   server: https://$cluster_server:443
                   resource_group: $cluster_resource_group
+            resourceGroupLevelOfDetails:
+              $cluster_resource_group: detailed
         codeCollections:
         - repoURL: "$repo_url"
           branch: "$branch_name"

@@ -20,7 +20,7 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/azure-vm-triage/runbook.robot
+    pathToRobot: codebundles/azure-akd-triage/runbook.robot
   configProvided:
     - name: AZ_RESOURCE_GROUP
       value: {{resource_group.name}}
