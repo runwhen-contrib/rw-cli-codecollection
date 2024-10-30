@@ -17,6 +17,7 @@ spec:
           levelOfDetail: basic
           outputItems:
             - type: slx
+              levelOfDetail: basic
             # - type: sli
             # - type: runbook
             #   templateName: azure-aks-triage-taskset.yaml

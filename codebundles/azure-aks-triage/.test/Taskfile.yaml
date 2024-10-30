@@ -90,7 +90,7 @@ tasks:
         cat <<EOF > workspaceInfo.yaml
         workspaceName: "$RW_WORKSPACE"
         workspaceOwnerEmail: authors@runwhen.com
-        defaultLOD: detailed
+        defaultLOD: "detailed"
         defaultLocation: location-01
         cloudConfig:
           azure:
