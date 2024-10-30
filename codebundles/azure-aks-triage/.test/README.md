@@ -4,9 +4,9 @@
 The terraform directory contains infrastructure used for testing. 
 
 # Local Development Testing
-export AZ_RESOURCE_GROUP=azure-vm-triage
-export VMSCALESET=test-vmss
-export AZURE_SUBSCRIPTION=$ARM_SUBSCRIPTION_ID
+
+
+
 ro sli.robot
 ro runbook.robot
 

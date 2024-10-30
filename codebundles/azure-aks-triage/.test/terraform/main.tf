@@ -20,6 +20,14 @@ resource "azurerm_user_assigned_identity" "aks_identity" {
   depends_on = [azurerm_resource_group.test]
 }
 
+# Assign "Reader" role to the service account for the resource group
+resource "azurerm_role_assignment" "reader" {
+  scope                = azurerm_resource_group.test.id
+  role_definition_name = "Reader"
+  principal_id         = var.sp_principal_id
+}
+
+
 # Assign Owner role to the managed identity for the resource group
 resource "azurerm_role_assignment" "aks_identity_owner_rg" {
   principal_id   = azurerm_user_assigned_identity.aks_identity.principal_id
@@ -58,7 +66,10 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
   }
 
   lifecycle {
-    ignore_changes = [kubelet_identity[0].user_assigned_identity_id]  # Helps avoid re-provisioning issues with identity
+    ignore_changes = [
+      default_node_pool[0].upgrade_settings,
+      kubelet_identity[0].user_assigned_identity_id
+    ]
   }
 }
 
