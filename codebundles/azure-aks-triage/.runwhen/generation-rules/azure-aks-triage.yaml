@@ -15,7 +15,7 @@ spec:
           qualifiers: [resource, resource_group]
           baseTemplateName: azure-aks-triage
           levelOfDetail: basic
-          outputItems: []
+          outputItems:
             - type: slx
             # - type: sli
             # - type: runbook
