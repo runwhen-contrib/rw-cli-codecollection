@@ -91,7 +91,6 @@ tasks:
         workspaceName: "$RW_WORKSPACE"
         workspaceOwnerEmail: authors@runwhen.com
         defaultLocation: location-01
-        defaultLOD: detailed
         cloudConfig:
           azure:
             subscriptionId: "$ARM_SUBSCRIPTION_ID"
