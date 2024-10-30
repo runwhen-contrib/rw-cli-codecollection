@@ -90,7 +90,7 @@ tasks:
         cat <<EOF > workspaceInfo.yaml
         workspaceName: "$RW_WORKSPACE"
         workspaceOwnerEmail: authors@runwhen.com
-        defaultLOD: 2
+        defaultLOD: detailed
         defaultLocation: location-01
         cloudConfig:
           azure:
@@ -98,8 +98,6 @@ tasks:
             tenantId: "$AZ_TENANT_ID"
             clientId: "$AZ_CLIENT_ID"
             clientSecret: "$AZ_CLIENT_SECRET"
-            # resourceGroupLevelOfDetails:
-            #   $cluster_resource_group: detailed
             aksClusters: 
               clusters: 
                 - name: $cluster_name
