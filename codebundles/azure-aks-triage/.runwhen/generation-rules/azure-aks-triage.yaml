@@ -17,3 +17,6 @@ spec:
           levelOfDetail: basic
           outputItems:
             - type: slx
+            - type: sli
+            - type: runbook
+              templateName: az-aks-triage-taskset.yaml
