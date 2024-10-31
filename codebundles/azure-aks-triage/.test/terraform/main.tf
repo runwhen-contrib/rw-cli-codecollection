@@ -37,6 +37,7 @@ resource "azurerm_role_assignment" "aks_identity_owner_rg" {
 
 # AKS Cluster
 resource "azurerm_kubernetes_cluster" "aks_cluster" {
+  depends_on = [azurerm_resource_group.test]
   name                = var.cluster_name
   location            = var.location
   resource_group_name = var.resource_group

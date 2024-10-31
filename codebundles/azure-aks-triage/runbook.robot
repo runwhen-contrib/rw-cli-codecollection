@@ -59,25 +59,32 @@ Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resou
 #    END
 #    RW.Core.Add Pre To Report    ${process.stdout}
 
-# Scan AKS `${AKS_CLUSTER}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
-#    [Documentation]    Gets the activities of the AKS cluster.
-#    [Tags]    AKS    Kubernetes    monitor    events    errors
-#    ${process}=    RW.CLI.Run Bash File
-#    ...    bash_file=aks_activities.sh
-#    ...    env=${env}
-#    ...    timeout_seconds=180
-#    ...    include_in_history=false
-#    ${next_steps}=    RW.CLI.Run Cli    cmd=echo -e "${process.stdout}" | grep "Next Steps" -A 20 | tail -n +2
-#    IF    ${process.returncode} > 0
-#    RW.Core.Add Issue    title=Azure Resource `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}` Has Errors In Activities
-#    ...    severity=3
-#    ...    next_steps=${next_steps.stdout}
-#    ...    expected=Azure Resource `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has no errors or criticals in activity logs
-#    ...    actual=Azure Resource `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has errors or critical events in activity logs
-#    ...    reproduce_hint=Run activities.sh
-#    ...    details=${process.stdout}
-#    END
-#    RW.Core.Add Pre To Report    ${process.stdout}
+Scan AKS `${AKS_CLUSTER}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Gets the activities for the AKS cluster set and checks for errors
+    [Tags]    AKS    activities    monitor    events    errors
+    ${activites}=    RW.CLI.Run Bash File
+    ...    bash_file=aks_activities.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+
+    RW.Core.Add Pre To Report    ${activites.stdout}
+
+    ${issues}=    RW.CLI.Run Cli    cmd=cat ${OUTPUT DIR}/issues.json 
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            RW.Core.Add Issue    
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_step"]}
+            ...    expected=AKS Cluster `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has no Warning/Error/Critical activities
+            ...    actual=AKS Cluster `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has Warning/Error/Critical activities
+            ...    reproduce_hint=${activites.cmd}
+            ...    details=${item["details"]}        
+        END
+    END
+
 
 # Validate Cluster `${AKS_CLUSTER}` Configuration In Resource Group `${AZ_RESOURCE_GROUP}`
 #    [Documentation]    performs a validation of the config of the AKS cluster.
@@ -109,6 +116,11 @@ Suite Initialization
     ...    type=string
     ...    description=The Azure AKS cluster to triage.
     ...    pattern=\w*
+    ${TIME_PERIOD_MINUTES}=    RW.Core.Import User Variable    TIME_PERIOD_MINUTES
+    ...    type=string
+    ...    description=The time period, in minutes, to look back for activites/events. 
+    ...    pattern=\w*
+    ...    default=60
     ${azure_credentials}=    RW.Core.Import Secret
     ...    azure_credentials
     ...    type=string
@@ -116,6 +128,7 @@ Suite Initialization
     ...    pattern=\w*
     Set Suite Variable    ${AKS_CLUSTER}    ${AKS_CLUSTER}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
+    Set Suite Variable    ${TIME_PERIOD_MINUTES}    ${TIME_PERIOD_MINUTES}
     Set Suite Variable
     ...    ${env}
-    ...    {"AKS_CLUSTER":"${AKS_CLUSTER}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "OUTPUT_DIR":"${OUTPUT_DIR}"}
+    ...    {"AKS_CLUSTER":"${AKS_CLUSTER}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "OUTPUT_DIR":"${OUTPUT DIR}", "TIME_PERIOD_MINUTES": "${TIME_PERIOD_MINUTES}"}
