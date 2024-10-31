@@ -18,4 +18,4 @@ spec:
   statement: AKS Clusters should not have CRITICAL or ERROR events.
   additionalContext:
     name: "{{match_resource.resource.name}}"
-    resource_group: "{{resource_group}}"
+    resource_group: "{{match_resource.resource.resource_group}}"
