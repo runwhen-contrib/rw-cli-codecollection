@@ -103,6 +103,8 @@ tasks:
                 - name: $cluster_name
                   server: https://$cluster_server:443
                   resource_group: $cluster_resource_group
+              resourceGroupLevelOfDetails:
+                $cluster_resource_group: basic
         codeCollections:
         - repoURL: "$repo_url"
           branch: "$branch_name"
