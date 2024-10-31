@@ -133,13 +133,9 @@ tasks:
 
         echo "Starting new container $CONTAINER_NAME..."
 
-      
-        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d us-docker.pkg.dev/runwhen-nonprod-shared/public-images/runwhen-local:536-merge-d4991335 || {
+        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d ghcr.io/runwhen-contrib/runwhen-local:latest || {
           echo "Failed to start container"; exit 1;
         }
-        # docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d ghcr.io/runwhen-contrib/runwhen-local:latest || {
-        #   echo "Failed to start container"; exit 1;
-        # }
 
         echo "Running workspace builder script in container..."
         docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh $1 --verbose || {
