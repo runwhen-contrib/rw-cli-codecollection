@@ -5,7 +5,8 @@ The terraform directory contains infrastructure used for testing.
 
 # Local Development Testing
 
-
+export AZ_RESOURCE_GROUP=azure-aks
+export AKS_CLUSTER=aks-cl-1
 
 ro sli.robot
 ro runbook.robot

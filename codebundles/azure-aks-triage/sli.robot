@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       Checks aks key config and returns a 1 when healthy, or 0 when not healthy.
+Documentation       Checks AKS Configuration and returns a 1 when healthy, or 0 when not healthy.
 Metadata            Author    jon-funk
 Metadata            Display Name    Azure AKS Triage
 Metadata            Supports    Azure      AKS    Kubernetes       Health

@@ -13,63 +13,90 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Fetch AKS `${AKS_CLUSTER}` Config In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Fetch the config of the AKS cluster in azure
-    [Tags]        AKS    config   
-    ${process}=    RW.CLI.Run Bash File
-    ...    bash_file=aks_config.sh
+Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Fetch a list of issues that might affect the AKS cluster
+    [Tags]    aks    config
+    ${resource_health}=    RW.CLI.Run Bash File
+    ...    bash_file=aks_resource_health.sh
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
-    IF    ${process.returncode} > 0
-        RW.Core.Add Issue    title=Azure Resource `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}` Has Errors In Activities
-        ...    severity=3
-        ...    next_steps=Review the report details produced by the configuration scan
-        ...    expected=Azure Resource `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has no misconfiguration(s)
-        ...    actual=Azure Resource `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has misconfiguration(s)
-        ...    reproduce_hint=Run config.sh
-        ...    details=${process.stdout}
-    END
-    RW.Core.Add Pre To Report    ${process.stdout}
-
-Scan AKS `${AKS_CLUSTER}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Gets the activities of the AKS cluster.
-    [Tags]    AKS    Kubernetes    monitor    events    errors
-    ${process}=    RW.CLI.Run Bash File
-    ...    bash_file=aks_activities.sh
+    ...    show_in_rwl_cheatsheet=true
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/az_resource_health.json
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
-    ${next_steps}=    RW.CLI.Run Cli    cmd=echo -e "${process.stdout}" | grep "Next Steps" -A 20 | tail -n +2
-    IF    ${process.returncode} > 0
-        RW.Core.Add Issue    title=Azure Resource `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}` Has Errors In Activities
-        ...    severity=3
-        ...    next_steps=${next_steps.stdout}
-        ...    expected=Azure Resource `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has no errors or criticals in activity logs
-        ...    actual=Azure Resource `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has errors or critical events in activity logs
-        ...    reproduce_hint=Run activities.sh
-        ...    details=${process.stdout}
-    END
-    RW.Core.Add Pre To Report    ${process.stdout}
-
-Validate Cluster `${AKS_CLUSTER}` Configuration In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    performs a validation of the config of the AKS cluster.
-    [Tags]    AKS    Kubernetes    monitor    events    errors
-    ${process}=    RW.CLI.Run Bash File
-    ...    bash_file=aks_info.sh
-    ...    env=${env}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
-    IF    ${process.returncode} > 0
-        RW.Core.Add Issue    title=AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}` Has Invalid Config
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    "${issue_list["properties"]["title"]}" != "Available"
+        RW.Core.Add Issue
         ...    severity=2
-        ...    next_steps=Review the configuration and agent pool state of the cluster `${AKS_CLUSTER}` in the resource group `${AZ_RESOURCE_GROUP}`
-        ...    expected=AKS Cluster `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has valid configuration
-        ...    actual=AKS Cluster `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has invalid configuration
-        ...    reproduce_hint=Run aks_info.sh
-        ...    details=${process.stdout}
+        ...    expected=Azure resources should be available for AKS Cluster `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
+        ...    actual=Azure resources are unhealthy for AKS Cluster `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
+        ...    title= ${issue_list["properties"]["title"]}
+        ...    reproduce_hint=${resource_health.cmd}
+        ...    details=${issue_list}
+        ...    next_steps=Please escalate to the Azure service owner or check back later.
     END
-    RW.Core.Add Pre To Report    ${process.stdout}
+    RW.Core.Add Pre To Report    ${resource_health.stdout}
+
+# Fetch AKS Cluster `${AKS_CLUSTER}` Config In Resource Group `${AZ_RESOURCE_GROUP}`
+#    [Documentation]    Fetch the config of the AKS cluster in azure
+#    [Tags]    AKS    config
+#    ${process}=    RW.CLI.Run Bash File
+#    ...    bash_file=aks_config.sh
+#    ...    env=${env}
+#    ...    timeout_seconds=180
+#    ...    include_in_history=false
+#    IF    ${process.returncode} > 0
+#    RW.Core.Add Issue    title=Azure Resource `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}` Has Errors In Activities
+#    ...    severity=3
+#    ...    next_steps=Review the report details produced by the configuration scan
+#    ...    expected=Azure Resource `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has no misconfiguration(s)
+#    ...    actual=Azure Resource `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has misconfiguration(s)
+#    ...    reproduce_hint=Run config.sh
+#    ...    details=${process.stdout}
+#    END
+#    RW.Core.Add Pre To Report    ${process.stdout}
+
+# Scan AKS `${AKS_CLUSTER}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
+#    [Documentation]    Gets the activities of the AKS cluster.
+#    [Tags]    AKS    Kubernetes    monitor    events    errors
+#    ${process}=    RW.CLI.Run Bash File
+#    ...    bash_file=aks_activities.sh
+#    ...    env=${env}
+#    ...    timeout_seconds=180
+#    ...    include_in_history=false
+#    ${next_steps}=    RW.CLI.Run Cli    cmd=echo -e "${process.stdout}" | grep "Next Steps" -A 20 | tail -n +2
+#    IF    ${process.returncode} > 0
+#    RW.Core.Add Issue    title=Azure Resource `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}` Has Errors In Activities
+#    ...    severity=3
+#    ...    next_steps=${next_steps.stdout}
+#    ...    expected=Azure Resource `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has no errors or criticals in activity logs
+#    ...    actual=Azure Resource `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has errors or critical events in activity logs
+#    ...    reproduce_hint=Run activities.sh
+#    ...    details=${process.stdout}
+#    END
+#    RW.Core.Add Pre To Report    ${process.stdout}
+
+# Validate Cluster `${AKS_CLUSTER}` Configuration In Resource Group `${AZ_RESOURCE_GROUP}`
+#    [Documentation]    performs a validation of the config of the AKS cluster.
+#    [Tags]    AKS    Kubernetes    monitor    events    errors
+#    ${process}=    RW.CLI.Run Bash File
+#    ...    bash_file=aks_info.sh
+#    ...    env=${env}
+#    ...    timeout_seconds=180
+#    ...    include_in_history=false
+#    IF    ${process.returncode} > 0
+#    RW.Core.Add Issue    title=AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}` Has Invalid Config
+#    ...    severity=2
+#    ...    next_steps=Review the configuration and agent pool state of the cluster `${AKS_CLUSTER}` in the resource group `${AZ_RESOURCE_GROUP}`
+#    ...    expected=AKS Cluster `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has valid configuration
+#    ...    actual=AKS Cluster `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has invalid configuration
+#    ...    reproduce_hint=Run aks_info.sh
+#    ...    details=${process.stdout}
+#    END
+#    RW.Core.Add Pre To Report    ${process.stdout}
 
 
 *** Keywords ***
@@ -91,4 +118,4 @@ Suite Initialization
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable
     ...    ${env}
-    ...    {"AKS_CLUSTER":"${AKS_CLUSTER}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}"}
+    ...    {"AKS_CLUSTER":"${AKS_CLUSTER}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "OUTPUT_DIR":"${OUTPUT_DIR}"}

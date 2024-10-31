@@ -1,52 +1,62 @@
 #!/bin/bash
 
-# ENV:
-# AZ_USERNAME
-# AZ_SECRET_VALUE
-# AZ_SUBSCRIPTION
-# AZ_TENANT
-# AKS_CLUSTER
-# AZ_RESOURCE_GROUP
 
-# # Log in to Azure CLI
-# az login --service-principal --username $AZ_USERNAME --password $AZ_SECRET_VALUE --tenant $AZ_TENANT > /dev/null
+# Check if AKS cluster exists
+if ! az aks show --resource-group "$AZ_RESOURCE_GROUP" --name "$AKS_CLUSTER" > /dev/null 2>&1; then
+  echo "AKS cluster $AKS_CLUSTER not found in resource group $AZ_RESOURCE_GROUP."
+  exit 1
+fi
 
-# # Set the subscription
-# az account set --subscription $AZ_SUBSCRIPTION
-
-
-az aks show --resource-group $AZ_RESOURCE_GROUP --name $AKS_CLUSTER
-
-resource_id=$(az aks show --resource-group $AZ_RESOURCE_GROUP --name $AKS_CLUSTER --query id -o tsv)
+# Fetch resource ID and initiate scan
+resource_id=$(az aks show --resource-group "$AZ_RESOURCE_GROUP" --name "$AKS_CLUSTER" --query id -o tsv)
 echo "Scanning configuration of resource $resource_id"
-prowler azure --az-cli-auth --service aks --output-directory /tmp/prowler --output-filename prowler_azure_scan > /dev/null
-report_json=$(cat /tmp/prowler/prowler_azure_scan.ocsf.json)
-report_csv=$(cat /tmp/prowler/prowler_azure_scan.csv)
+
+# Run Prowler scan with error handling
+# if ! prowler azure --az-cli-auth --service aks --output-directory /tmp/prowler --output-filename prowler_azure_scan > /dev/null 2>&1; then
+#   echo "Prowler scan failed. Please check the configuration and try again."
+#   exit 1
+# fi
+
+prowler azure --az-cli-auth --service aks --compliance cis_2.0_azure --output-directory /tmp/prowler --output-filename prowler_azure_scan
+
+# Check if the expected output files were created
+json_file="/tmp/prowler/prowler_azure_scan.ocsf.json"
+csv_file="/tmp/prowler/prowler_azure_scan.csv"
+
+if [ ! -f "$json_file" ] || [ ! -f "$csv_file" ]; then
+  echo "Prowler scan output files not found. Scan may have failed."
+  exit 1
+fi
+
+# Parse the JSON report and gather failed entries
 report=()
 ok=0
+report_json=$(cat "$json_file")
+
 for entry in $(echo "$report_json" | jq -r '.[] | @base64'); do
-    _jq() {
-        echo ${entry} | base64 --decode | jq -r ${1}
-    }
-    status_code=$(_jq '.status_code')
-    if [ "$status_code" != "PASS" ] && [ "$(_jq '.resources[].uid')" == "$resource_id" ]; then
-      resource_name=$(_jq '.resources[].uid')
-      status_details=$(_jq '.status_details')
-      risk_details=$(_jq '.risk_details')
-      report+=("--------------------")
-      report+=("Resource Name: $resource_name")
-      report+=("Status Code: $status_code")
-      report+=("Status Details: $status_details")
-      report+=("Risk Details: $risk_details")
-      report+=(" ")
-      report+=(" ")
-      ok=1
-    fi
+  _jq() {
+    echo "${entry}" | base64 --decode | jq -r "${1}"
+  }
+  status_code=$(_jq '.status_code')
+  resource_uid=$(_jq '.resources[].uid')
+
+  # Only process entries that failed and match the AKS resource ID
+  if [ "$status_code" != "PASS" ] && [ "$resource_uid" == "$resource_id" ]; then
+    report+=("Resource Name: $resource_uid")
+    report+=("Status Code: $status_code")
+    report+=("Status Details: $(_jq '.status_details')")
+    report+=("Risk Details: $(_jq '.risk_details')")
+    report+=("--------------------")
+    ok=1
+  fi
 done
+
+# Output scan results
 if [ $ok -eq 0 ]; then
-  echo "No issues found in the scan"
+  echo "No issues found in the scan for resource $resource_id."
 else
-  echo "Issues found in the scan related to resource $resource_id"
-  echo -e "${report[@]}"
+  echo "Issues found in the scan for resource $resource_id:"
+  printf "%s\n" "${report[@]}"
 fi
+
 exit $ok
