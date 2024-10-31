@@ -17,5 +17,6 @@ spec:
     - {{ workspace.owner_email }}
   statement: AKS Clusters should not have CRITICAL or ERROR events.
   additionalContext:
-    name: "{{match_resource.resource.name}}"
-    resource_group: "{{match_resource.resource.resource_group}}"
+    tags: "{{match_resource.tags}}"
+    qualified_name: "{{ match_resource.qualified_name }}"
+    resource_group: "{{ match_resource.resource_group.name }}"
