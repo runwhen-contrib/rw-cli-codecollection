@@ -14,7 +14,7 @@ spec:
         - baseName: az-aks-triage
           qualifiers: [resource, resource_group]
           baseTemplateName: azure-aks-triage
-          levelOfDetail: detailed
+          levelOfDetail: basic
           outputItems:
             - type: slx
             # - type: sli
