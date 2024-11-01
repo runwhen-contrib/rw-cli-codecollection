@@ -8,6 +8,8 @@ data "azurerm_client_config" "current" {}
 resource "azurerm_resource_group" "test" {
   name     = var.resource_group
   location = var.location
+  tags = var.tags
+
 }
 
 # Create a new managed identity
@@ -115,6 +117,7 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
       kubelet_identity[0].user_assigned_identity_id
     ]
   }
+  tags = var.tags
 }
 
 resource "tls_private_key" "ssh_key" {

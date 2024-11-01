@@ -13,8 +13,20 @@ ro runbook.robot
 
 Perform an azure login on the command line to interact with the infrastructure provisioned by Terraform. 
 
-To test or generate issues, perform some manual action like removing a node, or restarting a node. Advanced testing could be done with some apps that saturate the nodes resources - though only basic testing is required at this point in time. 
+To test or generate some issues: 
+- 
 
+- Network Recommendation Testing
+```
+# Create the default route
+az network route-table route create \
+  --resource-group "$AZ_RESOURCE_GROUP" \
+  --route-table-name "$AKS_CLUSTER-route-table" \
+  --name "default-route" \
+  --address-prefix "0.0.0.0/0" \
+  --next-hop-type "Internet"
+# Delete the Default Route
+```
 
 # Testing
 A `Taskfile.yaml` exists with numerous tasks for testing: 

@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       Runs diagnostic checks against an AKS cluster.
-Metadata            Author    jon-funk
+Metadata            Author    stewartshea
 Metadata            Display Name    Azure AKS Triage
 Metadata            Supports    Azure    AKS    Kubernetes    Service    Triage    Health
 
@@ -50,6 +50,18 @@ Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${
    ...    include_in_history=false
    ...    show_in_rwl_cheatsheet=true
    RW.Core.Add Pre To Report    ${config.stdout}
+
+
+Check Network Configuration of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
+   [Documentation]    Fetch the network configuration, generating resource URLs and basic recommendations
+   [Tags]    AKS    config    network    route    firewall
+   ${network}=    RW.CLI.Run Bash File
+   ...    bash_file=aks_network.sh
+   ...    env=${env}
+   ...    timeout_seconds=180
+   ...    include_in_history=false
+   ...    show_in_rwl_cheatsheet=true
+   RW.Core.Add Pre To Report    ${network.stdout}
 
 Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the activities for the AKS cluster set and checks for errors

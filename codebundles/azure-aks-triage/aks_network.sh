@@ -79,6 +79,7 @@ fi
 echo ""
 echo "------Firewall------"
 echo "Checking if Azure Firewall exists in the resource group..."
+az config set extension.use_dynamic_install=yes_without_prompt
 FIREWALL_PRESENT=$(az network firewall list --resource-group "$AZ_RESOURCE_GROUP" --query "[?provisioningState=='Succeeded'].id" -o tsv)
 
 if [ -z "$FIREWALL_PRESENT" ]; then
