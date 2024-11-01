@@ -19,7 +19,13 @@ PRIVATE_CLUSTER=$(echo "$CLUSTER_DETAILS" | jq -r '.apiServerAccessProfile.enabl
 RBAC_ENABLED=$(echo "$CLUSTER_DETAILS" | jq -r '.enableRbac')
 LOAD_BALANCER_SKU=$(echo "$CLUSTER_DETAILS" | jq -r '.networkProfile.loadBalancerSku')
 
+# Share raw output
+echo "-------Raw Cluster Details--------"
+echo $echo $CLUSTER_DETAILS | jq . 
+
+
 # Checks and outputs
+echo "-------Configuration Summary--------"
 echo "Cluster Name: $CLUSTER_NAME"
 echo "Location: $CLUSTER_LOCATION"
 echo "Resource Group: $CLUSTER_RG"

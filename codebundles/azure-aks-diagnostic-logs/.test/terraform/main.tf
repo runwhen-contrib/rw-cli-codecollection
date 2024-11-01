@@ -1,8 +1,10 @@
-# Current sub (assumed from CLI login)
-data "azurerm_subscription" "current" {}
+# Current sub (assumed from cli login)
+data "azurerm_subscription" "current" {
+}
 
 # Get tenant and user details of the current CLI session
 data "azurerm_client_config" "current" {}
+
 
 # Resource Group
 resource "azurerm_resource_group" "test" {
@@ -25,83 +27,38 @@ resource "azurerm_role_assignment" "reader" {
   principal_id         = var.sp_principal_id
 }
 
+
 # Assign Owner role to the managed identity for the resource group
 resource "azurerm_role_assignment" "aks_identity_owner_rg" {
-  principal_id         = azurerm_user_assigned_identity.aks_identity.principal_id
+  principal_id   = azurerm_user_assigned_identity.aks_identity.principal_id
   role_definition_name = "Owner"
-  scope                = azurerm_resource_group.test.id
-}
-
-# VNET and Subnet for Azure CNI
-resource "azurerm_virtual_network" "aks_vnet" {
-  name                = "${var.cluster_name}-vnet"
-  location            = var.location
-  resource_group_name = azurerm_resource_group.test.name
-  address_space       = ["10.0.0.0/16"]
-}
-
-resource "azurerm_subnet" "aks_subnet" {
-  name                 = "${var.cluster_name}-subnet"
-  resource_group_name  = azurerm_resource_group.test.name
-  virtual_network_name = azurerm_virtual_network.aks_vnet.name
-  address_prefixes     = ["10.0.1.0/24"]
-}
-
-# Network Security Group for subnet
-resource "azurerm_network_security_group" "aks_nsg" {
-  name                = "${var.cluster_name}-nsg"
-  location            = var.location
-  resource_group_name = azurerm_resource_group.test.name
-}
-
-resource "azurerm_subnet_network_security_group_association" "aks_subnet_nsg" {
-  subnet_id                 = azurerm_subnet.aks_subnet.id
-  network_security_group_id = azurerm_network_security_group.aks_nsg.id
-}
-
-# Route Table for subnet
-resource "azurerm_route_table" "aks_route_table" {
-  name                = "${var.cluster_name}-route-table"
-  location            = var.location
-  resource_group_name = azurerm_resource_group.test.name
-}
-
-resource "azurerm_subnet_route_table_association" "route_table_association" {
-  subnet_id      = azurerm_subnet.aks_subnet.id
-  route_table_id = azurerm_route_table.aks_route_table.id
+  scope          = azurerm_resource_group.test.id
 }
 
 # AKS Cluster
 resource "azurerm_kubernetes_cluster" "aks_cluster" {
-  depends_on = [azurerm_user_assigned_identity.aks_identity]
+  depends_on = [azurerm_resource_group.test]
   name                = var.cluster_name
   location            = var.location
   resource_group_name = var.resource_group
   dns_prefix          = "aks-${var.cluster_name}"
 
   default_node_pool {
-    name            = "default"
-    node_count      = 1
-    vm_size         = "Standard_DC2s_v2"
-    vnet_subnet_id  = azurerm_subnet.aks_subnet.id  # Updated for Azure CNI with VNET and Subnet
+    name       = "default"
+    node_count = 1
+    vm_size    = "Standard_DC2s_v2"  # Min size for a default node pool
   }
 
   identity {
-    type          = "UserAssigned"
-    identity_ids  = [azurerm_user_assigned_identity.aks_identity.id]
+    type = "UserAssigned"
+     identity_ids = [azurerm_user_assigned_identity.aks_identity.id]
+
   }
 
   kubelet_identity {
     client_id                 = azurerm_user_assigned_identity.aks_identity.client_id
     object_id                 = azurerm_user_assigned_identity.aks_identity.principal_id
     user_assigned_identity_id = azurerm_user_assigned_identity.aks_identity.id
-  }
-
-  # Network Profile to switch from Kubenet to Azure CNI
-  network_profile {
-    network_plugin    = "azure"   # Switch from "kubenet" to "azure" for Azure CNI
-    service_cidr      = "10.0.2.0/24"
-    dns_service_ip    = "10.0.2.10"
   }
 
   azure_active_directory_role_based_access_control {

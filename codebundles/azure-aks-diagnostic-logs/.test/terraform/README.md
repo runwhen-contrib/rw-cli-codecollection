@@ -1,5 +1,5 @@
 ## Infrastructure
-This will build out a simple AKS cluster set in a dedicated resource group, and enables the configure SP to own those resources, which will be needed when testing discovery of this with RunWhen Local (through the Taskfile in the parent directory)
+This will build out a simple AKS Cluster in a dedicated resource group, and enables the configure SP to own those resources, which will be needed when testing discovery of this with RunWhen Local (through the Taskfile in the parent directory)
 
 ## Usage
 

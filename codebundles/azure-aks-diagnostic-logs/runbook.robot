@@ -1,7 +1,7 @@
 *** Settings ***
-Documentation       Runs diagnostic checks against an AKS cluster.
-Metadata            Author    jon-funk
-Metadata            Display Name    Azure AKS Triage
+Documentation       Enables Diagnostic settings for troubleshooting a cluster.  
+Metadata            Author    stewartshea
+Metadata            Display Name    Azure AKS Diagnostic Logging
 Metadata            Supports    Azure    AKS    Kubernetes    Service    Triage    Health
 
 Library             BuiltIn
@@ -13,7 +13,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Enable Diagnostic Logging for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the AKS cluster
     [Tags]    aks    config
     ${resource_health}=    RW.CLI.Run Bash File
@@ -76,6 +76,8 @@ Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOUR
             ...    details=${item["details"]}        
         END
     END
+
+
 
 
 *** Keywords ***
