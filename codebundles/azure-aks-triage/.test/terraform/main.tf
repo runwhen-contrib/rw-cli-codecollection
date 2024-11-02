@@ -8,7 +8,7 @@ data "azurerm_client_config" "current" {}
 resource "azurerm_resource_group" "test" {
   name     = var.resource_group
   location = var.location
-  tags = var.tags
+  tags     = var.tags
 
 }
 
@@ -17,7 +17,7 @@ resource "azurerm_user_assigned_identity" "aks_identity" {
   name                = "${var.cluster_name}-identity"
   location            = var.location
   resource_group_name = var.resource_group
-  depends_on = [azurerm_resource_group.test]
+  depends_on          = [azurerm_resource_group.test]
 }
 
 # Assign "Reader" role to the service account for the resource group
@@ -75,22 +75,22 @@ resource "azurerm_subnet_route_table_association" "route_table_association" {
 
 # AKS Cluster
 resource "azurerm_kubernetes_cluster" "aks_cluster" {
-  depends_on = [azurerm_user_assigned_identity.aks_identity]
+  depends_on          = [azurerm_user_assigned_identity.aks_identity]
   name                = var.cluster_name
   location            = var.location
   resource_group_name = var.resource_group
   dns_prefix          = "aks-${var.cluster_name}"
 
   default_node_pool {
-    name            = "default"
-    node_count      = 1
-    vm_size         = "Standard_DC2s_v2"
-    vnet_subnet_id  = azurerm_subnet.aks_subnet.id  # Updated for Azure CNI with VNET and Subnet
+    name           = "default"
+    node_count     = 1
+    vm_size        = "Standard_DC2s_v2"
+    vnet_subnet_id = azurerm_subnet.aks_subnet.id # Updated for Azure CNI with VNET and Subnet
   }
 
   identity {
-    type          = "UserAssigned"
-    identity_ids  = [azurerm_user_assigned_identity.aks_identity.id]
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.aks_identity.id]
   }
 
   kubelet_identity {
@@ -101,14 +101,14 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
 
   # Network Profile to switch from Kubenet to Azure CNI
   network_profile {
-    network_plugin    = "azure"   # Switch from "kubenet" to "azure" for Azure CNI
-    service_cidr      = "10.0.2.0/24"
-    dns_service_ip    = "10.0.2.10"
+    network_plugin = "azure" # Switch from "kubenet" to "azure" for Azure CNI
+    service_cidr   = "10.0.2.0/24"
+    dns_service_ip = "10.0.2.10"
   }
 
   azure_active_directory_role_based_access_control {
     azure_rbac_enabled = true
-    tenant_id = var.tenant_id
+    tenant_id          = var.tenant_id
   }
 
   lifecycle {
@@ -135,13 +135,13 @@ output "ssh_key_public" {
 }
 
 output "cluster_fqdn" {
-    value = azurerm_kubernetes_cluster.aks_cluster.fqdn
+  value = azurerm_kubernetes_cluster.aks_cluster.fqdn
 }
 
 # Null resource to handle role assignments and credential retrieval
 resource "null_resource" "aks_role_assignments" {
   provisioner "local-exec" {
-    command = <<EOT
+    command     = <<EOT
       # Retrieve agent pool client ID
       AGENT_POOL_ID=$(az aks show --name ${var.cluster_name} --resource-group ${var.resource_group} --query "identityProfile.kubeletidentity.clientId" --output tsv)
 

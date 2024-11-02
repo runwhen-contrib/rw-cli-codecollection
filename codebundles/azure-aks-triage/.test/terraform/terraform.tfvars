@@ -1,5 +1,5 @@
 resource_group = "azure-aks"
-cluster_name = "aks-cl-1"
+cluster_name   = "aks-cl-1"
 location       = "East US"
 tags = {
   "env" : "test",

@@ -2,6 +2,7 @@
 
 # Input variables for subscription ID, cluster name, and resource group
 subscription=$(az account show --query "id" -o tsv)
+issues_json='{"issues": []}'
 
 # Get cluster details
 CLUSTER_DETAILS=$(az aks show --name "$AKS_CLUSTER" --resource-group "$AZ_RESOURCE_GROUP" -o json)
@@ -21,8 +22,7 @@ LOAD_BALANCER_SKU=$(echo "$CLUSTER_DETAILS" | jq -r '.networkProfile.loadBalance
 
 # Share raw output
 echo "-------Raw Cluster Details--------"
-echo $echo $CLUSTER_DETAILS | jq . 
-
+echo "$CLUSTER_DETAILS" | jq .
 
 # Checks and outputs
 echo "-------Configuration Summary--------"
@@ -37,18 +37,48 @@ echo "Private Cluster: $PRIVATE_CLUSTER"
 echo "RBAC Enabled: $RBAC_ENABLED"
 echo "Load Balancer SKU: $LOAD_BALANCER_SKU"
 
+# Add an issue if provisioning failed
+if [ "$PROVISIONING_STATE" != "Succeeded" ]; then
+    issues_json=$(echo "$issues_json" | jq \
+        --arg title "Provisioning Failure" \
+        --arg nextStep "Check the provisioning details and troubleshoot failures in the Azure Portal." \
+        --arg severity "1" \
+        --arg details "Provisioning state: $PROVISIONING_STATE" \
+        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
+    )
+    echo "Issue Detected: Provisioning has failed."
+fi
+
 # Check for diagnostics settings
 DIAGNOSTIC_SETTINGS=$(az monitor diagnostic-settings list --resource "$ID" -o json | jq 'length')
 if [ "$DIAGNOSTIC_SETTINGS" -gt 0 ]; then
     echo "Diagnostics settings are enabled."
 else
     echo "Diagnostics settings are not enabled."
+    issues_json=$(echo "$issues_json" | jq \
+        --arg title "Diagnostics Settings Missing" \
+        --arg nextStep "Enable diagnostics settings in the Azure Portal to capture logs and metrics." \
+        --arg severity "4" \
+        --arg details "Diagnostics settings are not configured for this resource." \
+        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
+    )
 fi
 
-# Additional checks (example): Check if any node pools have autoscaling disabled
+# Check if any node pools have autoscaling disabled
 AUTOSCALING_DISABLED_COUNT=$(echo "$CLUSTER_DETAILS" | jq '[.agentPoolProfiles[] | select(.enableAutoScaling == null)] | length')
 if [ "$AUTOSCALING_DISABLED_COUNT" -gt 0 ]; then
     echo "$AUTOSCALING_DISABLED_COUNT node pools do not have autoscaling enabled."
+    issues_json=$(echo "$issues_json" | jq \
+        --arg title "Autoscaling Disabled in Node Pools" \
+        --arg nextStep "Enable autoscaling on all node pools for better resource management." \
+        --arg severity "3" \
+        --arg details "$AUTOSCALING_DISABLED_COUNT node pools have autoscaling disabled." \
+        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
+    )
 else
     echo "All node pools have autoscaling enabled."
 fi
+
+# Print final issues JSON object
+echo "-------Identified Issues--------"
+echo "$issues_json" | jq . > 

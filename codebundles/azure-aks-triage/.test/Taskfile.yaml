@@ -15,6 +15,11 @@ tasks:
       - task: delete-slxs
       - task: clean-rwl-discovery
 
+  build-infra: 
+    desc: "Build test infrastructure"
+    cmds: 
+      - task: build-terraform-infra
+
   check-unpushed-commits:
     desc: Check if outstanding commits or file updates need to be pushed before testing. 
     vars:
@@ -248,6 +253,14 @@ tasks:
     desc: "Check if Terraform has any deployed infrastructure in the terraform subdirectory"
     cmds:
       - |
+        # Source Envs for Auth
+        source /workspace/codecollection-devtools/auth/terraform-azure
+
+        # Set Additional env
+        export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)
+        export TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
+        export TF_VAR_tenant_id=$AZ_TENANT_ID
+
         # Navigate to the Terraform directory
         if [ ! -d "terraform" ]; then
           echo "Terraform directory not found."
@@ -275,10 +288,46 @@ tasks:
         fi
     silent: true
 
+  build-terraform-infra:
+    desc: "Run terraform apply"
+    cmds:
+      - |
+        # Source Envs for Auth
+        source /workspace/codecollection-devtools/auth/terraform-azure
+
+        # Set Additional env
+        export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)
+        export TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
+        export TF_VAR_tenant_id=$AZ_TENANT_ID
+
+        # Navigate to the Terraform directory
+        if [ -d "terraform" ]; then
+          cd terraform
+        else
+          echo "Terraform directory not found. Terraform apply aborted."
+          exit 1
+        fi
+        task format-and-init-terraform
+        echo "Starting Terraform Build of Terraform infrastructure..."
+        terraform apply -auto-approve || {
+          echo "Failed to clean up Terraform infrastructure."
+          exit 1
+        }
+        echo "Terraform infrastructure build completed."
+    silent: true
+
   cleanup-terraform-infra:
     desc: "Cleanup deployed Terraform infrastructure"
     cmds:
       - |
+        # Source Envs for Auth
+        source /workspace/codecollection-devtools/auth/terraform-azure
+
+        # Set Additional env
+        export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)
+        export TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
+        export TF_VAR_tenant_id=$AZ_TENANT_ID
+        
         # Navigate to the Terraform directory
         if [ -d "terraform" ]; then
           cd terraform

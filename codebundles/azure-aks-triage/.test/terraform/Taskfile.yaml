@@ -25,6 +25,12 @@ tasks:
       - find . -type d -name .terraform -exec rm -rf {} +
       - find . -type f -name .terraform.lock.hcl -delete
 
+  format-and-init-terraform:
+    desc: Run Terraform fmt and init
+    cmds: 
+    - |
+      terraform fmt
+      terraform init
   test-terraform:
     desc: Run tests for all terraform directories.
     silent: true
@@ -41,7 +47,6 @@ tasks:
         for d in $DIRECTORIES; do 
           cd $d
           echo "${BOLD}$PWD:${NORM}"
-
           if ! terraform fmt -check=true -list=false -recursive=false; then
             echo "  ✗ terraform fmt" && exit 1
           else
