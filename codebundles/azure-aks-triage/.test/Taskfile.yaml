@@ -1,4 +1,4 @@
-version: '3'
+version: "3"
 
 tasks:
   default:
@@ -8,20 +8,20 @@ tasks:
       - task: generate-rwl-config
       - task: run-rwl-discovery
 
-  clean: 
+  clean:
     desc: "Run cleanup tasks"
-    cmds: 
+    cmds:
       - task: check-and-cleanup-terraform
       - task: delete-slxs
       - task: clean-rwl-discovery
 
-  build-infra: 
+  build-infra:
     desc: "Build test infrastructure"
-    cmds: 
+    cmds:
       - task: build-terraform-infra
 
   check-unpushed-commits:
-    desc: Check if outstanding commits or file updates need to be pushed before testing. 
+    desc: Check if outstanding commits or file updates need to be pushed before testing.
     vars:
       # Specify the base directory relative to your Taskfile location
       BASE_DIR: "../"
@@ -60,18 +60,18 @@ tasks:
     silent: true
   generate-rwl-config:
     desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
-    env: 
-      ARM_SUBSCRIPTION_ID: '{{.ARM_SUBSCRIPTION_ID}}'
-      AZ_TENANT_ID: '{{.AZ_TENANT_ID}}'
-      AZ_CLIENT_SECRET: '{{.AZ_CLIENT_SECRET}}'
-      AZ_CLIENT_ID: '{{.AZ_CLIENT_ID}}'
-      RW_WORKSPACE: '{{.RW_WORKSPACE}}'
+    env:
+      ARM_SUBSCRIPTION_ID: "{{.ARM_SUBSCRIPTION_ID}}"
+      AZ_TENANT_ID: "{{.AZ_TENANT_ID}}"
+      AZ_CLIENT_SECRET: "{{.AZ_CLIENT_SECRET}}"
+      AZ_CLIENT_ID: "{{.AZ_CLIENT_ID}}"
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
     cmds:
       - |
         repo_url=$(git config --get remote.origin.url)
         branch_name=$(git rev-parse --abbrev-ref HEAD)
         codebundle=$(basename "$(dirname "$PWD")")
-        
+
         # Fetch individual cluster details from Terraform state
         pushd terraform > /dev/null
         cluster_name=$(terraform show -json terraform.tfstate | jq -r '
@@ -175,13 +175,38 @@ tasks:
         rm -rf "$temp_dir"
     silent: true
 
+  check-rwp-config:
+    desc: Check if env vars are set for RunWhen Platform
+    cmds:
+      - |
+        missing_vars=()
+
+        if [ -z "$RW_WORKSPACE" ]; then
+          missing_vars+=("RW_WORKSPACE")
+        fi
+
+        if [ -z "$RW_API_URL" ]; then
+          missing_vars+=("RW_API_URL")
+        fi
+
+        if [ -z "$RW_PAT" ]; then
+          missing_vars+=("RW_PAT")
+        fi
+
+        if [ ${#missing_vars[@]} -ne 0 ]; then
+          echo "The following required environment variables are missing: ${missing_vars[*]}"
+          exit 1
+        fi
+    silent: true
+
   upload-slxs:
     desc: "Upload SLX files to the appropriate URL"
-    env: 
-      RW_WORKSPACE: '{{.RW_WORKSPACE}}'
-      RW_API_URL: '{{.RW_API}}'
-      RW_PAT: '{{.RW_PAT}}'
+    env:
+      RW_WORKSPACE: "{{.RW_WORKSPACE}}"
+      RW_API_URL: "{{.RW_API}}"
+      RW_PAT: "{{.RW_PAT}}"
     cmds:
+      - task: check-rwp-config
       - |
         BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
         if [ ! -d "$BASE_DIR" ]; then
@@ -219,10 +244,11 @@ tasks:
   delete-slxs:
     desc: "Delete SLX objects from the appropriate URL"
     env:
-      RW_WORKSPACE: '{{.RW_WORKSPACE}}'
-      RW_API_URL: '{{.RW_API}}'
-      RW_PAT: '{{.RW_PAT}}'
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+      RW_API_URL: "{{.RW_API}}"
+      RW_PAT: "{{.RW_PAT}}"
     cmds:
+      - task: check-rwp-config
       - |
         BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
         if [ ! -d "$BASE_DIR" ]; then
@@ -327,7 +353,7 @@ tasks:
         export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)
         export TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
         export TF_VAR_tenant_id=$AZ_TENANT_ID
-        
+
         # Navigate to the Terraform directory
         if [ -d "terraform" ]; then
           cd terraform
@@ -350,7 +376,7 @@ tasks:
       - |
         # Capture the output of check-terraform-infra
         infra_output=$(task check-terraform-infra | tee /dev/tty)
-        
+
         # Check if output contains indication of deployed infrastructure
         if echo "$infra_output" | grep -q "Deployed infrastructure detected"; then
           echo "Infrastructure detected; proceeding with cleanup."
@@ -367,4 +393,3 @@ tasks:
         sudo rm -rf output
         rm workspaceInfo.yaml
     silent: true
-
