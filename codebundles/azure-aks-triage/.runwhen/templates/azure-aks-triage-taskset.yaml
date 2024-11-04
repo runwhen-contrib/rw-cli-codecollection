@@ -24,8 +24,10 @@ spec:
   configProvided:
     - name: AZ_RESOURCE_GROUP
       value: {{resource_group.name}}
-    - name: API
+    - name: AKS_CLUSTER
       value: {{match_resource.resource.name}}
+    - name: TIME_PERIOD_MINUTES
+      value: 60
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}

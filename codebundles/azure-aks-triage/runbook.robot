@@ -22,6 +22,8 @@ Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resou
     ...    timeout_seconds=180
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
+    RW.Core.Add Pre To Report    ${resource_health.stdout}
+
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/az_resource_health.json
     ...    env=${env}
@@ -33,25 +35,41 @@ Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resou
         ...    severity=2
         ...    expected=Azure resources should be available for AKS Cluster `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
         ...    actual=Azure resources are unhealthy for AKS Cluster `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
-        ...    title= ${issue_list["properties"]["title"]}
+        ...    title=Azure reports an `${issue_list["properties"]["title"]}` Issue for AKS Cluster `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
         ...    reproduce_hint=${resource_health.cmd}
         ...    details=${issue_list}
         ...    next_steps=Please escalate to the Azure service owner or check back later.
     END
-    RW.Core.Add Pre To Report    ${resource_health.stdout}
 
 Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
-   [Documentation]    Fetch the config of the AKS cluster in azure
-   [Tags]    AKS    config
-   ${config}=    RW.CLI.Run Bash File
-   ...    bash_file=aks_cluster_health.sh
-   ...    env=${env}
-   ...    timeout_seconds=180
-   ...    include_in_history=false
-   ...    show_in_rwl_cheatsheet=true
-   RW.Core.Add Pre To Report    ${config.stdout}
+    [Documentation]    Fetch the config of the AKS cluster in azure
+    [Tags]    AKS    config
+    ${config}=    RW.CLI.Run Bash File
+    ...    bash_file=aks_cluster_health.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    RW.Core.Add Pre To Report    ${config.stdout}
 
-
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/az_cluster_health.json
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            RW.Core.Add Issue    
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_step"]}
+            ...    expected=AKS Cluster `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has no Warning/Error/Critical activities
+            ...    actual=AKS Cluster `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has Warning/Error/Critical activities
+            ...    reproduce_hint=${activites.cmd}
+            ...    details=${item["details"]}        
+        END
+    END
 Check Network Configuration of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
    [Documentation]    Fetch the network configuration, generating resource URLs and basic recommendations
    [Tags]    AKS    config    network    route    firewall
@@ -74,7 +92,7 @@ Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOUR
 
     RW.Core.Add Pre To Report    ${activites.stdout}
 
-    ${issues}=    RW.CLI.Run Cli    cmd=cat ${OUTPUT DIR}/issues.json 
+    ${issues}=    RW.CLI.Run Cli    cmd=cat ${OUTPUT DIR}/aks_activities_issues.json
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}

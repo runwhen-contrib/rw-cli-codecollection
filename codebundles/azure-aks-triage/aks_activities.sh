@@ -86,4 +86,4 @@ for level in "${!log_levels[@]}"; do
 done
 
 # Save the structured JSON data to issues.json
-echo "$issues_json" > "$OUTPUT_DIR/issues.json"
+echo "$issues_json" > "$OUTPUT_DIR/aks_activities_issues.json"

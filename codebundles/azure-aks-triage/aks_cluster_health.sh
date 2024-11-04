@@ -79,6 +79,5 @@ else
     echo "All node pools have autoscaling enabled."
 fi
 
-# Print final issues JSON object
-echo "-------Identified Issues--------"
-echo "$issues_json" | jq . > 
+# Dump the issues into a json list for processing
+echo "$issues_json" > "$OUTPUT_DIR/az_cluster_health.json"
