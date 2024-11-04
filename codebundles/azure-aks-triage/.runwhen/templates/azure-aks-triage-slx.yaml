@@ -9,13 +9,13 @@ metadata:
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/containers/10023-icon-service-Kubernetes-Services.svg
   alias: "AKS Cluster Health"
-  asMeasuredBy: "Querying the Azure AKS health for incidents or critical activities."
+  asMeasuredBy: "As scored by upstream Azure resource health, critical or error activities, and configuration health. 1=Health, 0=Unhealthy"
   configProvided:
     - name: SLX_PLACEHOLDER
       value: SLX_PLACEHOLDER
   owners:
     - {{ workspace.owner_email }}
-  statement: AKS Clusters should not have CRITICAL or ERROR events.
+  statement: AKS Clusters should be in a healthy state. 
   additionalContext:
     tags: "{{match_resource.tags}}"
     qualified_name: "{{ match_resource.qualified_name }}"

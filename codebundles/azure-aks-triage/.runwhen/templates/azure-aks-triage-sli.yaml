@@ -11,7 +11,7 @@ spec:
   displayUnitsShort: ok
   locations:
     - {{default_location}}
-  description: Measures the health of a Azure API Management service.
+  description: Score the health of a Azure AKS Cluster (1=Healthy, 0=Unhealthy) 
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
