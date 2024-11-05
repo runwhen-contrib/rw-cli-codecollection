@@ -44,7 +44,7 @@ Fetch VM Scale Set `${VMSCALESET}` Config In Resource Group `${AZ_RESOURCE_GROUP
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${process.stdout}
 
-Scan VM Scale Set `${VMSCALESET}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
+Fetch Activities for VM Scale Set `${VMSCALESET}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events for the scaled set and checks for errors
     [Tags]    VM    Scale Set    monitor    events    errors
     ${process}=    RW.CLI.Run Bash File
