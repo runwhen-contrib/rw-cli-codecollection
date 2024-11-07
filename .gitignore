@@ -44,3 +44,4 @@ build
 **kubeconfig**
 **/.test/output/
 **/.test/.task/**
+.vscode/settings.json
