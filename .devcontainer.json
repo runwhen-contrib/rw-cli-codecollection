@@ -3,20 +3,17 @@
     "shutdownAction": "none",
     "build": { "dockerfile": "Dockerfile" },
     "updateRemoteUserUID": false,
-    // "remoteUser": "python",
     "overrideCommand": false,
     "runArgs": [
         "-p",
         "3000:3000",
         "--name",
-        "mycodecollection",
-        "-v",
-        "./:/app/codecollection/:z"
+        "rw-cli-codecollection"
     ],
     "forwardPorts": [
         3000
     ],
-    "workspaceFolder": "/app/",
+    "workspaceFolder": "/home/runwhen/codecollection/",
     // Configure tool-specific properties.
     "customizations": {
         // Configure properties specific to VS Code.
@@ -27,39 +24,35 @@
                 "ms-python.pylint",
                 "ms-python.black-formatter",
                 "ms-python.python",
-                "njpwerner.autodocstring",
-                "timonwong.shellcheck"
+                "njpwerner.autodocstring"
             ],
             "settings": {
-                // "python.languageServer": "Jedi", disabling for now due to conflict
+                "python.languageServer": "Jedi",
                 "python.linting.enabled": true,
-                "pylint.interpreter": [
-                    "/usr/local/bin/python"
-                ],
-                "pylint.args": [
+                "python.linting.pylintEnabled": true,
+                "python.linting.pylintArgs": [
                     "--max-line-length=120",
                     "--enable=W0614" // track unused imports
                 ],
                 "[python]": {
-                    "editor.defaultFormatter": "ms-python.black-formatter",
                     "editor.insertSpaces": true,
                     "editor.tabSize": 4
                 },
                 "editor.formatOnSave": true,
                 "editor.lineNumbers": "on",
-                "black-formatter.args": [
+                "python.formatting.provider": "black",
+                "python.formatting.blackArgs": [
                     "--line-length",
                     "120"
                 ],
-                "black-formatter.interpreter": [
-                    "/usr/local/bin/python"
-                ],
                 "robot.language-server.python": "/usr/local/bin/python",
                 "robot.pythonpath": [
-                    "/app",
-                    "/app/codecollection/libraries",
-                    "/app/codecollection/libraries/RW",
-                    "/app/dev_facade"
+                    "/home/runwhen",
+                    "/home/runwhen/rw-public-codecollection/libraries",
+                    "/home/runwhen/rw-public-codecollection/libraries/RW",
+                    "/home/runwhen/codecollection/libraries",
+                    "/home/runwhen/codecollection/libraries/RW",
+                    "/home/runwhen/dev_facade"
                 ]
             }
         }

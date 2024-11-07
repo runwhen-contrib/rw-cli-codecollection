@@ -1,39 +1,33 @@
 FROM us-docker.pkg.dev/runwhen-nonprod-shared/public-images/codecollection-devtools:latest
-
 USER root
 
-RUN mkdir /app/codecollection
-COPY . /app/codecollection
+ENV RUNWHEN_HOME=/home/runwhen
+ENV PATH "$PATH:/usr/local/bin:/home/runwhen/.local/bin"
 
-RUN pip install -r /app/codecollection/requirements.txt
+# Set up directories and permissions
+RUN mkdir -p $RUNWHEN_HOME/codecollection
+WORKDIR $RUNWHEN_HOME/codecollection
 
-# Install packages
-RUN apt-get update && \
-    apt install -y git bc dnsutils shellcheck && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    rm -rf /var/cache/apt
+# Copy files into container with correct ownership
+COPY --chown=runwhen:0 . .
 
-# install aws cli
-RUN apt-get update && \
-    apt-get install -y groff mandoc less && \
-    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
-    unzip awscliv2.zip && \
-    ./aws/install && \
-    rm awscliv2.zip && \
-    rm -rf ./aws && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# Check and install requirements if requirements.txt exists
+RUN if [ -f "requirements.txt" ]; then pip install --no-cache-dir -r requirements.txt; else echo "requirements.txt not found, skipping pip install"; fi
 
-# Install az cli
-RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+# Install additional user packages
+#RUN apt-get update && \
+#    apt-get install -y --no-install-recommends net-tools && \
+#    apt-get clean && \
+#    rm -rRUN az extension add --name application-insights
 RUN az extension add --name application-insights
 
+# Add runwhen user to sudoers with no password prompt
+RUN echo "runwhen ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
-# Change the owner of all files inside /app to user and give full permissions
-RUN chown 1000:0 -R $WORKDIR
-RUN chown 1000:0 -R /app/codecollection
+# Adjust permissions for runwhen user
+RUN chown runwhen:0 -R $RUNWHEN_HOME/codecollection
 
-# Set the user to $USER
-ENV USER "python"
-USER python
+
+
+# Switch to runwhen user
+USER runwhen
