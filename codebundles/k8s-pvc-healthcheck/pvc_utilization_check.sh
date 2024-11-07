@@ -5,36 +5,22 @@ recommendations=""
 
 convert_to_gigabytes() {
     size=$1
-
-    # Extract the number and the unit (e.g., 10Gi, 1Ti)
     number=$(echo $size | sed -E 's/([0-9]+(\.[0-9]+)?).*/\1/')
     unit=$(echo $size | sed -E 's/[0-9]+(\.[0-9]+)?(.*)/\2/')
 
-    # Convert to gigabytes based on the unit
     case $unit in
-        Gi)
-            echo $number
-            ;;
-        Ti)
-            echo $(awk "BEGIN {print $number * 1024}")
-            ;;
-        Pi)
-            echo $(awk "BEGIN {print $number * 1024 * 1024}")
-            ;;
-        *)
-            echo "0"
-            ;;
+        Gi) echo $number ;;
+        Ti) echo $(awk "BEGIN {print $number * 1024}") ;;
+        Pi) echo $(awk "BEGIN {print $number * 1024 * 1024}") ;;
+        *) echo "0" ;;
     esac
 }
 
 calculate_recommendation() {
     current_size=$1
     utilization=$2
-
-    # Convert size to GB
     size_in_gb=$(convert_to_gigabytes $current_size)
 
-    # Ensure the size is a number
     if ! [[ $size_in_gb =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
         echo "0"
         return
@@ -43,7 +29,6 @@ calculate_recommendation() {
     recommended_size=0
     severity=""
 
-    # Calculate the recommended size and assign severity based on utilization
     if [ "$utilization" -ge 100 ]; then
         recommended_size=$(awk "BEGIN {print int(2 * $size_in_gb + 0.5)}")
         severity="1"
@@ -58,46 +43,46 @@ calculate_recommendation() {
         severity="4"
     fi
 
-    # Output the recommended size and severity
     echo "$recommended_size $severity"
 }
 
 # Loop over all running pods in the specified namespace and context
-for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.spec.volumes[]?.persistentVolumeClaim) | select(.status.phase=="Running") | .metadata.name'); do
-    # Get the entire JSON of the pod
+for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.spec.volumes[]?.persistentVolumeClaim) | .metadata.name'); do
+    pod_phase=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.status.phase')
+
+    # Check if the pod is not in the "Running" phase
+    if [ "$pod_phase" != "Running" ]; then
+        recommendation="{ \"pod\": \"$pod\", \"recommended_action\": \"Investigate pod status for $pod as it is currently not running.\" }"
+        recommendations="${recommendations:+$recommendations, }$recommendation"
+        continue
+    fi
+
     pod_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o json)
 
-    # Loop over all PVCs used by the pod
     for pvc in $(echo "$pod_json" | jq -r '.spec.volumes[] | select(has("persistentVolumeClaim")) | .persistentVolumeClaim.claimName'); do
-        # Get the volume name associated with the PVC
         volumeName=$(echo "$pod_json" | jq -r --arg pvcName "$pvc" '.spec.volumes[] | select(.persistentVolumeClaim.claimName == $pvcName) | .name')
-
-        # Get the first mount path and container name associated with the volume
         mountPath=$(echo "$pod_json" | jq -r --arg vol "$volumeName" '.spec.containers[].volumeMounts[] | select(.name == $vol) | .mountPath' | head -n 1)
         containerName=$(echo "$pod_json" | jq -r --arg vol "$volumeName" '.spec.containers[] | select(.volumeMounts[].name == $vol) | .name' | head -n 1)
 
-        # Get disk usage
-        disk_usage=$(${KUBERNETES_DISTRIBUTION_BINARY} exec $pod -n ${NAMESPACE} --context ${CONTEXT} -c $containerName -- df -h $mountPath | awk 'NR==2 {print $5}' | sed 's/%//')
-        disk_size=$(${KUBERNETES_DISTRIBUTION_BINARY} get pvc $pvc -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.status.capacity.storage')
+        # Attempt to get disk usage, add recommendation if it fails
+        disk_usage=$(${KUBERNETES_DISTRIBUTION_BINARY} exec $pod -n ${NAMESPACE} --context ${CONTEXT} -c $containerName -- df -h $mountPath 2>/dev/null | awk 'NR==2 {print $5}' | sed 's/%//')
+        if [ $? -ne 0 ] || [ -z "$disk_usage" ]; then
+            recommendation="{ \"pvc_name\":\"$pvc\", \"pod\": \"$pod\", \"volume_name\": \"$volumeName\", \"container_name\": \"$containerName\", \"mount_path\": \"$mountPath\", \"recommended_action\": \"Investigate pod $pod or PVC $pvc: unable to retrieve disk utilization.\" }"
+            recommendations="${recommendations:+$recommendations, }$recommendation"
+            continue
+        fi
 
-        # Calculate recommendation and severity
+        disk_size=$(${KUBERNETES_DISTRIBUTION_BINARY} get pvc $pvc -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.status.capacity.storage')
         recommendation_info=$(calculate_recommendation $disk_size $disk_usage)
         recommended_new_size=$(echo $recommendation_info | cut -d' ' -f1)
         severity=$(echo $recommendation_info | cut -d' ' -f2)
 
         if [ $recommended_new_size -ne 0 ]; then
-            # Format the recommendation as JSON
             recommendation="{ \"pvc_name\":\"$pvc\", \"pod\": \"$pod\", \"volume_name\": \"$volumeName\", \"container_name\": \"$containerName\", \"mount_path\": \"$mountPath\", \"current_size\": \"$disk_size\", \"usage\": \"$disk_usage%\", \"recommended_size\": \"${recommended_new_size}Gi\", \"severity\": \"$severity\" }"
-            # Add the recommendation to the array
-            if [ -z "$recommendations" ]; then
-                recommendations="$recommendation"
-            else
-                recommendations="$recommendations, $recommendation"
-            fi
+            recommendations="${recommendations:+$recommendations, }$recommendation"
         fi
     done
 done
-
 
 # Outputting recommendations as JSON
 if [ -n "$recommendations" ]; then
