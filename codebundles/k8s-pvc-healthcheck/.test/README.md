@@ -9,7 +9,7 @@ gcloud auth login
 
 export KUBERNETES_DISTRIBUTION_BINARY="kubectl"
 export CONTEXT="sandbox-cluster-1"
-export NAMESPACE="acme-fitness"
+export NAMESPACE="test-fill-volume"
 export RW_FROM_FILE='{"kubeconfig":"/home/runwhen/auth/kubeconfig"}'
 export KUBECONFIG="/home/runwhen/auth/kubeconfig"
 ```

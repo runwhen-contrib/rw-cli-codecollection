@@ -160,12 +160,12 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
             FOR    ${item}    IN    @{pvc_recommendation_list}
                 RW.Core.Add Issue
                 ...    severity=${item["severity"]}
-                ...    expected=PVCs should be less than 85% utilized for Namespace `${NAMESPACE}`
-                ...    actual=PVC utilization is ${item["usage"]} Namespace `${NAMESPACE}`
-                ...    title=PVC Storage Utilization is at ${item["usage"]} in `${NAMESPACE}`
+                ...    expected=PVCs are healthy and have free space in Namespace `${NAMESPACE}`
+                ...    actual=PVC issues exist in Namespace `${NAMESPACE}`
+                ...    title=${item["title"]} in `${NAMESPACE}`
                 ...    reproduce_hint=${pod_pvc_utilization.cmd}
-                ...    details=Found excessive PVC utilization for ${item["pvc_name"]}:\n${item}
-                ...    next_steps=Expand Persistent Volume Claim \`${item["pvc_name"]}\` in Namespace \`${NAMESPACE}\` to ${item["recommended_size"]}
+                ...    details=${item}
+                ...    next_steps=${item["next_steps"]}
             END
         END
     END    

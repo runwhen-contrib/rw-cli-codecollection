@@ -46,13 +46,38 @@ calculate_recommendation() {
     echo "$recommended_size $severity"
 }
 
+get_top_level_owner() {
+    # Start with the pod's immediate owner reference
+    resource_kind=$1
+    resource_name=$2
+
+    while [ "$resource_kind" == "ReplicaSet" ]; do
+        # Fetch the ReplicaSet's owner reference
+        owner_info=$(${KUBERNETES_DISTRIBUTION_BINARY} get replicaset $resource_name -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.metadata.ownerReferences[0] | "\(.kind)/\(.name)"')
+        resource_kind=$(echo "$owner_info" | cut -d'/' -f1)
+        resource_name=$(echo "$owner_info" | cut -d'/' -f2)
+    done
+
+    echo "$resource_kind/$resource_name"
+}
+
 # Loop over all running pods in the specified namespace and context
 for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.spec.volumes[]?.persistentVolumeClaim) | .metadata.name'); do
     pod_phase=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.status.phase')
 
+    # Retrieve the pod's immediate owner reference (likely a ReplicaSet)
+    initial_owner_info=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.metadata.ownerReferences[0] | "\(.kind)/\(.name)"')
+    initial_owner_kind=$(echo "$initial_owner_info" | cut -d'/' -f1)
+    initial_owner_name=$(echo "$initial_owner_info" | cut -d'/' -f2)
+
+    # Follow the chain to get the top-level owner (Deployment, StatefulSet, etc.)
+    top_level_owner=$(get_top_level_owner "$initial_owner_kind" "$initial_owner_name")
+    top_level_owner_kind=$(echo "$top_level_owner" | cut -d'/' -f1)
+    top_level_owner_name=$(echo "$top_level_owner" | cut -d'/' -f2)
+
     # Check if the pod is not in the "Running" phase
     if [ "$pod_phase" != "Running" ]; then
-        recommendation="{ \"pod\": \"$pod\", \"recommended_action\": \"Investigate pod status for $pod as it is currently not running.\" }"
+        recommendation="{ \"pod\": \"$pod\", \"owner_kind\": \"$top_level_owner_kind\", \"owner_name\": \"$top_level_owner_name\", \"next_steps\": \"Check $top_level_owner_kind \`$top_level_owner_name\` health\nInspect Pending Pods In Namespace \`$NAMESPACE\`\", \"title\": \"Pod `$pod` with PVC is running\", \"details\": \"Pod $pod, owned by $top_level_owner_kind $top_level_owner_name, is not in a running state.\", \"severity\": \"2\" }"
         recommendations="${recommendations:+$recommendations, }$recommendation"
         continue
     fi
@@ -67,7 +92,7 @@ for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} --contex
         # Attempt to get disk usage, add recommendation if it fails
         disk_usage=$(${KUBERNETES_DISTRIBUTION_BINARY} exec $pod -n ${NAMESPACE} --context ${CONTEXT} -c $containerName -- df -h $mountPath 2>/dev/null | awk 'NR==2 {print $5}' | sed 's/%//')
         if [ $? -ne 0 ] || [ -z "$disk_usage" ]; then
-            recommendation="{ \"pvc_name\":\"$pvc\", \"pod\": \"$pod\", \"volume_name\": \"$volumeName\", \"container_name\": \"$containerName\", \"mount_path\": \"$mountPath\", \"recommended_action\": \"Investigate pod $pod or PVC $pvc: unable to retrieve disk utilization.\" }"
+            recommendation="{ \"pvc_name\":\"$pvc\", \"pod\": \"$pod\", \"owner_kind\": \"$top_level_owner_kind\", \"owner_name\": \"$top_level_owner_name\", \"volume_name\": \"$volumeName\", \"container_name\": \"$containerName\", \"mount_path\": \"$mountPath\", \"next_steps\": \"Investigate $top_level_owner_kind or PVC $pvc: unable to retrieve disk utilization.\", \"title\": \"Disk Utilization Check Failed for $pvc\", \"details\": \"Unable to retrieve disk utilization for $pvc in pod $pod, owned by $top_level_owner_kind $top_level_owner_name.\", \"severity\": \"5\" }"
             recommendations="${recommendations:+$recommendations, }$recommendation"
             continue
         fi
@@ -78,7 +103,7 @@ for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} --contex
         severity=$(echo $recommendation_info | cut -d' ' -f2)
 
         if [ $recommended_new_size -ne 0 ]; then
-            recommendation="{ \"pvc_name\":\"$pvc\", \"pod\": \"$pod\", \"volume_name\": \"$volumeName\", \"container_name\": \"$containerName\", \"mount_path\": \"$mountPath\", \"current_size\": \"$disk_size\", \"usage\": \"$disk_usage%\", \"recommended_size\": \"${recommended_new_size}Gi\", \"severity\": \"$severity\" }"
+            recommendation="{ \"pvc_name\":\"$pvc\", \"pod\": \"$pod\", \"owner_kind\": \"$top_level_owner_kind\", \"owner_name\": \"$top_level_owner_name\", \"volume_name\": \"$volumeName\", \"container_name\": \"$containerName\", \"mount_path\": \"$mountPath\", \"current_size\": \"$disk_size\", \"usage\": \"$disk_usage%\", \"recommended_size\": \"${recommended_new_size}Gi\", \"severity\": \"$severity\", \"title\": \"High Utilization on PVC $pvc\", \"details\": \"Current size: $disk_size, Utilization: ${disk_usage}%, Recommended new size: ${recommended_new_size}Gi. Owned by $top_level_owner_kind $top_level_owner_name.\", \"next_steps\": \"Expand PVC $pvc to ${recommended_new_size}Gi.\" }"
             recommendations="${recommendations:+$recommendations, }$recommendation"
         fi
     done
