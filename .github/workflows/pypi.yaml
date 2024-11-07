@@ -40,6 +40,6 @@ jobs:
         uses: slackapi/slack-github-action@v1.19.0
         with:
           channel-id: "#codecollections" # Slack channel id or name to post message. https://api.slack.com/methods/chat.postMessage#channels
-          slack-message: "Just deployed version $VERSION of $PIP_PACKAGE_NAME to https://pypi.org/project/$PIP_PACKAGE_NAME"
+          slack-message: "Just deployed version ${{ env.VERSION }} of ${{ env.PIP_PACKAGE_NAME}}  to https://pypi.org/project/${{ env.PIP_PACKAGE_NAME }}"
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
