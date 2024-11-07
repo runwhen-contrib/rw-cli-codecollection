@@ -8,12 +8,26 @@ on:
       - VERSION
   workflow_dispatch:
 
+env: 
+  PIP_PACKAGE_NAME: rw-cli-keywords
+
 jobs:
   publish-pypi:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+      - name: Get version
+        run: |-
+          if [[ -s VERSION ]]; then
+            VERSION=$(cat VERSION)
+            echo "VERSION=$VERSION" >> $GITHUB_ENV
+            echo "VERSION extracted: $VERSION"
+          else
+            echo "VERSION file is missing or empty" >&2
+            exit 1
+          fi
+
       - name: Build Package
         run: |-
           pip install setuptools wheel twine
@@ -22,3 +36,10 @@ jobs:
       - name: Publish
         run: |-
           twine upload dist/* -u __token__ -p ${{ secrets.PYPI_TOKEN }}
+      - name: Notify Slack of pip update
+        uses: slackapi/slack-github-action@v1.19.0
+        with:
+          channel-id: "#codecollections" # Slack channel id or name to post message. https://api.slack.com/methods/chat.postMessage#channels
+          slack-message: "Just deployed version $VERSION of $PIP_PACKAGE_NAME to https://pypi.org/project/$PIP_PACKAGE_NAME"
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
