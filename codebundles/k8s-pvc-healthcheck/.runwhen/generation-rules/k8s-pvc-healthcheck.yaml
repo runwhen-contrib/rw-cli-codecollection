@@ -16,5 +16,6 @@ spec:
       baseTemplateName: k8s-pvc-healthcheck
       outputItems:
         - type: slx
+        - type: sli
         - type: runbook
           templateName: k8s-pvc-healthcheck-taskset.yaml
