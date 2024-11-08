@@ -276,4 +276,5 @@ tasks:
       - |
         sudo rm -rf output
         rm workspaceInfo.yaml
+        rm kubeconfig
     silent: true

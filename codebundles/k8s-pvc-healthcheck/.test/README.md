@@ -7,14 +7,20 @@ For quick testing purposes, a simple namespace and manifest has been included in
 Environment Variables: 
 
 ```
+# Login with auth provider - only needed if kubeconfig does not have permissions to create test infrastructure
 gcloud auth login
 
+# Set Namespace to the one used in the test manifest
+namespace=$(yq e 'select(.kind == "Namespace") | .metadata.name' kubernetes/mainfest.yaml -N)
+
+
+# Set Variables for SLI/TaskSet Testing
 export KUBERNETES_DISTRIBUTION_BINARY="kubectl"
 export CONTEXT="sandbox-cluster-1"
-export NAMESPACE="test-fill-volume"
+export NAMESPACE="$namespace"
 export RW_FROM_FILE='{"kubeconfig":"/home/runwhen/auth/kubeconfig"}'
-export KUBECONFIG="/home/runwhen/auth/kubeconfig"
 
+# Set RunWhen Platform Test Variables
 export RW_PAT=[]
 export RW_WORKSPACE=[]
 export RW_API_URL=[]
@@ -25,18 +31,15 @@ Certain test scenarios can be manually involked (or added to the Taskfile as des
 
 - Fill up the PVC to 90%
 ```
-namespace=$(yq e 'select(.kind == "Namespace") | .metadata.name' kubernetes/mainfest.yaml -N)
 kubectl exec deploy/test-deployment -n $namespace -- dd if=/dev/zero of=/data/testfile bs=1M count=900 
 ```
 
 - Reset to 0%
 ```
-namespace=$(yq e 'select(.kind == "Namespace") | .metadata.name' kubernetes/mainfest.yaml -N)
 kubectl exec deploy/test-deployment -n $namespace -- rm /data/testfile 
 ```
 
 - Fill it up to 100% and cause CrashLoopBackoff
 ```
-namespace=$(yq e 'select(.kind == "Namespace") | .metadata.name' kubernetes/mainfest.yaml -N)
 kubectl exec deploy/test-deployment -n $namespace -- dd if=/dev/zero of=/data/testfile bs=1M count=1024 
 ```
