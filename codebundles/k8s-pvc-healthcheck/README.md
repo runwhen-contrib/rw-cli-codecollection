@@ -13,15 +13,6 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 - `CONTEXT`: The Kubernetes context to operate within.
 - `NAMESPACE`: The name of the namespace to search. Leave it blank to search in all namespaces.
 
-## SLI 
-The SLI generates an aggregate score, where: 
-- 1 = Healthy
-- 0 = Failed
-- 0 < x < 1 = Degraded
-
-Curretly, it uses - `Fetch the Storage Utilization for PVC Mounts` from the TaskSet and lowers the score if any issues arise. 
-
-
 ## TaskSet
 
 The TaskSet provides the following tasks:

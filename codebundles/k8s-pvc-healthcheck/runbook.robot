@@ -151,22 +151,24 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${pvc_recommendations}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/pvc_issues.json
+    ...    cmd=echo '${pvc_utilization_script.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
     ...    env=${env}
     ...    include_in_history=false
-    ${issue_list}=    Evaluate    json.loads(r'''${pvc_recommendations.stdout}''')    json
-    IF    len(@{issue_list}) > 0
-        FOR    ${item}    IN    @{issue_list}
-            RW.Core.Add Issue
-            ...    severity=${item["severity"]}
-            ...    expected=PVCs are healthy and have free space in Namespace `${NAMESPACE}`
-            ...    actual=PVC issues exist in Namespace `${NAMESPACE}`
-            ...    title=${item["title"]} in `${NAMESPACE}`
-            ...    reproduce_hint=${pod_pvc_utilization.cmd}
-            ...    details=${item}
-            ...    next_steps=${item["next_steps"]}
+    IF    $pvc_recommendations.stdout != ""
+        ${pvc_recommendation_list}=    Evaluate    json.loads(r'''${pvc_recommendations.stdout}''')    json
+        IF    len(@{pvc_recommendation_list}) > 0
+            FOR    ${item}    IN    @{pvc_recommendation_list}
+                RW.Core.Add Issue
+                ...    severity=${item["severity"]}
+                ...    expected=PVCs should be less than 85% utilized for Namespace `${NAMESPACE}`
+                ...    actual=PVC utilization is ${item["usage"]} Namespace `${NAMESPACE}`
+                ...    title=PVC Storage Utilization is at ${item["usage"]} in `${NAMESPACE}`
+                ...    reproduce_hint=${pod_pvc_utilization.cmd}
+                ...    details=Found excessive PVC utilization for ${item["pvc_name"]}:\n${item}
+                ...    next_steps=Expand Persistent Volume Claim \`${item["pvc_name"]}\` in Namespace \`${NAMESPACE}\` to ${item["recommended_size"]}
+            END
         END
-    END
+    END    
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of PVC storage mount utilization in ${NAMESPACE}:
     RW.Core.Add Pre To Report    ${pod_pvc_utilization.stdout}
@@ -176,7 +178,7 @@ Check for RWO Persistent Volume Node Attachment Issues in Namespace `${NAMESPACE
     [Documentation]    For each pod in a namespace, check if it has an RWO persistent volume claim and if so, validate that the pod and the pv are on the same node. 
     [Tags]    pod    storage    pvc    readwriteonce    node    persistentvolumeclaims    persistentvolumeclaim    scheduled   attachment    ${NAMESPACE}
     ${pod_rwo_node_and_pod_attachment}=    RW.CLI.Run Cli
-    ...    cmd=NAMESPACE="${NAMESPACE}"; CONTEXT="${CONTEXT}"; PODS=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n $NAMESPACE --context=$CONTEXT -o json); for pod in $(jq -r '.items[] | @base64' <<< "$PODS"); do _jq() { jq -r \${1} <<< "$(base64 --decode <<< \${pod})"; }; POD_NAME=$(_jq '.metadata.name'); [[ "$(_jq '.metadata.ownerReferences[0].kind')" == "Job" ]] && continue; POD_NODE_NAME=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o custom-columns=:.spec.nodeName --no-headers); PVC_NAMES=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o jsonpath='{.spec.volumes[*].persistentVolumeClaim.claimName}'); for pvc_name in $PVC_NAMES; do PVC=$(${KUBERNETES_DISTRIBUTION_BINARY} get pvc $pvc_name -n $NAMESPACE --context=$CONTEXT -o json); ACCESS_MODE=$(jq -r '.spec.accessModes[0]' <<< "$PVC"); if [[ "$ACCESS_MODE" == "ReadWriteOnce" ]]; then PV_NAME=$(jq -r '.spec.volumeName' <<< "$PVC"); STORAGE_NODE_NAME=$(jq -r --arg pv "$PV_NAME" '.items[] | select(.status.volumesAttached != null) | select(.status.volumesInUse[] | contains($pv)) | .metadata.name' <<< "$(${KUBERNETES_DISTRIBUTION_BINARY} get nodes --context=$CONTEXT -o json)"); echo "------------"; if [[ "$POD_NODE_NAME" == "$STORAGE_NODE_NAME" ]]; then echo "OK: Pod and Storage Node Matched"; else echo "Error: Pod and Storage Node Mismatched - If the issue persists, the node requires attention."; fi; echo "Pod: $POD_NAME"; echo "PVC: $pvc_name"; echo "PV: $PV_NAME"; echo "Node with Pod: $POD_NODE_NAME"; echo "Node with Storage: $STORAGE_NODE_NAME"; echo; fi; done; done
+    ...    cmd=NAMESPACE="${NAMESPACE}"; CONTEXT="${CONTEXT}"; PODS=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n $NAMESPACE --context=$CONTEXT -o json); for pod in $(jq -r '.items[] | @base64' <<< "$PODS"); do _jq() { jq -r \${1} <<< "$(base64 --decode <<< \${pod})"; }; POD_NAME=$(_jq '.metadata.name'); POD_NODE_NAME=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o custom-columns=:.spec.nodeName --no-headers); PVC_NAMES=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o jsonpath='{.spec.volumes[*].persistentVolumeClaim.claimName}'); for pvc_name in $PVC_NAMES; do PVC=$(${KUBERNETES_DISTRIBUTION_BINARY} get pvc $pvc_name -n $NAMESPACE --context=$CONTEXT -o json); ACCESS_MODE=$(jq -r '.spec.accessModes[0]' <<< "$PVC"); if [[ "$ACCESS_MODE" == "ReadWriteOnce" ]]; then PV_NAME=$(jq -r '.spec.volumeName' <<< "$PVC"); STORAGE_NODE_NAME=$(jq -r --arg pv "$PV_NAME" '.items[] | select(.status.volumesAttached != null) | select(.status.volumesInUse[] | contains($pv)) | .metadata.name' <<< "$(${KUBERNETES_DISTRIBUTION_BINARY} get nodes --context=$CONTEXT -o json)"); echo "------------"; if [[ "$POD_NODE_NAME" == "$STORAGE_NODE_NAME" ]]; then echo "OK: Pod and Storage Node Matched"; else echo "Error: Pod and Storage Node Mismatched - If the issue persists, the node requires attention."; fi; echo "Pod: $POD_NAME"; echo "PVC: $pvc_name"; echo "PV: $PV_NAME"; echo "Node with Pod: $POD_NODE_NAME"; echo "Node with Storage: $STORAGE_NODE_NAME"; echo; fi; done; done
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
@@ -232,4 +234,4 @@ Suite Initialization
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${HOME}    ${HOME}
-    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "HOME":"${HOME}", "OUTPUT_DIR":"${OUTPUT_DIR}"}
+    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "HOME":"${HOME}"}

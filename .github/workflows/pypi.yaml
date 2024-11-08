@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 env: 
-  PIP_PACKAGE_NAME: rw_cli_keywords
+  PIP_PACKAGE_NAME: rw-cli-keywords
 
 jobs:
   publish-pypi:

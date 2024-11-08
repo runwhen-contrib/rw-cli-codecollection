@@ -28,8 +28,6 @@ spec:
       value: {{match_resource.resource.name}}
     - name: TIME_PERIOD_MINUTES
       value: "60"
-    - name: AZURE_RESOURCE_SUBSCRIPTION_ID
-      value: "{{ match_resource.subscription_id }}"
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}

@@ -16,20 +16,6 @@ DOCKER_TOKEN="${DOCKER_TOKEN:-""}"  # Optional Docker token
 SOURCES=($(echo "$IMAGE_MAPPINGS" | jq -r '.[] | .source'))
 DESTINATIONS=($(echo "$IMAGE_MAPPINGS" | jq -r '.[] | .destination'))
 
-# Check if AZURE_RESOURCE_SUBSCRIPTION_ID is set, otherwise get the current subscription ID
-if [ -z "$AZURE_RESOURCE_SUBSCRIPTION_ID" ]; then
-    subscription=$(az account show --query "id" -o tsv)
-    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
-else
-    subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
-    echo "Using specified subscription ID: $subscription"
-fi
-
-# Set the subscription to the determined ID
-echo "Switching to subscription ID: $subscription"
-az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
-
-
 # Function to extract destination image and apply optional tag pattern
 get_destination_image() {
   local src_image="$1"

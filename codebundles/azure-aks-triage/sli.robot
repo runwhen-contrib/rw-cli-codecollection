@@ -20,18 +20,15 @@ Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resou
     ...    timeout_seconds=180
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
+    RW.Core.Add Pre To Report    ${resource_health.stdout}
 
     ${resource_health_output}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/az_resource_health.json | tr -d '\n'
+    ...    cmd=cat ${OUTPUT_DIR}/az_resource_health.json
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${resource_health_output_json}=    Evaluate    json.loads(r'''${resource_health_output.stdout}''')    json
-    IF    len(@{resource_health_output_json}) > 0 
-        ${aks_resource_score}=    Evaluate    1 if "${resource_health_output_json["properties"]["title"]}" == "Available" else 0
-    ELSE
-        ${aks_resource_score}=    Set Variable    0
-    END
+    ${aks_resource_score}=    Evaluate    1 if "${resource_health_output_json["properties"]["title"]}" == "Available" else 0
     Set Global Variable    ${aks_resource_score}
 
 
@@ -43,6 +40,8 @@ Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOUR
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
+
+    RW.Core.Add Pre To Report    ${activites.stdout}
 
     ${issues}=    RW.CLI.Run Cli    cmd=cat ${OUTPUT DIR}/aks_activities_issues.json
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
@@ -67,14 +66,15 @@ Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${
     ...    timeout_seconds=180
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
+    RW.Core.Add Pre To Report    ${config.stdout}
 
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/az_cluster_health.json | jq '{issues: [.issues[] | select(.severity < 4)]}'
+    ...    cmd=cat ${OUTPUT_DIR}/az_cluster_health.json
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    ${aks_config_score}=    Evaluate    1 if len(@{issue_list["issues"]}) == 0 else 0
+    ${aks_config_score}=    Evaluate    1 if len(@{issue_list["issues"]}) > 0 else 0
     Set Global Variable    ${aks_config_score}
 
 Generate AKS Cluster Health Score
@@ -97,19 +97,14 @@ Suite Initialization
     ...    type=string
     ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
     ...    pattern=\w*
-    ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_RESOURCE_SUBSCRIPTION_ID
-    ...    type=string
-    ...    description=The Azure Subscription ID for the resource.  
-    ...    pattern=\w*
     ${TIME_PERIOD_MINUTES}=    RW.Core.Import User Variable    TIME_PERIOD_MINUTES
     ...    type=string
     ...    description=The time period, in minutes, to look back for activites/events. 
     ...    pattern=\w*
     ...    default=10
-    Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AKS_CLUSTER}    ${AKS_CLUSTER}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable    ${TIME_PERIOD_MINUTES}    ${TIME_PERIOD_MINUTES}
     Set Suite Variable
     ...    ${env}
-    ...    {"AKS_CLUSTER":"${AKS_CLUSTER}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "OUTPUT_DIR":"${OUTPUT DIR}", "TIME_PERIOD_MINUTES": "${TIME_PERIOD_MINUTES}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}
+    ...    {"AKS_CLUSTER":"${AKS_CLUSTER}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "OUTPUT_DIR":"${OUTPUT DIR}", "TIME_PERIOD_MINUTES": "${TIME_PERIOD_MINUTES}"}

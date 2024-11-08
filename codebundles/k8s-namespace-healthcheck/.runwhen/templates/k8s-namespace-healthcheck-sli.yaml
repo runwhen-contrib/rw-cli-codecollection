@@ -40,9 +40,9 @@ spec:
     - name: DISTRIBUTION
       value: Kubernetes
     - name: EVENT_THRESHOLD
-      value: '5'
+      value: '3'
     - name: CONTAINER_RESTART_THRESHOLD
-      value: '5'
+      value: '2'
   secretsProvided:
   {% if wb_version %}
     {% include "kubernetes-auth.yaml" ignore missing %}
@@ -50,16 +50,3 @@ spec:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
   {% endif %}
-  alerts:
-    warning:
-      operator: <
-      threshold: '1'
-      for: '10m'
-    ticket:
-      operator: <
-      threshold: '1'
-      for: '20m'
-    page:
-      operator: '=='
-      threshold: '0'
-      for: ''

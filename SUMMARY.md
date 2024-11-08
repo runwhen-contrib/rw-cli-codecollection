@@ -23,7 +23,6 @@
 * [gcp-bucket-health](codebundles/gcp-bucket-health/README.md)
 * [curl-gmp-kong-ingress-inspection](codebundles/curl-gmp-kong-ingress-inspection/README.md)
 * [k8s-pvc-healthcheck](codebundles/k8s-pvc-healthcheck/README.md)
-* [.test](codebundles/k8s-pvc-healthcheck/.test/README.md)
 * [k8s-serviceaccount-check](codebundles/k8s-serviceaccount-check/README.md)
 * [azure-appgateway-health](codebundles/azure-appgateway-health/README.md)
 * [azure-vmss-triage](codebundles/azure-vmss-triage/README.md)

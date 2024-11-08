@@ -1,20 +1,8 @@
 #!/bin/bash
 
-# Check if AZURE_RESOURCE_SUBSCRIPTION_ID is set, otherwise get the current subscription ID
-if [ -z "$AZURE_RESOURCE_SUBSCRIPTION_ID" ]; then
-    subscription=$(az account show --query "id" -o tsv)
-    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
-else
-    subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
-    echo "Using specified subscription ID: $subscription"
-fi
-
-# Set the subscription to the determined ID
-echo "Switching to subscription ID: $subscription"
-az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
-
+# Input variables for subscription ID, cluster name, and resource group
+subscription=$(az account show --query "id" -o tsv)
 issues_json='{"issues": []}'
-
 
 # Get cluster details
 CLUSTER_DETAILS=$(az aks show --name "$AKS_CLUSTER" --resource-group "$AZ_RESOURCE_GROUP" -o json)

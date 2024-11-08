@@ -8,18 +8,23 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   fromActivities:
-  - displayName: {{namespace.name}} Namespace SLI Alert Workflow
-    description: Start RunSession with Eager Edgar when SLI is alerting for {{namespace.name}} namespace health
+  - displayName: {{namespace.name}} Namespace SLO Alert Workflow
+    description: Start RunSession with Eager Edgar when SLO is alerting for {{namespace.name}} namespace health
     actions:
     - tasks:
         slx: {{slx_name.split('--')[1]}}
         persona: eager-edgar
         titles:
-          - '*'
-        sessionTTL: 20m
+        - Inspect Warning Events in Namespace `${NAMESPACE}`
+        - Inspect Container Restarts In Namespace `${NAMESPACE}`
+        - Inspect Pending Pods In Namespace `${NAMESPACE}`
+        - Inspect Failed Pods In Namespace `${NAMESPACE}`
+        - Inspect Workload Status Conditions In Namespace `${NAMESPACE}`
+        - Check Event Anomalies in Namespace `${NAMESPACE}`
+        - Check Resource Quota Utilization in Namespace `${NAMESPACE}`
     match:
       activityVerbs:
-      - SLI_ALERTS_STARTED
+      - ALERTS_STARTED
       slxs:
       - {{slx_name.split('--')[1]}}
-    name: {{slx_name.split('--')[1]}}-sli-alert-workflow
+    name: {{slx_name.split('--')[1]}}-slo-alert-workflow
