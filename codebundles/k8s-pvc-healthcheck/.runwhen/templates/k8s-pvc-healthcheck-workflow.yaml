@@ -1,0 +1,28 @@
+apiVersion: runwhen.com/v1
+kind: Workflow
+metadata:
+  name: {{slx_name}}-pvc-alert-workflow
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  fromActivities:
+  - displayName: {{namespace.name}} Namespace PVC Alert Workflow
+    description: Start RunSession with Eager Edgar when SLI is alerting for {{namespace.name}} PVC health
+    actions:
+    - tasks:
+        slx: {{slx_name.split('--')[1]}}
+        persona: eager-edgar
+        titles:
+          - '*'
+        sessionTTL: 20m
+    - email:
+        to:
+          - '@owners'
+    match:
+      activityVerbs:
+      - SLI_ALERTS_STARTED
+      slxs:
+      - {{slx_name.split('--')[1]}}
+    name: {{slx_name.split('--')[1]}}-pvc-alert-workflow
