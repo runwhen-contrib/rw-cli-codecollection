@@ -38,9 +38,7 @@ spec:
           command: ["/bin/sh", "-c"]
           args:
             - |
-              dd if=/dev/zero of=/data/testfile bs=1M count=1024 && \
-              echo "Filled the volume" && \
-              sleep 3600
+              while true; do sleep 30; done;
           volumeMounts:
             - mountPath: /data
               name: test-storage

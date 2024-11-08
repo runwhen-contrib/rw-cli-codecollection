@@ -25,7 +25,10 @@ tasks:
     cmds: 
      - |
         #KUBECONFIG=$(echo $RW_FROM_FILE | jq -r  .kubeconfig)
+        namespace=$(yq e 'select(.kind == "Namespace") | .metadata.name' kubernetes/mainfest.yaml -N)
         kubectl apply -f kubernetes/*
+        sleep 30
+        kubectl exec deploy/test-deployment -n $namespace -- dd if=/dev/zero of=/data/testfile bs=1M count=900 
     silent: true
 
   remove-kubernetes-objects:
@@ -85,24 +88,27 @@ tasks:
         branch_name=$(git rev-parse --abbrev-ref HEAD)
         codebundle=$(basename "$(dirname "$PWD")")
 
-        kubeconfig=$(echo $RW_FROM_FILE | jq -r  .kubeconfig)
         namespace=$(yq e 'select(.kind == "Namespace") | .metadata.name' kubernetes/mainfest.yaml -N)
-
         # Generate workspaceInfo.yaml with fetched cluster details
         cat <<EOF > workspaceInfo.yaml
         workspaceName: "$RW_WORKSPACE"
         workspaceOwnerEmail: authors@runwhen.com
         defaultLocation: location-01
-        defaultLOD: detailed
+        defaultLOD: none
         cloudConfig:
           kubernetes: 
-            kubeconfigFile: kubeconfig
+            kubeconfigFile: /shared/kubeconfig
+            namespaceLODs: 
+              $namespace: detailed
             namespaces: 
               - $namespace
         codeCollections:
         - repoURL: "$repo_url"
           branch: "$branch_name"
           codeBundles: ["$codebundle"]
+        custom:
+          kubeconfig_secret_name: "kubeconfig"
+          kubernetes_distribution_binary: kubectl
         EOF
     silent: true
 
@@ -127,7 +133,9 @@ tasks:
 
         echo "Starting new container $CONTAINER_NAME..."
 
-        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d ghcr.io/runwhen-contrib/runwhen-local:latest || {
+        kubeconfig=$(echo $RW_FROM_FILE | jq -r  .kubeconfig)
+
+        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -v $kubeconfig:/shared/kubeconfig -d ghcr.io/runwhen-contrib/runwhen-local:latest || {
           echo "Failed to start container"; exit 1;
         }
 
