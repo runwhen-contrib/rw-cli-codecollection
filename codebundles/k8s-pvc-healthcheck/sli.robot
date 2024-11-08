@@ -52,7 +52,7 @@ Suite Initialization
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${HOME}    ${HOME}
-    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "HOME":"${HOME}"}
+    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "OUTPUT_DIR":"${OUTPUT_DIR}"}
 
 
 *** Tasks ***
@@ -66,26 +66,10 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${pvc_recommendations}=    RW.CLI.Run Cli
-    ...    cmd=echo '${pvc_utilization_script.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+    ...    cmd=cat ${OUTPUT_DIR}/pvc_issues.json
     ...    env=${env}
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${pvc_recommendations.stdout}''')    json
-    # IF    $pvc_recommendations.stdout != ""
-    #     ${pvc_recommendation_list}=    Evaluate    json.loads(r'''${pvc_recommendations.stdout}''')    json
-    #     IF    len(@{pvc_recommendation_list}) > 0
-    #         FOR    ${item}    IN    @{pvc_recommendation_list}
-    #             RW.Core.Add Issue
-    #             ...    severity=${item["severity"]}
-    #             ...    expected=PVCs are healthy and have free space in Namespace `${NAMESPACE}`
-    #             ...    actual=PVC issues exist in Namespace `${NAMESPACE}`
-    #             ...    title=${item["title"]} in `${NAMESPACE}`
-    #             ...    reproduce_hint=${pod_pvc_utilization.cmd}
-    #             ...    details=${item}
-    #             ...    next_steps=${item["next_steps"]}
-    #         END
-    #     END
-    # END    
-    # Log    ${unreadypods_results.stdout} total unready pods
     ${pvc_utilization_score}=    Evaluate    1 if len(@{issue_list}) == 0 else 0
     Set Global Variable    ${pvc_utilization_score}
 

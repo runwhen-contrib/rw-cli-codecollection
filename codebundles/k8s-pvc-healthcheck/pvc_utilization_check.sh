@@ -92,7 +92,7 @@ for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} --contex
         # Attempt to get disk usage, add recommendation if it fails
         disk_usage=$(${KUBERNETES_DISTRIBUTION_BINARY} exec $pod -n ${NAMESPACE} --context ${CONTEXT} -c $containerName -- df -h $mountPath 2>/dev/null | awk 'NR==2 {print $5}' | sed 's/%//')
         if [ $? -ne 0 ] || [ -z "$disk_usage" ]; then
-            recommendation="{ \"pvc_name\":\"$pvc\", \"pod\": \"$pod\", \"owner_kind\": \"$top_level_owner_kind\", \"owner_name\": \"$top_level_owner_name\", \"volume_name\": \"$volumeName\", \"container_name\": \"$containerName\", \"mount_path\": \"$mountPath\", \"next_steps\": \"Check $top_level_owner_kind Log for Issues with \`$top_level_owner_name\`\nInspect Container Restarts for $top_level_owner_kind \`$top_level_owner_name\`\", \"title\": \"Disk Utilization Check Failed for $pvc\", \"details\": \"Unable to retrieve disk utilization for $pvc in pod $pod, owned by $top_level_owner_kind $top_level_owner_name.\", \"severity\": \"5\" }"
+            recommendation="{ \"pvc_name\":\"$pvc\", \"pod\": \"$pod\", \"owner_kind\": \"$top_level_owner_kind\", \"owner_name\": \"$top_level_owner_name\", \"volume_name\": \"$volumeName\", \"container_name\": \"$containerName\", \"mount_path\": \"$mountPath\", \"next_steps\": \"Check $top_level_owner_kind Log for Issues with \`$top_level_owner_name\`\nInspect Container Restarts for $top_level_owner_kind \`$top_level_owner_name\`\", \"title\": \"Disk Utilization Check Failed for \`$pvc\`\", \"details\": \"Unable to retrieve disk utilization for $pvc in pod $pod, owned by $top_level_owner_kind $top_level_owner_name.\", \"severity\": \"2\" }"
             recommendations="${recommendations:+$recommendations, }$recommendation"
             continue
         fi
@@ -103,7 +103,7 @@ for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} --contex
         severity=$(echo $recommendation_info | cut -d' ' -f2)
 
         if [ $recommended_new_size -ne 0 ]; then
-            recommendation="{ \"pvc_name\":\"$pvc\", \"pod\": \"$pod\", \"owner_kind\": \"$top_level_owner_kind\", \"owner_name\": \"$top_level_owner_name\", \"volume_name\": \"$volumeName\", \"container_name\": \"$containerName\", \"mount_path\": \"$mountPath\", \"current_size\": \"$disk_size\", \"usage\": \"$disk_usage%\", \"recommended_size\": \"${recommended_new_size}Gi\", \"severity\": \"$severity\", \"title\": \"High Storage Utilization on PVC $pvc\", \"details\": \"Current size: $disk_size, Utilization: ${disk_usage}%, Recommended new size: ${recommended_new_size}Gi. Owned by $top_level_owner_kind $top_level_owner_name.\", \"next_steps\": \"Expand PVC $pvc to ${recommended_new_size}Gi. in Namespace \`$NAMESPACE\`\" }"
+            recommendation="{ \"pvc_name\":\"$pvc\", \"pod\": \"$pod\", \"owner_kind\": \"$top_level_owner_kind\", \"owner_name\": \"$top_level_owner_name\", \"volume_name\": \"$volumeName\", \"container_name\": \"$containerName\", \"mount_path\": \"$mountPath\", \"current_size\": \"$disk_size\", \"usage\": \"$disk_usage%\", \"recommended_size\": \"${recommended_new_size}Gi\", \"severity\": \"$severity\", \"title\": \"High Storage Utilization on PVC \`$pvc\`\", \"details\": \"Current size: $disk_size, Utilization: ${disk_usage}%, Recommended new size: ${recommended_new_size}Gi. Owned by $top_level_owner_kind $top_level_owner_name.\", \"next_steps\": \"Expand PVC $pvc to ${recommended_new_size}Gi. in Namespace \`$NAMESPACE\`\" }"
             recommendations="${recommendations:+$recommendations, }$recommendation"
         fi
     done
@@ -111,8 +111,8 @@ done
 
 # Outputting recommendations as JSON
 if [ -n "$recommendations" ]; then
-    echo "Recommended Next Steps:"
-    echo "[$recommendations]" | jq .
+    echo "[$recommendations]" > $OUTPUT_DIR/pvc_issues.json
+    cat $OUTPUT_DIR/pvc_issues.json
 else
-    echo "No recommendations."
+    echo "[]" > $OUTPUT_DIR/pvc_issues.json
 fi
