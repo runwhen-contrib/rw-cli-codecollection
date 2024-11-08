@@ -19,3 +19,24 @@ export RW_PAT=[]
 export RW_WORKSPACE=[]
 export RW_API_URL=[]
 ```
+
+## Test Scenarios
+Certain test scenarios can be manually involked (or added to the Taskfile as desired)
+
+- Fill up the PVC to 90%
+```
+namespace=$(yq e 'select(.kind == "Namespace") | .metadata.name' kubernetes/mainfest.yaml -N)
+kubectl exec deploy/test-deployment -n $namespace -- dd if=/dev/zero of=/data/testfile bs=1M count=900 
+```
+
+- Reset to 0%
+```
+namespace=$(yq e 'select(.kind == "Namespace") | .metadata.name' kubernetes/mainfest.yaml -N)
+kubectl exec deploy/test-deployment -n $namespace -- rm /data/testfile 
+```
+
+- Fill it up to 100% and cause CrashLoopBackoff
+```
+namespace=$(yq e 'select(.kind == "Namespace") | .metadata.name' kubernetes/mainfest.yaml -N)
+kubectl exec deploy/test-deployment -n $namespace -- dd if=/dev/zero of=/data/testfile bs=1M count=1024 
+```

@@ -25,10 +25,7 @@ tasks:
     cmds: 
      - |
         #KUBECONFIG=$(echo $RW_FROM_FILE | jq -r  .kubeconfig)
-        namespace=$(yq e 'select(.kind == "Namespace") | .metadata.name' kubernetes/mainfest.yaml -N)
         kubectl apply -f kubernetes/*
-        sleep 30
-        kubectl exec deploy/test-deployment -n $namespace -- dd if=/dev/zero of=/data/testfile bs=1M count=900 
     silent: true
 
   remove-kubernetes-objects:
