@@ -221,16 +221,18 @@ tasks:
 
             URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/${SLX_NAME}"
             echo "Uploading SLX: $SLX_NAME to $URL"
-            response=$(curl -v -X POST "$URL" \
+            response_code=$(curl -X POST "$URL" \
               -H "Authorization: Bearer $RW_PAT" \
               -H "Content-Type: application/json" \
-              -d "$PAYLOAD" -w "%{http_code}" -o /dev/null -s 2>&1)
+              -d "$PAYLOAD" \
+              -w "%{http_code}" -o /dev/null -s)
             
-            if [[ "$response" =~ 200|201 ]]; then
+            if [[ "$response_code" == "200" || "$response_code" == "201" ]]; then
               echo "Successfully uploaded SLX: $SLX_NAME to $URL"
+            elif [[ "$response_code" == "405" ]]; then
+              echo "Failed to upload SLX: $SLX_NAME to $URL. Method not allowed (405)."
             else
-              echo "Failed to upload SLX: $SLX_NAME to $URL. Response:"
-              echo "$response"
+              echo "Failed to upload SLX: $SLX_NAME to $URL. Unexpected response code: $response_code"
             fi
           fi
         done
@@ -255,15 +257,17 @@ tasks:
             SLX_NAME=$(basename "$dir")
             URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/${SLX_NAME}"
             echo "Deleting SLX: $SLX_NAME from $URL"
-            response=$(curl -v -X DELETE "$URL" \
+            response_code=$(curl -X DELETE "$URL" \
               -H "Authorization: Bearer $RW_PAT" \
-              -H "Content-Type: application/json" -w "%{http_code}" -o /dev/null -s 2>&1)
-
-            if [[ "$response" =~ 200|204 ]]; then
+              -H "Content-Type: application/json" \
+              -w "%{http_code}" -o /dev/null -s)
+            
+            if [[ "$response_code" == "200" || "$response_code" == "204" ]]; then
               echo "Successfully deleted SLX: $SLX_NAME from $URL"
+            elif [[ "$response_code" == "405" ]]; then
+              echo "Failed to delete SLX: $SLX_NAME from $URL. Method not allowed (405)."
             else
-              echo "Failed to delete SLX: $SLX_NAME from $URL. Response:"
-              echo "$response"
+              echo "Failed to delete SLX: $SLX_NAME from $URL. Unexpected response code: $response_code"
             fi
           fi
         done
@@ -275,6 +279,6 @@ tasks:
     cmds:
       - |
         sudo rm -rf output
-        rm workspaceInfo.yaml
-        rm kubeconfig
+        rm -f workspaceInfo.yaml
+        rm -f kubeconfig
     silent: true
