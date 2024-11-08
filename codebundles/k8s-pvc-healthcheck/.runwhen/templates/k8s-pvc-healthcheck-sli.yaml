@@ -44,12 +44,12 @@ spec:
     warning:
       operator: <
       threshold: '1'
-      for: '5m'
+      for: '10m'
     ticket:
       operator: <
       threshold: '1'
-      for: '10m'
+      for: '20m'
     page:
       operator: '=='
       threshold: '0'
-      for: '20m'
+      for: '30m'
