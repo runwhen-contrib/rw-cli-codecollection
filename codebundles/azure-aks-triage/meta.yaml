@@ -105,34 +105,31 @@ commands:
     \ Provisioning has failed.\"\nfi\n\n# Check for diagnostics settings\nDIAGNOSTIC_SETTINGS=$(az\
     \ monitor diagnostic-settings list --resource \"$ID\" -o json | jq 'length')\n\
     if [ \"$DIAGNOSTIC_SETTINGS\" -gt 0 ]; then\n    echo \"Diagnostics settings are\
-    \ enabled.\"\nelse\n    echo \"Diagnostics settings are not enabled.\"\n    #\
-    \ Create an issue and add it to the issues_json\n    issues_json=$(echo \"$issues_json\"\
-    \ | jq \\\n        --arg title \"Diagnostics Settings Missing\" \\\n        --arg\
-    \ nextStep \"Enable diagnostics settings in the Azure Portal to capture logs and\
-    \ metrics.\" \\\n        --arg severity \"4\" \\\n        --arg details \"Diagnostics\
-    \ settings are not configured for this resource.\" \\\n        '.issues += [{\"\
-    title\": $title, \"next_step\": $nextStep, \"severity\": ($severity | tonumber),\
-    \ \"details\": $details}]'\n    )\nfi\n\n# Check if any node pools have autoscaling\
-    \ disabled\nAUTOSCALING_DISABLED_COUNT=$(echo \"$CLUSTER_DETAILS\" | jq '[.agentPoolProfiles[]\
-    \ | select(.enableAutoScaling == null)] | length')\nif [ \"$AUTOSCALING_DISABLED_COUNT\"\
-    \ -gt 0 ]; then\n    echo \"$AUTOSCALING_DISABLED_COUNT node pools do not have\
-    \ autoscaling enabled.\"\n    # Create an issue and add it to the issues_json\n\
-    \    issues_json=$(echo \"$issues_json\" | jq \\\n        --arg title \"Autoscaling\
-    \ Disabled in Node Pools\" \\\n        --arg nextStep \"Enable autoscaling on\
-    \ all node pools for better resource management.\" \\\n        --arg severity\
-    \ \"3\" \\\n        --arg details \"$AUTOSCALING_DISABLED_COUNT node pools have\
-    \ autoscaling disabled.\" \\\n        '.issues += [{\"title\": $title, \"next_step\"\
-    : $nextStep, \"severity\": ($severity | tonumber), \"details\": $details}]'\n\
-    \    )\nelse\n    echo \"All node pools have autoscaling enabled.\"\nfi\n\n# Dump\
-    \ the issues into a json list for processing\necho \"$issues_json\" > \"$OUTPUT_DIR/az_cluster_health.json\"\
-    \n\n\nIn the script:\n\n- The `az` CLI commands are used to interact with Azure\
-    \ resources.\n- The JSON response from `az aks show` is parsed using `jq` to extract\
-    \ specific information about the AKS cluster configuration and status.\n- Diagnostics\
-    \ settings, provisioning state, and autoscaling status are checked and appropriate\
-    \ issues are added to the `issues_json` based on the checks performed.\n- Finally,\
-    \ the `issues_json` is written to a file for further processing.\n\nThese comments\
-    \ provide insight into how the script interacts with the Azure resources and the\
-    \ logic used to check the health of the AKS cluster."
+    \ enabled.\"\nelse\n    echo \"Diagnostics settings are not enabled.\"\n    issues_json=$(echo\
+    \ \"$issues_json\" | jq \\\n        --arg title \"Diagnostics Settings Missing\"\
+    \ \\\n        --arg nextStep \"Enable diagnostics settings in the Azure Portal\
+    \ to capture logs and metrics.\" \\\n        --arg severity \"4\" \\\n       \
+    \ --arg details \"Diagnostics settings are not configured for this resource.\"\
+    \ \\\n        '.issues += [{\"title\": $title, \"next_step\": $nextStep, \"severity\"\
+    : ($severity | tonumber), \"details\": $details}]'\n    )\nfi\n\n# Check if any\
+    \ node pools have autoscaling disabled\nAUTOSCALING_DISABLED_COUNT=$(echo \"$CLUSTER_DETAILS\"\
+    \ | jq '[.agentPoolProfiles[] | select(.enableAutoScaling == null)] | length')\n\
+    if [ \"$AUTOSCALING_DISABLED_COUNT\" -gt 0 ]; then\n    echo \"$AUTOSCALING_DISABLED_COUNT\
+    \ node pools do not have autoscaling enabled.\"\n    issues_json=$(echo \"$issues_json\"\
+    \ | jq \\\n        --arg title \"Autoscaling Disabled in Node Pools\" \\\n   \
+    \     --arg nextStep \"Enable autoscaling on all node pools for better resource\
+    \ management.\" \\\n        --arg severity \"3\" \\\n        --arg details \"\
+    $AUTOSCALING_DISABLED_COUNT node pools have autoscaling disabled.\" \\\n     \
+    \   '.issues += [{\"title\": $title, \"next_step\": $nextStep, \"severity\": ($severity\
+    \ | tonumber), \"details\": $details}]'\n    )\nelse\n    echo \"All node pools\
+    \ have autoscaling enabled.\"\nfi\n\n# Dump the issues into a json list for processing\n\
+    echo \"$issues_json\" > \"$OUTPUT_DIR/az_cluster_health.json\"\n\nIn this bash\
+    \ script, we retrieve the details of an AKS (Azure Kubernetes Service) cluster\
+    \ and perform various checks on its configuration. We use the `jq` command line\
+    \ JSON processor to extract specific data from the JSON response. Then, we check\
+    \ for provisioning failure, missing diagnostics settings, and disabled autoscaling\
+    \ on the node pools. Finally, we store any detected issues in a JSON file for\
+    \ further processing."
   name: check_configuration_health_of_aks_cluster_aks_cluster_in_resource_group_az_resource_group
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: This
     script could be used by a DevOps or Site Reliability Engineer to gather details
@@ -275,33 +272,17 @@ commands:
     URL to Azure Firewall: ${BASE_PORTAL_URL}${FIREWALL_PRESENT}\" # Generate URL\
     \ to the Azure Firewall\nfi\n"
   name: check_network_configuration_of_aks_cluster_aks_cluster_in_resource_group_az_resource_group
-  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: An engineer
-    may use this bash script to check the networking setup for an AKS cluster to identify
-    any issues with the network configuration that may be causing the CrashLoopBackoff
-    events.
+  when_is_it_useful: '1. Troubleshooting networking issues in an AKS cluster, such
+    as pod-to-pod communication problems or access issues to external services.
 
+    2. Verifying the network setup during the deployment of a new application or service
+    on the AKS cluster to ensure proper connectivity and security configurations.
 
-    2. Investigating networking issues in a multi-tier application: If a DevOps or
-    SRE is troubleshooting networking issues in a multi-tier application running on
-    AKS, they can use this script to verify the networking setup and identify any
-    potential misconfigurations that could be causing the problems.
+    3. Performing routine maintenance and checks on the AKS networking setup to ensure
+    it is compliant with company standards and best practices.
 
+    4. Investigating and diagnosing any networking-related errors or warnings reported
+    by Kubernetes events, such as CrashLoopBackoff events caused by network failures.
 
-    3. Performing a routine health check of the AKS network setup: As part of regular
-    maintenance and monitoring, a DevOps or SRE may run this script to perform a health
-    check of the AKS network setup, ensuring that all required components such as
-    Virtual Network, Subnet, NSGs, Route Table, and Firewall are present and properly
-    configured.
-
-
-    4. Diagnosing connectivity issues between pods and services: If there are reported
-    connectivity issues between pods and services in an AKS cluster, an engineer may
-    use this script to assess the network setup and determine if there are any issues
-    that could be impacting communication between components.
-
-
-    5. Verifying network security configurations: This script can also be used to
-    validate that the network security configurations, such as NSGs and firewalls,
-    are correctly set up to ensure the security of the AKS cluster. This can help
-    in identifying any potential security vulnerabilities or misconfigurations that
-    need to be addressed.'
+    5. Providing insights and recommendations for optimizing the AKS networking setup
+    for performance, reliability, and security.'
