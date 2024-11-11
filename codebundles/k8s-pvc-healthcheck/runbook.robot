@@ -151,24 +151,22 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${pvc_recommendations}=    RW.CLI.Run Cli
-    ...    cmd=echo '${pvc_utilization_script.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
+    ...    cmd=cat ${OUTPUT_DIR}/pvc_issues.json
     ...    env=${env}
     ...    include_in_history=false
-    IF    $pvc_recommendations.stdout != ""
-        ${pvc_recommendation_list}=    Evaluate    json.loads(r'''${pvc_recommendations.stdout}''')    json
-        IF    len(@{pvc_recommendation_list}) > 0
-            FOR    ${item}    IN    @{pvc_recommendation_list}
-                RW.Core.Add Issue
-                ...    severity=${item["severity"]}
-                ...    expected=PVCs should be less than 85% utilized for Namespace `${NAMESPACE}`
-                ...    actual=PVC utilization is ${item["usage"]} Namespace `${NAMESPACE}`
-                ...    title=PVC Storage Utilization is at ${item["usage"]} in `${NAMESPACE}`
-                ...    reproduce_hint=${pod_pvc_utilization.cmd}
-                ...    details=Found excessive PVC utilization for ${item["pvc_name"]}:\n${item}
-                ...    next_steps=Expand Persistent Volume Claim \`${item["pvc_name"]}\` in Namespace \`${NAMESPACE}\` to ${item["recommended_size"]}
-            END
+    ${issue_list}=    Evaluate    json.loads(r'''${pvc_recommendations.stdout}''')    json
+    IF    len(@{issue_list}) > 0
+        FOR    ${item}    IN    @{issue_list}
+            RW.Core.Add Issue
+            ...    severity=${item["severity"]}
+            ...    expected=PVCs are healthy and have free space in Namespace `${NAMESPACE}`
+            ...    actual=PVC issues exist in Namespace `${NAMESPACE}`
+            ...    title=${item["title"]} in `${NAMESPACE}`
+            ...    reproduce_hint=${pod_pvc_utilization.cmd}
+            ...    details=${item}
+            ...    next_steps=${item["next_steps"]}
         END
-    END    
+    END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of PVC storage mount utilization in ${NAMESPACE}:
     RW.Core.Add Pre To Report    ${pod_pvc_utilization.stdout}
@@ -234,4 +232,4 @@ Suite Initialization
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${HOME}    ${HOME}
-    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "HOME":"${HOME}"}
+    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "HOME":"${HOME}", "OUTPUT_DIR":"${OUTPUT_DIR}"}

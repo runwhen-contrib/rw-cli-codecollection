@@ -19,6 +19,9 @@
         "ghcr.io/devcontainers/features/docker-in-docker:2": {}
     },
     "workspaceFolder": "/home/runwhen/codecollection/",
+    "features": {
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+    },
     // Configure tool-specific properties.
     "customizations": {
         // Configure properties specific to VS Code.
