@@ -28,11 +28,14 @@ Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resou
     ...    timeout_seconds=180
     ...    include_in_history=false
         ${resource_health_output_json}=    Evaluate    json.loads(r'''${resource_health_output.stdout}''')    json
-    IF    "${resource_health_output_json}" != [] and "${resource_health_output_json['properties']['title']}" != "Available"
-        ${aks_resource_score}=    Set Variable    1
-    ELSE
-        ${aks_resource_score}=    Set Variable    0
-    END    
+    ${aks_resource_score}=    Set Variable    0
+
+    IF    "${resource_health_output_json}" != []
+        # Now it's safe to check properties within the dictionary
+        IF    "${resource_health_output_json['properties']['title']}" != "Available"
+            ${aks_resource_score}=    Set Variable    1
+        END
+    END
     Set Global Variable    ${aks_resource_score}
 
 
