@@ -15,16 +15,14 @@ spec:
         slx: {{slx_name.split('--')[1]}}
         persona: eager-edgar
         titles:
-        - Inspect Warning Events in Namespace `${NAMESPACE}`
-        - Inspect Container Restarts In Namespace `${NAMESPACE}`
-        - Inspect Pending Pods In Namespace `${NAMESPACE}`
-        - Inspect Failed Pods In Namespace `${NAMESPACE}`
-        - Inspect Workload Status Conditions In Namespace `${NAMESPACE}`
-        - Check Event Anomalies in Namespace `${NAMESPACE}`
-        - Check Resource Quota Utilization in Namespace `${NAMESPACE}`
+          - '*'
+        sessionTTL: 20m
+    - email:
+        to:
+          - '@owners'
     match:
       activityVerbs:
-      - ALERTS_STARTED
+      - SLI_ALERTS_STARTED
       slxs:
       - {{slx_name.split('--')[1]}}
     name: {{slx_name.split('--')[1]}}-slo-alert-workflow
