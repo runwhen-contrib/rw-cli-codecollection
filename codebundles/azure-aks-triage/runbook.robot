@@ -139,6 +139,7 @@ Suite Initialization
     ...    type=string
     ...    description=The Azure Subscription ID for the resource.  
     ...    pattern=\w*
+    ...    default=""
     ${azure_credentials}=    RW.Core.Import Secret
     ...    azure_credentials
     ...    type=string

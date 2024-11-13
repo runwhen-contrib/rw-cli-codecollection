@@ -2,13 +2,19 @@
 
 echo "[]" > ${OUTPUT_DIR}/az_resource_health.json
 
-# Set the subscription to the specified ID
-echo "Switching to subscription ID: $AZURE_RESOURCE_SUBSCRIPTION_ID"
-az account set --subscription "$AZURE_RESOURCE_SUBSCRIPTION_ID" || { echo "Failed to set subscription."; exit 1; }
+# Check if AZURE_RESOURCE_SUBSCRIPTION_ID is set, otherwise get the current subscription ID
+if [ -z "$AZURE_RESOURCE_SUBSCRIPTION_ID" ]; then
+    subscription=$(az account show --query "id" -o tsv)
+    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
+else
+    subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
+    echo "Using specified subscription ID: $subscription"
+fi
 
-# Set subscription ID and resource details
-# subscription=$(az account show --query "id" -o tsv)
-subscription=$AZURE_RESOURCE_SUBSCRIPTION_ID
+# Set the subscription to the determined ID
+echo "Switching to subscription ID: $subscription"
+az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
+
 
 # Check if Microsoft.ResourceHealth provider is already registered
 echo "Checking registration status of Microsoft.ResourceHealth provider..."
