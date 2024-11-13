@@ -20,9 +20,13 @@ TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-60}"
 start_time=$(date -u -d "$TIME_PERIOD_MINUTES minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
 end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
-tenant_id=$(az account show --query "tenantId" -o tsv)
-subscription_id=$(az account show --query "id" -o tsv)
+# Set the subscription to the specified ID
+echo "Switching to subscription ID: $AZURE_RESOURCE_SUBSCRIPTION_ID"
+az account set --subscription "$AZURE_RESOURCE_SUBSCRIPTION_ID" || { echo "Failed to set subscription."; exit 1; }
 
+tenant_id=$(az account show --query "tenantId" -o tsv)
+# subscription_id=$(az account show --query "id" -o tsv)
+subscription_id=$AZURE_RESOURCE_SUBSCRIPTION_ID
 
 # Log in to Azure CLI (uncomment if needed)
 # az login --service-principal --username "$AZ_USERNAME" --password "$AZ_SECRET_VALUE" --tenant "$AZ_TENANT" > /dev/null

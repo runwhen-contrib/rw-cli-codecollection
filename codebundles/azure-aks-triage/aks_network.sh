@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Set the subscription to the specified ID
+echo "Switching to subscription ID: $AZURE_RESOURCE_SUBSCRIPTION_ID"
+az account set --subscription "$AZURE_RESOURCE_SUBSCRIPTION_ID" || { echo "Failed to set subscription."; exit 1; }
+
+
 # Ensure required environment variables are set
 if [ -z "$AZ_RESOURCE_GROUP" ] || [ -z "$AKS_CLUSTER" ]; then
   echo "Please set AZ_RESOURCE_GROUP and AKS_CLUSTER environment variables."

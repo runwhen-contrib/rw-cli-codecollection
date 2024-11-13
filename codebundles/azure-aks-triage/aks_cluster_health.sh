@@ -4,6 +4,11 @@
 subscription=$(az account show --query "id" -o tsv)
 issues_json='{"issues": []}'
 
+# Set the subscription to the specified ID
+echo "Switching to subscription ID: $AZURE_RESOURCE_SUBSCRIPTION_ID"
+az account set --subscription "$AZURE_RESOURCE_SUBSCRIPTION_ID" || { echo "Failed to set subscription."; exit 1; }
+
+
 # Get cluster details
 CLUSTER_DETAILS=$(az aks show --name "$AKS_CLUSTER" --resource-group "$AZ_RESOURCE_GROUP" -o json)
 

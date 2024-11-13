@@ -64,9 +64,9 @@ Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
             ...    next_steps=${item["next_step"]}
-            ...    expected=AKS Cluster `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has no Warning/Error/Critical activities
-            ...    actual=AKS Cluster `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has Warning/Error/Critical activities
-            ...    reproduce_hint=${activites.cmd}
+            ...    expected=AKS Cluster `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has no configuration issues
+            ...    actual=AKS Cluster `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has configuration issues
+            ...    reproduce_hint=${config.cmd}
             ...    details=${item["details"]}        
         END
     END
@@ -123,14 +123,19 @@ Suite Initialization
     ...    description=The time period, in minutes, to look back for activites/events. 
     ...    pattern=\w*
     ...    default=60
+    ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_RESOURCE_SUBSCRIPTION_ID
+    ...    type=string
+    ...    description=The Azure Subscription ID for the resource.  
+    ...    pattern=\w*
     ${azure_credentials}=    RW.Core.Import Secret
     ...    azure_credentials
     ...    type=string
     ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
     ...    pattern=\w*
+    Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AKS_CLUSTER}    ${AKS_CLUSTER}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable    ${TIME_PERIOD_MINUTES}    ${TIME_PERIOD_MINUTES}
     Set Suite Variable
     ...    ${env}
-    ...    {"AKS_CLUSTER":"${AKS_CLUSTER}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "OUTPUT_DIR":"${OUTPUT DIR}", "TIME_PERIOD_MINUTES": "${TIME_PERIOD_MINUTES}"}
+    ...    {"AKS_CLUSTER":"${AKS_CLUSTER}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "OUTPUT_DIR":"${OUTPUT DIR}", "TIME_PERIOD_MINUTES": "${TIME_PERIOD_MINUTES}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}

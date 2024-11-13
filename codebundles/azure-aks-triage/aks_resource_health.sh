@@ -1,7 +1,13 @@
 #!/bin/bash
 
+
+# Set the subscription to the specified ID
+echo "Switching to subscription ID: $AZURE_RESOURCE_SUBSCRIPTION_ID"
+az account set --subscription "$AZURE_RESOURCE_SUBSCRIPTION_ID" || { echo "Failed to set subscription."; exit 1; }
+
 # Set subscription ID and resource details
-subscription=$(az account show --query "id" -o tsv)
+# subscription=$(az account show --query "id" -o tsv)
+subscription=$AZURE_RESOURCE_SUBSCRIPTION_ID
 
 # Check if Microsoft.ResourceHealth provider is already registered
 echo "Checking registration status of Microsoft.ResourceHealth provider..."
