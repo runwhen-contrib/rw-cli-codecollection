@@ -8,8 +8,8 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   fromActivities:
-  - displayName: {{namespace.name}} Namespace SLO Alert Workflow
-    description: Start RunSession with Eager Edgar when SLO is alerting for {{namespace.name}} namespace health
+  - displayName: {{namespace.name}} Namespace SLI Alert Workflow
+    description: Start RunSession with Eager Edgar when SLI is alerting for {{namespace.name}} namespace health
     actions:
     - tasks:
         slx: {{slx_name.split('--')[1]}}
