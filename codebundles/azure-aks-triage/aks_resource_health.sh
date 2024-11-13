@@ -1,5 +1,6 @@
 #!/bin/bash
 
+echo "[]" > ${OUTPUT_DIR}/az_resource_health.json
 
 # Set the subscription to the specified ID
 echo "Switching to subscription ID: $AZURE_RESOURCE_SUBSCRIPTION_ID"
