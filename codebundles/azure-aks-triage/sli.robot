@@ -28,7 +28,7 @@ Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resou
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${resource_health_output_json}=    Evaluate    json.loads(r'''${resource_health_output.stdout}''')    json
-    ${aks_resource_score}=    Evaluate    1 if "${resource_health_output_json["properties"]["title"]}" == "Available" else 0
+    ${aks_resource_score}=    Evaluate    1 if issue_list["properties"]["title"] and issue_list["properties"]["title"] != "Available" else 0
     Set Global Variable    ${aks_resource_score}
 
 
