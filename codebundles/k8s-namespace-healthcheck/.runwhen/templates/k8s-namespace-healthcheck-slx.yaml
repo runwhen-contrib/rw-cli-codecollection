@@ -21,3 +21,4 @@ spec:
     labelMap: "{{match_resource.resource.metadata.labels}}"
     cluster: "{{ cluster.name }}"
     context: "{{ cluster.context }}"
+    subscription_id: "{{ cluster.subscription_id }}"
