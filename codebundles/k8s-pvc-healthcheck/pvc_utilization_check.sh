@@ -77,6 +77,10 @@ for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} --contex
 
     # Check if the pod is not in the "Running" phase
     if [ "$pod_phase" != "Running" ]; then
+        # Skip Pods owned by Jobs as they are meant to be transient
+        if [ "$top_level_owner_kind" == "Job" ]; then
+            continue
+        fi
         recommendation="{ \"pod\": \"$pod\", \"owner_kind\": \"$top_level_owner_kind\", \"owner_name\": \"$top_level_owner_name\", \"next_steps\": \"Check $top_level_owner_kind \`$top_level_owner_name\` health\nInspect Pending Pods In Namespace \`$NAMESPACE\`\", \"title\": \"Pod `$pod` with PVC is running\", \"details\": \"Pod $pod, owned by $top_level_owner_kind $top_level_owner_name, is not in a running state.\", \"severity\": \"2\" }"
         recommendations="${recommendations:+$recommendations, }$recommendation"
         continue

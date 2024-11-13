@@ -20,4 +20,4 @@ spec:
             - type: slo
             - type: runbook
               templateName: k8s-namespace-healthcheck-taskset.yaml
-            # - type: workflow
+            - type: workflow
