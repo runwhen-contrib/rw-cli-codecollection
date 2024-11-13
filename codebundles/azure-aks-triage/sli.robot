@@ -20,16 +20,18 @@ Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resou
     ...    timeout_seconds=180
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
-    RW.Core.Add Pre To Report    ${resource_health.stdout}
 
     ${resource_health_output}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/az_resource_health.json
+    ...    cmd=cat ${OUTPUT_DIR}/az_resource_health.json | tr -d '\n'
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${resource_health_output_json}=    Evaluate    json.loads(r'''${resource_health_output.stdout}''')    json
-    ${aks_resource_score}=    Evaluate    1 if resource_health_output_json != [] and resource_health_output_json.get("properties", {}).get("title") == "Available" else 0
-
+    IF    len(@{resource_health_output_json}) > 0 
+        ${aks_resource_score}=    Evaluate    1 if "${resource_health_output_json["properties"]["title"]}" == "Available" else 0
+    ELSE
+        ${aks_resource_score}=    Set Variable    0
+    END
     Set Global Variable    ${aks_resource_score}
 
 
@@ -41,8 +43,6 @@ Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOUR
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
-
-    RW.Core.Add Pre To Report    ${activites.stdout}
 
     ${issues}=    RW.CLI.Run Cli    cmd=cat ${OUTPUT DIR}/aks_activities_issues.json
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
@@ -67,15 +67,14 @@ Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${
     ...    timeout_seconds=180
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
-    RW.Core.Add Pre To Report    ${config.stdout}
 
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/az_cluster_health.json
+    ...    cmd=cat ${OUTPUT_DIR}/az_cluster_health.json | jq '{issues: [.issues[] | select(.severity < 4)]}'
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    ${aks_config_score}=    Evaluate    1 if len(@{issue_list["issues"]}) > 0 else 0
+    ${aks_config_score}=    Evaluate    1 if len(@{issue_list["issues"]}) == 0 else 0
     Set Global Variable    ${aks_config_score}
 
 Generate AKS Cluster Health Score
