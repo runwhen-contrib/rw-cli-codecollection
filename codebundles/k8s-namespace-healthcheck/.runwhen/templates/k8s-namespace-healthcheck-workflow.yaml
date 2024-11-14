@@ -25,4 +25,4 @@ spec:
       - SLI_ALERTS_STARTED
       slxs:
       - {{slx_name.split('--')[1]}}
-    name: {{slx_name.split('--')[1]}}-slo-alert-workflow
+    name: {{slx_name.split('--')[1]}}-sli-alert-workflow
