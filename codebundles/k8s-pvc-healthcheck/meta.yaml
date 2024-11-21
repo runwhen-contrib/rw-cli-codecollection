@@ -618,9 +618,10 @@ commands:
 - command: 'NAMESPACE="${NAMESPACE}"; CONTEXT="${CONTEXT}"; PODS=$(kubectl get pods
     -n $NAMESPACE --context=$CONTEXT -o json); for pod in $(jq -r ''.items[] | @base64''
     <<< "$PODS"); do _jq() { jq -r \${1} <<< "$(base64 --decode <<< \${pod})"; };
-    POD_NAME=$(_jq ''.metadata.name''); POD_NODE_NAME=$(kubectl get pod $POD_NAME
-    -n $NAMESPACE --context=$CONTEXT -o custom-columns=:.spec.nodeName --no-headers);
-    PVC_NAMES=$(kubectl get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o jsonpath=''{.spec.volumes[*].persistentVolumeClaim.claimName}'');
+    POD_NAME=$(_jq ''.metadata.name''); [[ "$(_jq ''.metadata.ownerReferences[0].kind'')"
+    == "Job" ]] && continue; POD_NODE_NAME=$(kubectl get pod $POD_NAME -n $NAMESPACE
+    --context=$CONTEXT -o custom-columns=:.spec.nodeName --no-headers); PVC_NAMES=$(kubectl
+    get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o jsonpath=''{.spec.volumes[*].persistentVolumeClaim.claimName}'');
     for pvc_name in $PVC_NAMES; do PVC=$(kubectl get pvc $pvc_name -n $NAMESPACE --context=$CONTEXT
     -o json); ACCESS_MODE=$(jq -r ''.spec.accessModes[0]'' <<< "$PVC"); if [[ "$ACCESS_MODE"
     == "ReadWriteOnce" ]]; then PV_NAME=$(jq -r ''.spec.volumeName'' <<< "$PVC");
@@ -634,77 +635,90 @@ commands:
     $STORAGE_NODE_NAME"; echo; fi; done; done'
   doc_links: '
 
-    - [Bash scripting tutorial](https://www.tutorialspoint.com/unix/shell_scripting.htm){:target="_blank"}
+    - [Kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
-    - [Kubectl documentation](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+    - [Kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
 
-    - [Understanding Kubernetes Pods](https://kubernetes.io/docs/concepts/workloads/pods/pod/){:target="_blank"}
+    - [Persistent Volumes in Kubernetes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/){:target="_blank"}
 
-    - [Understanding Kubernetes Persistent Volume Claims](https://kubernetes.io/docs/concepts/storage/persistent-volumes/){:target="_blank"}'
-  explanation: This command is a bash script that uses the kubectl command to retrieve
-    information about pods and their associated persistent volume claims and check
-    if the storage node matches the pod node. If there is a mismatch, it will display
-    an error message.
-  multi_line_details: "\n# Set the namespace and context variables\nNAMESPACE=\"${NAMESPACE}\"\
-    \nCONTEXT=\"${CONTEXT}\"\n\n# Retrieve pods on the given namespace and context\
-    \ in JSON format\nPODS=$(kubectl get pods -n $NAMESPACE --context=$CONTEXT -o\
-    \ json)\n\n# Loop through each pod and gather relevant information\nfor pod in\
-    \ $(jq -r '.items[] | @base64' <<< \"$PODS\"); do\n    _jq() { jq -r \\${1} <<<\
-    \ \"$(base64 --decode <<< \\${pod})\"; }\n    POD_NAME=$(_jq '.metadata.name')\n\
-    \    \n    # Get the node where the pod is running\n    POD_NODE_NAME=$(kubectl\
-    \ get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o custom-columns=:.spec.nodeName\
-    \ --no-headers)\n    \n    # Get the PVC names associated with the pod\n    PVC_NAMES=$(kubectl\
+    - [Kubernetes Nodes](https://kubernetes.io/docs/concepts/architecture/nodes/){:target="_blank"}
+
+    - [Bash Scripting Tutorial for Beginners](https://linuxconfig.org/bash-scripting-tutorial-for-beginners){:target="_blank"}'
+  explanation: This command is a bash script that uses kubectl to gather information
+    about pods, their associated persistent volumes, and the nodes they are running
+    on, checking for any mismatched data between the pod and storage nodes. If a mismatch
+    is found, it outputs an error message.
+  multi_line_details: "\n# Assign the value of the NAMESPACE environment variable\
+    \ to a new variable\nNAMESPACE=\"${NAMESPACE}\"\n\n# Assign the value of the CONTEXT\
+    \ environment variable to a new variable\nCONTEXT=\"${CONTEXT}\" \n\n# Retrieve\
+    \ the list of pods in the specified namespace and context as JSON\nPODS=$(kubectl\
+    \ get pods -n $NAMESPACE --context=$CONTEXT -o json) \n\n# Loop through each pod\
+    \ entry in the JSON list and perform operations\nfor pod in $(jq -r '.items[]\
+    \ | @base64' <<< \"$PODS\"); do \n    # Define a custom function using jq\n  \
+    \  _jq() { \n        jq -r \"${1}\" <<< \"$(base64 --decode <<< \"${pod}\")\"\
+    ; \n    } \n    \n    # Obtain the name of the current pod\n    POD_NAME=$(_jq\
+    \ '.metadata.name')\n\n    # Check if the pod is associated with a \"Job\", and\
+    \ if so, skip to the next iteration\n    [[ \"$(_jq '.metadata.ownerReferences[0].kind')\"\
+    \ == \"Job\" ]] && continue\n    \n    # Retrieve the node name where the pod\
+    \ is running\n    POD_NODE_NAME=$(kubectl get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT\
+    \ -o custom-columns=:.spec.nodeName --no-headers)\n    \n    # Retrieve the names\
+    \ of persistent volume claims (PVC) associated with the pod\n    PVC_NAMES=$(kubectl\
     \ get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o jsonpath='{.spec.volumes[*].persistentVolumeClaim.claimName}')\n\
-    \    \n    # Loop through each PVC name and gather relevant information\n    for\
-    \ pvc_name in $PVC_NAMES; do\n        PVC=$(kubectl get pvc $pvc_name -n $NAMESPACE\
-    \ --context=$CONTEXT -o json)\n        ACCESS_MODE=$(jq -r '.spec.accessModes[0]'\
-    \ <<< \"$PVC\")\n        \n        # Check if the PVC access mode is ReadWriteOnce\n\
-    \        if [[ \"$ACCESS_MODE\" == \"ReadWriteOnce\" ]]; then\n            PV_NAME=$(jq\
-    \ -r '.spec.volumeName' <<< \"$PVC\")\n            \n            # Get the node\
-    \ where the storage belonging to the PVC is attached\n            STORAGE_NODE_NAME=$(jq\
-    \ -r --arg pv \"$PV_NAME\" '.items[] | select(.status.volumesAttached != null)\
-    \ | select(.status.volumesInUse[] | contains($pv)) | .metadata.name' <<< \"$(kubectl\
-    \ get nodes --context=$CONTEXT -o json)\")\n            \n            # Print\
-    \ the corresponding information based on the comparison between the pod node and\
-    \ storage node\n            echo \"------------\"\n            \n            if\
-    \ [[ \"$POD_NODE_NAME\" == \"$STORAGE_NODE_NAME\" ]]; then\n                echo\
-    \ \"OK: Pod and Storage Node Matched\"\n            else\n                echo\
-    \ \"Error: Pod and Storage Node Mismatched - If the issue persists, the node requires\
-    \ attention.\"\n            fi\n            \n            echo \"Pod: $POD_NAME\"\
-    \n            echo \"PVC: $pvc_name\"\n            echo \"PV: $PV_NAME\"\n   \
-    \         echo \"Node with Pod: $POD_NODE_NAME\"\n            echo \"Node with\
-    \ Storage: $STORAGE_NODE_NAME\"\n            echo\n        fi\n    done\ndone\n"
+    \    \n    # Loop through each PVC name to obtain more details\n    for pvc_name\
+    \ in $PVC_NAMES; do \n        PVC=$(kubectl get pvc $pvc_name -n $NAMESPACE --context=$CONTEXT\
+    \ -o json)\n        ACCESS_MODE=$(jq -r '.spec.accessModes[0]' <<< \"$PVC\")\n\
+    \        \n        # If the access mode of the PVC is ReadWriteOnce, proceed with\
+    \ further checks\n        if [[ \"$ACCESS_MODE\" == \"ReadWriteOnce\" ]]; then\
+    \ \n            PV_NAME=$(jq -r '.spec.volumeName' <<< \"$PVC\")\n           \
+    \ \n            # Retrieve the node where the persistent volume (PV) is attached\n\
+    \            STORAGE_NODE_NAME=$(jq -r --arg pv \"$PV_NAME\" '.items[] | select(.status.volumesAttached\
+    \ != null) | select(.status.volumesInUse[] | contains($pv)) | .metadata.name'\
+    \ <<< \"$(kubectl get nodes --context=$CONTEXT -o json)\")\n            \n   \
+    \         # Display relevant information comparing pod and storage node associations\n\
+    \            echo \"------------\"\n            if [[ \"$POD_NODE_NAME\" == \"\
+    $STORAGE_NODE_NAME\" ]]; then \n                echo \"OK: Pod and Storage Node\
+    \ Matched\"\n            else \n                echo \"Error: Pod and Storage\
+    \ Node Mismatched - If the issue persists, the node requires attention.\"\n  \
+    \          fi\n            echo \"Pod: $POD_NAME\"\n            echo \"PVC: $pvc_name\"\
+    \n            echo \"PV: $PV_NAME\"\n            echo \"Node with Pod: $POD_NODE_NAME\"\
+    \n            echo \"Node with Storage: $STORAGE_NODE_NAME\"\n            echo\n\
+    \        fi\n    done\ndone\n"
   name: check_for_rwo_persistent_volume_node_attachment_issues_in_namespace_namespace
-  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
-    or Site Reliability Engineer may need to use this command to check for any mismatch
-    between storage nodes and pod nodes, which could be causing the CrashLoopBackoff
-    events.
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: when
+    a pod is constantly crashing and restarting, the DevOps or SRE might use this
+    bash script to gather information about the pods and their associated persistent
+    volumes to identify any issues causing the CrashLoopBackoff.
 
 
-    2. Investigating storage-related issues: If there are issues with persistent volume
-    claims not being properly mounted or accessed by pods, the engineer may use this
-    command to identify any mismatches between the storage and pod nodes.
+    2. Investigating performance issues in Kubernetes: if there are performance degradation
+    or latency issues within a Kubernetes cluster, the DevOps or SRE might use this
+    script to analyze the state of pods and their storage to identify any discrepancies
+    that could be affecting performance.
 
 
-    3. Resolving performance problems: When experiencing poor performance in a Kubernetes
-    environment, checking for mismatches between storage and pod nodes can help identify
-    potential bottlenecks and aid in optimizing performance.
+    3. Checking for resource constraints: the script can also be used to check if
+    any pods are experiencing resource constraints, such as running out of disk space
+    or exceeding CPU/memory limits, by gathering information about pods and their
+    associated persistent volumes.
 
 
-    4. Debugging unexpected errors: In case of unexpected errors related to storage
-    operations in Kubernetes, such as file system errors or mount failures, using
-    this command can help pinpoint any discrepancies between storage and pod nodes.
+    4. Debugging node failures: if there are issues with nodes failing or going offline
+    within the Kubernetes cluster, the script can be used to gather data about pods
+    and their nodes to identify any mismatches or inconsistencies that may be contributing
+    to the failures.
 
 
-    5. Ensuring data consistency: To ensure data consistency and integrity within
-    a Kubernetes cluster, DevOps or SREs may use this command to verify that persistent
-    volume claims are correctly linked to their respective pods.'
+    5. Auditing storage allocation: the script can be used to audit the allocation
+    and usage of persistent volumes within the cluster, ensuring that each pod has
+    the appropriate storage resources and identifying any discrepancies in storage
+    allocation.'
 - command: 'NAMESPACE="${NAMESPACE}"; CONTEXT="${CONTEXT}"; PODS=$(kubectl get pods
     -n $NAMESPACE --context=$CONTEXT -o json); for pod in $(jq -r ''.items[] | @base64''
     <<< "$PODS"); do _jq() { jq -r \${1} <<< "$(base64 --decode <<< \${pod})"; };
-    POD_NAME=$(_jq ''.metadata.name''); POD_NODE_NAME=$(kubectl get pod $POD_NAME
-    -n $NAMESPACE --context=$CONTEXT -o custom-columns=:.spec.nodeName --no-headers);
-    PVC_NAMES=$(kubectl get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o jsonpath=''{.spec.volumes[*].persistentVolumeClaim.claimName}'');
+    POD_NAME=$(_jq ''.metadata.name''); [[ "$(_jq ''.metadata.ownerReferences[0].kind'')"
+    == "Job" ]] && continue; POD_NODE_NAME=$(kubectl get pod $POD_NAME -n $NAMESPACE
+    --context=$CONTEXT -o custom-columns=:.spec.nodeName --no-headers); PVC_NAMES=$(kubectl
+    get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o jsonpath=''{.spec.volumes[*].persistentVolumeClaim.claimName}'');
     for pvc_name in $PVC_NAMES; do PVC=$(kubectl get pvc $pvc_name -n $NAMESPACE --context=$CONTEXT
     -o json); ACCESS_MODE=$(jq -r ''.spec.accessModes[0]'' <<< "$PVC"); if [[ "$ACCESS_MODE"
     == "ReadWriteOnce" ]]; then PV_NAME=$(jq -r ''.spec.volumeName'' <<< "$PVC");
@@ -718,68 +732,80 @@ commands:
     $STORAGE_NODE_NAME"; echo; fi; done; done'
   doc_links: '
 
-    - [Bash scripting tutorial](https://www.tutorialspoint.com/unix/shell_scripting.htm){:target="_blank"}
+    - [Kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
 
-    - [Kubectl documentation](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+    - [Kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
 
-    - [Understanding Kubernetes Pods](https://kubernetes.io/docs/concepts/workloads/pods/pod/){:target="_blank"}
+    - [Persistent Volumes in Kubernetes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/){:target="_blank"}
 
-    - [Understanding Kubernetes Persistent Volume Claims](https://kubernetes.io/docs/concepts/storage/persistent-volumes/){:target="_blank"}'
-  explanation: This command is a bash script that uses the kubectl command to retrieve
-    information about pods and their associated persistent volume claims and check
-    if the storage node matches the pod node. If there is a mismatch, it will display
-    an error message.
-  multi_line_details: "\n# Set the namespace and context variables\nNAMESPACE=\"${NAMESPACE}\"\
-    \nCONTEXT=\"${CONTEXT}\"\n\n# Retrieve pods on the given namespace and context\
-    \ in JSON format\nPODS=$(kubectl get pods -n $NAMESPACE --context=$CONTEXT -o\
-    \ json)\n\n# Loop through each pod and gather relevant information\nfor pod in\
-    \ $(jq -r '.items[] | @base64' <<< \"$PODS\"); do\n    _jq() { jq -r \\${1} <<<\
-    \ \"$(base64 --decode <<< \\${pod})\"; }\n    POD_NAME=$(_jq '.metadata.name')\n\
-    \    \n    # Get the node where the pod is running\n    POD_NODE_NAME=$(kubectl\
-    \ get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o custom-columns=:.spec.nodeName\
-    \ --no-headers)\n    \n    # Get the PVC names associated with the pod\n    PVC_NAMES=$(kubectl\
+    - [Kubernetes Nodes](https://kubernetes.io/docs/concepts/architecture/nodes/){:target="_blank"}
+
+    - [Bash Scripting Tutorial for Beginners](https://linuxconfig.org/bash-scripting-tutorial-for-beginners){:target="_blank"}'
+  explanation: This command is a bash script that uses kubectl to gather information
+    about pods, their associated persistent volumes, and the nodes they are running
+    on, checking for any mismatched data between the pod and storage nodes. If a mismatch
+    is found, it outputs an error message.
+  multi_line_details: "\n# Assign the value of the NAMESPACE environment variable\
+    \ to a new variable\nNAMESPACE=\"${NAMESPACE}\"\n\n# Assign the value of the CONTEXT\
+    \ environment variable to a new variable\nCONTEXT=\"${CONTEXT}\" \n\n# Retrieve\
+    \ the list of pods in the specified namespace and context as JSON\nPODS=$(kubectl\
+    \ get pods -n $NAMESPACE --context=$CONTEXT -o json) \n\n# Loop through each pod\
+    \ entry in the JSON list and perform operations\nfor pod in $(jq -r '.items[]\
+    \ | @base64' <<< \"$PODS\"); do \n    # Define a custom function using jq\n  \
+    \  _jq() { \n        jq -r \"${1}\" <<< \"$(base64 --decode <<< \"${pod}\")\"\
+    ; \n    } \n    \n    # Obtain the name of the current pod\n    POD_NAME=$(_jq\
+    \ '.metadata.name')\n\n    # Check if the pod is associated with a \"Job\", and\
+    \ if so, skip to the next iteration\n    [[ \"$(_jq '.metadata.ownerReferences[0].kind')\"\
+    \ == \"Job\" ]] && continue\n    \n    # Retrieve the node name where the pod\
+    \ is running\n    POD_NODE_NAME=$(kubectl get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT\
+    \ -o custom-columns=:.spec.nodeName --no-headers)\n    \n    # Retrieve the names\
+    \ of persistent volume claims (PVC) associated with the pod\n    PVC_NAMES=$(kubectl\
     \ get pod $POD_NAME -n $NAMESPACE --context=$CONTEXT -o jsonpath='{.spec.volumes[*].persistentVolumeClaim.claimName}')\n\
-    \    \n    # Loop through each PVC name and gather relevant information\n    for\
-    \ pvc_name in $PVC_NAMES; do\n        PVC=$(kubectl get pvc $pvc_name -n $NAMESPACE\
-    \ --context=$CONTEXT -o json)\n        ACCESS_MODE=$(jq -r '.spec.accessModes[0]'\
-    \ <<< \"$PVC\")\n        \n        # Check if the PVC access mode is ReadWriteOnce\n\
-    \        if [[ \"$ACCESS_MODE\" == \"ReadWriteOnce\" ]]; then\n            PV_NAME=$(jq\
-    \ -r '.spec.volumeName' <<< \"$PVC\")\n            \n            # Get the node\
-    \ where the storage belonging to the PVC is attached\n            STORAGE_NODE_NAME=$(jq\
-    \ -r --arg pv \"$PV_NAME\" '.items[] | select(.status.volumesAttached != null)\
-    \ | select(.status.volumesInUse[] | contains($pv)) | .metadata.name' <<< \"$(kubectl\
-    \ get nodes --context=$CONTEXT -o json)\")\n            \n            # Print\
-    \ the corresponding information based on the comparison between the pod node and\
-    \ storage node\n            echo \"------------\"\n            \n            if\
-    \ [[ \"$POD_NODE_NAME\" == \"$STORAGE_NODE_NAME\" ]]; then\n                echo\
-    \ \"OK: Pod and Storage Node Matched\"\n            else\n                echo\
-    \ \"Error: Pod and Storage Node Mismatched - If the issue persists, the node requires\
-    \ attention.\"\n            fi\n            \n            echo \"Pod: $POD_NAME\"\
-    \n            echo \"PVC: $pvc_name\"\n            echo \"PV: $PV_NAME\"\n   \
-    \         echo \"Node with Pod: $POD_NODE_NAME\"\n            echo \"Node with\
-    \ Storage: $STORAGE_NODE_NAME\"\n            echo\n        fi\n    done\ndone\n"
+    \    \n    # Loop through each PVC name to obtain more details\n    for pvc_name\
+    \ in $PVC_NAMES; do \n        PVC=$(kubectl get pvc $pvc_name -n $NAMESPACE --context=$CONTEXT\
+    \ -o json)\n        ACCESS_MODE=$(jq -r '.spec.accessModes[0]' <<< \"$PVC\")\n\
+    \        \n        # If the access mode of the PVC is ReadWriteOnce, proceed with\
+    \ further checks\n        if [[ \"$ACCESS_MODE\" == \"ReadWriteOnce\" ]]; then\
+    \ \n            PV_NAME=$(jq -r '.spec.volumeName' <<< \"$PVC\")\n           \
+    \ \n            # Retrieve the node where the persistent volume (PV) is attached\n\
+    \            STORAGE_NODE_NAME=$(jq -r --arg pv \"$PV_NAME\" '.items[] | select(.status.volumesAttached\
+    \ != null) | select(.status.volumesInUse[] | contains($pv)) | .metadata.name'\
+    \ <<< \"$(kubectl get nodes --context=$CONTEXT -o json)\")\n            \n   \
+    \         # Display relevant information comparing pod and storage node associations\n\
+    \            echo \"------------\"\n            if [[ \"$POD_NODE_NAME\" == \"\
+    $STORAGE_NODE_NAME\" ]]; then \n                echo \"OK: Pod and Storage Node\
+    \ Matched\"\n            else \n                echo \"Error: Pod and Storage\
+    \ Node Mismatched - If the issue persists, the node requires attention.\"\n  \
+    \          fi\n            echo \"Pod: $POD_NAME\"\n            echo \"PVC: $pvc_name\"\
+    \n            echo \"PV: $PV_NAME\"\n            echo \"Node with Pod: $POD_NODE_NAME\"\
+    \n            echo \"Node with Storage: $STORAGE_NODE_NAME\"\n            echo\n\
+    \        fi\n    done\ndone\n"
   name: check_for_rwo_persistent_volume_node_attachment_issues_in_namespace_namespace
-  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
-    or Site Reliability Engineer may need to use this command to check for any mismatch
-    between storage nodes and pod nodes, which could be causing the CrashLoopBackoff
-    events.
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: when
+    a pod is constantly crashing and restarting, the DevOps or SRE might use this
+    bash script to gather information about the pods and their associated persistent
+    volumes to identify any issues causing the CrashLoopBackoff.
 
 
-    2. Investigating storage-related issues: If there are issues with persistent volume
-    claims not being properly mounted or accessed by pods, the engineer may use this
-    command to identify any mismatches between the storage and pod nodes.
+    2. Investigating performance issues in Kubernetes: if there are performance degradation
+    or latency issues within a Kubernetes cluster, the DevOps or SRE might use this
+    script to analyze the state of pods and their storage to identify any discrepancies
+    that could be affecting performance.
 
 
-    3. Resolving performance problems: When experiencing poor performance in a Kubernetes
-    environment, checking for mismatches between storage and pod nodes can help identify
-    potential bottlenecks and aid in optimizing performance.
+    3. Checking for resource constraints: the script can also be used to check if
+    any pods are experiencing resource constraints, such as running out of disk space
+    or exceeding CPU/memory limits, by gathering information about pods and their
+    associated persistent volumes.
 
 
-    4. Debugging unexpected errors: In case of unexpected errors related to storage
-    operations in Kubernetes, such as file system errors or mount failures, using
-    this command can help pinpoint any discrepancies between storage and pod nodes.
+    4. Debugging node failures: if there are issues with nodes failing or going offline
+    within the Kubernetes cluster, the script can be used to gather data about pods
+    and their nodes to identify any mismatches or inconsistencies that may be contributing
+    to the failures.
 
 
-    5. Ensuring data consistency: To ensure data consistency and integrity within
-    a Kubernetes cluster, DevOps or SREs may use this command to verify that persistent
-    volume claims are correctly linked to their respective pods.'
+    5. Auditing storage allocation: the script can be used to audit the allocation
+    and usage of persistent volumes within the cluster, ensuring that each pod has
+    the appropriate storage resources and identifying any discrepancies in storage
+    allocation.'
