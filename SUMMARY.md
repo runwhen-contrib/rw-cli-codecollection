@@ -18,7 +18,6 @@
 * [aws-eks-node-reboot](codebundles/aws-eks-node-reboot/README.md)
 * [gcloud-log-inspection](codebundles/gcloud-log-inspection/README.md)
 * [k8s-app-troubleshoot](codebundles/k8s-app-troubleshoot/README.md)
-* [azure-monitor-event-triage](codebundles/azure-monitor-event-triage/README.md)
 * [k8s-redis-healthcheck](codebundles/k8s-redis-healthcheck/README.md)
 * [gcp-bucket-health](codebundles/gcp-bucket-health/README.md)
 * [curl-gmp-kong-ingress-inspection](codebundles/curl-gmp-kong-ingress-inspection/README.md)
