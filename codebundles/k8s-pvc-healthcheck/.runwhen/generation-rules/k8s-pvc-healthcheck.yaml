@@ -19,4 +19,4 @@ spec:
         - type: sli
         - type: runbook
           templateName: k8s-pvc-healthcheck-taskset.yaml
-        # - type: workflow
+        - type: workflow
