@@ -30,9 +30,9 @@ spec:
     - name: EVENT_TYPE
       value: Warning
     - name: EVENT_AGE
-      value: 5m
+      value: 10m
     - name: CONTAINER_RESTART_AGE
-      value: 5m
+      value: 10m
     - name: NAMESPACE
       value: {{match_resource.resource.metadata.name}}
     - name: CONTEXT
@@ -40,9 +40,9 @@ spec:
     - name: DISTRIBUTION
       value: Kubernetes
     - name: EVENT_THRESHOLD
-      value: '3'
+      value: '5'
     - name: CONTAINER_RESTART_THRESHOLD
-      value: '3'
+      value: '5'
   secretsProvided:
   {% if wb_version %}
     {% include "kubernetes-auth.yaml" ignore missing %}
@@ -54,11 +54,11 @@ spec:
     warning:
       operator: <
       threshold: '1'
-      for: '5m'
+      for: '10m'
     ticket:
       operator: <
       threshold: '1'
-      for: '10m'
+      for: '20m'
     page:
       operator: '=='
       threshold: '0'
