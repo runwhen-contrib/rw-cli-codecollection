@@ -4,7 +4,7 @@ with open("requirements.txt") as f:
     required = f.read().splitlines()
 
 setup(
-    name="rw-cli-keywords",
+    name="rw_cli_keywords",
     version=open("VERSION").read(),
     packages=["RW"],
     package_dir={"RW": "RW"},
