@@ -13,7 +13,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check AppService `${APPSERVICE}` Health Status In Resource Group `${AZ_RESOURCE_GROUP}`
+Check App Service `${APPSERVICE}` Health Status In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks the health status of a appservice workload.
     [Tags]    
     ${process}=    RW.CLI.Run Bash File
@@ -32,7 +32,7 @@ Check AppService `${APPSERVICE}` Health Status In Resource Group `${AZ_RESOURCE_
     END
     RW.Core.Add Pre To Report    ${process.stdout}
 
-Check AppService `${APPSERVICE}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
+Check App Service `${APPSERVICE}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Reviews key metrics for the app service and generates a report
     [Tags]    
     ${process}=    RW.CLI.Run Bash File
@@ -52,7 +52,7 @@ Check AppService `${APPSERVICE}` Key Metrics In Resource Group `${AZ_RESOURCE_GR
     END
     RW.Core.Add Pre To Report    ${process.stdout}
 
-Get AppService `${APPSERVICE}` Logs In Resource Group `${AZ_RESOURCE_GROUP}`
+Get App Service `${APPSERVICE}` Logs In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch logs of appservice workload
     [Tags]    appservice    logs    tail
     ${process}=    RW.CLI.Run Bash File
@@ -61,7 +61,6 @@ Get AppService `${APPSERVICE}` Logs In Resource Group `${AZ_RESOURCE_GROUP}`
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${process.stdout}
-
 Fetch App Service `${APPSERVICE}` Config In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch logs of appservice workload
     [Tags]    appservice    logs    tail
@@ -70,9 +69,18 @@ Fetch App Service `${APPSERVICE}` Config In Resource Group `${AZ_RESOURCE_GROUP}
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
+    IF    ${process.returncode} > 0
+        RW.Core.Add Issue    title=Azure Resource `${APPSERVICE}` In Resource Group `${AZ_RESOURCE_GROUP}` Has Errors In Activities
+        ...    severity=3
+        ...    next_steps=Review the report details produced by the configuration scan
+        ...    expected=Azure Resource `${APPSERVICE}` in resource group `${AZ_RESOURCE_GROUP}` has no misconfiguration(s)
+        ...    actual=Azure Resource `${APPSERVICE}` in resource group `${AZ_RESOURCE_GROUP}` has misconfiguration(s)
+        ...    reproduce_hint=Run config.sh
+        ...    details=${process.stdout}
+    END
     RW.Core.Add Pre To Report    ${process.stdout}
 
-Scan AppService `${APPSERVICE}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
+Scan App Service `${APPSERVICE}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events of appservice and checks for errors
     [Tags]    appservice    monitor    events    errors
     ${process}=    RW.CLI.Run Bash File
@@ -80,6 +88,16 @@ Scan AppService `${APPSERVICE}` Activities In Resource Group `${AZ_RESOURCE_GROU
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
+    ${next_steps}=    RW.CLI.Run Cli    cmd=echo -e "${process.stdout}" | grep "Next Steps" -A 20 | tail -n +2
+    IF    ${process.returncode} > 0
+        RW.Core.Add Issue    title=Azure Resource `${APPSERVICE}` In Resource Group `${AZ_RESOURCE_GROUP}` Has Errors In Activities
+        ...    severity=3
+        ...    next_steps=${next_steps.stdout}
+        ...    expected=Azure Resource `${APPSERVICE}` in resource group `${AZ_RESOURCE_GROUP}` has no errors or criticals in activity logs
+        ...    actual=Azure Resource `${APPSERVICE}` in resource group `${AZ_RESOURCE_GROUP}` has errors or critical events in activity logs
+        ...    reproduce_hint=Run activities.sh
+        ...    details=${process.stdout}
+    END
     RW.Core.Add Pre To Report    ${process.stdout}
 
 *** Keywords ***

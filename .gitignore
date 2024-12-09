@@ -3,11 +3,9 @@ __pycache__
 output.xml
 log.html
 report.html
-dist
-build
-*egg-info
-.kube
-*.out
+auth
+
+
 
 # Ignore Terraform state files
 **/terraform.tfstate
@@ -45,3 +43,8 @@ build
 **/.test/output/
 **/.test/.task/**
 .vscode/settings.json
+**.tf.local**
+**.tf.secret**
+**.secret**
+interactive_console_output.xml
+codebundles/aws-c7n-s3-health/.test/terraform/tf.secret

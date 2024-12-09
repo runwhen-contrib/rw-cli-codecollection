@@ -27,7 +27,9 @@ RUN echo "runwhen ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 # Adjust permissions for runwhen user
 RUN chown runwhen:0 -R $RUNWHEN_HOME/codecollection
 
-
+# Set RunWhen Temp Dir
+RUN mkdir -p /var/tmp/runwhen && chmod 1777 /var/tmp/runwhen
+ENV TMPDIR=/var/tmp/runwhen
 
 # Switch to runwhen user
 USER runwhen
