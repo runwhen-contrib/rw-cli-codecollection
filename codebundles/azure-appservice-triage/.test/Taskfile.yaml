@@ -74,20 +74,14 @@ tasks:
 
         # Fetch individual cluster details from Terraform state
         pushd terraform > /dev/null
-        cluster_name=$(terraform show -json terraform.tfstate | jq -r '
-          .values.root_module.resources[] | 
-          select(.type == "azurerm_kubernetes_cluster") | .values.name')
-        cluster_server=$(terraform show -json terraform.tfstate | jq -r '
-          .values.root_module.resources[] | 
-          select(.type == "azurerm_kubernetes_cluster") | .values.fqdn')
-        cluster_resource_group=$(terraform show -json terraform.tfstate | jq -r '
-          .values.root_module.resources[] | 
-          select(.type == "azurerm_kubernetes_cluster") | .values.resource_group_name')
+        resource_group=$(terraform show -json terraform.tfstate | jq -r '
+          .values.root_module.resources[] |
+          select(.type == "azurerm_resource_group") | .values.name')
         popd > /dev/null
 
         # Check if any of the required cluster variables are empty
-        if [ -z "$cluster_name" ] || [ -z "$cluster_server" ] || [ -z "$cluster_resource_group" ]; then
-          echo "Error: Missing cluster details. Ensure Terraform plan has been applied."
+        if [ -z "$resource_group" ]; then
+          echo "Error: Missing resource group details. Ensure Terraform plan has been applied."
           exit 1
         fi
 
@@ -103,13 +97,8 @@ tasks:
             tenantId: "$AZ_TENANT_ID"
             clientId: "$AZ_CLIENT_ID"
             clientSecret: "$AZ_CLIENT_SECRET"
-            aksClusters: 
-              clusters: 
-                - name: $cluster_name
-                  server: https://$cluster_server:443
-                  resource_group: $cluster_resource_group
-              resourceGroupLevelOfDetails:
-                $cluster_resource_group: basic
+            resourceGroupLevelOfDetails:
+              $resource_group: detailed
         codeCollections:
         - repoURL: "$repo_url"
           branch: "$branch_name"
@@ -280,7 +269,7 @@ tasks:
     cmds:
       - |
         # Source Envs for Auth
-        # source /workspace/codecollection-devtools/auth/terraform-azure
+        source /home/runwhen/codecollection/auth/terraform-azure
 
         # Set Additional env
         export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)
@@ -319,7 +308,7 @@ tasks:
     cmds:
       - |
         # Source Envs for Auth
-        # source /workspace/codecollection-devtools/auth/terraform-azure
+        source /home/runwhen/codecollection/auth/terraform-azure
 
         # Set Additional env
         export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)
@@ -347,7 +336,7 @@ tasks:
     cmds:
       - |
         # Source Envs for Auth
-        # source /workspace/codecollection-devtools/auth/terraform-azure
+        source /home/runwhen/codecollection/auth/terraform-azure
 
         # Set Additional env
         export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)

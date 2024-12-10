@@ -35,3 +35,7 @@ resource "azurerm_linux_web_app" "app-service-01" {
 output "app_service_url" {
   value = azurerm_linux_web_app.app-service-01.default_hostname
 }
+
+output "resource_group" {
+  value = azurerm_resource_group.test.name
+}

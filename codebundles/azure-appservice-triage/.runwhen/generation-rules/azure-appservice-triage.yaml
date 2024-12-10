@@ -5,6 +5,7 @@ spec:
   generationRules:
     - resourceTypes:
         - azure_appservice_web_apps
+        - azure_appservice_plans
       matchRules:
         - type: pattern
           pattern: ".+"
