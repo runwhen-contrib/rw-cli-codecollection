@@ -12,6 +12,13 @@ resource "azurerm_resource_group" "test" {
 
 }
 
+# Assign "Reader" role to the service account for the resource group
+resource "azurerm_role_assignment" "reader" {
+  scope                = azurerm_resource_group.test.id
+  role_definition_name = "Reader"
+  principal_id         = var.sp_principal_id
+}
+
 resource "azurerm_service_plan" "app-service-plan-01" {
   name                = "${var.codebundle}-01"
   location            = azurerm_resource_group.test.location
