@@ -32,35 +32,51 @@ Suite Setup         Suite Initialization
 #     END
 #     RW.Core.Add Pre To Report    ${process.stdout}
 
-# Check App Service `${APP_SERVICE_NAME}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
-#     [Documentation]    Reviews key metrics for the app service and generates a report
-#     [Tags]    
-#     ${process}=    RW.CLI.Run Bash File
-#     ...    bash_file=appservice_metrics.sh
-#     ...    env=${env}
-#     ...    timeout_seconds=180
-#     ...    include_in_history=false
-#     ${next_steps}=    RW.CLI.Run Cli    cmd=echo -e "${process.stdout}" | grep "Next Steps" -A 20 | tail -n +2
-#     IF    ${process.returncode} > 0
-#         RW.Core.Add Issue    title=App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}` Failed Metric Check
-#         ...    severity=2
-#         ...    next_steps=${next_steps.stdout}
-#         ...    expected=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no unusual metrics
-#         ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` metric check did not pass
-#         ...    reproduce_hint=Run appservice_metrics.sh
-#         ...    details=${process.stdout}
-#     END
-#     RW.Core.Add Pre To Report    ${process.stdout}
+Fetch App Service `${APP_SERVICE_NAME}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Reviews key metrics for the app service and generates a report
+    [Tags]    
+    ${metric_health}=    RW.CLI.Run Bash File
+    ...    bash_file=appservice_metric_health.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${metric_health.stdout}
+    ${summary}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/app_service_metrics_summary.txt
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${summary.stdout}
 
-# Get App Service `${APP_SERVICE_NAME}` Logs In Resource Group `${AZ_RESOURCE_GROUP}`
-#     [Documentation]    Fetch logs of appservice workload
-#     [Tags]    appservice    logs    tail
-#     ${process}=    RW.CLI.Run Bash File
-#     ...    bash_file=appservice_logs.sh
-#     ...    env=${env}
-#     ...    timeout_seconds=180
-#     ...    include_in_history=false
-#     RW.Core.Add Pre To Report    ${process.stdout}
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/app_service_metrics.json
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list["metrics"]}) > 0
+        FOR    ${item}    IN    @{issue_list["metrics"]}
+            RW.Core.Add Issue    
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_step"]}
+            ...    expected=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has healthy metrics
+            ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has metric issues
+            ...    reproduce_hint=${metric_health.cmd}
+            ...    details=${item["details"]}        
+        END
+    END
+
+
+Get App Service `${APP_SERVICE_NAME}` Logs In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Fetch logs of appservice workload
+    [Tags]    appservice    logs    tail
+    ${logs}=    RW.CLI.Run Bash File
+    ...    bash_file=appservice_logs.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${logs.stdout}
 
 Check Configuration Health of App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch logs of appservice workload
