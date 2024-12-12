@@ -41,8 +41,32 @@ Check App Service `${APP_SERVICE_NAME}` Configuration Health In Resource Group `
     END
 
 
+Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Gets the events of appservice and checks for errors
+    [Tags]    appservice    monitor    events    errors
+    ${activities}=    RW.CLI.Run Bash File
+    ...    bash_file=appservice_activities.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${activities.stdout}
+
+    ${issues}=    RW.CLI.Run Cli    cmd=cat ${OUTPUT DIR}/app_service_activities_issues.json
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    Set Global Variable     ${app_service_activities_score}    1
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            IF    ${item["severity"]} == 1 or ${item["severity"]} == 2
+                Set Global Variable    ${app_service_activities_score}    0
+                Exit For Loop
+            ELSE IF    ${item["severity"]} > 2
+                Set Global Variable    ${app_service_activities_score}    1
+            END
+        END
+    END
+
 Generate App Service Health Score
-    ${app_service_health_score}=      Evaluate  (${app_service_config_score}) / 3
+    ${app_service_health_score}=      Evaluate  (${app_service_config_score} + ${app_service_activities_score}) / 3
     ${health_score}=      Convert to Number    ${app_service_health_score}  2
     RW.Core.Push Metric    ${health_score}
 

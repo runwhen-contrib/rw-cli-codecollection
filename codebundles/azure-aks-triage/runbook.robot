@@ -66,7 +66,7 @@ Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${
             ...    next_steps=${item["next_step"]}
             ...    expected=AKS Cluster `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has no Warning/Error/Critical activities
             ...    actual=AKS Cluster `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has Warning/Error/Critical activities
-            ...    reproduce_hint=${activites.cmd}
+            ...    reproduce_hint=${activities.cmd}
             ...    details=${item["details"]}        
         END
     END
@@ -84,13 +84,13 @@ Check Network Configuration of AKS Cluster `${AKS_CLUSTER}` In Resource Group `$
 Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the activities for the AKS cluster set and checks for errors
     [Tags]    AKS    activities    monitor    events    errors
-    ${activites}=    RW.CLI.Run Bash File
+    ${activities}=    RW.CLI.Run Bash File
     ...    bash_file=aks_activities.sh
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
 
-    RW.Core.Add Pre To Report    ${activites.stdout}
+    RW.Core.Add Pre To Report    ${activities.stdout}
 
     ${issues}=    RW.CLI.Run Cli    cmd=cat ${OUTPUT DIR}/aks_activities_issues.json
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
@@ -102,7 +102,7 @@ Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOUR
             ...    next_steps=${item["next_step"]}
             ...    expected=AKS Cluster `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has no Warning/Error/Critical activities
             ...    actual=AKS Cluster `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has Warning/Error/Critical activities
-            ...    reproduce_hint=${activites.cmd}
+            ...    reproduce_hint=${activities.cmd}
             ...    details=${item["details"]}        
         END
     END
@@ -120,7 +120,7 @@ Suite Initialization
     ...    pattern=\w*
     ${TIME_PERIOD_MINUTES}=    RW.Core.Import User Variable    TIME_PERIOD_MINUTES
     ...    type=string
-    ...    description=The time period, in minutes, to look back for activites/events. 
+    ...    description=The time period, in minutes, to look back for activities/events. 
     ...    pattern=\w*
     ...    default=60
     ${azure_credentials}=    RW.Core.Import Secret

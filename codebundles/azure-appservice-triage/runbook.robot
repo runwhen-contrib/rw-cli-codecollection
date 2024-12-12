@@ -92,25 +92,30 @@ Check Configuration Health of App Service `${APP_SERVICE_NAME}` In Resource Grou
     END
 
 
-# Scan App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
-#     [Documentation]    Gets the events of appservice and checks for errors
-#     [Tags]    appservice    monitor    events    errors
-#     ${process}=    RW.CLI.Run Bash File
-#     ...    bash_file=appservice_activities.sh
-#     ...    env=${env}
-#     ...    timeout_seconds=180
-#     ...    include_in_history=false
-#     ${next_steps}=    RW.CLI.Run Cli    cmd=echo -e "${process.stdout}" | grep "Next Steps" -A 20 | tail -n +2
-#     IF    ${process.returncode} > 0
-#         RW.Core.Add Issue    title=Azure Resource `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}` Has Errors In Activities
-#         ...    severity=3
-#         ...    next_steps=${next_steps.stdout}
-#         ...    expected=Azure Resource `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no errors or criticals in activity logs
-#         ...    actual=Azure Resource `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has errors or critical events in activity logs
-#         ...    reproduce_hint=Run activities.sh
-#         ...    details=${process.stdout}
-#     END
-#     RW.Core.Add Pre To Report    ${process.stdout}
+Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Gets the events of appservice and checks for errors
+    [Tags]    appservice    monitor    events    errors
+    ${activities}=    RW.CLI.Run Bash File
+    ...    bash_file=appservice_activities.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${activities.stdout}
+
+    ${issues}=    RW.CLI.Run Cli    cmd=cat ${OUTPUT DIR}/app_service_activities_issues.json
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            RW.Core.Add Issue    
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_step"]}
+            ...    expected=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no Warning/Error/Critical activities
+            ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has Warning/Error/Critical activities
+            ...    reproduce_hint=${activities.cmd}
+            ...    details=${item["details"]}        
+        END
+    END
 
 *** Keywords ***
 Suite Initialization
@@ -130,7 +135,7 @@ Suite Initialization
     ...    pattern=\w*
     ${TIME_PERIOD_MINUTES}=    RW.Core.Import User Variable    TIME_PERIOD_MINUTES
     ...    type=string
-    ...    description=The time period, in minutes, to look back for activites/events. 
+    ...    description=The time period, in minutes, to look back for activities/events. 
     ...    pattern=\w*
     ...    default=10
     Set Suite Variable    ${APP_SERVICE_NAME}    ${APP_SERVICE_NAME}
