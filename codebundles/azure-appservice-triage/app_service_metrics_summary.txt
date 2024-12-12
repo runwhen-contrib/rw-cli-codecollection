@@ -1,4 +1,0 @@
-Azure App Service Metrics Summary
-=================================
-
-Issues Detected: 0

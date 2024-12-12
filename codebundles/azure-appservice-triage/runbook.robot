@@ -49,13 +49,13 @@ Fetch App Service `${APP_SERVICE_NAME}` Key Metrics In Resource Group `${AZ_RESO
     RW.Core.Add Pre To Report    ${summary.stdout}
 
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/app_service_metrics.json
+    ...    cmd=cat ${OUTPUT_DIR}/app_service_issues.json
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    IF    len(@{issue_list["metrics"]}) > 0
-        FOR    ${item}    IN    @{issue_list["metrics"]}
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
             RW.Core.Add Issue    
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
