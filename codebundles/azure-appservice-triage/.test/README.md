@@ -1,0 +1,2 @@
+export APP_SERVICE_NAME=azure-appservice-triage-01
+export AZ_RESOURCE_GROUP=azure-appservice-triage

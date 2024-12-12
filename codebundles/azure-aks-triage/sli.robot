@@ -74,8 +74,17 @@ Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    ${aks_config_score}=    Evaluate    1 if len(@{issue_list["issues"]}) > 0 else 0
-    Set Global Variable    ${aks_config_score}
+    Set Global Variable     ${aks_config_score}    1
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            IF    ${item["severity"]} == 1 or ${item["severity"]} == 2
+                Set Global Variable    ${aks_config_score}    0
+                Exit For Loop
+            ELSE IF    ${item["severity"]} > 2
+                Set Global Variable    ${aks_config_score}    1
+            END
+        END
+    END
 
 Generate AKS Cluster Health Score
     ${aks_cluster_health_score}=      Evaluate  (${aks_resource_score} + ${aks_activities_score} + ${aks_config_score}) / 3

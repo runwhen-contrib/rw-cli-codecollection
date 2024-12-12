@@ -20,10 +20,10 @@ ALLOWED_MEM=80
 BYTE_THRESHOLD=1
 METRIC_TOP=100
 
-# # Log in to Azure CLI
-# az login --service-principal --username $AZ_USERNAME --password $AZ_SECRET_VALUE --tenant $AZ_TENANT > /dev/null
+subscription_id=$(az account show --query "id" -o tsv)
+
 # # Set the subscription
-# az account set --subscription $AZ_SUBSCRIPTION
+az account set --subscription $subscription_id
 
 # get service plan in order to fetch other metrics
 service_plan=$(az webapp show --name $APPSERVICE --resource-group $AZ_RESOURCE_GROUP --query appServicePlanId)
