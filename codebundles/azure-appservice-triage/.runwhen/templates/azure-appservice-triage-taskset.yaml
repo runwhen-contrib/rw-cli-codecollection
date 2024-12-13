@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   location: {{default_location}}
-  description: Generates a report for Azure App Service Web Apps and surfaces issues to be actioned.
+  description: Generates a report for Azure App Service {{match_resource.resource.name}} in resource group {{resource_group.name}}
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -24,10 +24,10 @@ spec:
   configProvided:
     - name: AZ_RESOURCE_GROUP
       value: {{resource_group.name}}
-    - name: APPSERVICE
+    - name: APP_SERVICE_NAME
       value: {{match_resource.resource.name}}
-   - name: AZURE_RESOURCE_SUBSCRIPTION_ID
-      value: "{{ match_resource.subscription_id }}"
+    - name: TIME_PERIOD_MINUTES
+      value: "10"
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}
