@@ -33,13 +33,5 @@ spec:
     {% include "azure-auth.yaml" ignore missing %}
   {% else %}
     - name: azure_credentials
-      workspaceKey: azure:sp@cli
-    - name: az_subscriptionId
-      workspaceKey: az_subscriptionId
-    - name: az_clientId
-      workspaceKey: az_clientId
-    - name: az_tenantId
-      workspaceKey: az_tenantId
-    - name: az_clientSecret
-      workspaceKey: az_clientSecret
+      workspaceKey: AUTH DETAILS NOT FOUND
   {% endif %}
