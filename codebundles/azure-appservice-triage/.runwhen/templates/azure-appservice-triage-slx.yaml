@@ -8,13 +8,15 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/app%20services/10035-icon-service-App-Services.svg
-  alias: Azure App Service Web App {{match_resource.resource.name}}
-  asMeasuredBy: Availability of App Service Web App {{match_resource.resource.name}}.
+  alias: Azure App Service Web App {{match_resource.resource.name}} in resource group {{resource_group.name}}
+  asMeasuredBy: An aggregate score that is evaluated from configuration, metric, event or log issues. 
   configProvided:
-  - name: SLX_PLACEHOLDER
-    value: SLX_PLACEHOLDER
+  - name: AZ_RESOURCE_GROUP
+    value: {{resource_group.name}}
+  - name: APP_SERVICE_NAME
+    value: {{match_resource.resource.name}}
   owners:
   - {{workspace.owner_email}}
-  statement: App Service Web App should be available.
+  statement: App Service {{match_resource.resource.name}} in resource group {{resource_group.name}} be available and healthy. 
   additionalContext:
     name: "{{match_resource.resource.name}}"

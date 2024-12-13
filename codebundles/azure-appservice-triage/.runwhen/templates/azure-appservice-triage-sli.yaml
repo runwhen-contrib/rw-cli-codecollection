@@ -11,7 +11,7 @@ spec:
   displayUnitsShort: ok
   locations:
     - {{default_location}}
-  description: Measures the health of a Azure Application Gateway.
+  description: Measures the health of a Azure App Service {{match_resource.resource.name}} in resource group {{resource_group.name}}
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -29,8 +29,10 @@ spec:
   configProvided:
     - name: AZ_RESOURCE_GROUP
       value: {{resource_group.name}}
-    - name: APPSERVICE
+    - name: APP_SERVICE_NAME
       value: {{match_resource.resource.name}}
+    - name: TIME_PERIOD_MINUTES
+      value: 10
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}
