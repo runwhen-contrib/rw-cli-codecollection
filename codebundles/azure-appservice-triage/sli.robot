@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       Queries the health status of an App Service, and returns 0 when it's not healthy, and 1 when it is.
-Metadata            Author    jon-funk
+Metadata            Author    stewartshea
 Metadata            Display Name    Azure App Service Triage
 Metadata            Supports    Azure    App Service    Health
 
@@ -13,9 +13,35 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
+Check App Service `${APP_SERVICE_NAME}` Health Check Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Checks the health check metric of a appservice workload. If issues are generated with severity 1 or 2, the score is 0 / unhealthy. 
+    [Tags]    healthcheck    metric    appservice   
+    ${process}=    RW.CLI.Run Bash File
+    ...    bash_file=appservice_health_metric.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/app_service_health_check_issues.json
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    Set Global Variable     ${app_service_health_check_score}    1
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            IF    ${item["severity"]} == 1 or ${item["severity"]} == 2
+                Set Global Variable    ${app_service_health_check_score}    0
+                Exit For Loop
+            ELSE IF    ${item["severity"]} > 2
+                Set Global Variable    ${app_service_health_check_score}    1
+            END
+        END
+    END
 Check App Service `${APP_SERVICE_NAME}` Configuration Health In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Checks the health status of a appservice workload.
-    [Tags]    
+    [Documentation]    Checks the configuration health of a appservice workload. 1 = healthy, 0 = unhealthy. 
+    [Tags]    appservice    configuration    health
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_config_health.sh
     ...    env=${env}
@@ -66,7 +92,7 @@ Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOU
     END
 
 Generate App Service Health Score
-    ${app_service_health_score}=      Evaluate  (${app_service_config_score} + ${app_service_activities_score}) / 3
+    ${app_service_health_score}=      Evaluate  (${app_service_config_score} + ${app_service_activities_score} + ${app_service_health_check_score}) / 3
     ${health_score}=      Convert to Number    ${app_service_health_score}  2
     RW.Core.Push Metric    ${health_score}
 

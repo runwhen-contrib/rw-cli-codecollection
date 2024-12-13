@@ -19,8 +19,8 @@ resource "azurerm_role_assignment" "reader" {
   principal_id         = var.sp_principal_id
 }
 
-resource "azurerm_service_plan" "app-service-plan-01" {
-  name                = "${var.codebundle}-01"
+resource "azurerm_service_plan" "f1" {
+  name                = "${var.codebundle}-f1"
   location            = azurerm_resource_group.test.location
   resource_group_name = azurerm_resource_group.test.name
   os_type             = "Linux"
@@ -28,19 +28,47 @@ resource "azurerm_service_plan" "app-service-plan-01" {
 }
 
 resource "azurerm_linux_web_app" "app-service-01" {
-  name                = "${var.codebundle}-01"
+  name                = "${var.codebundle}-f1"
   location            = azurerm_resource_group.test.location
   resource_group_name = azurerm_resource_group.test.name
-  service_plan_id     = azurerm_service_plan.app-service-plan-01.id
+  service_plan_id     = azurerm_service_plan.f1.id
 
   site_config {
     always_on = false
   }
+  tags = var.tags
 
 }
 
-output "app_service_url" {
+resource "azurerm_service_plan" "b1" {
+  name                = "${var.codebundle}-b1"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  os_type             = "Linux"
+  sku_name            = "B1"
+}
+
+resource "azurerm_linux_web_app" "app-service-02" {
+  name                = "${var.codebundle}-b1"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  service_plan_id     = azurerm_service_plan.b1.id
+
+  site_config {
+    always_on                         = false
+    health_check_path                 = "/"
+    health_check_eviction_time_in_min = 2
+  }
+  tags = var.tags
+
+}
+
+output "f1-app_service_url" {
   value = azurerm_linux_web_app.app-service-01.default_hostname
+}
+
+output "b1-app_service_url" {
+  value = azurerm_linux_web_app.app-service-02.default_hostname
 }
 
 output "resource_group" {

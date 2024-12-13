@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       Triages an Azure App Service and its workloads, checking its status and logs and verifying key metrics.
-Metadata            Author    jon-funk
+Metadata            Author    stewartshea
 Metadata            Display Name    Azure App Service Triage
 Metadata            Supports    Azure    App Service    Health
 
@@ -13,24 +13,49 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-# Check App Service `${APP_SERVICE_NAME}` Health Status In Resource Group `${AZ_RESOURCE_GROUP}`
-#     [Documentation]    Checks the health status of a appservice workload.
-#     [Tags]    
-#     ${process}=    RW.CLI.Run Bash File
-#     ...    bash_file=appservice_health.sh
-#     ...    env=${env}
-#     ...    timeout_seconds=180
-#     ...    include_in_history=false
-#     IF    ${process.returncode} > 0
-#         RW.Core.Add Issue    title=App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}` Failing Health Check
-#         ...    severity=2
-#         ...    next_steps=Tail the logs of the App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}`\nReview resource usage metrics of App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}`
-#         ...    expected=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` should not be failing its health check
-#         ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` is failing its health check
-#         ...    reproduce_hint=Run appservice_health.sh
-#         ...    details=${process.stdout}
-#     END
-#     RW.Core.Add Pre To Report    ${process.stdout}
+Check App Service `${APP_SERVICE_NAME}` Health Check Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Checks the health status of a appservice workload.
+    [Tags]    
+    ${health_check_metric}=    RW.CLI.Run Bash File
+    ...    bash_file=appservice_health_metric.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${health_check_metric.stdout}
+    
+    ${summary}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/app_service_health_check_summary.txt
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${summary.stdout}
+
+    ${metrics}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/app_service_health_check_metrics.json
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${metrics.stdout}
+
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/app_service_health_check_issues.json
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            RW.Core.Add Issue    
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_step"]}
+            ...    expected=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has is reported healthy
+            ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has health check metric issues
+            ...    reproduce_hint=${health_check_metric.cmd}
+            ...    details=${item["details"]}        
+        END
+    END
+    RW.Core.Add Pre To Report    ${health_check_metric.stdout}
 
 Fetch App Service `${APP_SERVICE_NAME}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Reviews key metrics for the app service and generates a report
