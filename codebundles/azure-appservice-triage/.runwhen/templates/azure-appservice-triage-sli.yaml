@@ -32,7 +32,7 @@ spec:
     - name: APP_SERVICE_NAME
       value: {{match_resource.resource.name}}
     - name: TIME_PERIOD_MINUTES
-      value: 10
+      value: "10"
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}
@@ -40,16 +40,3 @@ spec:
     - name: azure_credentials
       workspaceKey: AUTH DETAILS NOT FOUND
   {% endif %}
-  alerts:
-    warning:
-      operator: <
-      threshold: '1'
-      for: '20m'
-    ticket:
-      operator: <
-      threshold: '1'
-      for: '30m'
-    page:
-      operator: '=='
-      threshold: '0'
-      for: ''

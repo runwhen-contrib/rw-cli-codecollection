@@ -27,7 +27,7 @@ spec:
     - name: APP_SERVICE_NAME
       value: {{match_resource.resource.name}}
     - name: TIME_PERIOD_MINUTES
-      value: 10
+      value: "10"
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}
