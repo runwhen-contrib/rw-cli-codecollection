@@ -40,7 +40,7 @@ spec:
     - name: azure_credentials
       workspaceKey: AUTH DETAILS NOT FOUND
   {% endif %}
-    alerts:
+  alerts:
     warning:
       operator: <
       threshold: '1'

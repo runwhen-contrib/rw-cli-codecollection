@@ -89,7 +89,7 @@ tasks:
         cat <<EOF > workspaceInfo.yaml
         workspaceName: "$RW_WORKSPACE"
         workspaceOwnerEmail: authors@runwhen.com
-        defaultLocation: location-01
+        defaultLocation: location-01-us-west1
         defaultLOD: detailed
         cloudConfig:
           azure:
@@ -216,7 +216,7 @@ tasks:
 
             URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/${SLX_NAME}"
             echo "Uploading SLX: $SLX_NAME to $URL"
-            response=$(curl -v -X POST "$URL" \
+            response=$(curl -vvv -X POST "$URL" \
               -H "Authorization: Bearer $RW_PAT" \
               -H "Content-Type: application/json" \
               -d "$PAYLOAD" -w "%{http_code}" -o /dev/null -s 2>&1)
