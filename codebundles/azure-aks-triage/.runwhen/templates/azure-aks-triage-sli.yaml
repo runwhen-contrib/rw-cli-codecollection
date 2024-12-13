@@ -11,7 +11,7 @@ spec:
   displayUnitsShort: ok
   locations:
     - {{default_location}}
-  description: Score the health of a Azure AKS Cluster (1=Healthy, 0=Unhealthy) 
+  description: Measures the health of Azure AKS Cluster {{match_resource.resource.name}} in resource group {{resource_group.name}} (1=Healthy, 0=Unhealthy) 
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -40,3 +40,16 @@ spec:
     - name: azure_credentials
       workspaceKey: AUTH DETAILS NOT FOUND
   {% endif %}
+  alerts:
+    warning:
+      operator: <
+      threshold: '1'
+      for: '10m'
+    ticket:
+      operator: <
+      threshold: '1'
+      for: '15m'
+    page:
+      operator: '=='
+      threshold: '0'
+      for: ''
