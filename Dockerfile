@@ -18,16 +18,17 @@ RUN if [ -f "requirements.txt" ]; then pip install --no-cache-dir -r requirement
 #RUN apt-get update && \
 #    apt-get install -y --no-install-recommends net-tools && \
 #    apt-get clean && \
-#    rm -rRUN az extension add --name application-insights
-RUN az extension add --name application-insights
+#    rm -rf /var/lib/apt/lists/* /var/cache/apt
 
 # Add runwhen user to sudoers with no password prompt
 RUN echo "runwhen ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
+# Set RunWhen Temp Dir
+RUN mkdir -p /var/tmp/runwhen && chmod 1777 /var/tmp/runwhen
+ENV TMPDIR=/var/tmp/runwhen
+
 # Adjust permissions for runwhen user
 RUN chown runwhen:0 -R $RUNWHEN_HOME/codecollection
-
-
 
 # Switch to runwhen user
 USER runwhen
