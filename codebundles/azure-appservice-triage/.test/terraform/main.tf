@@ -19,6 +19,13 @@ resource "azurerm_role_assignment" "reader" {
   principal_id         = var.sp_principal_id
 }
 
+# Assign "Reader" role to the service account for the resource group
+resource "azurerm_role_assignment" "website-contributor" {
+  scope                = azurerm_resource_group.test.id
+  role_definition_name = "Website Contributor"
+  principal_id         = var.sp_principal_id
+}
+
 resource "azurerm_service_plan" "f1" {
   name                = "${var.codebundle}-f1"
   location            = azurerm_resource_group.test.location

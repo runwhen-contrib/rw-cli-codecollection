@@ -57,7 +57,7 @@ Check App Service `${APP_SERVICE_NAME}` Health Check Metrics In Resource Group `
     END
     RW.Core.Add Pre To Report    ${health_check_metric.stdout}
 
-Fetch App Service `${APP_SERVICE_NAME}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
+Fetch App Service `${APP_SERVICE_NAME}` Utilization Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Reviews key metrics for the app service and generates a report
     [Tags]    
     ${metric_health}=    RW.CLI.Run Bash File

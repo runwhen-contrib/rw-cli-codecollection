@@ -25,7 +25,7 @@ subscription_id=$(az account show --query "id" -o tsv)
 
 # Log in to Azure CLI (uncomment if needed)
 # az login --service-principal --username "$AZ_USERNAME" --password "$AZ_SECRET_VALUE" --tenant "$AZ_TENANT" > /dev/null
-# az account set --subscription "$AZ_SUBSCRIPTION"
+az account set --subscription "$subscription_id"
 
 # Remove previous issues.json file if it exists
 [ -f "$OUTPUT_DIR/issues.json" ] && rm "$OUTPUT_DIR/issues.json"
