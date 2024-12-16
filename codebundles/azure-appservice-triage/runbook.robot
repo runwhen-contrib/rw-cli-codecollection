@@ -13,6 +13,46 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
+Check for Resource Health Issues Affecting App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Fetch a list of issues that might affect the APP Service as reported from Azure. 
+    [Tags]    aks    resource    health    service    azure
+    ${resource_health}=    RW.CLI.Run Bash File
+    ...    bash_file=appservice_resource_health.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    RW.Core.Add Pre To Report    ${resource_health.stdout}
+
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/app_service_health.json 
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list}) > 0 
+        IF    "${issue_list["properties"]["title"]}" != "Available"
+            RW.Core.Add Issue
+            ...    severity=2
+            ...    expected=Azure resources should be available for APP Service`${APP_SERVICE_NAME}` in `${AZ_RESOURCE_GROUP}`
+            ...    actual=Azure resources are unhealthy for APP Service`${APP_SERVICE_NAME}` in `${AZ_RESOURCE_GROUP}`
+            ...    title=Azure reports an `${issue_list["properties"]["title"]}` Issue for APP Service`${APP_SERVICE_NAME}` in `${AZ_RESOURCE_GROUP}`
+            ...    reproduce_hint=${resource_health.cmd}
+            ...    details=${issue_list}
+            ...    next_steps=Please escalate to the Azure service owner or check back later.
+        END
+    ELSE
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=Azure resources health should be enabled for APP Service`${APP_SERVICE_NAME}` in `${AZ_RESOURCE_GROUP}`
+        ...    actual=Azure resource health appears unavailable for APP Service`${APP_SERVICE_NAME}` in `${AZ_RESOURCE_GROUP}`
+        ...    title=Azure resource health is unavailable for APP Service`${APP_SERVICE_NAME}` in `${AZ_RESOURCE_GROUP}`
+        ...    reproduce_hint=${resource_health.cmd}
+        ...    details=${issue_list}
+        ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
+    END
+
+
 Check App Service `${APP_SERVICE_NAME}` Health Check Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks the health status of a appservice workload.
     [Tags]    
