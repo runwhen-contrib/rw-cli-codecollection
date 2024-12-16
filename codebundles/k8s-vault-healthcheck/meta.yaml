@@ -666,6 +666,8 @@ commands:
 
     - [cURL Documentation](https://curl.se/docs/){:target="_blank"}
 
+    - [cURL Tutorial for Beginners](https://www.hostinger.com/tutorials/how-to-use-curl-for-api-requests){:target="_blank"}
+
     - [HTTP Request Methods](https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods){:target="_blank"}
 
     - [Vault Documentation](https://www.vaultproject.io/docs){:target="_blank"}'
@@ -704,6 +706,8 @@ commands:
   doc_links: '
 
     - [cURL Documentation](https://curl.se/docs/){:target="_blank"}
+
+    - [cURL Tutorial for Beginners](https://www.hostinger.com/tutorials/how-to-use-curl-for-api-requests){:target="_blank"}
 
     - [HTTP Request Methods](https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods){:target="_blank"}
 
