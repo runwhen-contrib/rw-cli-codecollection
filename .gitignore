@@ -46,3 +46,4 @@ build
 **/.test/.task/**
 .vscode/settings.json
 **auth**
+**.secret**
