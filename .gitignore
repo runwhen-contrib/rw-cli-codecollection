@@ -45,3 +45,4 @@ build
 **/.test/output/
 **/.test/.task/**
 .vscode/settings.json
+**auth**
