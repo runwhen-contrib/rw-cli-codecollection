@@ -198,9 +198,9 @@ Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOU
         END
     END
 
+
 *** Keywords ***
 Suite Initialization
-
     ${AZ_RESOURCE_GROUP}=    RW.Core.Import User Variable    AZ_RESOURCE_GROUP
     ...    type=string
     ...    description=The resource group to perform actions against.
@@ -216,12 +216,61 @@ Suite Initialization
     ...    pattern=\w*
     ${TIME_PERIOD_MINUTES}=    RW.Core.Import User Variable    TIME_PERIOD_MINUTES
     ...    type=string
-    ...    description=The time period, in minutes, to look back for activities/events. 
+    ...    description=The time period, in minutes, to look back for activites/events. 
     ...    pattern=\w*
     ...    default=10
+    ${CPU_THRESHOLD}=    RW.Core.Import User Variable    CPU_THRESHOLD
+    ...    type=string
+    ...    description=The CPU % threshold in which to generate an issue.
+    ...    pattern=\w*
+    ...    default=80
+    ${REQUESTS_THRESHOLD}=    RW.Core.Import User Variable    CPU_THRESHOLD
+    ...    type=string
+    ...    description=The threshold of requests/s in which to generate an issue.
+    ...    pattern=\w*
+    ...    default=1000
+    ${BYTES_RECEIVED_THRESHOLD}=    RW.Core.Import User Variable    BYTES_RECEIVED_THRESHOLD
+    ...    type=string
+    ...    description=The threshold of received bytes/s in which to generate an issue.
+    ...    pattern=\w*
+    ...    default=10485760
+    ${HTTP5XX_THRESHOLD}=    RW.Core.Import User Variable    HTTP5XX_THRESHOLD
+    ...    type=string
+    ...    description=The threshold of HTTP5XX/s in which to generate an issue. Higher than this value indicates a high error rate.
+    ...    pattern=\w*
+    ...    default=5
+    ${HTTP2XX_THRESHOLD}=    RW.Core.Import User Variable    HTTP2XX_THRESHOLD
+    ...    type=string
+    ...    description=The threshold of HTTP2XX/s in which to generate an issue. Less than this value indicates low success rate.
+    ...    pattern=\w*
+    ...    default=50
+    ${HTTP4XX_THRESHOLD}=    RW.Core.Import User Variable    HTTP4XX_THRESHOLD
+    ...    type=string
+    ...    description=The threshold of HTTP4XX/s in which to generate an issue. Higher than this value indicates high client error rate.
+    ...    pattern=\w*
+    ...    default=200
+    ${DISK_USAGE_THRESHOLD}=    RW.Core.Import User Variable    DISK_USAGE_THRESHOLD
+    ...    type=string
+    ...    description=The threshold of disk usage % in which to generate an issue.
+    ...    pattern=\w*
+    ...    default=90
+    ${AVG_RSP_TIME}=    RW.Core.Import User Variable    AVG_RSP_TIME
+    ...    type=string
+    ...    description=The threshold of average response time (ms) in which to generate an issue. Higher than this value indicates slow response time.
+    ...    pattern=\w*
+    ...    default=300
     Set Suite Variable    ${APP_SERVICE_NAME}    ${APP_SERVICE_NAME}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable    ${TIME_PERIOD_MINUTES}    ${TIME_PERIOD_MINUTES}
+    Set Suite Variable    ${CPU_THRESHOLD}    ${CPU_THRESHOLD}
+    Set Suite Variable    ${REQUESTS_THRESHOLD}    ${REQUESTS_THRESHOLD}
+    Set Suite Variable    ${BYTES_RECEIVED_THRESHOLD}    ${BYTES_RECEIVED_THRESHOLD}
+    Set Suite Variable    ${HTTP5XX_THRESHOLD}    ${HTTP5XX_THRESHOLD}
+    Set Suite Variable    ${HTTP2XX_THRESHOLD}    ${HTTP2XX_THRESHOLD}
+    Set Suite Variable    ${HTTP4XX_THRESHOLD}    ${HTTP4XX_THRESHOLD}
+    Set Suite Variable    ${DISK_USAGE_THRESHOLD}    ${DISK_USAGE_THRESHOLD}
+    Set Suite Variable    ${AVG_RSP_TIME}    ${AVG_RSP_TIME}
+
     Set Suite Variable
     ...    ${env}
-    ...    {"APP_SERVICE_NAME":"${APP_SERVICE_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "OUTPUT_DIR":"${OUTPUT DIR}", "TIME_PERIOD_MINUTES": "${TIME_PERIOD_MINUTES}"}
+    ...    {"APP_SERVICE_NAME":"${APP_SERVICE_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "OUTPUT_DIR":"${OUTPUT DIR}", "TIME_PERIOD_MINUTES":"${TIME_PERIOD_MINUTES}","CPU_THRESHOLD":"${CPU_THRESHOLD}", "REQUESTS_THRESHOLD":"${REQUESTS_THRESHOLD}", "BYTES_RECEIVED_THRESHOLD":"${BYTES_RECEIVED_THRESHOLD}", "HTTP5XX_THRESHOLD":"${HTTP5XX_THRESHOLD}","HTTP2XX_THRESHOLD":"${HTTP2XX_THRESHOLD}", "HTTP4XX_THRESHOLD":"${HTTP4XX_THRESHOLD}", "DISK_USAGE_THRESHOLD":"${DISK_USAGE_THRESHOLD}", "AVG_RSP_TIME":"${AVG_RSP_TIME}"}
