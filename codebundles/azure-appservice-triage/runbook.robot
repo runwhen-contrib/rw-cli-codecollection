@@ -256,9 +256,9 @@ Suite Initialization
     ...    default=90
     ${AVG_RSP_TIME}=    RW.Core.Import User Variable    AVG_RSP_TIME
     ...    type=string
-    ...    description=The threshold of average response time in which to generate an issue. Higher than this value indicates slow response time.
+    ...    description=The threshold of average response time (ms) in which to generate an issue. Higher than this value indicates slow response time.
     ...    pattern=\w*
-    ...    default=20
+    ...    default=300
     Set Suite Variable    ${APP_SERVICE_NAME}    ${APP_SERVICE_NAME}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable    ${TIME_PERIOD_MINUTES}    ${TIME_PERIOD_MINUTES}
