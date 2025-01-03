@@ -224,7 +224,7 @@ Suite Initialization
     ...    description=The CPU % threshold in which to generate an issue.
     ...    pattern=\w*
     ...    default=80
-    ${REQUESTS_THRESHOLD}=    RW.Core.Import User Variable    CPU_THRESHOLD
+    ${REQUESTS_THRESHOLD}=    RW.Core.Import User Variable    REQUESTS_THRESHOLD
     ...    type=string
     ...    description=The threshold of requests/s in which to generate an issue.
     ...    pattern=\w*
