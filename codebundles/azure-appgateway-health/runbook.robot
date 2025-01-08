@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       Performs a health check on Azure Application Gateways and the backend pools used by them, generating a report of issues and next steps.
-Metadata            Author    jon-funk
+Metadata            Author    stewartshea
 Metadata            Display Name    Azure Application Gateway Health
 Metadata            Supports    Azure    Application Gateway    Health
 

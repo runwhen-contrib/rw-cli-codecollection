@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       Queries the health of an Azure Application Gateway, returning 1 when it's healthy and 0 when it's unhealthy.
-Metadata            Author    jon-funk
+Metadata            Author    stewartshea
 Metadata            Display Name    Azure Application Gateway Health
 Metadata            Supports    Azure    Application Gateway    Health
 
