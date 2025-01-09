@@ -50,10 +50,20 @@ resource "azurerm_linux_web_app" "app1" {
   resource_group_name = azurerm_resource_group.test.name
   service_plan_id     = azurerm_service_plan.app1.id
 
-  site_config {
-    always_on = true
+  app_settings = {
+    "GAME" = "oregon"
   }
 
+  site_config {
+    always_on                         = true
+    health_check_path                 = "/"
+    health_check_eviction_time_in_min = 2
+    application_stack {
+      docker_image_name   = "stewartshea/js-dos-container:latest"
+      docker_registry_url = "https://ghcr.io"
+
+    }
+  }
   tags = var.tags
 }
 
@@ -63,12 +73,20 @@ resource "azurerm_linux_web_app" "app2" {
   resource_group_name = azurerm_resource_group.test.name
   service_plan_id     = azurerm_service_plan.app2.id
 
+  app_settings = {
+    "GAME" = "scorched_earth"
+  }
+
   site_config {
     always_on                         = true
     health_check_path                 = "/"
     health_check_eviction_time_in_min = 2
-  }
+    application_stack {
+      docker_image_name   = "stewartshea/js-dos-container:broken"
+      docker_registry_url = "https://ghcr.io"
 
+    }
+  }
   tags = var.tags
 }
 
@@ -77,14 +95,14 @@ resource "azurerm_public_ip" "appgw1" {
   name                = "appgw1-pip"
   location            = azurerm_resource_group.test.location
   resource_group_name = azurerm_resource_group.test.name
-  allocation_method   = "Dynamic"
+  allocation_method   = "Static"
 }
 
 resource "azurerm_public_ip" "appgw2" {
   name                = "appgw2-pip"
   location            = azurerm_resource_group.test.location
   resource_group_name = azurerm_resource_group.test.name
-  allocation_method   = "Dynamic"
+  allocation_method   = "Static"
 }
 
 # Application Gateways
@@ -116,30 +134,34 @@ resource "azurerm_application_gateway" "appgw1" {
 
   backend_address_pool {
     name = "app1-pool"
+    fqdns = [
+    azurerm_linux_web_app.app1.default_hostname]
   }
 
   backend_http_settings {
-    name                  = "default-http-settings"
-    cookie_based_affinity = "Disabled"
-    path                  = "/"
-    port                  = 80
-    protocol              = "Http"
-    request_timeout       = 20
+    name                                = "http-settings"
+    cookie_based_affinity               = "Disabled"
+    port                                = 80
+    protocol                            = "Http"
+    request_timeout                     = 20
+    pick_host_name_from_backend_address = true
   }
 
+
   http_listener {
-    name                           = "appgw1-listener"
+    name                           = "http-listener"
     frontend_ip_configuration_name = "appgw1-frontend"
     frontend_port_name             = "appgw1-port"
     protocol                       = "Http"
   }
 
   request_routing_rule {
-    name                       = "app1-rule"
+    name                       = "app1-routing-rule"
     rule_type                  = "Basic"
-    http_listener_name         = "appgw1-listener"
+    http_listener_name         = "http-listener"
     backend_address_pool_name  = "app1-pool"
-    backend_http_settings_name = "default-http-settings"
+    backend_http_settings_name = "http-settings"
+    priority                   = 200
   }
 
   tags = var.tags
@@ -155,6 +177,7 @@ resource "azurerm_application_gateway" "appgw2" {
     tier     = "Standard_v2"
     capacity = 1
   }
+
 
   gateway_ip_configuration {
     name      = "appgw2-ipconfig"
@@ -173,34 +196,39 @@ resource "azurerm_application_gateway" "appgw2" {
 
   backend_address_pool {
     name = "app2-pool"
+    fqdns = [
+      azurerm_linux_web_app.app2.default_hostname
+    ]
   }
 
   backend_http_settings {
-    name                  = "default-http-settings"
-    cookie_based_affinity = "Disabled"
-    path                  = "/"
-    port                  = 80
-    protocol              = "Http"
-    request_timeout       = 20
+    name                                = "http-settings"
+    cookie_based_affinity               = "Disabled"
+    port                                = 80
+    protocol                            = "Http"
+    request_timeout                     = 20
+    pick_host_name_from_backend_address = true
   }
 
   http_listener {
-    name                           = "appgw2-listener"
+    name                           = "http-listener"
     frontend_ip_configuration_name = "appgw2-frontend"
     frontend_port_name             = "appgw2-port"
     protocol                       = "Http"
   }
 
   request_routing_rule {
-    name                       = "app2-rule"
+    name                       = "app2-routing-rule"
     rule_type                  = "Basic"
-    http_listener_name         = "appgw2-listener"
+    http_listener_name         = "http-listener"
     backend_address_pool_name  = "app2-pool"
-    backend_http_settings_name = "default-http-settings"
+    backend_http_settings_name = "http-settings"
+    priority                   = 200
   }
 
   tags = var.tags
 }
+
 
 # Outputs
 output "app1_url" {
