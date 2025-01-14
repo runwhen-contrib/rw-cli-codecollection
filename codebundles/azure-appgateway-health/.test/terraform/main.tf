@@ -10,6 +10,21 @@ resource "azurerm_resource_group" "test" {
   tags     = var.tags
 }
 
+# Access Control
+# Assign "Reader" role to the service account for the resource group
+resource "azurerm_role_assignment" "reader" {
+  scope                = azurerm_resource_group.test.id
+  role_definition_name = "Reader"
+  principal_id         = var.sp_principal_id
+}
+
+# Assign "Reader" role to the service account for the resource group
+resource "azurerm_role_assignment" "website-contributor" {
+  scope                = azurerm_resource_group.test.id
+  role_definition_name = "Network Contributor"
+  principal_id         = var.sp_principal_id
+}
+
 # Virtual Network and Subnet
 resource "azurerm_virtual_network" "vnet" {
   name                = "appgw-vnet"
