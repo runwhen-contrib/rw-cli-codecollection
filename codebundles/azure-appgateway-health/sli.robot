@@ -35,21 +35,48 @@ Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NA
         ${appgw_resource_score}=    Set Variable    0
     END
     Set Global Variable    ${appgw_resource_score}
-# Check AppService `${APP_GATEWAY_NAME}` Health Status In Resource Group `${AZ_RESOURCE_GROUP}`
-#     [Documentation]    Checks the health status of a application gateway and its backend pools.
-#     [Tags]    
-#     ${process}=    RW.CLI.Run Bash File
-#     ...    bash_file=APP_GATEWAY_NAME_health.sh
-#     ...    env=${env}
-#     ...    timeout_seconds=180
-#     ...    include_in_history=false
-#     IF    ${process.returncode} > 0
-#         RW.Core.Push Metric    0
-#     ELSE
-#         RW.Core.Push Metric    1
-#     END
+
+Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Fetch the config of the AKS cluster in azure
+    [Tags]    AKS    config
+    ${config}=    RW.CLI.Run Bash File
+    ...    bash_file=app_gateway_config_health.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/app_gateway_config_health.json | jq '{issues: [.issues[] | select(.severity < 4)]}'
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${appgw_config_score}=    Evaluate    1 if len(@{issue_list["issues"]}) == 0 else 0
+    Set Global Variable    ${appgw_config_score}
+
+Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Fetch the health of the application gateway backend pool members
+    [Tags]    appservice    logs    tail
+    ${config_health}=    RW.CLI.Run Bash File
+    ...    bash_file=app_gateway_backend_health.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/backend_pool_members_health.json | jq '{issues: [.issues[] | select(.severity < 4)]}'
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${appgw_backend_score}=    Evaluate    1 if len(@{issue_list["issues"]}) == 0 else 0
+    Set Global Variable    ${appgw_backend_score}
+
+
 Generate AKS Cluster Health Score
-    ${appgw_health_score}=      Evaluate  (${appgw_resource_score} ) / 1
+    ${appgw_health_score}=      Evaluate  (${appgw_resource_score} + ${appgw_config_score} + ${appgw_backend_score}) / 3
     ${health_score}=      Convert to Number    ${appgw_health_score}  2
     RW.Core.Push Metric    ${health_score}
 *** Keywords ***
@@ -78,4 +105,4 @@ Suite Initialization
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable
     ...    ${env}
-    ...    {"APP_GATEWAY_NAME":"${APP_GATEWAY_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}
+    ...    {"APP_GATEWAY_NAME":"${APP_GATEWAY_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "OUTPUT_DIR":"${OUTPUT_DIR}"}
