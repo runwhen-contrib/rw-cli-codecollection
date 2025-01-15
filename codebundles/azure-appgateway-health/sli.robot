@@ -75,7 +75,7 @@ Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resou
     Set Global Variable    ${appgw_backend_score}
 
 
-Generate AKS Cluster Health Score
+Generate Application Gateway Health Score
     ${appgw_health_score}=      Evaluate  (${appgw_resource_score} + ${appgw_config_score} + ${appgw_backend_score}) / 3
     ${health_score}=      Convert to Number    ${appgw_health_score}  2
     RW.Core.Push Metric    ${health_score}
