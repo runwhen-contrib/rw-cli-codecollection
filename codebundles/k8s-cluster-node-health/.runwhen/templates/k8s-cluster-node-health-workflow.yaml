@@ -1,7 +1,7 @@
 apiVersion: runwhen.com/v1
 kind: Workflow
 metadata:
-  name: {{ "{{ cluster.name }} Node Alert Workflow" | replace(" ", "-") | lower }}
+  name: {% raw %}{{cluster.name}}{% endraw %}-{{ "Node Alert Workflow" | replace(" ", "-") | lower }}
   labels:
     {% include "common-labels.yaml" %}
   annotations:
@@ -22,4 +22,4 @@ spec:
       - SLI_ALERTS_STARTED
       slxs:
       - {{slx_name.split('--')[1]}}
-    name: {{ "{{ cluster.name }} Node Alert Workflow" | replace(" ", "-") | lower }}
+    name: {% raw %}{{cluster.name}}{% endraw %}-{{ "Node Alert Workflow" | replace(" ", "-") | lower }}
