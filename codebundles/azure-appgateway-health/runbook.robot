@@ -13,11 +13,11 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check for Resource Health Issues Affecting Application Gateway `${APPGATEWAY}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the application gateway cluster
     [Tags]    aks    config
     ${resource_health}=    RW.CLI.Run Bash File
-    ...    bash_file=appgateway_resource_health.sh
+    ...    bash_file=app_gateway_resource_health.sh
     ...    env=${env}
     ...    timeout_seconds=60
     ...    include_in_history=false
@@ -34,9 +34,9 @@ Check for Resource Health Issues Affecting Application Gateway `${APPGATEWAY}` I
         IF    "${issue_list["properties"]["title"]}" != "Available"
             RW.Core.Add Issue
             ...    severity=2
-            ...    expected=Azure resources should be available for Application Gateway `${APPGATEWAY}` in `${AZ_RESOURCE_GROUP}`
-            ...    actual=Azure resources are unhealthy for Application Gateway `${APPGATEWAY}` in `${AZ_RESOURCE_GROUP}`
-            ...    title=Azure reports an `${issue_list["properties"]["title"]}` Issue for Application Gateway `${APPGATEWAY}` in `${AZ_RESOURCE_GROUP}`
+            ...    expected=Azure resources should be available for Application Gateway `${APP_GATEWAY_NAME}` in `${AZ_RESOURCE_GROUP}`
+            ...    actual=Azure resources are unhealthy for Application Gateway `${APP_GATEWAY_NAME}` in `${AZ_RESOURCE_GROUP}`
+            ...    title=Azure reports an `${issue_list["properties"]["title"]}` Issue for Application Gateway `${APP_GATEWAY_NAME}` in `${AZ_RESOURCE_GROUP}`
             ...    reproduce_hint=${resource_health.cmd}
             ...    details=${issue_list}
             ...    next_steps=Please escalate to the Azure service owner or check back later.
@@ -44,58 +44,114 @@ Check for Resource Health Issues Affecting Application Gateway `${APPGATEWAY}` I
     ELSE
         RW.Core.Add Issue
         ...    severity=4
-        ...    expected=Azure resources health should be enabled for Application Gateway `${APPGATEWAY}` in `${AZ_RESOURCE_GROUP}`
-        ...    actual=Azure resource health appears unavailable for Application Gateway `${APPGATEWAY}` in `${AZ_RESOURCE_GROUP}`
-        ...    title=Azure resource health is unavailable for Application Gateway `${APPGATEWAY}` in `${AZ_RESOURCE_GROUP}`
+        ...    expected=Azure resources health should be enabled for Application Gateway `${APP_GATEWAY_NAME}` in `${AZ_RESOURCE_GROUP}`
+        ...    actual=Azure resource health appears unavailable for Application Gateway `${APP_GATEWAY_NAME}` in `${AZ_RESOURCE_GROUP}`
+        ...    title=Azure resource health is unavailable for Application Gateway `${APP_GATEWAY_NAME}` in `${AZ_RESOURCE_GROUP}`
         ...    reproduce_hint=${resource_health.cmd}
         ...    details=${issue_list}
         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
     END
+Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Fetch the details and health of the application gateway configuration
+    [Tags]    appservice    logs    tail
+    ${config_health}=    RW.CLI.Run Bash File
+    ...    bash_file=app_gateway_config_health.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${config_health.stdout}
 
-# Check Application Gateway `${APPGATEWAY}` Health Status In Resource Group `${AZ_RESOURCE_GROUP}`
-#     [Documentation]    Checks the health status of a appgateway workload.
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/app_gateway_config_health.json
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            RW.Core.Add Issue    
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_step"]}
+            ...    expected=Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has a healthy configuration
+            ...    actual=Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has configuration recommendations
+            ...    reproduce_hint=${config_health.cmd}
+            ...    details=${item["details"]}        
+        END
+    END
+
+Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Fetch the health of the application gateway backend pool members
+    [Tags]    appservice    logs    tail
+    ${config_health}=    RW.CLI.Run Bash File
+    ...    bash_file=app_gateway_backend_health.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${config_health.stdout}
+
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/backend_pool_members_health.json
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            RW.Core.Add Issue    
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_step"]}
+            ...    expected=Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has healthy pool members
+            ...    actual=Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has unhealthy pool members
+            ...    reproduce_hint=${config_health.cmd}
+            ...    details=${item["details"]}        
+        END
+    END    
+# Check Application Gateway `${APP_GATEWAY_NAME}` Health Status In Resource Group `${AZ_RESOURCE_GROUP}`
+#     [Documentation]    Checks the health status of a APP_GATEWAY_NAME workload.
 #     [Tags]    
 #     ${process}=    RW.CLI.Run Bash File
-#     ...    bash_file=appgateway_health.sh
+#     ...    bash_file=APP_GATEWAY_NAME_health.sh
 #     ...    env=${env}
 #     ...    timeout_seconds=180
 #     ...    include_in_history=false
 #     IF    ${process.returncode} > 0
-#         RW.Core.Add Issue    title=Application Gateway `${APPGATEWAY}` In Resource Group `${AZ_RESOURCE_GROUP}` Failing Health Check
+#         RW.Core.Add Issue    title=Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}` Failing Health Check
 #         ...    severity=2
-#         ...    next_steps=Tail the logs of the Application Gateway `${APPGATEWAY}` in resource group `${AZ_RESOURCE_GROUP}`\nReview resource usage metrics of Application Gateway `${APPGATEWAY}` in resource group `${AZ_RESOURCE_GROUP}`
-#         ...    expected=Application Gateway `${APPGATEWAY}` in resource group `${AZ_RESOURCE_GROUP}` should not be failing its health check
-#         ...    actual=Application Gateway `${APPGATEWAY}` in resource group `${AZ_RESOURCE_GROUP}` is failing its health check
-#         ...    reproduce_hint=Run appgateway_health.sh
+#         ...    next_steps=Tail the logs of the Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}`\nReview resource usage metrics of Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}`
+#         ...    expected=Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}` should not be failing its health check
+#         ...    actual=Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}` is failing its health check
+#         ...    reproduce_hint=Run APP_GATEWAY_NAME_health.sh
 #         ...    details=${process.stdout}
 #     END
 #     RW.Core.Add Pre To Report    ${process.stdout}
 
-# Check AppService `${APPGATEWAY}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
+# Check AppService `${APP_GATEWAY_NAME}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
 #     [Documentation]    Reviews key metrics for the application gateway and generates a report
 #     [Tags]    
 #     ${process}=    RW.CLI.Run Bash File
-#     ...    bash_file=appgateway_metrics.sh
+#     ...    bash_file=APP_GATEWAY_NAME_metrics.sh
 #     ...    env=${env}
 #     ...    timeout_seconds=180
 #     ...    include_in_history=false
 #     ${next_steps}=    RW.CLI.Run Cli    cmd=echo -e "${process.stdout}" | grep "Next Steps" -A 20 | tail -n +2
 #     IF    ${process.returncode} > 0
-#         RW.Core.Add Issue    title=Application Gateway `${APPGATEWAY}` In Resource Group `${AZ_RESOURCE_GROUP}` Failed Metric Check
+#         RW.Core.Add Issue    title=Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}` Failed Metric Check
 #         ...    severity=2
 #         ...    next_steps=${next_steps.stdout}
-#         ...    expected=Application Gateway `${APPGATEWAY}` in resource group `${AZ_RESOURCE_GROUP}` has no unusual metrics
-#         ...    actual=Application Gateway `${APPGATEWAY}` in resource group `${AZ_RESOURCE_GROUP}` metric check did not pass
-#         ...    reproduce_hint=Run appgateway_metrics.sh
+#         ...    expected=Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no unusual metrics
+#         ...    actual=Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}` metric check did not pass
+#         ...    reproduce_hint=Run APP_GATEWAY_NAME_metrics.sh
 #         ...    details=${process.stdout}
 #     END
 #     RW.Core.Add Pre To Report    ${process.stdout}
 
-# Fetch Application Gateway `${APPGATEWAY}` Config In Resource Group `${AZ_RESOURCE_GROUP}`
-#     [Documentation]    Fetch logs of appgateway workload
-#     [Tags]    appgateway    logs    tail
+# Fetch Application Gateway `${APP_GATEWAY_NAME}` Config In Resource Group `${AZ_RESOURCE_GROUP}`
+#     [Documentation]    Fetch logs of APP_GATEWAY_NAME workload
+#     [Tags]    APP_GATEWAY_NAME    logs    tail
 #     ${process}=    RW.CLI.Run Bash File
-#     ...    bash_file=appgateway_config.sh
+#     ...    bash_file=APP_GATEWAY_NAME_config.sh
 #     ...    env=${env}
 #     ...    timeout_seconds=180
 #     ...    include_in_history=false
@@ -107,7 +163,7 @@ Suite Initialization
     ...    type=string
     ...    description=The resource group to perform actions against.
     ...    pattern=\w*
-    ${APPGATEWAY}=    RW.Core.Import User Variable    APPGATEWAY
+    ${APP_GATEWAY_NAME}=    RW.Core.Import User Variable    APP_GATEWAY_NAME
     ...    type=string
     ...    description=The Azure Application Gateway to health check.
     ...    pattern=\w*
@@ -122,8 +178,8 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=""
     Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
-    Set Suite Variable    ${APPGATEWAY}    ${APPGATEWAY}
+    Set Suite Variable    ${APP_GATEWAY_NAME}    ${APP_GATEWAY_NAME}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable
     ...    ${env}
-    ...    {"APPGATEWAY":"${APPGATEWAY}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}
+    ...    {"APP_GATEWAY_NAME":"${APP_GATEWAY_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "OUTPUT_DIR":"${OUTPUT_DIR}"}

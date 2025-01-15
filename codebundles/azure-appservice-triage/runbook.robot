@@ -144,7 +144,7 @@ Get App Service `${APP_SERVICE_NAME}` Logs In Resource Group `${AZ_RESOURCE_GROU
     RW.Core.Add Pre To Report    ${logs.stdout}
 
 Check Configuration Health of App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Fetch logs of appservice workload
+    [Documentation]    Fetch lthe configuration health of the App Service
     [Tags]    appservice    logs    tail
     ${config_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_config_health.sh

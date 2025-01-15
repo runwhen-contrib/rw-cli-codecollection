@@ -13,11 +13,11 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check for Resource Health Issues Affecting Application Gateway `${APPGATEWAY}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the Application Gateway as reported from Azure. 
     [Tags]    aks    resource    health    service    azure
     ${resource_health}=    RW.CLI.Run Bash File
-    ...    bash_file=appgateway_resource_health.sh
+    ...    bash_file=app_gateway_resource_health.sh
     ...    env=${env}
     ...    timeout_seconds=60
     ...    include_in_history=false
@@ -35,11 +35,11 @@ Check for Resource Health Issues Affecting Application Gateway `${APPGATEWAY}` I
         ${appgw_resource_score}=    Set Variable    0
     END
     Set Global Variable    ${appgw_resource_score}
-# Check AppService `${APPGATEWAY}` Health Status In Resource Group `${AZ_RESOURCE_GROUP}`
+# Check AppService `${APP_GATEWAY_NAME}` Health Status In Resource Group `${AZ_RESOURCE_GROUP}`
 #     [Documentation]    Checks the health status of a application gateway and its backend pools.
 #     [Tags]    
 #     ${process}=    RW.CLI.Run Bash File
-#     ...    bash_file=appgateway_health.sh
+#     ...    bash_file=APP_GATEWAY_NAME_health.sh
 #     ...    env=${env}
 #     ...    timeout_seconds=180
 #     ...    include_in_history=false
@@ -59,7 +59,7 @@ Suite Initialization
     ...    type=string
     ...    description=The resource group to perform actions against.
     ...    pattern=\w*
-    ${APPGATEWAY}=    RW.Core.Import User Variable    APPGATEWAY
+    ${APP_GATEWAY_NAME}=    RW.Core.Import User Variable    APP_GATEWAY_NAME
     ...    type=string
     ...    description=The Azure Application Gateway to health check.
     ...    pattern=\w*
@@ -74,8 +74,8 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=""
     Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
-    Set Suite Variable    ${APPGATEWAY}    ${APPGATEWAY}
+    Set Suite Variable    ${APP_GATEWAY_NAME}    ${APP_GATEWAY_NAME}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable
     ...    ${env}
-    ...    {"APPGATEWAY":"${APPGATEWAY}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}
+    ...    {"APP_GATEWAY_NAME":"${APP_GATEWAY_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}

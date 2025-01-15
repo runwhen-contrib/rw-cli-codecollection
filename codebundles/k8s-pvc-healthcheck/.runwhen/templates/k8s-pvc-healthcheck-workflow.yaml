@@ -1,7 +1,7 @@
 apiVersion: runwhen.com/v1
 kind: Workflow
 metadata:
-  name: {{slx_name}}-pvc-alert-workflow
+  name: {{ "{{namespace.name}} PVC Alert Workflow" | replace(" ", "-") | lower }}
   labels:
     {% include "common-labels.yaml" %}
   annotations:
@@ -22,4 +22,4 @@ spec:
       - SLI_ALERTS_STARTED
       slxs:
       - {{slx_name.split('--')[1]}}
-    name: {{slx_name.split('--')[1]}}-pvc-alert-workflow
+    name: {{ "{{namespace.name}} PVC Alert Workflow" | replace(" ", "-") | lower }}
