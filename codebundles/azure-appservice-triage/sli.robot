@@ -89,7 +89,32 @@ Check App Service `${APP_SERVICE_NAME}` Configuration Health In Resource Group `
             END
         END
     END
+Check Deployment Health of App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Fetch deployment health of the App Service
+    [Tags]    appservice    deployment
+    ${deployment_health}=    RW.CLI.Run Bash File
+    ...    bash_file=appservice_deployment_health.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
 
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/deployment_health.json
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    Set Global Variable     ${app_service_deployment_score}    1
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            IF    ${item["severity"]} == 1 or ${item["severity"]} == 2
+                Set Global Variable    ${app_service_deployment_score}    0
+                Exit For Loop
+            ELSE IF    ${item["severity"]} > 2
+                Set Global Variable    ${app_service_deployment_score}    1
+            END
+        END
+    END
 
 Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events of appservice and checks for errors
@@ -116,7 +141,7 @@ Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOU
     END
 
 Generate App Service Health Score
-    ${app_service_health_score}=      Evaluate  (${appservice_resource_score} + ${app_service_health_check_score} + ${app_service_config_score} + ${app_service_activities_score}) / 4
+    ${app_service_health_score}=      Evaluate  (${appservice_resource_score} + ${app_service_health_check_score} + ${app_service_config_score} + ${app_service_activities_score} + ${app_service_deployment_score}) / 5
     ${health_score}=      Convert to Number    ${app_service_health_score}  2
     RW.Core.Push Metric    ${health_score}
 
