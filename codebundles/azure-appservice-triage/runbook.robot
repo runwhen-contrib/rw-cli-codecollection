@@ -144,7 +144,7 @@ Get App Service `${APP_SERVICE_NAME}` Logs In Resource Group `${AZ_RESOURCE_GROU
     RW.Core.Add Pre To Report    ${logs.stdout}
 
 Check Configuration Health of App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Fetch logs of appservice workload
+    [Documentation]    Fetch the configuration health of the App Service
     [Tags]    appservice    logs    tail
     ${config_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_config_health.sh
@@ -172,6 +172,34 @@ Check Configuration Health of App Service `${APP_SERVICE_NAME}` In Resource Grou
         END
     END
 
+Check Deployment Health of App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Fetch deployment health of the App Service
+    [Tags]    appservice    deployment
+    ${deployment_health}=    RW.CLI.Run Bash File
+    ...    bash_file=appservice_deployment_health.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${deployment_health.stdout}
+
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/deployment_health.json
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            RW.Core.Add Issue    
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_step"]}
+            ...    expected=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has a healthy deployments
+            ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has deployment issues
+            ...    reproduce_hint=${deployment_health.cmd}
+            ...    details=${item["details"]}        
+        END
+    END
 
 Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events of appservice and checks for errors
@@ -197,7 +225,30 @@ Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOU
             ...    details=${item["details"]}        
         END
     END
+Check Logs for Errors in App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Gets the events of appservice and checks for errors
+    [Tags]    appservice    logs    errors
+    ${log_errors}=    RW.CLI.Run Bash File
+    ...    bash_file=appservice_log_analysis.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${log_errors.stdout}
 
+    ${issues}=    RW.CLI.Run Cli    cmd=cat ${OUTPUT DIR}/app_service_log_issues_report.json
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            RW.Core.Add Issue    
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_step"]}
+            ...    expected=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no Warning/Error/Critical logs
+            ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has Warning/Error/Critical logs
+            ...    reproduce_hint=${log_errors.cmd}
+            ...    details=${item["details"]}        
+        END
+    END
 
 *** Keywords ***
 Suite Initialization
