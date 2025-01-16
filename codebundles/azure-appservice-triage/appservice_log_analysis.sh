@@ -55,7 +55,7 @@ else
                     --arg details "$ERROR_LOGS" \
                     --arg nextStep "Review log file $(basename "$log_file") to address errors." \
                     --arg severity "3" \
-                    '.issues += [{"title": "Log File Errors with \`$APP_SERVICE_NAME\`", "log_file": $logFile, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber)}]')
+                    '.issues += [{"title": "Log File Errors with '"$APP_SERVICE_NAME"'", "log_file": $logFile, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber)}]')
             else
                 echo "No significant errors found in $log_file."
             fi
