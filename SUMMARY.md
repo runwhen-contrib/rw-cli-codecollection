@@ -42,6 +42,8 @@
 * [gcp-bucket-health](codebundles/gcp-bucket-health/README.md)
 * [k8s-ingress-healthcheck](codebundles/k8s-ingress-healthcheck/README.md)
 * [k8s-deployment-healthcheck](codebundles/k8s-deployment-healthcheck/README.md)
+* [terraform](codebundles/azure-appgateway-health/.test/terraform/README.md)
+* [.test](codebundles/azure-appgateway-health/.test/README.md)
 * [azure-appgateway-health](codebundles/azure-appgateway-health/README.md)
 * [k8s-chaos-workload](codebundles/k8s-chaos-workload/README.md)
 * [gcp-cloud-function-health](codebundles/gcp-cloud-function-health/README.md)
