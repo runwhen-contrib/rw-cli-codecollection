@@ -15,7 +15,7 @@ spec:
     value: SLX_PLACEHOLDER
   owners:
   - {{workspace.owner_email}}
-  statement: Application Gateways should be available.
+  statement: Application Gateway {{match_resource.resource.name}} should be healthy and serving traffic. 
   additionalContext:
     name: "{{match_resource.resource.name}}"
     tags: "{{match_resource.tags}}"

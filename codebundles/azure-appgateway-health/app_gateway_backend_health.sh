@@ -5,6 +5,7 @@ OUTPUT_DIR="${OUTPUT_DIR:-./output}"
 mkdir -p "$OUTPUT_DIR"
 HEALTH_OUTPUT="${OUTPUT_DIR}/backend_pool_members_health.json"
 rm -rf $HEALTH_OUTPUT || true
+newline=$'\n'
 
 # Ensure required environment variables are set
 if [ -z "$APP_GATEWAY_NAME" ] || [ -z "$AZ_RESOURCE_GROUP" ]; then
@@ -52,29 +53,29 @@ else
                         app_service_details=$(az webapp list --query "[?defaultHostName=='$address'] | [0]" -o json)
                         resource_id=$(echo "$app_service_details" | jq -r '.id')
                         resource_group=$(echo "$app_service_details" | jq -r '.resourceGroup')
-                        portal_url="https://portal.azure.com/#/resource$resource_id/appServices"
-                        next_step="Check App Service \`$app_service_name\` Health Check Metrics In Resource Group \`$resource_group\`\nView the App Service \`$app_service_name\` in the Azure Portal: $portal_url"
+                        portal_url="https://portal.azure.com/#@/resource$resource_id/appServices"
+                        next_step="Check App Service \`$app_service_name\` Health Check Metrics In Resource Group \`$resource_group\`${newline}View the App Service \`$app_service_name\` in the (Azure Portal)[$portal_url]"
                     elif [[ "$address" == *.azurecontainer.io ]]; then
                         resource_type="Container Instance"
                         resource_id=$(az container list --query "[?contains(ipAddress.fqdn, '$address')].id" -o tsv)
-                        portal_url="https://portal.azure.com/#@$resource_id"
+                        portal_url="https://portal.azure.com/#@resource$resource_id"
                         next_step="Inspect the Azure Container Instance logs and events for '$address' in the Azure Portal: $portal_url"
                     elif [[ "$address" == *.hcp.*.azmk8s.io ]]; then
                         resource_type="AKS Cluster"
                         resource_id=$(az aks list --query "[?contains(fqdn, '$address')].id" -o tsv)
-                        portal_url="https://portal.azure.com/#@$resource_id"
+                        portal_url="https://portal.azure.com/#@resource$resource_id"
                         next_step="Check the health of the AKS Cluster hosting '$address' in the Azure Portal: $portal_url"
                     elif [[ "$address" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
                         resource_type="Virtual Machine"
                         resource_id=$(az vm list-ip-addresses --query "[?ipAddress=='$address'].virtualMachine.id" -o tsv)
-                        portal_url="https://portal.azure.com/#@$resource_id"
+                        portal_url="https://portal.azure.com/#@resource$resource_id"
                         next_step="Check the health and connectivity of the Virtual Machine at '$address' in the Azure Portal: $portal_url"
                     else
                         resource_type="Unknown Resource"
                         next_step="Investigate the backend resource configuration for '$address' and ensure it responds to health probes."
                     fi
 
-                    issues_json=$(echo "$issues_json" | jq \
+                    issues_json=$(echo "$issues_json" | jq -n \
                         --arg title "Unhealthy $resource_type" \
                         --arg nextStep "$next_step" \
                         --arg severity "2" \
