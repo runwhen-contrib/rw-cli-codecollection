@@ -55,28 +55,32 @@ else
                         resource_group=$(echo "$app_service_details" | jq -r '.resourceGroup')
                         portal_url="https://portal.azure.com/#@/resource$resource_id/appServices"
                         next_step="Check App Service \`$app_service_name\` Health Check Metrics In Resource Group \`$resource_group\`${newline}View the App Service \`$app_service_name\` in the (Azure Portal)[$portal_url]"
+                        title="Unhealthy $resource_type Backend Pool Member at \`$app_service_name\`"
                     elif [[ "$address" == *.azurecontainer.io ]]; then
                         resource_type="Container Instance"
                         resource_id=$(az container list --query "[?contains(ipAddress.fqdn, '$address')].id" -o tsv)
                         portal_url="https://portal.azure.com/#@resource$resource_id"
                         next_step="Inspect the Azure Container Instance logs and events for '$address' in the Azure Portal: $portal_url"
+                        title="Unhealthy $resource_type Backend Pool Member at \`$address\`"
                     elif [[ "$address" == *.hcp.*.azmk8s.io ]]; then
                         resource_type="AKS Cluster"
                         resource_id=$(az aks list --query "[?contains(fqdn, '$address')].id" -o tsv)
                         portal_url="https://portal.azure.com/#@resource$resource_id"
                         next_step="Check the health of the AKS Cluster hosting '$address' in the Azure Portal: $portal_url"
+                        title="Unhealthy $resource_type Backend Pool Member at \`$address\`"
                     elif [[ "$address" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
                         resource_type="Virtual Machine"
                         resource_id=$(az vm list-ip-addresses --query "[?ipAddress=='$address'].virtualMachine.id" -o tsv)
                         portal_url="https://portal.azure.com/#@resource$resource_id"
                         next_step="Check the health and connectivity of the Virtual Machine at '$address' in the Azure Portal: $portal_url"
+                        title="Unhealthy $resource_type Backend Pool Member at \`$address\`"
                     else
                         resource_type="Unknown Resource"
                         next_step="Investigate the backend resource configuration for '$address' and ensure it responds to health probes."
                     fi
 
                     issues_json=$(echo "$issues_json" | jq -n \
-                        --arg title "Unhealthy $resource_type" \
+                        --arg title "$title" \
                         --arg nextStep "$next_step" \
                         --arg severity "2" \
                         --arg details "$log" \
