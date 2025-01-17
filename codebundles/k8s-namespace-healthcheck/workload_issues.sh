@@ -92,11 +92,19 @@ if echo "$messages" | grep -q "OCI runtime exec failed: exec failed: unable to s
     add_issue "2" "Possible node or container runtime issue" "$messages" "Escalate container runtime issue to service owner if they continue."
 fi
 
+
+# Ignore normal messages that should not trigger an issue
+
 if echo "$messages" | grep -q "Created container server\|no changes since last reconcilation\|Reconciliation finished\|successfully rotated K8s secret"; then
-    # Don't generate any issue data, these are normal strings
     echo "[]" | jq .
     exit 0
 fi
+
+if echo "$messages" | grep -qE "Created container|Successfully assigned|Successfully pulled image|Pulling image|Stopping container|Started container|deleting pod for node scale down"; then
+    echo "[]" | jq .
+    exit 0
+fi
+
 
 if echo "$messages" | grep -q "connect: connection refused"; then
     add_issue "3" "Internal connectivity issues detected" "$messages" "Escalate connectivity issues to service owner if they continue."
