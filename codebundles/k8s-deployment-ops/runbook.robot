@@ -83,12 +83,6 @@ Suite Initialization
     ...    enum=[kubectl,oc]
     ...    example=kubectl
     ...    default=kubectl
-    ${HOME}=    RW.Core.Import User Variable    HOME
-    ...    type=string
-    ...    description=The home path of the runner
-    ...    pattern=\w*
-    ...    example=/home/runwhen
-    ...    default=/home/runwhen 
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
@@ -97,4 +91,4 @@ Suite Initialization
     Set Suite Variable    ${HOME}    ${HOME}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "DEPLOYMENT_NAME": "${DEPLOYMENT_NAME}", "HOME":"${HOME}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "DEPLOYMENT_NAME": "${DEPLOYMENT_NAME}"}
