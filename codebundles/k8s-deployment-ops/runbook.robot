@@ -35,22 +35,32 @@ Restart Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    ----------\nPre restart log output:\n${logs.stdout}
 
     ${rollout}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} rollout restart deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT}; while true; do STATUS=$(${KUBERNETES_DISTRIBUTION_BINARY} rollout status deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} --timeout=180s); echo "$STATUS"; [[ "$STATUS" == *"successfully rolled out"* ]] && break; sleep 5; done
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} rollout restart deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT}
     ...    env=${env}
     ...    include_in_history=false
     ...    timeout_seconds=180
     ...    secret_file__kubeconfig=${kubeconfig}
-    RW.Core.Add Pre To Report    ----------\nRollout Output:\n${rollout.stdout}
+    RW.Core.Add Pre To Report    ----------\nRestart Output:\n${rollout.stdout}
 
-    IF    $rollout.stderr != ""
+    IF    ($rollout.stderr) == ""
+        ${rollout_status}=    RW.CLI.Run Cli
+        ...    cmd=while true; do STATUS=$(${KUBERNETES_DISTRIBUTION_BINARY} rollout status deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} --timeout=180s); echo "$STATUS"; [[ "$STATUS" == *"successfully rolled out"* ]] && break; sleep 5; done
+        ...    env=${env}
+        ...    include_in_history=false
+        ...    timeout_seconds=180
+        ...    secret_file__kubeconfig=${kubeconfig}
+        RW.Core.Add Pre To Report    ----------\nRollout Output:\n${rollout_status.stdout}
+    END
+
+    IF    ($rollout.stderr) != ""
         RW.Core.Add Issue
         ...    severity=3
-        ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should have restarted successfully
-        ...    actual=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` did not restarted successfully
+        ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should have rollout successfully
+        ...    actual=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` did not rollout successfully
         ...    title=Deployment `${DEPLOYMENT_NAME}` in `${NAMESPACE}` did not rollout properly
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} generated the following output during restart attempt: \n${rollout.stderr}
-        ...    next_steps=Escalate restart issue to service owner.
+        ...    next_steps=Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`\nEscalate rollout issues to service owner.
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
