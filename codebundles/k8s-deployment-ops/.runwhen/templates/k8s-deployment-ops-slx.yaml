@@ -15,7 +15,7 @@ spec:
     value: {{match_resource.resource.metadata.name}}
   owners:
   - {{workspace.owner_email}}
-  statement: Perform opreational tasks for {{match_resource.resource.metadata.name}} deployment in namespace {{match_resource.resource.metadata.namespace}} and cluster {{ cluster.name }}
+  statement: Perform ops tasks for {{match_resource.resource.metadata.name}} deployment in namespace {{match_resource.resource.metadata.namespace}} and cluster {{ cluster.name }}
   additionalContext:  
     namespace: "{{match_resource.resource.metadata.namespace}}"
     labelMap: "{{match_resource.resource.metadata.labels}}"
