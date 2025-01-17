@@ -40,7 +40,6 @@ tasks:
     desc: "Run RunWhen Local Discovery on test infrastructure"
     cmds:
       - |
-        BUILD_DIR=/home/runwhen/runwhen-local/src
         CONTAINER_NAME="RunWhenLocal"
         if docker ps -q --filter "name=$CONTAINER_NAME" | grep -q .; then
           echo "Stopping and removing existing container $CONTAINER_NAME..."
@@ -51,17 +50,14 @@ tasks:
         else
           echo "No existing container named $CONTAINER_NAME found."
         fi
-        
-        echo "Cleaning up output directory..."
-        rm -rf output || { echo "Failed to remove output directory"; exit 1; }
-        mkdir output && chmod 777 output || { echo "Failed to set permissions"; exit 1; }
 
-        ## Building Container Image
-        docker buildx build --builder mybuilder --platform linux/amd64  -t runwhen-local:test -f $BUILD_DIR/Dockerfile $BUILD_DIR --load
+        echo "Cleaning up output directory..."
+        sudo rm -rf output || { echo "Failed to remove output directory"; exit 1; }
+        mkdir output && chmod 777 output || { echo "Failed to set permissions"; exit 1; }
 
         echo "Starting new container $CONTAINER_NAME..."
 
-        docker run -e DEBUG_LOGGING=true --name $CONTAINER_NAME -p 8081:8081 -v $(pwd):/shared -d runwhen-local:test || {
+        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d ghcr.io/runwhen-contrib/runwhen-local:latest || {
           echo "Failed to start container"; exit 1;
         }
 
