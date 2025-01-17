@@ -17,7 +17,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Restart Deployment `${DEPLOYMENT_NAME}`
+Restart Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Perform a rollout restart on the deployment
     [Tags]
     ...    log
