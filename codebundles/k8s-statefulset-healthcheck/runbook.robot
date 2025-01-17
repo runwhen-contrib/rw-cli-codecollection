@@ -158,7 +158,7 @@ Check StatefulSet Event Anomalies for `${STATEFULSET_NAME}`
     RW.Core.Add To Report    ${anomalies_report_output}\n
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Fetch StatefulSet Logs for `${STATEFULSET_NAME}`
+Fetch StatefulSet Logs for `${STATEFULSET_NAME}` and Add to Report
     [Documentation]    Fetches the last 100 lines of logs for the given statefulset in the namespace.
     [Tags]    fetch    log    pod    container    errors    inspect    trace    info    ${STATEFULSET_NAME}    statefulset
     ${logs}=    RW.CLI.Run Cli
