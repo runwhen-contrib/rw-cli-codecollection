@@ -9,7 +9,7 @@ metadata:
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/kubernetes/resources/labeled/deploy.svg
   alias: {{match_resource.resource.metadata.name}} Deployment Operational Tasks
-  asMeasuredBy: 
+  asMeasuredBy: ""
   configProvided:
   - name: OBJECT_NAME
     value: {{match_resource.resource.metadata.name}}

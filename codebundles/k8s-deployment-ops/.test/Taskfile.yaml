@@ -75,6 +75,29 @@ tasks:
         echo "Review generated config files under output/workspaces/"
     silent: true
 
+  check-rwp-config:
+    desc: Check if env vars are set for RunWhen Platform
+    cmds:
+      - |
+        missing_vars=()
+
+        if [ -z "$RW_WORKSPACE" ]; then
+          missing_vars+=("RW_WORKSPACE")
+        fi
+
+        if [ -z "$RW_API_URL" ]; then
+          missing_vars+=("RW_API_URL")
+        fi
+
+        if [ -z "$RW_PAT" ]; then
+          missing_vars+=("RW_PAT")
+        fi
+
+        if [ ${#missing_vars[@]} -ne 0 ]; then
+          echo "The following required environment variables are missing: ${missing_vars[*]}"
+          exit 1
+        fi
+    silent: true
 
   upload-slxs:
     desc: "Upload SLX files to the appropriate URL"
