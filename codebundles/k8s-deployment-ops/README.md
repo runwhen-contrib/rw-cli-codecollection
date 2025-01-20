@@ -1,4 +1,4 @@
-# Kubernetes Deployment Triage
+# Kubernetes Deployment Operations
 
 This codebundle provides a suite of operational tasks related to a deployment in Kubernetes clusters.
 

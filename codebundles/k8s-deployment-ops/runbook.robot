@@ -1,7 +1,7 @@
 *** Settings ***
 Documentation       Perform oprational tasks for a Kubernetes deployment.
 Metadata            Author    stewartshea
-Metadata            Display Name    Kubernetes Deployment Triage
+Metadata            Display Name    Kubernetes Deployment Operations
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 
 Library             BuiltIn
