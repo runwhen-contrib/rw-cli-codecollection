@@ -3,7 +3,14 @@
 This codebundle provides a suite of operational tasks related to a deployment in Kubernetes clusters.
 
 ## Tasks
-`Restart Deployment`
+- Restart Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
+- Force Delete Pods in Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
+- Rollback Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` to Previous Version
+- Scale Down Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
+- Scale Up Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by ${SCALE_UP_FACTOR}x
+- Clean Up Stale ReplicaSets for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
+- Scale Down Stale ReplicaSets for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
+
 
 ## Configuration
 The TaskSet requires initialization to import necessary secrets, services, and user variables. The following variables should be set:
