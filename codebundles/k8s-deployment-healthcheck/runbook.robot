@@ -61,6 +61,25 @@ Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
     ...    Recent logs from Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE}:\n\n${logs.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
+Fetch Deployments Logs for `${DEPLOYMENT_NAME}` and Add to Report
+    [Documentation]    Fetches logs from running pods and adds content to the report
+    [Tags]
+    ...    kubernetes
+    ...    deployment
+    ...    logs
+    ...    deployment
+    ...    ${DEPLOYMENT_NAME}
+    ${logs}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --tail=${LOG_LINES} --all-containers=true --max-log-requests=20 --context ${CONTEXT}
+    ...    env=${env}
+    ...    include_in_history=true
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=180
+    ...    show_in_rwl_cheatsheet=true
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    Commands Used: ${history}
+    RW.Core.Add Pre To Report
+    ...    Recent logs from Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE}:\n\n${logs.stdout}
 
 Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     [Documentation]    Validates if a Liveliness probe has possible misconfigurations
@@ -440,7 +459,14 @@ Suite Initialization
     ...    description=The home path of the runner
     ...    pattern=\w*
     ...    example=/home/runwhen
-    ...    default=/home/runwhen    
+    ...    default=/home/runwhen 
+    ${LOG_LINES}=    RW.Core.Import User Variable    LOG_LINES
+    ...    type=string
+    ...    description=The number of lines to fetch when adding logs to the report
+    ...    pattern=\w*
+    ...    example=100
+    ...    default=100
+    Set Suite Variable    ${LOG_LINES}    ${LOG_LINES}   
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
