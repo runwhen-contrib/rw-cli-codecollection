@@ -181,10 +181,15 @@ Scale Down Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     ${scaledown}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} scale deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} --replicas=0
     ...    env=${env}
-    ...    include_in_history=false
+    ...    include_in_history=true
     ...    timeout_seconds=180
     ...    secret_file__kubeconfig=${kubeconfig}
-    RW.Core.Add Pre To Report    ----------\nRestart Output:\n${scaledown.stdout}
+    ${replicas}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} && ${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.replicas}'
+    ...    env=${env}
+    ...    include_in_history=true
+    ...    secret_file__kubeconfig=${kubeconfig}
+    RW.Core.Add Pre To Report    ----------\Scaledown Output:\n${scaledown.stdout}\nRollout and Replicas:\n${replicas.stdout}
 
     IF    ($scaledown.stderr) != ""
         RW.Core.Add Issue
@@ -207,13 +212,18 @@ Scale Up Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by ${SCALE_
     ...    ${DEPLOYMENT_NAME}
 
     ${scaleup}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} scale deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} --replicas=0
+    # ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} scale deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} --replicas=$(($(${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.replicas}') == 0 ? 1 : $(${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.replicas}') * ${SCALE_UP_FACTOR} ))
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} scale deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} --replicas=$(( $(${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.replicas}') == 0 ? 1 : $(${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.replicas}') * ${SCALE_UP_FACTOR}))
     ...    env=${env}
-    ...    include_in_history=false
+    ...    include_in_history=true
     ...    timeout_seconds=180
     ...    secret_file__kubeconfig=${kubeconfig}
-    RW.Core.Add Pre To Report    ----------\nRestart Output:\n${scaledown.stdout}
-
+    ${replicas}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} && ${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.replicas}'
+    ...    env=${env}
+    ...    include_in_history=true
+    ...    secret_file__kubeconfig=${kubeconfig}
+    RW.Core.Add Pre To Report    ----------\Scaleup Output:\n${scaleup.stdout}\nRollout and Replicas:\n${replicas.stdout}
     IF    ($scaleup.stderr) != ""
         RW.Core.Add Issue
         ...    severity=3
@@ -237,12 +247,12 @@ Clean Up Stale ReplicaSets for Deployment `${DEPLOYMENT_NAME}` in Namespace `${N
     ...    ${DEPLOYMENT_NAME}
 
     ${rs_cleanup}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} delete rs -n ${NAMESPACE} --context ${CONTEXT} --selector=$(kubectl get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.selector.matchLabels}' | tr -d '{}" ' | tr ':' '=' | tr ',' ' ') --field-selector=status.replicas=0
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get rs -n ${NAMESPACE} --context ${CONTEXT} --selector=$(${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.selector.matchLabels}' | tr -d '{}" ' | tr ':' '=') -o json | jq -r '.items[] | select(.status.replicas == 0) | .metadata.name' | while read -r rs; do ${KUBERNETES_DISTRIBUTION_BINARY} delete rs "$rs" -n ${NAMESPACE} --context ${CONTEXT}; done
     ...    env=${env}
-    ...    include_in_history=false
+    ...    include_in_history=true
     ...    timeout_seconds=180
     ...    secret_file__kubeconfig=${kubeconfig}
-    RW.Core.Add Pre To Report    ----------\nRestart Output:\n${rs_cleanup.stdout}
+    RW.Core.Add Pre To Report    ----------\Replicaset Cleanup Output:\n${rs_cleanup.stdout}
 
     IF    ($rs_cleanup.stderr) != ""
         RW.Core.Add Issue
@@ -252,7 +262,7 @@ Clean Up Stale ReplicaSets for Deployment `${DEPLOYMENT_NAME}` in Namespace `${N
         ...    title=Deployment `${DEPLOYMENT_NAME}` in `${NAMESPACE}` did not scale down properly
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} generated the following output during the replicaset cleanup attempt: \n${rs_cleanup.stderr}
-        ...    next_steps=Check ReplicaSet Health for Deployment `${DEPLOYMENT_NAME}`\nEscalate rollback issues to service owner.
+        ...    next_steps=Check ReplicaSet Health for Deployment `${DEPLOYMENT_NAME}`\nEscalate replicaset cleanup issues to service owner.
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -268,12 +278,12 @@ Scale Down Stale ReplicaSets for Deployment `${DEPLOYMENT_NAME}` in Namespace `$
     ...    ${DEPLOYMENT_NAME}
 
     ${rs_scaledown}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} scale rs -n ${NAMESPACE} --context ${CONTEXT} -l $(kubectl get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.selector.matchLabels}' | tr -d '{}" ' | tr ':' '=' | tr ',' ' ') --replicas=0
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} scale rs -n ${NAMESPACE} --context ${CONTEXT} -l $(${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.selector.matchLabels}' | tr -d '{}" ' | tr ':' '=') --replicas=0
     ...    env=${env}
-    ...    include_in_history=false
+    ...    include_in_history=true
     ...    timeout_seconds=180
     ...    secret_file__kubeconfig=${kubeconfig}
-    RW.Core.Add Pre To Report    ----------\nScaleout Output:\n${rs_scaledown.stdout}
+    RW.Core.Add Pre To Report    ----------\nScaledown Replicaset Output:\n${rs_scaledown.stdout}
 
     IF    ($rs_scaledown.stderr) != ""
         RW.Core.Add Issue
