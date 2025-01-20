@@ -20,8 +20,7 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 - `CONTEXT`: The Kubernetes context to operate within.
 - `NAMESPACE`: The name of the namespace to search. Leave it blank to search in all namespaces.
 - `DEPLOYMENT_NAME`: The name of the deployment.
-- `EXPECTED_AVAILABILITY`: The number of replicas allowed.
-
+- `SCALE_UP_FACTOR`: A multiple in which to increase replicas by
 ## Requirements
 - A kubeconfig with appropriate RBAC permissions to perform the desired command.
 
