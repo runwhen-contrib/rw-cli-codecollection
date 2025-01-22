@@ -47,9 +47,9 @@ Get details for unready Kustomizations in Namespace `${NAMESPACE}`
             ...    severity=2
             ...    expected=Kustomizations should be synced and ready.   
             ...    actual=Objects are not ready.
-            ...    title=Unready Kustomization \`${item["KustomizationName"]}\` Found In Namespace \`${NAMESPACE}\`
+            ...    title=GitOps Resources are Unhealthy in Namespace \`${NAMESPACE}\`
             ...    reproduce_hint=${kustomizations_not_ready.cmd}
-            ...    details=${item}
+            ...    details=Kustomization is not in a ready state ${item["KustomizationName"]} in Namespace ${NAMESPACE}\n${item}
             ...    next_steps=${item_next_steps.stdout}
         END
     END
