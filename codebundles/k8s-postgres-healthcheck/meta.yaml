@@ -147,8 +147,6 @@ commands:
 - command: bash 'config_health.sh'
   doc_links: '
 
-    - [Bash scripting guide](https://www.gnu.org/software/bash/manual/bash.html){:target="_blank"}
-
     - [PostgreSQL Operator documentation (Crunchy)](https://access.crunchydata.com/documentation/postgres-operator/latest/){:target="_blank"}
 
     - [PostgreSQL Operator documentation (Zalando)](https://github.com/zalando/postgres-operator){:target="_blank"}'
