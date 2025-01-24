@@ -8,6 +8,8 @@ build
 *egg-info
 .kube
 *.out
+# Ignore SSH private key files
+*.pem
 
 # Ignore Terraform state files
 **/terraform.tfstate
