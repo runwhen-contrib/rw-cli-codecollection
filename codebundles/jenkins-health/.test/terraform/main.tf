@@ -5,7 +5,7 @@ data "aws_ami" "ubuntu" {
 
   filter {
     name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*"]
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
   }
 
   filter {
@@ -132,17 +132,114 @@ resource "aws_instance" "jenkins_server" {
               # Install Java 17
               apt-get install -y openjdk-17-jdk
               # Add Jenkins repository key
-              curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | sudo tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null
+              curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null
               # Add Jenkins repository
-              echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/ | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+              echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/ | tee /etc/apt/sources.list.d/jenkins.list > /dev/null
               # Update package index again
-              apt-get update
-              # Install Jenkins
-              apt-get install -y jenkins
-              # Enable Jenkins to start on boot
-              systemctl enable jenkins
-              # Start Jenkins service
-              systemctl start jenkins
+              apt-get update && apt-get install -y jenkins && systemctl enable jenkins && systemctl start jenkins
+              sleep 60
+              # Get the initial admin password
+              JENKINS_PASS=$(sudo cat /var/lib/jenkins/secrets/initialAdminPassword)
+
+              # Install Jenkins CLI
+              wget -q http://localhost:8080/jnlpJars/jenkins-cli.jar
+
+              # Create groovy script to create admin user
+              cat <<GROOVY > create_admin.groovy
+              import jenkins.model.*
+              import hudson.security.*
+              import jenkins.install.*
+
+              def instance = Jenkins.getInstance()
+
+              // Skip setup wizard
+              instance.setInstallState(InstallState.INITIAL_SETUP_COMPLETED)
+
+              // Install suggested plugins
+              def pm = instance.getPluginManager()
+              def uc = instance.getUpdateCenter()
+              uc.updateAllSites()
+
+              def plugins = [
+                  // Organization and Administration
+                  "dashboard-view",
+                  "cloudbees-folder",
+                  "configuration-as-code",
+                  "antisamy-markup-formatter",
+                  
+                  // Build Features
+                  "build-name-setter",
+                  "build-timeout",
+                  "config-file-provider",
+                  "credentials-binding",
+                  "embeddable-build-status",
+                  "rebuild",
+                  "ssh-agent",
+                  "throttle-concurrents",
+                  "timestamper",
+                  "ws-cleanup",
+                  
+                  // Build Tools
+                  "ant",
+                  "gradle",
+                  
+                  // Pipelines and Continuous Delivery
+                  "workflow-aggregator",
+                  "github-branch-source",
+                  "pipeline-github-lib",
+                  "pipeline-stage-view",
+                  "conditional-buildstep",
+                  "parameterized-trigger",
+                  "copyartifact",
+                  
+                  // Source Code Management
+                  "git",
+                  "github",
+                  
+                  // Distributed Builds
+                  "ssh-slaves",
+                  
+                  // User Management and Security
+                  "matrix-auth",
+                  "pam-auth",
+                  "ldap",
+                  
+                  // Notifications and Publishing
+                  "email-ext",
+                  "mailer",
+
+                  "configuration-as-code",
+                  "ec2"
+              ]
+
+              plugins.each { plugin ->
+                  if (!pm.getPlugin(plugin)) {
+                      def installFuture = uc.getPlugin(plugin).deploy()
+                      installFuture.get()
+                  }
+              }
+
+              // Create admin user
+              def hudsonRealm = new HudsonPrivateSecurityRealm(false)
+              hudsonRealm.createAccount("admin", "admin123!")
+              instance.setSecurityRealm(hudsonRealm)
+
+              def strategy = new FullControlOnceLoggedInAuthorizationStrategy()
+              strategy.setAllowAnonymousRead(false)
+              instance.setAuthorizationStrategy(strategy)
+
+              instance.save()
+              GROOVY
+
+              # Execute the groovy script using Jenkins CLI
+              java -jar jenkins-cli.jar -s http://localhost:8080 -auth admin:$JENKINS_PASS groovy = < create_admin.groovy || {
+                echo "Failed to create admin user"
+                exit 1
+              }
+
+              # Clean up
+              rm -f create_admin.groovy
+
               EOF
 
   tags = {
