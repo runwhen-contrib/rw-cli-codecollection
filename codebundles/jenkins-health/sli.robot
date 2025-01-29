@@ -1,15 +1,14 @@
 *** Settings ***
-Documentation       This taskset collects information about Jenkins health and failed builds
-...                to help troubleshoot potential issues.
+Documentation    Check Jenkins health, failed builds, tests and long running builds
 Metadata            Author    saurabh3460
-Metadata            Display Name    Jenkins Healthcheck
+Metadata            Display Name    Jenkins Health
 Metadata            Supports    Jenkins
 
 Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
-
+Library             util.py
 
 Suite Setup         Suite Initialization
 
@@ -56,8 +55,36 @@ Check For Long Running Builds
     ${long_running_score}=    Evaluate    1 if int(${long_running_count}) <= int(${MAX_LONG_RUNNING_BUILDS}) else 0
     Set Global Variable    ${long_running_score}
 
+List Recent Faild Tests
+    [Documentation]    List Recent Faild Tests
+    [Tags]    Jenkins    Tests
+    ${failed_tests}=    Get Failed Tests
+    IF    len(${failed_tests}) > 0
+        ${failed_test_count}=    Evaluate    sum([len(suite['test_results']) for suite in ${failed_tests}])
+        ${failed_test_score}=    Evaluate    1 if int(${failed_test_count}) <= int(${MAX_FAILED_TESTS}) else 0
+        Set Global Variable    ${failed_test_score}
+    ELSE
+        Set Global Variable    ${failed_test_score}    1
+    END
+
+Check Jenkins Health
+    [Documentation]    Check if Jenkins instance is reachable and responding
+    [Tags]    Jenkins    Health
+    ${rsp}=    RW.CLI.Run Cli
+    ...    cmd=curl -s -u "$${JENKINS_USERNAME.key}:$${JENKINS_TOKEN.key}" "${JENKINS_URL}/api/json"
+    ...    env=${env}
+    ...    secret__jenkins_token=${JENKINS_TOKEN}
+    ...    secret__jenkins_username=${JENKINS_USERNAME}
+    TRY
+        ${data}=    Evaluate    json.loads('''${rsp.stdout}''')    json
+        Set Global Variable    ${jenkins_health_score}    1
+    EXCEPT
+        Set Global Variable    ${jenkins_health_score}    0
+    END
+
+
 Generate Health Score
-    ${health_score}=      Evaluate  (${failed_builds_score} + ${long_running_score}) / 2
+    ${health_score}=      Evaluate  (${failed_builds_score} + ${long_running_score} + ${failed_test_score} + ${jenkins_health_score}) / 4
     ${health_score}=      Convert to Number    ${health_score}  2
     RW.Core.Push Metric    ${health_score}
 
@@ -97,6 +124,12 @@ Suite Initialization
     ...    pattern=\d+
     ...    example="1"
     ...    default="0"
+    ${MAX_FAILED_TESTS}=    RW.Core.Import User Variable    MAX_FAILED_TESTS
+    ...    type=string
+    ...    description=The maximum number of failed tests to consider healthy
+    ...    pattern=\d+
+    ...    example="1"
+    ...    default="0"
     Set Suite Variable    ${env}    {"JENKINS_URL":"${JENKINS_URL}"}
     Set Suite Variable    ${JENKINS_URL}    ${JENKINS_URL}
     Set Suite Variable    ${JENKINS_USERNAME}    ${JENKINS_USERNAME}
@@ -104,3 +137,4 @@ Suite Initialization
     Set Suite Variable    ${TIME_THRESHOLD}    ${TIME_THRESHOLD}
     Set Suite Variable    ${MAX_FAILED_BUILDS}    ${MAX_FAILED_BUILDS}
     Set Suite Variable    ${MAX_LONG_RUNNING_BUILDS}    ${MAX_LONG_RUNNING_BUILDS}
+    Set Suite Variable    ${MAX_FAILED_TESTS}    ${MAX_FAILED_TESTS}
