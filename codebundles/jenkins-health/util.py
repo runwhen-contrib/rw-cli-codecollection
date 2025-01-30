@@ -1,24 +1,24 @@
 import os
 import requests
-import sys
+import json
+import time
 from collections import defaultdict
 from thefuzz import fuzz
 from thefuzz import process as fuzzprocessor
 
 # Ensure required environment variables are set
-JENKINS_URL = os.getenv("JENKINS_URL")
-JENKINS_USERNAME = os.getenv("JENKINS_USERNAME")
-JENKINS_TOKEN = os.getenv("JENKINS_TOKEN")
+JENKINS_URL =       os.getenv("JENKINS_URL")
+JENKINS_USERNAME =  os.getenv("JENKINS_USERNAME")
+JENKINS_TOKEN =     os.getenv("JENKINS_TOKEN")
 
 if not all([JENKINS_URL, JENKINS_USERNAME, JENKINS_TOKEN]):
-    print("Please set JENKINS_URL, JENKINS_USERNAME, and JENKINS_TOKEN environment variables.")
-    sys.exit(1)
+    error_msg = "Please set JENKINS_URL, JENKINS_USERNAME, and JENKINS_TOKEN environment variables."
+    raise ValueError(error_msg)
 
 # Jenkins API URL
-api_url = f"{JENKINS_URL}/api/json?depth=2"
-
+api_url =   f"{JENKINS_URL}/api/json?depth=2"
 # Basic authentication
-auth = (JENKINS_USERNAME, JENKINS_TOKEN)
+auth =  (JENKINS_USERNAME, JENKINS_TOKEN)
 
 # Fetch Jenkins jobs data
 try:
@@ -26,8 +26,7 @@ try:
     response.raise_for_status()  # Raises an HTTPError for bad responses (4xx, 5xx)
     jenkins_data = response.json()
 except requests.exceptions.RequestException as e:
-    print(f"Failed to fetch data from Jenkins: {e}")
-    sys.exit(1)
+    raise ConnectionError(f"Failed to fetch data from Jenkins: {e}")
 
 
 def get_failed_tests():
@@ -46,7 +45,7 @@ def get_failed_tests():
             }
             try:
                 tests_response = requests.get(job.get('lastBuild').get('url')+"testReport/api/json", auth=auth, timeout=10)
-                tests_response.raise_for_status()  # Raises an HTTPError for bad tests_responses (4xx, 5xx)
+                tests_response.raise_for_status()
                 suites = tests_response.json().get('suites')
                 test_results = []
                 for suite in suites:
@@ -54,14 +53,95 @@ def get_failed_tests():
                         if case.get('status') == 'FAILED':
                             test_results.append(case)
             except requests.exceptions.RequestException as e:
-                print(f"Failed to fetch data from Jenkins: {e}")
+                raise ConnectionError(f"Failed to fetch test data from Jenkins: {e}")
 
             result = {"pipeline_details": pipeline_details, "test_results": test_results}
             failed_tests.append(result)
     return failed_tests
 
+def get_queued_builds(wait_threshold="10m"):
+    """Get builds waiting in queue longer than the specified threshold.
+    
+    Args:
+        wait_threshold (str): Time threshold in format like '10min', '1h', '30m', '1d', '1day'
+        
+    Returns:
+        list: List of queued builds that exceed the wait threshold
+    """
+    # Convert threshold to minutes
+    threshold_value = 0
+    if 'min' in wait_threshold:
+        threshold_value = int(wait_threshold.replace('min', ''))
+    elif 'h' in wait_threshold:
+        threshold_value = int(wait_threshold.replace('h', '')) * 60
+    elif 'm' in wait_threshold:
+        threshold_value = int(wait_threshold.replace('m', ''))
+    elif 'day' in wait_threshold:
+        threshold_value = int(wait_threshold.replace('day', '')) * 24 * 60
+    elif 'd' in wait_threshold:
+        threshold_value = int(wait_threshold.replace('d', '')) * 24 * 60
+    else:
+        raise ValueError("Invalid threshold format. Use formats like '10min', '1h', '30m', '1d', '1day'")
 
-def build_logs_anyalytics(history_limit=5):
+    queued_builds = []
+    
+    try:
+        queue_url = f"{JENKINS_URL}/queue/api/json"
+        queue_response = requests.get(queue_url, auth=auth, timeout=10)
+        queue_response.raise_for_status()
+        queue_data = queue_response.json()
+        
+        current_time = int(time.time() * 1000)  # Convert to milliseconds
+        
+        for item in queue_data.get('items', []):
+            # Get time in queue in minutes
+            in_queue_since = item.get('inQueueSince', 0)
+            wait_time_mins = (current_time - in_queue_since) / (1000 * 60)  # Convert to minutes
+            
+            # Format wait time based on duration
+            if wait_time_mins >= 24*60:  # More than a day
+                wait_time = f"{wait_time_mins/(24*60):.1f}d"
+            elif wait_time_mins >= 60:  # More than an hour
+                wait_time = f"{wait_time_mins/60:.1f}h"
+            else:
+                wait_time = f"{wait_time_mins:.1f}min"
+            
+            if wait_time_mins >= threshold_value:
+                queued_build = {
+                    'job_name': item.get('task', {}).get('name', 'Unknown Job'),
+                    'waiting_since': in_queue_since,
+                    'wait_time': wait_time,
+                    'why': item.get('why', 'Unknown Reason'),
+                    'stuck': item.get('stuck', False),
+                    'blocked': item.get('blocked', False),
+                    'url': f"{JENKINS_URL}/{item.get('url', '')}"
+                }
+                queued_builds.append(queued_build)
+                
+        return queued_builds
+        
+    except requests.exceptions.RequestException as e:
+        raise ConnectionError(f"Failed to fetch queue data from Jenkins: {e}")
+
+
+def get_node_utilization():
+    node_utilization = []
+    for label in jenkins_data.get('assignedLabels', []):
+        busy_executors = label.get('busyExecutors', 0)
+        total_executors = label.get('totalExecutors', 0)
+        if total_executors > 0:
+            utilization = (busy_executors / total_executors) * 100
+        else:
+            utilization = 0
+        node_utilization.append({
+            'node_name': label.get('name', 'unknown'),
+            'busy_executors': busy_executors,
+            'total_executors': total_executors,
+            'utilization_percentage': utilization
+        })
+    return node_utilization
+
+def build_logs_analytics(history_limit=5):
     # Get failed builds (up to limit) for each job
     failed_builds = []
     for job in jenkins_data.get('jobs', []):
@@ -107,42 +187,65 @@ def build_logs_anyalytics(history_limit=5):
         if len(job_logs) < 2:
             continue
             
-        # Extract error lines from all logs
-        all_error_lines = []
+        # Extract error sections from logs
+        error_sections = []
         for log in job_logs:
-            error_lines = [
-                line.strip() for line in log['log_content'].split('\n')
-                if any(error_term in line.lower() for error_term in ['error', 'exception', 'failed', 'failure'])
-            ]
-            all_error_lines.extend(error_lines)
+            log_lines = log['log_content'].split('\n')
+            error_section = []
+            in_error = False
+            
+            for line in log_lines:
+                # Start capturing on error indicators
+                if any(error_term in line.lower() for error_term in ['error:', 'exception', 'failed', 'failure']):
+                    # Skip common, less meaningful lines
+                    if any(skip_term in line.lower() for skip_term in 
+                          ['finished: failure', 'build failure', '[info]']):
+                        continue
+                    in_error = True
+                    error_section = [line]
+                # Continue capturing context
+                elif in_error and line.strip():
+                    # Skip info/debug lines in error context
+                    if not line.lower().startswith('[info]'):
+                        error_section.append(line)
+                    # Stop after capturing some context
+                    if len(error_section) > 10:
+                        in_error = False
+                        if error_section:  # Only add if we have meaningful content
+                            error_sections.append('\n'.join(error_section))
+                elif in_error:
+                    in_error = False
+                    if error_section:  # Only add if we have meaningful content
+                        error_sections.append('\n'.join(error_section))
         
         # Use thefuzz to find similar error patterns
         common_patterns = defaultdict(list)
-        processed_lines = set()
+        processed_sections = set()
         
-        for line in all_error_lines:
-            if line in processed_lines:
+        for section in error_sections:
+            if section in processed_sections:
                 continue
                 
-            # Use process.extractBests to find similar lines
+            # Use process.extractBests to find similar sections
             matches = fuzzprocessor.extractBests(
-                line, 
-                all_error_lines,
-                scorer=fuzz.token_set_ratio,  # Better for error messages that might have different word orders
+                section,
+                error_sections,
+                scorer=fuzz.token_set_ratio,
                 score_cutoff=85  # 85% similarity threshold
             )
             
-            similar_lines = [match[0] for match in matches]
-            if len(similar_lines) > 1:
-                pattern_key = similar_lines[0]
+            similar_sections = [match[0] for match in matches]
+            # Only include patterns that occur in all builds
+            if len(similar_sections) == len(job_logs):  # Must occur in all builds
+                pattern_key = similar_sections[0]
                 common_patterns[pattern_key] = {
-                    'occurrences': len(similar_lines),
-                    'similar_lines': similar_lines,
+                    'occurrences': len(similar_sections),
+                    'similar_sections': similar_sections,
                     'similarity_scores': [match[1] for match in matches]
                 }
-                processed_lines.update(similar_lines)
+                processed_sections.update(similar_sections)
         
-        # Calculate overall log similarity using token_set_ratio
+        # Calculate overall log similarity
         similarity_scores = []
         for i in range(len(job_logs)):
             for j in range(i + 1, len(job_logs)):
@@ -154,6 +257,12 @@ def build_logs_anyalytics(history_limit=5):
         
         avg_similarity = sum(similarity_scores) / len(similarity_scores) if similarity_scores else 0
         
+        # Filter out patterns that don't meet minimum occurrence threshold
+        significant_patterns = {
+            pattern: details for pattern, details in common_patterns.items()
+            if details['occurrences'] == len(job_logs)  # Must occur in all builds
+        }
+        
         analysis_results.append({
             'job_name': job['job_name'],
             'builds_analyzed': len(job_logs),
@@ -162,15 +271,18 @@ def build_logs_anyalytics(history_limit=5):
                 {
                     'pattern': pattern,
                     'occurrences': details['occurrences'],
-                    'similar_lines': details['similar_lines'],
+                    'similar_sections': details['similar_sections'],
                     'similarity_scores': details['similarity_scores']
                 }
-                for pattern, details in common_patterns.items()
+                for pattern, details in significant_patterns.items()
             ]
         })
     
     return analysis_results
 
 
+
 if __name__ == "__main__":
-    print(build_logs_anyalytics())
+#     print(json.dumps(get_queued_builds()))
+    # print(json.dumps(build_logs_analytics()))
+    print(json.dumps(get_node_utilization()))

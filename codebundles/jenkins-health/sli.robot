@@ -82,9 +82,17 @@ Check Jenkins Health
         Set Global Variable    ${jenkins_health_score}    0
     END
 
+Check Queued Builds SLI
+    [Documentation]    Check for builds stuck in queue beyond threshold and calculate SLI score
+    [Tags]    Jenkins    Queue    Builds    SLI
+    ${queued_builds}=    Get Queued Builds    wait_threshold=1min
+    ${queued_count}=    Evaluate    len(${queued_builds})
+    ${queued_builds_score}=    Evaluate    1 if int(${queued_count}) <= int(${MAX_QUEUED_BUILDS}) else 0
+    Set Global Variable    ${queued_builds_score}
+
 
 Generate Health Score
-    ${health_score}=      Evaluate  (${failed_builds_score} + ${long_running_score} + ${failed_test_score} + ${jenkins_health_score}) / 4
+    ${health_score}=      Evaluate  (${failed_builds_score} + ${long_running_score} + ${failed_test_score} + ${jenkins_health_score} + ${queued_builds_score}) / 5
     ${health_score}=      Convert to Number    ${health_score}  2
     RW.Core.Push Metric    ${health_score}
 
@@ -130,6 +138,18 @@ Suite Initialization
     ...    pattern=\d+
     ...    example="1"
     ...    default="0"
+    ${MAX_QUEUED_BUILDS}=    RW.Core.Import User Variable    MAX_QUEUED_BUILDS
+    ...    type=string
+    ...    description=The maximum number of builds stuck in queue to consider healthy
+    ...    pattern=\d+
+    ...    example="1"
+    ...    default="0"
+    ${WAIT_THRESHOLD}=    RW.Core.Import User Variable    WAIT_THRESHOLD
+    ...    type=string
+    ...    description=The threshold for builds stuck in queue, formats like '5m', '2h', '1d' or '5min', '2h', '1d'
+    ...    pattern=\d+
+    ...    example="1m"
+    ...    default="10m"
     Set Suite Variable    ${env}    {"JENKINS_URL":"${JENKINS_URL}"}
     Set Suite Variable    ${JENKINS_URL}    ${JENKINS_URL}
     Set Suite Variable    ${JENKINS_USERNAME}    ${JENKINS_USERNAME}
@@ -138,3 +158,4 @@ Suite Initialization
     Set Suite Variable    ${MAX_FAILED_BUILDS}    ${MAX_FAILED_BUILDS}
     Set Suite Variable    ${MAX_LONG_RUNNING_BUILDS}    ${MAX_LONG_RUNNING_BUILDS}
     Set Suite Variable    ${MAX_FAILED_TESTS}    ${MAX_FAILED_TESTS}
+    Set Suite Variable    ${MAX_QUEUED_BUILDS}    ${MAX_QUEUED_BUILDS}
