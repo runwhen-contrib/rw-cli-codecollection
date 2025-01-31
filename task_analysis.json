@@ -1,0 +1,1436 @@
+[
+    {
+        "file": "./codebundles/cmd-test/runbook.robot",
+        "task": "Run Cli Command",
+        "score": 3,
+        "suggested_title": "Execute AWS CLI Command in `us-west-2` region and for `1234567890` account ID"
+    },
+    {
+        "file": "./codebundles/cmd-test/runbook.robot",
+        "task": "Run Bash File",
+        "score": 3,
+        "suggested_title": "\"Execute Bash File with AWS Credentials in ${AWS_REGION} region and ${AWS_ACCOUNT_ID}\""
+    },
+    {
+        "file": "./codebundles/cmd-test/runbook.robot",
+        "task": "Log Suggestion",
+        "score": 3,
+        "suggested_title": "\"Create CloudWatch Log Group in \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/azure-loadbalancer-triage/runbook.robot",
+        "task": "Check Activity Logs For Azure Load Balancer `${Az_Lb_Name}`",
+        "score": 1,
+        "suggested_title": "\"Review Azure Load Balancer Activity Logs for ${Az_Lb_Name} in Region \\${AZURE_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-chaos-flux/runbook.robot",
+        "task": "Suspend The Flux Resource Reconciliation",
+        "score": 3,
+        "suggested_title": "\"Suspend The Flux Resource Reconciliation in \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-chaos-flux/runbook.robot",
+        "task": "Find Random Fluxcd Workload As Chaos Target",
+        "score": 3,
+        "suggested_title": "\"Discover Random Fluxcd Workload for Chaos Testing in \\${CLOUD_PROVIDER}\""
+    },
+    {
+        "file": "./codebundles/k8s-chaos-flux/runbook.robot",
+        "task": "Execute Chaos Command",
+        "score": 3,
+        "suggested_title": "\"Execute Chaos Command in \\${AWS_REGION} for \\${AWS_ACCOUNT_ID}\""
+    },
+    {
+        "file": "./codebundles/k8s-chaos-flux/runbook.robot",
+        "task": "Execute Additional Chaos Command",
+        "score": 2,
+        "suggested_title": "\"Execute Additional Chaos Command in \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-chaos-flux/runbook.robot",
+        "task": "Resume Flux Resource Reconciliation",
+        "score": 3,
+        "suggested_title": "\"Resume Flux Resource Reconciliation in \\${AWS_REGION} for \\${AWS_ACCOUNT_ID}\""
+    },
+    {
+        "file": "./codebundles/gcp-cloud-function-health/sli.robot",
+        "task": "Count Unhealthy Gcp Cloud Functions In Gcp Project `${Gcp_Project_Id}`",
+        "score": 3,
+        "suggested_title": "\"Identify and Report Unhealthy GCP Cloud Functions in GCP Project `\\${Gcp_Project_Id}`\""
+    },
+    {
+        "file": "./codebundles/gcp-cloud-function-health/runbook.robot",
+        "task": "List Unhealhy Cloud Functions In Gcp Project `${Gcp_Project_Id}`",
+        "score": 3,
+        "suggested_title": "\"Identify Unhealthy Cloud Functions in GCP Project `${Gcp_Project_Id}`\""
+    },
+    {
+        "file": "./codebundles/gcp-cloud-function-health/runbook.robot",
+        "task": "Get Error Logs For Unhealthy Cloud Functions In Gcp Project `${Gcp_Project_Id}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/terraform-cloud-workspace-lock-check/runbook.robot",
+        "task": "Checking Whether The Terraform Cloud Workspace Is In A Locked State",
+        "score": 1,
+        "suggested_title": "\"Verifying the Locked State of Terraform Cloud Workspace in \\${TERRAFORM_REGION}\""
+    },
+    {
+        "file": "./codebundles/azure-appservice-triage/sli.robot",
+        "task": "Check For Resource Health Issues Affecting App Service `${App_Service_Name}` In Resource Group `${Az_Resource_Group}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/azure-appservice-triage/sli.robot",
+        "task": "Check App Service `${App_Service_Name}` Health Check Metrics In Resource Group `${Az_Resource_Group}`",
+        "score": 3,
+        "suggested_title": "\"Monitor App Service `${App_Service_Name}` Health Metrics in Resource Group `${Az_Resource_Group}` for AWS Region `${AWS_REGION}` and Account `${AWS_ACCOUNT_ID}`\""
+    },
+    {
+        "file": "./codebundles/azure-appservice-triage/sli.robot",
+        "task": "Check App Service `${App_Service_Name}` Configuration Health In Resource Group `${Az_Resource_Group}`",
+        "score": 3,
+        "suggested_title": "\"Verify App Service `${App_Service_Name}` Configuration Health in Resource Group `${Az_Resource_Group}` in Azure\""
+    },
+    {
+        "file": "./codebundles/azure-appservice-triage/sli.robot",
+        "task": "Check Deployment Health Of App Service `${App_Service_Name}` In Resource Group `${Az_Resource_Group}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/azure-appservice-triage/sli.robot",
+        "task": "Fetch App Service `${App_Service_Name}` Activities In Resource Group `${Az_Resource_Group}`",
+        "score": 3,
+        "suggested_title": "\"Retrieve Activity Logs for App Service `${App_Service_Name}` in Resource Group `${Az_Resource_Group}`\""
+    },
+    {
+        "file": "./codebundles/azure-appservice-triage/sli.robot",
+        "task": "Generate App Service Health Score",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/azure-appservice-triage/runbook.robot",
+        "task": "Check For Resource Health Issues Affecting App Service `${App_Service_Name}` In Resource Group `${Az_Resource_Group}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/azure-appservice-triage/runbook.robot",
+        "task": "Check App Service `${App_Service_Name}` Health Check Metrics In Resource Group `${Az_Resource_Group}`",
+        "score": 3,
+        "suggested_title": "\"Monitor App Service `${App_Service_Name}` Health Metrics in Resource Group `${Az_Resource_Group}` for AWS Region `${AWS_REGION}` and Account `${AWS_ACCOUNT_ID}`\""
+    },
+    {
+        "file": "./codebundles/azure-appservice-triage/runbook.robot",
+        "task": "Fetch App Service `${App_Service_Name}` Utilization Metrics In Resource Group `${Az_Resource_Group}`",
+        "score": 1,
+        "suggested_title": "\"Retrieve App Service `${App_Service_Name}` Usage Data in Resource Group `${Az_Resource_Group}` Using AWS CloudWatch\""
+    },
+    {
+        "file": "./codebundles/azure-appservice-triage/runbook.robot",
+        "task": "Get App Service `${App_Service_Name}` Logs In Resource Group `${Az_Resource_Group}`",
+        "score": 5,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/azure-appservice-triage/runbook.robot",
+        "task": "Check Configuration Health Of App Service `${App_Service_Name}` In Resource Group `${Az_Resource_Group}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/azure-appservice-triage/runbook.robot",
+        "task": "Check Deployment Health Of App Service `${App_Service_Name}` In Resource Group `${Az_Resource_Group}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/azure-appservice-triage/runbook.robot",
+        "task": "Fetch App Service `${App_Service_Name}` Activities In Resource Group `${Az_Resource_Group}`",
+        "score": 3,
+        "suggested_title": "\"Retrieve Activity Logs for App Service `${App_Service_Name}` in Resource Group `${Az_Resource_Group}`\""
+    },
+    {
+        "file": "./codebundles/azure-appservice-triage/runbook.robot",
+        "task": "Check Logs For Errors In App Service `${App_Service_Name}` In Resource Group `${Az_Resource_Group}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/aws-lambda-health/sli.robot",
+        "task": "Analyze Aws Lambda Invocation Errors",
+        "score": 3,
+        "suggested_title": "\"Identify and Resolve AWS Lambda Invocation Errors in \\${AWS_REGION} for Account ID \\${AWS_ACCOUNT_ID}\""
+    },
+    {
+        "file": "./codebundles/aws-lambda-health/runbook.robot",
+        "task": "List Lambda Versions And Runtimes",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/aws-lambda-health/runbook.robot",
+        "task": "Analyze Aws Lambda Invocation Errors",
+        "score": 3,
+        "suggested_title": "\"Identify and Resolve AWS Lambda Invocation Errors in \\${AWS_REGION} for Account ID \\${AWS_ACCOUNT_ID}\""
+    },
+    {
+        "file": "./codebundles/aws-lambda-health/runbook.robot",
+        "task": "Monitor Aws Lambda Performance Metrics",
+        "score": 3,
+        "suggested_title": "\"Monitor Performance Metrics for AWS Lambda in \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/curl-http-ok/sli.robot",
+        "task": "Checking Http Url Is Available And Timely",
+        "score": 3,
+        "suggested_title": "\"Validating Availability and Response Time of ${URL} in ${REGION}\""
+    },
+    {
+        "file": "./codebundles/curl-http-ok/runbook.robot",
+        "task": "Checking Http Url Is Available And Timely",
+        "score": 3,
+        "suggested_title": "\"Validating Availability and Response Time of ${URL} in ${REGION}\""
+    },
+    {
+        "file": "./codebundles/gh-actions-artifact-analysis/sli.robot",
+        "task": "Analyze Artifact From Github Workflow `${Workflow_Name}` In Repository `${Github_Repo}` And Push Metric",
+        "score": 3,
+        "suggested_title": "\"Analyze and Push Metric From Github Workflow `${Workflow_Name}` In Repository `${Github_Repo}` to AWS CloudWatch\""
+    },
+    {
+        "file": "./codebundles/gh-actions-artifact-analysis/runbook.robot",
+        "task": "Analyze Artifact From Github Workflow `${Workflow_Name}` In Repository `${Github_Repo}`",
+        "score": 3,
+        "suggested_title": "\"Analyze Artifact From GitHub Workflow `${Workflow_Name}` In Repository `${Github_Repo}` for `\\${AWS_REGION}` and `\\${AWS_ACCOUNT_ID}`\""
+    },
+    {
+        "file": "./codebundles/k8s-vault-healthcheck/runbook.robot",
+        "task": "Fetch Vault Csi Driver Logs",
+        "score": 3,
+        "suggested_title": "\"Retrieve Vault CSI Driver Logs from \\${AWS_REGION} in \\${AWS_ACCOUNT_ID}\""
+    },
+    {
+        "file": "./codebundles/k8s-vault-healthcheck/runbook.robot",
+        "task": "Get Vault Csi Driver Warning Events",
+        "score": 3,
+        "suggested_title": "\"Retrieve Vault Csi Driver Warning Events in AWS East Region\""
+    },
+    {
+        "file": "./codebundles/k8s-vault-healthcheck/runbook.robot",
+        "task": "Check Vault Csi Driver Replicas",
+        "score": 1,
+        "suggested_title": "Check Vault Csi Driver Replicas in AWS_REGION and AWS_ACCOUNT_ID"
+    },
+    {
+        "file": "./codebundles/k8s-vault-healthcheck/runbook.robot",
+        "task": "Fetch Vault Logs",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-vault-healthcheck/runbook.robot",
+        "task": "Get Related Vault Events",
+        "score": 3,
+        "suggested_title": "\"Retrieve Vault Events in \\${AWS_REGION} for Account ID \\${AWS_ACCOUNT_ID}\""
+    },
+    {
+        "file": "./codebundles/k8s-vault-healthcheck/runbook.robot",
+        "task": "Fetch Vault Statefulset Manifest Details",
+        "score": 1,
+        "suggested_title": "\"What: Retrieve Vault Statefulset Manifest Details with \\${AWS_REGION} and \\${AWS_ACCOUNT_ID}\""
+    },
+    {
+        "file": "./codebundles/k8s-vault-healthcheck/runbook.robot",
+        "task": "Fetch Vault Daemonset Manifest Details",
+        "score": 3,
+        "suggested_title": "Fetch Vault Daemonset Manifest Details from AWS in \\${AWS_REGION} region and \\${AWS_ACCOUNT_ID} account"
+    },
+    {
+        "file": "./codebundles/k8s-vault-healthcheck/runbook.robot",
+        "task": "Verify Vault Availability",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-vault-healthcheck/runbook.robot",
+        "task": "Check Vault Statefulset Replicas",
+        "score": 2,
+        "suggested_title": "\"Verify Vault Statefulset Replicas in \\${CLUSTER_NAME}\""
+    },
+    {
+        "file": "./codebundles/azure-aks-triage/sli.robot",
+        "task": "Check For Resource Health Issues Affecting Aks Cluster `${Aks_Cluster}` In Resource Group `${Az_Resource_Group}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/azure-aks-triage/sli.robot",
+        "task": "Fetch Activities For Aks Cluster `${Aks_Cluster}` In Resource Group `${Az_Resource_Group}`",
+        "score": 1,
+        "suggested_title": "Retrieve activities for the Aks Cluster `${Aks_Cluster}` located in the Resource Group `${Az_Resource_Group}`."
+    },
+    {
+        "file": "./codebundles/azure-aks-triage/sli.robot",
+        "task": "Check Configuration Health Of Aks Cluster `${Aks_Cluster}` In Resource Group `${Az_Resource_Group}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/azure-aks-triage/sli.robot",
+        "task": "Generate Aks Cluster Health Score",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/azure-aks-triage/runbook.robot",
+        "task": "Check For Resource Health Issues Affecting Aks Cluster `${Aks_Cluster}` In Resource Group `${Az_Resource_Group}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/azure-aks-triage/runbook.robot",
+        "task": "Check Configuration Health Of Aks Cluster `${Aks_Cluster}` In Resource Group `${Az_Resource_Group}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/azure-aks-triage/runbook.robot",
+        "task": "Check Network Configuration Of Aks Cluster `${Aks_Cluster}` In Resource Group `${Az_Resource_Group}`",
+        "score": 1,
+        "suggested_title": "\"Verify Network Configuration of AKS Cluster `${Aks_Cluster}` in Resource Group `${Az_Resource_Group}`\""
+    },
+    {
+        "file": "./codebundles/azure-aks-triage/runbook.robot",
+        "task": "Fetch Activities For Aks Cluster `${Aks_Cluster}` In Resource Group `${Az_Resource_Group}`",
+        "score": 1,
+        "suggested_title": "Retrieve activities for the Aks Cluster `${Aks_Cluster}` located in the Resource Group `${Az_Resource_Group}`."
+    },
+    {
+        "file": "./codebundles/azure-vmss-triage/sli.robot",
+        "task": "Check Scale Set `${Vmscaleset}` Key Metrics In Resource Group `${Az_Resource_Group}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/azure-vmss-triage/runbook.robot",
+        "task": "Check Scale Set `${Vmscaleset}` Key Metrics In Resource Group `${Az_Resource_Group}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/azure-vmss-triage/runbook.robot",
+        "task": "Fetch Vm Scale Set `${Vmscaleset}` Config In Resource Group `${Az_Resource_Group}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/azure-vmss-triage/runbook.robot",
+        "task": "Fetch Activities For Vm Scale Set `${Vmscaleset}` In Resource Group `${Az_Resource_Group}`",
+        "score": 3,
+        "suggested_title": "\"Retrieve Activities for VM Scale Set in Resource Group: ${Az_Resource_Group}\""
+    },
+    {
+        "file": "./codebundles/gcloud-node-preempt/sli.robot",
+        "task": "Count The Number Of Nodes In Active Prempt Operation",
+        "score": 2,
+        "suggested_title": "\"Count the Number of Nodes in Active Preempt Operation in AWS Lambda Environment\""
+    },
+    {
+        "file": "./codebundles/gcloud-node-preempt/runbook.robot",
+        "task": "List All Nodes In An Active Prempt Operation For Gcp Project `${Gcp_Project_Id}`",
+        "score": 3,
+        "suggested_title": "List All Nodes In An Active Prempt Operation For GCP Project `${Gcp_Project_Id}` in Region `\\${GCP_REGION}`"
+    },
+    {
+        "file": "./codebundles/k8s-argocd-application-health/runbook.robot",
+        "task": "Fetch Argocd Application Sync Status & Health For `${Application}`",
+        "score": 3,
+        "suggested_title": "\"Retrieve Argocd Application Sync Status & Health in AWS Region: `\\${AWS_REGION}` for `${Application}`\""
+    },
+    {
+        "file": "./codebundles/k8s-argocd-application-health/runbook.robot",
+        "task": "Fetch Argocd Application Last Sync Operation Details For `${Application}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-argocd-application-health/runbook.robot",
+        "task": "Fetch Unhealthy Argocd Application Resources For `${Application}`",
+        "score": 3,
+        "suggested_title": "\"Retrieve Unhealthy Argocd Application Resources for `${Application}` in AWS environment\""
+    },
+    {
+        "file": "./codebundles/k8s-argocd-application-health/runbook.robot",
+        "task": "Scan For Errors In Pod Logs Related To Argocd Application `${Application}`",
+        "score": 3,
+        "suggested_title": "\"Identify Errors in Pod Logs for Argocd Application `${Application}` in ${Environment}\""
+    },
+    {
+        "file": "./codebundles/k8s-argocd-application-health/runbook.robot",
+        "task": "Fully Describe Argocd Application `${Application}`",
+        "score": 2,
+        "suggested_title": "\"Detail What and Where For Argocd Application `${Application}` Using Specific Placeholders\""
+    },
+    {
+        "file": "./codebundles/aws-eks-health/sli.robot",
+        "task": "Check Eks Cluster Health Status",
+        "score": 3,
+        "suggested_title": "\"Monitor Eks Cluster Health in \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/aws-eks-health/runbook.robot",
+        "task": "Check Eks Fargate Cluster Health Status",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/aws-eks-health/runbook.robot",
+        "task": "Check Eks Cluster Health Status",
+        "score": 3,
+        "suggested_title": "\"Monitor Eks Cluster Health in \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/aws-eks-health/runbook.robot",
+        "task": "List Eks Cluster Metrics",
+        "score": 2,
+        "suggested_title": "\"Retrieve Eks Cluster Metrics in \\${AWS_REGION} for \\${AWS_ACCOUNT_ID}\""
+    },
+    {
+        "file": "./codebundles/k8s-kubectl-cmd/sli.robot",
+        "task": "Run User Provided Kubectl Command",
+        "score": 3,
+        "suggested_title": "\"Execute User-Specified kubectl Command in Specific AWS Region\""
+    },
+    {
+        "file": "./codebundles/k8s-kubectl-cmd/runbook.robot",
+        "task": "Run User Provided Kubectl Command",
+        "score": 3,
+        "suggested_title": "\"Execute User-Specified kubectl Command in Specific AWS Region\""
+    },
+    {
+        "file": "./codebundles/k8s-namespace-healthcheck/sli.robot",
+        "task": "Get Event Count And Score",
+        "score": 3,
+        "suggested_title": "\"Retrieve Event Count and Score from \\${DATA_SOURCE}\""
+    },
+    {
+        "file": "./codebundles/k8s-namespace-healthcheck/sli.robot",
+        "task": "Get Container Restarts And Score",
+        "score": 3,
+        "suggested_title": "Get Container Restarts And Score in AWS ECS Cluster"
+    },
+    {
+        "file": "./codebundles/k8s-namespace-healthcheck/sli.robot",
+        "task": "Get Notready Pods",
+        "score": 3,
+        "suggested_title": "\"Retrieve List of Notready Pods in \\${CLUSTER_NAME} Cluster\""
+    },
+    {
+        "file": "./codebundles/k8s-namespace-healthcheck/sli.robot",
+        "task": "Generate Namspace Score",
+        "score": 3,
+        "suggested_title": "\"Generate Namespace Score for \\${AWS_REGION} in \\${AWS_ACCOUNT_ID}\""
+    },
+    {
+        "file": "./codebundles/k8s-namespace-healthcheck/runbook.robot",
+        "task": "Inspect Warning Events In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-namespace-healthcheck/runbook.robot",
+        "task": "Inspect Container Restarts In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-namespace-healthcheck/runbook.robot",
+        "task": "Inspect Pending Pods In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-namespace-healthcheck/runbook.robot",
+        "task": "Inspect Failed Pods In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-namespace-healthcheck/runbook.robot",
+        "task": "Inspect Workload Status Conditions In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-namespace-healthcheck/runbook.robot",
+        "task": "Get Listing Of Resources In Namespace `${Namespace}`",
+        "score": 3,
+        "suggested_title": "\"Retrieve Resource List in Namespace `${Namespace}` within Region `\\${AWS_REGION}`\""
+    },
+    {
+        "file": "./codebundles/k8s-namespace-healthcheck/runbook.robot",
+        "task": "Check Event Anomalies In Namespace `${Namespace}`",
+        "score": 3,
+        "suggested_title": "\"Identify Anomalies in Event Logs in Namespace `${Namespace}` within AWS Account `\\${AWS_ACCOUNT_ID}`\""
+    },
+    {
+        "file": "./codebundles/k8s-namespace-healthcheck/runbook.robot",
+        "task": "Check Missing Or Risky Poddisruptionbudget Policies In Namepace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-namespace-healthcheck/runbook.robot",
+        "task": "Check Resource Quota Utilization In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-fluxcd-reconcile/sli.robot",
+        "task": "Health Check Flux Reconciliation",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-fluxcd-reconcile/runbook.robot",
+        "task": "Health Check Flux Reconciliation",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/cli-test/runbook.robot",
+        "task": "Run Cli And Parse Output For Issues",
+        "score": 3,
+        "suggested_title": "\"Parse Output from CLI to Identify Issues in \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/cli-test/runbook.robot",
+        "task": "Exec Test",
+        "score": 3,
+        "suggested_title": "\"Exec Test in \\${AWS_REGION} for \\${AWS_ACCOUNT_ID}\""
+    },
+    {
+        "file": "./codebundles/cli-test/runbook.robot",
+        "task": "Local Process Test",
+        "score": 3,
+        "suggested_title": "\"Local Process Test in \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-image-check/runbook.robot",
+        "task": "Check Image Rollover Times For Namespace `${Namespace}`",
+        "score": 3,
+        "suggested_title": "\"Verify Image Rollover Times For Namespace `${Namespace}` in AWS Region \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-image-check/runbook.robot",
+        "task": "List Images And Tags For Every Container In Running Pods For Namespace `${Namespace}`",
+        "score": 1,
+        "suggested_title": "\"Retrieve Image and Tag Information for all Running Containers in Pods for Namespace `${Namespace}`\""
+    },
+    {
+        "file": "./codebundles/k8s-image-check/runbook.robot",
+        "task": "List Images And Tags For Every Container In Failed Pods For Namespace `${Namespace}`",
+        "score": 5,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-image-check/runbook.robot",
+        "task": "List Imagepullbackoff Events And Test Path And Tags For Namespace `${Namespace}`",
+        "score": 3,
+        "suggested_title": "List Imagepullbackoff Events And Test Path And Tags For Namespace `${Namespace}` in AWS Region `\\${AWS_REGION}` and Account ID `\\${AWS_ACCOUNT_ID}`"
+    },
+    {
+        "file": "./codebundles/k8s-loki-healthcheck/runbook.robot",
+        "task": "Check Loki Ring Api",
+        "score": 3,
+        "suggested_title": "Check Loki Ring Api Endpoint Configuration in \\${AWS_REGION} region"
+    },
+    {
+        "file": "./codebundles/k8s-loki-healthcheck/runbook.robot",
+        "task": "Check Loki Api Ready",
+        "score": 3,
+        "suggested_title": "\"Validate Loki API Readiness in \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/gcp-bucket-health/sli.robot",
+        "task": "Fetch Gcp Bucket Storage Utilization For `${Project_Ids}`",
+        "score": 1,
+        "suggested_title": "\"Retrieve GCP Bucket Storage Utilization for `${Project_Ids}` in \\${GCP_ZONE}\""
+    },
+    {
+        "file": "./codebundles/gcp-bucket-health/sli.robot",
+        "task": "Check Gcp Bucket Security Configuration For `${Project_Ids}`",
+        "score": 3,
+        "suggested_title": "\"Review GCP Bucket Security Setup for `${Project_Ids}` in ${GCP_REGION}\""
+    },
+    {
+        "file": "./codebundles/gcp-bucket-health/sli.robot",
+        "task": "Fetch Gcp Bucket Storage Operations Rate For `${Project_Ids}`",
+        "score": 1,
+        "suggested_title": "Fetch Gcp Bucket Storage Operations Rate For `${Project_Ids}` in `${GCP_REGION}`"
+    },
+    {
+        "file": "./codebundles/gcp-bucket-health/sli.robot",
+        "task": "Generate Bucket Score",
+        "score": 3,
+        "suggested_title": "\"Calculate Bucket Score using \\${AWS_REGION} and \\${AWS_ACCOUNT_ID}\""
+    },
+    {
+        "file": "./codebundles/gcp-bucket-health/runbook.robot",
+        "task": "Fetch Gcp Bucket Storage Utilization For `${Project_Ids}`",
+        "score": 1,
+        "suggested_title": "\"Retrieve GCP Bucket Storage Utilization for `${Project_Ids}` in \\${GCP_ZONE}\""
+    },
+    {
+        "file": "./codebundles/gcp-bucket-health/runbook.robot",
+        "task": "Add Gcp Bucket Storage Configuration For `${Project_Ids}` To Report",
+        "score": 3,
+        "suggested_title": "\"Configure Gcp Bucket Storage for `${Project_Ids}` in `${GCP_REGION}` for Report\""
+    },
+    {
+        "file": "./codebundles/gcp-bucket-health/runbook.robot",
+        "task": "Check Gcp Bucket Security Configuration For `${Project_Ids}`",
+        "score": 3,
+        "suggested_title": "\"Review GCP Bucket Security Setup for `${Project_Ids}` in ${GCP_REGION}\""
+    },
+    {
+        "file": "./codebundles/gcp-bucket-health/runbook.robot",
+        "task": "Fetch Gcp Bucket Storage Operations Rate For `${Project_Ids}`",
+        "score": 1,
+        "suggested_title": "Fetch Gcp Bucket Storage Operations Rate For `${Project_Ids}` in `${GCP_REGION}`"
+    },
+    {
+        "file": "./codebundles/k8s-daemonset-healthcheck/runbook.robot",
+        "task": "Get Daemonset Logs For `${Daemonset_Name}` And Add To Report",
+        "score": 3,
+        "suggested_title": "\"Retrieve Daemonset Logs for `${Daemonset_Name}` in `${AWS_REGION}` and Include in Report\""
+    },
+    {
+        "file": "./codebundles/k8s-daemonset-healthcheck/runbook.robot",
+        "task": "Get Related Daemonset `${Daemonset_Name}` Events",
+        "score": 3,
+        "suggested_title": "\"Retrieve Events for Related Daemonset `${Daemonset_Name}` in Cluster \\${CLUSTER_ID}\""
+    },
+    {
+        "file": "./codebundles/k8s-daemonset-healthcheck/runbook.robot",
+        "task": "Check Daemonset `${Daemonset_Name}` Replicas",
+        "score": 3,
+        "suggested_title": "\"Verify ${Daemonset_Name} Replicas in ${Kubernetes_Cluster}\""
+    },
+    {
+        "file": "./codebundles/k8s-deployment-healthcheck/runbook.robot",
+        "task": "Check Deployment Log For Issues With `${Deployment_Name}`",
+        "score": 3,
+        "suggested_title": "Check Deployment Log for Issues with `${Deployment_Name}` in `${AWS_REGION}` and `${AWS_ACCOUNT_ID}`"
+    },
+    {
+        "file": "./codebundles/k8s-deployment-healthcheck/runbook.robot",
+        "task": "Fetch Deployments Logs For `${Deployment_Name}` And Add To Report",
+        "score": 3,
+        "suggested_title": "\"Retrieve Deployment Logs for `${Deployment_Name}` from AWS CloudWatch and Include in Report\""
+    },
+    {
+        "file": "./codebundles/k8s-deployment-healthcheck/runbook.robot",
+        "task": "Check Liveness Probe Configuration For Deployment `${Deployment_Name}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-deployment-healthcheck/runbook.robot",
+        "task": "Check Readiness Probe Configuration For Deployment `${Deployment_Name}`",
+        "score": 3,
+        "suggested_title": "\"Review Readiness Probe Configuration For Deployment `${Deployment_Name}` in AWS Cluster\""
+    },
+    {
+        "file": "./codebundles/k8s-deployment-healthcheck/runbook.robot",
+        "task": "Inspect Container Restarts For Deployment `${Deployment_Name}` Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-deployment-healthcheck/runbook.robot",
+        "task": "Inspect Deployment Warning Events For `${Deployment_Name}`",
+        "score": 3,
+        "suggested_title": "Inspect Deployment Warning Events For `${Deployment_Name}` in \\${AWS_REGION} and \\${AWS_ACCOUNT_ID}"
+    },
+    {
+        "file": "./codebundles/k8s-deployment-healthcheck/runbook.robot",
+        "task": "Get Deployment Workload Details For `${Deployment_Name}` And Add To Report",
+        "score": 3,
+        "suggested_title": "\"Fetch Deployment Workload Details For `${Deployment_Name}` from `\\${AWS_REGION}` and Include in Report\""
+    },
+    {
+        "file": "./codebundles/k8s-deployment-healthcheck/runbook.robot",
+        "task": "Inspect Deployment Replicas For `${Deployment_Name}`",
+        "score": 1,
+        "suggested_title": "\"Check Deployment Replicas For `${Deployment_Name}` in \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-deployment-healthcheck/runbook.robot",
+        "task": "Check Deployment Event Anomalies For `${Deployment_Name}`",
+        "score": 3,
+        "suggested_title": "\"Analyze ${Deployment_Name} for Anomalies in \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-deployment-healthcheck/runbook.robot",
+        "task": "Check Replicaset Health For Deployment `${Deployment_Name}`",
+        "score": 3,
+        "suggested_title": "\"Monitor Replicaset Health in AWS Region \\${AWS_REGION} for Deployment \\${Deployment_Name}\""
+    },
+    {
+        "file": "./codebundles/test-issue/runbook.robot",
+        "task": "Raise Full Issue",
+        "score": 2,
+        "suggested_title": "\"Raise Full Issue in \\${AWS_REGION} for \\${AWS_ACCOUNT_ID}\""
+    },
+    {
+        "file": "./codebundles/k8s-certmanager-healthcheck/sli.robot",
+        "task": "Count Unready And Expired Certificates",
+        "score": 3,
+        "suggested_title": "\"Identify Unready And Expired Certificates in \\${AWS_REGION} for \\${AWS_ACCOUNT_ID}\""
+    },
+    {
+        "file": "./codebundles/k8s-certmanager-healthcheck/runbook.robot",
+        "task": "Get Namespace Certificate Summary For Namespace `${Namespace}`",
+        "score": 3,
+        "suggested_title": "\"Retrieve Summary of Namespace Certificate for Namespace `${Namespace}` in AWS Region `\\${AWS_REGION}`\""
+    },
+    {
+        "file": "./codebundles/k8s-certmanager-healthcheck/runbook.robot",
+        "task": "Find Unhealthy Certificates In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-certmanager-healthcheck/runbook.robot",
+        "task": "Find Failed Certificate Requests And Identify Issues For Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-labeledpods-healthcheck/sli.robot",
+        "task": "Measure Number Of Running Pods With Label",
+        "score": 2,
+        "suggested_title": "\"Count Running Pods with Label in AWS Region: \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-cluster-node-health/sli.robot",
+        "task": "Check For Node Restarts In Cluster `${Context}`",
+        "score": 1,
+        "suggested_title": "Response unavailable"
+    },
+    {
+        "file": "./codebundles/k8s-cluster-node-health/sli.robot",
+        "task": "Generate Namspace Score",
+        "score": 3,
+        "suggested_title": "\"Generate Namespace Score for \\${AWS_REGION} in \\${AWS_ACCOUNT_ID}\""
+    },
+    {
+        "file": "./codebundles/k8s-cluster-node-health/runbook.robot",
+        "task": "Check For Node Restarts In Cluster `${Context}`",
+        "score": 1,
+        "suggested_title": "\"Check For Node Restarts In Cluster `${Context}` in AWS Region: \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-chaos-workload/runbook.robot",
+        "task": "Test `${Workload_Name}` High Availability",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-chaos-workload/runbook.robot",
+        "task": "Oomkill `${Workload_Name}` Pod",
+        "score": 3,
+        "suggested_title": "\"Terminate `${Workload_Name}` Pod in \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-chaos-workload/runbook.robot",
+        "task": "Mangle Service Selector For `${Workload_Name}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-chaos-workload/runbook.robot",
+        "task": "Mangle Service Port For `${Workload_Name}`",
+        "score": 3,
+        "suggested_title": "\"Mangle Service Port For `${Workload_Name}` in `\\${AWS_REGION}`\""
+    },
+    {
+        "file": "./codebundles/k8s-chaos-workload/runbook.robot",
+        "task": "Fill Tmp Directory Of Pod From `${Workload_Name}`",
+        "score": 3,
+        "suggested_title": "\"Populate Tmp Directory of Pod From `${Workload_Name}` with ${AWS_REGION} and ${AWS_ACCOUNT_ID}\""
+    },
+    {
+        "file": "./codebundles/k8s-postgres-healthcheck/sli.robot",
+        "task": "Fetch Patroni Database Lag",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-postgres-healthcheck/sli.robot",
+        "task": "Check Database Backup Status For Cluster `${Object_Name}` In Namespace `${Namespace}`",
+        "score": 3,
+        "suggested_title": "\"Check Database Backup Status For Cluster `${Object_Name}` In Namespace `${Namespace}` in AWS Region `\\${AWS_REGION}`\""
+    },
+    {
+        "file": "./codebundles/k8s-postgres-healthcheck/sli.robot",
+        "task": "Generate Namspace Score",
+        "score": 3,
+        "suggested_title": "\"Generate Namespace Score for \\${AWS_REGION} in \\${AWS_ACCOUNT_ID}\""
+    },
+    {
+        "file": "./codebundles/k8s-postgres-healthcheck/runbook.robot",
+        "task": "List Resources Related To Postgres Cluster `${Object_Name}` In Namespace `${Namespace}`",
+        "score": 3,
+        "suggested_title": "\"Retrieve AWS resources related to Postgres cluster `${Object_Name}` in namespace `${Namespace}` within AWS account\""
+    },
+    {
+        "file": "./codebundles/k8s-postgres-healthcheck/runbook.robot",
+        "task": "Get Postgres Pod Logs & Events For Cluster `${Object_Name}` In Namespace `${Namespace}`",
+        "score": 1,
+        "suggested_title": "\"Retrieve Postgres Pod Logs & Events for Cluster `${Object_Name}` in Namespace `${Namespace}` in AWS Region \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-postgres-healthcheck/runbook.robot",
+        "task": "Get Postgres Pod Resource Utilization For Cluster `${Object_Name}` In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-postgres-healthcheck/runbook.robot",
+        "task": "Get Running Postgres Configuration For Cluster `${Object_Name}` In Namespace `${Namespace}`",
+        "score": 3,
+        "suggested_title": "\"Retrieve Running Postgres Configuration For Cluster `${Object_Name}` In Namespace `${Namespace}` with specific AWS_REGION and AWS_ACCOUNT_ID\""
+    },
+    {
+        "file": "./codebundles/k8s-postgres-healthcheck/runbook.robot",
+        "task": "Get Patroni Output And Add To Report For Cluster `${Object_Name}` In Namespace `${Namespace}`",
+        "score": 3,
+        "suggested_title": "\"Retrieve Patroni Output and Include in Report for Cluster `${Object_Name}` within Namespace `${Namespace}` Using AWS Account Information\""
+    },
+    {
+        "file": "./codebundles/k8s-postgres-healthcheck/runbook.robot",
+        "task": "Fetch Patroni Database Lag For Cluster `${Object_Name}` In Namespace `${Namespace}`",
+        "score": 3,
+        "suggested_title": "\"Retrieve Patroni Database Lag For Cluster `${Object_Name}` In Namespace `${Namespace}` and AWS Region `\\${AWS_REGION}`\""
+    },
+    {
+        "file": "./codebundles/k8s-postgres-healthcheck/runbook.robot",
+        "task": "Check Database Backup Status For Cluster `${Object_Name}` In Namespace `${Namespace}`",
+        "score": 3,
+        "suggested_title": "\"Check Database Backup Status For Cluster `${Object_Name}` In Namespace `${Namespace}` in AWS Region `\\${AWS_REGION}`\""
+    },
+    {
+        "file": "./codebundles/k8s-postgres-healthcheck/runbook.robot",
+        "task": "Run Db Queries For Cluster `${Object_Name}` In Namespace `${Namespace}`",
+        "score": 3,
+        "suggested_title": "\"Run Db Queries For Cluster `${Object_Name}` In Namespace `${Namespace}` Using AWS Region `\\${AWS_REGION}`\""
+    },
+    {
+        "file": "./codebundles/azure-acr-image-sync/sli.robot",
+        "task": "Count Outdated Images In Azure Container Registry `${Acr_Registry}`",
+        "score": 3,
+        "suggested_title": "\"Identify and Quantify Outdated Images in Azure Container Registry `${Acr_Registry}`\""
+    },
+    {
+        "file": "./codebundles/azure-acr-image-sync/runbook.robot",
+        "task": "Sync Container Images Into Azure Container Registry `${Acr_Registry}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/gcloud-log-inspection/runbook.robot",
+        "task": "Inspect Gcp Logs For Common Errors",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-prometheus-healthcheck/runbook.robot",
+        "task": "Check Prometheus Service Monitors",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-prometheus-healthcheck/runbook.robot",
+        "task": "Check For Successful Rule Setup",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-prometheus-healthcheck/runbook.robot",
+        "task": "Verify Prometheus Rbac Can Access Servicemonitors",
+        "score": 3,
+        "suggested_title": "\"Verify Prometheus Rbac Can Access Servicemonitors in AWS Region \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-prometheus-healthcheck/runbook.robot",
+        "task": "Identify Endpoint Scraping Errors",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-prometheus-healthcheck/runbook.robot",
+        "task": "Check Prometheus Api Healthy",
+        "score": 3,
+        "suggested_title": "\"Verify Prometheus Api Health in \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-app-troubleshoot/sli.robot",
+        "task": "Measure Application Exceptions",
+        "score": 3,
+        "suggested_title": "\"Monitor and Analyze Application Exceptions in \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-app-troubleshoot/runbook.robot",
+        "task": "Get `${Container_Name}` Application Logs",
+        "score": 3,
+        "suggested_title": "\"Retrieve `${Container_Name}` Application Logs from AWS ECS\""
+    },
+    {
+        "file": "./codebundles/k8s-app-troubleshoot/runbook.robot",
+        "task": "Scan `${Container_Name}` Application For Misconfigured Environment",
+        "score": 3,
+        "suggested_title": "\"Scan `${Container_Name}` Application For Misconfigured Environment in \\${AWS_REGION} and \\${AWS_ACCOUNT_ID}\""
+    },
+    {
+        "file": "./codebundles/k8s-app-troubleshoot/runbook.robot",
+        "task": "Tail `${Container_Name}` Application Logs For Stacktraces",
+        "score": 1,
+        "suggested_title": "\"Tail `${Container_Name}` Application Logs For Stacktraces in \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-podresources-health/runbook.robot",
+        "task": "Show Pods Without Resource Limit Or Resource Requests Set In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-podresources-health/runbook.robot",
+        "task": "Get Pod Resource Utilization With Top In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-podresources-health/runbook.robot",
+        "task": "Identify Vpa Pod Resource Recommendations In Namespace `${Namespace}`",
+        "score": 3,
+        "suggested_title": "Identify Vpa Pod Resource Recommendations In Namespace `${Namespace}` for AWS_ACCOUNT_ID: `\\${AWS_ACCOUNT_ID}` and AWS_REGION: `\\${AWS_REGION}`"
+    },
+    {
+        "file": "./codebundles/k8s-podresources-health/runbook.robot",
+        "task": "Identify Resource Constrained Pods In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/aws-eks-node-reboot/runbook.robot",
+        "task": "Check Eks Nodegroup Status",
+        "score": 3,
+        "suggested_title": "Check Eks Nodegroup Status in \\${AWS_REGION} and \\${AWS_ACCOUNT_ID}"
+    },
+    {
+        "file": "./codebundles/k8s-artifactory-health/runbook.robot",
+        "task": "Check Artifactory Liveness And Readiness Endpoints",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-tail-logs-dynamic/sli.robot",
+        "task": "Tail `${Container_Name}` Application Logs For Stacktraces",
+        "score": 1,
+        "suggested_title": "\"Tail `${Container_Name}` Application Logs For Stacktraces in \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-tail-logs-dynamic/runbook.robot",
+        "task": "Get `${Container_Name}` Application Logs",
+        "score": 3,
+        "suggested_title": "\"Retrieve `${Container_Name}` Application Logs from AWS ECS\""
+    },
+    {
+        "file": "./codebundles/k8s-tail-logs-dynamic/runbook.robot",
+        "task": "Tail `${Container_Name}` Application Logs For Stacktraces",
+        "score": 1,
+        "suggested_title": "\"Tail `${Container_Name}` Application Logs For Stacktraces in \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-chaos-namespace/runbook.robot",
+        "task": "Kill Random Pods In Namespace `${Namespace}`",
+        "score": 2,
+        "suggested_title": "\"Terminate Random Pods in Namespace `${Namespace}` on AWS Cluster \\${AWS_CLUSTER_NAME}\""
+    },
+    {
+        "file": "./codebundles/k8s-chaos-namespace/runbook.robot",
+        "task": "Oomkill Pods In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-chaos-namespace/runbook.robot",
+        "task": "Mangle Service Selector In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-chaos-namespace/runbook.robot",
+        "task": "Mangle Service Port In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-chaos-namespace/runbook.robot",
+        "task": "Fill Random Pod Tmp Directory In Namespace `${Namespace}`",
+        "score": 5,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/aws-cloudwatch-overused-ec2/runbook.robot",
+        "task": "Check For Overutilized Ec2 Instances",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/curl-gmp-kong-ingress-inspection/runbook.robot",
+        "task": "Check If Kong Ingress Http Error Rate Violates Http Error Threshold",
+        "score": 3,
+        "suggested_title": "Check If Kong Ingress Http Error Rate Violates Http Error Threshold in \\${CLUSTER_NAME} Cluster"
+    },
+    {
+        "file": "./codebundles/curl-gmp-kong-ingress-inspection/runbook.robot",
+        "task": "Check If Kong Ingress Http Request Latency Violates Threshold",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/curl-gmp-kong-ingress-inspection/runbook.robot",
+        "task": "Check If Kong Ingress Controller Reports Upstream Errors",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-ingress-gce-healthcheck/runbook.robot",
+        "task": "Search For Gce Ingress Warnings In Gke",
+        "score": 3,
+        "suggested_title": "Search For GCE Ingress Warnings in GKE Cluster \\${CLUSTER_NAME}"
+    },
+    {
+        "file": "./codebundles/k8s-ingress-gce-healthcheck/runbook.robot",
+        "task": "Identify Unhealthy Gce Http Ingress Backends",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-ingress-gce-healthcheck/runbook.robot",
+        "task": "Validate Gcp Http Load Balancer Configurations",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-ingress-gce-healthcheck/runbook.robot",
+        "task": "Fetch Network Error Logs From Gcp Operations Manager For Ingress Backends",
+        "score": 3,
+        "suggested_title": "Retrieve Network Error Logs From Gcp Operations Manager for Ingress Backends - What: Network Error Logs; Where: GCP Operations Manager"
+    },
+    {
+        "file": "./codebundles/k8s-ingress-gce-healthcheck/runbook.robot",
+        "task": "Review Gcp Operations Logging Dashboard",
+        "score": 3,
+        "suggested_title": "\"Examine Gcp Operations Logging Dashboard for \\${PROJECT_NAME} in \\${GCP_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-argocd-helm-health/runbook.robot",
+        "task": "Fetch All Available Argocd Helm Releases In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-argocd-helm-health/runbook.robot",
+        "task": "Fetch Installed Argocd Helm Release Versions In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-redis-healthcheck/runbook.robot",
+        "task": "Ping `${Deployment_Name}` Redis Workload",
+        "score": 3,
+        "suggested_title": "\"Ping `${Deployment_Name}` Redis Workload in `\\${AWS_REGION}`\""
+    },
+    {
+        "file": "./codebundles/k8s-redis-healthcheck/runbook.robot",
+        "task": "Verify `${Deployment_Name}` Redis Read Write Operation",
+        "score": 3,
+        "suggested_title": "\"Verify `${Deployment_Name}` Redis Read Write Operation in AWS Lambda Function\""
+    },
+    {
+        "file": "./codebundles/k8s-pvc-healthcheck/sli.robot",
+        "task": "Fetch The Storage Utilization For Pvc Mounts In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-pvc-healthcheck/sli.robot",
+        "task": "Generate Namspace Score",
+        "score": 3,
+        "suggested_title": "\"Generate Namespace Score for \\${AWS_REGION} in \\${AWS_ACCOUNT_ID}\""
+    },
+    {
+        "file": "./codebundles/k8s-pvc-healthcheck/runbook.robot",
+        "task": "Fetch Events For Unhealthy Kubernetes Persistentvolumeclaims In Namespace `${Namespace}`",
+        "score": 5,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-pvc-healthcheck/runbook.robot",
+        "task": "List Persistentvolumeclaims In Terminating State In Namespace `${Namespace}`",
+        "score": 5,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-pvc-healthcheck/runbook.robot",
+        "task": "List Persistentvolumes In Terminating State In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-pvc-healthcheck/runbook.robot",
+        "task": "List Pods With Attached Volumes And Related Persistentvolume Details In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-pvc-healthcheck/runbook.robot",
+        "task": "Fetch The Storage Utilization For Pvc Mounts In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-pvc-healthcheck/runbook.robot",
+        "task": "Check For Rwo Persistent Volume Node Attachment Issues In Namespace `${Namespace}`",
+        "score": 3,
+        "suggested_title": "\"Check For Rwo Persistent Volume Node Attachment Issues In Namespace `${Namespace}` within AWS Region `\\${AWS_REGION}`\""
+    },
+    {
+        "file": "./codebundles/k8s-serviceaccount-check/runbook.robot",
+        "task": "Test Service Account Access To Kubernetes Api Server In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-jenkins-healthcheck/runbook.robot",
+        "task": "Query The Jenkins Kubernetes Workload Http Endpoint",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-jenkins-healthcheck/runbook.robot",
+        "task": "Query For Stuck Jenkins Jobs",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-jaeger-http-query/runbook.robot",
+        "task": "Query Traces In Jaeger For Unhealthy Http Response Codes In Namespace `${Namespace}`",
+        "score": 5,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/aws-s3-bucket-storage-report/runbook.robot",
+        "task": "Check Aws S3 Bucket Storage Utilization",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/aws-elasticache-redis-health/sli.robot",
+        "task": "Scan Elasticaches",
+        "score": 3,
+        "suggested_title": "\"Scan Elasticaches in \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/aws-elasticache-redis-health/runbook.robot",
+        "task": "Scan Aws Elasticache Redis Status",
+        "score": 3,
+        "suggested_title": "\"Check Aws Elasticache Redis Status in \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-gitops-gh-remediate/runbook.robot",
+        "task": "Remediate Readiness And Liveness Probe Gitops Manifests In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-gitops-gh-remediate/runbook.robot",
+        "task": "Increase Resourcequota For Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-gitops-gh-remediate/runbook.robot",
+        "task": "Adjust Pod Resources To Match Vpa Recommendation In `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-gitops-gh-remediate/runbook.robot",
+        "task": "Expand Persistent Volume Claims In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-fluxcd-kustomization-health/runbook.robot",
+        "task": "List All Available Kustomization Objects In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-fluxcd-kustomization-health/runbook.robot",
+        "task": "Get Details For Unready Kustomizations In Namespace `${Namespace}`",
+        "score": 3,
+        "suggested_title": "\"Retrieve Details of Unprepared Custom Configurations in Namespace `${Namespace}` using Placeholder Variables like \\${AWS_REGION} and \\${AWS_ACCOUNT_ID}\""
+    },
+    {
+        "file": "./codebundles/k8s-fluxcd-helm-health/runbook.robot",
+        "task": "List All Available Fluxcd Helmreleases In Namespace `${Namespace}`",
+        "score": 5,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-fluxcd-helm-health/runbook.robot",
+        "task": "Fetch Installed Fluxcd Helmrelease Versions In Namespace `${Namespace}`",
+        "score": 3,
+        "suggested_title": "\"Retrieve Installed Fluxcd Helmrelease Versions in Namespace `${Namespace}` on AWS EKS Cluster\""
+    },
+    {
+        "file": "./codebundles/k8s-fluxcd-helm-health/runbook.robot",
+        "task": "Fetch Mismatched Fluxcd Helmrelease Version In Namespace `${Namespace}`",
+        "score": 5,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-fluxcd-helm-health/runbook.robot",
+        "task": "Fetch Fluxcd Helmrelease Error Messages In Namespace `${Namespace}`",
+        "score": 3,
+        "suggested_title": "\"Retrieve Error Messages for Fluxcd Helmrelease in Namespace `${Namespace}`\""
+    },
+    {
+        "file": "./codebundles/k8s-fluxcd-helm-health/runbook.robot",
+        "task": "Check For Available Helm Chart Updates In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/curl-gmp-nginx-ingress-inspection/runbook.robot",
+        "task": "Fetch Nginx Http Errors From Gmp For Ingress `${Ingress_Object_Name}`",
+        "score": 3,
+        "suggested_title": "\"Retrieve Nginx Http Errors From Gmp For Ingress `\\${Ingress_Object_Name}` in AWS\""
+    },
+    {
+        "file": "./codebundles/curl-gmp-nginx-ingress-inspection/runbook.robot",
+        "task": "Find Owner And Service Health For Ingress `${Ingress_Object_Name}`",
+        "score": 2,
+        "suggested_title": "\"Find Owner And Service Health For Ingress `${Ingress_Object_Name}` in AWS Region \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-restart-resource/runbook.robot",
+        "task": "Get Current Resource State With Labels `${Labels}`",
+        "score": 3,
+        "suggested_title": "\"Retrieve Current Resource State With Labels `${Labels}` in \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-restart-resource/runbook.robot",
+        "task": "Get Resource Logs With Labels `${Labels}`",
+        "score": 3,
+        "suggested_title": "\"Retrieve Resource Logs With Labels `${Labels}` in AWS Region `\\${AWS_REGION}`\""
+    },
+    {
+        "file": "./codebundles/k8s-restart-resource/runbook.robot",
+        "task": "Restart Resource With Labels `${Labels}`",
+        "score": 3,
+        "suggested_title": "\"Restart Resource With Labels `${Labels}` in Region `\\${AWS_REGION}`\""
+    },
+    {
+        "file": "./codebundles/k8s-statefulset-healthcheck/runbook.robot",
+        "task": "Check Readiness Probe Configuration For Statefulset `${Statefulset_Name}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-statefulset-healthcheck/runbook.robot",
+        "task": "Check Liveness Probe Configuration For Statefulset `${Statefulset_Name}`",
+        "score": 3,
+        "suggested_title": "\"Review Liveness Probe Configuration for Statefulset `${Statefulset_Name}` in AWS Region \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-statefulset-healthcheck/runbook.robot",
+        "task": "Troubleshoot Statefulset Warning Events For `${Statefulset_Name}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-statefulset-healthcheck/runbook.robot",
+        "task": "Check Statefulset Event Anomalies For `${Statefulset_Name}`",
+        "score": 3,
+        "suggested_title": "\"Monitor Event Anomalies in Statefulset '${Statefulset_Name}' Within AWS ${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-statefulset-healthcheck/runbook.robot",
+        "task": "Fetch Statefulset Logs For `${Statefulset_Name}` And Add To Report",
+        "score": 3,
+        "suggested_title": "\"Retrieve Statefulset Logs for `${Statefulset_Name}` from AWS_REGION and Include in Report\""
+    },
+    {
+        "file": "./codebundles/k8s-statefulset-healthcheck/runbook.robot",
+        "task": "Get Related Statefulset `${Statefulset_Name}` Events",
+        "score": 3,
+        "suggested_title": "\"Retrieve Events for Statefulset `${Statefulset_Name}` in AWS Region `\\${AWS_REGION}`\""
+    },
+    {
+        "file": "./codebundles/k8s-statefulset-healthcheck/runbook.robot",
+        "task": "Fetch Manifest Details For Statefulset `${Statefulset_Name}`",
+        "score": 3,
+        "suggested_title": "\"Retrieve Manifest Details for Statefulset `${Statefulset_Name}` in AWS Region \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/k8s-statefulset-healthcheck/runbook.robot",
+        "task": "List Statefulsets With Unhealthy Replica Counts In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-cluster-resource-health/sli.robot",
+        "task": "Identify High Utilization Nodes For Cluster `${Context}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-cluster-resource-health/runbook.robot",
+        "task": "Identify High Utilization Nodes For Cluster `${Context}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-cluster-resource-health/runbook.robot",
+        "task": "Identify Pods Causing High Node Utilization In Cluster `${Context}`",
+        "score": 3,
+        "suggested_title": "\"Analyze Pods Triggering High Node Utilization in Cluster `${Context}` Within \\${AWS_REGION}\""
+    },
+    {
+        "file": "./codebundles/azure-appgateway-health/sli.robot",
+        "task": "Check For Resource Health Issues Affecting Application Gateway `${App_Gateway_Name}` In Resource Group `${Az_Resource_Group}`",
+        "score": 1,
+        "suggested_title": "\"Check for Resource Health Issues in Application Gateway `${App_Gateway_Name}` in Resource Group `${Az_Resource_Group}`\""
+    },
+    {
+        "file": "./codebundles/azure-appgateway-health/sli.robot",
+        "task": "Check Configuration Health Of Application Gateway `${App_Gateway_Name}` In Resource Group `${Az_Resource_Group}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/azure-appgateway-health/sli.robot",
+        "task": "Check Backend Pool Health For Application Gateway `${App_Gateway_Name}` In Resource Group `${Az_Resource_Group}`",
+        "score": 3,
+        "suggested_title": "\"Check Backend Pool Health For Application Gateway `${App_Gateway_Name}` In Resource Group `${Az_Resource_Group}` using Azure Monitor\""
+    },
+    {
+        "file": "./codebundles/azure-appgateway-health/sli.robot",
+        "task": "Generate Application Gateway Health Score",
+        "score": 3,
+        "suggested_title": "\"Calculate Application Gateway Health Score for \\${CLOUD_PROVIDER} in \\${REGION}\""
+    },
+    {
+        "file": "./codebundles/azure-appgateway-health/runbook.robot",
+        "task": "Check For Resource Health Issues Affecting Application Gateway `${App_Gateway_Name}` In Resource Group `${Az_Resource_Group}`",
+        "score": 1,
+        "suggested_title": "\"Check for Resource Health Issues in Application Gateway `${App_Gateway_Name}` in Resource Group `${Az_Resource_Group}`\""
+    },
+    {
+        "file": "./codebundles/azure-appgateway-health/runbook.robot",
+        "task": "Check Configuration Health Of Application Gateway `${App_Gateway_Name}` In Resource Group `${Az_Resource_Group}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/azure-appgateway-health/runbook.robot",
+        "task": "Check Backend Pool Health For Application Gateway `${App_Gateway_Name}` In Resource Group `${Az_Resource_Group}`",
+        "score": 3,
+        "suggested_title": "\"Check Backend Pool Health For Application Gateway `${App_Gateway_Name}` In Resource Group `${Az_Resource_Group}` using Azure Monitor\""
+    },
+    {
+        "file": "./codebundles/k8s-ingress-healthcheck/runbook.robot",
+        "task": "Fetch Ingress Object Health In Namespace `${Namespace}`",
+        "score": 3,
+        "suggested_title": "\"Retrieve Ingress Object Health in Namespace ${Namespace} using AWS_REGION and AWS_ACCOUNT_ID\""
+    },
+    {
+        "file": "./codebundles/k8s-ingress-healthcheck/runbook.robot",
+        "task": "Check For Ingress And Service Conflicts In Namespace `${Namespace}`",
+        "score": 3,
+        "suggested_title": "\"Check For Ingress And Service Conflicts In Namespace `${Namespace}` in AWS Environment\""
+    },
+    {
+        "file": "./codebundles/k8s-otelcollector/runbook.robot",
+        "task": "Query Collector Queued Spans In Namespace `${Namespace}`",
+        "score": 3,
+        "suggested_title": "\"Collect Queued Spans in Namespace `${Namespace}` for AWS Region `\\${AWS_REGION}`\""
+    },
+    {
+        "file": "./codebundles/k8s-otelcollector/runbook.robot",
+        "task": "Check Opentelemetry Collector Logs For Errors In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-otelcollector/runbook.robot",
+        "task": "Scan Opentelemetry Logs For Dropped Spans In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-deployment-ops/runbook.robot",
+        "task": "Restart Deployment `${Deployment_Name}` In Namespace `${Namespace}`",
+        "score": 1,
+        "suggested_title": "\"Restart Deployment `${Deployment_Name}` in Namespace `${Namespace}` on AWS Cloud\""
+    },
+    {
+        "file": "./codebundles/k8s-deployment-ops/runbook.robot",
+        "task": "Force Delete Pods In Deployment `${Deployment_Name}` In Namespace `${Namespace}`",
+        "score": 5,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-deployment-ops/runbook.robot",
+        "task": "Rollback Deployment `${Deployment_Name}` In Namespace `${Namespace}` To Previous Version",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-deployment-ops/runbook.robot",
+        "task": "Scale Down Deployment `${Deployment_Name}` In Namespace `${Namespace}`",
+        "score": 1,
+        "suggested_title": "\"Scale Down Deployment `${Deployment_Name}` In Namespace `${Namespace}` Using AWS ECS\""
+    },
+    {
+        "file": "./codebundles/k8s-deployment-ops/runbook.robot",
+        "task": "Scale Up Deployment `${Deployment_Name}` In Namespace `${Namespace}` By ${Scale_Up_Factor}X",
+        "score": 3,
+        "suggested_title": "\"Scale Up Deployment `${Deployment_Name}` In Namespace `${Namespace}` By ${Scale_Up_Factor}X in AWS_REGION\""
+    },
+    {
+        "file": "./codebundles/k8s-deployment-ops/runbook.robot",
+        "task": "Clean Up Stale Replicasets For Deployment `${Deployment_Name}` In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    },
+    {
+        "file": "./codebundles/k8s-deployment-ops/runbook.robot",
+        "task": "Scale Down Stale Replicasets For Deployment `${Deployment_Name}` In Namespace `${Namespace}`",
+        "score": 4,
+        "suggested_title": null
+    }
+]
