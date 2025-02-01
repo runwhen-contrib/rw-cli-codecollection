@@ -1,0 +1,23 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: gcp
+  generationRules:
+    - resourceTypes:
+        -  gcp_functions_functions
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: gcp-function-health
+          qualifiers: ["project"]
+          baseTemplateName: gcp-cloud-function-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: slo
+            - type: runbook
+              templateName: gcp-cloud-function-health-taskset.yaml

@@ -1,0 +1,275 @@
+commands:
+- command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json
+    | jq -r '.items[] | select(.spec.source.helm != null) | "\nName:\t\t\t" + .metadata.name
+    + "\nSync Status:\t\t" + .status.sync.status + "\nHealth Status:\t\t" + .status.health.status'
+  doc_links: '
+
+    - [Kubernetes API Overview](https://kubernetes.io/docs/concepts/overview/kubernetes-api/){:target="_blank"}
+
+    - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+
+    - [Kubernetes Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
+
+    - [Kubernetes Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
+
+    - [Kubernetes Services](https://kubernetes.io/docs/concepts/services-networking/service/){:target="_blank"}
+
+    - [jq Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command retrieves information about a specific resource in a Kubernetes
+    cluster, such as a deployment or service, within a specific namespace and context.
+    It then filters the results using the jq tool to display the name of the resource,
+    its sync status, and its health status.
+  multi_line_details: '
+
+    # Store the resource name in a variable
+
+    RESOURCE_NAME=pod
+
+
+    # Store the namespace in a variable
+
+    NAMESPACE=default
+
+
+    # Store the context in a variable
+
+    CONTEXT=cluster-1
+
+
+    # Use kubectl to get the JSON output of the specified Kubernetes resource in the
+    specified namespace and context, and store it in a variable
+
+    RESOURCE_INFO=$(kubectl get $RESOURCE_NAME -n $NAMESPACE --context $CONTEXT -o=json)
+
+
+    # Use jq to filter and format the JSON output to display specific information
+    about Helm charts
+
+    Helm_info=$(echo $RESOURCE_INFO | jq -r ''.items[] | select(.spec.source.helm
+    != null) | "\nName:\t\t\t" + .metadata.name + "\nSync Status:\t\t" + .status.sync.status
+    + "\nHealth Status:\t\t" + .status.health.status'')
+
+
+    # Print the formatted Helm chart information
+
+    echo "$Helm_info"
+
+
+
+    In this multi-line command, we first store the resource name, namespace, and context
+    in variables for clarity and ease of modification. We then use `kubectl` to fetch
+    the resource information in JSON format and store it in a variable. After that,
+    we use `jq` to filter and format the JSON data to display specific information
+    about Helm charts. Finally, we print the formatted information to the console.'
+  name: fetch_all_available_argocd_helm_releases_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: When
+    a Kubernetes pod enters a CrashLoopBackoff state, it means that the container
+    in the pod is repeatedly crashing and restarting. The DevOps or Site Reliability
+    Engineer might use the described command to gather information about the specific
+    deployment or service causing the issue and analyze its sync and health status.
+
+
+    2. Investigating resource sync and health status: In general, the DevOps or Site
+    Reliability Engineer might use this command to monitor and troubleshoot the sync
+    and health status of various resources within a Kubernetes cluster. This could
+    be part of regular monitoring and maintenance tasks, or in response to specific
+    incidents or alerts.
+
+
+    3. Checking for potential issues after deploying new resources: After deploying
+    new resources or making changes to existing ones, the engineer might use this
+    command to ensure that everything is syncing and healthy as expected. This can
+    help identify any issues early on and prevent potential downtime or performance
+    issues.
+
+
+    4. Verifying the status of critical services: For critical services or applications
+    running in a Kubernetes cluster, the engineer might use this command to regularly
+    verify their sync and health status. This proactive approach can help catch and
+    address potential problems before they impact users or operations.
+
+
+    5. Investigating user-reported issues: If users report issues with specific services
+    or deployments, the engineer might use this command to quickly retrieve and analyze
+    relevant information to understand the current status and identify any potential
+    problems that need to be addressed.'
+- command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json
+    | jq -r '.items[] | select(.spec.source.helm != null) | "\nName:\t\t\t" + .metadata.name
+    + "\nSync Status:\t\t" + .status.sync.status + "\nHealth Status:\t\t" + .status.health.status'
+  doc_links: '
+
+    - [Kubernetes API Overview](https://kubernetes.io/docs/concepts/overview/kubernetes-api/){:target="_blank"}
+
+    - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+
+    - [Kubernetes Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
+
+    - [Kubernetes Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
+
+    - [Kubernetes Services](https://kubernetes.io/docs/concepts/services-networking/service/){:target="_blank"}
+
+    - [jq Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command retrieves information about a specific resource in a Kubernetes
+    cluster, such as a deployment or service, within a specific namespace and context.
+    It then filters the results using the jq tool to display the name of the resource,
+    its sync status, and its health status.
+  multi_line_details: '
+
+    # Store the resource name in a variable
+
+    RESOURCE_NAME=pod
+
+
+    # Store the namespace in a variable
+
+    NAMESPACE=default
+
+
+    # Store the context in a variable
+
+    CONTEXT=cluster-1
+
+
+    # Use kubectl to get the JSON output of the specified Kubernetes resource in the
+    specified namespace and context, and store it in a variable
+
+    RESOURCE_INFO=$(kubectl get $RESOURCE_NAME -n $NAMESPACE --context $CONTEXT -o=json)
+
+
+    # Use jq to filter and format the JSON output to display specific information
+    about Helm charts
+
+    Helm_info=$(echo $RESOURCE_INFO | jq -r ''.items[] | select(.spec.source.helm
+    != null) | "\nName:\t\t\t" + .metadata.name + "\nSync Status:\t\t" + .status.sync.status
+    + "\nHealth Status:\t\t" + .status.health.status'')
+
+
+    # Print the formatted Helm chart information
+
+    echo "$Helm_info"
+
+
+
+    In this multi-line command, we first store the resource name, namespace, and context
+    in variables for clarity and ease of modification. We then use `kubectl` to fetch
+    the resource information in JSON format and store it in a variable. After that,
+    we use `jq` to filter and format the JSON data to display specific information
+    about Helm charts. Finally, we print the formatted information to the console.'
+  name: fetch_all_available_argocd_helm_releases_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: When
+    a Kubernetes pod enters a CrashLoopBackoff state, it means that the container
+    in the pod is repeatedly crashing and restarting. The DevOps or Site Reliability
+    Engineer might use the described command to gather information about the specific
+    deployment or service causing the issue and analyze its sync and health status.
+
+
+    2. Investigating resource sync and health status: In general, the DevOps or Site
+    Reliability Engineer might use this command to monitor and troubleshoot the sync
+    and health status of various resources within a Kubernetes cluster. This could
+    be part of regular monitoring and maintenance tasks, or in response to specific
+    incidents or alerts.
+
+
+    3. Checking for potential issues after deploying new resources: After deploying
+    new resources or making changes to existing ones, the engineer might use this
+    command to ensure that everything is syncing and healthy as expected. This can
+    help identify any issues early on and prevent potential downtime or performance
+    issues.
+
+
+    4. Verifying the status of critical services: For critical services or applications
+    running in a Kubernetes cluster, the engineer might use this command to regularly
+    verify their sync and health status. This proactive approach can help catch and
+    address potential problems before they impact users or operations.
+
+
+    5. Investigating user-reported issues: If users report issues with specific services
+    or deployments, the engineer might use this command to quickly retrieve and analyze
+    relevant information to understand the current status and identify any potential
+    problems that need to be addressed.'
+- command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json
+    | jq -r '.items[] | select(.spec.source.helm != null) | "\nName:\t\t\t" + .metadata.name
+    + "\nTarget Revision:\t" + .spec.source.targetRevision + "\nAttempted Revision:\t"
+    + .status.sync.revision + "\nSync Status:\t\t" + .status.sync.status + "\nOperational
+    State:\t" + .status.operationState.message'
+  doc_links: '
+
+    - [Kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
+
+    - [Kubectl Command Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+
+    - [jq Manual (GitHub)](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command uses kubectl to get information about a specific resource
+    in a particular namespace and context, and then formats the output using jq to
+    display details such as name, target revision, attempted revision, sync status,
+    and operational state.
+  multi_line_details: "\n# Here we are using kubectl to get the resources in a specific\
+    \ namespace and context \n# We want to output the results in JSON format and then\
+    \ use jq to filter and format the output\n\nkubectl get ${RESOURCE_NAME} -n ${NAMESPACE}\
+    \ --context ${CONTEXT} -o=json |  \n  jq -r '.items[] | select(.spec.source.helm\
+    \ != null) | \n  \"\\nName:\\t\\t\\t\" + .metadata.name + \n  \"\\nTarget Revision:\\\
+    t\" + .spec.source.targetRevision + \n  \"\\nAttempted Revision:\\t\" + .status.sync.revision\
+    \ + \n  \"\\nSync Status:\\t\\t\" + .status.sync.status + \n  \"\\nOperational\
+    \ State:\\t\" + .status.operationState.message'\n\n\nIn this multi-line command,\
+    \ we added comments to explain each step of the command. This can help newer or\
+    \ less experienced devops engineers understand what each part of the command does\
+    \ and how it contributes to the overall functionality."
+  name: fetch_installed_argocd_helm_release_versions_in_namespace_namespace
+  when_is_it_useful: '1. Investigating and troubleshooting Kubernetes CrashLoopBackoff
+    events to determine the root cause and resolve the issue
+
+    2. Monitoring and analyzing the performance and health of a specific resource
+    in a particular namespace and context to identify any anomalies or problems
+
+    3. Debugging and resolving deployment issues, such as failed updates or incorrect
+    configurations, by retrieving detailed information about the resource and its
+    status
+
+    4. Gathering insights into the synchronization and operational state of a resource
+    in order to ensure proper functioning and reliability within the Kubernetes cluster
+
+    5. Conducting regular audits and checks on resources to maintain the overall stability
+    and availability of the Kubernetes environment'
+- command: kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json
+    | jq -r '.items[] | select(.spec.source.helm != null) | "\nName:\t\t\t" + .metadata.name
+    + "\nTarget Revision:\t" + .spec.source.targetRevision + "\nAttempted Revision:\t"
+    + .status.sync.revision + "\nSync Status:\t\t" + .status.sync.status + "\nOperational
+    State:\t" + .status.operationState.message'
+  doc_links: '
+
+    - [Kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
+
+    - [Kubectl Command Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+
+    - [jq Manual (GitHub)](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command uses kubectl to get information about a specific resource
+    in a particular namespace and context, and then formats the output using jq to
+    display details such as name, target revision, attempted revision, sync status,
+    and operational state.
+  multi_line_details: "\n# Here we are using kubectl to get the resources in a specific\
+    \ namespace and context \n# We want to output the results in JSON format and then\
+    \ use jq to filter and format the output\n\nkubectl get ${RESOURCE_NAME} -n ${NAMESPACE}\
+    \ --context ${CONTEXT} -o=json |  \n  jq -r '.items[] | select(.spec.source.helm\
+    \ != null) | \n  \"\\nName:\\t\\t\\t\" + .metadata.name + \n  \"\\nTarget Revision:\\\
+    t\" + .spec.source.targetRevision + \n  \"\\nAttempted Revision:\\t\" + .status.sync.revision\
+    \ + \n  \"\\nSync Status:\\t\\t\" + .status.sync.status + \n  \"\\nOperational\
+    \ State:\\t\" + .status.operationState.message'\n\n\nIn this multi-line command,\
+    \ we added comments to explain each step of the command. This can help newer or\
+    \ less experienced devops engineers understand what each part of the command does\
+    \ and how it contributes to the overall functionality."
+  name: fetch_installed_argocd_helm_release_versions_in_namespace_namespace
+  when_is_it_useful: '1. Investigating and troubleshooting Kubernetes CrashLoopBackoff
+    events to determine the root cause and resolve the issue
+
+    2. Monitoring and analyzing the performance and health of a specific resource
+    in a particular namespace and context to identify any anomalies or problems
+
+    3. Debugging and resolving deployment issues, such as failed updates or incorrect
+    configurations, by retrieving detailed information about the resource and its
+    status
+
+    4. Gathering insights into the synchronization and operational state of a resource
+    in order to ensure proper functioning and reliability within the Kubernetes cluster
+
+    5. Conducting regular audits and checks on resources to maintain the overall stability
+    and availability of the Kubernetes environment'

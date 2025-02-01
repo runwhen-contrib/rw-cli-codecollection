@@ -1,0 +1,31 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+    - resourceTypes:
+        - service
+      matchRules:
+        - type: and
+          matches:
+            - type: pattern
+              pattern: ".+"
+              properties: [name]
+              mode: substring
+            - type: pattern
+              pattern: "LoadBalancer"
+              properties: [spec/type]
+              mode: substring
+            - type: pattern
+              pattern: "false"
+              properties: [metadata/annotations/service.beta.kubernetes.io//azure-load-balancer-internal]
+              mode: substring
+      slxs:
+        - baseName: http-ok-tls-aks
+          qualifiers: ["resource", "namespace", "cluster"]
+          baseTemplateName: http-ok-tls-aks-public-loadbalancer-ext-dns-tls
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: http-ok-tls-aks-public-loadbalancer-ext-dns-tls-taskset.yaml
