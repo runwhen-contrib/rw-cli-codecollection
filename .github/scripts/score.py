@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import fnmatch
 import requests
@@ -515,10 +516,17 @@ def print_analysis_report(task_results, codebundle_results, lint_results):
     print()
 
 def main():
-    codebundles_dir = "../../test"  # Adjust to your directory or CLI param as needed
+    # Default directory if none is provided
+    codebundles_dir = "../../codebundles"
+
+    # If an argument is passed from CLI, use that instead
+    if len(sys.argv) > 1:
+        codebundles_dir = sys.argv[1]
+
+    # (Then run your analysis as before)
     task_results, codebundle_results, lint_results = analyze_codebundles(codebundles_dir)
     print_analysis_report(task_results, codebundle_results, lint_results)
-    print(f"\nAnalysis complete. Results saved to {PERSISTENT_FILE}\n")
+    print(f"\nAnalysis complete for directory: {codebundles_dir}")
 
 if __name__ == "__main__":
     main()
