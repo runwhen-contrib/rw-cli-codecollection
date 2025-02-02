@@ -183,7 +183,7 @@ def score_task_title(title, doc, tags, imported_variables, existing_data, refere
     Base LLM-based scoring for clarity/specificity of a task name.
     """
     # 1) Check if it exists in existing_data
-    for entry in existing_data:
+    for entry in existing_data["task_results"]:
         if entry["task"] == title:
             return entry["score"], entry.get("reasoning", ""), entry.get("suggested_title", "")
 
@@ -202,10 +202,11 @@ Compare it to the following reference examples: {json.dumps(reference_data)}.
 A 1 is vague like 'Check EC2 Health'; a 5 is detailed like 'Check Overutilized EC2 Instances in AWS Region `${{AWS_REGION}}` in AWS Account `${{AWS_ACCOUNT_ID}}`'.
 
 Ensure that tasks with both a 'What' (resource type) and a 'Where' (specific scope) score at least a 4.
-Assume variables will be substituted at runtime, so do not penalize titles for placeholders like `${{VAR_NAME}}`.
+Assume variables will be substituted at runtime, so do not penalize titles for placeholders like `${VAR_NAME}`.
+Ensure that any suggested title sets the "Where" variable in backticks & curly braces, such as `${VAR_NAME}`
 If a task lacks a specific 'Where' variable, suggest the most relevant imported variable as a "Where" in the reasoning.
 
-Return a JSON object with keys: "score", "reasoning", "suggested_title".
+Return a JSON object with keys: "score", "reasoning", "suggested_title". 
 """
     response_text = query_openai(prompt)
     if not response_text or response_text == "Response unavailable":
@@ -403,6 +404,7 @@ def analyze_codebundles(directory):
             all_task_results.append({
                 "codebundle": bundle_name,
                 "file": file_name,
+                "filepath": filepath,
                 "task": t["name"],
                 "score": final_score,
                 "reasoning": final_reasoning,
