@@ -1,224 +1,298 @@
 [
     {
-        "file": "../../test/azure-loadbalancer-triage/runbook.robot",
+        "codebundle": "azure-loadbalancer-triage",
+        "file": "runbook.robot",
         "task": "Check Activity Logs for Azure Load Balancer `${AZ_LB_NAME}`",
-        "score": 3,
-        "reasoning": "The task provides a clear 'What' (Azure Load Balancer) and has a specific scope by referencing the variable ${AZ_LB_NAME}. It lacks a specific location, but the imported variable ${az_lb_name} could be used as a relevant 'Where'. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 5,
+        "reasoning": "The task is clear, human-readable, and specific. It provides detailed information about what is being checked (Azure Load Balancer health probe) and where (specific Azure Load Balancer name). The tags also provide additional context.",
+        "suggested_title": "Check Activity Logs for Azure Load Balancer 'MyAzureLoadBalancer'"
     },
     {
-        "file": "../../test/gcp-cloud-function-health/sli.robot",
+        "codebundle": "gcp-cloud-function-health",
+        "file": "sli.robot",
         "task": "Count unhealthy GCP Cloud Functions in GCP Project `${GCP_PROJECT_ID}`",
-        "score": 3,
-        "reasoning": "The task title is clear, human-readable, and specific. It includes the 'What' (unhealthy GCP Cloud Functions) and the 'Where' (GCP Project `${GCP_PROJECT_ID}`). The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 5,
+        "reasoning": "The task title is clear, human-readable, and specific. It includes the 'What' (unhealthy GCP Cloud Functions) and the 'Where' (GCP Project specified by the imported variable GCP_PROJECT_ID).",
+        "suggested_title": "Count unhealthy GCP Cloud Functions in GCP Project '${GCP_PROJECT_ID}'"
     },
     {
-        "file": "../../test/gcp-cloud-function-health/runbook.robot",
+        "codebundle": "gcp-cloud-function-health",
+        "file": "runbook.robot",
         "task": "List Unhealhy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`",
-        "score": 3,
-        "reasoning": "Fully detailed, including both what (unhealthy Cloud Functions) and where (specific GCP Project ID). The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 5,
+        "reasoning": "The task title is clear, human-readable, and specific. It provides the 'What' (unhealthy Cloud Functions) and the 'Where' (GCP Project specified by variable GCP_PROJECT_ID).",
+        "suggested_title": "List Unhealhy Cloud Functions in GCP Project ${GCP_PROJECT_ID}"
     },
     {
-        "file": "../../test/gcp-cloud-function-health/runbook.robot",
+        "codebundle": "gcp-cloud-function-health",
+        "file": "runbook.robot",
         "task": "Get Error Logs for Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`",
-        "score": 3,
-        "reasoning": "Fully detailed, including both what (unhealthy Cloud Functions) and where (specific GCP project). The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 5,
+        "reasoning": "The task title is clear, human-readable, and specific. It includes the 'What' (unhealthy Cloud Functions) and the 'Where' (GCP Project `${GCP_PROJECT_ID}`). The documentation and tags also provide additional context.",
+        "suggested_title": "Get Error Logs for Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`"
     },
     {
-        "file": "../../test/terraform-cloud-workspace-lock-check/runbook.robot",
+        "codebundle": "terraform-cloud-workspace-lock-check",
+        "file": "runbook.robot",
         "task": "Checking whether the Terraform Cloud Workspace is in a locked state",
         "score": 3,
-        "reasoning": "The task title provides clarity on what is being checked (Terraform Cloud Workspace) and includes relevant tags for the context. It lacks a specific 'Where' variable, but the imported user variables could potentially include relevant location information. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "reasoning": "The title is clear, human-readable, and specific. It provides detailed information about what is being checked (Terraform Cloud Workspace) and where (locked state). The documentation and tags also align with the task. The task lacks a specific 'Where' variable; consider using `TERRAFORM_API_URL`.",
+        "suggested_title": "Check if the Terraform Cloud Workspace is in a locked state"
     },
     {
-        "file": "../../test/aws-lambda-health/sli.robot",
+        "codebundle": "aws-lambda-health",
+        "file": "sli.robot",
         "task": "Analyze AWS Lambda Invocation Errors",
         "score": 3,
-        "reasoning": "The title clearly specifies the task of analyzing AWS Lambda invocation errors for a specified function within a specified region, and it includes relevant tags for clarity. It also mentions that the user variables will be imported, indicating that specific 'where' information can be provided through runtime variables. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "reasoning": "The task title is clear, human-readable, and specific. It provides detailed information about what is being analyzed (AWS Lambda Invocation Errors) and where (specified function within a specified region). The tags also provide additional context. The task lacks a specific 'Where' variable; consider using `AWS_REGION`.",
+        "suggested_title": ""
     },
     {
-        "file": "../../test/aws-lambda-health/runbook.robot",
+        "codebundle": "aws-lambda-health",
+        "file": "runbook.robot",
         "task": "List Lambda Versions and Runtimes",
         "score": 3,
-        "reasoning": "The task is specific, clear, and human-readable. It includes both the 'What' (Lambda versions and runtimes) and the 'Where' (specified AWS Lambda function). The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "reasoning": "The task title clearly specifies the action (List Lambda Versions and Runtimes), the 'What' (Lambda function), and the 'Where' (AWS region). The documentation provides a clear description of the script's purpose, and the tags further clarify the context. The imported user variable AWS_REGION is used to specify the location. The task lacks a specific 'Where' variable; consider using `AWS_REGION`.",
+        "suggested_title": null
     },
     {
-        "file": "../../test/aws-lambda-health/runbook.robot",
+        "codebundle": "aws-lambda-health",
+        "file": "runbook.robot",
         "task": "Analyze AWS Lambda Invocation Errors",
         "score": 3,
-        "reasoning": "The title clearly specifies the task of analyzing AWS Lambda invocation errors for a specified function within a specified region, and it includes relevant tags for clarity. It also mentions that the user variables will be imported, indicating that specific 'where' information can be provided through runtime variables. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "reasoning": "The task title is clear, human-readable, and specific. It provides detailed information about what is being analyzed (AWS Lambda Invocation Errors) and where (specified function within a specified region). The tags also provide additional context. The task lacks a specific 'Where' variable; consider using `AWS_REGION`.",
+        "suggested_title": ""
     },
     {
-        "file": "../../test/aws-lambda-health/runbook.robot",
+        "codebundle": "aws-lambda-health",
+        "file": "runbook.robot",
         "task": "Monitor AWS Lambda Performance Metrics",
         "score": 3,
-        "reasoning": "The task is clear, human-readable, and specific. It provides detailed information about the 'what' (AWS Lambda Performance Metrics) and includes relevant tags for further context. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "reasoning": "The task title is clear, human-readable, and specific. It provides details about what (monitoring AWS Lambda Performance Metrics) and where (in the specified AWS region). It also includes relevant tags for further clarity. The task lacks a specific 'Where' variable; consider using `AWS_REGION`.",
+        "suggested_title": "Monitor AWS Lambda Performance Metrics in AWS Region `${AWS_REGION}`"
     },
     {
-        "file": "../../test/curl-http-ok/sli.robot",
+        "codebundle": "curl-http-ok",
+        "file": "sli.robot",
         "task": "Checking HTTP URL Is Available And Timely",
-        "score": 3,
-        "reasoning": "The task title clearly states what is being checked (HTTP URL) and how it will be validated (using cURL). It also includes relevant tags for reference. There are no imported user variables, but the documentation provides guidance on how to accomplish the task. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 5,
+        "reasoning": "The task title is clear, human-readable, and specific. It includes the action ('Checking'), the resource type ('HTTP URL'), and the requirement for timeliness. The documentation provided also gives detailed instructions on how to achieve the task using cURL, and the imported user variables help specify the URL, target latency, and desired response code.",
+        "suggested_title": "Check Availability and Timeliness of HTTP URL Using cURL"
     },
     {
-        "file": "../../test/curl-http-ok/runbook.robot",
+        "codebundle": "curl-http-ok",
+        "file": "runbook.robot",
         "task": "Checking HTTP URL Is Available And Timely",
-        "score": 3,
-        "reasoning": "The task title is clear, human-readable, and specific. It clearly states what needs to be checked (HTTP URL availability and timeliness) and provides the method of validation (using cURL). Additionally, it includes relevant tags for further context. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 5,
+        "reasoning": "The task title is clear, human-readable, and specific. It includes the action ('Checking'), the resource type ('HTTP URL'), and the requirement for timeliness. The documentation provided also gives detailed instructions on how to achieve the task using cURL, and the imported user variables help specify the URL, target latency, and desired response code.",
+        "suggested_title": "Check Availability and Timeliness of HTTP URL Using cURL"
     },
     {
-        "file": "../../test/k8s-daemonset-healthcheck/runbook.robot",
+        "codebundle": "k8s-daemonset-healthcheck",
+        "file": "runbook.robot",
         "task": "Get DaemonSet Logs for `${DAEMONSET_NAME}` and Add to Report",
-        "score": 3,
-        "reasoning": "The title provides clarity about what is being done (get DaemonSet logs) and where (specific daemonset in the namespace). It could be improved by specifying the namespace for added clarity. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 5,
+        "reasoning": "The task title is clear, human-readable, and specific. It includes both the 'What' (DaemonSet Logs) and the 'Where' (specific namespace). It also provides a clear description of the action to be taken.",
+        "suggested_title": "Get DaemonSet Logs for `${DAEMONSET_NAME}` in Namespace `${NAMESPACE}` and Add to Report"
     },
     {
-        "file": "../../test/k8s-daemonset-healthcheck/runbook.robot",
+        "codebundle": "k8s-daemonset-healthcheck",
+        "file": "runbook.robot",
         "task": "Get Related Daemonset `${DAEMONSET_NAME}` Events",
-        "score": 3,
-        "reasoning": "The task provides clear information about what is being fetched (daemonset events) and the scope (in the namespace). There is no specific 'Where' variable, but the namespace can be considered as the relevant scope. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 4,
+        "reasoning": "The task provides a clear 'what' (daemonset workload) and includes the relevant imported variable 'NAMESPACE' as the 'where' (specific namespace). The title is also human-readable and specific.",
+        "suggested_title": "Get Related Daemonset `${DAEMONSET_NAME}` Events in Namespace `${NAMESPACE}`"
     },
     {
-        "file": "../../test/k8s-daemonset-healthcheck/runbook.robot",
+        "codebundle": "k8s-daemonset-healthcheck",
+        "file": "runbook.robot",
         "task": "Check Daemonset `${DAEMONSET_NAME}` Replicas",
-        "score": 3,
-        "reasoning": "The task provides clarity about what is being checked (Daemonset `${DAEMONSET_NAME}` Replicas) and hints at the location by referencing a specific resource type (Daemonset). It could be improved by including a specific 'Where' variable, such as the Kubernetes cluster or namespace where the Daemonset is located. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 4,
+        "reasoning": "The task provides a clear 'What' (resource type: daemonset) and a 'Where' in the form of the NAMESPACE variable.",
+        "suggested_title": "Check Daemonset `${DAEMONSET_NAME}` Replicas in Namespace `${NAMESPACE}`"
     },
     {
-        "file": "../../test/k8s-deployment-healthcheck/runbook.robot",
+        "codebundle": "k8s-deployment-healthcheck",
+        "file": "runbook.robot",
         "task": "Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`",
-        "score": 3,
-        "reasoning": "The task title is clear, human-readable, and specific. It specifies the action ('Check Deployment Log'), the resource ('${DEPLOYMENT_NAME}'), and the location ('namespace'). The tags provide further context and the use of variables allows for flexibility in deployment names. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 4,
+        "reasoning": "The title is clear about the task (checking deployment log for issues) and includes a specific resource type (${DEPLOYMENT_NAME}), but lacks a specific location. The most relevant imported variable for 'Where' would be 'NAMESPACE'.",
+        "suggested_title": "Check Deployment Log For Issues with `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`"
     },
     {
-        "file": "../../test/k8s-deployment-healthcheck/runbook.robot",
+        "codebundle": "k8s-deployment-healthcheck",
+        "file": "runbook.robot",
         "task": "Fetch Deployments Logs for `${DEPLOYMENT_NAME}` and Add to Report",
-        "score": 3,
-        "reasoning": "The task provides clarity about what is being fetched (deployment logs) and where it is being fetched from (running pods). It lacks specificity on the deployment name variable, which can be improved by providing more information about the specific deployment being targeted. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 4,
+        "reasoning": "The task provides a clear 'what' (Fetch Deployments Logs) and uses the variable ${DEPLOYMENT_NAME} as a specific 'where' variable to indicate which deployment's logs to fetch.",
+        "suggested_title": "Fetch Deployments Logs for Deployment XYZ and Add to Report"
     },
     {
-        "file": "../../test/k8s-deployment-healthcheck/runbook.robot",
+        "codebundle": "k8s-deployment-healthcheck",
+        "file": "runbook.robot",
         "task": "Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`",
-        "score": 3,
-        "reasoning": "The task provides a clear 'What' (liveness probe configuration for a specific deployment) but lacks a specific 'Where'. The relevant imported variable '${DEPLOYMENT_NAME}' can be suggested as the specific scope. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 5,
+        "reasoning": "The task is very clear, human-readable, and specific. It includes both the 'What' (liveliness probe configuration for a specific deployment) and the 'Where' (specific deployment name).",
+        "suggested_title": "Check Liveness Probe Configuration for Deployment 'DEPLOYMENT_NAME' in Namespace 'NAMESPACE'"
     },
     {
-        "file": "../../test/k8s-deployment-healthcheck/runbook.robot",
+        "codebundle": "k8s-deployment-healthcheck",
+        "file": "runbook.robot",
         "task": "Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`",
-        "score": 3,
-        "reasoning": "The task provides a specific 'what' (readiness probe configuration for deployment) but lacks a specific 'where' variable. The most relevant imported variable could be used as the 'where' in the reasoning and suggested improvement. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 5,
+        "reasoning": "The task title is clear, human-readable, and specific. It includes 'what' (readiness probe configuration) and 'where' (specific deployment name).",
+        "suggested_title": "Check Readiness Probe Configuration for Deployment 'DEPLOYMENT_NAME'"
     },
     {
-        "file": "../../test/k8s-deployment-healthcheck/runbook.robot",
+        "codebundle": "k8s-deployment-healthcheck",
+        "file": "runbook.robot",
         "task": "Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` Namespace `${NAMESPACE}`",
-        "score": 3,
-        "reasoning": "Fully detailed, including both what (container restarts for specific deployment and namespace) and where (specific namespace). The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 5,
+        "reasoning": "The task title is very clear and specific, including both the 'What' (container restarts) and the 'Where' (deployment name and namespace). The documentation and tags also provide further context and detail.",
+        "suggested_title": "Inspect Container Restarts for Deployment 'example_deployment' Namespace 'example_namespace'"
     },
     {
-        "file": "../../test/k8s-deployment-healthcheck/runbook.robot",
+        "codebundle": "k8s-deployment-healthcheck",
+        "file": "runbook.robot",
         "task": "Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`",
-        "score": 3,
-        "reasoning": "Fully detailed, including both what (deployment warning events related to the workload) and where (specific deployment name in the namespace). The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 4,
+        "reasoning": "The task provides a clear 'What' (warning events related to the deployment workload) but lacks a specific 'Where'. The most relevant imported variable for 'Where' is 'NAMESPACE'.",
+        "suggested_title": "Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`"
     },
     {
-        "file": "../../test/k8s-deployment-healthcheck/runbook.robot",
+        "codebundle": "k8s-deployment-healthcheck",
+        "file": "runbook.robot",
         "task": "Get Deployment Workload Details For `${DEPLOYMENT_NAME}` and Add to Report",
-        "score": 3,
-        "reasoning": "The task title provides a clear 'What' (deployment workload details) and lacks a specific 'Where', but the imported 'DEPLOYMENT_NAME' variable can be used as a relevant 'Where' in this context. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 5,
+        "reasoning": "The task provides the specific 'What' (deployment) and a 'Where' variable (${DEPLOYMENT_NAME}) for the location, making it fully detailed.",
+        "suggested_title": "Get Deployment Workload Details For `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` and Add to Report"
     },
     {
-        "file": "../../test/k8s-deployment-healthcheck/runbook.robot",
+        "codebundle": "k8s-deployment-healthcheck",
+        "file": "runbook.robot",
         "task": "Inspect Deployment Replicas for `${DEPLOYMENT_NAME}`",
-        "score": 3,
-        "reasoning": "Provides a clear 'What' (replica information for a given deployment) and a specific 'Where' (deployment name) along with details on what to check for, making it highly detailed and specific. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 5,
+        "reasoning": "The title is highly specific, providing clear information on what is being checked (deployment replicas) and where (specific deployment name). It also includes additional details about the expected checks and potential issues to be raised.",
+        "suggested_title": "Inspect Deployment Replicas for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`"
     },
     {
-        "file": "../../test/k8s-deployment-healthcheck/runbook.robot",
+        "codebundle": "k8s-deployment-healthcheck",
+        "file": "runbook.robot",
         "task": "Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`",
-        "score": 3,
-        "reasoning": "The task provides specific details about what is being checked (deployment event anomalies) and includes the relevant variable for the deployment name. It also covers the 'where' aspect as it mentions parsing events in a namespace, which can be seen as the specific scope. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 4,
+        "reasoning": "The task provides a clear 'What' (Check Deployment Event Anomalies) but lacks a specific 'Where'. The most relevant imported variable for 'Where' would be 'NAMESPACE'.",
+        "suggested_title": "Check Deployment Event Anomalies in namespace `${NAMESPACE}`"
     },
     {
-        "file": "../../test/k8s-deployment-healthcheck/runbook.robot",
+        "codebundle": "k8s-deployment-healthcheck",
+        "file": "runbook.robot",
         "task": "Check ReplicaSet Health for Deployment `${DEPLOYMENT_NAME}`",
-        "score": 3,
-        "reasoning": "Provides clear information about what is being checked (ReplicaSet Health for Deployment `${DEPLOYMENT_NAME}`), but lacks a specific 'Where' variable. The 'deployment' tag suggests using the ${DEPLOYMENT_NAME} variable as the specific scope, which would improve the clarity and specificity of the task. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 5,
+        "reasoning": "The task title is clear, human-readable, and specific, including both the 'What' (ReplicaSet Health for Deployment) and the 'Where' information through the imported user variable ${DEPLOYMENT_NAME}. It also provides a brief documentation of what the task entails.",
+        "suggested_title": "Check ReplicaSet Health for Deployment '${DEPLOYMENT_NAME}' in Namespace '${NAMESPACE}'"
     },
     {
-        "file": "../../test/k8s-labeledpods-healthcheck/sli.robot",
+        "codebundle": "k8s-labeledpods-healthcheck",
+        "file": "sli.robot",
         "task": "Measure Number of Running Pods with Label",
         "score": 3,
-        "reasoning": "The task is clear, human-readable, and specific. It provides details about 'what' is being measured (number of running pods with labels) and does not need a location variable as it is applicable to any Kubernetes cluster. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "reasoning": "The task title is specific, clear, and human-readable. It clearly states the 'What' (number of running pods with label) and provides relevant context for the 'Where' (using the imported variable NAMESPACE). The documentation and tags also support the clarity and specificity of the task. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+        "suggested_title": "Measure Number of Running Pods with Label in Namespace '${NAMESPACE}'"
     },
     {
-        "file": "../../test/k8s-app-troubleshoot/sli.robot",
+        "codebundle": "k8s-app-troubleshoot",
+        "file": "sli.robot",
         "task": "Measure Application Exceptions",
         "score": 3,
-        "reasoning": "The task provides detail about 'what' is being measured (application exceptions) but lacks a specific 'where' variable. It could improve by suggesting the use of the 'resource' tag as the 'where' variable, such as 'Measure Application Exceptions in ${RESOURCE}'. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "reasoning": "The task provides detail about 'what' is being measured (Application Exceptions) but lacks a specific 'Where'. The most relevant imported variable for 'Where' is 'NAMESPACE'. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+        "suggested_title": "Measure Application Exceptions in Namespace '${NAMESPACE}'"
     },
     {
-        "file": "../../test/k8s-app-troubleshoot/runbook.robot",
+        "codebundle": "k8s-app-troubleshoot",
+        "file": "runbook.robot",
         "task": "Get `${CONTAINER_NAME}` Application Logs",
-        "score": 3,
-        "reasoning": "The task title provides clear and specific direction for the user to collect application logs from a specified container name within a workload. It includes relevant tags and detail about the action being performed. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 4,
+        "reasoning": "The task provides a clear 'What' (Application Logs) but lacks a specific 'Where'. 'NAMESPACE' could be suggested as the most relevant imported variable for 'Where'.",
+        "suggested_title": "Get `${CONTAINER_NAME}` Application Logs in Namespace `${NAMESPACE}`"
     },
     {
-        "file": "../../test/k8s-app-troubleshoot/runbook.robot",
+        "codebundle": "k8s-app-troubleshoot",
+        "file": "runbook.robot",
         "task": "Scan `${CONTAINER_NAME}` Application For Misconfigured Environment",
-        "score": 3,
-        "reasoning": "The task title clearly states the action (Scan) and specifies the 'What' (Container Name) being scanned for misconfigured environment. It is clear and specific, but could be improved by specifying the 'Where' (location or environment). Since the 'Where' variable is not specified, it is suggested to use the 'workload_name' imported variable as the location where the application is running. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 5,
+        "reasoning": "The task title is specific and clear about what is being checked (Scan `${CONTAINER_NAME}` Application) and where it will be checked (Misconfigured Environment)",
+        "suggested_title": "Scan `${CONTAINER_NAME}` Application For Misconfigured Environment in `${NAMESPACE}` Namespace"
     },
     {
-        "file": "../../test/k8s-app-troubleshoot/runbook.robot",
+        "codebundle": "k8s-app-troubleshoot",
+        "file": "runbook.robot",
         "task": "Tail `${CONTAINER_NAME}` Application Logs For Stacktraces",
-        "score": 3,
-        "reasoning": "The task title is very clear, human-readable, and specific. It mentions the exact action being performed on container logs for stacktraces and even includes relevant tags for further context. The use of a variable `${CONTAINER_NAME}` allows for runtime substitution, and the imported user variables could provide additional information if needed. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 4,
+        "reasoning": "The task provides a clear 'what' (tail application logs for stacktraces) and includes a specific 'where' variable (container name). It is human-readable and specific.",
+        "suggested_title": "Tail Application Logs For Stacktraces in `${CONTAINER_NAME}`"
     },
     {
-        "file": "../../test/aws-cloudwatch-overused-ec2/runbook.robot",
+        "codebundle": "aws-cloudwatch-overused-ec2",
+        "file": "runbook.robot",
         "task": "Check For Overutilized Ec2 Instances",
         "score": 2,
-        "reasoning": "Provides more detail about 'what' is being checked, but lacks a location."
+        "reasoning": "Provides more detail about 'what' is being checked, but lacks a location.",
+        "suggested_title": "No suggestion required"
     },
     {
-        "file": "../../test/k8s-argocd-helm-health/runbook.robot",
+        "codebundle": "k8s-argocd-helm-health",
+        "file": "runbook.robot",
         "task": "Fetch all available ArgoCD Helm releases in namespace `${NAMESPACE}`",
-        "score": 3,
-        "reasoning": "The task title is very clear and specific, it clearly states the action to be taken (Fetch) and what is being fetched (all available ArgoCD Helm releases) in a specific namespace (${NAMESPACE}). It also includes relevant tags to provide more context. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 4,
+        "reasoning": "The task provides a clear 'what' (fetch all available ArgoCD Helm releases) and a relevant 'where' (namespace). The documentation and tags also add to its clarity and specificity.",
+        "suggested_title": "Fetch all available ArgoCD Helm releases in namespace ${NAMESPACE}"
     },
     {
-        "file": "../../test/k8s-argocd-helm-health/runbook.robot",
+        "codebundle": "k8s-argocd-helm-health",
+        "file": "runbook.robot",
         "task": "Fetch Installed ArgoCD Helm release versions in namespace `${NAMESPACE}`",
-        "score": 3,
-        "reasoning": "The task provides clear information about what is being fetched (Installed ArgoCD Helm release versions) and specifies the namespace for the fetch. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 4,
+        "reasoning": "The task is clear in terms of what is being fetched (Installed ArgoCD Helm release versions) and uses the imported variable for 'Where' (namespace). It lacks specific details about the namespace, but it is still relatively clear.",
+        "suggested_title": "Fetch Installed ArgoCD Helm release versions in namespace `${NAMESPACE}` in Kubernetes distribution `${DISTRIBUTION}`"
     },
     {
-        "file": "../../test/aws-s3-bucket-storage-report/runbook.robot",
+        "codebundle": "aws-s3-bucket-storage-report",
+        "file": "runbook.robot",
         "task": "Check AWS S3 Bucket Storage Utilization",
         "score": 3,
-        "reasoning": "The task is clear, human-readable, and specific. It specifies what is being checked (AWS S3 bucket storage utilization) and where it is being checked (specified AWS S3 bucket). The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "reasoning": "The title is clear, specific, and human-readable. It provides detailed information about what is being checked (AWS S3 Bucket Storage Utilization) and where (specific AWS region). The imported variable 'AWS_REGION' is used for the 'Where'. The task lacks a specific 'Where' variable; consider using `AWS_REGION`.",
+        "suggested_title": "Check AWS S3 Bucket Storage Utilization in AWS Region `${AWS_REGION}`"
     },
     {
-        "file": "../../test/curl-gmp-nginx-ingress-inspection/runbook.robot",
+        "codebundle": "curl-gmp-nginx-ingress-inspection",
+        "file": "runbook.robot",
         "task": "Fetch Nginx HTTP Errors From GMP for Ingress `${INGRESS_OBJECT_NAME}`",
-        "score": 3,
-        "reasoning": "The title clearly states what is being fetched (Nginx HTTP Errors) and specifies the location (Ingress `${INGRESS_OBJECT_NAME}`). It is also clear, human-readable, and specific. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 5,
+        "reasoning": "The task provides clear and specific details about what is being fetched (Nginx HTTP Errors), where it's being fetched from (GMP for Ingress `${INGRESS_OBJECT_NAME}`), and the purpose of the task (for further troubleshooting). It also includes relevant tags for clarity.",
+        "suggested_title": "Fetch Nginx HTTP Errors From GMP for Ingress `${INGRESS_OBJECT_NAME}`"
     },
     {
-        "file": "../../test/curl-gmp-nginx-ingress-inspection/runbook.robot",
+        "codebundle": "curl-gmp-nginx-ingress-inspection",
+        "file": "runbook.robot",
         "task": "Find Owner and Service Health for Ingress `${INGRESS_OBJECT_NAME}`",
-        "score": 3,
-        "reasoning": "The task title is clear, human-readable, and specific. It includes both 'what' (Ingress object service and endpoints) and 'where' (owner of the pods supporting the Ingress). The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 4,
+        "reasoning": "The task provides a clear 'What' (resource type) and a specific 'Where' (INGRESS_OBJECT_NAME) variable, but it could be improved by including the 'Where' variable INGRESS_HOST as well for better clarity.",
+        "suggested_title": "Find Owner and Service Health for Ingress `${INGRESS_OBJECT_NAME}` at `${INGRESS_HOST}`"
     },
     {
-        "file": "../../test/k8s-ingress-healthcheck/runbook.robot",
+        "codebundle": "k8s-ingress-healthcheck",
+        "file": "runbook.robot",
         "task": "Fetch Ingress Object Health in Namespace `${NAMESPACE}`",
-        "score": 3,
-        "reasoning": "The task title clearly specifies the action (Fetch), the resource type (Ingress Object), and the location (Namespace `${NAMESPACE}`). It provides clear and human-readable details about what is being fetched and in which specific namespace. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 5,
+        "reasoning": "The title is clear, human-readable, and specific. It includes the 'What' (Ingress Object Health) and the 'Where' (specific Namespace). It also mentions the specific outputs expected.",
+        "suggested_title": "Fetch Ingress Object Health in Namespace `${NAMESPACE}`"
     },
     {
-        "file": "../../test/k8s-ingress-healthcheck/runbook.robot",
+        "codebundle": "k8s-ingress-healthcheck",
+        "file": "runbook.robot",
         "task": "Check for Ingress and Service Conflicts in Namespace `${NAMESPACE}`",
-        "score": 3,
-        "reasoning": "The task provides a clear 'What' (conflicting configuration between service and ingress objects) but lacks a specific 'Where' variable. The most relevant imported variable could be used as the 'Where', such as the '${NAMESPACE}' variable. The task lacks a specific 'Where' variable, suggesting `N/A` as a possible location."
+        "score": 5,
+        "reasoning": "The task provides specific detail about what is being checked (conflicting configuration between service and ingress objects) and includes the 'Where' variable NAMESPACE as the scope.",
+        "suggested_title": "Check for Ingress and Service Conflicts in Namespace `${NAMESPACE}`"
     }
 ]
