@@ -1,0 +1,18 @@
+[
+    {
+      "task": "Check EC2 Health",
+      "score": 1,
+      "reasoning": "Lacks specificity about what is being checked and where."
+    },
+    {
+      "task": "Check For Overutilized EC2 Instances",
+      "score": 2,
+      "reasoning": "Provides more detail about 'what' is being checked, but lacks a location."
+    },
+    {
+      "task": "Check For Overutilized EC2 Instances in AWS Region `${AWS_REGION}` in AWS Account `${AWS_ACCOUNT_ID}`",
+      "score": 5,
+      "reasoning": "Fully detailed, including both what (overutilized EC2 instances) and where (specific AWS region and account)."
+    }
+  ]
+  

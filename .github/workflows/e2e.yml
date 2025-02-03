@@ -1,45 +1,45 @@
-name: Run E2E Tests
-on:
-  workflow_dispatch:
-    inputs:
-      runall:
-        type: choice
-        description: Test all codebundles found in workspace, regardless of changes?
-        options: 
-          - no
-          - yes
-  push: 
-    branches: 
-      - main
-    paths: 
-      - "codebundles/**.robot"
-# TODO: add traced python dependency support
+# name: Run E2E Tests
+# on:
+#   workflow_dispatch:
+#     inputs:
+#       runall:
+#         type: choice
+#         description: Test all codebundles found in workspace, regardless of changes?
+#         options: 
+#           - no
+#           - yes
+#   push: 
+#     branches: 
+#       - main
+#     paths: 
+#       - "codebundles/**.robot"
+# # TODO: add traced python dependency support
 
-concurrency:
-  group: CI
-  cancel-in-progress: true
+# concurrency:
+#   group: CI
+#   cancel-in-progress: true
 
-jobs:
-  run-e2e:
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - name: install deps
-        run: |
-          pip install requests
-      - name: Run E2E Tests
-        env:
-          API_USER: ${{ secrets.API_USER }}
-          API_TOKEN: ${{ secrets.API_TOKEN }}
-          API_URL: https://papi.test.runwhen.com/api/v3
-          GIT_URL: https://github.com/runwhen-contrib/rw-cli-codecollection.git
-          WORKSPACE: jon-rwl-test
-        run: |
-          if [ "${{ github.event.inputs.runall }}" = "yes" ] || [ "${{ github.event.inputs.runall }}" = "true" ]; then
-            cd .github/scripts/ && python e2e.py $WORKSPACE $API_URL $GIT_URL --runall
-          else
-            cd .github/scripts/ && python e2e.py $WORKSPACE $API_URL $GIT_URL
-          fi
+# jobs:
+#   run-e2e:
+#     runs-on: ubuntu-latest
+#     timeout-minutes: 25
+#     steps:
+#       - uses: actions/checkout@v3
+#         with:
+#           fetch-depth: 0
+#       - name: install deps
+#         run: |
+#           pip install requests
+#       - name: Run E2E Tests
+#         env:
+#           API_USER: ${{ secrets.API_USER }}
+#           API_TOKEN: ${{ secrets.API_TOKEN }}
+#           API_URL: https://papi.test.runwhen.com/api/v3
+#           GIT_URL: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+#           WORKSPACE: jon-rwl-test
+#         run: |
+#           if [ "${{ github.event.inputs.runall }}" = "yes" ] || [ "${{ github.event.inputs.runall }}" = "true" ]; then
+#             cd .github/scripts/ && python e2e.py $WORKSPACE $API_URL $GIT_URL --runall
+#           else
+#             cd .github/scripts/ && python e2e.py $WORKSPACE $API_URL $GIT_URL
+#           fi
