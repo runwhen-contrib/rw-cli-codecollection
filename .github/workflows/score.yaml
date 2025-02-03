@@ -22,7 +22,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - uses: runwhen-contrib/github-actions/codecollection-score@score
+      - uses: runwhen-contrib/github-actions/codecollection-score@main
         with:
           directory: './codebundles'
           commit_results: true
