@@ -1,3 +1,5 @@
+> Note: This is moving to a github action at 
+
 # CodeBundle Lint & Scoring Script
 
 This script provides **automated linting and scoring** for Robot Framework-based RunWhen “CodeBundles.” It performs:
