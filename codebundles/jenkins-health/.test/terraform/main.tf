@@ -216,61 +216,6 @@ resource "aws_instance" "jenkins_server" {
 }
 
 
-# ec2 Agent
-# IAM Role for Jenkins
-# resource "aws_iam_role" "jenkins_role" {
-#   name = "jenkins_role"
-
-#   assume_role_policy = jsonencode({
-#     Version = "2012-10-17"
-#     Statement = [
-#       {
-#         Action = "sts:AssumeRole"
-#         Effect = "Allow"
-#         Principal = {
-#           Service = "ec2.amazonaws.com"
-#         }
-#       }
-#     ]
-#   })
-# }
-
-# # IAM Policy for Jenkins EC2 plugin
-# resource "aws_iam_role_policy" "jenkins_policy" {
-#   name = "jenkins_policy"
-#   role = aws_iam_role.jenkins_role.id
-
-#   policy = jsonencode({
-#     Version = "2012-10-17"
-#     Statement = [
-#       {
-#         Effect = "Allow"
-#         Action = [
-#           "ec2:DescribeSpotInstanceRequests",
-#           "ec2:CancelSpotInstanceRequests",
-#           "ec2:GetConsoleOutput",
-#           "ec2:RequestSpotInstances",
-#           "ec2:RunInstances",
-#           "ec2:StartInstances",
-#           "ec2:StopInstances",
-#           "ec2:TerminateInstances",
-#           "ec2:CreateTags",
-#           "ec2:DeleteTags",
-#           "ec2:DescribeInstances",
-#           "ec2:DescribeKeyPairs",
-#           "ec2:DescribeRegions",
-#           "ec2:DescribeImages",
-#           "ec2:DescribeAvailabilityZones",
-#           "ec2:DescribeSecurityGroups",
-#           "ec2:DescribeSubnets",
-#           "iam:PassRole"
-#         ]
-#         Resource = ["*"]
-#       }
-#     ]
-#   })
-# }
-
 # # Instance Profile for Jenkins
 # resource "aws_iam_instance_profile" "jenkins_profile" {
 #   name = "jenkins_profile"
@@ -362,6 +307,33 @@ resource "null_resource" "wait_for_jenkins" {
 #     ]
 #   }
 # }
+
+# Create IAM user for Jenkins
+resource "aws_iam_user" "jenkins_user" {
+  name = "jenkins-user"
+}
+
+# Create access key for the IAM user
+resource "aws_iam_access_key" "jenkins_user_key" {
+  user = aws_iam_user.jenkins_user.name
+}
+
+# Attach policy to the user
+resource "aws_iam_user_policy_attachment" "jenkins_user_policy" {
+  user       = aws_iam_user.jenkins_user.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2FullAccess"
+}
+
+# Output the credentials
+output "jenkins_user_access_key" {
+  value     = aws_iam_access_key.jenkins_user_key.id
+  sensitive = true
+}
+
+output "jenkins_user_secret_key" {
+  value     = aws_iam_access_key.jenkins_user_key.secret
+  sensitive = true
+}
 
 output "jenkins_public_ip" {
   value = aws_instance.jenkins_server.public_ip

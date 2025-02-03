@@ -13,8 +13,8 @@ Library             util.py
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Check Failed Jenkins Builds
-    [Documentation]    Check Failed Jenkins Builds
+Check For Failed Build Logs in Jenkins
+    [Documentation]    Check For Failed Build Logs in Jenkins
     [Tags]    Jenkins    Logs    Builds
     ${rsp}=    RW.CLI.Run Bash File
     ...    bash_file=faild_build_logs.sh
@@ -32,7 +32,7 @@ Check Failed Jenkins Builds
     ${failed_builds_score}=    Evaluate    1 if int(${failed_builds}) <= int(${MAX_FAILED_BUILDS}) else 0
     Set Global Variable    ${failed_builds_score}
 
-Check For Long Running Builds
+Check For Long Running Builds in Jenkins
     [Documentation]    Check Jenkins builds that have been running longer than a specified threshold
     [Tags]    Jenkins    Builds
     ${rsp}=    RW.CLI.Run Bash File
@@ -55,8 +55,8 @@ Check For Long Running Builds
     ${long_running_score}=    Evaluate    1 if int(${long_running_count}) <= int(${MAX_LONG_RUNNING_BUILDS}) else 0
     Set Global Variable    ${long_running_score}
 
-List Recent Faild Tests
-    [Documentation]    List Recent Faild Tests
+Check For Recent Failed Tests in Jenkins
+    [Documentation]    Check For Recent Failed Tests in Jenkins
     [Tags]    Jenkins    Tests
     ${failed_tests}=    Get Failed Tests
     IF    len(${failed_tests}) > 0
@@ -67,7 +67,7 @@ List Recent Faild Tests
         Set Global Variable    ${failed_test_score}    1
     END
 
-Check Jenkins Health
+Check For Jenkins Health
     [Documentation]    Check if Jenkins instance is reachable and responding
     [Tags]    Jenkins    Health
     ${rsp}=    RW.CLI.Run Cli
@@ -82,10 +82,10 @@ Check Jenkins Health
         Set Global Variable    ${jenkins_health_score}    0
     END
 
-Check Queued Builds SLI
+Check For Long Queued Builds in Jenkins
     [Documentation]    Check for builds stuck in queue beyond threshold and calculate SLI score
     [Tags]    Jenkins    Queue    Builds    SLI
-    ${queued_builds}=    Get Queued Builds    wait_threshold=1min
+    ${queued_builds}=    Get Queued Builds    wait_threshold=${QUEUE_WAIT_THRESHOLD}
     ${queued_count}=    Evaluate    len(${queued_builds})
     ${queued_builds_score}=    Evaluate    1 if int(${queued_count}) <= int(${MAX_QUEUED_BUILDS}) else 0
     Set Global Variable    ${queued_builds_score}
@@ -114,12 +114,18 @@ Suite Initialization
     ...    description=Jenkins API token for authentication
     ...    pattern=\w*
     ...    example=11aa22bb33cc44dd55ee66ff77gg88hh
-    ${TIME_THRESHOLD}=    RW.Core.Import User Variable    TIME_THRESHOLD
+    ${LONG_RUNNING_BUILD_TIME_THRESHOLD}=    RW.Core.Import User Variable    LONG_RUNNING_BUILD_TIME_THRESHOLD
     ...    type=string
     ...    description=The threshold for long running builds, formats like '5m', '2h', '1d' or '5min', '2h', '1d'
     ...    pattern=\d+
-    ...    example="1m"
-    ...    default="1m"
+    ...    example="10m"
+    ...    default="10m"
+    ${QUEUE_WAIT_THRESHOLD}=    RW.Core.Import User Variable    QUEUE_WAIT_THRESHOLD
+    ...    type=string
+    ...    description=The time threshold for builds in queue, formats like '5m', '2h', '1d' or '5min', '2h', '1d'
+    ...    pattern=\d+
+    ...    example="10m"
+    ...    default="10m"
     ${MAX_FAILED_BUILDS}=    RW.Core.Import User Variable    MAX_FAILED_BUILDS
     ...    type=string
     ...    description=The maximum number of failed builds to consider healthy

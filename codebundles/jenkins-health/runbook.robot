@@ -12,9 +12,9 @@ Library             util.py
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-List Failed Jenkins Builds
+List Failed Build Logs in Jenkins
     [Documentation]    Fetches logs from failed Jenkins builds using the Jenkins API
-    [Tags]    Jenkins    Logs    Failures    API    Builds
+    [Tags]    Jenkins    Logs    Builds
     ${rsp}=    RW.CLI.Run Bash File
     ...    bash_file=faild_build_logs.sh
     ...    env=${env}
@@ -38,23 +38,23 @@ List Failed Jenkins Builds
             ${pretty_item}=    Evaluate    pprint.pformat(${job})    modules=pprint
             RW.Core.Add Issue        
             ...    severity=3
-            ...    expected=Jenkins job `${job_name}` should have a successful build
-            ...    actual=Jenkins job `${job_name}` has a failed build
-            ...    title=Jenkins job `${job_name}` has a failed build
+            ...    expected=Jenkins job `${job_name}` should be successfully build
+            ...    actual=Jenkins job `${job_name}` has a failed build with build number `${build_number}`
+            ...    title=Jenkins job `${job_name}` with build number `${build_number}` failed to build
             ...    reproduce_hint=${rsp.cmd}
             ...    details=${pretty_item}
-            ...    next_steps=Review the Jenkins job `${job_name}` build number `${build_number}`
+            ...    next_steps=Review Failed build logs for Jenkins job `${job_name}`
         END
     ELSE
         RW.Core.Add Pre To Report    "No failed builds found"
     END
 
-List Long Running Builds
+List Long Running Builds in Jenkins
     [Documentation]    Identifies Jenkins builds that have been running longer than a specified threshold
-    [Tags]    Jenkins    Builds    Monitoring
+    [Tags]    Jenkins    Builds
     ${rsp}=    RW.CLI.Run Bash File
     ...    bash_file=long_running_builds.sh
-    ...    cmd_override=./long_running_builds.sh ${TIME_THRESHOLD}
+    ...    cmd_override=./long_running_builds.sh ${LONG_RUNNING_BUILD_TIME_THRESHOLD}
     ...    env=${env}
     ...    include_in_history=False
     ...    secret__jenkins_token=${JENKINS_TOKEN}
@@ -83,12 +83,12 @@ List Long Running Builds
             ${pretty_item}=    Evaluate    pprint.pformat(${job})    modules=pprint
             RW.Core.Add Issue
             ...    severity=4
-            ...    expected=Jenkins job `${job_name}` should complete within ${TIME_THRESHOLD}
-            ...    actual=Jenkins job `${job_name}` has been running for ${duration}
+            ...    expected=Jenkins job `${job_name}` build number `${build_number}` should be completed within ${LONG_RUNNING_BUILD_TIME_THRESHOLD}
+            ...    actual=Jenkins job `${job_name}` build number `${build_number}` has been running for ${duration}
             ...    title=Jenkins job build `${job_name}` `${build_number}` has been running for ${duration}
             ...    reproduce_hint=${rsp.cmd}
             ...    details=${pretty_item}
-            ...    next_steps=Review the Jenkins job `${job_name}` build number `${build_number}` at ${url}
+            ...    next_steps=Review the Jenkins job `${job_name}` build taking too long to complete
         END
     ELSE
         RW.Core.Add Pre To Report    "No long running builds found"
@@ -210,44 +210,44 @@ List Queued Builds
     END
 
 
-Analyze Build Logs
-    [Documentation]    Analyze build logs for common error patterns and similarities
-    [Tags]    Jenkins    Logs    Analysis
+# Analyze Build Logs
+#     [Documentation]    Analyze build logs for common error patterns and similarities
+#     [Tags]    Jenkins    Logs    Analysis
     
-    ${rsp}=    BUILD LOGS ANALYTICS
+#     ${rsp}=    BUILD LOGS ANALYTICS
 
-    TRY
-        ${analysis_results}=    Evaluate    json.loads('''${rsp.stdout}''')    json
+#     TRY
+#         ${analysis_results}=    Evaluate    json.loads('''${rsp.stdout}''')    json
         
-        FOR    ${result}    IN    @{analysis_results}
-            ${job_name}=    Set Variable    ${result['job_name']}
-            ${builds_analyzed}=    Set Variable    ${result['builds_analyzed']}
-            ${similarity_score}=    Set Variable    ${result['similarity_score']}
+#         FOR    ${result}    IN    @{analysis_results}
+#             ${job_name}=    Set Variable    ${result['job_name']}
+#             ${builds_analyzed}=    Set Variable    ${result['builds_analyzed']}
+#             ${similarity_score}=    Set Variable    ${result['similarity_score']}
             
-            RW.Core.Add Pre To Report    Job: ${job_name}\nBuilds Analyzed: ${builds_analyzed}\nLog Similarity Score: ${similarity_score}%\n
+#             RW.Core.Add Pre To Report    Job: ${job_name}\nBuilds Analyzed: ${builds_analyzed}\nLog Similarity Score: ${similarity_score}%\n
             
-            FOR    ${pattern}    IN    @{result['common_error_patterns']}
-                ${occurrences}=    Set Variable    ${pattern['occurrences']}
-                ${error_pattern}=    Set Variable    ${pattern['pattern']}
+#             FOR    ${pattern}    IN    @{result['common_error_patterns']}
+#                 ${occurrences}=    Set Variable    ${pattern['occurrences']}
+#                 ${error_pattern}=    Set Variable    ${pattern['pattern']}
                 
-                RW.Core.Add Issue
-                ...    severity=2
-                ...    expected=Build logs should not contain recurring error patterns
-                ...    actual=Found error pattern occurring ${occurrences} times across builds
-                ...    title=Recurring Error Pattern in ${job_name}
-                ...    details=Error Pattern:\n${error_pattern}\n\nOccurrences: ${occurrences}\nSimilar Lines:\n${pattern['similar_lines']}
-                ...    reproduce_hint=Review build logs for job ${job_name}
-                ...    next_steps=- Investigate root cause of recurring error pattern\n- Check if this is a systemic issue\n- Review job configuration
-            END
-        END
+#                 RW.Core.Add Issue
+#                 ...    severity=2
+#                 ...    expected=Build logs should not contain recurring error patterns
+#                 ...    actual=Found error pattern occurring ${occurrences} times across builds
+#                 ...    title=Recurring Error Pattern in ${job_name}
+#                 ...    details=Error Pattern:\n${error_pattern}\n\nOccurrences: ${occurrences}\nSimilar Lines:\n${pattern['similar_lines']}
+#                 ...    reproduce_hint=Review build logs for job ${job_name}
+#                 ...    next_steps=- Investigate root cause of recurring error pattern\n- Check if this is a systemic issue\n- Review job configuration
+#             END
+#         END
         
-        IF    ${analysis_results} == []
-            RW.Core.Add Pre To Report    No failed builds found for analysis
-        END
+#         IF    ${analysis_results} == []
+#             RW.Core.Add Pre To Report    No failed builds found for analysis
+#         END
         
-    EXCEPT    AS    ${error}
-        Log    ${error}
-    END
+#     EXCEPT    AS    ${error}
+#         Log    ${error}
+#     END
 
 
 
@@ -268,20 +268,20 @@ Suite Initialization
     ...    description=Jenkins API token for authentication
     ...    pattern=\w*
     ...    example=11aa22bb33cc44dd55ee66ff77gg88hh
-    ${TIME_THRESHOLD}=    RW.Core.Import User Variable    TIME_THRESHOLD
+    ${LONG_RUNNING_BUILD_TIME_THRESHOLD}=    RW.Core.Import User Variable    LONG_RUNNING_BUILD_TIME_THRESHOLD
     ...    type=string
     ...    description=The threshold for long running builds, formats like '5m', '2h', '1d' or '5min', '2h', '1d'
     ...    pattern=\d+
-    ...    example="1m"
-    ...    default="30m"
+    ...    example="10m"
+    ...    default="10m"
     ${QUEUE_WAIT_THRESHOLD}=    RW.Core.Import User Variable    QUEUE_WAIT_THRESHOLD
     ...    type=string
     ...    description=The time threshold for builds in queue, formats like '5m', '2h', '1d' or '5min', '2h', '1d'
     ...    pattern=\d+
-    ...    example="1m"
+    ...    example="10m"
     ...    default="10m"
     Set Suite Variable    ${env}    {"JENKINS_URL":"${JENKINS_URL}"}
-    Set Suite Variable    ${TIME_THRESHOLD}    ${TIME_THRESHOLD}
+    Set Suite Variable    ${LONG_RUNNING_BUILD_TIME_THRESHOLD}    ${LONG_RUNNING_BUILD_TIME_THRESHOLD}
     Set Suite Variable    ${JENKINS_URL}    ${JENKINS_URL}
     Set Suite Variable    ${JENKINS_USERNAME}    ${JENKINS_USERNAME}
     Set Suite Variable    ${JENKINS_TOKEN}    ${JENKINS_TOKEN}
