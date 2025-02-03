@@ -1,0 +1,354 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Generate workspaceInfo and rebuild/test"
+    cmds:
+      - task: check-unpushed-commits
+      - task: generate-rwl-config
+      - task: run-rwl-discovery
+
+  clean:
+    desc: "Run cleanup tasks"
+    cmds:
+      - task: check-and-cleanup-terraform
+      # - task: clean-rwl-discovery
+
+  build-infra:
+    desc: "Build test infrastructure"
+    cmds:
+      - task: build-terraform-infra
+
+  check-unpushed-commits:
+    desc: Check if outstanding commits or file updates need to be pushed before testing.
+    vars:
+      # Specify the base directory relative to your Taskfile location
+      BASE_DIR: "../"
+    cmds:
+      - |
+        echo "Checking for uncommitted changes in $BASE_DIR and $BASE_DIR.runwhen, excluding '.test'..."
+        UNCOMMITTED_FILES=$(git diff --name-only HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNCOMMITTED_FILES" ]; then
+          echo "✗"
+          echo "Uncommitted changes found:"
+          echo "$UNCOMMITTED_FILES"
+          echo "Remember to commit & push changes before executing the `run-rwl-discovery` task."
+          echo "------------"
+          exit 1    
+        else
+          echo "√"
+          echo "No uncommitted changes in specified directories."
+          echo "------------"        
+        fi
+      - |
+        echo "Checking for unpushed commits in $BASE_DIR and $BASE_DIR.runwhen, excluding '.test'..."
+        git fetch origin
+        UNPUSHED_FILES=$(git diff --name-only origin/$(git rev-parse --abbrev-ref HEAD) HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNPUSHED_FILES" ]; then
+          echo "✗"
+          echo "Unpushed commits found:"
+          echo "$UNPUSHED_FILES"
+          echo "Remember to push changes before executing the `run-rwl-discovery` task."
+          echo "------------"
+          exit 1        
+        else
+          echo "√"
+          echo "No unpushed commits in specified directories."
+          echo "------------"        
+        fi
+    silent: true
+
+  generate-rwl-config:
+    desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
+    env:
+      AWS_ACCESS_KEY_ID: "{{.AWS_ACCESS_KEY_ID}}"
+      AWS_SECRET_ACCESS_KEY: "{{.AWS_SECRET_ACCESS_KEY}}"
+      AWS_DEFAULT_REGION: "{{.AWS_DEFAULT_REGION}}"
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+      JENKINS_URL: '{{.JENKINS_URL | default "http://localhost:8080"}}'
+    cmds:
+      - |
+        source terraform/cb.secret
+        repo_url=$(git config --get remote.origin.url)
+        branch_name=$(git rev-parse --abbrev-ref HEAD)
+        codebundle=$(basename "$(dirname "$PWD")")
+
+        # Fetch individual cluster details from Terraform state
+        # pushd terraform > /dev/null
+        # cluster1_name=$(terraform show -json terraform.tfstate | jq -r '
+        #   .values.outputs.cluster_1_name.value')
+ 
+        # popd > /dev/null
+
+        # # Check if any of the required cluster variables are empty
+        # if [ -z "$cluster1_name" ] || [ -z "$cluster1_server" ] || [ -z "$cluster1_resource_group" ]; then
+        #   echo "Error: Missing cluster details. Ensure Terraform plan has been applied."
+        #   exit 1
+        # fi
+
+        # Generate workspaceInfo.yaml with fetched cluster details
+        cat <<EOF > workspaceInfo.yaml
+        workspaceName: "$RW_WORKSPACE"
+        workspaceOwnerEmail: authors@runwhen.com
+        defaultLocation: location-01-us-west1
+        defaultLOD: detailed
+        cloudConfig:
+          aws: 
+            awsAccessKeyId: "$AWS_ACCESS_KEY_ID"
+            awsSecretAccessKey: "$AWS_SECRET_ACCESS_KEY"
+        codeCollections:
+        - repoURL: "$repo_url"
+          branch: "$branch_name"
+          codeBundles: ["$codebundle"]
+        custom:
+          aws_access_key_id: AWS_ACCESS_KEY_ID
+          aws_secret_access_key: AWS_SECRET_ACCESS_KEY
+          jenkins_url: $JENKINS_URL
+        EOF
+    silent: true
+
+  run-rwl-discovery:
+    desc: "Run RunWhen Local Discovery on test infrastructure"
+    cmds:
+      - |
+        CONTAINER_NAME="RunWhenLocal"
+        if docker ps -q --filter "name=$CONTAINER_NAME" | grep -q .; then
+          echo "Stopping and removing existing container $CONTAINER_NAME..."
+          docker stop $CONTAINER_NAME && docker rm $CONTAINER_NAME
+        elif docker ps -a -q --filter "name=$CONTAINER_NAME" | grep -q .; then
+          echo "Removing existing stopped container $CONTAINER_NAME..."
+          docker rm $CONTAINER_NAME
+        else
+          echo "No existing container named $CONTAINER_NAME found."
+        fi
+
+        echo "Cleaning up output directory..."
+        sudo rm -rf output || { echo "Failed to remove output directory"; exit 1; }
+        mkdir output && chmod 777 output || { echo "Failed to set permissions"; exit 1; }
+
+        echo "Starting new container $CONTAINER_NAME..."
+
+        docker run --name $CONTAINER_NAME -e DEBUG_LOGGING=true -p 8081:8081 -v "$(pwd)":/shared -d ghcr.io/runwhen-contrib/runwhen-local:latest || {
+          echo "Failed to start container"; exit 1;
+        }
+
+        echo "Running workspace builder script in container..."
+        docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh $1 --verbose || {
+          echo "Error executing script in container"; exit 1;
+        }
+
+        echo "Review generated config files under output/workspaces/"
+    silent: true
+
+  check-terraform-infra:
+    desc: "Check if Terraform has any deployed infrastructure in the terraform subdirectory"
+    cmds:
+      - |
+        # Source Envs for Auth
+        source terraform/tf.secret
+
+        # Navigate to the Terraform directory
+        if [ ! -d "terraform" ]; then
+          echo "Terraform directory not found."
+          exit 1
+        fi
+        cd terraform
+
+        # Check if Terraform state file exists
+        if [ ! -f "terraform.tfstate" ]; then
+          echo "No Terraform state file found in the terraform directory. No infrastructure is deployed."
+          exit 0
+        fi
+
+        # List resources in Terraform state
+        resources=$(terraform state list)
+
+        # Check if any resources are listed in the state file
+        if [ -n "$resources" ]; then
+          echo "Deployed infrastructure detected."
+          echo "$resources"
+          exit 0
+        else
+          echo "No deployed infrastructure found in Terraform state."
+          exit 0
+        fi
+    silent: true
+
+  build-terraform-infra:
+    desc: "Run terraform apply"
+    cmds:
+      - |
+        # Source Envs for Auth
+        source terraform/tf.secret
+
+
+        # Navigate to the Terraform directory
+        if [ -d "terraform" ]; then
+          cd terraform
+        else
+          echo "Terraform directory not found. Terraform apply aborted."
+          exit 1
+        fi
+        task format-and-init-terraform
+        echo "Starting Terraform Build of Terraform infrastructure..."
+        terraform apply -auto-approve || {
+          echo "Failed to clean up Terraform infrastructure."
+          exit 1
+        }
+        echo "Terraform infrastructure build completed."
+    silent: true
+
+  check-rwp-config:
+    desc: Check if env vars are set for RunWhen Platform
+    cmds:
+      - |
+        source terraform/cb.secret
+        missing_vars=()
+
+        if [ -z "$RW_WORKSPACE" ]; then
+          missing_vars+=("RW_WORKSPACE")
+        fi
+
+        if [ -z "$RW_API_URL" ]; then
+          missing_vars+=("RW_API_URL")
+        fi
+
+        if [ -z "$RW_PAT" ]; then
+          missing_vars+=("RW_PAT")
+        fi
+
+        if [ ${#missing_vars[@]} -ne 0 ]; then
+          echo "The following required environment variables are missing: ${missing_vars[*]}"
+          exit 1
+        fi
+    silent: true
+
+  upload-slxs:
+      desc: "Upload SLX files to the appropriate URL"
+      env:
+        RW_WORKSPACE: "{{.RW_WORKSPACE}}"
+        RW_API_URL: "{{.RW_API}}"
+        RW_PAT: "{{.RW_PAT}}"
+      cmds:
+        - task: check-rwp-config
+        - |
+          source terraform/cb.secret
+          BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
+          if [ ! -d "$BASE_DIR" ]; then
+            echo "Directory $BASE_DIR does not exist. Upload aborted."
+            exit 1
+          fi
+
+          for dir in "$BASE_DIR"/*; do
+            if [ -d "$dir" ]; then
+              SLX_NAME=$(basename "$dir")
+              PAYLOAD=$(jq -n --arg commitMsg "Creating new SLX $SLX_NAME" '{ commitMsg: $commitMsg, files: {} }')
+              for file in slx.yaml runbook.yaml sli.yaml; do
+                if [ -f "$dir/$file" ]; then
+                  CONTENT=$(cat "$dir/$file")
+                  PAYLOAD=$(echo "$PAYLOAD" | jq --arg fileContent "$CONTENT" --arg fileName "$file" '.files[$fileName] = $fileContent')
+                fi
+              done
+
+              URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/${SLX_NAME}"
+              echo "Uploading SLX: $SLX_NAME to $URL"
+              response_code=$(curl -X POST "$URL" \
+                -H "Authorization: Bearer $RW_PAT" \
+                -H "Content-Type: application/json" \
+                -d "$PAYLOAD" \
+                -w "%{http_code}" -o /dev/null -s)
+              
+              if [[ "$response_code" == "200" || "$response_code" == "201" ]]; then
+                echo "Successfully uploaded SLX: $SLX_NAME to $URL"
+              elif [[ "$response_code" == "405" ]]; then
+                echo "Failed to upload SLX: $SLX_NAME to $URL. Method not allowed (405)."
+              else
+                echo "Failed to upload SLX: $SLX_NAME to $URL. Unexpected response code: $response_code"
+              fi
+            fi
+          done
+      silent: true
+
+  delete-slxs:
+    desc: "Delete SLX objects from the appropriate URL"
+    env:
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+      RW_API_URL: "{{.RW_API}}"
+      RW_PAT: "{{.RW_PAT}}"
+    cmds:
+      - task: check-rwp-config
+      - |
+        source terraform/cb.secret
+        BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
+        if [ ! -d "$BASE_DIR" ]; then
+          echo "Directory $BASE_DIR does not exist. Deletion aborted."
+          exit 1
+        fi
+
+        for dir in "$BASE_DIR"/*; do
+          if [ -d "$dir" ]; then
+            SLX_NAME=$(basename "$dir")
+            URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/${SLX_NAME}"
+            echo "Deleting SLX: $SLX_NAME from $URL"
+            response_code=$(curl -X DELETE "$URL" \
+              -H "Authorization: Bearer $RW_PAT" \
+              -H "Content-Type: application/json" \
+              -w "%{http_code}" -o /dev/null -s)
+            
+            if [[ "$response_code" == "200" || "$response_code" == "204" ]]; then
+              echo "Successfully deleted SLX: $SLX_NAME from $URL"
+            elif [[ "$response_code" == "405" ]]; then
+              echo "Failed to delete SLX: $SLX_NAME from $URL. Method not allowed (405)."
+            else
+              echo "Failed to delete SLX: $SLX_NAME from $URL. Unexpected response code: $response_code"
+            fi
+          fi
+        done
+    silent: true
+
+  cleanup-terraform-infra:
+    desc: "Cleanup deployed Terraform infrastructure"
+    cmds:
+      - |
+        # Source Envs for Auth
+        source terraform/tf.secret
+
+        # Navigate to the Terraform directory
+        if [ -d "terraform" ]; then
+          cd terraform
+        else
+          echo "Terraform directory not found. Cleanup aborted."
+          exit 1
+        fi
+
+        echo "Starting cleanup of Terraform infrastructure..."
+        terraform destroy -auto-approve || {
+          echo "Failed to clean up Terraform infrastructure."
+          exit 1
+        }
+        echo "Terraform infrastructure cleanup completed."
+    silent: true
+
+  check-and-cleanup-terraform:
+    desc: "Check and clean up deployed Terraform infrastructure if it exists"
+    cmds:
+      - |
+        # Capture the output of check-terraform-infra
+        infra_output=$(task check-terraform-infra | tee /dev/tty)
+
+        # Check if output contains indication of deployed infrastructure
+        if echo "$infra_output" | grep -q "Deployed infrastructure detected"; then
+          echo "Infrastructure detected; proceeding with cleanup."
+          task cleanup-terraform-infra
+        else
+          echo "No deployed infrastructure found; no cleanup required."
+        fi
+    silent: true
+
+  clean-rwl-discovery:
+    desc: "Check and clean up RunWhen Local discovery output"
+    cmds:
+      - |
+        sudo rm -rf output
+        rm workspaceInfo.yaml
+    silent: true
