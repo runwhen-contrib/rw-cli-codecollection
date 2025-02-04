@@ -61,8 +61,9 @@ while read -r job_info; do
 {
     "job_name": "$job_name",
     "result": "FAILURE",
-    "buildNumber": $build_number,
-    "logs": $escaped_logs
+    "build_number": $build_number,
+    "logs": $escaped_logs,
+    "url": "$build_url"
 }
 EOF
 done
