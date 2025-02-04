@@ -9,8 +9,6 @@ on:
 
 permissions:
     contents: 'write'
-    id-token: 'write'
-    pull-requests: 'write'
 
 jobs:
   score-codebundles:
@@ -29,4 +27,3 @@ jobs:
       - uses: runwhen-contrib/github-actions/codecollection-score@fix/sli-lint
         with:
           directory: './codebundles'
-          commit_results: true
