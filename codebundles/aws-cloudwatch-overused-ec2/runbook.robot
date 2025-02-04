@@ -1,90 +1,109 @@
 *** Settings ***
-Documentation       Queries AWS CloudWatch for a list of EC2 instances with a high amount of resource utilization, raising issues when overutilized instances are found.
-Metadata            Author    jon-funk
-Metadata            Display Name    AWS CloudWatch Overutlized EC2 Inspection
-Metadata            Supports    AWS,CloudWatch
-
+Documentation       This codebundle runs a series of tasks to identify potential Kustomization issues related to Flux managed Kustomization objects. 
+Metadata            Author    stewartshea
+Metadata            Display Name    Kubernetes FluxCD Kustomization TaskSet
+Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,FluxCD
 Library             RW.Core
 Library             RW.CLI
+Library             RW.platform
+Library             RW.NextSteps
+Library             String
 
 Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check For Overutilized Ec2 Instances
-    [Documentation]    Fetches CloudWatch metrics for a list of EC2 instances and raises issues if they're over-utilized based on a configurable threshold.
-    [Tags]    cloudwatch    metrics    ec2    utilization
-    ${now}=    RW.CLI.String To Datetime    0h
-    ${past_time}=    RW.CLI.String To Datetime    3h
-    ${util_metrics}=    RW.CLI.Run Cli
-    ...    cmd=${AWS_ASSUME_ROLE_CMD} aws cloudwatch get-metric-data --start-time ${past_time} --end-time ${now} --metric-data-queries '[{"Id":"runWhenMetric","Expression":"SELECT MAX(CPUUtilization) FROM \\"AWS/EC2\\" GROUP BY InstanceId","Period":60,"ReturnData":true}]' | jq -r '.MetricDataResults[] | select(.Values|max > ${UTILIZATION_THRESHOLD}) | "Instance:" + .Label + "Max Detected Utilization:" + (.Values|max|tostring)'
-    ...    target_service=${AWS_SERVICE}
-    ...    secret__aws_access_key_id=${aws_access_key_id}
-    ...    secret__aws_secret_access_key=${aws_secret_access_key}
-    ...    secret__aws_role_arn=${aws_role_arn}
-    ...    secret__aws_assume_role_name=${aws_assume_role_name}
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${util_metrics}
-    ...    set_severity_level=4
-    ...    set_issue_expected=EC2 instance is not overutilized.
-    ...    set_issue_actual=EC2 instances detected past ${UTILIZATION_THRESHOLD} utilization threshold.
-    ...    set_issue_title=EC2 Instances Over Utilized
-    ...    set_issue_details=The following EC2 instances have been detected as over-utilized: \n\n"$_stdout"
-    ...    _line__raise_issue_if_contains=Instance
-    RW.Core.Add Pre To Report
-    ...    The following EC2 instances in ${AWS_DEFAULT_REGION} are classified as over-utilized according to the threshold: ${UTILIZATION_THRESHOLD}:\n\n
-    RW.Core.Add Pre To Report    ${util_metrics.stdout}
+List all available Kustomization objects in Namespace `${NAMESPACE}`    
+    [Documentation]    List all FluxCD kustomization objects found in ${NAMESPACE}
+    [Tags]        FluxCD     Kustomization     Available    List    ${NAMESPACE}
+    ${kustomizations}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${KUBECONFIG}
+    ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
+    RW.Core.Add Pre To Report    Kustomizations available: \n ${kustomizations.stdout}
+    RW.Core.Add Pre To Report    Commands Used:\n${history}
+
+Get details for unready Kustomizations in Namespace `${NAMESPACE}`  
+    [Documentation]    List all Kustomizations that are not found in a ready state in namespace ${NAMESPACE}  
+    [Tags]        FluxCD     Kustomization    Versions    ${NAMESPACE}
+    ${kustomizations_not_ready}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json | jq '[.items[] | select(.status.conditions[] | select(.type == "Ready" and .status == "False")) | {KustomizationName: .metadata.name, ReadyStatus: {ready: (.status.conditions[] | select(.type == "Ready").status), message: (.status.conditions[] | select(.type == "Ready").message), reason: (.status.conditions[] | select(.type == "Ready").reason), last_transition_time: (.status.conditions[] | select(.type == "Ready").lastTransitionTime)}, ReconcileStatus: {reconciling: (.status.conditions[] | select(.type == "Reconciling").status), message: (.status.conditions[] | select(.type == "Reconciling").message)}}]'
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${KUBECONFIG}
+    ...    show_in_rwl_cheatsheet=true
+    ${kustomizations_not_ready_list}=    Evaluate    json.loads(r'''${kustomizations_not_ready.stdout}''')    json
+    IF    len(@{kustomizations_not_ready_list}) > 0
+        FOR    ${item}    IN    @{kustomizations_not_ready_list}               
+            ${messages}=    Replace String    ${item["ReadyStatus"]["message"]}   "    ${EMPTY}
+            ${item_next_steps}=    RW.CLI.Run Bash File
+            ...    bash_file=workload_next_steps.sh
+            ...    cmd_override=./workload_next_steps.sh "${messages}"
+            ...    env=${env}
+            ...    include_in_history=False
+            RW.Core.Add Issue
+            ...    severity=2
+            ...    expected=Kustomizations should be synced and ready.   
+            ...    actual=Objects are not ready.
+            ...    title=GitOps Resources are Unhealthy in Namespace \`${NAMESPACE}\`
+            ...    reproduce_hint=${kustomizations_not_ready.cmd}
+            ...    details=Kustomization is not in a ready state ${item["KustomizationName"]} in Namespace ${NAMESPACE}\n${item}
+            ...    next_steps=${item_next_steps.stdout}
+        END
+    END
+    ${history}=    RW.CLI.Pop Shell History
+    IF    """${kustomizations_not_ready.stdout}""" == ""
+        ${kustomizations_not_ready}=    Set Variable    No Kustomizations Pending Found
+    ELSE
+        ${kustomizations_not_ready}=    Set Variable    ${kustomizations_not_ready.stdout}
+    END
+    RW.Core.Add Pre To Report    Kustomizations with: \n ${kustomizations_not_ready}
+    RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 
 *** Keywords ***
 Suite Initialization
-    ${AWS_SERVICE}=    RW.Core.Import Service    aws
+    ${kubeconfig}=    RW.Core.Import Secret
+    ...    kubeconfig
     ...    type=string
-    ...    description=The selected RunWhen Service to use for accessing services within a network.
+    ...    description=The kubernetes kubeconfig yaml containing connection configuration used to connect to cluster(s).
     ...    pattern=\w*
-    ...    example=aws-service.shared
-    ...    default=aws-service.shared
-    ${aws_access_key_id}=    RW.Core.Import Secret    aws_access_key_id
+    ...    example=For examples, start here https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
+    ${DISTRIBUTION}=    RW.Core.Import User Variable    DISTRIBUTION
     ...    type=string
-    ...    description=The AWS access key ID to use for connecting to AWS APIs.
+    ...    description=Which distribution of Kubernetes to use for operations, such as: Kubernetes, OpenShift, etc.
     ...    pattern=\w*
-    ...    example=SUPERSECRETKEYID
-    ${aws_secret_access_key}=    RW.Core.Import Secret    aws_secret_access_key
+    ...    enum=[Kubernetes,GKE,OpenShift]
+    ...    example=Kubernetes
+    ...    default=Kubernetes
+    ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
-    ...    description=The AWS access key to use for connecting to AWS APIs.
-    ...    pattern=\w*
-    ...    example=SUPERSECRETKEY
-    ${aws_role_arn}=    RW.Core.Import Secret    aws_role_arn
+    ...    description=Which binary to use for Kubernetes CLI commands.
+    ...    enum=[kubectl,oc]
+    ...    example=kubectl
+    ...    default=kubectl
+    ${NAMESPACE}=    RW.Core.Import User Variable    NAMESPACE
     ...    type=string
-    ...    description=The AWS role ARN to use for connecting to AWS APIs.
+    ...    description=The name of the Kubernetes namespace to scope actions and searching to. 
     ...    pattern=\w*
-    ...    example=arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME
-    ${aws_assume_role_name}=    RW.Core.Import Secret    aws_assume_role_name
+    ...    example=my-namespace
+    ...    default=default
+    ${RESOURCE_NAME}=    RW.Core.Import User Variable    RESOURCE_NAME
     ...    type=string
-    ...    description=The AWS role ARN to use for connecting to AWS APIs.
+    ...    description=The short or long name of the Kubernetes kustomizations resource to search for. These might vary by Kustomize controller implementation, and are best to use full crd name. 
     ...    pattern=\w*
-    ...    example=runwhen-sa
-    ${AWS_DEFAULT_REGION}=    RW.Core.Import User Variable    AWS_DEFAULT_REGION
+    ...    example=kustomizations.kustomize.toolkit.fluxcd.io
+    ...    default=kustomizations
+    ${CONTEXT}=    RW.Core.Import User Variable    CONTEXT
     ...    type=string
-    ...    description=The AWS region to scope API requests to.
+    ...    description=Which Kubernetes context to operate within.
     ...    pattern=\w*
-    ...    example=us-west-1
-    ...    default=us-west-1
-    ${UTILIZATION_THRESHOLD}=    RW.Core.Import User Variable    UTILIZATION_THRESHOLD
-    ...    type=string
-    ...    description=The threshold at which an instance is determined as overutilized.
-    ...    pattern=\w*
-    ...    example=0.8
-    ...    default=0.8
-    Set Suite Variable    ${aws_access_key_id}    ${aws_access_key_id}
-    Set Suite Variable    ${aws_secret_access_key}    ${aws_secret_access_key}
-    Set Suite Variable    ${aws_role_arn}    ${aws_role_arn}
-    Set Suite Variable    ${aws_assume_role_name}    ${aws_assume_role_name}
-    Set Suite Variable    ${AWS_DEFAULT_REGION}    ${AWS_DEFAULT_REGION}
-    Set Suite Variable    ${AWS_SERVICE}    ${AWS_SERVICE}
-    Set Suite Variable    ${UTILIZATION_THRESHOLD}    ${UTILIZATION_THRESHOLD}
-    Set Suite Variable
-    ...    ${AWS_ASSUME_ROLE_CMD}
-    ...    role_json=$(AWS_ACCESS_KEY_ID=$${aws_access_key_id.key} AWS_SECRET_ACCESS_KEY=$${aws_secret_access_key.key} AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION} aws sts assume-role --role-arn $${aws_role_arn.key} --role-session-name ${aws_assume_role_name.key}) && AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION} AWS_ACCESS_KEY_ID=$(echo $role_json | jq -r '.Credentials.AccessKeyId') AWS_SECRET_ACCESS_KEY=$(echo $role_json | jq -r '.Credentials.SecretAccessKey') AWS_SESSION_TOKEN=$(echo $role_json | jq -r '.Credentials.SessionToken')
+    ...    default=default
+    ...    example=my-main-cluster
+    Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
+    Set Suite Variable    ${kubeconfig}    ${kubeconfig}
+    Set Suite Variable    ${RESOURCE_NAME}    ${RESOURCE_NAME}
+    Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
+    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}

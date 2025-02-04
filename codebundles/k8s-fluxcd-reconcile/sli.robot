@@ -1,7 +1,7 @@
 *** Settings ***
-Documentation       Measures failing reconciliations for fluxcd
+Documentation       Generates a report of the reconciliation errors for fluxcd in your cluster.
 Metadata            Author    jon-funk
-Metadata            Display Name    Kubernetes Fluxcd Reconciliation Monitor
+Metadata            Display Name    Kubernetes Fluxcd Reconciliation Report
 Metadata            Supports    Kubernetes Fluxcd
 Metadata            Builder
 
@@ -17,17 +17,21 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 Health Check Flux Reconciliation
-    [Documentation]   Measures failing reconciliations for fluxcd
+    [Documentation]   Fetches reconciliation logs for flux and creates a report for them.
     [Tags]  Kubernetes    Namespace    Flux
     ${process}=    RW.CLI.Run Bash File    flux_reconcile_report.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    Log To Console    ${process.stdout}
     IF    ${process.returncode} != 0
-        RW.Core.Push Metric    0
-    ELSE
-        RW.Core.Push Metric    1
+        RW.Core.Add Issue    title=Errors in Flux Controller Reconciliation
+        ...    severity=3
+        ...    expected=No errors in Flux controller reconciliation.
+        ...    actual=Flux controllers have errors in their reconciliation process.
+        ...    reproduce_hint=Run flux_reconcile_report.sh manually to see the errors.
+        ...    next_steps=Inspect Flux logs to determine which objects are failing to reconcile.
+        ...    details=${process.stdout}
     END
+    RW.Core.Add Pre To Report    ${process.stdout}
 
 *** Keywords ***
 Suite Initialization
@@ -48,8 +52,8 @@ Suite Initialization
 
 
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
-    Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${FLUX_NAMESPACE}    ${FLUX_NAMESPACE}
+    Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable
     ...    &{env}
     ...    KUBECONFIG=${kubeconfig.key}

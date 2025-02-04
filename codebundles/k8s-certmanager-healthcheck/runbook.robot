@@ -1,8 +1,8 @@
 *** Settings ***
-Documentation       Checks the overall health of certificates in a namespace that are managed by cert-manager.
+Documentation       This SLI collects information about storage such as PersistentVolumes and PersistentVolumeClaims and generates an aggregated health score for the namespace. 1 = Healthy, 0 = Failed, >0 <1 = Degraded
 Metadata            Author    stewartshea
-Metadata            Display Name    Kubernetes cert-manager Healthcheck
-Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,cert-manager
+Metadata            Display Name    Kubernetes Persistent Volume Healthcheck
+Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 
 Library             BuiltIn
 Library             RW.Core
@@ -14,112 +14,6 @@ Library             Collections
 Library             String
 
 Suite Setup         Suite Initialization
-
-
-*** Tasks ***
-Get Namespace Certificate Summary for Namespace `${NAMESPACE}`
-    [Documentation]    Gets a list of cert-manager certificates that are due for renewal and summarize their information for review.
-    [Tags]    tls    certificates    kubernetes    objects    expiration    summary    cert-manager
-    ${cert_info}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get certificates.cert-manager.io --context=${CONTEXT} -n ${NAMESPACE} -ojson | jq -r --arg now "$(date +%Y-%m-%dT%H:%M:%SZ)" '.items[] | select(.status.conditions[] | select(.type == "Ready" and .status == "True")) | select(.status.renewalTime) | select((.status.notAfter | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime) <= ($now | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime)) | "Namespace:" + .metadata.namespace + " URL:" + .spec.dnsNames[0] + " Renews:" + .status.renewalTime + " Expires:" + .status.notAfter'
-    ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${cert_info}
-    ...    set_severity_level=3
-    ...    set_issue_expected=No certificates found past their set renewal date in the namespace `${NAMESPACE}`
-    ...    set_issue_actual=Certificates were found in the namespace `${NAMESPACE}` that are past their renewal time and not renewed
-    ...    set_issue_title=Found certificates due for renewal in namespace `${NAMESPACE}` that are not renewing
-    ...    set_issue_details=cert-manager certificates not renewing: "$_stdout".
-    ...    set_issue_next_steps=Find Failed Certificate Requests and Identify Issues for Namespace `${NAMESPACE}` \nCheck Logs for Cert-Manager Deployment in Cluster `${CONTEXT}`
-    ...    _line__raise_issue_if_contains=Namespace
-    RW.Core.Add Pre To Report    Certificate Information:\n${cert_info.stdout}
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
-
-Find Unhealthy Certificates in Namespace `${NAMESPACE}`
-    [Documentation]    Gets a list of cert-manager certificates are not available.
-    [Tags]    tls    certificates    kubernetes    cert-manager    failed
-    ${unready_certs}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get --context=${CONTEXT} -n ${NAMESPACE} certificates.cert-manager.io -ojson | jq '[.items[] | select(.status.conditions[] | select(.type == "Ready" and .status == "False"))]'
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ...    show_in_rwl_cheatsheet=true
-
-    ${unready_cert_list}=    Evaluate    json.loads(r'''${unready_certs.stdout}''')    json
-    IF    len(@{unready_cert_list}) > 0
-        FOR    ${item}    IN    @{unready_cert_list}
-            RW.Core.Add Issue
-            ...    severity=3
-            ...    expected=Certificates should be ready `${NAMESPACE}`
-            ...    actual=Certificates in namespace `${NAMESPACE}` are not ready.
-            ...    title= Certificate `${item["metadata"]["name"]}` is not available in namespace `${NAMESPACE}`.
-            ...    reproduce_hint=${unready_certs.cmd}
-            ...    details=${item}
-            ...    next_steps=Find Failed Certificate Requests and Identify Issues for Namespace `${NAMESPACE}` \nCheck Logs for cert-manager Deployment in Cluster `${CONTEXT}`
-        END
-    END
-
-    RW.Core.Add Pre To Report    Unready Certificates:\n${unready_certs.stdout}
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
-
-Find Failed Certificate Requests and Identify Issues for Namespace `${NAMESPACE}`
-    [Documentation]    Gets a list of failed cert-manager certificates and summarize their issues.
-    [Tags]
-    ...    tls
-    ...    certificates
-    ...    kubernetes
-    ...    objects
-    ...    failed
-    ...    certificaterequest
-    ...    cert-manager
-    ...    ${namespace}
-    ${failed_certificaterequests}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get certificaterequests.cert-manager.io --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select(.status.conditions[] | select(.type == "Ready" and .status != "True")) | {certRequest: .metadata.name, certificate: (.metadata.ownerReferences[].name), issuer: .spec.issuerRef.name, readyStatus: (.status.conditions[] | select(.type == "Ready")).status, readyMessage: (.status.conditions[] | select(.type == "Ready")).message, approvedStatus: (.status.conditions[] | select(.type == "Approved")).status, approvedMessage: (.status.conditions[] | select(.type == "Approved")).message} | "\\nCertificateRequest: \\(.certRequest)", "Certificate: \\(.certificate)", "Issuer: \\(.issuer)", "Ready Status: \\(.readyStatus)", "Ready Message: \\(.readyMessage)", "Approved Status: \\(.approvedStatus)", "Approved Message: \\(.approvedMessage)\\n------------"'
-    ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ${failed_cert_list}=    Split String    ${failed_certificaterequests.stdout}    ------------
-    IF    len($failed_cert_list) > 0
-        FOR    ${item}    IN    @{failed_cert_list}
-            ${is_not_just_newline}=    Evaluate    '''${item}'''.strip() != ''
-            IF    ${is_not_just_newline}
-                ${ready_message}=    RW.CLI.Run Cli
-                ...    cmd=echo '${item}' | grep "Ready Message:" | sed 's/^Ready Message: //' | sed 's/ *$//' | tr -d '\n'
-                ...    env=${env}
-                ...    include_in_history=false
-                ${certificate_name}=    RW.CLI.Run Cli
-                ...    cmd=echo '${item}' | grep "Certificate:" | sed 's/^Certificate: //' | sed 's/ *$//' | tr -d '\n'
-                ...    env=${env}
-                ...    include_in_history=false
-                ${issuer_name}=    RW.CLI.Run Cli
-                ...    cmd=echo '${item}' | grep "Issuer:" | sed 's/^Issuer: //' | sed 's/ *$//' | tr -d '\n'
-                ...    env=${env}
-                ...    include_in_history=false
-                ${item_next_steps}=    RW.CLI.Run Bash File
-                ...    bash_file=certificate_next_steps.sh
-                ...    cmd_override=./certificate_next_steps.sh "${ready_message.stdout}" "${certificate_name.stdout}" "${Issuer_name.stdout}"
-                ...    env=${env}
-                ...    secret_file__kubeconfig=${kubeconfig}
-                ...    include_in_history=False
-                RW.Core.Add Issue
-                ...    severity=2
-                ...    expected=All certifiactes to be ready in ${NAMESPACE}
-                ...    actual=Certificates are not ready in ${NAMESPACE}
-                ...    title=Certificate `${certificate_name.stdout}` has failed in namespace `${NAMESPACE}`
-                ...    details=cert-manager certificates failure details: ${item}.
-                ...    reproduce_hint=${failed_certificaterequests.cmd}
-                ...    next_steps=${item_next_steps.stdout}
-            END
-        END
-    END
-    RW.Core.Add Pre To Report    Certificate Information:\n${failed_certificaterequests.stdout}
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
 *** Keywords ***
@@ -147,8 +41,39 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=otel-demo
     ...    default=
+    ${HOME}=    RW.Core.Import User Variable    HOME
+    ...    type=string
+    ...    description=The home path of the runner
+    ...    pattern=\w*
+    ...    example=/home/runwhen
+    ...    default=/home/runwhen
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
-    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
+    Set Suite Variable    ${HOME}    ${HOME}
+    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "OUTPUT_DIR":"${OUTPUT_DIR}"}
+
+
+*** Tasks ***
+Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
+    [Documentation]    For each pod in a namespace, fetch the utilization of any PersistentVolumeClaims mounted using the linux df command. Requires kubectl exec permissions.
+    [Tags]    pod    storage    pvc    utilization    capacity    persistentvolumeclaims    persistentvolumeclaim    check pvc    ${NAMESPACE}
+    ${pvc_utilization_script}=    RW.CLI.Run Bash File
+    ...    bash_file=pvc_utilization_check.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${pvc_recommendations}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/pvc_issues.json
+    ...    env=${env}
+    ...    include_in_history=false
+    ${issue_list}=    Evaluate    json.loads(r'''${pvc_recommendations.stdout}''')    json
+    ${pvc_utilization_score}=    Evaluate    1 if len(@{issue_list}) == 0 else 0
+    Set Global Variable    ${pvc_utilization_score}
+
+Generate Namspace Score
+    ${pvc_health_score}=      Evaluate  (${pvc_utilization_score}) / 1
+    ${health_score}=      Convert to Number    ${pvc_health_score}  2
+    RW.Core.Push Metric    ${health_score}

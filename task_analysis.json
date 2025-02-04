@@ -1,0 +1,2173 @@
+{
+    "task_results": [
+        {
+            "codebundle": "gcloud-log-inspection",
+            "file": "runbook.robot",
+            "filepath": "codebundles/gcloud-log-inspection/runbook.robot",
+            "task": "Inspect GCP Logs For Common Errors",
+            "score": 3,
+            "reasoning": "The task title is clear and specific, indicating the action of inspecting GCP logs for common errors. It is also easily readable by humans. The imported user variables are used to provide specificity by filtering logs from a specific GCP project. The task lacks a specific 'Where' variable; consider using `SEVERITY`.",
+            "suggested_title": "Inspect GCP Logs For Common Errors in GCP Project `${GCP_PROJECT_ID}`"
+        },
+        {
+            "codebundle": "curl-http-ok",
+            "file": "runbook.robot",
+            "filepath": "codebundles/curl-http-ok/runbook.robot",
+            "task": "Checking HTTP URL Is Available And Timely",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, it provides a clear instruction to use cURL to validate the http response. It includes specific tags related to the task. The imported user variables are effectively used in the documentation.",
+            "suggested_title": "Check HTTP URL Availability and Timeliness for `${URL}`"
+        },
+        {
+            "codebundle": "curl-http-ok",
+            "file": "sli.robot",
+            "filepath": "codebundles/curl-http-ok/sli.robot",
+            "task": "Checking HTTP URL Is Available And Timely",
+            "score": 4,
+            "reasoning": "The task title is clear in its purpose and specific in the method to be used (cURL). It provides a clear directive for what the task entails, but could be more specific by including the 'Where' variable, which in this case would be the imported 'URL' variable.",
+            "suggested_title": "Validate HTTP URL Availability and Timeliness for ${URL}"
+        },
+        {
+            "codebundle": "k8s-redis-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-redis-healthcheck/runbook.robot",
+            "task": "Ping `${DEPLOYMENT_NAME}` Redis Workload",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It includes the 'What' (Redis Workload) and the 'Where' (DEPLOYMENT_NAME) variables in backticks & curly braces.",
+            "suggested_title": "Ping `${DEPLOYMENT_NAME}` Redis Workload"
+        },
+        {
+            "codebundle": "k8s-redis-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-redis-healthcheck/runbook.robot",
+            "task": "Verify `${DEPLOYMENT_NAME}` Redis Read Write Operation",
+            "score": 4,
+            "reasoning": "The task title is clear in its purpose, readable, and specific. It includes the resource type (Redis) and the 'Where' variable `${DEPLOYMENT_NAME}` in backticks and curly braces.",
+            "suggested_title": "Verify `${DEPLOYMENT_NAME}` Redis Read Write Operation in Kubernetes"
+        },
+        {
+            "codebundle": "terraform-cloud-workspace-lock-check",
+            "file": "runbook.robot",
+            "filepath": "codebundles/terraform-cloud-workspace-lock-check/runbook.robot",
+            "task": "Checking whether the Terraform Cloud Workspace is in a locked state",
+            "score": 3,
+            "reasoning": "The task title is clear and specific, mentioning 'Terraform Cloud Workspace' and 'locked state'. It is human-readable and provides a clear action using 'curl'. The only improvement would be to include the specific workspace name in the title. The task lacks a specific 'Where' variable; consider using `TERRAFORM_API_URL`.",
+            "suggested_title": "Checking whether the Terraform Cloud Workspace '${TERRAFORM_WORKSPACE_NAME}' is in a locked state"
+        },
+        {
+            "codebundle": "k8s-artifactory-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-artifactory-health/runbook.robot",
+            "task": "Check Artifactory Liveness and Readiness Endpoints",
+            "score": 3,
+            "reasoning": "The task title is clear and specific about checking the liveness and readiness endpoints of Artifactory. It also mentions using curl to perform the check. The tags provide additional context. The imported variables are used effectively in the documentation. The task lacks a specific 'Where' variable; consider using `STATEFULSET_NAME`.",
+            "suggested_title": "Check Artifactory Liveness and Readiness Endpoints in `NAMESPACE`"
+        },
+        {
+            "codebundle": "k8s-otelcollector",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-otelcollector/runbook.robot",
+            "task": "Query Collector Queued Spans in Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The title is clear and specific in terms of what needs to be done (query collector queued spans) and where (in the namespace). The use of backticks and curly braces for the 'Where' variable adds clarity.",
+            "suggested_title": "Query Collector Queued Spans in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-otelcollector",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-otelcollector/runbook.robot",
+            "task": "Check OpenTelemetry Collector Logs For Errors In Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is very clear and specific. It provides a clear directive to fetch OpenTelemetry Collector logs and check for errors, while also indicating that the search will be in a specific namespace.",
+            "suggested_title": "Check OpenTelemetry Collector Logs For Errors In Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-otelcollector",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-otelcollector/runbook.robot",
+            "task": "Scan OpenTelemetry Logs For Dropped Spans In Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is very clear and specific, providing a clear directive to query OpenTelemetry logs for dropped spans in a specific namespace. The use of backticks and curly braces around the NAMESPACE variable enhances readability and specificity.",
+            "suggested_title": "Query OpenTelemetry Logs For Dropped Spans In Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-podresources-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-podresources-health/runbook.robot",
+            "task": "Show Pods Without Resource Limit or Resource Requests Set in Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The title is clear, specific, and human-readable. It includes both the 'What' (pods without resource limit or resource requests) and the 'Where' (namespace) variables identified by the placeholders and the imported user variable. The tags provide additional context and specificity.",
+            "suggested_title": "Show Pods Without Resource Limit or Resource Requests Set in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-podresources-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-podresources-health/runbook.robot",
+            "task": "Get Pod Resource Utilization with Top in Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, mentioning the action (Get Pod Resource Utilization with Top), the resource type (Pod), and the specific scope (Namespace `${NAMESPACE}`). The use of backticks & curly braces for the 'Where' variable adds clarity.",
+            "suggested_title": "Check Pod Resource Utilization with Top in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-podresources-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-podresources-health/runbook.robot",
+            "task": "Identify VPA Pod Resource Recommendations in Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is very clear in its purpose, mentioning both the 'What' (VPA Pod Resource Recommendations) and the 'Where' (specific Namespace). It is also human-readable and specific.",
+            "suggested_title": "Identify VPA Pod Resource Recommendations in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-podresources-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-podresources-health/runbook.robot",
+            "task": "Identify Resource Constrained Pods In Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title clearly specifies the 'What' (identifying resource constrained pods) and the 'Where' (in the specified namespace). It is human-readable and specific, providing clear guidance on what the task entails.",
+            "suggested_title": "Identify Overutilized Pods in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "aws-s3-bucket-storage-report",
+            "file": "runbook.robot",
+            "filepath": "codebundles/aws-s3-bucket-storage-report/runbook.robot",
+            "task": "Check AWS S3 Bucket Storage Utilization",
+            "score": 3,
+            "reasoning": "The task title is clear, specific, and human-readable. It clearly states the action to be performed, the resource type (AWS S3 Bucket), and the specific scope (specified bucket). The imported variable AWS_REGION is used for specifying the location. The task lacks a specific 'Where' variable; consider using `AWS_REGION`.",
+            "suggested_title": null
+        },
+        {
+            "codebundle": "k8s-cluster-node-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-cluster-node-health/runbook.robot",
+            "task": "Check for Node Restarts in Cluster `${CONTEXT}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, mentioning the cluster context and the action to be taken. It is also human-readable and would be easy to understand for someone with knowledge of the environment. However, it could be improved by including a specific time interval for the node restarts.",
+            "suggested_title": "Check for Node Restarts in Cluster `${CONTEXT}` within Interval `${INTERVAL}`"
+        },
+        {
+            "codebundle": "k8s-cluster-node-health",
+            "file": "sli.robot",
+            "filepath": "codebundles/k8s-cluster-node-health/sli.robot",
+            "task": "Check for Node Restarts in Cluster `${CONTEXT}`",
+            "score": 4,
+            "reasoning": "The task title is clear in its purpose (checking for node restarts), readable, and specific. It includes the 'What' (Node Restarts) and utilizes the imported 'CONTEXT' variable as the 'Where'.",
+            "suggested_title": "Check for Node Restarts in Cluster `${CONTEXT}`"
+        },
+        {
+            "codebundle": "k8s-cluster-node-health",
+            "file": "sli.robot",
+            "filepath": "codebundles/k8s-cluster-node-health/sli.robot",
+            "task": "Generate Namspace Score",
+            "score": 2,
+            "reasoning": "The task title is vague and lacks specificity. It does not provide clear instructions or indicate a specific resource type or scope.",
+            "suggested_title": "Generate Namespace Score in Kubernetes Cluster `$${CONTEXT}`"
+        },
+        {
+            "codebundle": "gh-actions-artifact-analysis",
+            "file": "runbook.robot",
+            "filepath": "codebundles/gh-actions-artifact-analysis/runbook.robot",
+            "task": "Analyze artifact from GitHub workflow `${WORKFLOW_NAME}` in repository `${GITHUB_REPO}`",
+            "score": 5,
+            "reasoning": "The title is clear, human-readable, and specific. It provides a clear instruction to analyze an artifact from a specific GitHub workflow in a specific repository using a user provided command.",
+            "suggested_title": "Analyze artifact from GitHub workflow `${WORKFLOW_NAME}` in repository `${GITHUB_REPO}` using command `${ANALYSIS_COMMAND}`"
+        },
+        {
+            "codebundle": "gh-actions-artifact-analysis",
+            "file": "sli.robot",
+            "filepath": "codebundles/gh-actions-artifact-analysis/sli.robot",
+            "task": "Analyze artifact from GitHub Workflow `${WORKFLOW_NAME}` in repository `${GITHUB_REPO}` and push metric",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, it provides a clear set of actions to be performed on a specific artifact from a GitHub workflow in a repository. It includes user-provided analysis command and metric push. However, it could be improved by including the specific metric to be pushed.",
+            "suggested_title": "Analyze artifact from GitHub Workflow `${WORKFLOW_NAME}` in repository `${GITHUB_REPO}` and push `${METRIC}` metric"
+        },
+        {
+            "codebundle": "k8s-image-check",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-image-check/runbook.robot",
+            "task": "Check Image Rollover Times for Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, indicating the action to be performed (Check Image Rollover Times) and the specific scope (Namespace `${NAMESPACE}`). The documentation and tags provide additional context for the task.",
+            "suggested_title": "Check Image Rollover Times for Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-image-check",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-image-check/runbook.robot",
+            "task": "List Images and Tags for Every Container in Running Pods for Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The title is clear, specific, and human-readable. It clearly defines the task of listing images and tags for every container in running pods for a specific namespace. The documentation and tags provided further clarify the purpose of the task.",
+            "suggested_title": "List Images and Tags for Every Container in Running Pods for Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-image-check",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-image-check/runbook.robot",
+            "task": "List Images and Tags for Every Container in Failed Pods for Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The title is clear and specific in its instruction to list images and tags for every container in failed pods specifically for the namespace. It includes relevant tags for indexing, and the imported 'NAMESPACE' variable is used to specify the scope.",
+            "suggested_title": "List Images and Tags for Every Container in Failed Pods for Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-image-check",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-image-check/runbook.robot",
+            "task": "List ImagePullBackOff Events and Test Path and Tags for Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title clearly outlines the specific actions to be taken, including searching for ImagePullBackOff events and testing the path and tags for a specified namespace. It is human-readable and specific, providing clear guidance on what needs to be done.",
+            "suggested_title": "List ImagePullBackOff Events and Test Path and Tags for Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "cli-test",
+            "file": "runbook.robot",
+            "filepath": "codebundles/cli-test/runbook.robot",
+            "task": "Run CLI and Parse Output For Issues",
+            "score": 3,
+            "reasoning": "The title is clear and specific, indicating the action of running a CLI and parsing its output for issues. It also mentions fetching output from a cluster and running tests, which provides context for the task. The imported variables NAMESPACE and CONTEXT provide clarity on the specific scope, as they will be substituted at runtime to specify the 'where' of the task. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Run CLI and Parse Output For Issues in `${NAMESPACE}` namespace and `${CONTEXT}` context"
+        },
+        {
+            "codebundle": "cli-test",
+            "file": "runbook.robot",
+            "filepath": "codebundles/cli-test/runbook.robot",
+            "task": "Exec Test",
+            "score": 3,
+            "reasoning": "The task title is clear and specific, explaining the purpose of the task and what it does. It is also human-readable. The tags provided give additional context to the task. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Exec Test in Pod `$${NAMESPACE}`"
+        },
+        {
+            "codebundle": "cli-test",
+            "file": "runbook.robot",
+            "filepath": "codebundles/cli-test/runbook.robot",
+            "task": "Local Process Test",
+            "score": 3,
+            "reasoning": "The title is clear and specific, indicating that the test is for running commands locally within the runner. It is also readable to a human and includes relevant tags. The imported user variables are not used in the title, however 'NAMESPACE' could potentially be used as a 'Where' variable. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Local Process Test for '$${NAMESPACE}'"
+        },
+        {
+            "codebundle": "curl-gmp-kong-ingress-inspection",
+            "file": "runbook.robot",
+            "filepath": "codebundles/curl-gmp-kong-ingress-inspection/runbook.robot",
+            "task": "Check If Kong Ingress HTTP Error Rate Violates HTTP Error Threshold",
+            "score": 3,
+            "reasoning": "The task title is clear and specific, providing details on what needs to be checked (Kong Ingress HTTP Error Rate) and the threshold for violation. It is also human-readable with no ambiguous language. The imported variables provide context for where the inspection will take place. The task lacks a specific 'Where' variable; consider using `GCP_PROJECT_ID`.",
+            "suggested_title": "Check If Kong Ingress HTTP Error Rate Violates HTTP Error Threshold in GCP Project `$${GCP_PROJECT_ID}`"
+        },
+        {
+            "codebundle": "curl-gmp-kong-ingress-inspection",
+            "file": "runbook.robot",
+            "filepath": "codebundles/curl-gmp-kong-ingress-inspection/runbook.robot",
+            "task": "Check If Kong Ingress HTTP Request Latency Violates Threshold",
+            "score": 3,
+            "reasoning": "The task title is clear in its purpose, readable by a human, and specific in its scope. It clearly outlines the action, resource type (Kong Ingress), and specifies the threshold to be checked. The imported variable 'INGRESS_UPSTREAM' can be used as the 'Where' variable for further specificity. The task lacks a specific 'Where' variable; consider using `GCP_PROJECT_ID`.",
+            "suggested_title": "Check If Kong Ingress HTTP Request Latency Violates Threshold for Upstream `$${INGRESS_UPSTREAM}`"
+        },
+        {
+            "codebundle": "curl-gmp-kong-ingress-inspection",
+            "file": "runbook.robot",
+            "filepath": "codebundles/curl-gmp-kong-ingress-inspection/runbook.robot",
+            "task": "Check If Kong Ingress Controller Reports Upstream Errors",
+            "score": 3,
+            "reasoning": "The title is clear, specific, and human-readable. It clearly states the task of checking for upstream errors in the Kong ingress controller. It also mentions metrics, healthchecks, and dns errors, providing additional context. The tags and user variables are well-aligned with the task, further adding to the specificity. The task lacks a specific 'Where' variable; consider using `GCP_PROJECT_ID`.",
+            "suggested_title": "Check If Kong Ingress Controller Reports Upstream Errors in GCP Project `$${GCP_PROJECT_ID}`"
+        },
+        {
+            "codebundle": "k8s-pvc-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-pvc-healthcheck/runbook.robot",
+            "task": "Fetch Events for Unhealthy Kubernetes PersistentVolumeClaims in Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, indicating the action to 'Fetch Events' and the 'Where' being the namespace variable. It is human-readable and provides a specific scope.",
+            "suggested_title": "Fetch Events for Unhealthy Kubernetes PersistentVolumeClaims in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-pvc-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-pvc-healthcheck/runbook.robot",
+            "task": "List PersistentVolumeClaims in Terminating State in Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It includes the 'What' (persistentvolumeclaim) and 'Where' (Namespace) variables in backticks and curly braces.",
+            "suggested_title": "List PersistentVolumeClaims in Terminating State in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-pvc-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-pvc-healthcheck/runbook.robot",
+            "task": "List PersistentVolumes in Terminating State in Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is very clear, human-readable, and specific. It clearly states what needs to be done (List PersistentVolumes in Terminating State) and specifies the scope using the 'Where' variable (Namespace `${NAMESPACE}`). The documentation and tags also provide additional context and specificity.",
+            "suggested_title": "List PersistentVolumes in Terminating State in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-pvc-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-pvc-healthcheck/runbook.robot",
+            "task": "List Pods with Attached Volumes and Related PersistentVolume Details in Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is specific, clear, and human-readable. It clearly states the 'What' (List Pods with Attached Volumes and Related PersistentVolume Details) and the 'Where' (Namespace ${NAMESPACE}). The documentation provides additional context on what details to collect, making it highly specific.",
+            "suggested_title": null
+        },
+        {
+            "codebundle": "k8s-pvc-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-pvc-healthcheck/runbook.robot",
+            "task": "Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, providing a clear action to fetch storage utilization for PVC mounts in a specific namespace. It is also human-readable and includes relevant tags for categorization. The only improvement would be to include the 'Where' variable in backticks and curly braces.",
+            "suggested_title": "Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-pvc-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-pvc-healthcheck/runbook.robot",
+            "task": "Check for RWO Persistent Volume Node Attachment Issues in Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is clear in its goal of checking for RWO Persistent Volume Node Attachment Issues in a specific namespace. It provides specific guidance on what to look for and where to look for it.",
+            "suggested_title": "Check for RWO Persistent Volume Node Attachment Issues in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-pvc-healthcheck",
+            "file": "sli.robot",
+            "filepath": "codebundles/k8s-pvc-healthcheck/sli.robot",
+            "task": "Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, providing a clear action to fetch storage utilization for PVC mounts in a specific namespace. It is also human-readable and includes relevant tags for categorization. The only improvement would be to include the 'Where' variable in backticks and curly braces.",
+            "suggested_title": "Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-pvc-healthcheck",
+            "file": "sli.robot",
+            "filepath": "codebundles/k8s-pvc-healthcheck/sli.robot",
+            "task": "Generate Namspace Score",
+            "score": 3,
+            "reasoning": "The task title is somewhat clear but lacks specificity. It mentions 'Generate Namespace Score' but does not specify the location or resource for this action. It would be clearer with a specific 'Where' variable, such as 'NAMESPACE'.",
+            "suggested_title": "Generate Namespace Score for Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-certmanager-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-certmanager-healthcheck/runbook.robot",
+            "task": "Get Namespace Certificate Summary for Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It includes the 'What' (Namespace Certificate Summary) and uses the imported variable for 'Where' (NAMESPACE) within backticks & curly braces.",
+            "suggested_title": ""
+        },
+        {
+            "codebundle": "k8s-certmanager-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-certmanager-healthcheck/runbook.robot",
+            "task": "Find Unhealthy Certificates in Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is clear, human-readable, and specific. It includes the 'What' (certificates) and 'Where' (namespace) variables. The documentation and tags provide additional context.",
+            "suggested_title": "Find Unhealthy Certificates in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-certmanager-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-certmanager-healthcheck/runbook.robot",
+            "task": "Find Failed Certificate Requests and Identify Issues for Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The title is clear, human-readable, and specific. It includes the 'What' (cert-manager certificates) and the 'Where' (specific namespace). The documentation and tags provide additional context for understanding the task.",
+            "suggested_title": "Find Failed Certificate Requests and Identify Issues for Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-certmanager-healthcheck",
+            "file": "sli.robot",
+            "filepath": "codebundles/k8s-certmanager-healthcheck/sli.robot",
+            "task": "Count Unready and Expired Certificates",
+            "score": 3,
+            "reasoning": "The task title is clear in its purpose, readable, and specific enough with the use of 'cert' and 'certificate' tags. It includes both the 'What' (certificates) and the 'Where' (namespace) variables for Kubernetes, making it specific to a certain scope. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Count Unready and Expired Certificates in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "aws-eks-node-reboot",
+            "file": "runbook.robot",
+            "filepath": "codebundles/aws-eks-node-reboot/runbook.robot",
+            "task": "Check EKS Nodegroup Status",
+            "score": 3,
+            "reasoning": "The task title is clear, human-readable, and specific. It clearly states the action to be performed, the resource type (EKS nodegroup), and the where variable 'EKS_CLUSTER_NAME' included as a placeholder. The task lacks a specific 'Where' variable; consider using `AWS_DEFAULT_REGION`.",
+            "suggested_title": "Check EKS Nodegroup Status in `${EKS_CLUSTER_NAME}`"
+        },
+        {
+            "codebundle": "azure-acr-image-sync",
+            "file": "runbook.robot",
+            "filepath": "codebundles/azure-acr-image-sync/runbook.robot",
+            "task": "Sync Container Images into Azure Container Registry `${ACR_REGISTRY}`",
+            "score": 4,
+            "reasoning": "The title is clear and specific about the task of syncing container images into Azure Container Registry. It includes the 'Where' variable `${ACR_REGISTRY}` in backticks and curly braces, making it easily identifiable.",
+            "suggested_title": "Sync Container Images into Azure Container Registry `${ACR_REGISTRY}`"
+        },
+        {
+            "codebundle": "azure-acr-image-sync",
+            "file": "sli.robot",
+            "filepath": "codebundles/azure-acr-image-sync/sli.robot",
+            "task": "Count Outdated Images in Azure Container Registry `${ACR_REGISTRY}`",
+            "score": 4,
+            "reasoning": "The task title is clear in its purpose, readable to a human, and specific in counting outdated images in the Azure Container Registry. It includes the 'What' (ACR) and provides a specific scope ('${ACR_REGISTRY}') using the imported variable.",
+            "suggested_title": "Count Outdated Images in Azure Container Registry `${ACR_REGISTRY}`"
+        },
+        {
+            "codebundle": "aws-lambda-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/aws-lambda-health/runbook.robot",
+            "task": "List Lambda Versions and Runtimes",
+            "score": 3,
+            "reasoning": "The title is clear and specific, indicating the task's purpose to list Lambda versions and runtimes. It is also human-readable and provides a clear understanding of what the script will do. The tags provide additional context, and the imported user variables are clearly mentioned. The task lacks a specific 'Where' variable; consider using `AWS_REGION`.",
+            "suggested_title": "List Lambda Versions and Runtimes in AWS Region `${AWS_REGION}`"
+        },
+        {
+            "codebundle": "aws-lambda-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/aws-lambda-health/runbook.robot",
+            "task": "Analyze AWS Lambda Invocation Errors",
+            "score": 3,
+            "reasoning": "The task title is specific, clear, and human-readable. It provides a clear indication of what the script does and for which function and region it applies. The tags further clarify the purpose of the task. The task lacks a specific 'Where' variable; consider using `AWS_REGION`.",
+            "suggested_title": "Analyze AWS Lambda Invocation Errors for Function `${AWS_REGION}` in Region `${AWS_REGION}`"
+        },
+        {
+            "codebundle": "aws-lambda-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/aws-lambda-health/runbook.robot",
+            "task": "Monitor AWS Lambda Performance Metrics",
+            "score": 3,
+            "reasoning": "The task title is clear and specific about monitoring AWS Lambda performance metrics. It mentions the resource type (Lambda) and the action to be performed (monitoring performance metrics). The imported user variable AWS_REGION is used for specifying the 'Where' in the title. The task lacks a specific 'Where' variable; consider using `AWS_REGION`.",
+            "suggested_title": "Monitor AWS Lambda Performance Metrics in AWS Region `${AWS_REGION}`"
+        },
+        {
+            "codebundle": "aws-lambda-health",
+            "file": "sli.robot",
+            "filepath": "codebundles/aws-lambda-health/sli.robot",
+            "task": "Analyze AWS Lambda Invocation Errors",
+            "score": 3,
+            "reasoning": "The task title is specific, clear, and human-readable. It provides a clear indication of what the script does and for which function and region it applies. The tags further clarify the purpose of the task. The task lacks a specific 'Where' variable; consider using `AWS_REGION`.",
+            "suggested_title": "Analyze AWS Lambda Invocation Errors for Function `${AWS_REGION}` in Region `${AWS_REGION}`"
+        },
+        {
+            "codebundle": "k8s-statefulset-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-statefulset-healthcheck/runbook.robot",
+            "task": "Check Readiness Probe Configuration for StatefulSet `${STATEFULSET_NAME}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, mentioning the StatefulSet `${STATEFULSET_NAME}`. It is also human-readable and provides a clear understanding of what the task entails.",
+            "suggested_title": "Check Readiness Probe Configuration for StatefulSet `${STATEFULSET_NAME}`"
+        },
+        {
+            "codebundle": "k8s-statefulset-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-statefulset-healthcheck/runbook.robot",
+            "task": "Check Liveness Probe Configuration for StatefulSet `${STATEFULSET_NAME}`",
+            "score": 5,
+            "reasoning": "The title is clear, human-readable, and specific. It includes the task of checking liveness probe configuration for a specific StatefulSet, making it both clear on the 'What' and specifying the 'Where' with the STATEFULSET_NAME variable.",
+            "suggested_title": "Check Liveness Probe Configuration for StatefulSet `${STATEFULSET_NAME}`"
+        },
+        {
+            "codebundle": "k8s-statefulset-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-statefulset-healthcheck/runbook.robot",
+            "task": "Troubleshoot StatefulSet Warning Events for `${STATEFULSET_NAME}`",
+            "score": 4,
+            "reasoning": "The title is clear in its task to troubleshoot warning events for a specific StatefulSet. It is also human-readable, and the use of backticks and curly braces makes it easy to understand where the specific StatefulSet name will be inserted.",
+            "suggested_title": "Troubleshoot StatefulSet Warning Events for `${STATEFULSET_NAME}`"
+        },
+        {
+            "codebundle": "k8s-statefulset-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-statefulset-healthcheck/runbook.robot",
+            "task": "Check StatefulSet Event Anomalies for `${STATEFULSET_NAME}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, providing a clear action to be performed on a specific resource type (StatefulSet) with the use of the imported variable. It also includes the purpose of the task, which is to check for anomalies in statefulset events.",
+            "suggested_title": "Check StatefulSet Event Anomalies for `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-statefulset-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-statefulset-healthcheck/runbook.robot",
+            "task": "Fetch StatefulSet Logs for `${STATEFULSET_NAME}` and Add to Report",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, indicating the action to be taken (fetch logs) and the target resource (StatefulSet). The documentation and tags provide additional context. It lacks specific information about the namespace, which could be included in the suggested title.",
+            "suggested_title": "Fetch StatefulSet Logs for `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}` and Add to Report"
+        },
+        {
+            "codebundle": "k8s-statefulset-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-statefulset-healthcheck/runbook.robot",
+            "task": "Get Related StatefulSet `${STATEFULSET_NAME}` Events",
+            "score": 5,
+            "reasoning": "The task title is very clear and specific, indicating the action to 'Get Related StatefulSet' events. It is also human-readable and includes the specific resource type 'StatefulSet' and the scope 'in the namespace'. The imported variable '${STATEFULSET_NAME}' is used in a clear and consistent manner.",
+            "suggested_title": ""
+        },
+        {
+            "codebundle": "k8s-statefulset-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-statefulset-healthcheck/runbook.robot",
+            "task": "Fetch Manifest Details for StatefulSet `${STATEFULSET_NAME}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, indicating the action to be performed (fetch manifest details) and the resource type (StatefulSet). The use of backticks and curly braces for the STATEFULSET_NAME variable enhances human readability. However, it could benefit from specifying the 'Where' variable in the title, such as fetching manifest details for a specific StatefulSet in a particular namespace.",
+            "suggested_title": "Fetch Manifest Details for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-statefulset-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-statefulset-healthcheck/runbook.robot",
+            "task": "List StatefulSets with Unhealthy Replica Counts In Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is specific, clear, and human-readable. It provides the 'What' (StatefulSets) and 'Where' (Namespace) variables, making it easy to understand and execute.",
+            "suggested_title": "List Unhealthy Replica Counts for StatefulSets in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-labeledpods-healthcheck",
+            "file": "sli.robot",
+            "filepath": "codebundles/k8s-labeledpods-healthcheck/sli.robot",
+            "task": "Measure Number of Running Pods with Label",
+            "score": 3,
+            "reasoning": "The title clearly states the action to be performed (measure), the resource type (running pods), and the specific scope (with label). The documentation provides additional context, and the tags give a clear indication of the task's purpose. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Measure Number of Running Pods with Label in `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-serviceaccount-check",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-serviceaccount-check/runbook.robot",
+            "task": "Test Service Account Access to Kubernetes API Server in Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is very clear, human-readable, and specific. It includes the 'What' (Test Service Account Access to Kubernetes API Server) and the 'Where' (Namespace `${NAMESPACE}`). It also includes relevant tags and uses imported variables for clarity.",
+            "suggested_title": "Test Service Account Access to Kubernetes API Server in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-flux-suspend-namespace",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-flux-suspend-namespace/runbook.robot",
+            "task": "Flux Suspend Namespace ${NAMESPACE}",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It includes the 'What' (Namespace) and the 'Where' (specific scope) variable with the correct format for substitution.",
+            "suggested_title": "Flux Suspend Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-flux-suspend-namespace",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-flux-suspend-namespace/runbook.robot",
+            "task": "Unsuspend Flux for Namespace ${NAMESPACE}",
+            "score": 4,
+            "reasoning": "The task title is clear, human-readable, and specific. It clearly describes the action to be taken (unsuspending flux) and specifies the scope by using the 'NAMESPACE' variable. The tags also provide additional context.",
+            "suggested_title": "Unsuspend Flux for Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-jaeger-http-query",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-jaeger-http-query/runbook.robot",
+            "task": "Query Traces in Jaeger for Unhealthy HTTP Response Codes in Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The title is clear, human readable, and specific. It clearly defines the task of querying Jaeger for unhealthy HTTP response codes in a specific namespace. The usage of backticks and curly braces around the NAMESPACE variable enhances clarity and specificity.",
+            "suggested_title": "Query Traces in Jaeger for Unhealthy HTTP Response Codes in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "aws-elasticache-redis-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/aws-elasticache-redis-health/runbook.robot",
+            "task": "Scan AWS Elasticache Redis Status",
+            "score": 3,
+            "reasoning": "The task title is clear and specific, indicating the action of scanning for AWS Elasticache Redis status. It also provides a high-level description of what will be checked. The use of the imported user variable 'AWS_REGION' ensures that the task has a specific scope. The task lacks a specific 'Where' variable; consider using `AWS_REGION`.",
+            "suggested_title": "Scan AWS Elasticache Redis Status in AWS Region `${AWS_REGION}`"
+        },
+        {
+            "codebundle": "aws-elasticache-redis-health",
+            "file": "sli.robot",
+            "filepath": "codebundles/aws-elasticache-redis-health/sli.robot",
+            "task": "Scan ElastiCaches",
+            "score": 3,
+            "reasoning": "The task title is clear, specific, and human-readable. It includes the action 'Scan', the resource 'ElastiCaches', and the scope 'all Elasticache instances in the region'. The imported variable 'AWS_REGION' is appropriately used as the 'Where' variable. The task lacks a specific 'Where' variable; consider using `AWS_REGION`.",
+            "suggested_title": "Scan ElastiCaches in AWS Region `${AWS_REGION}`"
+        },
+        {
+            "codebundle": "gcloud-node-preempt",
+            "file": "runbook.robot",
+            "filepath": "codebundles/gcloud-node-preempt/runbook.robot",
+            "task": "List all nodes in an active prempt operation for GCP Project `${GCP_PROJECT_ID}`",
+            "score": 4,
+            "reasoning": "The task title provides a clear and specific instruction to list all nodes that have been preempted within the defined time interval. It includes the 'What' (nodes) and the 'Where' (GCP Project specified by the GCP_PROJECT_ID variable). The title could be improved by specifying the time interval or age of the preempted nodes.",
+            "suggested_title": "List all nodes in an active preempt operation for GCP Project `${GCP_PROJECT_ID}` within the last `${AGE}` hours"
+        },
+        {
+            "codebundle": "gcloud-node-preempt",
+            "file": "sli.robot",
+            "filepath": "codebundles/gcloud-node-preempt/sli.robot",
+            "task": "Count the number of nodes in active prempt operation",
+            "score": 3,
+            "reasoning": "The title is clear and specific, indicating the task is to count the number of nodes in active preemption. It is also human-readable without jargon. The documentation and tags provide further context and clarity. The imported user variables are used for substitution. The 'Where' variable 'GCP_PROJECT_ID' is enclosed in backticks and curly braces. The task lacks a specific 'Where' variable; consider using `GCP_PROJECT_ID`.",
+            "suggested_title": "Count the number of nodes in active preempt operation in project `${GCP_PROJECT_ID}`"
+        },
+        {
+            "codebundle": "azure-appgateway-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/azure-appgateway-health/runbook.robot",
+            "task": "Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 4,
+            "reasoning": "The task title is clear, human-readable, and specific, providing both the 'What' (application gateway) and the 'Where' (resource group) variables. It also mentions the documentation and tags to provide context.",
+            "suggested_title": "Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-appgateway-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/azure-appgateway-health/runbook.robot",
+            "task": "Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 4,
+            "reasoning": "The title is clear and specific, mentioning the resource type 'Application Gateway' and the specific scope in backticks & curly braces. However, it could be more human-readable and detailed.",
+            "suggested_title": "Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}` in Subscription `${AZURE_RESOURCE_SUBSCRIPTION_ID}`"
+        },
+        {
+            "codebundle": "azure-appgateway-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/azure-appgateway-health/runbook.robot",
+            "task": "Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 5,
+            "reasoning": "The task title is clear, specific, and human-readable. It includes both the 'What' (application gateway backend pool) and the 'Where' (resource group) variables in a well-structured format. The documentation, tags, and user variables also complement the clarity and specificity of the task.",
+            "suggested_title": "Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-appgateway-health",
+            "file": "sli.robot",
+            "filepath": "codebundles/azure-appgateway-health/sli.robot",
+            "task": "Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 5,
+            "reasoning": "The title is very clear and specific, mentioning the resource type (Application Gateway) and the specific scope (resource group) using the imported variables. It is also human-readable and provides a clear understanding of the task.",
+            "suggested_title": "Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-appgateway-health",
+            "file": "sli.robot",
+            "filepath": "codebundles/azure-appgateway-health/sli.robot",
+            "task": "Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, indicating the action of checking the configuration health of an Application Gateway in a specified resource group. The title also includes placeholders for user variables, making it ready for runtime substitution.",
+            "suggested_title": "Fetch AKS Cluster Config in Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-appgateway-health",
+            "file": "sli.robot",
+            "filepath": "codebundles/azure-appgateway-health/sli.robot",
+            "task": "Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 5,
+            "reasoning": "The task title is clear, specific, and human-readable. It includes both the 'What' (application gateway backend pool) and the 'Where' (resource group) variables in a well-structured format. The documentation, tags, and user variables also complement the clarity and specificity of the task.",
+            "suggested_title": "Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-appgateway-health",
+            "file": "sli.robot",
+            "filepath": "codebundles/azure-appgateway-health/sli.robot",
+            "task": "Generate Application Gateway Health Score",
+            "score": 3,
+            "reasoning": "The title is clear and specific, but could be more human-readable. It specifies the 'What' (Application Gateway) and utilizes imported variables for 'Where' (AZ_RESOURCE_GROUP, APP_GATEWAY_NAME). The task lacks a specific 'Where' variable; consider using `AZ_RESOURCE_GROUP`.",
+            "suggested_title": "Generate Application Gateway Health Score for `${APP_GATEWAY_NAME}` in Azure Subscription `${AZURE_RESOURCE_SUBSCRIPTION_ID}`"
+        },
+        {
+            "codebundle": "k8s-kubectl-cmd",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-kubectl-cmd/runbook.robot",
+            "task": "Run User Provided Kubectl Command",
+            "score": 3,
+            "reasoning": "The title is clear in its purpose, readable by humans, and specific in its action of running a user provided kubectl command. It also includes the relevant tag 'kubectl' for easy categorization. The documentation provides additional clarity on the task's purpose. The task lacks a specific 'Where' variable; consider using `KUBECTL_COMMAND`.",
+            "suggested_title": "Run User Provided Kubectl Command on `${KUBECTL_COMMAND}` in Kubernetes Cluster"
+        },
+        {
+            "codebundle": "k8s-kubectl-cmd",
+            "file": "sli.robot",
+            "filepath": "codebundles/k8s-kubectl-cmd/sli.robot",
+            "task": "Run User Provided Kubectl Command",
+            "score": 3,
+            "reasoning": "The title is clear and specific about the task of running a user provided kubectl command and pushing the metric as an SLI. It is readable and does not include placeholders. The imported variable 'KUBECTL_COMMAND' is used to specify the user provided kubectl command. The task lacks a specific 'Where' variable; consider using `KUBECTL_COMMAND`.",
+            "suggested_title": "Run User Provided Kubectl Command in Kubernetes Cluster `$${KUBECTL_CLUSTER}`"
+        },
+        {
+            "codebundle": "k8s-ingress-gce-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-ingress-gce-healthcheck/runbook.robot",
+            "task": "Search For GCE Ingress Warnings in GKE",
+            "score": 3,
+            "reasoning": "The task title is clear, human-readable, and specific. It clearly states the action to be taken (Search For GCE Ingress Warnings) and the specific location to perform the search (in GKE). The imported user variables are not explicitly used in the title, however, 'CONTEXT' can be used as the specific GKE context for clarity. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Search For GCE Ingress Warnings in GKE Context `${CONTEXT}`"
+        },
+        {
+            "codebundle": "k8s-ingress-gce-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-ingress-gce-healthcheck/runbook.robot",
+            "task": "Identify Unhealthy GCE HTTP Ingress Backends",
+            "score": 3,
+            "reasoning": "The title is clear and provides a specific task to identify unhealthy GCE HTTP Ingress Backends. It includes relevant tags and specific documentation for clarity. The imported variables are also used in the documentation. The 'Where' variable is provided as 'INGRESS' and is properly formatted with backticks and curly braces. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Identify Unhealthy GCE HTTP Ingress Backends in GKE Namespace `$${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-ingress-gce-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-ingress-gce-healthcheck/runbook.robot",
+            "task": "Validate GCP HTTP Load Balancer Configurations",
+            "score": 3,
+            "reasoning": "The task title is clear, specific, and human-readable. It mentions the resource type (GCP HTTP Load Balancer Configurations) and the specific action to be taken (Validate), as well as the method (Extract from ingress annotations and check health of each object). It includes relevant tags and imported user variables for context. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Validate GCP HTTP Load Balancer Configurations in GCP Project `$${GCP_PROJECT_ID}`"
+        },
+        {
+            "codebundle": "k8s-ingress-gce-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-ingress-gce-healthcheck/runbook.robot",
+            "task": "Fetch Network Error Logs from GCP Operations Manager for Ingress Backends",
+            "score": 3,
+            "reasoning": "The title is clear and specific, providing details about the task, the resource type (GCP Operations Manager) and the specific scope (Ingress Backends). The documentation and tags provide additional clarity and specificity. The imported user variables are also clear and relevant. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Fetch Network Error Logs from GCP Operations Manager for Ingress Backends in GCP Project `$${GCP_PROJECT_ID}`"
+        },
+        {
+            "codebundle": "k8s-ingress-gce-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-ingress-gce-healthcheck/runbook.robot",
+            "task": "Review GCP Operations Logging Dashboard",
+            "score": 3,
+            "reasoning": "The title is clear and specific in indicating the task to review GCP Operations Logging Dashboard, providing clarity on the action to be taken. It is human-readable and the use of backticks and curly braces for the 'Where' variable ensures specificity. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Review GCP Operations Logging Dashboard in GCP project `$${GCP_PROJECT_ID}`"
+        },
+        {
+            "codebundle": "k8s-restart-resource",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-restart-resource/runbook.robot",
+            "task": "Get Current Resource State with Labels `${LABELS}`",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It includes the action to be performed ('Get'), the resource type ('Current Resource State'), and the specific scope ('with Labels ${LABELS}'). The documentation provides additional context about the purpose of the task.",
+            "suggested_title": null
+        },
+        {
+            "codebundle": "k8s-restart-resource",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-restart-resource/runbook.robot",
+            "task": "Get Resource Logs with Labels `${LABELS}`",
+            "score": 4,
+            "reasoning": "The task title is clear in its purpose of collecting resource logs with specific labels, and the imported variable ${LABELS} provides specificity. The documentation also adds clarity to the task.",
+            "suggested_title": "Get Resource Logs with Labels `${LABELS}`"
+        },
+        {
+            "codebundle": "k8s-restart-resource",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-restart-resource/runbook.robot",
+            "task": "Restart Resource with Labels `${LABELS}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, indicating the action to be taken (Restart) and the resource type (Resource) with labels specified by the user variable. It is also human-readable and includes information about the purpose of the task. The absence of a specific 'Where' variable is compensated by the use of the imported user variable 'CONTEXT' as a relevant substitute.",
+            "suggested_title": "Restart Resource with Labels `${LABELS}` in `${CONTEXT}`"
+        },
+        {
+            "codebundle": "k8s-cluster-resource-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-cluster-resource-health/runbook.robot",
+            "task": "Identify High Utilization Nodes for Cluster `${CONTEXT}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific in its purpose, and the use of backticks & curly braces for the 'Where' variable adds human readability. The documentation and tags provide additional context.",
+            "suggested_title": "Identify High Utilization Nodes for Cluster `${CONTEXT}`"
+        },
+        {
+            "codebundle": "k8s-cluster-resource-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-cluster-resource-health/runbook.robot",
+            "task": "Identify Pods Causing High Node Utilization in Cluster `${CONTEXT}`",
+            "score": 5,
+            "reasoning": "The task title clearly indicates the 'What' (identifying pods causing high node utilization) and includes a specific 'Where' variable in backticks & curly braces (Cluster `${CONTEXT}`). It is human-readable and specific.",
+            "suggested_title": "Identify Pods Causing High Node Utilization in Cluster `${CONTEXT}`"
+        },
+        {
+            "codebundle": "k8s-cluster-resource-health",
+            "file": "sli.robot",
+            "filepath": "codebundles/k8s-cluster-resource-health/sli.robot",
+            "task": "Identify High Utilization Nodes for Cluster `${CONTEXT}`",
+            "score": 4,
+            "reasoning": "The task is clear in its objective to identify high utilization nodes in a specific cluster. It is human-readable and specific in the requirement for CPU or Memory utilization above 90%. The use of backticks and curly braces for the 'Where' variable (CONTEXT) ensures specificity.",
+            "suggested_title": "Identify High Utilization Nodes for Cluster `${CONTEXT}`"
+        },
+        {
+            "codebundle": "k8s-prometheus-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-prometheus-healthcheck/runbook.robot",
+            "task": "Check Prometheus Service Monitors",
+            "score": 3,
+            "reasoning": "The task title is clear and specific, mentioning the 'Prometheus Service Monitors' and the specific action to be taken. It is also human-readable. The only improvement would be to include the specific namespace in the title. The task lacks a specific 'Where' variable; consider using `KUBERNETES_DISTRIBUTION_BINARY`.",
+            "suggested_title": "Check Prometheus Service Monitors in namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-prometheus-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-prometheus-healthcheck/runbook.robot",
+            "task": "Check For Successful Rule Setup",
+            "score": 3,
+            "reasoning": "The task title is clear and specific in stating the action to 'Check For Successful Rule Setup'. It provides a clear direction for what needs to be done. However, it lacks the specific 'Where' variable, so the most relevant imported variable, 'NAMESPACE', can be used as the 'Where' variable. The task lacks a specific 'Where' variable; consider using `KUBERNETES_DISTRIBUTION_BINARY`.",
+            "suggested_title": "Check For Successful Rule Setup in Kubernetes Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-prometheus-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-prometheus-healthcheck/runbook.robot",
+            "task": "Verify Prometheus RBAC Can Access ServiceMonitors",
+            "score": 3,
+            "reasoning": "The title is clear and specific, it mentions the task to verify RBAC for Prometheus accessing ServiceMonitors. The documentation also provides a clear direction on how to approach the task by fetching operator rbac and verifying it has ServiceMonitors in rbac. The imported user variables also provide context for where this verification needs to take place. The task lacks a specific 'Where' variable; consider using `KUBERNETES_DISTRIBUTION_BINARY`.",
+            "suggested_title": "Verify Prometheus RBAC Can Access ServiceMonitors in Namespace `${PROM_NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-prometheus-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-prometheus-healthcheck/runbook.robot",
+            "task": "Identify Endpoint Scraping Errors",
+            "score": 3,
+            "reasoning": "The task title is clear and specific, providing a clear instruction to inspect prometheus operator logs for scraping errors and raise issues if any found. It lacks a specific 'Where' variable, but the most relevant imported variable 'NAMESPACE' can be used. The task lacks a specific 'Where' variable; consider using `KUBERNETES_DISTRIBUTION_BINARY`.",
+            "suggested_title": "Inspect Prometheus Operator Logs for Scraping Errors in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-prometheus-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-prometheus-healthcheck/runbook.robot",
+            "task": "Check Prometheus API Healthy",
+            "score": 3,
+            "reasoning": "The title is clear and specific, indicating the task is to check the Prometheus healthy API endpoint. It could be more specific if it included the 'Where' variable being used, such as 'PROM_NAMESPACE'. The task lacks a specific 'Where' variable; consider using `KUBERNETES_DISTRIBUTION_BINARY`.",
+            "suggested_title": "Check Prometheus API Healthy in Namespace `${PROM_NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-loki-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-loki-healthcheck/runbook.robot",
+            "task": "Check Loki Ring API",
+            "score": 3,
+            "reasoning": "The title is somewhat clear in its purpose but lacks specificity and human readability. It mentions the API to be checked and the type of inspection, but it could benefit from additional details and clarity.",
+            "suggested_title": "Check Loki Ring API for Unhealthy Shards in Kubernetes Cluster `$${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-loki-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-loki-healthcheck/runbook.robot",
+            "task": "Check Loki API Ready",
+            "score": 3,
+            "reasoning": "The title is clear and specifies the task of checking Loki API readiness. It is also human-readable although it could be improved with more specific details. The task lacks a specific 'Where' variable; consider using `KUBERNETES_DISTRIBUTION_BINARY`.",
+            "suggested_title": "Check Loki API Ready in Kubernetes Cluster `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "aws-eks-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/aws-eks-health/runbook.robot",
+            "task": "Check EKS Fargate Cluster Health Status",
+            "score": 3,
+            "reasoning": "The title is clear, human-readable, and specific. It specifies the task of checking the health status of an EKS Fargate cluster, which is the 'What', and also includes the AWS region as the 'Where' variable using the imported user variable. The task lacks a specific 'Where' variable; consider using `AWS_REGION`.",
+            "suggested_title": "Check EKS Fargate Cluster Health Status in AWS Region `${AWS_REGION}`"
+        },
+        {
+            "codebundle": "aws-eks-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/aws-eks-health/runbook.robot",
+            "task": "Check EKS Cluster Health Status",
+            "score": 3,
+            "reasoning": "The task title is clear and specific, indicating it checks the health status of an Amazon EKS cluster. The documentation and tags provide additional context, and the imported user variable 'AWS_REGION' suggests a specific scope. The task lacks a specific 'Where' variable; consider using `AWS_REGION`.",
+            "suggested_title": "Check Amazon EKS Cluster Health Status in AWS Region `${AWS_REGION}`"
+        },
+        {
+            "codebundle": "aws-eks-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/aws-eks-health/runbook.robot",
+            "task": "List EKS Cluster Metrics",
+            "score": 3,
+            "reasoning": "The task title is clear in its purpose and specifies the resource type (EKS Cluster) and the Where variable AWS region which is provided as an imported user variable. The task lacks a specific 'Where' variable; consider using `AWS_REGION`.",
+            "suggested_title": "Monitor EKS Cluster Health in AWS Region `${AWS_REGION}`"
+        },
+        {
+            "codebundle": "aws-eks-health",
+            "file": "sli.robot",
+            "filepath": "codebundles/aws-eks-health/sli.robot",
+            "task": "Check EKS Cluster Health Status",
+            "score": 3,
+            "reasoning": "The task title is clear and specific, indicating it checks the health status of an Amazon EKS cluster. The documentation and tags provide additional context, and the imported user variable 'AWS_REGION' suggests a specific scope. The task lacks a specific 'Where' variable; consider using `AWS_REGION`.",
+            "suggested_title": "Check Amazon EKS Cluster Health Status in AWS Region `${AWS_REGION}`"
+        },
+        {
+            "codebundle": "k8s-ingress-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-ingress-healthcheck/runbook.robot",
+            "task": "Fetch Ingress Object Health in Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The title is clear in stating the task to fetch the health of Ingress objects in a specific namespace. It is human-readable and provides specific details on what data will be fetched. It lacks the specific 'Where' variable, but the imported 'NAMESPACE' variable can be used as the 'Where' in this context.",
+            "suggested_title": "Fetch Ingress Object Health in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-ingress-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-ingress-healthcheck/runbook.robot",
+            "task": "Check for Ingress and Service Conflicts in Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title provides clear guidance on the specific action to be performed (Check for Ingress and Service Conflicts) and specifies the scope of the action using the `${NAMESPACE}` variable. The documentation and tags further clarify the purpose and context of the task.",
+            "suggested_title": ""
+        },
+        {
+            "codebundle": "k8s-argocd-helm-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-argocd-helm-health/runbook.robot",
+            "task": "Fetch all available ArgoCD Helm releases in namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, indicating the action to be performed (fetch) and the resource type (ArgoCD Helm releases). It also includes a specific scope in the form of the namespace `${NAMESPACE}`. The usage of backticks & curly braces for the 'Where' variable adds clarity.",
+            "suggested_title": "Fetch all available ArgoCD Helm releases in namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-argocd-helm-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-argocd-helm-health/runbook.robot",
+            "task": "Fetch Installed ArgoCD Helm release versions in namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, indicating the action (Fetch) and the target (Installed ArgoCD Helm release versions) in the specified namespace using the provided 'NAMESPACE' variable. It is also human-readable and provides a clear understanding of the task.",
+            "suggested_title": "Fetch Installed ArgoCD Helm release versions in namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "azure-aks-triage",
+            "file": "runbook.robot",
+            "filepath": "codebundles/azure-aks-triage/runbook.robot",
+            "task": "Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, indicating the action to be taken ('Check for Resource Health Issues') and specifying the resource type ('AKS Cluster') as well as the location ('Resource Group'). The documentation provides a clear understanding of the task. However, it could be improved by including specific health issues to check for.",
+            "suggested_title": "Check for Overutilization and Networking Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-aks-triage",
+            "file": "runbook.robot",
+            "filepath": "codebundles/azure-aks-triage/runbook.robot",
+            "task": "Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 4,
+            "reasoning": "The title provides a clear indication of the task, specifying to check the configuration health of the AKS Cluster in a specific resource group in Azure. The use of backticks and curly braces for the 'Where' variable (${AZ_RESOURCE_GROUP}) adds specificity.",
+            "suggested_title": "Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-aks-triage",
+            "file": "runbook.robot",
+            "filepath": "codebundles/azure-aks-triage/runbook.robot",
+            "task": "Check Network Configuration of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 5,
+            "reasoning": "The task title is clear and specific, providing the 'What' (AKS Cluster) and 'Where' (Resource Group) variables in backticks and curly braces. It is also human-readable and includes relevant tags for easy categorization.",
+            "suggested_title": "Check Network Configuration of AKS Cluster `${{AKS_CLUSTER}}` In Resource Group `${{AZ_RESOURCE_GROUP}}`"
+        },
+        {
+            "codebundle": "azure-aks-triage",
+            "file": "runbook.robot",
+            "filepath": "codebundles/azure-aks-triage/runbook.robot",
+            "task": "Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 5,
+            "reasoning": "The title is clear, readable, and specific. It clearly states the task of fetching activities for a specific AKS cluster in a specific resource group. It provides enough context for someone to understand the purpose of the task.",
+            "suggested_title": "Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-aks-triage",
+            "file": "sli.robot",
+            "filepath": "codebundles/azure-aks-triage/sli.robot",
+            "task": "Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 5,
+            "reasoning": "The title is clear, specific, and human-readable. It includes the 'What' (AKS cluster) and 'Where' (Resource Group) variables in backticks & curly braces as required. The documentation and tags provide additional context.",
+            "suggested_title": "Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-aks-triage",
+            "file": "sli.robot",
+            "filepath": "codebundles/azure-aks-triage/sli.robot",
+            "task": "Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 5,
+            "reasoning": "The task title is clear, easily readable by humans, and very specific. It includes the 'What' (AKS Cluster) and the 'Where' (Resource Group) variables in backticks and curly braces.",
+            "suggested_title": "Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-aks-triage",
+            "file": "sli.robot",
+            "filepath": "codebundles/azure-aks-triage/sli.robot",
+            "task": "Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It clearly states the task of checking the configuration health of the AKS cluster in a specific resource group in Azure. The use of backticks and curly braces for the 'Where' variable (AKS_CLUSTER and AZ_RESOURCE_GROUP) adds specificity and clarity.",
+            "suggested_title": "Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-aks-triage",
+            "file": "sli.robot",
+            "filepath": "codebundles/azure-aks-triage/sli.robot",
+            "task": "Generate AKS Cluster Health Score",
+            "score": 3,
+            "reasoning": "The task title lacks specificity and does not provide clear details about what exactly the health score is measuring. It also does not specify the 'Where' variable, such as the location or scope of the AKS Cluster.",
+            "suggested_title": "Calculate AKS Cluster Health Score for AKS Cluster `${AKS_CLUSTER}` in Azure Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "k8s-tail-logs-dynamic",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-tail-logs-dynamic/runbook.robot",
+            "task": "Get `${CONTAINER_NAME}` Application Logs",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, mentioning the collection of logs from a particular container. It is also human-readable. However, it could be improved by including the 'Where' variable in the title.",
+            "suggested_title": "Get `${CONTAINER_NAME}` Application Logs in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-tail-logs-dynamic",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-tail-logs-dynamic/runbook.robot",
+            "task": "Tail `${CONTAINER_NAME}` Application Logs For Stacktraces",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It includes the task of tailing application logs for stacktraces and mentions parsing them to find relevant source code information. The imported user variables are used appropriately and there is a clear 'What' (container logs) and 'Where' (specified by ${CONTAINER_NAME} variable) in the title.",
+            "suggested_title": "Tail `${CONTAINER_NAME}` Application Logs For Stacktraces"
+        },
+        {
+            "codebundle": "k8s-tail-logs-dynamic",
+            "file": "sli.robot",
+            "filepath": "codebundles/k8s-tail-logs-dynamic/sli.robot",
+            "task": "Tail `${CONTAINER_NAME}` Application Logs For Stacktraces",
+            "score": 4,
+            "reasoning": "The title is clear and specific about the task of tailing application logs for stacktraces. It includes a variable `${CONTAINER_NAME}` indicating the specific scope, which ensures the task has both a 'What' (resource type) and a 'Where' (specific scope). The documentation provides additional context and clarity.",
+            "suggested_title": "Tail `${CONTAINER_NAME}` Application Logs For Stacktraces"
+        },
+        {
+            "codebundle": "k8s-daemonset-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-daemonset-healthcheck/runbook.robot",
+            "task": "Get DaemonSet Logs for `${DAEMONSET_NAME}` and Add to Report",
+            "score": 5,
+            "reasoning": "The task title is clear, specific, and human-readable. It includes the 'What' (daemonset) and 'Where' (specific daemonset name in the namespace) variables, and provides a clear instruction to fetch logs and add them to a report.",
+            "suggested_title": "Get DaemonSet Logs for `${DAEMONSET_NAME}` and Add to Report"
+        },
+        {
+            "codebundle": "k8s-daemonset-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-daemonset-healthcheck/runbook.robot",
+            "task": "Get Related Daemonset `${DAEMONSET_NAME}` Events",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It includes the 'What' (daemonset) and the 'Where' (namespace). The documentation and tags also provide additional context and specificity.",
+            "suggested_title": "Get Related Daemonset `${DAEMONSET_NAME}` Events in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-daemonset-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-daemonset-healthcheck/runbook.robot",
+            "task": "Check Daemonset `${DAEMONSET_NAME}` Replicas",
+            "score": 5,
+            "reasoning": "The task title is clear, easily readable, and specific. It clearly states the action 'Check Daemonset Replicas', includes the 'Where' variable `${DAEMONSET_NAME}`, and provides additional context about checking for high availability and expected replica counts.",
+            "suggested_title": "Check Daemonset `${DAEMONSET_NAME}` Replicas"
+        },
+        {
+            "codebundle": "k8s-chaos-workload",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-chaos-workload/runbook.robot",
+            "task": "Test `${WORKLOAD_NAME}` High Availability",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, it mentions the purpose of the task which is to test the high availability of a specific workload. It also uses the imported variable for the workload name. However, it could be improved by including the 'Where' variable, which in this case would be the 'NAMESPACE' variable.",
+            "suggested_title": "Test `${WORKLOAD_NAME}` High Availability in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-chaos-workload",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-chaos-workload/runbook.robot",
+            "task": "OOMKill `${WORKLOAD_NAME}` Pod",
+            "score": 4,
+            "reasoning": "The title is clear and specific about the task, explaining that it will OOMKill a specific pod under a configured workload. It also includes relevant tags for context. The use of backticks and curly braces in the title ensures clarity and specificity.",
+            "suggested_title": "OOMKill `${WORKLOAD_NAME}` Pod"
+        },
+        {
+            "codebundle": "k8s-chaos-workload",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-chaos-workload/runbook.robot",
+            "task": "Mangle Service Selector For `${WORKLOAD_NAME}`",
+            "score": 4,
+            "reasoning": "The title is specific and clear in its purpose, mentioning the manipulation of a service's selector to cause a network disruption. It includes the placeholder for the 'What' variable (${WORKLOAD_NAME}), but could benefit from including the 'Where' variable in backticks & curly braces.",
+            "suggested_title": "Mangle Service Selector For `${WORKLOAD_NAME}` in `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-chaos-workload",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-chaos-workload/runbook.robot",
+            "task": "Mangle Service Port For `${WORKLOAD_NAME}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, with a defined action and target. It is readable and provides enough context to understand the intended purpose. The imported variable `${WORKLOAD_NAME}` is used appropriately. However, it could be more specific if it included the 'Where' variable, such as NAMESPACE",
+            "suggested_title": "Mangle Service Port For `${WORKLOAD_NAME}` in `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-chaos-workload",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-chaos-workload/runbook.robot",
+            "task": "Fill Tmp Directory Of Pod From `${WORKLOAD_NAME}`",
+            "score": 4,
+            "reasoning": "The title provides a clear instruction to fill the /tmp directory of a specific pod identified by the WORKLOAD_NAME variable. It is human-readable and has a specific scope.",
+            "suggested_title": "Fill Tmp Directory Of Pod From `${WORKLOAD_NAME}`"
+        },
+        {
+            "codebundle": "k8s-postgres-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-postgres-healthcheck/runbook.robot",
+            "task": "List Resources Related to Postgres Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is specific and clear, providing a clear 'What' (Postgres Cluster) and a 'Where' (Namespace) using the imported variable. The documentation provides a simple explanation of the task, and the tags give further context to the task's purpose.",
+            "suggested_title": "List Resources Related to Postgres Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-postgres-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-postgres-healthcheck/runbook.robot",
+            "task": "Get Postgres Pod Logs & Events for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, indicating that the goal is to get Postgres pod logs and events for a particular cluster in a specific namespace. The use of backticks and curly braces for the 'Where' variable (`${NAMESPACE}`) adds clarity and specificity.",
+            "suggested_title": "Get Postgres Pod Logs & Events for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-postgres-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-postgres-healthcheck/runbook.robot",
+            "task": "Get Postgres Pod Resource Utilization for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It includes the 'What' (Postgres Pod Resource Utilization) and the 'Where' (Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`). The use of backticks & curly braces for the 'Where' variable is correct.",
+            "suggested_title": "Get Postgres Pod Resource Utilization for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-postgres-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-postgres-healthcheck/runbook.robot",
+            "task": "Get Running Postgres Configuration for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, indicating the action to 'Get Running Postgres Configuration' and including both the 'What' (Postgres instance) and 'Where' (Cluster and Namespace) variables in backticks & curly braces.",
+            "suggested_title": "Get Running Postgres Configuration for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-postgres-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-postgres-healthcheck/runbook.robot",
+            "task": "Get Patroni Output and Add to Report for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It includes the 'What' (resource type) which is the cluster `${OBJECT_NAME}` and the 'Where' (specific scope) which is the namespace `${NAMESPACE}`. The documentation and tags provide additional context and clarity.",
+            "suggested_title": "Get Patroni Output and Add to Report for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-postgres-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-postgres-healthcheck/runbook.robot",
+            "task": "Fetch Patroni Database Lag for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is extremely clear, human-readable, and specific. It provides a clear action ('Fetch Patroni Database Lag'), specifies the resource type ('Cluster `${OBJECT_NAME}`') and the specific scope ('in Namespace `${NAMESPACE}`). The use of backticks & curly braces for variables adds clarity to the specific scope.",
+            "suggested_title": "Fetch Patroni Database Lag for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-postgres-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-postgres-healthcheck/runbook.robot",
+            "task": "Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, indicating the action of checking the database backup status for a specific cluster and namespace in Kubernetes. It also includes relevant tags and imported user variables. The only room for improvement would be to include the 'WHERE' variable in backticks and curly braces.",
+            "suggested_title": "Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-postgres-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-postgres-healthcheck/runbook.robot",
+            "task": "Run DB Queries for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is specific and human-readable, including the 'What' (Cluster) and 'Where' (Namespace) variables in backticks and curly braces.",
+            "suggested_title": "Run DB Queries for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-postgres-healthcheck",
+            "file": "sli.robot",
+            "filepath": "codebundles/k8s-postgres-healthcheck/sli.robot",
+            "task": "Fetch Patroni Database Lag",
+            "score": 3,
+            "reasoning": "The task title is clear, human-readable, and specific. It accurately describes the action of fetching Patroni database lag using 'patronictl' and mentions raising issues if necessary. The tags provide additional context, and the imported user variables will be substituted at runtime. This task has both a 'What' (resource type - Patroni database) and a 'Where' (specific scope) with variables like 'NAMESPACE', 'HOSTNAME', and 'DATABASE_CONTAINER'. The task lacks a specific 'Where' variable; consider using `CONTEXT`.",
+            "suggested_title": "Check Patroni Database Lag in Namespace `${NAMESPACE}` on Host `${HOSTNAME}` using `patronictl`"
+        },
+        {
+            "codebundle": "k8s-postgres-healthcheck",
+            "file": "sli.robot",
+            "filepath": "codebundles/k8s-postgres-healthcheck/sli.robot",
+            "task": "Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The title is clear and specific, including the 'What' (cluster database backup status) and the 'Where' (the cluster and namespace variables). The documentation provides additional clarity on the task. The tags also help to further specify the task.",
+            "suggested_title": "Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-postgres-healthcheck",
+            "file": "sli.robot",
+            "filepath": "codebundles/k8s-postgres-healthcheck/sli.robot",
+            "task": "Generate Namspace Score",
+            "score": 3,
+            "reasoning": "The task title 'Generate Namspace Score' is clear and specific in terms of the action to be performed, but it lacks clarity in terms of the specific scope or 'Where' variable. It does not provide a clear indication of the specific namespace for which the score should be generated.",
+            "suggested_title": "Generate Namespace Score for Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-fluxcd-reconcile",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-fluxcd-reconcile/runbook.robot",
+            "task": "Health Check Flux Reconciliation",
+            "score": 3,
+            "reasoning": "The task title is clear and specific, indicating that it fetches reconciliation logs for flux and creates a report for them. The tags provide additional context about the technology involved. The imported user variables are used in a clear manner. The title lacks a specific 'Where' variable, so 'FLUX_NAMESPACE' can be used as the most relevant imported variable as a 'Where' in this case. The task lacks a specific 'Where' variable; consider using `CONTEXT`.",
+            "suggested_title": "Health Check Flux Reconciliation in Kubernetes Namespace `${FLUX_NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-fluxcd-reconcile",
+            "file": "sli.robot",
+            "filepath": "codebundles/k8s-fluxcd-reconcile/sli.robot",
+            "task": "Health Check Flux Reconciliation",
+            "score": 3,
+            "reasoning": "The task title is clear, specific, and human-readable. It includes the 'What' (Flux Reconciliation) and the 'Where' (Flux namespace) variables, making it very specific and well-defined. The task lacks a specific 'Where' variable; consider using `CONTEXT`.",
+            "suggested_title": ""
+        },
+        {
+            "codebundle": "curl-gmp-nginx-ingress-inspection",
+            "file": "runbook.robot",
+            "filepath": "codebundles/curl-gmp-nginx-ingress-inspection/runbook.robot",
+            "task": "Fetch Nginx HTTP Errors From GMP for Ingress `${INGRESS_OBJECT_NAME}`",
+            "score": 5,
+            "reasoning": "The task title is very clear and specific, mentioning the resource type (Nginx HTTP Errors), the location (GMP for Ingress `${INGRESS_OBJECT_NAME}`), and the action to be taken. It is also human-readable and does not require technical knowledge to understand.",
+            "suggested_title": "Fetch Nginx HTTP Errors From GMP for Ingress `${INGRESS_OBJECT_NAME}`"
+        },
+        {
+            "codebundle": "curl-gmp-nginx-ingress-inspection",
+            "file": "runbook.robot",
+            "filepath": "codebundles/curl-gmp-nginx-ingress-inspection/runbook.robot",
+            "task": "Find Owner and Service Health for Ingress `${INGRESS_OBJECT_NAME}`",
+            "score": 5,
+            "reasoning": "The task title clearly states the specific action to be performed (Find Owner and Service Health), the resource type (Ingress), and includes a placeholder for the specific scope (`${INGRESS_OBJECT_NAME}`). The documentation and tags provide additional clarity and specificity.",
+            "suggested_title": "Find Owner and Service Health for Ingress `${INGRESS_OBJECT_NAME}`"
+        },
+        {
+            "codebundle": "k8s-namespace-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-namespace-healthcheck/runbook.robot",
+            "task": "Inspect Warning Events in Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, providing a clear action to be taken ('Inspect Warning Events') and specifying the scope with the 'Where' variable placeholder. The documentation provides additional context and details for the task.",
+            "suggested_title": "Inspect Warning Events in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-namespace-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-namespace-healthcheck/runbook.robot",
+            "task": "Inspect Container Restarts In Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title provides a clear and specific instruction to inspect container restarts in the specified namespace. It is human-readable and includes the 'What' (container restarts) and the 'Where' (namespace) variables.",
+            "suggested_title": "Inspect Container Restarts In Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-namespace-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-namespace-healthcheck/runbook.robot",
+            "task": "Inspect Pending Pods In Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is specific in its instruction to inspect pending pods in a particular namespace, making it clear and easily understandable. The use of the imported variable for the namespace ensures human readability and specificity.",
+            "suggested_title": "Inspect Pending Pods In Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-namespace-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-namespace-healthcheck/runbook.robot",
+            "task": "Inspect Failed Pods In Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is clear in its purpose, readable, and specific. It includes the 'What' (failed pods) and the 'Where' (namespace) variables. The tags also provide additional context.",
+            "suggested_title": "Inspect Failed Pods In Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-namespace-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-namespace-healthcheck/runbook.robot",
+            "task": "Inspect Workload Status Conditions In Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is specific and clear in its purpose of inspecting workload status conditions in a particular namespace. It includes the 'What' (workload status conditions) and the 'Where' (namespace) variables, leading to a high score.",
+            "suggested_title": "Inspect Workload Status Conditions In Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-namespace-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-namespace-healthcheck/runbook.robot",
+            "task": "Get Listing Of Resources In Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is clear about what it wants to accomplish (get listing of resources) and where it should be done (in the namespace). It provides a specific action and location, but could benefit from including the namespace variable in backticks and curly braces.",
+            "suggested_title": "Get Listing Of Resources In Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-namespace-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-namespace-healthcheck/runbook.robot",
+            "task": "Check Event Anomalies in Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, indicating the action of checking for event anomalies in a specific namespace. It is also human-readable and provides enough information for a user to understand the purpose of the task.",
+            "suggested_title": "Check Event Anomalies in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-namespace-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-namespace-healthcheck/runbook.robot",
+            "task": "Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is very clear, human-readable, and specific. It clearly defines the 'What' (resource type - PodDisruptionBudget Policies) and the 'Where' (specific scope - Namespace). The documentation and tags provide additional context and clarity.",
+            "suggested_title": "Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-namespace-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-namespace-healthcheck/runbook.robot",
+            "task": "Check Resource Quota Utilization in Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It includes the 'What' (resource quotas) and the 'Where' (specific namespace) variables within backticks and curly braces. The documentation and tags also provide clear context for the task.",
+            "suggested_title": "Check Resource Quota Utilization in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-namespace-healthcheck",
+            "file": "sli.robot",
+            "filepath": "codebundles/k8s-namespace-healthcheck/sli.robot",
+            "task": "Get Event Count and Score",
+            "score": 3,
+            "reasoning": "The task title clearly states the action to be performed (Get Event Count) and specifies the purpose (and Score). The documentation provides clear explanation of what the task does. The tags also provide additional context. The imported user variables are relevant and will be used in the task. Overall, the title is very clear, human-readable, and specific. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Get Error Event Count within ${EVENT_AGE} and calculate Score"
+        },
+        {
+            "codebundle": "k8s-namespace-healthcheck",
+            "file": "sli.robot",
+            "filepath": "codebundles/k8s-namespace-healthcheck/sli.robot",
+            "task": "Get Container Restarts and Score",
+            "score": 3,
+            "reasoning": "The title is clear in its purpose and provides a specific action - counting container restarts and determining if they're beyond a threshold. It is readable and understandable for a human. The use of imported user variables and tags also adds specificity to the task. The only improvement would be to specify the 'Where' variable, using the NAMESPACE variable as a suggestion. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Get Container Restarts and Score in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-namespace-healthcheck",
+            "file": "sli.robot",
+            "filepath": "codebundles/k8s-namespace-healthcheck/sli.robot",
+            "task": "Get NotReady Pods",
+            "score": 3,
+            "reasoning": "The task title is clear, human-readable, and specific. It clearly indicates the purpose of fetching unready pods. The 'What' (resource type) is 'Pods', and the suggested 'Where' variable could be 'NAMESPACE' from the imported variables. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Get NotReady Pods in `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-namespace-healthcheck",
+            "file": "sli.robot",
+            "filepath": "codebundles/k8s-namespace-healthcheck/sli.robot",
+            "task": "Generate Namspace Score",
+            "score": 3,
+            "reasoning": "The task title is clear and specific, but it lacks a specific 'Where' variable. The 'NAMESPACE' variable can be used as the most relevant 'Where' variable. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Generate Namespace Score in `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "azure-loadbalancer-triage",
+            "file": "runbook.robot",
+            "filepath": "codebundles/azure-loadbalancer-triage/runbook.robot",
+            "task": "Check Activity Logs for Azure Load Balancer `${AZ_LB_NAME}`",
+            "score": 4,
+            "reasoning": "The title is clear, human-readable, and specific. It clearly states the task of checking activity logs for a specific Azure Load Balancer using a provided variable. The imported 'AZ_LB_NAME' variable provides the necessary 'Where' (specific scope) for the task.",
+            "suggested_title": "Check Activity Logs for Azure Load Balancer `${AZ_LB_NAME}`"
+        },
+        {
+            "codebundle": "k8s-vault-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-vault-healthcheck/runbook.robot",
+            "task": "Fetch Vault CSI Driver Logs",
+            "score": 3,
+            "reasoning": "The task title is clear, human-readable, and specific. It includes the action to be performed ('Fetch'), the resource type ('Vault CSI Driver'), and the specific scope ('Logs'). The documentation and tags provide additional context and details. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Fetch Vault CSI Driver Logs in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-vault-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-vault-healthcheck/runbook.robot",
+            "task": "Get Vault CSI Driver Warning Events",
+            "score": 3,
+            "reasoning": "The task title is clear in specifying the action to be performed (Get Vault CSI Driver Warning Events), it is human-readable, and it provides specific details about the type of events to be fetched. The title includes the 'What' (Vault CSI Driver Warning Events) but lacks a specific 'Where' variable. The most relevant imported variable 'NAMESPACE' can be used as a 'Where' variable in backticks & curly braces. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Get Vault CSI Driver Warning Events in `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-vault-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-vault-healthcheck/runbook.robot",
+            "task": "Check Vault CSI Driver Replicas",
+            "score": 3,
+            "reasoning": "The task title is clear, human-readable, and specific. It clearly states the action to be performed, the resource type (replicas), and the specific scope (vault CSI driver daemonset). The tags and imported user variables provide additional context. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": null
+        },
+        {
+            "codebundle": "k8s-vault-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-vault-healthcheck/runbook.robot",
+            "task": "Fetch Vault Logs",
+            "score": 3,
+            "reasoning": "The task title is clear, human-readable, and specific. It clearly states the action to be performed (Fetch Vault Logs), provides details on what will be fetched (last 100 lines of logs for all vault pod workloads), and specifies the scope (vault namespace). The imported variables 'NAMESPACE' and 'LABELS' are used for specifying the 'What' (namespace) and 'Where' (workloads with specific labels) respectively. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Fetch Vault Pod Workload Logs in Namespace `${NAMESPACE}` with Labels `${LABELS}`"
+        },
+        {
+            "codebundle": "k8s-vault-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-vault-healthcheck/runbook.robot",
+            "task": "Get Related Vault Events",
+            "score": 3,
+            "reasoning": "The title is clear, human-readable, and specific. It clearly states the 'What' (vault) and 'Where' (namespace) using the imported variable 'NAMESPACE'. It also defines the purpose of fetching warning-type events related to the vault in the namespace. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Get Related Vault Events in Namespace `$${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-vault-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-vault-healthcheck/runbook.robot",
+            "task": "Fetch Vault StatefulSet Manifest Details",
+            "score": 3,
+            "reasoning": "The task title is clear, specific, and human-readable. It clearly defines the action to be taken ('Fetch Vault StatefulSet Manifest Details') and provides a context for where the action will be performed ('NAMESPACE'). The documentation and tags provide further clarity on the purpose of the task. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Fetch Vault StatefulSet Manifest Details in `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-vault-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-vault-healthcheck/runbook.robot",
+            "task": "Fetch Vault DaemonSet Manifest Details",
+            "score": 3,
+            "reasoning": "The title is clear, human-readable, and specific. It clearly states the task of fetching details of the vault daemonset manifest for inspection. It includes the 'What' (manifest) and the 'Where' (daemonset) variables. The imported user variables are also well-defined and will provide necessary context for the task. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Fetch Vault DaemonSet Manifest Details in Kubernetes Cluster `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-vault-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-vault-healthcheck/runbook.robot",
+            "task": "Verify Vault Availability",
+            "score": 3,
+            "reasoning": "The title is clear and specific, indicating the task involves verifying the availability of a vault endpoint. It is also human-readable and includes relevant tags. The imported variables are not directly related to the 'Where' aspect, but 'NAMESPACE' and 'CONTEXT' can be used as the 'where' variable in Kubernetes environments. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Verify Vault Availability in Namespace `${NAMESPACE}` and Context `${CONTEXT}`"
+        },
+        {
+            "codebundle": "k8s-vault-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-vault-healthcheck/runbook.robot",
+            "task": "Check Vault StatefulSet Replicas",
+            "score": 3,
+            "reasoning": "The task title is clear and specific, providing a clear 'What' (Vault StatefulSet Replicas) and also mentions the check should be for highly available and healthy values. It also includes relevant tags and imported user variables. The specific scope is not mentioned in the title but could be substituted with the 'NAMESPACE' imported variable. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Check Vault StatefulSet Replicas in `NAMESPACE`"
+        },
+        {
+            "codebundle": "k8s-fluxcd-helm-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-fluxcd-helm-health/runbook.robot",
+            "task": "List all available FluxCD Helmreleases in Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, indicating the action (List) and the resource type (FluxCD Helmreleases) in a specific scope (Namespace `${NAMESPACE}`). The documentation and tags provide additional context for clarity. The use of variable `${NAMESPACE}` provides specificity to the scope.",
+            "suggested_title": "List all available FluxCD Helmreleases in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-fluxcd-helm-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-fluxcd-helm-health/runbook.robot",
+            "task": "Fetch Installed FluxCD Helmrelease Versions in Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The title is clear and specific, indicating the exact task to be performed in the specified namespace. It provides details on what information needs to be fetched and where it needs to be fetched from using the NAMESPACE variable.",
+            "suggested_title": "Fetch Installed FluxCD Helmrelease Versions in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-fluxcd-helm-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-fluxcd-helm-health/runbook.robot",
+            "task": "Fetch Mismatched FluxCD HelmRelease Version in Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is very clear, specific, and human-readable. It provides a clear action to be taken (Fetch Mismatched FluxCD HelmRelease Version) and specifies the exact location for the action (in Namespace `${NAMESPACE}`). The documentation and tags provide additional context and specificity.",
+            "suggested_title": "Fetch Mismatched FluxCD HelmRelease Version in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-fluxcd-helm-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-fluxcd-helm-health/runbook.robot",
+            "task": "Fetch FluxCD HelmRelease Error Messages in Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The title is clear in its purpose, human-readable, and specific. It includes the 'What' (HelmRelease) and a clear 'Where' scope (namespace). The tags provide additional context for the task.",
+            "suggested_title": "Fetch FluxCD HelmRelease Error Messages in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-fluxcd-helm-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-fluxcd-helm-health/runbook.robot",
+            "task": "Check for Available Helm Chart Updates in Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is clear, human-readable, and specific. It provides the 'What' (Helm Chart Updates) and the 'Where' (Namespace). The documentation and tags further clarify the task's purpose and context.",
+            "suggested_title": "Check for Available Helm Chart Updates in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-chaos-flux",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-chaos-flux/runbook.robot",
+            "task": "Suspend the Flux Resource Reconciliation",
+            "score": 3,
+            "reasoning": "The title is clear, human readable, and specific. It provides the 'What' (Flux Resource Reconciliation) and the 'Where' (specific scope) by using the imported variable FLUX_RESOURCE_NAME in backticks & curly braces to suspend a specific flux resource for chaos purposes in a Kubernetes cluster. The task lacks a specific 'Where' variable; consider using `KUBERNETES_DISTRIBUTION_BINARY`.",
+            "suggested_title": "Suspend the Flux Resource Reconciliation for ${FLUX_RESOURCE_NAME} in namespace ${FLUX_RESOURCE_NAMESPACE}"
+        },
+        {
+            "codebundle": "k8s-chaos-flux",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-chaos-flux/runbook.robot",
+            "task": "Find Random FluxCD Workload as Chaos Target",
+            "score": 3,
+            "reasoning": "The task title is clear and specific about finding a random FluxCD workload as a chaos target. It provides human-readable instructions and mentions the condition under which it runs. The documentation also adds to the clarity of the task. The task lacks a specific 'Where' variable; consider using `KUBERNETES_DISTRIBUTION_BINARY`.",
+            "suggested_title": "Select Random FluxCD Workload for Chaos Target in Namespace `${FLUX_RESOURCE_NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-chaos-flux",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-chaos-flux/runbook.robot",
+            "task": "Execute Chaos Command",
+            "score": 3,
+            "reasoning": "The title is clear, specific, and human-readable. It provides a clear 'What' (Chaos Command) and 'Where' (targeted resource) by using the imported variables, such as KUBERNETES_DISTRIBUTION_BINARY, TARGET_NAMESPACE, and TARGET_RESOURCE. The task lacks a specific 'Where' variable; consider using `KUBERNETES_DISTRIBUTION_BINARY`.",
+            "suggested_title": "Execute Chaos Command on ${TARGET_RESOURCE} in Namespace ${TARGET_NAMESPACE}"
+        },
+        {
+            "codebundle": "k8s-chaos-flux",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-chaos-flux/runbook.robot",
+            "task": "Execute Additional Chaos Command",
+            "score": 3,
+            "reasoning": "The task title is clear and specific, but lacks some human readability. The documentation provides clear instructions on what to do. The task lacks a specific 'Where' variable; consider using `KUBERNETES_DISTRIBUTION_BINARY`.",
+            "suggested_title": "Execute Additional Chaos Command on ${FLUX_RESOURCE_TYPE} '${FLUX_RESOURCE_NAME}' in namespace '${FLUX_RESOURCE_NAMESPACE}'"
+        },
+        {
+            "codebundle": "k8s-chaos-flux",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-chaos-flux/runbook.robot",
+            "task": "Resume Flux Resource Reconciliation",
+            "score": 3,
+            "reasoning": "The task title is clear and specific, indicating the action to be performed ('Resume Flux reconciliation') and the desired resource ('desired resource'). The tags provide additional context. The task lacks a specific 'Where' variable, so the most relevant imported variable 'TARGET_NAMESPACE' has been suggested. The task lacks a specific 'Where' variable; consider using `KUBERNETES_DISTRIBUTION_BINARY`.",
+            "suggested_title": "Resume Flux Resource Reconciliation in `${TARGET_NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-fluxcd-kustomization-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-fluxcd-kustomization-health/runbook.robot",
+            "task": "List all available Kustomization objects in Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is very clear and specific, providing a clear instruction to list all available FluxCD Kustomization objects in a specific namespace. The use of backticks & curly braces for the 'Where' variable ensures that the 'NAMESPACE' variable will be replaced at runtime, making it clear where the action should take place.",
+            "suggested_title": "List all available Kustomization objects in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-fluxcd-kustomization-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-fluxcd-kustomization-health/runbook.robot",
+            "task": "Get details for unready Kustomizations in Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is very clear, specific, and human-readable. It clearly states the task to list all unready Kustomizations in a specific namespace. It also uses the imported variable for the namespace to ensure clarity and specificity.",
+            "suggested_title": "List Unready Kustomizations in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "aws-cloudwatch-overused-ec2",
+            "file": "runbook.robot",
+            "filepath": "codebundles/aws-cloudwatch-overused-ec2/runbook.robot",
+            "task": "Check For Overutilized Ec2 Instances",
+            "score": 3,
+            "reasoning": "The task title is clear, human-readable, and specific. It clearly states the action to be performed, the resource type (EC2 instances), and the specific scope (utilization) in the AWS region specified by the 'AWS_DEFAULT_REGION' variable. The utilization threshold is also clearly mentioned. The task lacks a specific 'Where' variable; consider using `AWS_DEFAULT_REGION`.",
+            "suggested_title": null
+        },
+        {
+            "codebundle": "k8s-chaos-namespace",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-chaos-namespace/runbook.robot",
+            "task": "Kill Random Pods In Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, mentioning the action to be performed (kill pods) and the specific scope (namespace). It also includes a brief explanation of the purpose. The use of imported user variables adds to the clarity and specificity.",
+            "suggested_title": "Kill Random Pods In Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-chaos-namespace",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-chaos-namespace/runbook.robot",
+            "task": "OOMKill Pods In Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific about the action (OOMKill Pods) and the scope (Namespace `${NAMESPACE}`). It is also human-readable and provides enough information for someone familiar with Kubernetes to understand the task.",
+            "suggested_title": "OOMKill Pods In Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-chaos-namespace",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-chaos-namespace/runbook.robot",
+            "task": "Mangle Service Selector In Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The title is clear and specific, mentioning the action to mangle a service selector in a particular namespace. The use of backticks and curly braces for the `NAMESPACE` variable adds specificity.",
+            "suggested_title": "Mangle Service Selector In Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-chaos-namespace",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-chaos-namespace/runbook.robot",
+            "task": "Mangle Service Port In Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The title clearly states the action (Mangle Service Port) and includes the specific scope (Namespace `${NAMESPACE}`). It is also human-readable and specific.",
+            "suggested_title": "Mangle Service Port In Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-chaos-namespace",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-chaos-namespace/runbook.robot",
+            "task": "Fill Random Pod Tmp Directory In Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The title is clear, specific, and human-readable. It includes both the 'What' (pod) and 'Where' (namespace) variables, making it very detailed.",
+            "suggested_title": "Fill Random Pod Tmp Directory In Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-app-troubleshoot",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-app-troubleshoot/runbook.robot",
+            "task": "Get `${CONTAINER_NAME}` Application Logs",
+            "score": 5,
+            "reasoning": "The title is clear, human-readable, and specific. It includes the specific task of getting application logs from a container, the variable `CONTAINER_NAME` is clearly marked for substitution, and it provides context for where the logs are being collected from. It also utilizes relevant imported user variables for NAMESPACE and CONTEXT.",
+            "suggested_title": "Get `${CONTAINER_NAME}` Application Logs from Workload `${WORKLOAD_NAME}` in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-app-troubleshoot",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-app-troubleshoot/runbook.robot",
+            "task": "Scan `${CONTAINER_NAME}` Application For Misconfigured Environment",
+            "score": 4,
+            "reasoning": "The title is clear and specific, mentioning the action 'Scan', the resource type 'Application' and the specific scope '`${CONTAINER_NAME}`'. It is also human-readable and uses relevant imported user variables.",
+            "suggested_title": "Scan `${CONTAINER_NAME}` Application For Misconfigured Environment"
+        },
+        {
+            "codebundle": "k8s-app-troubleshoot",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-app-troubleshoot/runbook.robot",
+            "task": "Tail `${CONTAINER_NAME}` Application Logs For Stacktraces",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It provides a clear action ('Tail'), specifies the container name using the imported variable, and describes the purpose of the task in detail.",
+            "suggested_title": "Tail `${CONTAINER_NAME}` Application Logs For Stacktraces in Workload `${WORKLOAD_NAME}`"
+        },
+        {
+            "codebundle": "k8s-app-troubleshoot",
+            "file": "sli.robot",
+            "filepath": "codebundles/k8s-app-troubleshoot/sli.robot",
+            "task": "Measure Application Exceptions",
+            "score": 3,
+            "reasoning": "The title is clear in its purpose of measuring application exceptions, it is human-readable, and provides specificity by mentioning the examination of recent logs. It could score higher if it included a specific 'Where' variable, such as 'NAMESPACE', which is the most relevant imported variable. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Measure Application Exceptions in `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "azure-appservice-triage",
+            "file": "runbook.robot",
+            "filepath": "codebundles/azure-appservice-triage/runbook.robot",
+            "task": "Check for Resource Health Issues Affecting App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 5,
+            "reasoning": "The task title is specific, clear, and human-readable. It includes the 'What' (App Service) and 'Where' (Resource Group) variables in backticks & curly braces, which provides a high level of clarity and specificity.",
+            "suggested_title": "Check for Resource Health Issues Affecting App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-appservice-triage",
+            "file": "runbook.robot",
+            "filepath": "codebundles/azure-appservice-triage/runbook.robot",
+            "task": "Check App Service `${APP_SERVICE_NAME}` Health Check Metrics In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, mentioning the app service and resource group. It provides a clear instruction to check the health status of a specific appservice workload.",
+            "suggested_title": "Check App Service `${APP_SERVICE_NAME}` Health in Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-appservice-triage",
+            "file": "runbook.robot",
+            "filepath": "codebundles/azure-appservice-triage/runbook.robot",
+            "task": "Fetch App Service `${APP_SERVICE_NAME}` Utilization Metrics In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 4,
+            "reasoning": "The task title is clear about the action to be performed, which is fetching app service utilization metrics. It is also human-readable and specific as it includes the resource group variable as the 'where' scope.",
+            "suggested_title": "Fetch App Service `${APP_SERVICE_NAME}` Utilization Metrics In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-appservice-triage",
+            "file": "runbook.robot",
+            "filepath": "codebundles/azure-appservice-triage/runbook.robot",
+            "task": "Get App Service `${APP_SERVICE_NAME}` Logs In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It clearly states the action of fetching logs for a specific app service in a specific resource group.",
+            "suggested_title": "Get App Service `${APP_SERVICE_NAME}` Logs In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-appservice-triage",
+            "file": "runbook.robot",
+            "filepath": "codebundles/azure-appservice-triage/runbook.robot",
+            "task": "Check Configuration Health of App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It includes the 'What' (App Service) and the 'Where' (Resource Group) variables in backticks and curly braces, making it easy for users to understand and execute the task.",
+            "suggested_title": "Check Configuration Health of App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-appservice-triage",
+            "file": "runbook.robot",
+            "filepath": "codebundles/azure-appservice-triage/runbook.robot",
+            "task": "Check Deployment Health of App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It provides the 'What' (App Service) and the 'Where' (Resource Group) with placeholders for substitution. It also matches the documentation and tags provided.",
+            "suggested_title": "Fetch Deployment Health of App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-appservice-triage",
+            "file": "runbook.robot",
+            "filepath": "codebundles/azure-appservice-triage/runbook.robot",
+            "task": "Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 5,
+            "reasoning": "The task title is clear, specific, and human-readable. It includes the 'What' (app service) and 'Where' (resource group) variables within backticks and curly braces. The documentation and tags provide additional context and the imported user variables are used in an organized manner.",
+            "suggested_title": "Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-appservice-triage",
+            "file": "runbook.robot",
+            "filepath": "codebundles/azure-appservice-triage/runbook.robot",
+            "task": "Check Logs for Errors in App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 4,
+            "reasoning": "The title is clear and specific in terms of what needs to be checked (logs for errors) and where (in the specified app service and resource group). It is also human-readable.",
+            "suggested_title": "Check Logs for Errors in App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-appservice-triage",
+            "file": "sli.robot",
+            "filepath": "codebundles/azure-appservice-triage/sli.robot",
+            "task": "Check for Resource Health Issues Affecting App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 5,
+            "reasoning": "The task title is specific, clear, and human-readable. It includes the 'What' (App Service) and 'Where' (Resource Group) variables in backticks & curly braces, which provides a high level of clarity and specificity.",
+            "suggested_title": "Check for Resource Health Issues Affecting App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-appservice-triage",
+            "file": "sli.robot",
+            "filepath": "codebundles/azure-appservice-triage/sli.robot",
+            "task": "Check App Service `${APP_SERVICE_NAME}` Health Check Metrics In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 5,
+            "reasoning": "The task title is clear, specific, and human-readable. It includes the 'What' (appservice) and the 'Where' (resource group) variables in backticks and curly braces, ensuring clarity and specificity.",
+            "suggested_title": "Check App Service `${APP_SERVICE_NAME}` Health Check Metrics In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-appservice-triage",
+            "file": "sli.robot",
+            "filepath": "codebundles/azure-appservice-triage/sli.robot",
+            "task": "Check App Service `${APP_SERVICE_NAME}` Configuration Health In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 5,
+            "reasoning": "The task title is very clear, human-readable, and specific. It includes the 'What' (app service) and the 'Where' (resource group) variables in backticks and curly braces, and provides a clear indication of the expected outcome.",
+            "suggested_title": "Check App Service `${APP_SERVICE_NAME}` Configuration Health In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-appservice-triage",
+            "file": "sli.robot",
+            "filepath": "codebundles/azure-appservice-triage/sli.robot",
+            "task": "Check Deployment Health of App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It provides the 'What' (App Service) and the 'Where' (Resource Group) with placeholders for substitution. It also matches the documentation and tags provided.",
+            "suggested_title": "Fetch Deployment Health of App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-appservice-triage",
+            "file": "sli.robot",
+            "filepath": "codebundles/azure-appservice-triage/sli.robot",
+            "task": "Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 5,
+            "reasoning": "The task title is clear, specific, and human-readable. It includes the 'What' (app service) and 'Where' (resource group) variables within backticks and curly braces. The documentation and tags provide additional context and the imported user variables are used in an organized manner.",
+            "suggested_title": "Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-appservice-triage",
+            "file": "sli.robot",
+            "filepath": "codebundles/azure-appservice-triage/sli.robot",
+            "task": "Generate App Service Health Score",
+            "score": 3,
+            "reasoning": "The task title is clear and specific, providing a clear objective to generate an app service health score. The human readability is good, but the inclusion of backticks & curly braces for the specific scope variable would improve readability. The imported variables provide clarity on what metrics are being used for the health score. The task lacks a specific 'Where' variable; consider using `AZ_RESOURCE_GROUP`.",
+            "suggested_title": "Generate App Service Health Score for `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "cmd-test",
+            "file": "runbook.robot",
+            "filepath": "codebundles/cmd-test/runbook.robot",
+            "task": "Run CLI Command",
+            "score": 3,
+            "reasoning": "The title is clear about the task, the documentation provides a clear description of what the task does, and the imported user variables provide context for where the CLI command will be executed. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Run CLI Command in `${NAMESPACE}` namespace"
+        },
+        {
+            "codebundle": "cmd-test",
+            "file": "runbook.robot",
+            "filepath": "codebundles/cmd-test/runbook.robot",
+            "task": "Run Bash File",
+            "score": 3,
+            "reasoning": "The task title is clear and specific, as it clearly states the action to be performed (Run Bash File) and the purpose of verifying script passthrough. It also includes relevant tags. However, it could be improved by including the specific file or location where the bash file is located. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Run Bash File in `${NAMESPACE}`/${CONTEXT}/path/to/script.sh"
+        },
+        {
+            "codebundle": "cmd-test",
+            "file": "runbook.robot",
+            "filepath": "codebundles/cmd-test/runbook.robot",
+            "task": "Log Suggestion",
+            "score": 3,
+            "reasoning": "The task title is clear in its purpose to generate a next step suggestion, format it, and log it. It provides enough information to understand the task, and it uses specific terminology like 'next step suggestion' and 'log'. It could be more specific if it included a 'Where' variable, such as logging the suggestion in a specific context or namespace. The task lacks a specific 'Where' variable; consider using `NAMESPACE`.",
+            "suggested_title": "Generate Next Step Suggestion and Log in `NAMESPACE`"
+        },
+        {
+            "codebundle": "k8s-argocd-application-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-argocd-application-health/runbook.robot",
+            "task": "Fetch ArgoCD Application Sync Status & Health for `${APPLICATION}`",
+            "score": 5,
+            "reasoning": "The task title is clear and specific, indicating the action to be performed (fetch ArgoCD Application Sync Status & Health) and the specific application for which the status will be fetched. The title also includes a relevant tag, providing clarity and specificity.",
+            "suggested_title": ""
+        },
+        {
+            "codebundle": "k8s-argocd-application-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-argocd-application-health/runbook.robot",
+            "task": "Fetch ArgoCD Application Last Sync Operation Details for `${APPLICATION}`",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It specifies the action of fetching ArgoCD Application last sync operation details for a specific application, using the imported variable `${APPLICATION}`. The documentation and tags also provide clarity on the purpose of the task.",
+            "suggested_title": "Fetch ArgoCD Application Last Sync Operation Details for `${APPLICATION}`"
+        },
+        {
+            "codebundle": "k8s-argocd-application-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-argocd-application-health/runbook.robot",
+            "task": "Fetch Unhealthy ArgoCD Application Resources for `${APPLICATION}`",
+            "score": 5,
+            "reasoning": "The title clearly states the task, specifies the resource type (ArgoCD Application Resources), and provides a placeholder for the 'Where' variable (${APPLICATION}). The documentation also explains the purpose of the task and the tags provide additional context. Overall, it is clear, human-readable, and specific.",
+            "suggested_title": "Fetch Unhealthy ArgoCD Application Resources for `${APPLICATION}`"
+        },
+        {
+            "codebundle": "k8s-argocd-application-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-argocd-application-health/runbook.robot",
+            "task": "Scan For Errors in Pod Logs Related to ArgoCD Application `${APPLICATION}`",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It clearly states the action (Scan For Errors), the resource type (Pod Logs), and the specific scope (ArgoCD Application `${APPLICATION}`). The documentation and tags provide additional context and clarity.",
+            "suggested_title": "Scan For Errors in Pod Logs Related to ArgoCD Application `${APPLICATION}`"
+        },
+        {
+            "codebundle": "k8s-argocd-application-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-argocd-application-health/runbook.robot",
+            "task": "Fully Describe ArgoCD Application `${APPLICATION}`",
+            "score": 4,
+            "reasoning": "The title is specific, clear, and readable. It uses the imported user variable for 'APPLICATION' and mentions ArgoCD and application description.",
+            "suggested_title": "Fully Describe ArgoCD Application `${APPLICATION}`"
+        },
+        {
+            "codebundle": "test-issue",
+            "file": "runbook.robot",
+            "filepath": "codebundles/test-issue/runbook.robot",
+            "task": "Raise Full Issue",
+            "score": 3,
+            "reasoning": "The title is clear and specific, indicating that the task is to raise an issue with full content. It is also human-readable as it uses common language. The tags provide additional context. The task lacks a specific 'Where' variable; consider using `N/A`.",
+            "suggested_title": "Raise Full Issue on `${RESOURCE_TYPE}` in `${SCOPE}`"
+        },
+        {
+            "codebundle": "azure-vmss-triage",
+            "file": "runbook.robot",
+            "filepath": "codebundles/azure-vmss-triage/runbook.robot",
+            "task": "Check Scale Set `${VMSCALESET}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 5,
+            "reasoning": "The title is clear, specific, and human-readable. It includes the 'What' (VM Scale Set) and the 'Where' (specific resource group) variables in backticks & curly braces. The tags also support the clarity and specificity of the task.",
+            "suggested_title": "Check Scale Set `${VMSCALESET}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-vmss-triage",
+            "file": "runbook.robot",
+            "filepath": "codebundles/azure-vmss-triage/runbook.robot",
+            "task": "Fetch VM Scale Set `${VMSCALESET}` Config In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 4,
+            "reasoning": "The title is clear and specific, indicating the task is to fetch the VM Scale Set config in a specific Azure Resource Group. The use of backticks and curly braces for the variables makes it clear where the substitution will occur.",
+            "suggested_title": "Fetch VM Scale Set `${VMSCALESET}` Config In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-vmss-triage",
+            "file": "runbook.robot",
+            "filepath": "codebundles/azure-vmss-triage/runbook.robot",
+            "task": "Fetch Activities for VM Scale Set `${VMSCALESET}` In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It includes the 'What' (VM Scale Set) and the 'Where' (Resource Group) variables in backticks & curly braces. The documentation and tags provide additional clarity and specificity.",
+            "suggested_title": "Fetch Activities for VM Scale Set `${VMSCALESET}` In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "azure-vmss-triage",
+            "file": "sli.robot",
+            "filepath": "codebundles/azure-vmss-triage/sli.robot",
+            "task": "Check Scale Set `${VMSCALESET}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`",
+            "score": 4,
+            "reasoning": "The task title is clear, human-readable, and specific. It provides the 'What' (VM Scale Set) and 'Where' (Resource Group) variables. It also includes relevant tags for easy categorization.",
+            "suggested_title": "Check Scale Set `${VMSCALESET}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`"
+        },
+        {
+            "codebundle": "k8s-deployment-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-deployment-healthcheck/runbook.robot",
+            "task": "Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`",
+            "score": 5,
+            "reasoning": "The title is very clear, human-readable, and specific. It includes both the 'What' (deployment) and the 'Where' (specific deployment name) variables. The use of backticks and curly braces around the 'Where' variable ensures clarity and specificity.",
+            "suggested_title": "Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`"
+        },
+        {
+            "codebundle": "k8s-deployment-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-deployment-healthcheck/runbook.robot",
+            "task": "Fetch Deployments Logs for `${DEPLOYMENT_NAME}` and Add to Report",
+            "score": 4,
+            "reasoning": "The task title is clear and specific about fetching deployment logs, and the use of the `${DEPLOYMENT_NAME}` variable adds human readability and specificity. However, it could be improved by including the `NAMESPACE` variable as the 'Where' scope.",
+            "suggested_title": "Fetch Deployments Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` and Add to Report"
+        },
+        {
+            "codebundle": "k8s-deployment-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-deployment-healthcheck/runbook.robot",
+            "task": "Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`",
+            "score": 5,
+            "reasoning": "The task title is very clear and specific. It includes the action 'Check', the resource type 'Liveness Probe Configuration', and the specific scope 'for Deployment ${DEPLOYMENT_NAME}'. The documentation and tags provide further context and the imported user variables are used appropriately.",
+            "suggested_title": "Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`"
+        },
+        {
+            "codebundle": "k8s-deployment-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-deployment-healthcheck/runbook.robot",
+            "task": "Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`",
+            "score": 4,
+            "reasoning": "The title is clear and specific, indicating the task is to check the readiness probe configuration for a specific deployment. The use of backticks and curly braces shows that the title will be easily substitutable with the DEPLOYMENT_NAME variable. However, it could be improved by including the NAMESPACE as the 'Where' variable.",
+            "suggested_title": "Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-deployment-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-deployment-healthcheck/runbook.robot",
+            "task": "Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, providing a clear action 'Inspect Container Restarts' and specifying the 'Where' with the placeholders ${DEPLOYMENT_NAME} and ${NAMESPACE}. It is human-readable and provides a specific action to be taken.",
+            "suggested_title": "Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-deployment-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-deployment-healthcheck/runbook.robot",
+            "task": "Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It includes the 'What' (deployment workload) and the 'Where' (namespace), and it provides a clear action to be performed.",
+            "suggested_title": "Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`"
+        },
+        {
+            "codebundle": "k8s-deployment-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-deployment-healthcheck/runbook.robot",
+            "task": "Get Deployment Workload Details For `${DEPLOYMENT_NAME}` and Add to Report",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, indicating the action to fetch deployment workload details for a specific deployment name. It provides clarity on what needs to be done and where using the DEPLOYMENT_NAME variable.",
+            "suggested_title": "Fetch Deployment Workload Details For `${DEPLOYMENT_NAME}`"
+        },
+        {
+            "codebundle": "k8s-deployment-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-deployment-healthcheck/runbook.robot",
+            "task": "Inspect Deployment Replicas for `${DEPLOYMENT_NAME}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, mentioning the resource type (deployment) and indicating the need to inspect its replicas. The documentation provides clarity on what the task entails, making it human-readable. The use of imported user variables like DEPLOYMENT_NAME ensures specificity.",
+            "suggested_title": "Inspect Deployment Replicas for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-deployment-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-deployment-healthcheck/runbook.robot",
+            "task": "Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`",
+            "score": 5,
+            "reasoning": "The title is very clear about the task, easy to understand, and specific. It includes the task to check for anomalies in deployment events for a specific deployment name.",
+            "suggested_title": "Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`"
+        },
+        {
+            "codebundle": "k8s-deployment-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-deployment-healthcheck/runbook.robot",
+            "task": "Check ReplicaSet Health for Deployment `${DEPLOYMENT_NAME}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, providing the action to be performed (Check ReplicaSet Health) and the specific scope (for Deployment `${DEPLOYMENT_NAME}`). The documentation and tags provide further clarity on the purpose of the task.",
+            "suggested_title": "Check ReplicaSet Health for Deployment `${DEPLOYMENT_NAME}`"
+        },
+        {
+            "codebundle": "k8s-jenkins-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-jenkins-healthcheck/runbook.robot",
+            "task": "Query The Jenkins Kubernetes Workload HTTP Endpoint",
+            "score": 3,
+            "reasoning": "The title is clear, specific, and human-readable. It clearly defines the task of querying the Jenkins Kubernetes workload HTTP endpoint to check if the pod is up and healthy. It provides the necessary context for the task and includes specific tags for easy identification. The task lacks a specific 'Where' variable; consider using `KUBERNETES_DISTRIBUTION_BINARY`.",
+            "suggested_title": "Query The Jenkins Kubernetes Workload HTTP Endpoint in Kubernetes StatefulSet `${STATEFULSET_NAME}`"
+        },
+        {
+            "codebundle": "k8s-jenkins-healthcheck",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-jenkins-healthcheck/runbook.robot",
+            "task": "Query For Stuck Jenkins Jobs",
+            "score": 3,
+            "reasoning": "The title is clear and specific, providing a detailed task of querying for stuck Jenkins jobs within the kubernetes statefulset workload. It is human-readable and includes relevant tags for context. The imported variables are used for specificity. The task lacks a specific 'Where' variable; consider using `KUBERNETES_DISTRIBUTION_BINARY`.",
+            "suggested_title": "Query For Stuck Jenkins Jobs in Kubernetes Statefulset Workload `$${STATEFULSET_NAME}`"
+        },
+        {
+            "codebundle": "gcp-bucket-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/gcp-bucket-health/runbook.robot",
+            "task": "Fetch GCP Bucket Storage Utilization for `${PROJECT_IDS}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, indicating the action of fetching GCP Bucket Storage Utilization. It provides a specific resource type (GCP buckets) and scope (`${PROJECT_IDS}`). The use of backticks and curly braces for the 'Where' variable is also present. The documentation and tags provide additional context and clarity.",
+            "suggested_title": "Fetch GCP Bucket Storage Utilization for `${PROJECT_IDS}`"
+        },
+        {
+            "codebundle": "gcp-bucket-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/gcp-bucket-health/runbook.robot",
+            "task": "Add GCP Bucket Storage Configuration for `${PROJECT_IDS}` to Report",
+            "score": 4,
+            "reasoning": "The task title is clear in its objective, readable to humans, and specific in what it aims to achieve. It includes the 'What' (GCP Bucket Storage Configuration) and the 'Where' (PROJECT_IDS). The documentation further clarifies the task's purpose and the tags provide additional context.",
+            "suggested_title": "Add GCP Bucket Storage Configuration for `${PROJECT_IDS}` to Report"
+        },
+        {
+            "codebundle": "gcp-bucket-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/gcp-bucket-health/runbook.robot",
+            "task": "Check GCP Bucket Security Configuration for `${PROJECT_IDS}`",
+            "score": 5,
+            "reasoning": "The title is clear, human-readable, and specific. It includes the 'What' (GCP Bucket Security Configuration) and the 'Where' (project IDs) in backticks and curly braces.",
+            "suggested_title": "Check GCP Bucket Security Configuration for `${PROJECT_IDS}`"
+        },
+        {
+            "codebundle": "gcp-bucket-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/gcp-bucket-health/runbook.robot",
+            "task": "Fetch GCP Bucket Storage Operations Rate for `${PROJECT_IDS}`",
+            "score": 5,
+            "reasoning": "The title is clear, specific, and human-readable. It clearly states the task to fetch GCP Bucket Storage Operations Rate for a specific PROJECT_IDS. It also mentions generating issues if the rate is above a specified threshold.",
+            "suggested_title": "Fetch GCP Bucket Storage Operations Rate for `${PROJECT_IDS}`"
+        },
+        {
+            "codebundle": "gcp-bucket-health",
+            "file": "sli.robot",
+            "filepath": "codebundles/gcp-bucket-health/sli.robot",
+            "task": "Fetch GCP Bucket Storage Utilization for `${PROJECT_IDS}`",
+            "score": 5,
+            "reasoning": "The title is clear, specific, and human-readable. It includes the action to be performed (Fetch), the resource type (GCP Bucket Storage), and the specific scope (for `${PROJECT_IDS}`). The documentation and tags provide additional clarity and context.",
+            "suggested_title": "Fetch GCP Bucket Storage Utilization for `${PROJECT_IDS}`"
+        },
+        {
+            "codebundle": "gcp-bucket-health",
+            "file": "sli.robot",
+            "filepath": "codebundles/gcp-bucket-health/sli.robot",
+            "task": "Check GCP Bucket Security Configuration for `${PROJECT_IDS}`",
+            "score": 4,
+            "reasoning": "The title is clear about the task of checking GCP Bucket Security Configuration and includes a specific 'What' (resource type) and a placeholder for the 'Where' (specific scope) variable. The documentation also provides clear details on what will be checked, making it human-readable and specific.",
+            "suggested_title": "Check GCP Bucket Security Configuration for `${PROJECT_IDS}`"
+        },
+        {
+            "codebundle": "gcp-bucket-health",
+            "file": "sli.robot",
+            "filepath": "codebundles/gcp-bucket-health/sli.robot",
+            "task": "Fetch GCP Bucket Storage Operations Rate for `${PROJECT_IDS}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, indicating the need to fetch GCP Bucket Storage Operations Rate for a specified project. The documentation and tags provide additional context and clarity.",
+            "suggested_title": "Fetch GCP Bucket Storage Operations Rate for `${PROJECT_IDS}`"
+        },
+        {
+            "codebundle": "gcp-bucket-health",
+            "file": "sli.robot",
+            "filepath": "codebundles/gcp-bucket-health/sli.robot",
+            "task": "Generate Bucket Score",
+            "score": 3,
+            "reasoning": "The task title is clear and specific, but lacks human readability and documentation. It also does not specify the 'Where' variable.",
+            "suggested_title": "Generate Bucket Score in Project `$${PROJECT_IDS}`"
+        },
+        {
+            "codebundle": "k8s-deployment-ops",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-deployment-ops/runbook.robot",
+            "task": "Restart Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is very clear, human-readable, and specific. It includes the 'What' (deployment) and the 'Where' (namespace) variables in backticks and curly braces, making it easily understandable and ready for variable substitution at runtime.",
+            "suggested_title": "Restart Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-deployment-ops",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-deployment-ops/runbook.robot",
+            "task": "Force Delete Pods in Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, mentioning the deployment name and namespace. It is also human-readable and includes the necessary information for someone to understand what needs to be done.",
+            "suggested_title": "Force Delete Pods in Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-deployment-ops",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-deployment-ops/runbook.robot",
+            "task": "Rollback Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` to Previous Version",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It provides a clear instruction to rollback a deployment to a previous version in a specific namespace. The tags and imported user variables are relevant and align with the task.",
+            "suggested_title": ""
+        },
+        {
+            "codebundle": "k8s-deployment-ops",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-deployment-ops/runbook.robot",
+            "task": "Scale Down Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is very clear, human-readable, and specific. It includes both the 'What' (deployment) and the 'Where' (namespace) variables. The documentation and tags provide additional context and clarity.",
+            "suggested_title": "Halt Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-deployment-ops",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-deployment-ops/runbook.robot",
+            "task": "Scale Up Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by ${SCALE_UP_FACTOR}x",
+            "score": 5,
+            "reasoning": "The task title is very clear and specific, providing the exact action ('Scale Up Deployment'), the specific deployment and namespace ('${DEPLOYMENT_NAME}' in Namespace '${NAMESPACE}'), and the scale up factor. The documentation and tags also support clarity and specificity.",
+            "suggested_title": "Scale Up Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by ${SCALE_UP_FACTOR}x"
+        },
+        {
+            "codebundle": "k8s-deployment-ops",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-deployment-ops/runbook.robot",
+            "task": "Clean Up Stale ReplicaSets for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It includes the 'What' (ReplicaSets for Deployment) and the 'Where' (Namespace). The documentation and tags provide additional clarity on what the task entails.",
+            "suggested_title": ""
+        },
+        {
+            "codebundle": "k8s-deployment-ops",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-deployment-ops/runbook.robot",
+            "task": "Scale Down Stale ReplicaSets for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It includes both the 'What' (ReplicaSets for Deployment) and the 'Where' (Namespace). The documentation and tags provide additional context, and the imported user variables are used to specify the 'What' and 'Where'.",
+            "suggested_title": "Scale Down Stale ReplicaSets for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "gcp-cloud-function-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/gcp-cloud-function-health/runbook.robot",
+            "task": "List Unhealhy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`",
+            "score": 4,
+            "reasoning": "The task title is clear, human-readable, and specific. It provides the 'What' (Cloud Functions) and the 'Where' (${GCP_PROJECT_ID}) variables in backticks and curly braces, and the documentation gives a clear explanation of the task.",
+            "suggested_title": "List Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`"
+        },
+        {
+            "codebundle": "gcp-cloud-function-health",
+            "file": "runbook.robot",
+            "filepath": "codebundles/gcp-cloud-function-health/runbook.robot",
+            "task": "Get Error Logs for Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, mentioning the GCP Project ID and the type of resource (Cloud Functions). It is also human-readable. The only improvement would be to specify a particular GCP region or environment for better specificity.",
+            "suggested_title": "Get Error Logs for Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}` in `us-central1` Region"
+        },
+        {
+            "codebundle": "gcp-cloud-function-health",
+            "file": "sli.robot",
+            "filepath": "codebundles/gcp-cloud-function-health/sli.robot",
+            "task": "Count unhealthy GCP Cloud Functions in GCP Project `${GCP_PROJECT_ID}`",
+            "score": 5,
+            "reasoning": "The title is clear, specific, and human-readable. It includes the task to count unhealthy GCP Cloud Functions, specifies the GCP Project using the imported variable, and provides a clear definition of what 'unhealthy' means in this context.",
+            "suggested_title": "Count unhealthy GCP Cloud Functions in GCP Project `${GCP_PROJECT_ID}`"
+        },
+        {
+            "codebundle": "k8s-gitops-gh-remediate",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-gitops-gh-remediate/runbook.robot",
+            "task": "Remediate Readiness and Liveness Probe GitOps Manifests in Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is very clear and specific, indicating the action to fix misconfigured probes in a specific namespace within a GitOps repository. It includes placeholders for variables, making it easily interpretable when executed.",
+            "suggested_title": "Remediate Readiness and Liveness Probe GitOps Manifests in Namespace `${NAMESPACE}`"
+        },
+        {
+            "codebundle": "k8s-gitops-gh-remediate",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-gitops-gh-remediate/runbook.robot",
+            "task": "Increase ResourceQuota for Namespace `${NAMESPACE}`",
+            "score": 4,
+            "reasoning": "The task title is clear and specific, indicating the action to be taken ('Increase ResourceQuota') and the specific scope for the action ('Namespace ${NAMESPACE}'). The tags also provide relevant context. The title could be more human-readable by adding a verb and specifying the type of resourcequota.",
+            "suggested_title": "Increase ResourceQuota Limit for Namespace `${NAMESPACE}` in GitHub GitOps Repository"
+        },
+        {
+            "codebundle": "k8s-gitops-gh-remediate",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-gitops-gh-remediate/runbook.robot",
+            "task": "Adjust Pod Resources to Match VPA Recommendation in `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title is clear, human-readable, and specific. It includes the 'What' (Pod Resources) and 'Where' (specific namespace) variables. The documentation and tags also provide additional context and clarity.",
+            "suggested_title": null
+        },
+        {
+            "codebundle": "k8s-gitops-gh-remediate",
+            "file": "runbook.robot",
+            "filepath": "codebundles/k8s-gitops-gh-remediate/runbook.robot",
+            "task": "Expand Persistent Volume Claims in Namespace `${NAMESPACE}`",
+            "score": 5,
+            "reasoning": "The task title clearly states the specific action of expanding Persistent Volume Claims in a specific namespace. It is human-readable and provides clear direction for the intended action. The tags also provide additional context for the task.",
+            "suggested_title": ""
+        }
+    ]
+}
