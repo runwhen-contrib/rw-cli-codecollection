@@ -83,12 +83,12 @@ Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resou
 Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the health of the application gateway backend pool members
     [Tags]    appservice    logs    tail
-    ${config_health}=    RW.CLI.Run Bash File
+    ${backend_health}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_backend_health.sh
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
-    RW.Core.Add Pre To Report    ${config_health.stdout}
+    RW.Core.Add Pre To Report    ${backend_health.stdout}
 
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/backend_pool_members_health.json
@@ -104,7 +104,7 @@ Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resou
             ...    next_steps=${item["next_step"]}
             ...    expected=Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has healthy pool members
             ...    actual=Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has unhealthy pool members
-            ...    reproduce_hint=${config_health.cmd}
+            ...    reproduce_hint=${backend_health.cmd}
             ...    details=${item["details"]}        
         END
     END    

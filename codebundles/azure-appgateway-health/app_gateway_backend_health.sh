@@ -32,7 +32,7 @@ if [ -z "$BACKEND_POOLS" ]; then
     issues_json=$(echo "$issues_json" | jq \
         --arg title "No Backend Pools Configured (What)" \
         --arg details "The Application Gateway has no backend pools configured." \
-        --arg nextStep "Add backend pools to route traffic to application instances. (Where: Application Gateway in the Azure Portal)" \
+        --arg nextStep "Add backend pools to route traffic to application instances" \
         --arg severity "1" \
         '.issues += [{
             "title": $title,
@@ -56,7 +56,7 @@ else
             issues_json=$(echo "$issues_json" | jq \
                 --arg title "Empty or Misconfigured Backend Pool (What)" \
                 --arg details "The backend pool '$pool_name' has no associated HTTP settings." \
-                --arg nextStep "Configure HTTP settings for the backend pool \`$pool_name\`. (Where: In the Azure Portal under the Application Gateway HTTP settings)" \
+                --arg nextStep "Configure HTTP settings for the backend pool \`$pool_name\`" \
                 --arg severity "1" \
                 '.issues += [{
                     "title": $title,
