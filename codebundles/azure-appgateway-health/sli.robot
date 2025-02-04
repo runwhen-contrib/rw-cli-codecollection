@@ -36,7 +36,7 @@ Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NA
     END
     Set Global Variable    ${appgw_resource_score}
 
-Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Fetch AKS Cluster Config in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the config of the AKS cluster in azure
     [Tags]    AKS    config
     ${config}=    RW.CLI.Run Bash File
@@ -75,7 +75,7 @@ Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resou
     Set Global Variable    ${appgw_backend_score}
 
 
-Generate Application Gateway Health Score
+Generate Application Gateway Health Score for `${APP_GATEWAY_NAME}` in Azure Subscription `${AZURE_RESOURCE_SUBSCRIPTION_ID}`
     ${appgw_health_score}=      Evaluate  (${appgw_resource_score} + ${appgw_config_score} + ${appgw_backend_score}) / 3
     ${health_score}=      Convert to Number    ${appgw_health_score}  2
     RW.Core.Push Metric    ${health_score}

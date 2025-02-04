@@ -13,7 +13,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Check for Overutilization and Networking Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the AKS cluster
     [Tags]    aks    config
     ${resource_health}=    RW.CLI.Run Bash File
@@ -82,7 +82,7 @@ Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${
             ...    details=${item["details"]}        
         END
     END
-Check Network Configuration of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Check Network Configuration of AKS Cluster `${{AKS_CLUSTER}}` In Resource Group `${{AZ_RESOURCE_GROUP}}`
    [Documentation]    Fetch the network configuration, generating resource URLs and basic recommendations
    [Tags]    AKS    config    network    route    firewall
    ${network}=    RW.CLI.Run Bash File

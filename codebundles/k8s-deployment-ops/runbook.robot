@@ -161,7 +161,7 @@ Rollback Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` to Previous
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Scale Down Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
+Halt Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Stops all running pods in a deployment to immediately halt a failing or runaway service.
     [Tags]
     ...    log

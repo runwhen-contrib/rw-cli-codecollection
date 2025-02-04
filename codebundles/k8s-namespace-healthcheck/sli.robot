@@ -68,7 +68,7 @@ Suite Initialization
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
 
 *** Tasks ***
-Get Event Count and Score
+Get Error Event Count within ${EVENT_AGE} and calculate Score
     [Documentation]    Captures error events and counts them within a configurable timeframe.
     [Tags]    Event    Count    Warning
     ${error_events}=    RW.CLI.Run Cli
@@ -85,7 +85,7 @@ Get Event Count and Score
     ${event_score}=    Evaluate    1 if ${error_event_count.stdout} <= ${EVENT_THRESHOLD} else 0
     Set Global Variable    ${event_score}
 
-Get Container Restarts and Score
+Get Container Restarts and Score in Namespace `${NAMESPACE}`
     [Documentation]    Counts the total sum of container restarts within a timeframe and determines if they're beyond a threshold.
     [Tags]    Restarts    Pods    Containers    Count    Status
     ${pods}=    RW.CLI.Run Cli
@@ -103,7 +103,7 @@ Get Container Restarts and Score
     ${container_restart_score}=    Evaluate    1 if ${container_restarts_sum.stdout} <= ${CONTAINER_RESTART_THRESHOLD} else 0
     Set Global Variable    ${container_restart_score}
 
-Get NotReady Pods
+Get NotReady Pods in `${NAMESPACE}`
     [Documentation]    Fetches a count of unready pods.
     [Tags]    Pods    Status    Phase    Ready    Unready    Running
     ${unreadypods_results}=    RW.CLI.Run Cli
@@ -114,7 +114,7 @@ Get NotReady Pods
     ${pods_notready_score}=    Evaluate    1 if ${unreadypods_results.stdout} == 0 else 0
     Set Global Variable    ${pods_notready_score}
 
-Generate Namspace Score
+Generate Namespace Score in `${NAMESPACE}`
     ${namespace_health_score}=      Evaluate  (${event_score} + ${container_restart_score} + ${pods_notready_score}) / 3
     ${health_score}=      Convert to Number    ${namespace_health_score}  2
     RW.Core.Push Metric    ${health_score}

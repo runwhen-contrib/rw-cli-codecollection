@@ -12,7 +12,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Run User Provided Kubectl Command
+Run User Provided Kubectl Command on `${KUBECTL_COMMAND}` in Kubernetes Cluster
     [Documentation]    Runs a user provided kubectl command and adds the output to the report.
     [Tags]    kubectl    cli
     ${rsp}=    RW.CLI.Run Cli

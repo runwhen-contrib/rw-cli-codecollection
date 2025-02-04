@@ -28,7 +28,7 @@ Check for Node Restarts in Cluster `${CONTEXT}`
     ${event_score}=    Evaluate    1 if ${events} == 0 else 0
     Set Global Variable    ${event_score}
 
-Generate Namspace Score
+Generate Namespace Score in Kubernetes Cluster `$${CONTEXT}`
     ${cluster_node_score}=    Evaluate    (${event_score} / 1)
     ${health_score}=    Convert to Number    ${cluster_node_score}    2
     RW.Core.Push Metric    ${health_score}

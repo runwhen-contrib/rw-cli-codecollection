@@ -14,7 +14,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Analyze artifact from GitHub workflow `${WORKFLOW_NAME}` in repository `${GITHUB_REPO}`
+Analyze artifact from GitHub workflow `${WORKFLOW_NAME}` in repository `${GITHUB_REPO}` using command `${ANALYSIS_COMMAND}`
     [Documentation]    Check GitHub workflow status and analyze artifact with a user provided command.
     [Tags]    github    workflow    actions    artifact    report
     ${ESCAPED_ANALYSIS_COMMAND}=    RW.CLI.Escape Bash Command    ${ANALYSIS_COMMAND}

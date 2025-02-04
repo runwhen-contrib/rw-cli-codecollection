@@ -46,7 +46,7 @@ Suite Initialization
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
 
 *** Tasks ***
-Measure Number of Running Pods with Label
+Measure Number of Running Pods with Label in `${NAMESPACE}`
     [Documentation]    Counts the number of running pods with the configured labels.
     [Tags]    Pods    Containers    Running    Status    Count    Health
     ${running_pods}=    RW.CLI.Run Cli

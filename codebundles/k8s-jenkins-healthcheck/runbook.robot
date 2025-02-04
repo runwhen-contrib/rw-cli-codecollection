@@ -67,7 +67,7 @@ Suite Initialization
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
 
 *** Tasks ***
-Query The Jenkins Kubernetes Workload HTTP Endpoint
+Query The Jenkins Kubernetes Workload HTTP Endpoint in Kubernetes StatefulSet `${STATEFULSET_NAME}`
     [Documentation]    Performs a curl within the jenkins statefulset kubernetes workload to determine if the pod is up and healthy, and can serve requests.
     [Tags]    HTTP    Curl    Web    Code    OK    Available    Jenkins    HTTP    Endpoint    API
     ${rsp}=    RW.CLI.Run Cli
@@ -97,7 +97,7 @@ Query The Jenkins Kubernetes Workload HTTP Endpoint
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
-Query For Stuck Jenkins Jobs
+Query For Stuck Jenkins Jobs in Kubernetes Statefulset Workload `$${STATEFULSET_NAME}`
     [Documentation]    Performs a curl within the jenkins statefulset kubernetes workload to check for stuck jobs in the jenkins piepline queue.
     [Tags]    HTTP    Curl    Web    Code    OK    Available    Queue    Stuck    Jobs    Jenkins
     ${rsp}=    RW.CLI.Run Cli

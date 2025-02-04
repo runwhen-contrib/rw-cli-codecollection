@@ -73,7 +73,7 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
     ${pvc_utilization_score}=    Evaluate    1 if len(@{issue_list}) == 0 else 0
     Set Global Variable    ${pvc_utilization_score}
 
-Generate Namspace Score
+Generate Namespace Score for Namespace `${NAMESPACE}`
     ${pvc_health_score}=      Evaluate  (${pvc_utilization_score}) / 1
     ${health_score}=      Convert to Number    ${pvc_health_score}  2
     RW.Core.Push Metric    ${health_score}

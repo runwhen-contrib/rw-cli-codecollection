@@ -16,7 +16,7 @@ Library             Process
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Test `${WORKLOAD_NAME}` High Availability
+Test `${WORKLOAD_NAME}` High Availability in Namespace `${NAMESPACE}`
     [Documentation]   Kills a pod under this workload to test high availability.
     [Tags]  Kubernetes    StatefulSet    Deployments    Pods    Highly Available
     ${process}=    RW.CLI.Run Bash File
@@ -34,7 +34,7 @@ OOMKill `${WORKLOAD_NAME}` Pod
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ${process.stdout}
 
-Mangle Service Selector For `${WORKLOAD_NAME}`
+Mangle Service Selector For `${WORKLOAD_NAME}` in `${NAMESPACE}`
     [Documentation]   Breaks a service's label selector to cause a network disruption
     [Tags]  Kubernetes    networking    Services    Selector
     ${process}=    RW.CLI.Run Bash File
@@ -43,7 +43,7 @@ Mangle Service Selector For `${WORKLOAD_NAME}`
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ${process.stdout}
 
-Mangle Service Port For `${WORKLOAD_NAME}`
+Mangle Service Port For `${WORKLOAD_NAME}` in `${NAMESPACE}`
     [Documentation]   Changes a service's port to cause a network disruption
     [Tags]  Kubernetes    networking    Services    Port
     ${process}=    RW.CLI.Run Bash File

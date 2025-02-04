@@ -14,7 +14,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Search For GCE Ingress Warnings in GKE
+Search For GCE Ingress Warnings in GKE Context `${CONTEXT}`
     [Documentation]    Find warning events related to GCE Ingress and services objects
     [Tags]    service    ingress    endpoint    health    ingress-gce    gke
     ${event_warnings}=    RW.CLI.Run Cli
@@ -31,13 +31,13 @@ Search For GCE Ingress Warnings in GKE
     ...    set_issue_actual=Ingress and service objects have warnings in namespace `${NAMESPACE}` for ingress `${INGRESS}`
     ...    set_issue_title=Unhealthy GCE ingress or service objects found in namespace `${NAMESPACE}` for ingress `${INGRESS}`
     ...    set_issue_details=The following warning events were found:\n\n${event_warnings.stdout}\n\n
-    ...    set_issue_next_steps=Validate GCP HTTP Load Balancer Configurations for ${INGRESS}
+    ...    set_issue_next_steps=Validate GCP HTTP Load Balancer Configurations in GCP Project `$${GCP_PROJECT_ID}` for ${INGRESS}
     ...    _line__raise_issue_if_contains=Warning
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    GCE Ingress warnings for ${NAMESPACE}:\n\n${event_warnings.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Identify Unhealthy GCE HTTP Ingress Backends
+Identify Unhealthy GCE HTTP Ingress Backends in GKE Namespace `$${NAMESPACE}`
     [Documentation]    Checks the backend annotations on the ingress object to determine if they are not regstered as healthy
     [Tags]    service    ingress    endpoint    health    ingress-gce    gke
     ${unhealthy_backends}=    RW.CLI.Run Cli
@@ -61,7 +61,7 @@ Identify Unhealthy GCE HTTP Ingress Backends
     ...    GCE unhealthy backends in `${NAMESPACE}` for ingress `${INGRESS}`:\n\n${unhealthy_backends.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Validate GCP HTTP Load Balancer Configurations
+Validate GCP HTTP Load Balancer Configurations in GCP Project `$${GCP_PROJECT_ID}`
     [Documentation]    Extract GCP HTTP Load Balancer components from ingress annotations and check health of each object
     [Tags]    service    ingress    endpoint    health    backends    urlmap     gce
     ${gce_config_objects}=    RW.CLI.Run Bash File
@@ -90,7 +90,7 @@ Validate GCP HTTP Load Balancer Configurations
     RW.Core.Add Pre To Report    Ingress object summary for ingress: `${INGRESS}` in namespace: `${NAMESPACE}`:\n\n${gce_config_objects.stdout}
 
 
-Fetch Network Error Logs from GCP Operations Manager for Ingress Backends
+Fetch Network Error Logs from GCP Operations Manager for Ingress Backends in GCP Project `$${GCP_PROJECT_ID}`
    [Documentation]    Fetch logs from the last 1d that are specific to the HTTP Load Balancer within the last 60 minutes
    [Tags]    service    ingress    endpoint    health
    ${network_error_logs}=    RW.CLI.Run Cli
@@ -115,7 +115,7 @@ Fetch Network Error Logs from GCP Operations Manager for Ingress Backends
    RW.Core.Add Pre To Report    Network error logs possibly related to Ingress ${INGRESS}:\n\n${network_error_logs.stdout}
    RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Review GCP Operations Logging Dashboard
+Review GCP Operations Logging Dashboard in GCP project `$${GCP_PROJECT_ID}`
    [Documentation]    Create urls that will help users obtain logs from the GCP Dashboard
    [Tags]    service    ingress    endpoint    health    logging    http    loadbalancer
    ${loadbalancer_log_url}=   RW.CLI.Run CLI

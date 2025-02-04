@@ -14,7 +14,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-List all nodes in an active prempt operation for GCP Project `${GCP_PROJECT_ID}`
+List all nodes in an active preempt operation for GCP Project `${GCP_PROJECT_ID}` within the last `${AGE}` hours
     [Documentation]    Fetches all nodes that have been preempted within the defined time interval.
     [Tags]    stdout    gcloud    node    preempt    gcp    ${gcp_project_id}
     ${preempt_node_list}=    RW.CLI.Run Cli

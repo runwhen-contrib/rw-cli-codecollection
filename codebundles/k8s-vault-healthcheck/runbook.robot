@@ -14,7 +14,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Fetch Vault CSI Driver Logs
+Fetch Vault CSI Driver Logs in Namespace `${NAMESPACE}`
     [Documentation]    Fetches the last 100 lines of logs for the vault CSI driver.
     [Tags]    fetch    log    pod    container    errors    inspect    trace    info    vault    csi    driver
     ${logs}=    RW.CLI.Run Cli
@@ -31,7 +31,7 @@ Fetch Vault CSI Driver Logs
     RW.Core.Add Pre To Report    ${found_logs}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Get Vault CSI Driver Warning Events
+Get Vault CSI Driver Warning Events in `${NAMESPACE}`
     [Documentation]    Fetches warning-type events related to the vault CSI driver.
     [Tags]    events    errors    warnings    get    vault    csi    driver
     ${events}=    RW.CLI.Run Cli
@@ -130,7 +130,7 @@ Check Vault CSI Driver Replicas
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Fetch Vault Logs
+Fetch Vault Pod Workload Logs in Namespace `${NAMESPACE}` with Labels `${LABELS}`
     [Documentation]    Fetches the last 100 lines of logs for all vault pod workloads in the vault namespace.
     [Tags]    fetch    log    pod    container    errors    inspect    trace    info    statefulset    vault
     ${logs}=    RW.CLI.Run Cli
@@ -147,7 +147,7 @@ Fetch Vault Logs
     RW.Core.Add Pre To Report    ${found_logs}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Get Related Vault Events
+Get Related Vault Events in Namespace `$${NAMESPACE}`
     [Documentation]    Fetches all warning-type events related to vault in the vault namespace.
     [Tags]    events    workloads    errors    warnings    get    statefulset    vault
     ${events}=    RW.CLI.Run Cli
@@ -164,7 +164,7 @@ Get Related Vault Events
     RW.Core.Add Pre To Report    ${found_events}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Fetch Vault StatefulSet Manifest Details
+Fetch Vault StatefulSet Manifest Details in `${NAMESPACE}`
     [Documentation]    Fetches the current state of the vault statefulset manifest for inspection.
     [Tags]    statefulset    details    manifest    info    vault
     ${statefulset}=    RW.CLI.Run Cli
@@ -177,7 +177,7 @@ Fetch Vault StatefulSet Manifest Details
     RW.Core.Add Pre To Report    ${statefulset.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Fetch Vault DaemonSet Manifest Details
+Fetch Vault DaemonSet Manifest Details in Kubernetes Cluster `${NAMESPACE}`
     [Documentation]    Fetches the current state of the vault daemonset manifest for inspection.
     [Tags]    statefulset    details    manifest    info    vault
     ${statefulset}=    RW.CLI.Run Cli
@@ -190,7 +190,7 @@ Fetch Vault DaemonSet Manifest Details
     RW.Core.Add Pre To Report    ${statefulset.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Verify Vault Availability
+Verify Vault Availability in Namespace `${NAMESPACE}` and Context `${CONTEXT}`
     [Documentation]    Curls the vault endpoint and checks the HTTP response code.
     [Tags]    http    curl    vault    web    code    ok    available
     ${rsp}=    RW.CLI.Run Cli
@@ -207,7 +207,7 @@ Verify Vault Availability
     ...    set_issue_title=The Vault API Responded With An Error State
     ...    set_issue_details=The vault state is init:$init, standby:$standby and sealed:$sealed. Based on "$_stdout". Check statefulset pod logs and events. Verify or invoke unseal process.
 
-Check Vault StatefulSet Replicas
+Check Vault StatefulSet Replicas in `NAMESPACE`
     [Documentation]    Pulls the replica information for the Vault statefulset and checks if it's highly available
     ...    , if the replica counts are the expected / healthy values, and if not, what they should be.
     [Tags]

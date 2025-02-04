@@ -53,7 +53,7 @@ Check OpenTelemetry Collector Logs For Errors In Namespace `${NAMESPACE}`
     END
     RW.Core.Add Pre To Report    ${process.stdout}\n
 
-Scan OpenTelemetry Logs For Dropped Spans In Namespace `${NAMESPACE}`
+Query OpenTelemetry Logs For Dropped Spans In Namespace `${NAMESPACE}`
     [Documentation]    Query the collector logs for dropped spans from errors
     [Tags]    otel collector    metrics    errors    logs    dropped    rejected
     ${process}=    RW.CLI.Run Bash File

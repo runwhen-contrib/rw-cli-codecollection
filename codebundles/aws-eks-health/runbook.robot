@@ -16,7 +16,7 @@ Library             Process
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Check EKS Fargate Cluster Health Status
+Check EKS Fargate Cluster Health Status in AWS Region `${AWS_REGION}`
     [Documentation]   This script checks the health status of an Amazon EKS Fargate cluster.
     [Tags]  EKS    Fargate    Cluster Health    AWS    Kubernetes    Pods    Nodes  
     ${process}=    RW.CLI.Run Bash File    check_eks_fargate_cluster_health_status.sh
@@ -35,7 +35,7 @@ Check EKS Fargate Cluster Health Status
     END
     RW.Core.Add Pre To Report    ${process.stdout}
 
-Check EKS Cluster Health Status
+Check Amazon EKS Cluster Health Status in AWS Region `${AWS_REGION}`
     [Documentation]   This script checks the health status of an Amazon EKS cluster. 
     [Tags]  EKS       Cluster Health    AWS    Kubernetes    Pods    Nodes  
     ${process}=    RW.CLI.Run Bash File    check_eks_cluster_health.sh
@@ -54,7 +54,7 @@ Check EKS Cluster Health Status
     END
     RW.Core.Add Pre To Report    ${process.stdout}
 
-List EKS Cluster Metrics
+Monitor EKS Cluster Health in AWS Region `${AWS_REGION}`
     [Documentation]   This bash script is designed to monitor the health and status of an Amazon EKS cluster.
     [Tags]  AWS    EKS    Fargate    Bash Script    Node Health   
     ${process}=    RW.CLI.Run Bash File    list_eks_fargate_metrics.sh

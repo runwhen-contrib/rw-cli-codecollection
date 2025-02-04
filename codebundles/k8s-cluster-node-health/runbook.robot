@@ -14,7 +14,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check for Node Restarts in Cluster `${CONTEXT}`
+Check for Node Restarts in Cluster `${CONTEXT}` within Interval `${INTERVAL}`
     [Documentation]    Identify nodes that are starting and stopping within the time interval.
     [Tags]    cluster    preempt    spot    reboot    utilization    saturation    exhaustion    starvation
     ${node_restart_details}=    RW.CLI.Run Bash File

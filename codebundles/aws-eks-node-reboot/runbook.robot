@@ -11,7 +11,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check EKS Nodegroup Status
+Check EKS Nodegroup Status in `${EKS_CLUSTER_NAME}`
     [Documentation]    Performs a check on a given cluster's nodegroup, raising an issue if the status of the nodegroup is not healthy.
     [Tags]    aws    eks    node    group    status
     ${node_state}=    RW.CLI.Run Cli

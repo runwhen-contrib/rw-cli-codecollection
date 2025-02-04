@@ -77,7 +77,7 @@ Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${
     ${aks_config_score}=    Evaluate    1 if len(@{issue_list["issues"]}) == 0 else 0
     Set Global Variable    ${aks_config_score}
 
-Generate AKS Cluster Health Score
+Calculate AKS Cluster Health Score for AKS Cluster `${AKS_CLUSTER}` in Azure Resource Group `${AZ_RESOURCE_GROUP}`
     ${aks_cluster_health_score}=      Evaluate  (${aks_resource_score} + ${aks_activities_score} + ${aks_config_score}) / 3
     ${health_score}=      Convert to Number    ${aks_cluster_health_score}  2
     RW.Core.Push Metric    ${health_score}

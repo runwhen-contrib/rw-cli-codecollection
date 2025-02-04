@@ -60,7 +60,7 @@ Fetch GCP Bucket Storage Operations Rate for `${PROJECT_IDS}`
     ${bucket_ops_rate_score}=    Evaluate    1 if int(${buckets_over_ops_threshold.stdout}) == 0 else 0
     Set Global Variable    ${bucket_ops_rate_score}
 
-Generate Bucket Score
+Generate Bucket Score in Project `$${PROJECT_IDS}`
     ${bucket_health_score}=      Evaluate  (${buckets_over_utilization} + ${public_bucket_score} + ${bucket_ops_rate_score}) / 3
     ${health_score}=      Convert to Number    ${bucket_health_score}  2
     RW.Core.Push Metric    ${health_score}

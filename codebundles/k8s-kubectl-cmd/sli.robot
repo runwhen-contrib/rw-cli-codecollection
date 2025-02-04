@@ -12,7 +12,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Run User Provided Kubectl Command
+Run User Provided Kubectl Command in Kubernetes Cluster `$${KUBECTL_CLUSTER}`
     [Documentation]    Runs a user provided kubectl command and pushes the metric as an SLI
     [Tags]    kubectl    cli    metric    sli
     ${rsp}=    RW.CLI.Run Cli

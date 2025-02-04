@@ -104,7 +104,7 @@ Suite Initialization
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
 
 *** Tasks ***
-Suspend the Flux Resource Reconciliation
+Suspend the Flux Resource Reconciliation for ${FLUX_RESOURCE_NAME} in namespace ${FLUX_RESOURCE_NAMESPACE}
         [Documentation]    Suspends a flux resource so that it can be manipulated for chaos purposes. 
         [Tags]    Chaos    Flux    Kubernetes    Resource    Suspend
         ${suspend_flux_resource}=    RW.CLI.Run Cli
@@ -114,7 +114,7 @@ Suspend the Flux Resource Reconciliation
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Find Random FluxCD Workload as Chaos Target
+Select Random FluxCD Workload for Chaos Target in Namespace `${FLUX_RESOURCE_NAMESPACE}`
     [Documentation]    Inspects the Flux resource and randomly selects a deployment to tickle. Tehe. Only runs if RANDOMIZE = Yes. 
     [Tags]    Chaos    Flux    Kubernetes    Resource    Random
     IF     "${RANDOMIZE}" == "Yes"
@@ -138,7 +138,7 @@ Find Random FluxCD Workload as Chaos Target
         Set Suite Variable    ${TARGET_RESOURCE}    deployment/${deployment_name}
     END
 
-Execute Chaos Command
+Execute Chaos Command on ${TARGET_RESOURCE} in Namespace ${TARGET_NAMESPACE}
     [Documentation]    Run the desired chaos command within a targeted resource 
     [Tags]    Chaos    Flux    Kubernetes    Resource    Kill    OOM
     FOR    ${index}    IN RANGE    ${CHAOS_COMMAND_LOOP}
@@ -150,7 +150,7 @@ Execute Chaos Command
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Execute Additional Chaos Command
+Execute Additional Chaos Command on ${FLUX_RESOURCE_TYPE} '${FLUX_RESOURCE_NAME}' in namespace '${FLUX_RESOURCE_NAMESPACE}'
     [Documentation]    Run the additional command as input, verbatim. 
     [Tags]    Chaos    Flux    Kubernetes    Resource
     ${run_additional_command}=    RW.CLI.Run Cli
@@ -160,7 +160,7 @@ Execute Additional Chaos Command
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Resume Flux Resource Reconciliation
+Resume Flux Resource Reconciliation in `${TARGET_NAMESPACE}`
     [Documentation]    Resumes Flux reconciliation on desired resource.  
     [Tags]    Chaos    Flux    Kubernetes    Resource    Resume
     ${resume_flux}=    RW.CLI.Run Cli

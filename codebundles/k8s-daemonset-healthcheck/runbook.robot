@@ -27,7 +27,7 @@ Get DaemonSet Logs for `${DAEMONSET_NAME}` and Add to Report
     RW.Core.Add Pre To Report    ${logs.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Get Related Daemonset `${DAEMONSET_NAME}` Events
+Get Related Daemonset `${DAEMONSET_NAME}` Events in Namespace `${NAMESPACE}`
     [Documentation]    Fetches events related to the daemonset workload in the namespace.
     [Tags]    events    workloads    errors    warnings    get    daemonset    csi
     ${events}=    RW.CLI.Run Cli
