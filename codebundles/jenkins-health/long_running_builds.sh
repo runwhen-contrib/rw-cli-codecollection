@@ -73,7 +73,7 @@ echo "$jenkins_data" | jq --arg threshold "$THRESHOLD_MINUTES" --arg current "$c
     .jobs[] | 
     select(.lastBuild != null and .lastBuild.building) |
     {
-      "name": .name,
+      "job_name": .name,
       "build_number": .lastBuild.number,
       "node": (if .lastBuild.builtOn == "" then "Built-in Node" else .lastBuild.builtOn end),
       "start_time": .lastBuild.timestamp,
