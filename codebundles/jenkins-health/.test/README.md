@@ -51,20 +51,86 @@ Create this file with the following environment variables:
 		task build-infra
 	```	
 
-2. Generate RunWhen Configurations
+2. Configure Jenkins and create pipelines:
+
+	- **Initial Setup**: Follow the Jenkins UI prompts to install suggested plugins.
+
+	- **Reproducing Scenarios**:
+
+	  - **Failed Pipeline Logs**:
+		 Create a `Freestyle project` and choose the `Execute shell` option under `Build Steps` with an arbitrary script that will fail, such as a syntax error.
+
+	  - **Long Running Pipelines**:
+		 Create a `Freestyle project` and choose the `Execute shell` option under `Build Steps`. Use the following script:
+		 ```sh
+		 #!/bin/bash
+
+		 error 
+		 # Print the start time
+		 echo "Script started at: $(date)"
+
+		 # Sleep for 30 minutes (1800 seconds)
+		 sleep 1800
+
+		 # Print the end time
+		 echo "Script ended at: $(date)"
+		 ```
+
+	  - **Queued Builds**:
+		 Create three `Freestyle projects` using the above long-running script. With the default Jenkins setup having two executors, triggering all three projects will result in one being queued for a long time.
+
+	  - **Failed Tests**:
+		 Create a `Pipeline` project and under the Definition section, paste the following Groovy script:
+		 ```groovy
+			pipeline {
+				agent any
+
+				tools {
+					// Install the Maven version configured as "M3" and add it to the path.
+					maven "M3"
+				}
+
+				stages {
+					stage('Build') {
+						steps {
+							// Get some code from a GitHub repository
+							git 'https://github.com/saurabh3460/simple-maven-project-with-tests.git'
+
+							// Run Maven on a Unix agent.
+							sh "mvn -Dmaven.test.failure.ignore=true clean package"
+
+							// To run Maven on a Windows agent, use
+							// bat "mvn -Dmaven.test.failure.ignore=true clean package"
+						}
+
+						post {
+							// If Maven was able to run the tests, even if some of the test
+							// failed, record the test results and archive the jar file.
+							success {
+								junit '**/target/surefire-reports/TEST-*.xml'
+								archiveArtifacts 'target/*.jar'
+							}
+						}
+					}
+				}
+			}
+		 ```
+
+
+3. Generate RunWhen Configurations
 	```sh
 		tasks
 	```
 
-3. Upload generated SLx to RunWhen Platform
+4. Upload generated SLx to RunWhen Platform
 
 	```sh
 		task upload-slxs
 	```
 
-4. At last, after testing, clean up the test infrastructure.
+5. At last, after testing, clean up the test infrastructure.
 
-```sh
-	task clean
-```
+	```sh
+		task clean
+	```
 
