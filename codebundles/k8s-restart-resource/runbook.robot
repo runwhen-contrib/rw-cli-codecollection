@@ -42,7 +42,7 @@ Get Resource Logs with Labels `${LABELS}`
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Restart Resource with Labels `${LABELS}`
+Restart Resource with Labels `${LABELS}` in `${CONTEXT}`
     [Documentation]    Restarts the labeled resource in an attempt to get it out of a bad state.
     [Tags]    resource    application    restart    pod    kill    rollout    revision
     ${resource_name}=    RW.CLI.Run Cli

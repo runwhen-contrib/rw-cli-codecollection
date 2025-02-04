@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check If Kong Ingress HTTP Error Rate Violates HTTP Error Threshold
+Check If Kong Ingress HTTP Error Rate Violates HTTP Error Threshold in GCP Project `$${GCP_PROJECT_ID}`
     [Documentation]    Fetches HTTP Error metrics for the Kong ingress host and service from GMP and performs an inspection on the results. If there are currently any results with more than the defined HTTP error threshold, their route and service names will be surfaced for further troubleshooting.
     [Tags]    curl    http    ingress    errors    metrics    kong    gmp
     ${gmp_rsp}=    RW.CLI.Run Cli
@@ -48,7 +48,7 @@ Check If Kong Ingress HTTP Error Rate Violates HTTP Error Threshold
     RW.Core.Add Pre To Report    HTTP Error Violation & Details:\n${gmp_rsp.stdout}
     RW.Core.Add Pre To Report    GMP Json Data:\n${gmp_json.stdout}
 
-Check If Kong Ingress HTTP Request Latency Violates Threshold
+Check If Kong Ingress HTTP Request Latency Violates Threshold for Upstream `$${INGRESS_UPSTREAM}`
     [Documentation]    Fetches metrics for the Kong ingress 99th percentile request latency from GMP and performs an inspection on the results. If there are currently any results with more than the defined request latency threshold, their route and service names will be surfaced for further troubleshooting.
     [Tags]    curl    request    ingress    latency    http    kong    gmp
     ${gmp_rsp}=    RW.CLI.Run Cli
@@ -79,7 +79,7 @@ Check If Kong Ingress HTTP Request Latency Violates Threshold
     RW.Core.Add Pre To Report    Commands Used: ${history}
     RW.Core.Add Pre To Report    HTTP Request Latency Within Acceptable Parameters:\n${gmp_rsp.stdout}
 
-Check If Kong Ingress Controller Reports Upstream Errors
+Check If Kong Ingress Controller Reports Upstream Errors in GCP Project `$${GCP_PROJECT_ID}`
     [Documentation]    Fetches metrics for the Kong ingress controller related to upstream healthchecks or dns errors.
     [Tags]    curl    request    ingress    upstream    healthcheck    dns    errrors    http    kong    gmp
     ${gmp_healthchecks_off_rsp}=    RW.CLI.Run Cli

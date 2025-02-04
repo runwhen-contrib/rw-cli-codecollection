@@ -53,7 +53,7 @@ Check for Resource Health Issues Affecting App Service `${APP_SERVICE_NAME}` In 
     END
 
 
-Check App Service `${APP_SERVICE_NAME}` Health Check Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
+Check App Service `${APP_SERVICE_NAME}` Health in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks the health status of a appservice workload.
     [Tags]    
     ${health_check_metric}=    RW.CLI.Run Bash File
@@ -172,7 +172,7 @@ Check Configuration Health of App Service `${APP_SERVICE_NAME}` In Resource Grou
         END
     END
 
-Check Deployment Health of App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Fetch Deployment Health of App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch deployment health of the App Service
     [Tags]    appservice    deployment
     ${deployment_health}=    RW.CLI.Run Bash File

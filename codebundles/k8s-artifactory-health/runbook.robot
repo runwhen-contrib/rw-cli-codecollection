@@ -66,7 +66,7 @@ Suite Initialization
 
 
 *** Tasks ***
-Check Artifactory Liveness and Readiness Endpoints
+Check Artifactory Liveness and Readiness Endpoints in `NAMESPACE`
     [Documentation]    Runs a set of exec commands internally in the Artifactory workloads to curl the system health endpoints.
     [Tags]    Pods    Statefulset    Artifactory    Health    System    Curl    API    OK    HTTP
     # these endpoints dont respect json type headers

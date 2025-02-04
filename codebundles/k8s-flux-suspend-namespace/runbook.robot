@@ -16,7 +16,7 @@ Library             Process
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Flux Suspend Namespace ${NAMESPACE}
+Flux Suspend Namespace `${NAMESPACE}`
     [Documentation]   Applies a flux suspend to the spec of all flux objects reconciling in a given namespace.
     [Tags]  Kubernetes    Namespace    Flux    Suspend
     ${process}=    RW.CLI.Run Bash File    suspend_namespace.sh
@@ -24,7 +24,7 @@ Flux Suspend Namespace ${NAMESPACE}
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ${process.stdout}
 
-Unsuspend Flux for Namespace ${NAMESPACE}
+Unsuspend Flux for Namespace `${NAMESPACE}`
     [Documentation]   Unsuspends any suspended flux objects in a given namespace, allowing reconciliation to resume.
     [Tags]  Kubernetes    Namespace    Flux    Unsuspend
     ${process}=    RW.CLI.Run Bash File    unsuspend_namespace.sh

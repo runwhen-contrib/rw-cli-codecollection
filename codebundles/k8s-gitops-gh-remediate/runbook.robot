@@ -54,7 +54,7 @@ Remediate Readiness and Liveness Probe GitOps Manifests in Namespace `${NAMESPAC
     RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${probe_health.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${probe_health.cmd}
 
-Increase ResourceQuota for Namespace `${NAMESPACE}`
+Increase ResourceQuota Limit for Namespace `${NAMESPACE}` in GitHub GitOps Repository
     [Documentation]    Looks for a resourcequota object in the namespace and increases it if applicable, and if it is managed in a GitHub GitOps repository
     [Tags]    resourcequota    quota    namespace    remediate    github    gitops    ${NAMESPACE}
     ${quota_usage}=    RW.CLI.Run Bash File

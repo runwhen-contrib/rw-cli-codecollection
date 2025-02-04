@@ -51,7 +51,7 @@ Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NA
         ...    details=${issue_list}
         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
     END
-Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}` in Subscription `${AZURE_RESOURCE_SUBSCRIPTION_ID}`
     [Documentation]    Fetch the details and health of the application gateway configuration
     [Tags]    appservice    logs    tail
     ${config_health}=    RW.CLI.Run Bash File

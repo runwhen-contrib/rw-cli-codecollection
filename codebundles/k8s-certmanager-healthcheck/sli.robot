@@ -14,7 +14,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Count Unready and Expired Certificates
+Count Unready and Expired Certificates in Namespace `${NAMESPACE}`
     [Documentation]    Adds together the count of unready and expired certificates. A healthy SLI value is 0.
     [Tags]    certificate    status    count    health    certmanager    cert
 

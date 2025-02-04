@@ -61,7 +61,7 @@ Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
     ...    Recent logs from Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE}:\n\n${logs.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Fetch Deployments Logs for `${DEPLOYMENT_NAME}` and Add to Report
+Fetch Deployments Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` and Add to Report
     [Documentation]    Fetches logs from running pods and adds content to the report
     [Tags]
     ...    kubernetes
@@ -118,7 +118,7 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     RW.Core.Add Pre To Report    Liveness probe testing results:\n\n${liveness_probe_health.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${liveness_probe_health.cmd}
 
-Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
+Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Validates if a readiness probe has possible misconfigurations
     [Tags]
     ...    readiness
@@ -229,7 +229,7 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`
     RW.Core.Add Pre To Report    ${events.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Get Deployment Workload Details For `${DEPLOYMENT_NAME}` and Add to Report
+Fetch Deployment Workload Details For `${DEPLOYMENT_NAME}`
     [Documentation]    Fetches the current state of the deployment for future review in the report.
     [Tags]    deployment    details    manifest    info    ${DEPLOYMENT_NAME}
     ${deployment}=    RW.CLI.Run Cli
@@ -242,7 +242,7 @@ Get Deployment Workload Details For `${DEPLOYMENT_NAME}` and Add to Report
     RW.Core.Add Pre To Report    Snapshot of deployment state:\n\n${deployment.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Inspect Deployment Replicas for `${DEPLOYMENT_NAME}`
+Inspect Deployment Replicas for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
     [Documentation]    Pulls the replica information for a given deployment and checks if it's highly available
     ...    , if the replica counts are the expected / healthy values, and raises issues if it is not progressing
     ...    and is missing pods.
@@ -297,7 +297,7 @@ Inspect Deployment Replicas for `${DEPLOYMENT_NAME}`
         ...    title= Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` is not configured to be highly available.
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment `${DEPLOYMENT_NAME}` is only configured to have a single pod:\n`${deployment_status}`
-        ...    next_steps=Get Deployment Workload Details For `${DEPLOYMENT_NAME}` and Add to Report\nAdjust Deployment `${DEPLOYMENT_NAME}` spec.replicas to be greater than 1.
+        ...    next_steps=Fetch Deployment Workload Details For `${DEPLOYMENT_NAME}`\nAdjust Deployment `${DEPLOYMENT_NAME}` spec.replicas to be greater than 1.
     END
     RW.Core.Add Pre To Report    Deployment State:\n${deployment_replicas.stdout}
     ${history}=    RW.CLI.Pop Shell History

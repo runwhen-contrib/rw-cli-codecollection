@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Get `${CONTAINER_NAME}` Application Logs
+Get `${CONTAINER_NAME}` Application Logs from Workload `${WORKLOAD_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Collects the last approximately 300 lines of logs from the workload
     [Tags]    resource    application    workload    logs    state    ${container_name}    ${workload_name}
     ${logs}=    RW.CLI.Run Cli
@@ -41,7 +41,7 @@ Scan `${CONTAINER_NAME}` Application For Misconfigured Environment
     RW.Core.Add Pre To Report    Stdout:\n\n${script_run.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Tail `${CONTAINER_NAME}` Application Logs For Stacktraces 
+Tail `${CONTAINER_NAME}` Application Logs For Stacktraces in Workload `${WORKLOAD_NAME}` 
     [Documentation]    Performs an inspection on container logs for exceptions/stacktraces, parsing them and attempts to find relevant source code information
     [Tags]
     ...    application

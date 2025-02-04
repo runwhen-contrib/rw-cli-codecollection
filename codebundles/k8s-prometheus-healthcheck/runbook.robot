@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check Prometheus Service Monitors
+Check Prometheus Service Monitors in namespace `${NAMESPACE}`
     [Documentation]    Checks the selector mappings of service monitors are valid in the namespace
     ${sm_report}=    RW.CLI.Run Bash File
     ...    bash_file=validate_servicemonitors.sh
@@ -39,7 +39,7 @@ Check Prometheus Service Monitors
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Check For Successful Rule Setup
+Check For Successful Rule Setup in Kubernetes Namespace `${NAMESPACE}`
     [Documentation]    Inspects operator instance logs for failed rules setup
     Log To Console    Prometheus
     ${rsp}=    RW.CLI.Run Cli
@@ -65,7 +65,7 @@ Check For Successful Rule Setup
     RW.Core.Add Pre To Report    Logs Found:\n ${rsp.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Verify Prometheus RBAC Can Access ServiceMonitors
+Verify Prometheus RBAC Can Access ServiceMonitors in Namespace `${PROM_NAMESPACE}`
     [Documentation]    Fetch operator rbac and verify it has ServiceMonitors in rbac.
     ${clusterrole}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get clusterrole/kube-prometheus-stack-operator -ojson
@@ -87,7 +87,7 @@ Verify Prometheus RBAC Can Access ServiceMonitors
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Identify Endpoint Scraping Errors
+Inspect Prometheus Operator Logs for Scraping Errors in Namespace `${NAMESPACE}`
     [Documentation]    Inspect the prometheus operator logs for scraping errors and raise issues if any found
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${PROM_NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/name=prometheus -o=jsonpath='{.items[0].metadata.name}') -c prometheus | grep -iP "(scrape.*.error)" || true
@@ -112,7 +112,7 @@ Identify Endpoint Scraping Errors
     RW.Core.Add Pre To Report    Logs Found:\n ${rsp.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Check Prometheus API Healthy
+Check Prometheus API Healthy in Namespace `${PROM_NAMESPACE}`
     [Documentation]    Ping Prometheus healthy API endpoint for a 200 response code.
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${PROM_NAMESPACE} exec $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/name=prometheus -o=jsonpath='{.items[0].metadata.name}') --container prometheus -- wget -qO- -S 127.0.0.1:9090/-/healthy 2>&1 | grep "HTTP/" | awk '{print $2}'

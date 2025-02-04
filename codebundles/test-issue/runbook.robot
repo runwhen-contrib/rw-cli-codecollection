@@ -13,7 +13,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Raise Full Issue
+Raise Full Issue on `${RESOURCE_TYPE}` in `${SCOPE}`
     [Documentation]    Always raises an issue with full content
     [Tags]    test
     ${issue}=    RW.CLI.Run Cli

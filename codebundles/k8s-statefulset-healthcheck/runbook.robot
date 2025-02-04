@@ -120,7 +120,7 @@ Troubleshoot StatefulSet Warning Events for `${STATEFULSET_NAME}`
     RW.Core.Add Pre To Report    ${events.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Check StatefulSet Event Anomalies for `${STATEFULSET_NAME}`
+Check StatefulSet Event Anomalies for `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Parses all events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
     [Tags]    statefulset    events    info    state    anomolies    count    occurences    ${statefulset_name}
     ${recent_anomalies}=    RW.CLI.Run Cli
@@ -158,7 +158,7 @@ Check StatefulSet Event Anomalies for `${STATEFULSET_NAME}`
     RW.Core.Add To Report    ${anomalies_report_output}\n
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Fetch StatefulSet Logs for `${STATEFULSET_NAME}` and Add to Report
+Fetch StatefulSet Logs for `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}` and Add to Report
     [Documentation]    Fetches the last 100 lines of logs for the given statefulset in the namespace.
     [Tags]    fetch    log    pod    container    errors    inspect    trace    info    ${STATEFULSET_NAME}    statefulset
     ${logs}=    RW.CLI.Run Cli
@@ -184,7 +184,7 @@ Get Related StatefulSet `${STATEFULSET_NAME}` Events
     RW.Core.Add Pre To Report    ${events.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Fetch Manifest Details for StatefulSet `${STATEFULSET_NAME}`
+Fetch Manifest Details for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches the current state of the statefulset manifest for inspection.
     [Tags]    statefulset    details    manifest    info    ${STATEFULSET_NAME}
     ${statefulset}=    RW.CLI.Run Cli
@@ -197,7 +197,7 @@ Fetch Manifest Details for StatefulSet `${STATEFULSET_NAME}`
     RW.Core.Add Pre To Report    ${statefulset.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-List StatefulSets with Unhealthy Replica Counts In Namespace `${NAMESPACE}`
+List Unhealthy Replica Counts for StatefulSets in Namespace `${NAMESPACE}`
     [Documentation]    Pulls the replica information for a given StatefulSet and checks if it's highly available
     ...    , if the replica counts are the expected / healthy values, and if not, what they should be.
     [Tags]

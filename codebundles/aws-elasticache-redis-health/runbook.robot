@@ -16,7 +16,7 @@ Library             Process
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Scan AWS Elasticache Redis Status
+Scan AWS Elasticache Redis Status in AWS Region `${AWS_REGION}`
     [Documentation]   Checks the high level metrics and status of the elasticache redis instances in the region.
     [Tags]  AWS Elasticache    configuration endpoint    configuration
     ${process}=    RW.CLI.Run Bash File    analyze_aws_elasticache_redis_metrics.sh

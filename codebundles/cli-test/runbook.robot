@@ -31,7 +31,7 @@ Suite Initialization
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
 
 *** Tasks ***
-Run CLI and Parse Output For Issues
+Run CLI and Parse Output For Issues in `${NAMESPACE}` namespace and `${CONTEXT}` context
     [Documentation]    Fetch some output from the cluster in varying forms and run tests against it
     [Tags]    Stdout    Test    Output    Pods
     ${rsp}=    RW.CLI.Run Cli
@@ -77,7 +77,7 @@ Run CLI and Parse Output For Issues
     ...    total_container_restarts__raise_issue_if_lt=1
     RW.Core.Add Pre To Report    Found issues after parsing the output of: kubectl get pods --context ${CONTEXT} -n ${NAMESPACE} -ojson
 
-Exec Test
+Exec Test in Pod `$${NAMESPACE}`
     [Documentation]    Used to verify that running CLI commands in remote workloads works
     [Tags]    Remote    Exec    Command    Tags    Workload    Pod
     ${df}=    RW.CLI.Run Cli
@@ -95,7 +95,7 @@ Exec Test
     ...    optional_namespace=${NAMESPACE}
     ...    optional_context=${CONTEXT}
 
-Local Process Test
+Local Process Test for '$${NAMESPACE}'
     [Documentation]    Verifies that commands can be run locally directly within the runner
     [Tags]    Commands    Direct    Process    Local
     # run local 'ls'

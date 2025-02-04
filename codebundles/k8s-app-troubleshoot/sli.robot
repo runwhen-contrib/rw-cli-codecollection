@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Measure Application Exceptions
+Measure Application Exceptions in `${NAMESPACE}`
     [Documentation]    Examines recent logs for exceptions, providing a count of them.
     [Tags]    resource    application    workload    logs    state    exceptions    errors
     ${cmd}=    Set Variable

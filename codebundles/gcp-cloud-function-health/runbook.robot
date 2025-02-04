@@ -14,7 +14,7 @@ Library             Collections
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-List Unhealhy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
+List Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Fetches a list of GCP Cloud Functions that are not healthy.
     [Tags]    gcloud    function    gcp    ${GCP_PROJECT_ID}
     # This command is cheat-sheet friendly
@@ -67,7 +67,7 @@ List Unhealhy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
     RW.Core.Add Pre To Report    Failed GCP Functions Table:\n${unhealthy_cloud_function_list_simple_output.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Get Error Logs for Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
+Get Error Logs for Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}` in `us-central1` Region
    [Documentation]    Fetches GCP logs related to unhealthy Cloud Functions within the last 14 days
     [Tags]    gcloud    function    gcp    ${GCP_PROJECT_ID}
     # This command is cheat-sheet friendly
