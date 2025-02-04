@@ -153,71 +153,19 @@ resource "aws_instance" "jenkins_server" {
               def instance = Jenkins.getInstance()
 
               // Skip setup wizard
-              instance.setInstallState(InstallState.INITIAL_SETUP_COMPLETED)
+              // instance.setInstallState(InstallState.INITIAL_SETUP_COMPLETED)
 
               // Install suggested plugins
-              def pm = instance.getPluginManager()
-              def uc = instance.getUpdateCenter()
-              uc.updateAllSites()
+              // def pm = instance.getPluginManager()
+              // def uc = instance.getUpdateCenter()
+              // uc.updateAllSites()
 
-              def plugins = [
-                  // Organization and Administration
-                  "dashboard-view",
-                  "cloudbees-folder",
-                  "configuration-as-code",
-                  "antisamy-markup-formatter",
-                  
-                  // Build Features
-                  "build-name-setter",
-                  "build-timeout",
-                  "config-file-provider",
-                  "credentials-binding",
-                  "embeddable-build-status",
-                  "rebuild",
-                  "ssh-agent",
-                  "throttle-concurrents",
-                  "timestamper",
-                  "ws-cleanup",
-                  
-                  // Build Tools
-                  "ant",
-                  "gradle",
-                  
-                  // Pipelines and Continuous Delivery
-                  "workflow-aggregator",
-                  "github-branch-source",
-                  "pipeline-github-lib",
-                  "pipeline-stage-view",
-                  "conditional-buildstep",
-                  "parameterized-trigger",
-                  "copyartifact",
-                  
-                  // Source Code Management
-                  "git",
-                  "github",
-                  
-                  // Distributed Builds
-                  "ssh-slaves",
-                  
-                  // User Management and Security
-                  "matrix-auth",
-                  "pam-auth",
-                  "ldap",
-                  
-                  // Notifications and Publishing
-                  "email-ext",
-                  "mailer",
-
-                  "configuration-as-code",
-                  "ec2"
-              ]
-
-              plugins.each { plugin ->
-                  if (!pm.getPlugin(plugin)) {
-                      def installFuture = uc.getPlugin(plugin).deploy()
-                      installFuture.get()
-                  }
-              }
+              // plugins.each { plugin ->
+              //     if (!pm.getPlugin(plugin)) {
+              //         def installFuture = uc.getPlugin(plugin).deploy()
+              //         installFuture.get()
+              //     }
+              // }
 
               // Create admin user
               def hudsonRealm = new HudsonPrivateSecurityRealm(false)
@@ -240,11 +188,151 @@ resource "aws_instance" "jenkins_server" {
               # Clean up
               rm -f create_admin.groovy
 
+              # Add Docker's official GPG key:
+              apt-get update
+              apt-get -y install ca-certificates curl
+              install -m 0755 -d /etc/apt/keyrings
+              curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+              chmod a+r /etc/apt/keyrings/docker.asc
+
+              # Add the repository to Apt sources:
+              echo \
+                "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+                $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+                tee /etc/apt/sources.list.d/docker.list > /dev/null
+              apt-get update
+              apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin 
+
+              echo "DOCKER_OPTS=\"-H tcp://0.0.0.0:2376 -H unix:///var/run/docker.sock\"" >> /etc/default/docker
+              systemctl restart docker
+              groupadd docker
+              usermod -aG docker $USER
+
               EOF
 
   tags = {
     Name = "jenkins-server"
   }
+}
+
+
+# # Instance Profile for Jenkins
+# resource "aws_iam_instance_profile" "jenkins_profile" {
+#   name = "jenkins_profile"
+#   role = aws_iam_role.jenkins_role.name
+# }
+
+# # Security Group for Jenkins Agents
+# resource "aws_security_group" "jenkins_agent_sg" {
+#   name        = "jenkins-agent-sg"
+#   description = "Security group for Jenkins agents"
+#   vpc_id      = aws_vpc.jenkins_vpc.id
+
+#   ingress {
+#     from_port       = 22
+#     to_port         = 22
+#     protocol        = "tcp"
+#     security_groups = [aws_security_group.jenkins_sg.id]
+#   }
+
+#   egress {
+#     from_port   = 0
+#     to_port     = 0
+#     protocol    = "-1"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
+
+#   tags = {
+#     Name = "jenkins-agent-sg"
+#   }
+# }
+
+
+# Wait for Jenkins to be ready
+resource "null_resource" "wait_for_jenkins" {
+  depends_on = [aws_instance.jenkins_server]
+
+  provisioner "local-exec" {
+    command = <<-EOF
+      while ! nc -z ${aws_instance.jenkins_server.public_ip} 8080; do   
+        echo "Waiting for Jenkins to be ready..."
+        sleep 10
+      done
+    EOF
+  }
+}
+
+
+# Configure Jenkins EC2 agents
+# resource "null_resource" "configure_jenkins_agents" {
+#   depends_on = [null_resource.wait_for_jenkins]
+
+#   connection {
+#     type        = "ssh"
+#     user        = "ubuntu"
+#     private_key = tls_private_key.jenkins_key.private_key_pem
+#     host        = aws_instance.jenkins_server.public_ip
+#   }
+
+#   provisioner "file" {
+#     content     = tls_private_key.jenkins_key.private_key_pem
+#     destination = "/tmp/jenkins-key.pem"
+#   }
+
+#   provisioner "file" {
+#     content     = templatefile("${path.module}/configure_ec2_agent.groovy.tpl", {
+#       ami_id           = data.aws_ami.ubuntu.id
+#       subnet_id        = aws_subnet.jenkins_subnet.id
+#       security_group_id = aws_security_group.jenkins_sg.id
+#     })
+#     destination = "/tmp/configure_ec2_agent.groovy"
+#   }
+
+
+#   provisioner "remote-exec" {
+#     inline = [
+#       # Setup SSH key for Jenkins
+#       "sudo mkdir -p /var/lib/jenkins/.ssh",
+#       "sudo mv /tmp/jenkins-key.pem /var/lib/jenkins/.ssh/",
+#       "sudo chown -R jenkins:jenkins /var/lib/jenkins/.ssh",
+#       "sudo chmod 700 /var/lib/jenkins/.ssh",
+#       "sudo chmod 600 /var/lib/jenkins/.ssh/jenkins-key.pem",
+#       "cat /tmp/configure_ec2_agent.groovy",
+#       "wget -q http://localhost:8080/jnlpJars/jenkins-cli.jar",
+#       # Execute the Groovy script using Jenkins CLI
+#       "java -jar jenkins-cli.jar -s http://localhost:8080 -auth admin:admin123! groovy = < /tmp/configure_ec2_agent.groovy",
+
+#       # Cleanup
+#       "rm /tmp/configure_ec2_agent.groovy"
+#     ]
+#   }
+# }
+
+# Create IAM user for Jenkins
+resource "aws_iam_user" "jenkins_user" {
+  name = "jenkins-user"
+}
+
+# Create access key for the IAM user
+resource "aws_iam_access_key" "jenkins_user_key" {
+  user = aws_iam_user.jenkins_user.name
+}
+
+# Attach policy to the user
+resource "aws_iam_user_policy_attachment" "jenkins_user_policy" {
+  user       = aws_iam_user.jenkins_user.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2FullAccess"
+}
+
+# Output the credentials
+output "jenkins_user_access_key" {
+  value     = aws_iam_access_key.jenkins_user_key.id
+  sensitive = true
+}
+
+output "jenkins_user_secret_key" {
+  value     = aws_iam_access_key.jenkins_user_key.secret
+  sensitive = true
 }
 
 output "jenkins_public_ip" {
@@ -254,3 +342,4 @@ output "jenkins_public_ip" {
 output "ssh_connection_string" {
   value = "ssh -i jenkins-key.pem ubuntu@${aws_instance.jenkins_server.public_ip}"
 }
+
