@@ -183,19 +183,63 @@ Fetch Metrics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `$
         ...    details=${metrics.stderr}
     END
     ${metrics_output}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/app_gateway_metrics_issues.json | jq '.metrics'
+    ...    cmd=cat ${OUTPUT_DIR}/app_gateway_metrics.json | jq '.metrics'
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${metrics_output.stdout}
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/app_gateway_metrics_issues.json | jq '.issues'
+    ...    cmd=cat ${OUTPUT_DIR}/app_gateway_metrics.json | jq '.issues'
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    IF    len(@{issue_list["issues"]}) > 0
-        FOR    ${item}    IN    @{issue_list["issues"]}
+    IF    len(@{issue_list}) > 0
+        FOR    ${item}    IN    @{issue_list}
+            RW.Core.Add Issue    
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_step"]}
+            ...    expected=Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has healthy metrics
+            ...    actual=Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has unhealthy metrics
+            ...    reproduce_hint=${metrics.cmd}
+            ...    details=${item["details"]}        
+        END
+    END   
+
+Check SSL Certificate Health for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Fetch SSL certificates and validate expiry dates for Azure Application Gateway instances
+    [Tags]    appservice    ssl    expiry
+    ${metrics}=    RW.CLI.Run Bash File
+    ...    bash_file=app_gateway_ssl_certs.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${metrics.stdout}
+    IF    "${metrics.stderr}" != ''
+        RW.Core.Add Issue
+        ...    title=Warnings/Errors running task.
+        ...    severity=3
+        ...    next_steps=Check debug logs in Report
+        ...    expected=No stderr output
+        ...    actual=stderr encountered
+        ...    reproduce_hint=${metrics.cmd}
+        ...    details=${metrics.stderr}
+    END
+    ${ssl_output}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/appgw_ssl_certificate_checks.json
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${ssl_output.stdout}
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/app_gateway_metrics.json | jq '.issues'
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list}) > 0
+        FOR    ${item}    IN    @{issue_list}
             RW.Core.Add Issue    
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}

@@ -1,0 +1,10 @@
+{
+  "issues": [
+    {
+      "title": "No SSL Certificates Found",
+      "details": "The Application Gateway has no sslCertificates[] array in its config.",
+      "next_step": "If you rely on Key Vault references or no HTTPS listeners, this may be expected. Otherwise, check your config.",
+      "severity": 1
+    }
+  ]
+}

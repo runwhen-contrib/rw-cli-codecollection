@@ -3,13 +3,15 @@ set -euo pipefail
 
 # -----------------------------------------------------------------------------
 # Hardcoded aggregator mappings. 
-#   These are the known-working aggregators for your environment.
-#   - "TotalRequests" => "Count"
-#   - "FailedRequests" => "Count"
-#   - "UnhealthyHostCount" => "Average" 
-#   - "HealthyHostCount" => "Average"
-#   - "CurrentConnections" => "Count"
-#   - "Throughput" => "Average"
+# Adjust to the aggregators that work best for your environment:
+#   - "TotalRequests"       => "Average"
+#   - "FailedRequests"      => "Average"
+#   - "UnhealthyHostCount"  => "Average"
+#   - "HealthyHostCount"    => "Average"
+#   - "CurrentConnections"  => "Average"
+#   - "Throughput"          => "Average"
+#   - "ClientRtt"           => "Average"
+#   - "BackendConnectTime"  => "Average"
 # -----------------------------------------------------------------------------
 declare -A METRIC_TO_AGGREGATOR=(
   ["TotalRequests"]="Average"
@@ -18,9 +20,13 @@ declare -A METRIC_TO_AGGREGATOR=(
   ["HealthyHostCount"]="Average"
   ["CurrentConnections"]="Average"
   ["Throughput"]="Average"
+  ["ClientRtt"]="Average"
+  ["BackendConnectTime"]="Average"
 )
 
+# -----------------------------------------------------------------------------
 # Metrics you want to query
+# -----------------------------------------------------------------------------
 METRICS_TO_FETCH=(
   "TotalRequests"
   "FailedRequests"
@@ -28,6 +34,8 @@ METRICS_TO_FETCH=(
   "HealthyHostCount"
   "CurrentConnections"
   "Throughput"
+  "ClientRtt"
+  "BackendConnectTime"
 )
 
 # -----------------------------------------------------------------------------
@@ -44,7 +52,7 @@ METRICS_TO_FETCH=(
 #  2) For each metric, runs a single 'az monitor metrics list' 
 #     with the aggregator from METRIC_TO_AGGREGATOR
 #  3) Parses the result (or stores 0 on error)
-#  4) Outputs JSON: { "metrics": { ... }, "issues": [...] }
+#  4) Adds threshold-based checks and produces a JSON: { "metrics": { ... }, "issues": [...] }
 # -----------------------------------------------------------------------------
 
 : "${APP_GATEWAY_NAME:?Must set APP_GATEWAY_NAME}"
@@ -53,7 +61,7 @@ METRICS_TO_FETCH=(
 METRIC_TIME_RANGE="${METRIC_TIME_RANGE:-PT1H}"
 OUTPUT_DIR="${OUTPUT_DIR:-./output}"
 mkdir -p "$OUTPUT_DIR"
-OUTPUT_FILE="${OUTPUT_DIR}/app_gateway_metrics_simplified.json"
+OUTPUT_FILE="${OUTPUT_DIR}/app_gateway_metrics.json"
 
 echo "Fetching metrics for Application Gateway \`$APP_GATEWAY_NAME\` in resource group \`$AZ_RESOURCE_GROUP\` over $METRIC_TIME_RANGE..."
 
@@ -143,12 +151,12 @@ for metric_name in "${METRICS_TO_FETCH[@]}"; do
   echo "Querying metric \`$metric_name\` with aggregator \`$aggregator\`..."
   echo "Command: $cmd"
 
-  # Simpler approach: capture stdout in cli_stdout, stderr in $OUTPUT_DIR/app_gw_metrics_errors.log
+  # Capture stdout in cli_stdout, stderr in $OUTPUT_DIR/app_gw_metrics_errors.log
   if ! cli_stdout=$(eval "$cmd" 2>$OUTPUT_DIR/app_gw_metrics_errors.log); then
     echo "ERROR: aggregator=$aggregator for metric=$metric_name"
     cat $OUTPUT_DIR/app_gw_metrics_errors.log
     issues_json=$(echo "$issues_json" | jq \
-      --arg title "Failed to Fetch Metric \`$metric_name\`" \
+      --arg title "Failed to Fetch Metric \`$metric_name\` for Application Gateway \`$APP_GATEWAY_NAME\`" \
       --arg details "$(cat $OUTPUT_DIR/app_gw_metrics_errors.log)" \
       --arg severity "1" \
       --arg nextStep "Check aggregator or permissions. Possibly not supported in your tier/region." \
@@ -166,8 +174,8 @@ for metric_name in "${METRICS_TO_FETCH[@]}"; do
   fi
   rm -f $OUTPUT_DIR/app_gw_metrics_errors.log
 
-  echo "Raw CLI output for \`$metric_name\`, aggregator=\`$aggregator\`:"
-  echo "$cli_stdout"
+  # echo "Raw CLI output for \`$metric_name\`, aggregator=\`$aggregator\`:"
+  # echo "$cli_stdout"
 
   # Parse metric value
   raw_val=$(parse_metric_value "$cli_stdout" "$aggregator")
@@ -197,15 +205,15 @@ for metric_name in "${METRICS_TO_FETCH[@]}"; do
 done
 
 # -----------------------------------------------------------------------------
-# 3) Optional threshold checks
+# 3) Threshold / Issue Checks for the new metrics
 # -----------------------------------------------------------------------------
 unhealthy=$(echo "$metrics_json" | jq '.UnhealthyHostCount // 0')
 if (( $(echo "$unhealthy > 0" | bc -l) )); then
   issues_json=$(echo "$issues_json" | jq \
-    --arg title "Detected Unhealthy Hosts" \
+    --arg title "Detected Unhealthy Hosts in Application Gateway \`$APP_GATEWAY_NAME\`" \
     --arg details "UnhealthyHostCount = $unhealthy" \
     --arg severity "2" \
-    --arg nextStep "Check backend pool health for \`$APP_GATEWAY_NAME\`." \
+    --arg nextStep "Check backend pool health for App Gateway  \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\`" \
     '.issues += [{
       "title": $title,
       "details": $details,
@@ -217,14 +225,15 @@ fi
 total_requests=$(echo "$metrics_json" | jq '.TotalRequests // 0')
 failed_requests=$(echo "$metrics_json" | jq '.FailedRequests // 0')
 
+# If we have some traffic, check the failure rate
 if (( $(echo "$total_requests > 0" | bc -l) )); then
   fail_rate=$(awk "BEGIN { printf \"%.2f\", $failed_requests/$total_requests * 100 }")
   if (( $(echo "$fail_rate >= 10.0" | bc -l) )); then
     issues_json=$(echo "$issues_json" | jq \
-      --arg title "High Failure Rate" \
+      --arg title "High Failure Rate for Application Gateway \`$APP_GATEWAY_NAME\`" \
       --arg details "Failure rate is $fail_rate%, above 10% threshold." \
       --arg severity "2" \
-      --arg nextStep "Investigate 4xx/5xx responses or check logs for \`$APP_GATEWAY_NAME\`." \
+      --arg nextStep "Investigate 4xx/5xx responses or check logs for App Gateway  \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\`" \
       '.issues += [{
          "title": $title,
          "details": $details,
@@ -232,6 +241,70 @@ if (( $(echo "$total_requests > 0" | bc -l) )); then
          "severity": ($severity | tonumber)
        }]')
   fi
+fi
+
+current_conn=$(echo "$metrics_json" | jq '.CurrentConnections // 0')
+# Suppose we consider > 500 average connections as high usage
+if (( $(echo "$current_conn > 500" | bc -l) )); then
+  issues_json=$(echo "$issues_json" | jq \
+    --arg title "High Current Connections for Application Gateway \`$APP_GATEWAY_NAME\`" \
+    --arg details "Avg CurrentConnections = $current_conn is above 500." \
+    --arg severity "2" \
+    --arg nextStep "Check if autoscaling is configured and verify capacity for App Gateway  \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\`" \
+    '.issues += [{
+       "title": $title,
+       "details": $details,
+       "next_step": $nextStep,
+       "severity": ($severity | tonumber)
+    }]')
+fi
+
+throughput=$(echo "$metrics_json" | jq '.Throughput // 0')
+# If throughput is above e.g. 1 MB/s = 1,000,000 bytes/s average => threshold
+if (( $(echo "$throughput > 1000000" | bc -l) )); then
+  issues_json=$(echo "$issues_json" | jq \
+    --arg title "High Throughput for Application Gateway \`$APP_GATEWAY_NAME\`" \
+    --arg details "Throughput = $throughput bytes/s is above 1 MB/s." \
+    --arg severity "2" \
+    --arg nextStep "Confirm App Gateway scaling, check backend performance." \
+    '.issues += [{
+       "title": $title,
+       "details": $details,
+       "next_step": $nextStep,
+       "severity": ($severity | tonumber)
+    }]')
+fi
+
+client_rtt=$(echo "$metrics_json" | jq '.ClientRtt // 0')
+# e.g. consider above 300 ms average to be quite high
+if (( $(echo "$client_rtt > 300" | bc -l) )); then
+  issues_json=$(echo "$issues_json" | jq \
+    --arg title "High Client Round Trip Time for Application Gateway \`$APP_GATEWAY_NAME\`" \
+    --arg details "Avg ClientRtt = $client_rtt ms indicates significant latency." \
+    --arg severity "2" \
+    --arg nextStep "Investigate client-side latency or network paths. Possibly check CDN or caching." \
+    '.issues += [{
+       "title": $title,
+       "details": $details,
+       "next_step": $nextStep,
+       "severity": ($severity | tonumber)
+    }]')
+fi
+
+backend_connect_time=$(echo "$metrics_json" | jq '.BackendConnectTime // 0')
+# e.g. if backend connect time > 200ms => indicates slow handshake or networking issues
+if (( $(echo "$backend_connect_time > 200" | bc -l) )); then
+  issues_json=$(echo "$issues_json" | jq \
+    --arg title "High Backend Connect Time for Application Gateway \`$APP_GATEWAY_NAME\`" \
+    --arg details "Avg BackendConnectTime = $backend_connect_time ms. Possibly slow network or unresponsive backend." \
+    --arg severity "2" \
+    --arg nextStep "Check backend VNet config, consider enabling keep-alive or investigating network latency for App Gateway  \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\`" \
+    '.issues += [{
+       "title": $title,
+       "details": $details,
+       "next_step": $nextStep,
+       "severity": ($severity | tonumber)
+    }]')
 fi
 
 # -----------------------------------------------------------------------------
