@@ -21,6 +21,7 @@ set -euo pipefail
 : "${APP_GATEWAY_NAME:?Must set APP_GATEWAY_NAME}"
 : "${AZ_RESOURCE_GROUP:?Must set AZ_RESOURCE_GROUP}"
 
+newline=$'\n'
 DAYS_THRESHOLD="${DAYS_THRESHOLD:-30}"  # Warn if cert expires within these days
 OUTPUT_DIR="${OUTPUT_DIR:-./output}"
 mkdir -p "$OUTPUT_DIR"
@@ -66,7 +67,7 @@ if [[ -z "$ssl_certs" ]]; then
     --arg title "No SSL Certificates Found for Application Gateway \`$APP_GATEWAY_NAME\`" \
     --arg details "The Application Gateway has no sslCertificates[] array in its config." \
     --arg severity "3" \
-    --arg nextStep "If you rely on Key Vault references or no HTTPS listeners, this may be expected\nCheck Configuration Health of Application Gateway \`$APP_GATEWAY_NAME\` In Resource Group \`$AZ_RESOURCE_GROUP\`" \
+    --arg nextStep "If you rely on Key Vault references or no HTTPS listeners, this may be expected $newline Check Configuration Health of Application Gateway \`$APP_GATEWAY_NAME\` In Resource Group \`$AZ_RESOURCE_GROUP\`" \
     '.issues += [{
        "title": $title,
        "details": $details,

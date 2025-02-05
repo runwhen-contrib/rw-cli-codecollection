@@ -148,7 +148,7 @@ fi
 # Check HTTP/2 setting
 if [ "$ENABLE_HTTP2" != "true" ]; then
     title="HTTP/2 Disabled on Application Gateway \`$APP_GATEWAY_NAME\`"
-    next_step="Enable HTTP/2 on \`$APP_GATEWAY_NAME\` for better performance.$newline [Portal Link]($PORTAL_LINK)"
+    next_step="Enable HTTP/2 on \`$APP_GATEWAY_NAME\` for better performance$newline [Portal Link]($PORTAL_LINK)"
     details="HTTP/2 is not enabled."
 
     issues_json=$(echo "$issues_json" | jq \
