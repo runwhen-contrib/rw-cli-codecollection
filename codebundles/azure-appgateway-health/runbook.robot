@@ -298,7 +298,7 @@ List Related Azure Resources for Application Gateway `${APP_GATEWAY_NAME}` In Re
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false 
-    RW.Core.Add To Report    "Related Resources:"   
+    RW.Core.Add To Report    Related Resources:   
     RW.Core.Add Pre To Report    ${resource_table.stdout}
  
 
