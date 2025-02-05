@@ -5,6 +5,7 @@ import time
 from collections import defaultdict
 from thefuzz import fuzz
 from thefuzz import process as fuzzprocessor
+import xml.etree.ElementTree as ET
 
 # Ensure required environment variables are set
 JENKINS_URL =       os.getenv("JENKINS_URL")
@@ -293,3 +294,23 @@ def build_logs_analytics(history_limit=5):
         })
     
     return analysis_results
+
+
+def parse_jenkins_atom_feed():
+    # Define the namespace for Atom feed
+    namespace = {'atom': 'http://www.w3.org/2005/Atom'}
+    # Fetch Jenkins log feed
+    try:
+        response = requests.get(f"{JENKINS_URL}/manage/log/rss", auth=auth, timeout=10)
+        response.raise_for_status()  # Raise an error for bad responses
+    except requests.exceptions.RequestException as e:
+        raise ConnectionError(f"Failed to fetch data from Jenkins: {e}")
+    root = ET.fromstring(response.text)
+
+    # Extract log contents
+    logs = ""
+    for entry in root.findall('atom:entry', namespace):
+        content = entry.find('atom:content', namespace).text.strip()
+        logs += f"{content}\n{'=' * 80}\n"
+    return logs
+
