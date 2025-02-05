@@ -242,6 +242,13 @@ List Jenkins Executor Utilization
     END
 
 
+List Jenkins Logs from Atom Feed
+    [Documentation]    Fetches and displays Jenkins logs from the Atom feed
+    [Tags]    Jenkins    Logs
+    ${rsp}=    Parse Jenkins Atom Feed
+    RW.Core.Add Pre To Report    ${rsp}
+
+
 *** Keywords ***
 Suite Initialization
     ${JENKINS_URL}=    RW.Core.Import User Variable    JENKINS_URL
