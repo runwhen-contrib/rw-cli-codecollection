@@ -269,4 +269,3 @@ fi
 # Save results
 echo "$issues_json" > "$HEALTH_OUTPUT"
 echo "Configuration health check completed. Results saved to \`$HEALTH_OUTPUT\`"
-echo "Configuration health check completed. Results saved to \`$HEALTH_OUTPUT\`"
