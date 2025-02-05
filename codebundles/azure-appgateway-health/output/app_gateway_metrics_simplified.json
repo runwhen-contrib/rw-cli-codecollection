@@ -1,0 +1,24 @@
+{
+  "metrics": {
+    "TotalRequests": 0.03,
+    "FailedRequests": 0.03,
+    "UnhealthyHostCount": 1,
+    "HealthyHostCount": 0,
+    "CurrentConnections": 5,
+    "Throughput": 0.98
+  },
+  "issues": [
+    {
+      "title": "Detected Unhealthy Hosts",
+      "details": "UnhealthyHostCount = 1",
+      "next_step": "Check backend pool health for `appgw2`.",
+      "severity": 2
+    },
+    {
+      "title": "High Failure Rate",
+      "details": "Failure rate is 100.00%, above 10% threshold.",
+      "next_step": "Investigate 4xx/5xx responses or check logs for `appgw2`.",
+      "severity": 2
+    }
+  ]
+}
