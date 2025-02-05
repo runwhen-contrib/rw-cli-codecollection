@@ -75,8 +75,65 @@ Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resou
     Set Global Variable    ${appgw_backend_score}
 
 
+Fetch Metrics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Fetch metrics for the application gateway
+    [Tags]    appgateway    metrics    analytics
+    ${metrics}=    RW.CLI.Run Bash File
+    ...    bash_file=app_gateway_metrics.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/app_gateway_metrics.json | jq '{issues: [.issues[] | select(.severity < 4)]}'
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${appgw_metrics_score}=    Evaluate    1 if len(@{issue_list["issues"]}) == 0 else 0
+    Set Global Variable    ${appgw_metrics_score}
+  
+
+Check SSL Certificate Health for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Fetch SSL certificates and validate expiry dates for Azure Application Gateway instances
+    [Tags]    appgateway    ssl    expiry
+    ${ssl_health}=    RW.CLI.Run Bash File
+    ...    bash_file=app_gateway_ssl_certs.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/appgw_ssl_certificate_checks.json | jq '{issues: [.issues[] | select(.severity < 4)]}'
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${appgw_ssl_score}=    Evaluate    1 if len(@{issue_list["issues"]}) == 0 else 0
+    Set Global Variable    ${appgw_ssl_score}
+
+Check Logs for Errors with Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Query log analytics workspace for common errors like IP mismatches or subnet issues
+    [Tags]    appgateway    logs    network    errors
+    ${log_errors}=    RW.CLI.Run Bash File
+    ...    bash_file=app_gateway_log_errors.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/appgw_diagnostic_log_issues.json | jq '{issues: [.issues[] | select(.severity < 4)]}'
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${appgw_errlog_score}=    Evaluate    1 if len(@{issue_list["issues"]}) == 0 else 0
+    Set Global Variable    ${appgw_errlog_score}
+
+
+
+
 Generate Application Gateway Health Score
-    ${appgw_health_score}=      Evaluate  (${appgw_resource_score} + ${appgw_config_score} + ${appgw_backend_score}) / 3
+    ${appgw_health_score}=      Evaluate  (${appgw_resource_score} + ${appgw_config_score} + ${appgw_backend_score} + ${appgw_metrics_score} + ${appgw_ssl_score} + ${appgw_errlog_score} ) / 6
     ${health_score}=      Convert to Number    ${appgw_health_score}  2
     RW.Core.Push Metric    ${health_score}
 *** Keywords ***
