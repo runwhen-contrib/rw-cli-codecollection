@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-
 set -o pipefail
 
 # Variables
@@ -188,7 +187,6 @@ else
                     # Title: "Unhealthy App Service Backend in Resource Group `myRG`"
                     issue_title="Unhealthy $resource_type Backend in Resource Group \`$resource_group_from_lookup\`"
                     issue_details="The backend pool '$pool_name' with address '$address' is failing health checks.${newline}Health Probe Log: $log"
-
                     issues_json=$(echo "$issues_json" | jq \
                         --arg title "$issue_title" \
                         --arg details "$issue_details" \
