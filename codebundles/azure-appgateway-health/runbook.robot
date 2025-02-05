@@ -283,6 +283,25 @@ Check Logs for Errors with Application Gateway `${APP_GATEWAY_NAME}` In Resource
         END
     END   
 
+List Related Azure Resources for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Fetch a list of resources that are releated to the application gateway
+    [Tags]    appgateway    resources    azure    related
+    ${resources}=    RW.CLI.Run Bash File
+    ...    bash_file=app_gateway_related_resources.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${resources.stdout}
+
+    ${resource_table}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/appgw_resource_discovery.json | jq -r '.discoveries | (["POOL","ADDRESS","TYPE","RESOURCE_ID"]|@tsv),(["----","----","----","----"]|@tsv),(.[ ]|[.backendPoolName,.address,.resource_type,.resource_id]|@tsv)' | column -t -s $'\t'
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false 
+    RW.Core.Add To Report    "Related Resources:"   
+    RW.Core.Add Pre To Report    ${resource_table.stdout}
+ 
+
 *** Keywords ***
 Suite Initialization
     ${AZ_RESOURCE_GROUP}=    RW.Core.Import User Variable    AZ_RESOURCE_GROUP

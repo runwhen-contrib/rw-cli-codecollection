@@ -158,7 +158,7 @@ for metric_name in "${METRICS_TO_FETCH[@]}"; do
     issues_json=$(echo "$issues_json" | jq \
       --arg title "Failed to Fetch Metric \`$metric_name\` for Application Gateway \`$APP_GATEWAY_NAME\`" \
       --arg details "$(cat $OUTPUT_DIR/app_gw_metrics_errors.log)" \
-      --arg severity "1" \
+      --arg severity "4" \
       --arg nextStep "Check aggregator or permissions. Possibly not supported in your tier/region." \
       '.issues += [{
          "title": $title,
