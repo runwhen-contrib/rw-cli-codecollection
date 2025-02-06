@@ -1,0 +1,358 @@
+{
+  "patterns": [
+    {
+      "match": "connection refused",
+      "category": "Networking",
+      "severity": 2,
+      "next_step": "Check if the service for ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is reachable. Validate firewall rules and network policies."
+    },
+    {
+      "match": "timeout",
+      "category": "Performance",
+      "severity": 3,
+      "next_step": "Investigate slow queries or latency in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Increase timeout values if needed."
+    },
+    {
+      "match": "authentication failed",
+      "category": "Authentication",
+      "severity": 2,
+      "next_step": "Verify credentials for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Check if tokens or passwords are expired."
+    },
+    {
+      "match": "Exception",
+      "category": "Java",
+      "severity": 2,
+      "next_step": "Analyze the Java exception in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Verify exception handling and log details."
+    },
+    {
+      "match": "Traceback",
+      "category": "Python",
+      "severity": 2,
+      "next_step": "Identify the root cause of the Python traceback in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Check for missing dependencies or incorrect data."
+    },
+    {
+      "match": "panic:",
+      "category": "Golang",
+      "severity": 2,
+      "next_step": "Investigate why ${WORKLOAD_TYPE} ${WORKLOAD_NAME} panicked. Use `recover()` to handle unhandled crashes."
+    },
+    {
+      "match": "segmentation fault",
+      "category": "C",
+      "severity": 1,
+      "next_step": "Analyze memory usage for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Use `gdb` to debug segmentation faults."
+    },
+    {
+      "match": "connection refused",
+      "category": "Networking",
+      "severity": 2,
+      "next_step": "Check if the service for ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is running and reachable. Validate firewall rules and network policies."
+    },
+    {
+      "match": "connection timeout",
+      "category": "Networking",
+      "severity": 3,
+      "next_step": "Investigate network latency for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Check DNS resolution and service response time."
+    },
+    {
+      "match": "failed to connect",
+      "category": "Networking",
+      "severity": 2,
+      "next_step": "Ensure that ${WORKLOAD_TYPE} ${WORKLOAD_NAME} has the correct service endpoints. Validate hostnames and connection settings."
+    },
+    {
+      "match": "service unavailable",
+      "category": "Service",
+      "severity": 2,
+      "next_step": "Verify if the backend service for ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is healthy and accepting connections."
+    },
+    {
+      "match": "unable to reach",
+      "category": "Networking",
+      "severity": 3,
+      "next_step": "Confirm that ${WORKLOAD_TYPE} ${WORKLOAD_NAME} has network access to required services. Check for misconfigured network policies."
+    },
+    {
+      "match": "timeout",
+      "category": "Performance",
+      "severity": 3,
+      "next_step": "Investigate slow responses in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Check backend latency and optimize timeouts."
+    },
+    {
+      "match": "request timeout",
+      "category": "Networking",
+      "severity": 3,
+      "next_step": "Review API response times for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Ensure service endpoints are responsive."
+    },
+    {
+      "match": "operation timed out",
+      "category": "Networking",
+      "severity": 3,
+      "next_step": "Check if ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is experiencing long-running operations. Consider adjusting timeout settings."
+    },
+    {
+      "match": "execution expired",
+      "category": "Performance",
+      "severity": 3,
+      "next_step": "Identify delays in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Review service dependencies and optimize response times."
+    },
+    {
+      "match": "deadline exceeded",
+      "category": "Networking",
+      "severity": 3,
+      "next_step": "Verify service timeouts for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Adjust retry mechanisms if necessary."
+    },
+    {
+      "match": "unauthorized",
+      "category": "Authentication",
+      "severity": 3,
+      "next_step": "Verify user credentials and authentication settings for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Check for missing or expired tokens."
+    },
+    {
+      "match": "authentication failed",
+      "category": "Authentication",
+      "severity": 3,
+      "next_step": "Check the authentication provider for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Ensure API keys and passwords are correct."
+    },
+    {
+      "match": "access denied",
+      "category": "Authorization",
+      "severity": 2,
+      "next_step": "Verify RBAC permissions for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Ensure the correct roles are assigned."
+    },
+    {
+      "match": "forbidden",
+      "category": "Authorization",
+      "severity": 2,
+      "next_step": "Check Kubernetes role bindings and policies for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Ensure required permissions exist."
+    },
+    {
+      "match": "invalid credentials",
+      "category": "Authentication",
+      "severity": 3,
+      "next_step": "Ensure that the credentials for ${WORKLOAD_TYPE} ${WORKLOAD_NAME} are valid. Check for misconfigured secrets."
+    },
+    {
+      "match": "token expired",
+      "category": "Authentication",
+      "severity": 3,
+      "next_step": "Renew expired tokens for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Verify OAuth and JWT configurations."
+    },
+    {
+      "match": "NullPointerException",
+      "category": "Application",
+      "severity": 2,
+      "next_step": "Investigate possible null dereferences in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Add null checks and handle missing values appropriately."
+    },
+    {
+      "match": "TypeError",
+      "category": "Application",
+      "severity": 3,
+      "next_step": "Check type mismatches in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Ensure expected data structures are used."
+    },
+    {
+      "match": "ReferenceError",
+      "category": "Application",
+      "severity": 3,
+      "next_step": "Verify that variables and functions are correctly declared and accessible in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}."
+    },
+    {
+      "match": "UnhandledPromiseRejectionWarning",
+      "category": "Application",
+      "severity": 3,
+      "next_step": "Handle rejected promises properly in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Use try/catch or .catch() to handle errors."
+    },
+    {
+      "match": "panic:",
+      "category": "Golang",
+      "severity": 2,
+      "next_step": "Investigate unhandled panic in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Consider using `recover()` to catch unexpected panics."
+    },
+    {
+      "match": "segmentation fault",
+      "category": "C/C++",
+      "severity": 1,
+      "next_step": "Analyze memory access issues in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Use debugging tools like `gdb` or `valgrind`."
+    },
+    {
+      "match": "NullPointerException",
+      "category": "Java",
+      "severity": 2,
+      "next_step": "Investigate possible null dereferences in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Add null checks and handle missing values appropriately."
+    },
+    {
+      "match": "TypeError",
+      "category": "Python, JavaScript",
+      "severity": 3,
+      "next_step": "Check type mismatches in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Ensure expected data structures are used."
+    },
+    {
+      "match": "ReferenceError",
+      "category": "JavaScript",
+      "severity": 3,
+      "next_step": "Verify that variables and functions are correctly declared and accessible in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}."
+    },
+    {
+      "match": "UnhandledPromiseRejectionWarning",
+      "category": "JavaScript",
+      "severity": 3,
+      "next_step": "Handle rejected promises properly in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Use try/catch or .catch() to handle errors."
+    },
+    {
+      "match": "panic:",
+      "category": "Golang, Rust",
+      "severity": 2,
+      "next_step": "Investigate unhandled panic in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Consider using `recover()` (Go) or debugging Rust backtraces."
+    },
+    {
+      "match": "segmentation fault",
+      "category": "C, C++",
+      "severity": 1,
+      "next_step": "Analyze memory access issues in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Use debugging tools like `gdb`, `valgrind`, or AddressSanitizer."
+    },
+    {
+      "match": "IndexError",
+      "category": "Python",
+      "severity": 3,
+      "next_step": "Check list indexing in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Ensure indices are within range."
+    },
+    {
+      "match": "KeyError",
+      "category": "Python",
+      "severity": 3,
+      "next_step": "Verify dictionary keys in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Ensure keys exist before accessing them."
+    },
+    {
+      "match": "AssertionError",
+      "category": "Python",
+      "severity": 3,
+      "next_step": "Check failed assertions in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Ensure expected conditions are met."
+    },
+    {
+      "match": "ArithmeticException",
+      "category": "Java",
+      "severity": 3,
+      "next_step": "Investigate division by zero or numeric overflows in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}."
+    },
+    {
+      "match": "IllegalStateException",
+      "category": "Java",
+      "severity": 2,
+      "next_step": "Verify that ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is in a valid state before calling dependent functions."
+    },
+    {
+      "match": "System.InvalidOperationException",
+      "category": "C#, .NET",
+      "severity": 2,
+      "next_step": "Ensure ${WORKLOAD_TYPE} ${WORKLOAD_NAME} follows correct sequence operations and does not call methods at an invalid state."
+    },
+    {
+      "match": "process exited",
+      "category": "Application Failure",
+      "severity": 2,
+      "next_step": "Check logs in ${WORKLOAD_TYPE} ${WORKLOAD_NAME} for crash details. Investigate unhandled exceptions or out-of-memory errors."
+    },
+    {
+      "match": "shutting down",
+      "category": "Application Failure",
+      "severity": 3,
+      "next_step": "Investigate why ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is shutting down. Look for termination signals or resource exhaustion."
+    },
+    {
+      "match": "restart",
+      "category": "Application Restart",
+      "severity": 2,
+      "next_step": "Monitor ${WORKLOAD_TYPE} ${WORKLOAD_NAME} for repeated restarts. Check readiness probes and resource limits."
+    },
+    {
+      "match": "fatal error",
+      "category": "Application Failure",
+      "severity": 1,
+      "next_step": "A fatal error was detected in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Review logs and debug the cause immediately."
+    },
+    {
+      "match": "segmentation fault",
+      "category": "C, C++",
+      "severity": 1,
+      "next_step": "Analyze memory access issues in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Use debugging tools like `gdb`, `valgrind`, or AddressSanitizer."
+    },
+    {
+      "match": "core dumped",
+      "category": "Application Crash",
+      "severity": 1,
+      "next_step": "Check core dump analysis for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Debug using `gdb` or post-mortem tools."
+    },
+    {
+      "match": "Out of memory",
+      "category": "Memory",
+      "severity": 1,
+      "next_step": "Increase memory limits for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Investigate memory leaks or optimize resource allocation."
+    },
+    {
+      "match": "Killed process",
+      "category": "Memory",
+      "severity": 1,
+      "next_step": "A process was killed due to memory exhaustion in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Increase available memory or reduce memory consumption."
+    },
+    {
+      "match": "memory limit exceeded",
+      "category": "Memory",
+      "severity": 2,
+      "next_step": "Monitor ${WORKLOAD_TYPE} ${WORKLOAD_NAME} for memory usage spikes. Consider adjusting requests and limits."
+    },
+    {
+      "match": "high CPU usage",
+      "category": "CPU",
+      "severity": 2,
+      "next_step": "Investigate high CPU usage in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Optimize CPU-intensive tasks and adjust resource limits."
+    },
+    {
+      "match": "CPU throttling detected",
+      "category": "CPU",
+      "severity": 2,
+      "next_step": "Kubernetes is throttling CPU for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Consider increasing CPU limits or reviewing workload efficiency."
+    },
+    {
+      "match": "OOMKilled",
+      "category": "Memory",
+      "severity": 1,
+      "next_step": "The pod running ${WORKLOAD_TYPE} ${WORKLOAD_NAME} was OOMKilled. Increase memory allocation or optimize memory usage."
+    },
+    {
+      "match": "service unavailable",
+      "category": "Service Dependency",
+      "severity": 2,
+      "next_step": "Verify if the backend service for ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is healthy and accepting connections."
+    },
+    {
+      "match": "connection refused",
+      "category": "Service Dependency",
+      "severity": 2,
+      "next_step": "Check if the target service for ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is reachable. Validate firewall rules and network policies."
+    },
+    {
+      "match": "failed to connect",
+      "category": "Service Dependency",
+      "severity": 2,
+      "next_step": "Ensure that ${WORKLOAD_TYPE} ${WORKLOAD_NAME} has the correct service endpoints. Validate hostnames and connection settings."
+    },
+    {
+      "match": "could not resolve host",
+      "category": "Service Dependency",
+      "severity": 3,
+      "next_step": "Investigate DNS resolution issues for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Ensure DNS is properly configured."
+    },
+    {
+      "match": "read: connection reset by peer",
+      "category": "Service Dependency",
+      "severity": 3,
+      "next_step": "Check if the remote service for ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is experiencing intermittent failures. Increase retry logic if needed."
+    },
+    {
+      "match": "remote error: internal server error",
+      "category": "Service Dependency",
+      "severity": 3,
+      "next_step": "Investigate backend failures impacting ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Review service logs for further details."
+    }
+  ]
+}
