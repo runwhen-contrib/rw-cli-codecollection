@@ -27,10 +27,12 @@ tasks:
         cloudConfig:
           kubernetes: 
             kubeconfigFile: /shared/kubeconfig.secret
+            namespaces: 
+              voting-app
         codeCollections: 
           - repoURL: "https://github.com/runwhen-contrib/rw-cli-codecollection"
             branch: "main"
-            codeBundles: ["k8s-deployment-healthcheck"]
+            codeBundles: ["k8s-application-log-health"]
         custom: 
           kubernetes_distribution_binary: kubectl
         EOF

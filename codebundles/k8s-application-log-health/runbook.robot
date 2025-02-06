@@ -41,7 +41,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` ERROR Logs in Namespace `${NAMESPACE}`
         END
     END   
 
-Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Stack Tracesin Namespace `${NAMESPACE}` 
+Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Stack Traces in Namespace `${NAMESPACE}` 
     [Documentation]   Identifies multi-line stack traces from application failures.
     [Tags]    kubernetes    logs    stacktraces    ${WORKLOAD_TYPE}
     ${stacktraces}=    RW.CLI.Run Bash File

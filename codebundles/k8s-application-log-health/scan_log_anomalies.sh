@@ -14,6 +14,7 @@ echo "Scanning logs for frequent log anomalies in ${WORKLOAD_TYPE}/${WORKLOAD_NA
 PODS=($(jq -r '.[].metadata.name' "${OUTPUT_DIR}/application_logs_pods.json"))
 
 for POD in ${PODS[@]}; do
+    echo "Processing Pod $POD"
     CONTAINERS=$(kubectl get pod "${POD}" -n "${NAMESPACE}" --context "${CONTEXT}" -o jsonpath='{.spec.containers[*].name}')
     
     for CONTAINER in ${CONTAINERS}; do

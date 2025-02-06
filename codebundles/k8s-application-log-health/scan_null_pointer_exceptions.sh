@@ -17,6 +17,7 @@ echo "Scanning logs for null pointer and unhandled exceptions in ${WORKLOAD_TYPE
 PODS=($(jq -r '.[].metadata.name' "${OUTPUT_DIR}/application_logs_pods.json"))
 
 for POD in ${PODS[@]}; do
+    echo "Processing Pod $POD"
     CONTAINERS=$(kubectl get pod "${POD}" -n "${NAMESPACE}" --context "${CONTEXT}" -o jsonpath='{.spec.containers[*].name}')
     
     for CONTAINER in ${CONTAINERS}; do
