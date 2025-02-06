@@ -4,16 +4,17 @@
 # WORKLOAD_TYPE=$2
 # WORKLOAD_NAME=$3
 # CONTEXT=${5:-default}
+
 LOG_LINES=${4:-500}
 
 ERROR_JSON="../error_patterns.json"
 
 ISSUES_JSON='{"issues": []}'
-ISSUES_OUTPUT=${OUTPUT_DIR}/scan_conn_issues.json
+ISSUES_OUTPUT=${OUTPUT_DIR}/scan_auth_issues.json
 ERROR_COUNTS=()
 declare -A ERROR_STATS
 
-echo "Scanning logs for connection failures in ${WORKLOAD_TYPE}/${WORKLOAD_NAME} in namespace ${NAMESPACE}..."
+echo "Scanning logs for authentication and authorization failures in ${WORKLOAD_TYPE}/${WORKLOAD_NAME} in namespace ${NAMESPACE}..."
 PODS=($(jq -r '.[].metadata.name' "${OUTPUT_DIR}/application_logs_pods.json"))
 
 for POD in ${PODS[@]}; do
@@ -22,7 +23,7 @@ for POD in ${PODS[@]}; do
     
     for CONTAINER in ${CONTAINERS}; do
         LOG_FILE="${OUTPUT_DIR}/${POD}_${CONTAINER}_logs.txt"
-        ERROR_FILE="${OUTPUT_DIR}/${POD}_${CONTAINER}_connection_failures.txt"
+        ERROR_FILE="${OUTPUT_DIR}/${POD}_${CONTAINER}_auth_failures.txt"
         
         kubectl logs "${POD}" -c "${CONTAINER}" -n "${NAMESPACE}" --context "${CONTEXT}" --tail="${LOG_LINES}" --timestamps > "${LOG_FILE}" 2>/dev/null
         kubectl logs "${POD}" -c "${CONTAINER}" -n "${NAMESPACE}" --context "${CONTEXT}" --tail="${LOG_LINES}" --timestamps --previous >> "${LOG_FILE}" 2>/dev/null
@@ -69,15 +70,15 @@ for POD in ${PODS[@]}; do
             # Adjust recommendations based on occurrence severity
             OCCURRENCES=${ERROR_STATS["$pattern"]}
             if ((OCCURRENCES >= 10)); then
-                NEXT_STEP+=" Multiple failures detected (${OCCURRENCES} occurrences). Immediate investigation recommended."
+                NEXT_STEP+=" Multiple failures detected (${OCCURRENCES} occurrences). Immediate security review recommended."
                 SEVERITY=1
             elif ((OCCURRENCES >= 5)); then
-                NEXT_STEP+=" Repeated failures detected (${OCCURRENCES} occurrences). Consider increasing logging and monitoring."
+                NEXT_STEP+=" Repeated failures detected (${OCCURRENCES} occurrences). Consider increasing security logging and monitoring."
                 SEVERITY=2
             fi
 
             ISSUES_JSON=$(echo "$ISSUES_JSON" | jq \
-                --arg title "Connection Failure Detected in ${POD} (${CONTAINER}) - ${CATEGORY}" \
+                --arg title "Authentication/Authorization Failure in ${POD} (${CONTAINER}) - ${CATEGORY}" \
                 --arg details "${DETAILS}" \
                 --arg nextStep "${NEXT_STEP}" \
                 --arg severity "${SEVERITY}" \
@@ -91,12 +92,11 @@ done
 # Generate summary of affected services
 if [[ ${#ERROR_COUNTS[@]} -gt 0 ]]; then
     UNIQUE_CATEGORIES=$(printf "%s\n" "${ERROR_COUNTS[@]}" | sort -u | paste -sd ", ")
-    SUMMARY="Detected connection issues affecting ${UNIQUE_CATEGORIES}."
+    SUMMARY="Detected authentication and authorization issues affecting ${UNIQUE_CATEGORIES}."
 else
-    SUMMARY="No connection failures detected."
+    SUMMARY="No authentication or authorization failures detected."
 fi
 
 ISSUES_JSON=$(echo "$ISSUES_JSON" | jq --arg summary "$SUMMARY" '.summary = $summary')
 
 echo "${ISSUES_JSON}" > $ISSUES_OUTPUT
-
