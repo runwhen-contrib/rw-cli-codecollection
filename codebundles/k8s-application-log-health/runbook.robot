@@ -159,6 +159,10 @@ Scan And Report Issues
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list}) > 0
         FOR    ${item}    IN    @{issue_list}
+            ${details}=     RW.CLI.Run Bash File
+            ...    bash_file=summarize_details.sh
+            ...    cmd_override=echo -e ${item["details"]} | ./summarize_details.sh
+            ...    env={"SCAN_SCRIPT": "${SCAN_SCRIPT}", "OUTPUT_DIR":"${OUTPUT_DIR}"}
             RW.Core.Add Issue    
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
@@ -166,6 +170,6 @@ Scan And Report Issues
             ...    expected=${WORKLOAD_TYPE} `${WORKLOAD_NAME}` namespace `${NAMESPACE}` has no errors
             ...    actual=${WORKLOAD_TYPE} `${WORKLOAD_NAME}` namespace `${NAMESPACE}` has errors
             ...    reproduce_hint=${cli_result.cmd}
-            ...    details=${item["details"]}        
+            ...    details=${details.stdout}        
         END
     END   
