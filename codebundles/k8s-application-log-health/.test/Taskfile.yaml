@@ -126,6 +126,7 @@ tasks:
               PAYLOAD=$(jq -n --arg commitMsg "Creating new SLX $SLX_NAME" '{ commitMsg: $commitMsg, files: {} }')
               for file in slx.yaml runbook.yaml sli.yaml; do
                 if [ -f "$dir/$file" ]; then
+                  yq -i '.metadata.annotations = {}' $dir/$file 
                   CONTENT=$(cat "$dir/$file")
                   PAYLOAD=$(echo "$PAYLOAD" | jq --arg fileContent "$CONTENT" --arg fileName "$file" '.files[$fileName] = $fileContent')
                 fi

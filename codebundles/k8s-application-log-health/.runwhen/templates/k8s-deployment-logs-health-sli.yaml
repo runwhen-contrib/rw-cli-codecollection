@@ -11,7 +11,7 @@ spec:
   displayUnitsShort: ok
   locations:
     - {{default_location}}
-  description: Loogs for errors and stack traces in Kubernetes Application Logs
+  description: Logs for errors and stack traces in Kubernetes Application Logs
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
