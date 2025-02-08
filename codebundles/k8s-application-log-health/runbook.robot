@@ -13,7 +13,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` ERROR Logs in Namespace `${NAMESPACE}`
+Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for ERROR Logs in Namespace `${NAMESPACE}`
     [Documentation]    Validates if a Liveliness probe has possible misconfigurations
     [Tags]    kubernetes    logs    errors    exception    ${WORKLOAD_TYPE}
     Scan And Report Issues
