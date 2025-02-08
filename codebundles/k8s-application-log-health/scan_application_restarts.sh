@@ -5,7 +5,7 @@
 # WORKLOAD_NAME=$3
 # CONTEXT=${5:-default}
 LOG_LINES=${4:-1000}  # Fetch more logs to detect patterns
-ERROR_JSON="../error_patterns.json"
+ERROR_JSON="error_patterns.json"
 
 ISSUES_JSON='{"issues": []}'
 ISSUES_OUTPUT=${OUTPUT_DIR}/scan_application_restarts.json
