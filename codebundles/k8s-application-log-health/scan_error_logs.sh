@@ -6,7 +6,7 @@
 # CONTEXT=${5:-default}
 LOG_LINES=${4:-500}  # Default to last 500 lines if not specified
 
-ERROR_JSON="../error_patterns.json"
+ERROR_JSON="error_patterns.json"
 ISSUES_OUTPUT=${OUTPUT_DIR}/scan_error_issues.json
 ISSUES_JSON='{"issues": []}'
 

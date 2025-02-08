@@ -208,84 +208,118 @@ def run_bash_file(
     timeout_seconds: int = 60,
     **kwargs,
 ) -> platform.ShellServiceResponse:
-    """Runs a bash file from the local file system or remotely on a shellservice.
+    """
+    Runs a bash file from the local file system or remotely on a shellservice.
+
+    1) If `bash_file` is found in the current directory, use it.
+    2) Otherwise, we fall back to rewriting paths using `resolve_path_to_robot()`.
+    3) Once we determine the final local path of `bash_file`, we copy *all* files
+       from that same directory (no subfolders) into the environment that will run
+       this bash file.
+    4) We call `execute_command()` with all these files, so references to them
+       inside the script should work (assuming relative paths within that directory).
 
     Args:
-        bash_file (str): the name of the bashfile to run
-        target_service (platform.Service, optional): the shellservice to use if provided. Defaults to None.
-        env (dict, optional): a mapping of environment variables to set for the environment. Defaults to None.
-        include_in_history (bool, optional): whether to include in the shell history or not. Defaults to True.
-        cmd_override (str, optional): the entrypoint command to use, similar to a dockerfile. Defaults to "./<bash_file" internally.
+        bash_file (str): the name (or relative path) of the bash file to run.
+        target_service (platform.Service, optional): remote shell service if needed. Defaults to None.
+        env (dict, optional): environment variables to set for the command. Defaults to None.
+        include_in_history (bool, optional): whether to include script contents in shell history. Defaults to True.
+        cmd_override (str, optional): overrides the final command (defaults to "./<bash_file>").
+        timeout_seconds (int, optional): command timeout. Defaults to 60.
 
     Returns:
-        platform.ShellServiceResponse: the structured response from running the file.
+        platform.ShellServiceResponse: structured response from the command execution.
     """
-    # Check if the file exists in the current working directory
+
+    # --- 1) Check if bash_file exists in the current working directory ---
     if os.path.exists(bash_file):
         logger.info(f"File '{bash_file}' found in the current working directory.")
     else:
+        # Not found directly, so do the fallback logic with resolve_path_to_robot
         cwd = os.getcwd()
-        rw_path_to_robot = resolve_path_to_robot()
-        ## Users will expect to run the command from within the current working directory
-        ## Here we will rewrite the path so that it executes properly from the cwd
+        logger.warning(f"File '{bash_file}' not found in '{cwd}'. Attempting fallback logic...")
+        rw_path_to_robot = resolve_path_to_robot()  # your custom function
+
         if rw_path_to_robot:
-            # Split the path at the patterns you provided and join with the new prefix
+            # We try to rewrite the path based on known patterns
             for pattern in ["sli.robot", "runbook.robot"]:
                 if pattern in rw_path_to_robot:
                     path, _ = rw_path_to_robot.split(pattern)
-                    # if cwd == runwhen_home:
-                    #     new_path = path
-                    # else:
-                    #     # This for backwards compatibility for older images
-                    #     # that have /collection at the root 
-                    #     new_path = os.path.join("/collection", path)
-                    # # Modify the bash_file to point to the new directory
                     local_bash_file = f"./{bash_file}"
-                    bash_file = os.path.join(path, bash_file)
-                    if os.path.exists(bash_file):
-                        logger.info(
-                            f"File '{bash_file}' found at derived path: {path}."
-                        )
+                    candidate_path = os.path.join(path, bash_file)
+
+                    if os.path.exists(candidate_path):
+                        logger.info(f"File '{bash_file}' found at derived path: {candidate_path}")
+                        bash_file = candidate_path
+                        # If the user gave a cmd_override, replace references
                         if cmd_override:
-                            cmd_override = cmd_override.replace(
-                                f"{local_bash_file}", f"{bash_file}"
-                            )
+                            cmd_override = cmd_override.replace(local_bash_file, bash_file)
                         else:
-                            cmd_override = f"{bash_file}"
+                            cmd_override = bash_file
                         break
                     else:
                         logger.warning(
-                            f"File '{bash_file}' not found at derived path: {path}."
+                            f"File '{bash_file}' not found at derived path: {candidate_path}"
                         )
         else:
-            logger.warning(
-                f"Current directory is '{cwd}', but 'RW_PATH_TO_ROBOT' is not set."
-            )
+            logger.warning(f"RW_PATH_TO_ROBOT not set (resolve_path_to_robot returned None).")
+
+    # --- 2) If cmd_override is empty, default to "./<the_final_bash_file>" ---
     if not cmd_override:
-        cmd_override = f"./{bash_file}"
-    logger.info(f"Received kwargs: {kwargs}")
+        # If `bash_file` is absolute, we could run it directly. Otherwise prefix "./"
+        if os.path.isabs(bash_file):
+            cmd_override = bash_file
+        else:
+            cmd_override = f"./{bash_file}"
+
+    # --- 3) Determine the *final* directory containing bash_file ---
+    final_path = os.path.abspath(bash_file)
+    if not os.path.exists(final_path):
+        raise FileNotFoundError(f"Could not find the bash file at '{final_path}'.")
+
+    final_dir = os.path.dirname(final_path)
+    script_name = os.path.basename(final_path)
+
+    logger.info(f"Using final path '{final_path}' (directory: '{final_dir}')")
+    logger.info(f"Final command override: '{cmd_override}'")
+
+    # --- 4) Copy ALL files from final_dir into the environment (no subfolders) ---
+    files_dict = {}
+    for fname in os.listdir(final_dir):
+        full_path = os.path.join(final_dir, fname)
+        if os.path.isfile(full_path):
+            with open(full_path, "r") as fh:
+                files_dict[fname] = fh.read()
+
+    # --- 5) Prepare to run the script ---
+    # We also might want to read the final bash file specifically for logging or history
+    file_contents = files_dict.get(script_name, "")
+    logger.info(f"Script file '{script_name}' contents:\n\n{file_contents}")
+
     request_secrets = _create_secrets_from_kwargs(**kwargs)
-    file_contents: str = ""
-    with open(f"{bash_file}", "r") as fh:
-        file_contents = fh.read()
-    logger.info(f"Script file contents:\n\n{file_contents}")
+
+    # --- 6) Execute the command with the entire directory's files ---
     rsp = execute_command(
         cmd=cmd_override,
-        files={f"{bash_file}": file_contents},
+        files=files_dict,
         service=target_service,
         request_secrets=request_secrets,
         env=env,
         timeout_seconds=timeout_seconds,
     )
+
+    # --- 7) Optionally add the script contents to SHELL_HISTORY ---
     if include_in_history:
         SHELL_HISTORY.append(file_contents)
+
+    # --- 8) Log the results as before ---
     logger.info(f"shell stdout: {rsp.stdout}")
     logger.info(f"shell stderr: {rsp.stderr}")
     logger.info(f"shell status: {rsp.status}")
     logger.info(f"shell returncode: {rsp.returncode}")
     logger.info(f"shell rsp: {rsp}")
-    return rsp
 
+    return rsp
 
 def run_cli(
     cmd: str,

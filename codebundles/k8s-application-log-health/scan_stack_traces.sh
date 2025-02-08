@@ -5,7 +5,7 @@
 # WORKLOAD_NAME=$3
 # CONTEXT=${5:-default}
 LOG_LINES=${4:-1000}
-ERROR_JSON="../error_patterns.json"
+ERROR_JSON="error_patterns.json"
 
 ISSUES_OUTPUT=${OUTPUT_DIR}/scan_stacktrace_issues.json
 

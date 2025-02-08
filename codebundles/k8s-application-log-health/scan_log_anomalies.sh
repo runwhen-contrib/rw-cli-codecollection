@@ -6,7 +6,7 @@
 # CONTEXT=${5:-default}
 LOG_LINES=${4:-1000}  # Fetch more lines to detect patterns
 
-ERROR_JSON="../error_patterns.json"
+ERROR_JSON="error_patterns.json"
 ISSUES_OUTPUT=${OUTPUT_DIR}/scan_anomoly_issues.json
 ISSUES_JSON='{"issues": []}'
 
