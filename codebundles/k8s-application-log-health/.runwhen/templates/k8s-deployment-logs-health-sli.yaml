@@ -46,11 +46,11 @@ spec:
     warning:
       operator: <
       threshold: '1'
-      for: '20m'
+      for: '5m'
     ticket:
       operator: <
       threshold: '1'
-      for: '30m'
+      for: '10m'
     page:
       operator: '=='
       threshold: '0'

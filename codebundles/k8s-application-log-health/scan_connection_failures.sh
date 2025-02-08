@@ -16,21 +16,34 @@ declare -A ERROR_STATS
 echo "Scanning logs for connection failures in ${WORKLOAD_TYPE}/${WORKLOAD_NAME} in namespace ${NAMESPACE}..."
 PODS=($(jq -r '.[].metadata.name' "${OUTPUT_DIR}/application_logs_pods.json"))
 
-for POD in ${PODS[@]}; do
+# 2) Iterate over each pod
+for POD in "${PODS[@]}"; do
     echo "Processing Pod $POD"
-    CONTAINERS=$(kubectl get pod "${POD}" -n "${NAMESPACE}" --context "${CONTEXT}" -o jsonpath='{.spec.containers[*].name}')
-    
+
+    # 2a) Extract container names from the same JSON
+    #     Instead of calling kubectl get pod ...
+    CONTAINERS=$(jq -r --arg POD "$POD" '
+      .[] 
+      | select(.metadata.name == $POD)
+      | .spec.containers[].name
+    ' "${OUTPUT_DIR}/application_logs_pods.json")
+
+    # 2b) For each container, read the local logs
     for CONTAINER in ${CONTAINERS}; do
-        LOG_FILE="${OUTPUT_DIR}/${POD}_${CONTAINER}_logs.txt"
-        ERROR_FILE="${OUTPUT_DIR}/${POD}_${CONTAINER}_connection_failures.txt"
+        echo "  Processing Container $CONTAINER"
         
-        kubectl logs "${POD}" -c "${CONTAINER}" -n "${NAMESPACE}" --context "${CONTEXT}" --tail="${LOG_LINES}" --timestamps > "${LOG_FILE}" 2>/dev/null
-        kubectl logs "${POD}" -c "${CONTAINER}" -n "${NAMESPACE}" --context "${CONTEXT}" --tail="${LOG_LINES}" --timestamps --previous >> "${LOG_FILE}" 2>/dev/null
+        # 3) Point to the local log file from your "get_pods_for_workload_fulljson.sh" step
+        LOG_FILE="${OUTPUT_DIR}/${WORKLOAD_TYPE}_${WORKLOAD_NAME}_logs/${POD}_${CONTAINER}_logs.txt"
+
+        if [[ ! -f "$LOG_FILE" ]]; then
+            echo "  Warning: No log file found at $LOG_FILE" >&2
+            continue
+        fi
 
         declare -A ERROR_AGGREGATE
 
         while read -r pattern; do
-            MATCHED_LINES=$(grep -Ei "${pattern}" "${LOG_FILE}" || true)
+            MATCHED_LINES=$(grep -Pi "${pattern}" "${LOG_FILE}" || true)
             if [[ -n "${MATCHED_LINES}" ]]; then
                 CATEGORY=$(jq -r --arg pattern "${pattern}" '.patterns[] | select(.match == $pattern) | .category' "${ERROR_JSON}")
                 SEVERITY=$(jq -r --arg pattern "${pattern}" '.patterns[] | select(.match == $pattern) | .severity' "${ERROR_JSON}")

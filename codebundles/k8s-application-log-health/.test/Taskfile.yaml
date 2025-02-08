@@ -10,9 +10,8 @@ tasks:
   clean:
     desc: "Run cleanup tasks"
     cmds:
-      - task: clean-rwl-discovery
       - task: delete-slxs
-
+      - task: clean-rwl-discovery
 
 
   generate-rwl-config:
@@ -24,18 +23,18 @@ tasks:
         repo_url=$(git config --get remote.origin.url)
         branch_name=$(git rev-parse --abbrev-ref HEAD)
         codebundle=$(basename "$(dirname "$PWD")")
-        
+
         # Generate workspaceInfo.yaml with fetched cluster details
         cat <<EOF > workspaceInfo.yaml
         workspaceName: "$RW_WORKSPACE"
         workspaceOwnerEmail: authors@runwhen.com
-        defaultLocation: location-01-us-west1
+        defaultLocation: northamerica-northeast2-01
         defaultLOD: detailed
         cloudConfig:
           kubernetes: 
-            kubeconfigFile: /shared/kubeconfig.secret
+            kubeconfigFile: /shared/kubeconfig-test.secret
             namespaces: 
-              voting-app
+              backend-services
         codeCollections:
         - repoURL: "$repo_url"
           branch: "$branch_name"
@@ -44,6 +43,26 @@ tasks:
           kubernetes_distribution_binary: kubectl
           kubeconfig_secret_name: kubeconfig
         EOF
+
+        # # Generate workspaceInfo.yaml with fetched cluster details
+        # cat <<EOF > workspaceInfo.yaml
+        # workspaceName: "$RW_WORKSPACE"
+        # workspaceOwnerEmail: authors@runwhen.com
+        # defaultLocation: location-01-us-west1
+        # defaultLOD: detailed
+        # cloudConfig:
+        #   kubernetes: 
+        #     kubeconfigFile: /shared/kubeconfig.secret
+        #     namespaces: 
+        #       voting-app
+        # codeCollections:
+        # - repoURL: "$repo_url"
+        #   branch: "$branch_name"
+        #   codeBundles: ["$codebundle"]
+        # custom: 
+        #   kubernetes_distribution_binary: kubectl
+        #   kubeconfig_secret_name: kubeconfig
+        # EOF
     silent: true
 
   run-rwl-discovery:

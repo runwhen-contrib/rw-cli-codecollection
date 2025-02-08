@@ -1,12 +1,18 @@
 {
   "patterns": [
-    // ---------------------------
-    // GenericError
-    // ---------------------------
+    {
+      "match": "error=connection closed before message completed",
+      "category": "GenericError",
+      "severity": 4,
+      "next_steps": [
+        "These 'connection closed' lines are typically normal and do not indicate a genuine error",
+        "Monitor if repeated excessively. If so, investigate possible timeouts or network disruptions"
+      ]
+    },
     {
       "match": "(?i)error", 
       "category": "GenericError",
-      "severity": 2,
+      "severity": 3,
       "next_steps": [
         "Review logs for generic error messages in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
         "Identify if they indicate operational issues or known warnings"
@@ -15,7 +21,7 @@
     {
       "match": "(?i)fail",
       "category": "GenericError",
-      "severity": 2,
+      "severity": 3,
       "next_steps": [
         "Investigate 'fail' references in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
         "Check if they correspond to test failures, partial successes, or genuine errors"
@@ -66,10 +72,6 @@
         "Consider adding guard clauses or additional checks"
       ]
     },
-
-    // ---------------------------
-    // Connection-related issues (Networking + Service + Service Dependency)
-    // ---------------------------
     {
       "match": "connection refused",
       "category": "Connection",
@@ -186,10 +188,6 @@
         "Look for partial writes or large data transfers in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}"
       ]
     },
-
-    // ---------------------------
-    // Timeout-related (Performance + Networking timeouts, etc.)
-    // ---------------------------
     {
       "match": "timeout",
       "category": "Timeout",
@@ -280,10 +278,6 @@
         "Investigate large data sets or slow I/O"
       ]
     },
-
-    // ---------------------------
-    // Auth (Authentication + Authorization)
-    // ---------------------------
     {
       "match": "authentication failed",
       "category": "Auth",
@@ -383,10 +377,6 @@
         "Confirm token hasn't expired or been revoked"
       ]
     },
-
-    // ---------------------------
-    // Exceptions (language-specific or general “Application” errors)
-    // ---------------------------
     {
       "match": "Exception",
       "category": "Exceptions",
@@ -554,10 +544,6 @@
         "Debug with gdb or relevant memory analysis tools"
       ]
     },
-
-    // ---------------------------
-    // AppFailure (Application Failure / Crash)
-    // ---------------------------
     {
       "match": "process exited",
       "category": "AppFailure",
@@ -639,10 +625,6 @@
         "Implement fallback logic or investigate logs thoroughly"
       ]
     },
-
-    // ---------------------------
-    // AppRestart (Application Restarts)
-    // ---------------------------
     {
       "match": "restart",
       "category": "AppRestart",
@@ -697,10 +679,6 @@
         "Ensure no critical workloads are abruptly stopped"
       ]
     },
-
-    // ---------------------------
-    // Resource (Memory & CPU)
-    // ---------------------------
     {
       "match": "Out of memory",
       "category": "Resource",

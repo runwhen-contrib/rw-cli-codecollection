@@ -141,8 +141,8 @@ Suite Initialization
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
 
     ${pods}=    RW.CLI.Run Bash File
-    ...    bash_file=get_pods_for_workload.sh
-    ...    cmd_override=./get_pods_for_workload.sh ${WORKLOAD_TYPE} ${WORKLOAD_NAME} ${NAMESPACE} ${CONTEXT}
+    ...    bash_file=get_pod_logs_for_workload.sh
+    ...    cmd_override=./get_pod_logs_for_workload.sh ${WORKLOAD_TYPE} ${WORKLOAD_NAME} ${NAMESPACE} ${CONTEXT}
     ...    env={"KUBECONFIG":"./${kubeconfig.key}", "OUTPUT_DIR":"${OUTPUT_DIR}"}
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}

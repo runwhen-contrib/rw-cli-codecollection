@@ -1,0 +1,10 @@
+{
+    "patterns": [
+      {
+        "match": "connection closed before message completed",
+        "category": "Ignore",
+        "explanation": "Normal closures"
+      }
+    ]
+  }
+  
