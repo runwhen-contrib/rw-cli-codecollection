@@ -21,10 +21,10 @@
 #   }
 # ]
 
-WORKLOAD_TYPE="$1"   # "deployment", "statefulset", or "daemonset"
-WORKLOAD_NAME="$2"
-NAMESPACE="$3"
-CONTEXT="$4"
+WORKLOAD_TYPE="${1:-$WORKLOAD_TYPE}"   # "deployment", "statefulset", or "daemonset"
+WORKLOAD_NAME="${2:-$WORKLOAD_NAME}"
+NAMESPACE="${3:-$NAMESPACE}"
+CONTEXT="${4:-$CONTEXT}"
 OUTPUT_FILE=$OUTPUT_DIR/application_logs_pods.json
 # 1) Fetch the workload as JSON, extract its UID
 WORKLOAD_JSON=$(kubectl get "${WORKLOAD_TYPE}" "${WORKLOAD_NAME}" \

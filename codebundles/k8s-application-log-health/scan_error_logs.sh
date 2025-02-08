@@ -42,7 +42,7 @@ for POD in ${PODS[@]}; do
                     '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber)}]'
                 )
             fi
-        done < <(jq -r '.patterns[].match' "${ERROR_JSON}")
+        done < <(jq -r '.patterns[] | select(.category == "GenericError" or .category == "AppFailure") | .match' "${ERROR_JSON}")
     done
 done
 

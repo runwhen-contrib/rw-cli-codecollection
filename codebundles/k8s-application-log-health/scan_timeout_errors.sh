@@ -55,7 +55,7 @@ for POD in ${PODS[@]}; do
                     ERROR_STATS["$pattern"]=1
                 fi
             fi
-        done < <(jq -r '.patterns[].match' "${ERROR_JSON}")
+        done < <(jq -r '.patterns[] | select(.category == "Timeout") | .match' "${ERROR_JSON}")
 
         for pattern in "${!ERROR_AGGREGATE[@]}"; do
             DETAILS=$(jq -Rs . <<< "${ERROR_AGGREGATE[$pattern]}")

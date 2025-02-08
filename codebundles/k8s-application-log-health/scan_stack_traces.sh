@@ -55,7 +55,7 @@ for POD in ${PODS[@]}; do
                     NEXT_STEP=$(jq -r --arg pattern "${pattern}" '.patterns[] | select(.match == $pattern) | .next_step' "${ERROR_JSON}")
                     break
                 fi
-            done < <(jq -r '.patterns[].match' "${ERROR_JSON}")
+            done < <(jq -r '.patterns[] | select(.category == "Exceptions") | .match' "${ERROR_JSON}")
 
             # If no specific match was found, set a generic message
             if [[ -z "${NEXT_STEP}" ]]; then

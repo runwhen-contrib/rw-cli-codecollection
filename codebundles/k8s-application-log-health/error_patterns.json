@@ -1,358 +1,804 @@
 {
   "patterns": [
+    // ---------------------------
+    // GenericError
+    // ---------------------------
     {
-      "match": "connection refused",
-      "category": "Networking",
+      "match": "(?i)error", 
+      "category": "GenericError",
       "severity": 2,
-      "next_step": "Check if the service for ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is reachable. Validate firewall rules and network policies."
+      "next_steps": [
+        "Review logs for generic error messages in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Identify if they indicate operational issues or known warnings"
+      ]
     },
     {
-      "match": "timeout",
-      "category": "Performance",
+      "match": "(?i)fail",
+      "category": "GenericError",
+      "severity": 2,
+      "next_steps": [
+        "Investigate 'fail' references in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Check if they correspond to test failures, partial successes, or genuine errors"
+      ]
+    },
+    {
+      "match": "(?i)generic failure",
+      "category": "GenericError",
+      "severity": 2,
+      "next_steps": [
+        "Review logs for references to 'generic failure' in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Determine whether this indicates a minor or major operational issue"
+      ]
+    },
+    {
+      "match": "(?i)unhandled error",
+      "category": "GenericError",
+      "severity": 2,
+      "next_steps": [
+        "Look for unhandled error traces in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Add error handling or logging to capture more details"
+      ]
+    },
+    {
+      "match": "(?i)problem occurred",
+      "category": "GenericError",
+      "severity": 2,
+      "next_steps": [
+        "Check for known issues or configuration problems in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Correlate with surrounding log lines to isolate root cause"
+      ]
+    },
+    {
+      "match": "(?i)issue:",
+      "category": "GenericError",
+      "severity": 2,
+      "next_steps": [
+        "Investigate the reported 'issue:' logs in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Assess if it's user-facing or internal diagnostic info"
+      ]
+    },
+    {
+      "match": "(?i)unexpected situation",
+      "category": "GenericError",
       "severity": 3,
-      "next_step": "Investigate slow queries or latency in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Increase timeout values if needed."
+      "next_steps": [
+        "Analyze why an unexpected situation arose in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Consider adding guard clauses or additional checks"
+      ]
     },
-    {
-      "match": "authentication failed",
-      "category": "Authentication",
-      "severity": 2,
-      "next_step": "Verify credentials for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Check if tokens or passwords are expired."
-    },
-    {
-      "match": "Exception",
-      "category": "Java",
-      "severity": 2,
-      "next_step": "Analyze the Java exception in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Verify exception handling and log details."
-    },
-    {
-      "match": "Traceback",
-      "category": "Python",
-      "severity": 2,
-      "next_step": "Identify the root cause of the Python traceback in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Check for missing dependencies or incorrect data."
-    },
-    {
-      "match": "panic:",
-      "category": "Golang",
-      "severity": 2,
-      "next_step": "Investigate why ${WORKLOAD_TYPE} ${WORKLOAD_NAME} panicked. Use `recover()` to handle unhandled crashes."
-    },
-    {
-      "match": "segmentation fault",
-      "category": "C",
-      "severity": 1,
-      "next_step": "Analyze memory usage for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Use `gdb` to debug segmentation faults."
-    },
+
+    // ---------------------------
+    // Connection-related issues (Networking + Service + Service Dependency)
+    // ---------------------------
     {
       "match": "connection refused",
-      "category": "Networking",
+      "category": "Connection",
       "severity": 2,
-      "next_step": "Check if the service for ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is running and reachable. Validate firewall rules and network policies."
+      "next_steps": [
+        "Check if the service for ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is reachable",
+        "Validate firewall rules and network policies"
+      ]
     },
     {
       "match": "connection timeout",
-      "category": "Networking",
+      "category": "Connection",
       "severity": 3,
-      "next_step": "Investigate network latency for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Check DNS resolution and service response time."
+      "next_steps": [
+        "Investigate network latency for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Check DNS resolution and service response time"
+      ]
     },
     {
       "match": "failed to connect",
-      "category": "Networking",
+      "category": "Connection",
       "severity": 2,
-      "next_step": "Ensure that ${WORKLOAD_TYPE} ${WORKLOAD_NAME} has the correct service endpoints. Validate hostnames and connection settings."
+      "next_steps": [
+        "Ensure that ${WORKLOAD_TYPE} ${WORKLOAD_NAME} has the correct service endpoints",
+        "Validate hostnames and connection settings"
+      ]
     },
     {
       "match": "service unavailable",
-      "category": "Service",
+      "category": "Connection",
       "severity": 2,
-      "next_step": "Verify if the backend service for ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is healthy and accepting connections."
+      "next_steps": [
+        "Verify if the backend service for ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is healthy and accepting connections"
+      ]
     },
     {
       "match": "unable to reach",
-      "category": "Networking",
+      "category": "Connection",
       "severity": 3,
-      "next_step": "Confirm that ${WORKLOAD_TYPE} ${WORKLOAD_NAME} has network access to required services. Check for misconfigured network policies."
-    },
-    {
-      "match": "timeout",
-      "category": "Performance",
-      "severity": 3,
-      "next_step": "Investigate slow responses in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Check backend latency and optimize timeouts."
-    },
-    {
-      "match": "request timeout",
-      "category": "Networking",
-      "severity": 3,
-      "next_step": "Review API response times for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Ensure service endpoints are responsive."
-    },
-    {
-      "match": "operation timed out",
-      "category": "Networking",
-      "severity": 3,
-      "next_step": "Check if ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is experiencing long-running operations. Consider adjusting timeout settings."
-    },
-    {
-      "match": "execution expired",
-      "category": "Performance",
-      "severity": 3,
-      "next_step": "Identify delays in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Review service dependencies and optimize response times."
-    },
-    {
-      "match": "deadline exceeded",
-      "category": "Networking",
-      "severity": 3,
-      "next_step": "Verify service timeouts for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Adjust retry mechanisms if necessary."
-    },
-    {
-      "match": "unauthorized",
-      "category": "Authentication",
-      "severity": 3,
-      "next_step": "Verify user credentials and authentication settings for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Check for missing or expired tokens."
-    },
-    {
-      "match": "authentication failed",
-      "category": "Authentication",
-      "severity": 3,
-      "next_step": "Check the authentication provider for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Ensure API keys and passwords are correct."
-    },
-    {
-      "match": "access denied",
-      "category": "Authorization",
-      "severity": 2,
-      "next_step": "Verify RBAC permissions for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Ensure the correct roles are assigned."
-    },
-    {
-      "match": "forbidden",
-      "category": "Authorization",
-      "severity": 2,
-      "next_step": "Check Kubernetes role bindings and policies for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Ensure required permissions exist."
-    },
-    {
-      "match": "invalid credentials",
-      "category": "Authentication",
-      "severity": 3,
-      "next_step": "Ensure that the credentials for ${WORKLOAD_TYPE} ${WORKLOAD_NAME} are valid. Check for misconfigured secrets."
-    },
-    {
-      "match": "token expired",
-      "category": "Authentication",
-      "severity": 3,
-      "next_step": "Renew expired tokens for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Verify OAuth and JWT configurations."
-    },
-    {
-      "match": "NullPointerException",
-      "category": "Application",
-      "severity": 2,
-      "next_step": "Investigate possible null dereferences in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Add null checks and handle missing values appropriately."
-    },
-    {
-      "match": "TypeError",
-      "category": "Application",
-      "severity": 3,
-      "next_step": "Check type mismatches in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Ensure expected data structures are used."
-    },
-    {
-      "match": "ReferenceError",
-      "category": "Application",
-      "severity": 3,
-      "next_step": "Verify that variables and functions are correctly declared and accessible in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}."
-    },
-    {
-      "match": "UnhandledPromiseRejectionWarning",
-      "category": "Application",
-      "severity": 3,
-      "next_step": "Handle rejected promises properly in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Use try/catch or .catch() to handle errors."
-    },
-    {
-      "match": "panic:",
-      "category": "Golang",
-      "severity": 2,
-      "next_step": "Investigate unhandled panic in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Consider using `recover()` to catch unexpected panics."
-    },
-    {
-      "match": "segmentation fault",
-      "category": "C/C++",
-      "severity": 1,
-      "next_step": "Analyze memory access issues in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Use debugging tools like `gdb` or `valgrind`."
-    },
-    {
-      "match": "NullPointerException",
-      "category": "Java",
-      "severity": 2,
-      "next_step": "Investigate possible null dereferences in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Add null checks and handle missing values appropriately."
-    },
-    {
-      "match": "TypeError",
-      "category": "Python, JavaScript",
-      "severity": 3,
-      "next_step": "Check type mismatches in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Ensure expected data structures are used."
-    },
-    {
-      "match": "ReferenceError",
-      "category": "JavaScript",
-      "severity": 3,
-      "next_step": "Verify that variables and functions are correctly declared and accessible in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}."
-    },
-    {
-      "match": "UnhandledPromiseRejectionWarning",
-      "category": "JavaScript",
-      "severity": 3,
-      "next_step": "Handle rejected promises properly in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Use try/catch or .catch() to handle errors."
-    },
-    {
-      "match": "panic:",
-      "category": "Golang, Rust",
-      "severity": 2,
-      "next_step": "Investigate unhandled panic in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Consider using `recover()` (Go) or debugging Rust backtraces."
-    },
-    {
-      "match": "segmentation fault",
-      "category": "C, C++",
-      "severity": 1,
-      "next_step": "Analyze memory access issues in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Use debugging tools like `gdb`, `valgrind`, or AddressSanitizer."
-    },
-    {
-      "match": "IndexError",
-      "category": "Python",
-      "severity": 3,
-      "next_step": "Check list indexing in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Ensure indices are within range."
-    },
-    {
-      "match": "KeyError",
-      "category": "Python",
-      "severity": 3,
-      "next_step": "Verify dictionary keys in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Ensure keys exist before accessing them."
-    },
-    {
-      "match": "AssertionError",
-      "category": "Python",
-      "severity": 3,
-      "next_step": "Check failed assertions in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Ensure expected conditions are met."
-    },
-    {
-      "match": "ArithmeticException",
-      "category": "Java",
-      "severity": 3,
-      "next_step": "Investigate division by zero or numeric overflows in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}."
-    },
-    {
-      "match": "IllegalStateException",
-      "category": "Java",
-      "severity": 2,
-      "next_step": "Verify that ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is in a valid state before calling dependent functions."
-    },
-    {
-      "match": "System.InvalidOperationException",
-      "category": "C#, .NET",
-      "severity": 2,
-      "next_step": "Ensure ${WORKLOAD_TYPE} ${WORKLOAD_NAME} follows correct sequence operations and does not call methods at an invalid state."
-    },
-    {
-      "match": "process exited",
-      "category": "Application Failure",
-      "severity": 2,
-      "next_step": "Check logs in ${WORKLOAD_TYPE} ${WORKLOAD_NAME} for crash details. Investigate unhandled exceptions or out-of-memory errors."
-    },
-    {
-      "match": "shutting down",
-      "category": "Application Failure",
-      "severity": 3,
-      "next_step": "Investigate why ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is shutting down. Look for termination signals or resource exhaustion."
-    },
-    {
-      "match": "restart",
-      "category": "Application Restart",
-      "severity": 2,
-      "next_step": "Monitor ${WORKLOAD_TYPE} ${WORKLOAD_NAME} for repeated restarts. Check readiness probes and resource limits."
-    },
-    {
-      "match": "fatal error",
-      "category": "Application Failure",
-      "severity": 1,
-      "next_step": "A fatal error was detected in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Review logs and debug the cause immediately."
-    },
-    {
-      "match": "segmentation fault",
-      "category": "C, C++",
-      "severity": 1,
-      "next_step": "Analyze memory access issues in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Use debugging tools like `gdb`, `valgrind`, or AddressSanitizer."
-    },
-    {
-      "match": "core dumped",
-      "category": "Application Crash",
-      "severity": 1,
-      "next_step": "Check core dump analysis for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Debug using `gdb` or post-mortem tools."
-    },
-    {
-      "match": "Out of memory",
-      "category": "Memory",
-      "severity": 1,
-      "next_step": "Increase memory limits for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Investigate memory leaks or optimize resource allocation."
-    },
-    {
-      "match": "Killed process",
-      "category": "Memory",
-      "severity": 1,
-      "next_step": "A process was killed due to memory exhaustion in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Increase available memory or reduce memory consumption."
-    },
-    {
-      "match": "memory limit exceeded",
-      "category": "Memory",
-      "severity": 2,
-      "next_step": "Monitor ${WORKLOAD_TYPE} ${WORKLOAD_NAME} for memory usage spikes. Consider adjusting requests and limits."
-    },
-    {
-      "match": "high CPU usage",
-      "category": "CPU",
-      "severity": 2,
-      "next_step": "Investigate high CPU usage in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Optimize CPU-intensive tasks and adjust resource limits."
-    },
-    {
-      "match": "CPU throttling detected",
-      "category": "CPU",
-      "severity": 2,
-      "next_step": "Kubernetes is throttling CPU for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Consider increasing CPU limits or reviewing workload efficiency."
-    },
-    {
-      "match": "OOMKilled",
-      "category": "Memory",
-      "severity": 1,
-      "next_step": "The pod running ${WORKLOAD_TYPE} ${WORKLOAD_NAME} was OOMKilled. Increase memory allocation or optimize memory usage."
-    },
-    {
-      "match": "service unavailable",
-      "category": "Service Dependency",
-      "severity": 2,
-      "next_step": "Verify if the backend service for ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is healthy and accepting connections."
-    },
-    {
-      "match": "connection refused",
-      "category": "Service Dependency",
-      "severity": 2,
-      "next_step": "Check if the target service for ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is reachable. Validate firewall rules and network policies."
-    },
-    {
-      "match": "failed to connect",
-      "category": "Service Dependency",
-      "severity": 2,
-      "next_step": "Ensure that ${WORKLOAD_TYPE} ${WORKLOAD_NAME} has the correct service endpoints. Validate hostnames and connection settings."
+      "next_steps": [
+        "Confirm that ${WORKLOAD_TYPE} ${WORKLOAD_NAME} has network access to required services",
+        "Check for misconfigured network policies"
+      ]
     },
     {
       "match": "could not resolve host",
-      "category": "Service Dependency",
+      "category": "Connection",
       "severity": 3,
-      "next_step": "Investigate DNS resolution issues for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Ensure DNS is properly configured."
+      "next_steps": [
+        "Investigate DNS resolution issues for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Ensure DNS is properly configured"
+      ]
     },
     {
       "match": "read: connection reset by peer",
-      "category": "Service Dependency",
+      "category": "Connection",
       "severity": 3,
-      "next_step": "Check if the remote service for ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is experiencing intermittent failures. Increase retry logic if needed."
+      "next_steps": [
+        "Check if the remote service for ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is experiencing intermittent failures",
+        "Increase retry logic if needed"
+      ]
     },
     {
       "match": "remote error: internal server error",
-      "category": "Service Dependency",
+      "category": "Connection",
       "severity": 3,
-      "next_step": "Investigate backend failures impacting ${WORKLOAD_TYPE} ${WORKLOAD_NAME}. Review service logs for further details."
+      "next_steps": [
+        "Investigate backend failures impacting ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Review service logs for further details"
+      ]
+    },
+    {
+      "match": "network is unreachable",
+      "category": "Connection",
+      "severity": 2,
+      "next_steps": [
+        "Confirm that the host network allows traffic for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Check route tables and network interfaces"
+      ]
+    },
+    {
+      "match": "SSL handshake error",
+      "category": "Connection",
+      "severity": 3,
+      "next_steps": [
+        "Verify certificates used by ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Check if TLS versions or cipher suites are mismatched"
+      ]
+    },
+    {
+      "match": "DNS lookup failed",
+      "category": "Connection",
+      "severity": 3,
+      "next_steps": [
+        "Ensure DNS configuration is correct for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Check /etc/resolv.conf or cluster DNS pods"
+      ]
+    },
+    {
+      "match": "host unreachable",
+      "category": "Connection",
+      "severity": 2,
+      "next_steps": [
+        "Verify the target host is up and responding to pings",
+        "Review firewall or security group rules restricting connectivity"
+      ]
+    },
+    {
+      "match": "broken pipe",
+      "category": "Connection",
+      "severity": 2,
+      "next_steps": [
+        "Check if the remote service forcibly closed the connection",
+        "Look for partial writes or large data transfers in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}"
+      ]
+    },
+
+    // ---------------------------
+    // Timeout-related (Performance + Networking timeouts, etc.)
+    // ---------------------------
+    {
+      "match": "timeout",
+      "category": "Timeout",
+      "severity": 3,
+      "next_steps": [
+        "Investigate slow responses in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Check backend latency and optimize timeouts"
+      ]
+    },
+    {
+      "match": "request timeout",
+      "category": "Timeout",
+      "severity": 3,
+      "next_steps": [
+        "Review API response times for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Ensure service endpoints are responsive"
+      ]
+    },
+    {
+      "match": "operation timed out",
+      "category": "Timeout",
+      "severity": 3,
+      "next_steps": [
+        "Check if ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is experiencing long-running operations",
+        "Consider adjusting timeout settings"
+      ]
+    },
+    {
+      "match": "execution expired",
+      "category": "Timeout",
+      "severity": 3,
+      "next_steps": [
+        "Identify delays in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Review service dependencies and optimize response times"
+      ]
+    },
+    {
+      "match": "deadline exceeded",
+      "category": "Timeout",
+      "severity": 3,
+      "next_steps": [
+        "Verify service timeouts for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Adjust retry mechanisms if necessary"
+      ]
+    },
+    {
+      "match": "response took too long",
+      "category": "Timeout",
+      "severity": 3,
+      "next_steps": [
+        "Investigate if ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is overloaded",
+        "Review performance metrics and potential bottlenecks"
+      ]
+    },
+    {
+      "match": "gateway timeout",
+      "category": "Timeout",
+      "severity": 3,
+      "next_steps": [
+        "Confirm upstream services respond within the gateway's time limit",
+        "Evaluate timeouts for the gateway or load balancer"
+      ]
+    },
+    {
+      "match": "operation exceeded time limit",
+      "category": "Timeout",
+      "severity": 3,
+      "next_steps": [
+        "Identify which operation in ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is slow",
+        "Optimize or break it down into smaller tasks"
+      ]
+    },
+    {
+      "match": "script timed out",
+      "category": "Timeout",
+      "severity": 3,
+      "next_steps": [
+        "Check any scripting logic in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Review max execution times or watch for infinite loops"
+      ]
+    },
+    {
+      "match": "query took too long",
+      "category": "Timeout",
+      "severity": 3,
+      "next_steps": [
+        "Optimize database queries or indexes for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Investigate large data sets or slow I/O"
+      ]
+    },
+
+    // ---------------------------
+    // Auth (Authentication + Authorization)
+    // ---------------------------
+    {
+      "match": "authentication failed",
+      "category": "Auth",
+      "severity": 2,
+      "next_steps": [
+        "Verify credentials for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Check if tokens or passwords are expired"
+      ]
+    },
+    {
+      "match": "unauthorized",
+      "category": "Auth",
+      "severity": 3,
+      "next_steps": [
+        "Verify user credentials and authentication settings for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Check for missing or expired tokens"
+      ]
+    },
+    {
+      "match": "invalid credentials",
+      "category": "Auth",
+      "severity": 3,
+      "next_steps": [
+        "Ensure that the credentials for ${WORKLOAD_TYPE} ${WORKLOAD_NAME} are valid",
+        "Check for misconfigured secrets"
+      ]
+    },
+    {
+      "match": "token expired",
+      "category": "Auth",
+      "severity": 3,
+      "next_steps": [
+        "Renew expired tokens for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Verify OAuth and JWT configurations"
+      ]
+    },
+    {
+      "match": "access denied",
+      "category": "Auth",
+      "severity": 2,
+      "next_steps": [
+        "Verify RBAC permissions for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Ensure the correct roles are assigned"
+      ]
+    },
+    {
+      "match": "forbidden",
+      "category": "Auth",
+      "severity": 2,
+      "next_steps": [
+        "Check Kubernetes role bindings and policies for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Ensure required permissions exist"
+      ]
+    },
+    {
+      "match": "login failed",
+      "category": "Auth",
+      "severity": 2,
+      "next_steps": [
+        "Verify username/password or tokens used by ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Check if there's a lockout policy after multiple failures"
+      ]
+    },
+    {
+      "match": "unauthenticated request",
+      "category": "Auth",
+      "severity": 3,
+      "next_steps": [
+        "Determine why ${WORKLOAD_TYPE} ${WORKLOAD_NAME} didn't authenticate the request",
+        "Add required authentication headers or tokens"
+      ]
+    },
+    {
+      "match": "API key invalid",
+      "category": "Auth",
+      "severity": 3,
+      "next_steps": [
+        "Refresh or rotate the API key for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Ensure the configured key matches the backend"
+      ]
+    },
+    {
+      "match": "user does not have permission",
+      "category": "Auth",
+      "severity": 2,
+      "next_steps": [
+        "Review role-based access controls for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Update roles if the user should have access"
+      ]
+    },
+    {
+      "match": "token validation failed",
+      "category": "Auth",
+      "severity": 3,
+      "next_steps": [
+        "Check JWT or OAuth token for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Confirm token hasn't expired or been revoked"
+      ]
+    },
+
+    // ---------------------------
+    // Exceptions (language-specific or general “Application” errors)
+    // ---------------------------
+    {
+      "match": "Exception",
+      "category": "Exceptions",
+      "severity": 2,
+      "next_steps": [
+        "Analyze the Java exception in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Verify exception handling and log details"
+      ]
+    },
+    {
+      "match": "Traceback",
+      "category": "Exceptions",
+      "severity": 2,
+      "next_steps": [
+        "Identify the root cause of the Python traceback in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Check for missing dependencies or incorrect data"
+      ]
+    },
+    {
+      "match": "NullPointerException",
+      "category": "Exceptions",
+      "severity": 2,
+      "next_steps": [
+        "Investigate possible null dereferences in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Add null checks and handle missing values appropriately"
+      ]
+    },
+    {
+      "match": "TypeError",
+      "category": "Exceptions",
+      "severity": 3,
+      "next_steps": [
+        "Check type mismatches in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Ensure expected data structures are used"
+      ]
+    },
+    {
+      "match": "ReferenceError",
+      "category": "Exceptions",
+      "severity": 3,
+      "next_steps": [
+        "Verify that variables and functions are correctly declared and accessible in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}"
+      ]
+    },
+    {
+      "match": "UnhandledPromiseRejectionWarning",
+      "category": "Exceptions",
+      "severity": 3,
+      "next_steps": [
+        "Handle rejected promises properly in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Use try/catch or .catch() to handle errors"
+      ]
+    },
+    {
+      "match": "panic:",
+      "category": "Exceptions",
+      "severity": 2,
+      "next_steps": [
+        "Investigate unhandled panic in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Use `recover()` to handle unhandled crashes"
+      ]
+    },
+    {
+      "match": "segmentation fault",
+      "category": "Exceptions",
+      "severity": 1,
+      "next_steps": [
+        "Analyze memory usage for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Use `gdb` or `valgrind` to debug segmentation faults"
+      ]
+    },
+    {
+      "match": "ArithmeticException",
+      "category": "Exceptions",
+      "severity": 3,
+      "next_steps": [
+        "Investigate division by zero or numeric overflows in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}"
+      ]
+    },
+    {
+      "match": "IllegalStateException",
+      "category": "Exceptions",
+      "severity": 2,
+      "next_steps": [
+        "Verify that ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is in a valid state before calling dependent functions"
+      ]
+    },
+    {
+      "match": "System.InvalidOperationException",
+      "category": "Exceptions",
+      "severity": 2,
+      "next_steps": [
+        "Ensure ${WORKLOAD_TYPE} ${WORKLOAD_NAME} follows correct sequence operations and does not call methods at an invalid state"
+      ]
+    },
+    {
+      "match": "IndexError",
+      "category": "Exceptions",
+      "severity": 3,
+      "next_steps": [
+        "Check list indexing in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Ensure indices are within range"
+      ]
+    },
+    {
+      "match": "KeyError",
+      "category": "Exceptions",
+      "severity": 3,
+      "next_steps": [
+        "Verify dictionary keys in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Ensure keys exist before accessing them"
+      ]
+    },
+    {
+      "match": "AssertionError",
+      "category": "Exceptions",
+      "severity": 3,
+      "next_steps": [
+        "Check failed assertions in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Ensure expected conditions are met"
+      ]
+    },
+    {
+      "match": "IndexOutOfBoundsException",
+      "category": "Exceptions",
+      "severity": 3,
+      "next_steps": [
+        "Check array or list indexing in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Ensure indices are within valid bounds"
+      ]
+    },
+    {
+      "match": "ZeroDivisionError",
+      "category": "Exceptions",
+      "severity": 3,
+      "next_steps": [
+        "Verify arithmetic operations in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Avoid dividing by zero or handle zero-check logic"
+      ]
+    },
+    {
+      "match": "ModuleNotFoundError",
+      "category": "Exceptions",
+      "severity": 3,
+      "next_steps": [
+        "Install or reference the missing module in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Check environment paths or package versions"
+      ]
+    },
+    {
+      "match": "NameError",
+      "category": "Exceptions",
+      "severity": 3,
+      "next_steps": [
+        "Ensure variables or functions are declared before use in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Check for typos or scope issues"
+      ]
+    },
+    {
+      "match": "SIGSEGV",
+      "category": "Exceptions",
+      "severity": 1,
+      "next_steps": [
+        "A segmentation fault occurred in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Debug with gdb or relevant memory analysis tools"
+      ]
+    },
+
+    // ---------------------------
+    // AppFailure (Application Failure / Crash)
+    // ---------------------------
+    {
+      "match": "process exited",
+      "category": "AppFailure",
+      "severity": 2,
+      "next_steps": [
+        "Check logs in ${WORKLOAD_TYPE} ${WORKLOAD_NAME} for crash details",
+        "Investigate unhandled exceptions or out-of-memory errors"
+      ]
+    },
+    {
+      "match": "shutting down",
+      "category": "AppFailure",
+      "severity": 3,
+      "next_steps": [
+        "Investigate why ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is shutting down",
+        "Look for termination signals or resource exhaustion"
+      ]
+    },
+    {
+      "match": "fatal error",
+      "category": "AppFailure",
+      "severity": 1,
+      "next_steps": [
+        "A fatal error was detected in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Review logs and debug the cause immediately"
+      ]
+    },
+    {
+      "match": "core dumped",
+      "category": "AppFailure",
+      "severity": 1,
+      "next_steps": [
+        "Check core dump analysis for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Debug using `gdb` or post-mortem tools"
+      ]
+    },
+    {
+      "match": "exited with code",
+      "category": "AppFailure",
+      "severity": 2,
+      "next_steps": [
+        "Check process exit codes for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Investigate logs for the reason of non-zero exit"
+      ]
+    },
+    {
+      "match": "hang detected",
+      "category": "AppFailure",
+      "severity": 2,
+      "next_steps": [
+        "Look for deadlocks or infinite loops in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Capture thread dumps or stack traces if possible"
+      ]
+    },
+    {
+      "match": "broken state",
+      "category": "AppFailure",
+      "severity": 3,
+      "next_steps": [
+        "Investigate logs to see how ${WORKLOAD_TYPE} ${WORKLOAD_NAME} reached a broken state",
+        "Restart or roll back to a stable version if needed"
+      ]
+    },
+    {
+      "match": "fatal termination",
+      "category": "AppFailure",
+      "severity": 1,
+      "next_steps": [
+        "A fatal termination was triggered in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Check logs for root cause and fix underlying issue"
+      ]
+    },
+    {
+      "match": "unrecoverable error",
+      "category": "AppFailure",
+      "severity": 1,
+      "next_steps": [
+        "The application cannot continue safely in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Implement fallback logic or investigate logs thoroughly"
+      ]
+    },
+
+    // ---------------------------
+    // AppRestart (Application Restarts)
+    // ---------------------------
+    {
+      "match": "restart",
+      "category": "AppRestart",
+      "severity": 2,
+      "next_steps": [
+        "Monitor ${WORKLOAD_TYPE} ${WORKLOAD_NAME} for repeated restarts",
+        "Check readiness probes and resource limits"
+      ]
+    },
+    {
+      "match": "init process restarted",
+      "category": "AppRestart",
+      "severity": 2,
+      "next_steps": [
+        "Check why the init process in ${WORKLOAD_TYPE} ${WORKLOAD_NAME} triggered a restart",
+        "Review system logs or container logs for restart signals"
+      ]
+    },
+    {
+      "match": "service reboot initiated",
+      "category": "AppRestart",
+      "severity": 2,
+      "next_steps": [
+        "Determine if an admin or automated script caused a reboot for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Verify if it's part of a normal update cycle"
+      ]
+    },
+    {
+      "match": "app is restarting",
+      "category": "AppRestart",
+      "severity": 2,
+      "next_steps": [
+        "Verify readiness/liveness probes for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Ensure frequent restarts are not caused by configuration issues"
+      ]
+    },
+    {
+      "match": "restart loop detected",
+      "category": "AppRestart",
+      "severity": 3,
+      "next_steps": [
+        "Investigate repeated restarts for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Check resource usage or unhandled exceptions"
+      ]
+    },
+    {
+      "match": "system is rebooting",
+      "category": "AppRestart",
+      "severity": 2,
+      "next_steps": [
+        "Confirm if the system reboot is expected (maintenance)",
+        "Ensure no critical workloads are abruptly stopped"
+      ]
+    },
+
+    // ---------------------------
+    // Resource (Memory & CPU)
+    // ---------------------------
+    {
+      "match": "Out of memory",
+      "category": "Resource",
+      "severity": 1,
+      "next_steps": [
+        "Increase memory limits for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Investigate memory leaks or optimize resource allocation"
+      ]
+    },
+    {
+      "match": "Killed process",
+      "category": "Resource",
+      "severity": 1,
+      "next_steps": [
+        "A process was killed due to memory exhaustion in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Increase available memory or reduce memory consumption"
+      ]
+    },
+    {
+      "match": "memory limit exceeded",
+      "category": "Resource",
+      "severity": 2,
+      "next_steps": [
+        "Monitor ${WORKLOAD_TYPE} ${WORKLOAD_NAME} for memory usage spikes",
+        "Consider adjusting requests and limits"
+      ]
+    },
+    {
+      "match": "OOMKilled",
+      "category": "Resource",
+      "severity": 1,
+      "next_steps": [
+        "The pod running ${WORKLOAD_TYPE} ${WORKLOAD_NAME} was OOMKilled",
+        "Increase memory allocation or optimize memory usage"
+      ]
+    },
+    {
+      "match": "high CPU usage",
+      "category": "Resource",
+      "severity": 2,
+      "next_steps": [
+        "Investigate high CPU usage in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Optimize CPU-intensive tasks and adjust resource limits"
+      ]
+    },
+    {
+      "match": "CPU throttling detected",
+      "category": "Resource",
+      "severity": 2,
+      "next_steps": [
+        "Kubernetes is throttling CPU for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Consider increasing CPU limits or reviewing workload efficiency"
+      ]
+    },
+    {
+      "match": "disk full",
+      "category": "Resource",
+      "severity": 1,
+      "next_steps": [
+        "Free up disk space for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Add persistent volume or increase disk allocation"
+      ]
+    },
+    {
+      "match": "max file descriptors exceeded",
+      "category": "Resource",
+      "severity": 2,
+      "next_steps": [
+        "Increase the open files limit for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Close file handles properly to avoid leaks"
+      ]
+    },
+    {
+      "match": "thread pool exhausted",
+      "category": "Resource",
+      "severity": 2,
+      "next_steps": [
+        "Check thread usage for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Raise thread pool size or optimize concurrent operations"
+      ]
+    },
+    {
+      "match": "out of swap space",
+      "category": "Resource",
+      "severity": 1,
+      "next_steps": [
+        "Increase swap or reduce memory usage in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Optimize memory-hungry operations"
+      ]
+    },
+    {
+      "match": "too many open files",
+      "category": "Resource",
+      "severity": 2,
+      "next_steps": [
+        "Raise the file descriptor limit for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}",
+        "Check for file handle leaks or improper resource cleanup"
+      ]
     }
   ]
 }
