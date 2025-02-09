@@ -7,11 +7,11 @@
 LOG_LINES=${4:-1000}  # Fetch more lines to detect patterns
 
 ERROR_JSON="error_patterns.json"
-ISSUES_OUTPUT=${OUTPUT_DIR}/scan_anomoly_issues.json
+ISSUES_OUTPUT=${SHARED_TEMP_DIR}/scan_anomoly_issues.json
 ISSUES_JSON='{"issues": []}'
 
 echo "Scanning logs for frequent log anomalies in ${WORKLOAD_TYPE}/${WORKLOAD_NAME} in namespace ${NAMESPACE}..."
-PODS=($(jq -r '.[].metadata.name' "${OUTPUT_DIR}/application_logs_pods.json"))
+PODS=($(jq -r '.[].metadata.name' "${SHARED_TEMP_DIR}/application_logs_pods.json"))
 
 # 2) Iterate over each pod
 for POD in "${PODS[@]}"; do
@@ -23,14 +23,14 @@ for POD in "${PODS[@]}"; do
       .[] 
       | select(.metadata.name == $POD)
       | .spec.containers[].name
-    ' "${OUTPUT_DIR}/application_logs_pods.json")
+    ' "${SHARED_TEMP_DIR}/application_logs_pods.json")
 
     # 2b) For each container, read the local logs
     for CONTAINER in ${CONTAINERS}; do
         echo "  Processing Container $CONTAINER"
         
         # 3) Point to the local log file from your "get_pods_for_workload_fulljson.sh" step
-        LOG_FILE="${OUTPUT_DIR}/${WORKLOAD_TYPE}_${WORKLOAD_NAME}_logs/${POD}_${CONTAINER}_logs.txt"
+        LOG_FILE="${SHARED_TEMP_DIR}/${WORKLOAD_TYPE}_${WORKLOAD_NAME}_logs/${POD}_${CONTAINER}_logs.txt"
 
         if [[ ! -f "$LOG_FILE" ]]; then
             echo "  Warning: No log file found at $LOG_FILE" >&2
@@ -42,7 +42,7 @@ for POD in "${PODS[@]}"; do
 
         while read -r count message; do
             SEVERITY=3  # Default to informational
-            NEXT_STEP="Review logs in ${WORKLOAD_TYPE} ${WORKLOAD_NAME} to determine if frequent messages indicate an issue."
+            NEXT_STEP="Review logs in ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` to determine if frequent messages indicate an issue."
 
             if (( count >= 10 )); then
                 SEVERITY=1
@@ -61,7 +61,7 @@ for POD in "${PODS[@]}"; do
                 --arg nextStep "${NEXT_STEP}" \
                 --arg severity "${SEVERITY}" \
                 --arg occurrences "$count" \
-                '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber), "occurrences": ($occurrences | tonumber)}]'
+                '.issues += [{"title": $title, "details": $details, ".next_steps": $nextStep, "severity": ($severity | tonumber), "occurrences": ($occurrences | tonumber)}]'
             )
         done < "${ANOMALY_FILE}"
     done

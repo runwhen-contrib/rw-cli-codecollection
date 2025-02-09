@@ -8,8 +8,10 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             OperatingSystem
 
 Suite Setup         Suite Initialization
+Suite Teardown      Suite Cleanup
 
 
 *** Tasks ***
@@ -19,7 +21,8 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` ERROR Logs in Namespace `${NAMESPACE}`
     Scan And Score Issues
     ...    error_log
     ...    scan_error_logs.sh
-    ...    scan_error_issues.json
+    ...    ${SHARED_TEMP_DIR}/scan_error_issues.json
+    ...    GenericError,AppFailure
 
 
 Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Stack Traces in Namespace `${NAMESPACE}` 
@@ -28,7 +31,8 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Stack Traces in Namespace `${NAMESP
     Scan And Score Issues
     ...    stacktrace_log
     ...    scan_stack_traces.sh
-    ...    scan_stacktrace_issues.json
+    ...    ${SHARED_TEMP_DIR}/scan_stacktrace_issues.json
+    ...    StackTrace
 
 
 Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Connection Failures in Namespace `${NAMESPACE}`
@@ -37,7 +41,8 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Connection Failures in Namespace `$
     Scan And Score Issues
     ...    connection_log
     ...    scan_connection_failures.sh
-    ...    scan_conn_issues.json
+    ...    ${SHARED_TEMP_DIR}/scan_conn_issues.json
+    ...    Connection
 
 Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Timeout Errors in Namespace `${NAMESPACE}`
     [Documentation]   Checks for application logs indicating request timeouts or slow responses.
@@ -45,7 +50,8 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Timeout Errors in Namespace `${NAME
     Scan And Score Issues
     ...    timeout_log
     ...    scan_timeout_errors.sh
-    ...    scan_timeout_issues.json
+    ...    ${SHARED_TEMP_DIR}/scan_timeout_issues.json
+    ...    Timeout
   
 Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Authentication and Authorization Failures in Namespace `${NAMESPACE}`
     [Documentation]   Identifies issues where applications fail to authenticate or authorize users/services.
@@ -53,15 +59,17 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Authentication and Authorization Fa
     Scan And Score Issues
     ...    auth_log
     ...    scan_auth_failures.sh
-    ...    scan_auth_issues.json
+    ...    ${SHARED_TEMP_DIR}/scan_auth_issues.json
+    ...    Auth
 
 Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Null Pointer and Unhandled Exceptions in Namespace `${NAMESPACE}`
     [Documentation]   Finds critical application crashes due to unhandled exceptions in the code.
     [Tags]    kubernetes    logs    exception    ${WORKLOAD_TYPE}
     Scan And Score Issues
-    ...    exception_log    
+    ...    exception_log
     ...    scan_null_pointer_exceptions.sh
-    ...    scan_exception_issues.json
+    ...    ${SHARED_TEMP_DIR}/scan_exception_issues.json
+    ...    Exceptions
 
 
 Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Log Anomalies in Namespace `${NAMESPACE}`
@@ -70,7 +78,8 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Log Anomalies in Namespace `${NAMES
     Scan And Score Issues
     ...    anomaly_log
     ...    scan_log_anomalies.sh
-    ...    scan_anomoly_issues.json
+    ...    ${SHARED_TEMP_DIR}/scan_anomoly_issues.json
+    ...    Anomaly
  
 
 Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Application Restarts and Failures in Namespace `${NAMESPACE}`
@@ -79,7 +88,8 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Application Restarts and Failures i
     Scan And Score Issues
     ...    app_log
     ...    scan_application_restarts.sh
-    ...    scan_application_restarts.json
+    ...    ${SHARED_TEMP_DIR}/scan_application_restarts.json
+    ...    AppRestart,AppFailure
  
 Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Memory and CPU Resource Warnings in Namespace `${NAMESPACE}`
     [Documentation]   Identifies log messages related to high memory or CPU utilization warnings.
@@ -87,7 +97,8 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Memory and CPU Resource Warnings in
     Scan And Score Issues
     ...    resource_log
     ...    scan_resource_warnings.sh
-    ...    scan_resource_issues.json
+    ...    ${SHARED_TEMP_DIR}/scan_application_restarts.json
+    ...    Resource
 
 Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Service Dependency Failures in Namespace `${NAMESPACE}`
     [Documentation]   Detects failures when the application cannot reach required services (databases, queues, APIs).
@@ -95,7 +106,8 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Service Dependency Failures in Name
     Scan And Score Issues
     ...    dependency_log
     ...    scan_service_dependency_failures.sh
-    ...    scan_service_issues.json
+    ...    ${SHARED_TEMP_DIR}/scan_service_issues.json
+    ...    Connection,Timeout,Auth
 
 Generate Application Gateway Health Score
     ${log_score}=      Evaluate  (${error_log_score} + ${stacktrace_log_score} + ${connection_log_score} + ${timeout_log_score} + ${auth_log_score} + ${exception_log_score} + ${anomaly_log_score} + ${app_log_score} + ${resource_log_score} + ${dependency_log_score} ) / 10
@@ -140,28 +152,36 @@ Suite Initialization
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
 
+    ${temp_dir}=  Set Variable   ${CURDIR}/.suite_temp
+    Create Directory    ${temp_dir}
+    Set Suite Variable  ${SHARED_TEMP_DIR}  ${temp_dir}
+    Log   Created shared temp directory: ${SHARED_TEMP_DIR}
+
     ${pods}=    RW.CLI.Run Bash File
     ...    bash_file=get_pod_logs_for_workload.sh
     ...    cmd_override=./get_pod_logs_for_workload.sh ${WORKLOAD_TYPE} ${WORKLOAD_NAME} ${NAMESPACE} ${CONTEXT}
-    ...    env={"KUBECONFIG":"./${kubeconfig.key}", "OUTPUT_DIR":"${OUTPUT_DIR}"}
+    ...    env={"SHARED_TEMP_DIR":"${SHARED_TEMP_DIR}","KUBECONFIG":"./${kubeconfig.key}", "SHARED_TEMP_DIR":"${SHARED_TEMP_DIR}"}
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}","WORKLOAD_TYPE":"${WORKLOAD_TYPE}", "WORKLOAD_NAME":"${WORKLOAD_NAME}", "NAMESPACE":"${NAMESPACE}", "CONTEXT":"${CONTEXT}", "OUTPUT_DIR":"${OUTPUT_DIR}"}
+    ...    {"SHARED_TEMP_DIR":"${SHARED_TEMP_DIR}","CURDIR":"${CURDIR}","KUBECONFIG":"./${kubeconfig.key}","WORKLOAD_TYPE":"${WORKLOAD_TYPE}", "WORKLOAD_NAME":"${WORKLOAD_NAME}", "NAMESPACE":"${NAMESPACE}", "CONTEXT":"${CONTEXT}", "OUTPUT_DIR":"${OUTPUT_DIR}"}
 
+Suite Cleanup
+    Remove Directory    ${SHARED_TEMP_DIR}    recurse=True
+    Log   Removed suite temp directory: ${SHARED_TEMP_DIR}
 
 Scan And Score Issues
-    [Arguments]    ${TASK}    ${SCAN_SCRIPT}    ${ISSUE_FILE}
+    [Arguments]    ${TASK}    ${SCAN_SCRIPT}    ${ISSUE_FILE}    ${CATEGORIES}
 
     ${cli_result}=    RW.CLI.Run Bash File
     ...    bash_file=${SCAN_SCRIPT}
+    ...    cmd_override=ISSUE_FILE=${ISSUE_FILE} SHARED_TEMP_DIR=${SHARED_TEMP_DIR} CATEGORIES=${CATEGORIES} ${SCAN_SCRIPT}
     ...    env=${env}
     ...    include_in_history=False
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ...    show_in_rwl_cheatsheet=true  
+
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=jq '.issues' ${OUTPUT_DIR}/${ISSUE_FILE}
+    ...    cmd=jq '.issues' ${ISSUE_FILE}
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false

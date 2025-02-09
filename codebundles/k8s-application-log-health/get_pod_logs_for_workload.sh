@@ -26,7 +26,7 @@ WORKLOAD_NAME="${2:-$WORKLOAD_NAME}"
 NAMESPACE="${3:-$NAMESPACE}"
 CONTEXT="${4:-$CONTEXT}"
 LOG_LINES=${5:-10000}
-OUTPUT_FILE=$OUTPUT_DIR/application_logs_pods.json
+OUTPUT_FILE=$SHARED_TEMP_DIR/application_logs_pods.json
 IGNORE_JSON="ignore_patterns.json"      # the file with skip patterns
 
 
@@ -127,10 +127,10 @@ else
 fi
 
 # 2) Gather pods from application_logs_pods.json
-PODS=($(jq -r '.[].metadata.name' "${OUTPUT_DIR}/application_logs_pods.json"))
+PODS=($(jq -r '.[].metadata.name' "${SHARED_TEMP_DIR}/application_logs_pods.json"))
 
 # 3) Prepare a local directory for the logs
-LOGS_DIR="${OUTPUT_DIR}/${WORKLOAD_TYPE}_${WORKLOAD_NAME}_logs"
+LOGS_DIR="${SHARED_TEMP_DIR}/${WORKLOAD_TYPE}_${WORKLOAD_NAME}_logs"
 rm -rf "${LOGS_DIR}" || true
 mkdir -p "${LOGS_DIR}"
 
@@ -142,7 +142,7 @@ for POD in "${PODS[@]}"; do
     CONTAINERS=$(jq -r --arg POD "$POD" '
       .[] | select(.metadata.name == $POD)
       | .spec.containers[].name
-    ' "${OUTPUT_DIR}/application_logs_pods.json")
+    ' "${SHARED_TEMP_DIR}/application_logs_pods.json")
 
     for CONTAINER in ${CONTAINERS}; do
         echo "  Container: $CONTAINER"
