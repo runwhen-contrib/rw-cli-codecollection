@@ -11,6 +11,7 @@ Library             RW.platform
 Library             Process
 Library             OperatingSystem
 
+
 Suite Setup         Suite Initialization
 Suite Teardown      Suite Cleanup
 
@@ -181,11 +182,15 @@ Scan And Report Issues
             Create File    ${SHARED_TEMP_DIR}/${SCAN_SCRIPT}_details.log    "${item['details']}" 
             ${log_summary}=    RW.CLI.Run Cli
             ...    cmd=python3 ${CURDIR}/summarize.py < ${SHARED_TEMP_DIR}/${SCAN_SCRIPT}_details.log
+            # ${parsed}=    Load JSON From String    ${item["next_steps"]}
+
+            # ${next_steps}=    Convert String to JSON   ${item["next_steps"]}
+            ${next_steps}=    Catenate    SEPARATOR=\n   @{item["next_steps"]}
 
             RW.Core.Add Issue    
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
-            ...    next_steps=${item["next_steps"]}
+            ...    next_steps=${next_steps}
             ...    expected=${WORKLOAD_TYPE} `${WORKLOAD_NAME}` namespace `${NAMESPACE}` has no errors
             ...    actual=${WORKLOAD_TYPE} `${WORKLOAD_NAME}` namespace `${NAMESPACE}` has errors
             ...    reproduce_hint=${cli_result.cmd}
