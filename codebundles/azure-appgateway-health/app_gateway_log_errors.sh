@@ -24,7 +24,7 @@ set -euo pipefail
 : "${AZ_RESOURCE_GROUP:?Must set AZ_RESOURCE_GROUP}"
 
 WARNINGS_THRESHOLD="${WARNINGS_THRESHOLD:-1}"
-TIME_RANGE="${TIME_RANGE:-PT1H}"
+TIME_RANGE="${TIME_RANGE:-1h}"
 OUTPUT_DIR="${OUTPUT_DIR:-./output}"
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_FILE="${OUTPUT_DIR}/appgw_diagnostic_log_issues.json"
