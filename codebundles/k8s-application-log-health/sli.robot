@@ -15,7 +15,7 @@ Suite Teardown      Suite Cleanup
 
 
 *** Tasks ***
-Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` ERROR Logs in Namespace `${NAMESPACE}`
+Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Errors in Namespace `${NAMESPACE}`
     [Documentation]    Validates if a Liveliness probe has possible misconfigurations
     [Tags]    kubernetes    logs    errors    exception    ${WORKLOAD_TYPE}
     Scan And Score Issues
@@ -25,7 +25,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` ERROR Logs in Namespace `${NAMESPACE}`
     ...    GenericError,AppFailure
 
 
-Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Stack Traces in Namespace `${NAMESPACE}` 
+Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Stack Traces in Namespace `${NAMESPACE}` 
     [Documentation]   Identifies multi-line stack traces from application failures.
     [Tags]    kubernetes    logs    stacktraces    ${WORKLOAD_TYPE}
     Scan And Score Issues
@@ -35,7 +35,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Stack Traces in Namespace `${NAMESP
     ...    StackTrace
 
 
-Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Connection Failures in Namespace `${NAMESPACE}`
+Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Connection Failures in Namespace `${NAMESPACE}`
     [Documentation]   Detects errors related to database, API, or network connectivity issues.
     [Tags]    kubernetes    logs    connection    failure    ${WORKLOAD_TYPE}
     Scan And Score Issues
@@ -44,7 +44,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Connection Failures in Namespace `$
     ...    ${SHARED_TEMP_DIR}/scan_conn_issues.json
     ...    Connection
 
-Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Timeout Errors in Namespace `${NAMESPACE}`
+Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Timeout Errors in Namespace `${NAMESPACE}`
     [Documentation]   Checks for application logs indicating request timeouts or slow responses.
     [Tags]    kubernetes    logs    timeout    failure    ${WORKLOAD_TYPE}
     Scan And Score Issues
@@ -53,7 +53,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Timeout Errors in Namespace `${NAME
     ...    ${SHARED_TEMP_DIR}/scan_timeout_issues.json
     ...    Timeout
   
-Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Authentication and Authorization Failures in Namespace `${NAMESPACE}`
+Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Authentication and Authorization Failures in Namespace `${NAMESPACE}`
     [Documentation]   Identifies issues where applications fail to authenticate or authorize users/services.
     [Tags]    kubernetes    logs    auth    failure    ${WORKLOAD_TYPE}
     Scan And Score Issues
@@ -62,7 +62,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Authentication and Authorization Fa
     ...    ${SHARED_TEMP_DIR}/scan_auth_issues.json
     ...    Auth
 
-Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Null Pointer and Unhandled Exceptions in Namespace `${NAMESPACE}`
+Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Null Pointer and Unhandled Exceptions in Namespace `${NAMESPACE}`
     [Documentation]   Finds critical application crashes due to unhandled exceptions in the code.
     [Tags]    kubernetes    logs    exception    ${WORKLOAD_TYPE}
     Scan And Score Issues
@@ -82,7 +82,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Log Anomalies in Namespace `${NAMES
     ...    Anomaly
  
 
-Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Application Restarts and Failures in Namespace `${NAMESPACE}`
+Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Application Restarts and Failures in Namespace `${NAMESPACE}`
     [Documentation]   Checks logs for indicators of application restarts outside Kubernetes events.
     [Tags]    kubernetes    logs    restart    ${WORKLOAD_TYPE}
     Scan And Score Issues
@@ -91,7 +91,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Application Restarts and Failures i
     ...    ${SHARED_TEMP_DIR}/scan_application_restarts.json
     ...    AppRestart,AppFailure
  
-Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Memory and CPU Resource Warnings in Namespace `${NAMESPACE}`
+Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Memory and CPU Resource Warnings in Namespace `${NAMESPACE}`
     [Documentation]   Identifies log messages related to high memory or CPU utilization warnings.
     [Tags]    kubernetes    logs    resource    ${WORKLOAD_TYPE}
     Scan And Score Issues
@@ -100,7 +100,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Memory and CPU Resource Warnings in
     ...    ${SHARED_TEMP_DIR}/scan_application_restarts.json
     ...    Resource
 
-Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Service Dependency Failures in Namespace `${NAMESPACE}`
+Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Service Dependency Failures in Namespace `${NAMESPACE}`
     [Documentation]   Detects failures when the application cannot reach required services (databases, queues, APIs).
     [Tags]    kubernetes    logs    service    dependency    ${WORKLOAD_TYPE}
     Scan And Score Issues
@@ -146,12 +146,18 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=default
     ...    example=my-main-cluster
+    ${LOG_AGE}=    RW.Core.Import User Variable    LOG_AGE
+    ...    type=string
+    ...    description=Only return logs newer than a relative duration like 5s, 2m, or 3h.
+    ...    pattern=\w*
+    ...    default=10m
+    ...    example=5s,10m,1h
+    Set Suite Variable    ${LOG_AGE}    ${LOG_AGE}
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${WORKLOAD_TYPE}    ${WORKLOAD_TYPE}
     Set Suite Variable    ${WORKLOAD_NAME}    ${WORKLOAD_NAME}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
-
     ${temp_dir}=  Set Variable   ${CURDIR}/.suite_temp
     Create Directory    ${temp_dir}
     Set Suite Variable  ${SHARED_TEMP_DIR}  ${temp_dir}
@@ -160,7 +166,7 @@ Suite Initialization
     ${pods}=    RW.CLI.Run Bash File
     ...    bash_file=get_pod_logs_for_workload.sh
     ...    cmd_override=./get_pod_logs_for_workload.sh ${WORKLOAD_TYPE} ${WORKLOAD_NAME} ${NAMESPACE} ${CONTEXT}
-    ...    env={"SHARED_TEMP_DIR":"${SHARED_TEMP_DIR}","KUBECONFIG":"./${kubeconfig.key}", "SHARED_TEMP_DIR":"${SHARED_TEMP_DIR}"}
+    ...    env={"LOG_AGE":"${LOG_AGE}", "SHARED_TEMP_DIR":"${SHARED_TEMP_DIR}","KUBECONFIG":"./${kubeconfig.key}", "OUTPUT_DIR":"${OUTPUT_DIR}"}
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
     Set Suite Variable

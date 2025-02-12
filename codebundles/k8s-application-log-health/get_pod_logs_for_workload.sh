@@ -28,7 +28,7 @@ CONTEXT="${4:-$CONTEXT}"
 LOG_LINES=${5:-10000}
 OUTPUT_FILE=$SHARED_TEMP_DIR/application_logs_pods.json
 IGNORE_JSON="ignore_patterns.json"      # the file with skip patterns
-
+LOG_AGE="${LOG_AGE:-10m}"
 
 # 1) Fetch the workload as JSON, extract its UID
 WORKLOAD_JSON=$(kubectl get "${WORKLOAD_TYPE}" "${WORKLOAD_NAME}" \
@@ -153,25 +153,25 @@ for POD in "${PODS[@]}"; do
         # Pipe through grep -vP to remove ignore patterns
         if [[ -n "$IGNORE_EXPR" ]]; then
           kubectl logs "${POD}" -c "${CONTAINER}" -n "${NAMESPACE}" --context "${CONTEXT}" \
-              --tail="${LOG_LINES}" --timestamps 2>/dev/null \
+              --since="${LOG_AGE}" --timestamps 2>/dev/null \
             | grep -vP "$IGNORE_EXPR" \
             > "${LOG_FILE}"
         else
           # If no ignore patterns, store raw logs
           kubectl logs "${POD}" -c "${CONTAINER}" -n "${NAMESPACE}" --context "${CONTEXT}" \
-              --tail="${LOG_LINES}" --timestamps 2>/dev/null \
+              --since="${LOG_AGE}" --timestamps 2>/dev/null \
             > "${LOG_FILE}"
         fi
 
         # 4b) Previous logs (if any)
         if [[ -n "$IGNORE_EXPR" ]]; then
           kubectl logs "${POD}" -c "${CONTAINER}" -n "${NAMESPACE}" --context "${CONTEXT}" \
-              --tail="${LOG_LINES}" --timestamps --previous 2>/dev/null \
+              --since="${LOG_AGE}" --timestamps --previous 2>/dev/null \
             | grep -vP "$IGNORE_EXPR" \
             >> "${LOG_FILE}"
         else
           kubectl logs "${POD}" -c "${CONTAINER}" -n "${NAMESPACE}" --context "${CONTEXT}" \
-              --tail="${LOG_LINES}" --timestamps --previous 2>/dev/null \
+              --since="${LOG_AGE}" --timestamps --previous 2>/dev/null \
             >> "${LOG_FILE}"
         fi
     done
