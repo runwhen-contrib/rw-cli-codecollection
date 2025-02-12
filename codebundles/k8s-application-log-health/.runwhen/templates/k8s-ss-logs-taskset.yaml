@@ -29,6 +29,8 @@ spec:
       value: {{match_resource.resource.metadata.name}}
     - name: WORKLOAD_TYPE
       value: statefulset
+    - name: LOG_AGE
+      value: 1h
   secretsProvided:
   {% if wb_version %}
     {% include "kubernetes-auth.yaml" ignore missing %}

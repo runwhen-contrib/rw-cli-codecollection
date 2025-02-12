@@ -69,6 +69,7 @@ def main():
             with open(log_file, "r", encoding="utf-8") as lf:
                 log_content = lf.read()
 
+            # Check each pattern
             for pattern_def in error_data.get("patterns", []):
                 category = pattern_def.get("category", "")
                 if category not in categories_to_match:
@@ -91,13 +92,11 @@ def main():
                         + "\n".join(matched_lines) + "\n"
                     )
 
-                    # Handle next_steps if it is a list or a string
+                    # Handle next_steps
                     if isinstance(next_steps, str):
-                        # Replace placeholders in the single string
                         replaced_steps = _replace_placeholders(next_steps, workload_type, workload_name, namespace)
                         all_next_steps.append(replaced_steps)
                     elif isinstance(next_steps, list):
-                        # Replace placeholders in each item of the list
                         for step in next_steps:
                             replaced_steps = _replace_placeholders(step, workload_type, workload_name, namespace)
                             all_next_steps.append(replaced_steps)
@@ -105,10 +104,12 @@ def main():
                     if severity > max_severity:
                         max_severity = severity
 
-    # Final JSON
-    issues_json = {"issues": []}
+    # Prepare final JSON output
+    # Includes both 'issues' and 'summary' top-level keys
+    issues_json = {"issues": [], "summary": []}
 
     if aggregator:
+        # We found at least one matching pattern
         details_json = {}
         for container_name, matched_text in aggregator.items():
             details_json[container_name] = matched_text
@@ -117,21 +118,32 @@ def main():
         unique_next_steps = list(set(all_next_steps))
 
         categories_joined = ", ".join(categories_to_match)
-        title = (f"Errors detected in {workload_type} `{workload_name}` "
-                 f"(namespace `{namespace}`) - {categories_joined}")
+        title = (f"{categories_joined} errors detected logs for {workload_type} `{workload_name}` "
+                 f"(namespace `{namespace}`)")
 
-        new_issue = {
+        # Add the issues entry
+        issues_json["issues"].append({
             "title": title,
             "details": details_json,
             "next_steps": unique_next_steps,
             "severity": max_severity
-        }
-        issues_json["issues"].append(new_issue)
+        })
+
+        # Add a corresponding summary line
+        issues_json["summary"].append(
+            f"Found errors in {workload_type} '{workload_name}' (ns: {namespace})."
+            f" Max severity: {max_severity}. Categories: {categories_joined}."
+        )
+
+    else:
+        # No patterns matched => no entries in 'issues'
+        # But we add a summary line so it's visible that no issues were found
+        issues_json["summary"].append(
+            f"No issues found in {workload_type} '{workload_name}' (namespace '{namespace}')."
+        )
 
     with open(issues_output_path, "w", encoding="utf-8") as f:
         json.dump(issues_json, f, indent=2)
-
-    print(f"Finished. Wrote single aggregated issue to {issues_output_path}")
 
 def _replace_placeholders(text: str, workload_type: str, workload_name: str, namespace: str) -> str:
     """Helper to replace placeholders in a single step string."""

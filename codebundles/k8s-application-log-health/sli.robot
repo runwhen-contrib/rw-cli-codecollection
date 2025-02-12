@@ -185,6 +185,7 @@ Scan And Score Issues
     ...    cmd_override=ISSUE_FILE=${ISSUE_FILE} SHARED_TEMP_DIR=${SHARED_TEMP_DIR} CATEGORIES=${CATEGORIES} ${SCAN_SCRIPT}
     ...    env=${env}
     ...    include_in_history=False
+    ...    timeout_seconds=180
 
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=jq '.issues' ${ISSUE_FILE}
@@ -192,5 +193,14 @@ Scan And Score Issues
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    ${${TASK}_score}=    Evaluate    1 if len(@{issue_list}) == 0 else 0 
-    Set Global Variable    ${${TASK}_score}
+    Set Global Variable     ${${TASK}_score}    1
+    IF    len(@{issue_list}) > 0
+        FOR    ${item}    IN    @{issue_list}
+            IF    ${item["severity"]} < 4
+                Set Global Variable    ${${TASK}_score}   0
+                Exit For Loop
+            ELSE IF    ${item["severity"]} > 2
+                Set Global Variable    ${${TASK}_score}   1
+            END
+        END
+    END

@@ -4,6 +4,11 @@
         "match": "connection closed before message completed",
         "category": "Ignore",
         "explanation": "Normal closures"
+      },
+      {
+        "match": "server idle timeout",
+        "category": "Ignore",
+        "explanation": "Normal closures"
       }
     ]
   }

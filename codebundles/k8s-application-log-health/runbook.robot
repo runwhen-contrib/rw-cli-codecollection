@@ -173,7 +173,7 @@ Scan And Report Issues
     Add Pre To Report    Report Output:\n${cli_result.stdout}
 
     ${summary}=    RW.CLI.Run Cli
-    ...    cmd=jq '.summary' ${ISSUE_FILE}
+    ...    cmd=jq '.summary[]' ${ISSUE_FILE}
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -190,9 +190,7 @@ Scan And Report Issues
             Create File    ${SHARED_TEMP_DIR}/${SCAN_SCRIPT}_details.log    "${item['details']}" 
             ${log_summary}=    RW.CLI.Run Cli
             ...    cmd=python3 ${CURDIR}/summarize.py < ${SHARED_TEMP_DIR}/${SCAN_SCRIPT}_details.log
-            # ${parsed}=    Load JSON From String    ${item["next_steps"]}
 
-            # ${next_steps}=    Convert String to JSON   ${item["next_steps"]}
             ${next_steps}=    Catenate    SEPARATOR=\n   @{item["next_steps"]}
 
             RW.Core.Add Issue    

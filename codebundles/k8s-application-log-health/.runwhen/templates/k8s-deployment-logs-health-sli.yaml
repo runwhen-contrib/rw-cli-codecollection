@@ -11,7 +11,7 @@ spec:
   displayUnitsShort: ok
   locations:
     - {{default_location}}
-  description: Logs for errors and stack traces in Kubernetes Application Logs
+  description: Logs for errors and stack traces in Kubernetes Logs for statefulset {{match_resource.resource.metadata.name}}
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -25,7 +25,7 @@ spec:
     {% endif %}
     pathToRobot: codebundles/k8s-application-log-health/sli.robot
   intervalStrategy: intermezzo
-  intervalSeconds: 300
+  intervalSeconds: 600
   configProvided:
     - name: NAMESPACE
       value: {{match_resource.resource.metadata.namespace}}
@@ -35,6 +35,8 @@ spec:
       value: {{match_resource.resource.metadata.name}}
     - name: WORKLOAD_TYPE
       value: deployment
+    - name: LOG_AGE
+      value: 15m
   secretsProvided:
   {% if wb_version %}
     {% include "kubernetes-auth.yaml" ignore missing %}
@@ -46,11 +48,11 @@ spec:
     warning:
       operator: <
       threshold: '1'
-      for: '5m'
+      for: '10m'
     ticket:
       operator: <
       threshold: '1'
-      for: '10m'
+      for: '20m'
     page:
       operator: '=='
       threshold: '0'

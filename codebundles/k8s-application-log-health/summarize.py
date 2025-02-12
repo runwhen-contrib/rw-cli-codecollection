@@ -75,26 +75,22 @@ def remove_ephemeral_fields(line):
     - IP:port patterns
     """
     # Remove leading ISO8601 timestamps
-    # e.g. 2025-02-09T09:35:33.433770318Z ...
     line = re.sub(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]{8,}Z\s*", "", line)
 
     # Remove bracketed ephemeral times like [  3642.480217s]
     line = re.sub(r"\[\s*[0-9]+\.[0-9]+s\]", "[<time-s>]", line)
 
     # Remove IP:port patterns
-    # e.g. 10.68.6.38:8086 => <IP>:<PORT>
     line = re.sub(r"[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+", "<IP>:<PORT>", line)
 
     return line
 
 def normalize_line(line):
     """
-    Optionally remove ephemeral bits from each line.
-    And do final .strip().
+    Remove ephemeral bits and trailing whitespace/CR. 
     """
-    line = line.rstrip("\r")  # remove windows CR if needed
+    line = line.rstrip("\r")
     line = remove_ephemeral_fields(line)
-    # Possibly also remove or unify any trailing quotes or extra escaping
     line = line.strip()
     return line
 
@@ -112,72 +108,79 @@ def group_or_add_line(log_line_groups, new_line, threshold=80):
             "count": <int>
           }
         ]
-
-    Returns None, modifies log_line_groups in place.
     """
     for group in log_line_groups:
         rep = group["representative"]
-        # We use partial_ratio or ratio; partial_ratio is more lenient
         score = fuzz.partial_ratio(rep, new_line)
         if score >= threshold:
-            # we consider them the same "deduplicated" line
             group["count"] += 1
             group["lines"].append(new_line)
             return
-    # if none matched, create a new group
+
+    # If none matched, create a new group
     log_line_groups.append({
         "representative": new_line,
         "lines": [new_line],
         "count": 1
     })
 
-def summarize_lines(multi_line_text, fuzzy_threshold=80):
+def should_skip_line(line: str) -> bool:
     """
-    Summarize a string containing multiple lines by:
-      - splitting into lines
-      - normalizing ephemeral data
-      - fuzzy deduplicating (similar lines => single representative)
+    Return True if this line should be excluded from the summary.
+    For example, any aggregator lines that look like:
+      --- Pod: <something> (pattern: <something>) ---
+    """
+    # Adjust the regex as needed to skip lines you consider "just pod lines"
+    if re.match(r"^--- Pod: .*\(pattern: .*\) ---$", line):
+        return True
+    return False
 
-    Returns a dict with:
-      {
-        "total_lines": <int>,
-        "unique_log_line_groups": <int>,
-        "log_line_groups": <list_of_dicts>
-      }
-    """
+def summarize_lines(multi_line_text, fuzzy_threshold=80):
+    suspicious_keywords = ("error", "exception", "fail", "fatal", "panic", "traceback", "critical", "warning")
+    
     lines = multi_line_text.split("\n")
-    total = 0
+    total_lines = 0
     log_line_groups = []
+    suspicious_count = 0
 
     for ln in lines:
-        # Basic normalization
         norm = normalize_line(ln)
-        # Optionally skip truly empty lines
         if not norm:
+            continue  # skip empty line
+
+        # Skip lines you don't want in the final summary
+        if should_skip_line(norm):
             continue
 
-        total += 1
-        # Try to group with fuzzy threshold
+        total_lines += 1
+
+        # Fuzzy group
         group_or_add_line(log_line_groups, norm, threshold=fuzzy_threshold)
 
-    # Build final structure
+        # Check if line contains any suspicious keyword (case-insensitive)
+        low_line = norm.lower()
+        if any(keyword in low_line for keyword in suspicious_keywords):
+            suspicious_count += 1
+
+    # Build final group structure
     groups_arr = []
     for g in log_line_groups:
         groups_arr.append({
             "representative": g["representative"],
             "count": g["count"],
-            "examples": g["lines"][:3]  # maybe store up to 3 examples
+            "examples": g["lines"][:3]  # store up to 3 examples
         })
 
     summary = {
-        "total_lines": total,
+        "total_lines": total_lines,
         "unique_log_line_groups": len(log_line_groups),
-        "log_line_groups": groups_arr
+        "log_line_groups": groups_arr,
+        "suspicious_line_count": suspicious_count
     }
     return summary
 
 def main():
-    # 1) Read input from stdin or command line
+    # 1) Read input
     if len(sys.argv) > 1:
         raw_data = " ".join(sys.argv[1:])
     else:
@@ -186,14 +189,14 @@ def main():
     # 2) Parse as top-level dict
     parsed_dict = decode_top_level(raw_data)
 
-    # 3) If top-level is a dict, handle each container key
+    # 3) Summarize logs per container
     final_result = {"summary_by_container": {}}
 
     if parsed_dict is not None:
-        # We expect each key to be a container name, each value is multiline logs
+        # We expect each key: container name => multiline logs
         for container_name, log_text in parsed_dict.items():
             if not isinstance(log_text, str):
-                log_text = str(log_text)  # fallback
+                log_text = str(log_text)
             summary = summarize_lines(log_text, fuzzy_threshold=85)
             final_result["summary_by_container"][container_name] = summary
     else:
@@ -201,33 +204,17 @@ def main():
         summary = summarize_lines(raw_data, fuzzy_threshold=85)
         final_result["summary_by_container"]["unknown"] = summary
 
-    # 4) Generate and print final reports
+    # 4) Output final reports
     report_md = build_markdown_report(final_result)
     report_cli = build_plain_text_report(final_result)
-    
+
     # Print the plain-text version to stdout (more CLI-friendly)
     print(report_cli)
 
 def build_plain_text_report(data):
     """
-    Build and return a plain-text summary from `data`.
-    `data` is expected to be the final_result dict with structure:
-      {
-        "summary_by_container": {
-          <container_name>: {
-            "total_lines": <int>,
-            "unique_log_line_groups": <int>,
-            "log_line_groups": [
-              {
-                "representative": <str>,
-                "count": <int>,
-                "examples": [<str>, ...]
-              },
-              ...
-            ]
-          }
-        }
-      }
+    Build and return a plain-text summary from the final `data`.
+    Shows whether suspicious lines were found or not.
     """
     lines = []
     lines.append("LOG SUMMARY")
@@ -239,8 +226,16 @@ def build_plain_text_report(data):
         lines.append(f"Container: {container_name}")
         lines.append("-" * (len("Container: ") + len(container_name)))
         lines.append(f"  Total lines: {details['total_lines']}")
-        lines.append(f"  Unique Log Line Groups: {details['unique_log_line_groups']}\n")
+        lines.append(f"  Unique Log Line Groups: {details['unique_log_line_groups']}")
 
+        # Issue summary
+        suspicious_count = details.get("suspicious_line_count", 0)
+        if suspicious_count > 0:
+            lines.append(f"  Potentially suspicious lines: {suspicious_count}")
+        else:
+            lines.append("  No issues found.")
+
+        lines.append("")
         # Log line groups
         for idx, group in enumerate(details.get("log_line_groups", []), start=1):
             lines.append(f"  Log Line Group {idx}:")
@@ -263,7 +258,8 @@ def build_plain_text_report(data):
 
 def build_markdown_report(data):
     """
-    Build and return a Markdown-formatted summary from `data`.
+    Build and return a Markdown-formatted summary.
+    Includes a short note about suspicious lines.
     """
     lines = []
     lines.append("# Error Log Summary Report\n")
@@ -272,13 +268,20 @@ def build_markdown_report(data):
     for container_name, details in summary.items():
         lines.append(f"## Container: `{container_name}`")
         lines.append(f"- **Total lines**: {details['total_lines']}")
-        lines.append(f"- **Unique Log Line Groups**: {details['unique_log_line_groups']}\n")
+        lines.append(f"- **Unique Log Line Groups**: {details['unique_log_line_groups']}")
+
+        suspicious_count = details.get("suspicious_line_count", 0)
+        if suspicious_count > 0:
+            lines.append(f"- **Potentially suspicious lines**: {suspicious_count}\n")
+        else:
+            lines.append("- **No issues found**\n")
         
+        # Log line groups
         for idx, group in enumerate(details["log_line_groups"], start=1):
             rep = group["representative"]
             count = group["count"]
             examples = group.get("examples", [])
-            
+
             lines.append(f"### Log Line Group {idx}")
             lines.append(f"- Count: {count}")
             lines.append(f"- **Representative line**:\n\n```text\n{rep[:500]}\n```\n")
@@ -288,6 +291,7 @@ def build_markdown_report(data):
                 for ex_idx, ex_line in enumerate(examples[:2], start=1):
                     lines.append(f"  {ex_idx}. ```text\n{ex_line[:500]}\n```")
             lines.append("")
+
     return "\n".join(lines)
 
 if __name__ == "__main__":
