@@ -45,7 +45,9 @@ build
 **/.test/output/
 **/.test/.task/**
 .vscode/settings.json
-**auth**
+**/auth/**
+**.secret**
+**.suite_temp
 **.secret**
 **.pem
 **.pfx

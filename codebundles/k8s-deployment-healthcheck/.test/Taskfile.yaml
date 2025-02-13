@@ -18,6 +18,10 @@ tasks:
       RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
     cmds:
       - |
+        repo_url=$(git config --get remote.origin.url)
+        branch_name=$(git rev-parse --abbrev-ref HEAD)
+        codebundle=$(basename "$(dirname "$PWD")")
+        
         # Generate workspaceInfo.yaml with fetched cluster details
         cat <<EOF > workspaceInfo.yaml
         workspaceName: "$RW_WORKSPACE"
@@ -27,10 +31,10 @@ tasks:
         cloudConfig:
           kubernetes: 
             kubeconfigFile: /shared/kubeconfig.secret
-        codeCollections: 
-          - repoURL: "https://github.com/runwhen-contrib/rw-cli-codecollection"
-            branch: "main"
-            codeBundles: ["k8s-deployment-healthcheck"]
+        codeCollections:
+        - repoURL: "$repo_url"
+          branch: "$branch_name"
+          codeBundles: ["$codebundle"]
         custom: 
           kubernetes_distribution_binary: kubectl
         EOF
