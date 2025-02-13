@@ -1,4 +1,60 @@
 commands:
+- command: kubectl logs deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --tail=${LOG_LINES}
+    --all-containers=true --max-log-requests=20 --context ${CONTEXT}
+  doc_links: '
+
+    - [Viewing and Filtering Logs](https://kubernetes.io/docs/concepts/cluster-administration/logging/){:target="_blank"}
+
+    - [Kubectl Command Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs){:target="_blank"}'
+  explanation: This command is used to view the logs of a specific deployment in a
+    Kubernetes cluster, allowing you to specify the number of log lines to display
+    and the context in which to view the logs. It also includes options for displaying
+    logs from all containers within the deployment and limiting the number of log
+    requests.
+  multi_line_details: '
+
+    # Set the kubectl context to the specified cluster
+
+    kubectl config use-context ${CONTEXT}
+
+
+    # Display the logs for the specified deployment in the specified namespace
+
+    # Limit the number of lines of output to ${LOG_LINES}
+
+    # Include logs from all containers within the pod
+
+    # Allow a maximum of 20 log requests to be made
+
+    kubectl logs deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --tail=${LOG_LINES}
+    --all-containers=true --max-log-requests=20
+
+    '
+  name: fetch_deployments_logs_for_deployment_name_and_add_to_report
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event: The
+    DevOps or Site Reliability Engineer may need to use this command to view the logs
+    of the deployment to identify any errors or issues causing the pod to continuously
+    restart.
+
+
+    2. Monitoring application performance: The engineer may use this command to view
+    the logs of a specific deployment to monitor the performance of the application
+    and identify any bottlenecks or errors affecting its functionality.
+
+
+    3. Investigating security incidents: In the event of a security incident or breach,
+    the engineer may need to review the logs of a specific deployment to identify
+    any unauthorized access or unusual activity within the Kubernetes cluster.
+
+
+    4. Debugging an application issue: When troubleshooting an issue with a specific
+    application running on the Kubernetes cluster, the engineer may use this command
+    to view the logs and identify the root cause of the problem.
+
+
+    5. Analyzing resource usage: The engineer may use this command to view the logs
+    of a deployment to analyze the resource usage of the application and identify
+    any inefficiencies or areas for optimization within the Kubernetes environment.'
 - command: bash 'validate_probes.sh' livenessProbe | tee "${SCRIPT_TMP_DIR}/liveness_probe_output"
   doc_links: '
 

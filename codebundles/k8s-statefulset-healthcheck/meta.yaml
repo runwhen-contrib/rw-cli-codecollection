@@ -280,7 +280,7 @@ commands:
     ${NAMESPACE}
 
     '
-  name: fetch_statefulset_logs_for_statefulset_name
+  name: fetch_statefulset_logs_for_statefulset_name_and_add_to_report
   when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event for a
     specific StatefulSet in a critical production environment to identify the root
     cause of the issue and minimize downtime.
@@ -329,7 +329,7 @@ commands:
     ${NAMESPACE}
 
     '
-  name: fetch_statefulset_logs_for_statefulset_name
+  name: fetch_statefulset_logs_for_statefulset_name_and_add_to_report
   when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event for a
     specific StatefulSet in a critical production environment to identify the root
     cause of the issue and minimize downtime.

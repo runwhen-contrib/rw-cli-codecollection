@@ -88,18 +88,27 @@ def run_bash_file(bash_file: str,
 
 Runs a bash file from the local file system or remotely on a shellservice.
 
+1) If `bash_file` is found in the current directory, use it.
+2) Otherwise, we fall back to rewriting paths using `resolve_path_to_robot()`.
+3) Once we determine the final local path of `bash_file`, we copy *all* files
+from that same directory (no subfolders) into the environment that will run
+this bash file.
+4) We call `execute_command()` with all these files, so references to them
+inside the script should work (assuming relative paths within that directory).
+
 **Arguments**:
 
-- `bash_file` _str_ - the name of the bashfile to run
-- `target_service` _platform.Service, optional_ - the shellservice to use if provided. Defaults to None.
-- `env` _dict, optional_ - a mapping of environment variables to set for the environment. Defaults to None.
-- `include_in_history` _bool, optional_ - whether to include in the shell history or not. Defaults to True.
-- `cmd_override` _str, optional_ - the entrypoint command to use, similar to a dockerfile. Defaults to "./<bash_file" internally.
+- `bash_file` _str_ - the name (or relative path) of the bash file to run.
+- `target_service` _platform.Service, optional_ - remote shell service if needed. Defaults to None.
+- `env` _dict, optional_ - environment variables to set for the command. Defaults to None.
+- `include_in_history` _bool, optional_ - whether to include script contents in shell history. Defaults to True.
+- `cmd_override` _str, optional_ - overrides the final command (defaults to "./<bash_file>").
+- `timeout_seconds` _int, optional_ - command timeout. Defaults to 60.
   
 
 **Returns**:
 
-- `platform.ShellServiceResponse` - the structured response from running the file.
+- `platform.ShellServiceResponse` - structured response from the command execution.
 
 <a id="libraries.RW.CLI.CLI.run_cli"></a>
 

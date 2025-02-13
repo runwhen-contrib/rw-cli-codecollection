@@ -32,7 +32,7 @@ commands:
     kubectl logs --tail=100 daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
 
     '
-  name: get_daemonset_log_details_for_report
+  name: get_daemonset_logs_for_daemonset_name_and_add_to_report
   when_is_it_useful: '1. Monitoring the health and performance of a specific daemonset
     in a Kubernetes cluster to troubleshoot any issues or anomalies.
 
@@ -80,7 +80,7 @@ commands:
     kubectl logs --tail=100 daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
 
     '
-  name: get_daemonset_log_details_for_report
+  name: get_daemonset_logs_for_daemonset_name_and_add_to_report
   when_is_it_useful: '1. Monitoring the health and performance of a specific daemonset
     in a Kubernetes cluster to troubleshoot any issues or anomalies.
 
@@ -133,7 +133,7 @@ commands:
     | grep -i "${DAEMONSET_NAME}" || true
 
     '
-  name: get_related_daemonset_events
+  name: get_related_daemonset_daemonset_name_events
   when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes cluster for potential
     issues such as CrashLoopBackoff events
 
@@ -185,7 +185,7 @@ commands:
     | grep -i "${DAEMONSET_NAME}" || true
 
     '
-  name: get_related_daemonset_events
+  name: get_related_daemonset_daemonset_name_events
   when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes cluster for potential
     issues such as CrashLoopBackoff events
 
@@ -238,7 +238,7 @@ commands:
     kubectl describe daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
 
     '
-  name: check_daemonset_replicas
+  name: check_daemonset_daemonset_name_replicas
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events in a production
     environment to identify the root cause and resolve the issue.
 
@@ -292,7 +292,7 @@ commands:
     kubectl describe daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
 
     '
-  name: check_daemonset_replicas
+  name: check_daemonset_daemonset_name_replicas
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events in a production
     environment to identify the root cause and resolve the issue.
 
