@@ -18,3 +18,9 @@ variable "sp_principal_id" {
 variable "tenant_id" {
   type = string
 }
+
+# Password for .pfx files (self-signed)
+variable "ssl_cert_password" {
+  type    = string
+  default = "P@ssw0rd123!"
+}
