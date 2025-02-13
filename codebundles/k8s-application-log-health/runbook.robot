@@ -168,8 +168,8 @@ Scan And Report Issues
     ...    bash_file=${SCAN_SCRIPT}
     ...    cmd_override=ISSUE_FILE=${ISSUE_FILE} SHARED_TEMP_DIR=${SHARED_TEMP_DIR} CATEGORIES=${CATEGORIES} ${SCAN_SCRIPT}
     ...    env=${env}
-    ...    include_in_history=False
     ...    timeout_seconds=180
+    ...    include_in_history=False
     Add Pre To Report    Report Output:\n${cli_result.stdout}
 
     ${summary}=    RW.CLI.Run Cli

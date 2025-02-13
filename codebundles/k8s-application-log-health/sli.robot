@@ -184,9 +184,8 @@ Scan And Score Issues
     ...    bash_file=${SCAN_SCRIPT}
     ...    cmd_override=ISSUE_FILE=${ISSUE_FILE} SHARED_TEMP_DIR=${SHARED_TEMP_DIR} CATEGORIES=${CATEGORIES} ${SCAN_SCRIPT}
     ...    env=${env}
-    ...    include_in_history=False
     ...    timeout_seconds=180
-
+    ...    include_in_history=False
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=jq '.issues' ${ISSUE_FILE}
     ...    env=${env}

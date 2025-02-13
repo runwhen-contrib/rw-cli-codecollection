@@ -44,7 +44,15 @@ def main():
     # Aggregators
     aggregator = {}
     all_next_steps = []
-    max_severity = 0
+    max_severity = 5
+
+    # Map of numeric severity to text label
+    severity_label_map = {
+        1: "Critical",
+        2: "Major",
+        3: "Minor",
+        4: "Informational",
+    }
 
     pods = [pod["metadata"]["name"] for pod in pods_data]
 
@@ -101,7 +109,7 @@ def main():
                             replaced_steps = _replace_placeholders(step, workload_type, workload_name, namespace)
                             all_next_steps.append(replaced_steps)
 
-                    if severity > max_severity:
+                    if severity < max_severity:
                         max_severity = severity
 
     # Prepare final JSON output
@@ -117,8 +125,13 @@ def main():
         # Deduplicate next steps
         unique_next_steps = list(set(all_next_steps))
 
+        # Figure out the severity label for the "worst" severity
+        severity_label = severity_label_map.get(
+            max_severity, f"Unknown({max_severity})"
+        )
+
         categories_joined = ", ".join(categories_to_match)
-        title = (f"{categories_joined} errors detected logs for {workload_type} `{workload_name}` "
+        title = (f"{categories_joined} errors detected in logs for {workload_type} `{workload_name}` "
                  f"(namespace `{namespace}`)")
 
         # Add the issues entry
@@ -126,13 +139,14 @@ def main():
             "title": title,
             "details": details_json,
             "next_steps": unique_next_steps,
-            "severity": max_severity
+            "severity": max_severity, 
+            "severity_label": severity_label
         })
 
         # Add a corresponding summary line
         issues_json["summary"].append(
             f"Found errors in {workload_type} '{workload_name}' (ns: {namespace})."
-            f" Max severity: {max_severity}. Categories: {categories_joined}."
+            f" Max severity: {severity_label}. Categories: {categories_joined}."
         )
 
     else:

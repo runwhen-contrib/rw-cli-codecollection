@@ -47,3 +47,4 @@ build
 .vscode/settings.json
 **/auth
 **.secret**
+**.suite_temp
