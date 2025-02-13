@@ -1,3 +1,14 @@
+resource "random_password" "jenkins_admin_password" {
+  length    = 16
+  special   = true
+  min_upper = 1
+  min_lower = 1
+  min_numeric = 1
+
+  # Optional: If you prefer fewer special characters, define allow_*:
+  # override_special = "!@#%"
+}
+
 # Get latest Ubuntu AMI
 data "aws_ami" "ubuntu" {
   most_recent = true
@@ -119,32 +130,30 @@ resource "aws_security_group" "jenkins_sg" {
 resource "aws_instance" "jenkins_server" {
   ami           = data.aws_ami.ubuntu.id
   instance_type = "t2.micro"
-
-  subnet_id                   = aws_subnet.jenkins_subnet.id
+  subnet_id     = aws_subnet.jenkins_subnet.id
   vpc_security_group_ids      = [aws_security_group.jenkins_sg.id]
   key_name                    = aws_key_pair.generated_key.key_name
   associate_public_ip_address = true
 
   user_data = <<-EOF
               #!/bin/bash
-              # Update package index
               apt-get update
-              # Install Java 17
               apt-get install -y openjdk-17-jdk
-              # Add Jenkins repository key
               curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null
-              # Add Jenkins repository
               echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/ | tee /etc/apt/sources.list.d/jenkins.list > /dev/null
-              # Update package index again
               apt-get update && apt-get install -y jenkins && systemctl enable jenkins && systemctl start jenkins
+
+              # Wait a bit for Jenkins to start
               sleep 60
-              # Get the initial admin password
+
+              # Retrieve the initial admin password (only valid until we run our Groovy script)
               JENKINS_PASS=$(sudo cat /var/lib/jenkins/secrets/initialAdminPassword)
 
-              # Install Jenkins CLI
+              # Download Jenkins CLI
               wget -q http://localhost:8080/jnlpJars/jenkins-cli.jar
 
-              # Create groovy script to create admin user
+              # Create Groovy script to set Jenkins to "INITIAL_SETUP_COMPLETED"
+              # and create a new admin user with the random password
               cat <<GROOVY > create_admin.groovy
               import jenkins.model.*
               import hudson.security.*
@@ -152,24 +161,12 @@ resource "aws_instance" "jenkins_server" {
 
               def instance = Jenkins.getInstance()
 
-              // Skip setup wizard
-              // instance.setInstallState(InstallState.INITIAL_SETUP_COMPLETED)
+              // Skip the Jenkins setup wizard
+              instance.setInstallState(InstallState.INITIAL_SETUP_COMPLETED)
 
-              // Install suggested plugins
-              // def pm = instance.getPluginManager()
-              // def uc = instance.getUpdateCenter()
-              // uc.updateAllSites()
-
-              // plugins.each { plugin ->
-              //     if (!pm.getPlugin(plugin)) {
-              //         def installFuture = uc.getPlugin(plugin).deploy()
-              //         installFuture.get()
-              //     }
-              // }
-
-              // Create admin user
+              // Create admin user with a random password
               def hudsonRealm = new HudsonPrivateSecurityRealm(false)
-              hudsonRealm.createAccount("admin", "admin123!")
+              hudsonRealm.createAccount("admin", "${random_password.jenkins_admin_password.result}")
               instance.setSecurityRealm(hudsonRealm)
 
               def strategy = new FullControlOnceLoggedInAuthorizationStrategy()
@@ -179,39 +176,24 @@ resource "aws_instance" "jenkins_server" {
               instance.save()
               GROOVY
 
-              # Execute the groovy script using Jenkins CLI
-              java -jar jenkins-cli.jar -s http://localhost:8080 -auth admin:$JENKINS_PASS groovy = < create_admin.groovy || {
-                echo "Failed to create admin user"
-                exit 1
-              }
+              # Use the initial Jenkins password to run the Groovy script
+              java -jar jenkins-cli.jar \
+                -s http://localhost:8080 \
+                -auth admin:$JENKINS_PASS \
+                groovy = < create_admin.groovy || {
+                  echo "Failed to create admin user"
+                  exit 1
+                }
 
-              # Clean up
               rm -f create_admin.groovy
 
-              # Add Docker's official GPG key:
-              apt-get update
-              apt-get -y install ca-certificates curl
-              install -m 0755 -d /etc/apt/keyrings
-              curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-              chmod a+r /etc/apt/keyrings/docker.asc
-
-              # Add the repository to Apt sources:
-              echo \
-                "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-                $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-                tee /etc/apt/sources.list.d/docker.list > /dev/null
-              apt-get update
-              apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin 
-
-              echo "DOCKER_OPTS=\"-H tcp://0.0.0.0:2376 -H unix:///var/run/docker.sock\"" >> /etc/default/docker
-              systemctl restart docker
-              groupadd docker
-              usermod -aG docker $USER
-
+              # (Optional) Additional setup commands, e.g. Docker, etc.
+              # ...
               EOF
 
   tags = {
-    Name = "jenkins-server"
+    Name = "jenkins-server",
+    lifecycle = "deleteme"
   }
 }
 
@@ -248,19 +230,33 @@ resource "aws_instance" "jenkins_server" {
 # }
 
 
-# Wait for Jenkins to be ready
-resource "null_resource" "wait_for_jenkins" {
+
+resource "null_resource" "wait_for_jenkins_authenticated" {
   depends_on = [aws_instance.jenkins_server]
 
   provisioner "local-exec" {
-    command = <<-EOF
-      while ! nc -z ${aws_instance.jenkins_server.public_ip} 8080; do   
-        echo "Waiting for Jenkins to be ready..."
-        sleep 10
+    command = <<-EOT
+      while true; do
+        echo "Checking Jenkins with the new random password..."
+
+        STATUS_CODE=$(curl -s -o /dev/null -w '%%{http_code}' \
+          -u "admin:${random_password.jenkins_admin_password.result}" \
+          http://${aws_instance.jenkins_server.public_ip}:8080/api/json)
+
+        if [ "$STATUS_CODE" = "200" ]; then
+          echo "Jenkins is responding with HTTP 200 to admin:${random_password.jenkins_admin_password.result}"
+          break
+        else
+          echo "Got HTTP $STATUS_CODE. Waiting for Jenkins..."
+          sleep 10
+        fi
       done
-    EOF
+
+      echo "Jenkins is fully up and accepting authenticated requests."
+    EOT
   }
 }
+
 
 
 # Configure Jenkins EC2 agents
@@ -343,3 +339,15 @@ output "ssh_connection_string" {
   value = "ssh -i jenkins-key.pem ubuntu@${aws_instance.jenkins_server.public_ip}"
 }
 
+output "jenkins_admin_password" {
+  value     = random_password.jenkins_admin_password.result
+  sensitive = true
+}
+
+output "fetch_admin_passwrd" {
+  value = "cd terraform && terraform show -json | jq '.values.outputs.jenkins_admin_password.value'"
+}
+
+output "jenkins_url" {
+  value = "http://${aws_instance.jenkins_server.public_ip}:8080"
+}
