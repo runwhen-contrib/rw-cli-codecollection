@@ -14,7 +14,7 @@ spec:
               mode: substring
             - type: pattern
               pattern: "xen"
-              properties: [resource.hypervisor]
+              properties: [hypervisor]
               mode: substring
 
       slxs:
