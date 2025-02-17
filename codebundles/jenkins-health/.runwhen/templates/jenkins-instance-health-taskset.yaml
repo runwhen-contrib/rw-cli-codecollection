@@ -19,7 +19,7 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/jenkins-healthcheck/runbook.robot
+    pathToRobot: codebundles/jenkins-health/runbook.robot
   configProvided:
     - name: JENKINS_URL
       workspaceKey: {{custom.jenkins_url}}
