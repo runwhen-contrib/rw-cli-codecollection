@@ -28,7 +28,7 @@ spec:
   intervalSeconds: 600
   configProvided:
     - name: JENKINS_URL
-      workspaceKey: {{custom.jenkins_url}}
+      value: {{custom.jenkins_url}}
   secretsProvided:
     - name: JENKINS_USERNAME
       workspaceKey: {{custom.jenkins_username}}
