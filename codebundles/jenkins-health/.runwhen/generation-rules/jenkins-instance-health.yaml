@@ -14,7 +14,7 @@ spec:
               mode: substring
             - type: pattern
               pattern: "Running"
-              properties: [state["Name"]]
+              properties: [state/Name]
               mode: substring
 
       slxs:
