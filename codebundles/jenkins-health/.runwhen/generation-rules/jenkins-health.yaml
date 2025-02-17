@@ -1,14 +1,22 @@
 apiVersion: runwhen.com/v1
 kind: GenerationRules
 spec:
+  platform: aws
   generationRules:
     - resourceTypes:
-        - custom
+        - ec2_instance
       matchRules:
-        - type: pattern
-          pattern: ".+"
-          properties: [custom/jenkins_url]
-          mode: substring
+        - type: and
+          matches:
+            - type: pattern
+              pattern: "jenkins-server"
+              properties: [name]
+              mode: substring
+            - type: pattern
+              pattern: ".+"
+              properties: [custom/jenkins_url]
+              mode: substring
+
       slxs:
         - baseName: jenkins-health
           levelOfDetail: detailed
