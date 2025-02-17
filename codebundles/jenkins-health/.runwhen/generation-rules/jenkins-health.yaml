@@ -10,7 +10,7 @@ spec:
           matches:
             - type: pattern
               pattern: "jenkins-server"
-              properties: [name]
+              properties: [resource/tags/Name]
               mode: substring
             - type: pattern
               pattern: ".+"
