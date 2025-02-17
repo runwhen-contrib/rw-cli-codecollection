@@ -65,7 +65,6 @@ Create this file with the following environment variables:
 		 ```sh
 		 #!/bin/bash
 
-		 error 
 		 # Print the start time
 		 echo "Script started at: $(date)"
 

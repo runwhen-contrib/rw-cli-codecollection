@@ -149,6 +149,27 @@ resource "aws_instance" "jenkins_server" {
               # Download Jenkins CLI
               wget -q http://localhost:8080/jnlpJars/jenkins-cli.jar
 
+              # Install the Job DSL plugin
+              echo "[INFO] Installing Job DSL plugin..."
+              java -jar /tmp/jenkins-cli.jar \
+                -s http://localhost:8080 \
+                -auth "admin:$JENKINS_PASS" \
+                install-plugin job-dsl -deploy
+
+              echo "[INFO] Installing Pipeline plugin (workflow-aggregator)..."
+              java -jar /tmp/jenkins-cli.jar \
+                -s "http://localhost:8080" \
+                -auth "admin:$JENKINS_PASS" \
+                install-plugin workflow-aggregator -deploy
+
+              echo "[INFO] Restarting Jenkins..."
+              java -jar /tmp/jenkins-cli.jar \
+                -s http://localhost:8080 \
+                -auth "admin:$JENKINS_PASS" \
+                safe-restart
+
+              sleep 30
+
               # Create Groovy script to set Jenkins to "INITIAL_SETUP_COMPLETED"
               # and create a new admin user with the random password
               cat <<GROOVY > create_admin.groovy
@@ -248,12 +269,53 @@ resource "null_resource" "create_jobs" {
 
   provisioner "local-exec" {
     command = <<-EOT
-      curl -X POST -u 'admin:${data.external.jenkins_token.result["token"]}' -H "Content-Type: application/xml" --data-binary @jenkins-job.xml http://${aws_instance.jenkins_server.public_ip}:8080/createItem?name=long-running-job
+      #!/usr/bin/env bash
 
-      
+      TOKEN='${data.external.jenkins_token.result["token"]}'
+      JENKINS_URL="http://${aws_instance.jenkins_server.public_ip}:8080"
+
+      # Define a function to check if a job exists. If yes, update; if not, create.
+      function upsert_job() {
+        local job_name="$1"
+        local config_file="$2"
+
+        # Check if job exists by hitting its /api/json
+        local status_code
+        status_code=$(curl -s -o /dev/null -w '%%{http_code}' -u "admin:$TOKEN" "$JENKINS_URL/job/$job_name/api/json")
+
+        if [ "$status_code" = "200" ]; then
+          echo "Updating job: $job_name"
+          curl -X POST -u "admin:$TOKEN" \
+               -H "Content-Type: application/xml" \
+               --data-binary @"$config_file" \
+               "$JENKINS_URL/job/$job_name/config.xml"
+        else
+          echo "Creating job: $job_name"
+          curl -X POST -u "admin:$TOKEN" \
+               -H "Content-Type: application/xml" \
+               --data-binary @"$config_file" \
+               "$JENKINS_URL/createItem?name=$job_name"
+        fi
+      }
+
+      # Upsert each job
+      upsert_job "the-fastest-job" "long-running-job.xml"
+      upsert_job "this-never-breaks" "failed-job.xml"
+      upsert_job "my-fun-pipeline" "failed-pipeline.xml"
+
+      # Now queue the slow jobs (build them) -- same as before
+      curl -X POST -u "admin:$TOKEN" "$JENKINS_URL/job/the-fastest-job/build"
+      curl -X POST -u "admin:$TOKEN" "$JENKINS_URL/job/the-fastest-job/build"
+      curl -X POST -u "admin:$TOKEN" "$JENKINS_URL/job/the-fastest-job/build"
+
+      curl -X POST -u "admin:$TOKEN" "$JENKINS_URL/job/this-never-breaks/build"
+      curl -X POST -u "admin:$TOKEN" "$JENKINS_URL/job/my-fun-pipeline/build"
     EOT
+    # This ensures /bin/bash is used:
+    interpreter = ["/bin/bash", "-c"]
   }
 }
+
 
 
 # Configure Jenkins EC2 agents
