@@ -65,7 +65,6 @@ tasks:
       AWS_SECRET_ACCESS_KEY: "{{.AWS_SECRET_ACCESS_KEY}}"
       AWS_DEFAULT_REGION: "{{.AWS_DEFAULT_REGION}}"
       RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
-      JENKINS_URL: '{{.JENKINS_URL | default "http://localhost:8080"}}'
     cmds:
       - |
         source terraform/cb.secret
@@ -73,18 +72,18 @@ tasks:
         branch_name=$(git rev-parse --abbrev-ref HEAD)
         codebundle=$(basename "$(dirname "$PWD")")
 
-        # Fetch individual cluster details from Terraform state
-        # pushd terraform > /dev/null
-        # cluster1_name=$(terraform show -json terraform.tfstate | jq -r '
-        #   .values.outputs.cluster_1_name.value')
+        Fetch individual cluster details from Terraform state
+        pushd terraform > /dev/null
+        jenkins_url=$(terraform show -json terraform.tfstate | jq -r '
+          .values.outputs.jenkins_url.value')
  
-        # popd > /dev/null
+        popd > /dev/null
 
-        # # Check if any of the required cluster variables are empty
-        # if [ -z "$cluster1_name" ] || [ -z "$cluster1_server" ] || [ -z "$cluster1_resource_group" ]; then
-        #   echo "Error: Missing cluster details. Ensure Terraform plan has been applied."
-        #   exit 1
-        # fi
+        # Check if any of the required cluster variables are empty
+        if [ -z "$jenkins_url" ]; then
+          echo "Error: Missing jenkins_url details. Ensure Terraform plan has been applied."
+          exit 1
+        fi
 
         # Generate workspaceInfo.yaml with fetched cluster details
         cat <<EOF > workspaceInfo.yaml
@@ -103,7 +102,9 @@ tasks:
         custom:
           aws_access_key_id: AWS_ACCESS_KEY_ID
           aws_secret_access_key: AWS_SECRET_ACCESS_KEY
-          jenkins_url: $JENKINS_URL
+          jenkins_url: $jenkins_url
+          jenkins_username: jenkins_username
+          jenkins_token: jenkins_token
         EOF
     silent: true
 
