@@ -13,7 +13,7 @@ spec:
               properties: [tag-values]
               mode: substring
             - type: pattern
-              pattern: "Running"
+              pattern: "running"
               properties: [state/Name]
               mode: substring
 
