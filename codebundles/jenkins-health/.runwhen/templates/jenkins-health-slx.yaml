@@ -16,8 +16,4 @@ spec:
   owners:
   - {{workspace.owner_email}}
   statement: The number of failed Jenkins builds should be zero.
-  additionalContext:  
-    namespace: "{{match_resource.resource.metadata.namespace}}"
-    labelMap: "{{match_resource.resource.metadata.labels}}"   
-    cluster: "{{ cluster.name }}"
-    context: "{{ cluster.context }}"
+  additionalContext:  []
