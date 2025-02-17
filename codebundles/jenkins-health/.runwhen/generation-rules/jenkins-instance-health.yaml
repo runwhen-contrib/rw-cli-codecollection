@@ -25,4 +25,4 @@ spec:
           outputItems:
             - type: slx
             - type: runbook
-              templateName: jenkins-health-taskset.yaml
+              templateName: jenkins-instance-health-taskset.yaml
