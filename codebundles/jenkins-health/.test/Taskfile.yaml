@@ -239,6 +239,34 @@ tasks:
             echo "Directory $BASE_DIR does not exist. Upload aborted."
             exit 1
           fi
+          # Upload Secrets 
+          pushd terraform > /dev/null
+          jenkins_username=admin
+          jenkins_token=$(terraform show -json terraform.tfstate | jq -r '
+            .values.outputs.jenkins_admin_password.value')
+  
+          popd > /dev/null
+
+          # Check if any of the required cluster variables are empty
+          if [ -z "$jenkins_token" ]; then
+            echo "Error: Missing jenkins_token details. Ensure Terraform plan has been applied."
+            exit 1
+          fi
+          
+          # Create Secrets
+          URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/secrets"
+          PAYLOAD='{"secrets": {"jenkins_username": "$jenkins_username", "jenkins_password": "$jenkins_password" }}'
+          echo "Uploading secrets to $URL"
+          response_code=$(curl -X POST "$URL" \
+            -H "Authorization: Bearer $RW_PAT" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            -w "%{http_code}" -o /dev/null -s)
+          if [[ "$response_code" == "200" || "$response_code" == "201" ]]; then
+            echo "Successfully uploaded secrets to $URL"
+          else
+            echo "Failed to upload secrets: $SLX_NAME to $URL. Unexpected response code: $response_code"
+          fi
 
           for dir in "$BASE_DIR"/*; do
             if [ -d "$dir" ]; then
