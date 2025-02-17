@@ -13,8 +13,8 @@ spec:
               properties: [tag-values]
               mode: substring
             - type: pattern
-              pattern: "xen"
-              properties: [hypervisor]
+              pattern: "Running"
+              properties: [state/Name]
               mode: substring
 
       slxs:
