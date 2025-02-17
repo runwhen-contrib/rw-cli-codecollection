@@ -24,5 +24,6 @@ spec:
           baseTemplateName: jenkins-instance-health
           outputItems:
             - type: slx
+            - type: sli
             - type: runbook
               templateName: jenkins-instance-health-taskset.yaml
