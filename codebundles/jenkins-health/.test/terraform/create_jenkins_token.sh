@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
+# echo '{"token": "hello"}'
 set -x
 
 # 1) Read JSON input from stdin
@@ -15,8 +16,8 @@ echo "[DEBUG] Jenkins URL: $JENKINS_URL" >&2
 echo "[DEBUG] Username:    $USERNAME" >&2
 
 # 2) Wait for Jenkins up to MAX_ATTEMPTS
-MAX_ATTEMPTS=10
-SLEEP_SECONDS=5
+MAX_ATTEMPTS=30
+SLEEP_SECONDS=10
 echo "[DEBUG] Checking Jenkins readiness up to $MAX_ATTEMPTS attempts..." >&2
 
 for i in $(seq 1 "$MAX_ATTEMPTS"); do
