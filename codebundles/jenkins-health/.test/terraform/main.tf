@@ -1,12 +1,9 @@
 resource "random_password" "jenkins_admin_password" {
-  length      = 16
-  special     = true
+  length      = 12
+  special     = false
   min_upper   = 1
   min_lower   = 1
   min_numeric = 1
-
-  # Optional: If you prefer fewer special characters, define allow_*:
-  # override_special = "!@#%"
 }
 
 # Get latest Ubuntu AMI
@@ -164,6 +161,9 @@ resource "aws_instance" "jenkins_server" {
               // Skip the Jenkins setup wizard
               instance.setInstallState(InstallState.INITIAL_SETUP_COMPLETED)
 
+              // Disable CSRF
+              instance.setCrumbIssuer(null)
+
               // Create admin user with a random password
               def hudsonRealm = new HudsonPrivateSecurityRealm(false)
               hudsonRealm.createAccount("admin", "${random_password.jenkins_admin_password.result}")
@@ -231,32 +231,29 @@ resource "aws_instance" "jenkins_server" {
 
 
 
-resource "null_resource" "wait_for_jenkins_authenticated" {
+data "external" "jenkins_token" {
   depends_on = [aws_instance.jenkins_server]
+  program    = ["bash", "./create_jenkins_token.sh"]
 
-  provisioner "local-exec" {
-    command = <<-EOT
-      while true; do
-        echo "Checking Jenkins with the new random password..."
-
-        STATUS_CODE=$(curl -s -o /dev/null -w '%%{http_code}' \
-          -u "admin:${random_password.jenkins_admin_password.result}" \
-          http://${aws_instance.jenkins_server.public_ip}:8080/api/json)
-
-        if [ "$STATUS_CODE" = "200" ]; then
-          echo "Jenkins is responding with HTTP 200 to admin:${random_password.jenkins_admin_password.result}"
-          break
-        else
-          echo "Got HTTP $STATUS_CODE. Waiting for Jenkins..."
-          sleep 10
-        fi
-      done
-
-      echo "Jenkins is fully up and accepting authenticated requests."
-    EOT
+  # These JSON values get passed on stdin to the script
+  query = {
+    jenkins_url = "http://${aws_instance.jenkins_server.public_ip}:8080"
+    username    = "admin"
+    password    = "${random_password.jenkins_admin_password.result}"
   }
 }
 
+resource "null_resource" "create_jobs" {
+  depends_on = [data.external.jenkins_token]
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      curl -X POST -u 'admin:${data.external.jenkins_token.result["token"]}' -H "Content-Type: application/xml" --data-binary @jenkins-job.xml http://${aws_instance.jenkins_server.public_ip}:8080/createItem?name=long-running-job
+
+      
+    EOT
+  }
+}
 
 
 # Configure Jenkins EC2 agents
@@ -345,9 +342,19 @@ output "jenkins_admin_password" {
 }
 
 output "fetch_admin_passwrd" {
-  value = "cd terraform && terraform show -json | jq '.values.outputs.jenkins_admin_password.value'"
+  value = "JENKINS_PASSWORD=$(cd terraform && terraform show -json | jq -r '.values.outputs.jenkins_admin_password.value')"
 }
 
 output "jenkins_url" {
   value = "http://${aws_instance.jenkins_server.public_ip}:8080"
 }
+
+output "jenkins_api_token" {
+  value     = data.external.jenkins_token.result["token"]
+  sensitive = true
+}
+
+output "fetch_jenkins_api_token" {
+  value = "JENKINS_TOKEN=$(cd terraform && terraform show -json | jq -r '.values.outputs.jenkins_api_token.value')"
+}
+
