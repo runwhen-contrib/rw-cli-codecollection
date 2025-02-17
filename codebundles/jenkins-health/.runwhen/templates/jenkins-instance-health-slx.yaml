@@ -8,8 +8,8 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/Jenkins_logo.svg
-  # alias: {{match_resource.resource.tags.Name}} Health
-  alias: Jenkins Health
+  alias: {{match_resource.resource.tags.Name}} Instance Health
+  # alias: Jenkins Health
   asMeasuredBy: The number of failed Jenkins builds.
   configProvided:
   - name: SLX_PLACEHOLDER
