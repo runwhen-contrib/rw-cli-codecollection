@@ -72,7 +72,7 @@ tasks:
         branch_name=$(git rev-parse --abbrev-ref HEAD)
         codebundle=$(basename "$(dirname "$PWD")")
 
-        Fetch individual cluster details from Terraform state
+        ## Fetch individual cluster details from Terraform state
         pushd terraform > /dev/null
         jenkins_url=$(terraform show -json terraform.tfstate | jq -r '
           .values.outputs.jenkins_url.value')
