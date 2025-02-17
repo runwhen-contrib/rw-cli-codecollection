@@ -23,7 +23,7 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/jenkins-healthcheck/runbook.robot
+    pathToRobot: codebundles/jenkins-health/runbook.robot
   intervalStrategy: intermezzo
   intervalSeconds: 600
   configProvided:
