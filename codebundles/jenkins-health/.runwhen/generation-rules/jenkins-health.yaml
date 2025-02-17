@@ -12,10 +12,10 @@ spec:
               pattern: "jenkins-server"
               properties: [tag-values]
               mode: substring
-            - type: pattern
-              pattern: ".+"
-              properties: [custom/jenkins_url]
-              mode: substring
+            # - type: pattern
+            #   pattern: ".+"
+            #   properties: [custom/jenkins_url]
+            #   mode: substring
 
       slxs:
         - baseName: jenkins-health
