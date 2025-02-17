@@ -8,7 +8,7 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
 Library             String
-Library             util.py
+Library             Jenkins
 Suite Setup         Suite Initialization
 
 *** Tasks ***
@@ -16,7 +16,7 @@ List Failed Build Logs in Jenkins
     [Documentation]    Fetches logs from failed Jenkins builds using the Jenkins API
     [Tags]    Jenkins    Logs    Builds
     ${rsp}=    RW.CLI.Run Bash File
-    ...    bash_file=faild_build_logs.sh
+    ...    bash_file=failed_build_logs.sh
     ...    env=${env}
     ...    include_in_history=False
     ...    secret__jenkins_token=${JENKINS_TOKEN}
@@ -98,7 +98,10 @@ List Long Running Builds in Jenkins
 List Recent Failed Tests in Jenkins
     [Documentation]    List Recent Failed Tests in Jenkins
     [Tags]    Jenkins    Tests
-    ${failed_tests}=    Get Failed Tests
+    ${failed_tests}=    Jenkins.Get Failed Tests
+    ...    jenkins_url=${JENKINS_URL}
+    ...    jenkins_username=${JENKINS_USERNAME}
+    ...    jenkins_token=${JENKINS_TOKEN}
 
     IF    len(${failed_tests}) > 0
         FOR    ${test_suite}    IN    @{failed_tests}
@@ -161,7 +164,11 @@ List Long Queued Builds in Jenkins
     [Documentation]    Check for builds stuck in queue beyond threshold
     [Tags]    Jenkins    Queue    Builds
     
-    ${queued_builds}=    GET QUEUED BUILDS    wait_threshold=${QUEUED_BUILD_MAX_WAIT_TIME}
+    ${queued_builds}=    Jenkins.Get Queued Builds    
+    ...    jenkins_url=${JENKINS_URL}
+    ...    jenkins_username=${JENKINS_USERNAME}
+    ...    jenkins_token=${JENKINS_TOKEN}
+    ...    wait_threshold=${QUEUED_BUILD_MAX_WAIT_TIME}
 
     TRY 
         IF    ${queued_builds} == []
@@ -207,7 +214,10 @@ List Jenkins Executor Utilization
     [Documentation]    Check Jenkins executor utilization across nodes
     [Tags]    Jenkins    Executors    Utilization
     
-    ${executor_utilization}=    GET EXECUTOR UTILIZATION
+    ${executor_utilization}=    Jenkins.Get Executor Utilization
+    ...    jenkins_url=${JENKINS_URL}
+    ...    jenkins_username=${JENKINS_USERNAME}
+    ...    jenkins_token=${JENKINS_TOKEN}
 
     TRY 
         IF    ${executor_utilization} == []
@@ -242,10 +252,13 @@ List Jenkins Executor Utilization
     END
 
 
-List Jenkins Logs from Atom Feed
+Fetch Jenkins Logs and Add to Report
     [Documentation]    Fetches and displays Jenkins logs from the Atom feed
     [Tags]    Jenkins    Logs
-    ${rsp}=    Parse Jenkins Atom Feed
+    ${rsp}=    Jenkins.Parse Atom Feed
+    ...    jenkins_url=${JENKINS_URL}
+    ...    jenkins_username=${JENKINS_USERNAME}
+    ...    jenkins_token=${JENKINS_TOKEN}
     RW.Core.Add Pre To Report    ${rsp}
 
 
@@ -284,10 +297,11 @@ Suite Initialization
     ...    pattern=\d+
     ...    example="80"
     ...    default="80"
-    Set Suite Variable    ${env}    {"JENKINS_URL":"${JENKINS_URL}"}
     Set Suite Variable    ${LONG_RUNNING_BUILD_MAX_WAIT_TIME}    ${LONG_RUNNING_BUILD_MAX_WAIT_TIME}
     Set Suite Variable    ${JENKINS_URL}    ${JENKINS_URL}
     Set Suite Variable    ${JENKINS_USERNAME}    ${JENKINS_USERNAME}
     Set Suite Variable    ${JENKINS_TOKEN}    ${JENKINS_TOKEN}
     Set Suite Variable    ${QUEUED_BUILD_MAX_WAIT_TIME}    ${QUEUED_BUILD_MAX_WAIT_TIME}
     Set Suite Variable    ${MAX_EXECUTOR_UTILIZATION}    ${MAX_EXECUTOR_UTILIZATION}
+    Set Suite Variable    ${env}    {"JENKINS_URL":"${JENKINS_URL}"}
+    #Set Suite Variable    ${env}    {"JENKINS_URL":"${JENKINS_URL}", "JENKINS_USERNAME":"${JENKINS_USERNAME.key}", "JENKINS_TOKEN":"${JENKINS_TOKEN.key}"}

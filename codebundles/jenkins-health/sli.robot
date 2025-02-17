@@ -8,7 +8,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
-Library             util.py
+Library             Jenkins
 
 Suite Setup         Suite Initialization
 
@@ -17,7 +17,7 @@ Check For Failed Build Logs in Jenkins
     [Documentation]    Check For Failed Build Logs in Jenkins
     [Tags]    Jenkins    Logs    Builds
     ${rsp}=    RW.CLI.Run Bash File
-    ...    bash_file=faild_build_logs.sh
+    ...    bash_file=failed_build_logs.sh
     ...    env=${env}
     ...    include_in_history=False
     ...    secret__jenkins_token=${JENKINS_TOKEN}
@@ -58,9 +58,12 @@ Check For Long Running Builds in Jenkins
 Check For Recent Failed Tests in Jenkins
     [Documentation]    Check For Recent Failed Tests in Jenkins
     [Tags]    Jenkins    Tests
-    ${failed_test_suites}=    Get Failed Tests
-    IF    len(${failed_test_suites}) > 0
-        ${total_failed_tests}=    Evaluate    sum([len(suite['test_results']) for suite in ${failed_test_suites}])
+    ${failed_tests}=    Jenkins.Get Failed Tests
+    ...    jenkins_url=${JENKINS_URL}
+    ...    jenkins_username=${JENKINS_USERNAME}
+    ...    jenkins_token=${JENKINS_TOKEN}
+    IF    len(${failed_tests}) > 0
+        ${total_failed_tests}=    Evaluate    sum([len(suite['test_results']) for suite in ${failed_tests}])
         ${failed_test_score}=    Evaluate    1 if int(${total_failed_tests}) <= int(${MAX_ALLOWED_FAILED_TESTS}) else 0
         Set Global Variable    ${failed_test_score}
     ELSE
@@ -85,7 +88,11 @@ Check For Jenkins Health
 Check For Long Queued Builds in Jenkins
     [Documentation]    Check for builds stuck in queue beyond threshold and calculate SLI score
     [Tags]    Jenkins    Queue    Builds    SLI
-    ${queued_builds}=    Get Queued Builds    wait_threshold=${QUEUED_BUILD_MAX_WAIT_TIME}
+    ${queued_builds}=    Jenkins.Get Queued Builds    
+    ...    jenkins_url=${JENKINS_URL}
+    ...    jenkins_username=${JENKINS_USERNAME}
+    ...    jenkins_token=${JENKINS_TOKEN}
+    ...    wait_threshold=${QUEUED_BUILD_MAX_WAIT_TIME}    
     ${queued_count}=    Evaluate    len(${queued_builds})
     ${queued_builds_score}=    Evaluate    1 if int(${queued_count}) <= int(${MAX_QUEUED_BUILDS}) else 0
     Set Global Variable    ${queued_builds_score}
@@ -93,7 +100,10 @@ Check For Long Queued Builds in Jenkins
 Check Jenkins Executor Utilization
     [Documentation]    Check if Jenkins executor utilization is above 80%
     [Tags]    Jenkins    Executors    Utilization
-    ${executor_utilization}=    Get Executor Utilization
+    ${executor_utilization}=    Jenkins.Get Executor Utilization
+    ...    jenkins_url=${JENKINS_URL}
+    ...    jenkins_username=${JENKINS_USERNAME}
+    ...    jenkins_token=${JENKINS_TOKEN}    
     ${high_utilization}=    Set Variable    False
     FOR    ${executor}    IN    @{executor_utilization}
         IF    ${executor['utilization_percentage']} > float(${MAX_EXECUTOR_UTILIZATION})
