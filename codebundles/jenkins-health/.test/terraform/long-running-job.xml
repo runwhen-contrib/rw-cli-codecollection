@@ -23,8 +23,7 @@
     <hudson.tasks.Shell>
       <command><![CDATA[
 #!/bin/bash
-
-error 
+ 
 # Print the start time
 echo "Script started at: $(date)"
 
