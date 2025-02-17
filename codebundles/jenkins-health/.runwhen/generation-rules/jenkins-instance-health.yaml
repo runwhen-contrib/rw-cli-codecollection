@@ -18,10 +18,10 @@ spec:
             #   mode: substring
 
       slxs:
-        - baseName: jenkins-health
+        - baseName: jenkins-instance-health
           levelOfDetail: detailed
           qualifiers: ["resource"]
-          baseTemplateName: jenkins-health
+          baseTemplateName: jenkins-instance-health
           outputItems:
             - type: slx
             - type: runbook
