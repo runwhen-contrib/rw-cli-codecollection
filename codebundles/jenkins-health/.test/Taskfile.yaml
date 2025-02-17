@@ -241,9 +241,9 @@ tasks:
           fi
           # Upload Secrets 
           pushd terraform > /dev/null
-          jenkins_username=admin
+          jenkins_username="admin"
           jenkins_token=$(terraform show -json terraform.tfstate | jq -r '
-            .values.outputs.jenkins_admin_password.value')
+            .values.outputs.jenkins_api_token.value')
   
           popd > /dev/null
 
@@ -255,7 +255,7 @@ tasks:
           
           # Create Secrets
           URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/secrets"
-          PAYLOAD='{"secrets": {"jenkins_username": "$jenkins_username", "jenkins_token": "$jenkins_password" }}'
+          PAYLOAD='{"secrets": {"jenkins_username": "$jenkins_username", "jenkins_token": "$jenkins_token" }}'
           echo "Uploading secrets to $URL"
           response_code=$(curl -X POST "$URL" \
             -H "Authorization: Bearer $RW_PAT" \

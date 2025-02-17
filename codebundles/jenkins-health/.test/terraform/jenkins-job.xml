@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project>
+  <actions/>
+  <description>Freestyle job that runs a 30-minute sleep script.</description>
+  <keepDependencies>false</keepDependencies>
+  <properties/>
+  
+  <!-- No SCM -->
+  <scm class="hudson.scm.NullSCM"/>
+  
+  <canRoam>true</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  
+  <!-- No triggers -->
+  <triggers/>
+  
+  <concurrentBuild>false</concurrentBuild>
+  
+  <!-- Build step: Shell with your script -->
+  <builders>
+    <hudson.tasks.Shell>
+      <command><![CDATA[
+#!/bin/bash
+
+error 
+# Print the start time
+echo "Script started at: $(date)"
+
+# Sleep for 30 minutes (1800 seconds)
+sleep 1800
+
+# Print the end time
+echo "Script ended at: $(date)"
+]]></command>
+    </hudson.tasks.Shell>
+  </builders>
+  
+  <!-- No post-build actions -->
+  <publishers/>
+  
+  <buildWrappers/>
+</project>
