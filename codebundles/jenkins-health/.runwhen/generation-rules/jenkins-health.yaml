@@ -3,16 +3,16 @@ kind: GenerationRules
 spec:
   generationRules:
     - resourceTypes:
-        - statefulset
+        - custom
       matchRules:
         - type: pattern
-          pattern: "jenkins"
-          properties: [name]
+          pattern: ".+"
+          properties: [custom/jenkins_url]
           mode: substring
       slxs:
         - baseName: jenkins-health
           levelOfDetail: detailed
-          qualifiers: ["resource", "namespace", "cluster"]
+          qualifiers: ["resource"]
           baseTemplateName: jenkins-health
           outputItems:
             - type: slx

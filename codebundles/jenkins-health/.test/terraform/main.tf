@@ -1,8 +1,8 @@
 resource "random_password" "jenkins_admin_password" {
-  length    = 16
-  special   = true
-  min_upper = 1
-  min_lower = 1
+  length      = 16
+  special     = true
+  min_upper   = 1
+  min_lower   = 1
   min_numeric = 1
 
   # Optional: If you prefer fewer special characters, define allow_*:
@@ -128,9 +128,9 @@ resource "aws_security_group" "jenkins_sg" {
 
 # EC2 Instance
 resource "aws_instance" "jenkins_server" {
-  ami           = data.aws_ami.ubuntu.id
-  instance_type = "t2.micro"
-  subnet_id     = aws_subnet.jenkins_subnet.id
+  ami                         = data.aws_ami.ubuntu.id
+  instance_type               = "t2.micro"
+  subnet_id                   = aws_subnet.jenkins_subnet.id
   vpc_security_group_ids      = [aws_security_group.jenkins_sg.id]
   key_name                    = aws_key_pair.generated_key.key_name
   associate_public_ip_address = true
@@ -192,7 +192,7 @@ resource "aws_instance" "jenkins_server" {
               EOF
 
   tags = {
-    Name = "jenkins-server",
+    Name      = "jenkins-server",
     lifecycle = "deleteme"
   }
 }
