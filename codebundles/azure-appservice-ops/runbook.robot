@@ -118,7 +118,7 @@ Scale Down App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GR
         ...  details=${scaledown.stderr}
         ...  next_steps=Review plan or SKU details, check resource group quotas, or contact Azure admin.
     END
-Scale Out Instances for App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}` by `${SCALE_OUT_FACTOR}`x
+Scale Out Instances for App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}` by ${SCALE_OUT_FACTOR}x
     [Documentation]    Multiplies current worker count by SCALE_OUT_FACTOR
     [Tags]    
     ...    azure    
@@ -145,7 +145,7 @@ Scale Out Instances for App Service `${APP_SERVICE_NAME}` in Resource Group `${A
 
 
 
-Scale In Instances for App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}` to `1//${SCALE_IN_FACTOR}`
+Scale In Instances for App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}` to 1/${SCALE_IN_FACTOR}
     [Documentation]    Decreases the number of instances within the current App Service Plan
     [Tags]
     ...    azure
