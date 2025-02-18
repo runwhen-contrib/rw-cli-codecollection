@@ -26,28 +26,6 @@ Restart App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ----------\nRestart output:\n${restart_service.stdout}
 
-    # ${logs_pre_restart}=    RW.CLI.Run Bash File
-    # ...    bash_file=appservice_logs.sh
-    # ...    env=${env}
-    # ...    timeout_seconds=180
-    # ...    include_in_history=false
-    # RW.Core.Add Pre To Report    ----------\nPre-restart log output:\n${logs_pre_restart.stdout}
-
-    # ${restart_service}=    RW.CLI.Run Cli
-    # ...    cmd=az webapp restart --name ${APP_SERVICE_NAME} --resource-group ${AZ_RESOURCE_GROUP}
-    # ...    env=${env}
-    # ...    timeout_seconds=180
-    # ...    include_in_history=true
-    # RW.Core.Add Pre To Report    ----------\nRestart Output:\n${restart_service.stdout}
-
-    # IF    $restart.stderr == ""
-    #     # Optionally, you can re-check logs or query state to confirm it's truly running
-    #     ${logs_post_restart}=    RW.CLI.Run Bash File
-    #     ...    bash_file=appservice_logs.sh
-    #     ...    env=${env}
-    #     ...    timeout_seconds=180
-    #     ...    include_in_history=false
-    #     RW.Core.Add Pre To Report    ----------\nPost-restart log output:\n${logs_post_restart.stdout}
     IF    $restart_service.stderr != ""
         RW.Core.Add Issue
         ...    severity=3
