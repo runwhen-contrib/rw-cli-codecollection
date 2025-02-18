@@ -1,0 +1,29 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: aws
+  generationRules:
+    - resourceTypes:
+        - ec2_instance
+      matchRules:
+        - type: and
+          matches:
+            - type: pattern
+              pattern: "jenkins-server"
+              properties: [tag-values]
+              mode: substring
+            - type: pattern
+              pattern: "running"
+              properties: [state/Name]
+              mode: substring
+
+      slxs:
+        - baseName: jenkins-instance-health
+          levelOfDetail: detailed
+          qualifiers: ["resource"]
+          baseTemplateName: jenkins-instance-health
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: jenkins-instance-health-taskset.yaml
