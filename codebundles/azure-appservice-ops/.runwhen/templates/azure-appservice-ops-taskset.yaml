@@ -28,6 +28,10 @@ spec:
       value: {{match_resource.resource.name}}
     - name: TIME_PERIOD_MINUTES
       value: "10"
+    - name: SCALE_OUT_FACTOR
+      value: "2"
+    - name: SCALE_IN_FACTOR
+      value: "2"
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}
