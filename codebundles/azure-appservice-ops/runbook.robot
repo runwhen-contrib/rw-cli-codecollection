@@ -19,6 +19,7 @@ Restart App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP
     ...    azure
     ...    appservice
     ...    restart
+    ...    access:read-write
     ${restart_service}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_restart.sh
     ...    env=${env}
