@@ -1,8 +1,8 @@
 *** Settings ***
-Documentation       Operational tasks for an Azure App Services
+Documentation       Operational tasks for an Azure App Services, such as restarting, scaling or re-deploying.
 Metadata            Author    stewartshea
 Metadata            Display Name    Azure App Service Operations
-Metadata            Supports        Azure    App Service
+Metadata            Supports        Azure    AppService    Ops
 
 Library             BuiltIn
 Library             RW.Core
@@ -27,7 +27,7 @@ Restart App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ----------\nRestart output:\n${restart_service.stdout}
 
-    IF    $restart_service.stderr != ""
+    IF  'ERROR' in $restart_service.stdout
         RW.Core.Add Issue
         ...    severity=3
         ...    expected=Azure App Service `${APP_SERVICE_NAME}` should restart successfully
@@ -39,190 +39,220 @@ Restart App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP
     END
 
 
-# Swap Deployment Slots for App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
-#     [Documentation]    Performs a slot swap to promote or rollback code changes.
-#     [Tags]
-#     ...    azure
-#     ...    appservice
-#     ...    slot
-#     ...    swap
-#     ...    deployment
-#     # This example assumes you have SOURCE_SLOT and TARGET_SLOT variables, or hard-code them if needed.
-#     ${slot_swap}=    RW.CLI.Run Cli
-#     ...    cmd=az webapp deployment slot swap --name ${APP_SERVICE_NAME} --resource-group ${AZ_RESOURCE_GROUP} --slot ${SOURCE_SLOT} --target-slot ${TARGET_SLOT}
-#     ...    env=${env}
-#     ...    timeout_seconds=180
-#     ...    include_in_history=true
-#     RW.Core.Add Pre To Report    ----------\nSlot Swap Output:\n${slot_swap.stdout}
+Swap Deployment Slots for App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Calls the script that checks plan tier, lists slots, auto-determines source/target if only one non-prod slot
+    [Tags]
+    ...    azure
+    ...    appservice
+    ...    slot
+    ...    swap
+    ...    deployment
+    ...    access:read-write
 
-#     IF    ${slot_swap.stderr} == ""
-#         # Optionally verify deployment is healthy
-#         ${verify_slot_swap}=    RW.CLI.Run Cli
-#         ...    cmd=az webapp show --name ${APP_SERVICE_NAME} --resource-group ${AZ_RESOURCE_GROUP} --slot ${TARGET_SLOT}
-#         ...    env=${env}
-#         ...    timeout_seconds=180
-#         ...    include_in_history=false
-#         RW.Core.Add Pre To Report    ----------\nSlot Swap Verification:\n${verify_slot_swap.stdout}
-#     ELSE
-#         RW.Core.Add Issue
-#         ...    severity=3
-#         ...    expected=Slot swap for App Service `${APP_SERVICE_NAME}` should succeed
-#         ...    actual=Slot swap encountered issues
-#         ...    title=Slot swap failed for `${SOURCE_SLOT}` -> `${TARGET_SLOT}`
-#         ...    reproduce_hint=Check logs from the slot swap command
-#         ...    details=${slot_swap.stderr}
-#         ...    next_steps=Inspect App Service logs and Azure Portal for errors or conflicts.
-#     END
+    ${slot_swap}=  RW.CLI.Run Bash File
+    ...  bash_file=appservice_slot_swap.sh
+    ...  env=${env}
+    ...  timeout_seconds=180
+    RW.Core.Add Pre To Report    ----------\nSlot Swap Script Output:\n${slot_swap.stdout}
+
+    IF  'ERROR' in $slot_swap.stdout
+        RW.Core.Add Issue
+        ...  severity=3
+        ...  expected=Slot swap for App Service should succeed
+        ...  actual=Slot swap encountered issues
+        ...  title=Slot swap failed
+        ...  reproduce_hint=Check script logs
+        ...  details=${slot_swap.stderr}
+        ...  next_steps=Check Azure Portal, logs, or plan SKU
+    END
 
 
-# Scale Up App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
-#     [Documentation]    Scales the Azure App Service up to a higher tier or plan.
-#     [Tags]
-#     ...    azure
-#     ...    appservice
-#     ...    scaleup
-#     # Example: from Basic to Standard, or Standard to Premium. Adjust the plan name as needed.
-#     ${scale_up}=    RW.CLI.Run Cli
-#     ...    cmd=az webapp up --name ${APP_SERVICE_NAME} --resource-group ${AZ_RESOURCE_GROUP} --plan ${NEW_APP_SERVICE_PLAN}
-#     ...    env=${env}
-#     ...    timeout_seconds=300
-#     ...    include_in_history=true
-#     RW.Core.Add Pre To Report    ----------\nScale-Up Output:\n${scale_up.stdout}
+Scale Up App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Scales up the App Service to the next plan from current SKU
+    [Tags]    
+    ...    azure    
+    ...    appservice    
+    ...    scaleup
+    ...    access:read-write
 
-#     IF    ${scale_up.stderr} != ""
-#         RW.Core.Add Issue
-#         ...    severity=3
-#         ...    expected=Azure App Service `${APP_SERVICE_NAME}` should scale up successfully
-#         ...    actual=Scale-up encountered issues
-#         ...    title=Scale up failed for App Service `${APP_SERVICE_NAME}`
-#         ...    reproduce_hint=Check `az webapp up` command
-#         ...    details=${scale_up.stderr}
-#         ...    next_steps=Review plan or SKU details, check resource group quotas, or contact Azure admin.
-#     END
+    ${scaleup}=    RW.CLI.Run Bash File
+    ...    bash_file=appservice_plan_scaleup.sh
+    ...    env=${env}  
+    ...    include_in_history=true
+    ...    timeout_seconds=300
+    RW.Core.Add Pre To Report    ----------\nScale-Up Script Output:\n${scaleup.stdout}
 
-
-# Scale Out (Increase Instances) for App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
-#     [Documentation]    Increases the number of instances within the current App Service Plan.
-#     [Tags]
-#     ...    azure
-#     ...    appservice
-#     ...    scaleout
-#     # This example sets the "–number-of-workers" argument
-#     ${scale_out}=    RW.CLI.Run Cli
-#     ...    cmd=az webapp scale --name ${APP_SERVICE_NAME} --resource-group ${AZ_RESOURCE_GROUP} --number-of-workers ${SCALE_OUT_WORKERS}
-#     ...    env=${env}
-#     ...    timeout_seconds=180
-#     ...    include_in_history=true
-#     RW.Core.Add Pre To Report    ----------\nScale-Out Output:\n${scale_out.stdout}
-
-#     IF    ${scale_out.stderr} != ""
-#         RW.Core.Add Issue
-#         ...    severity=3
-#         ...    expected=Azure App Service `${APP_SERVICE_NAME}` should scale out successfully
-#         ...    actual=Scale-out encountered issues
-#         ...    title=Scale out failed for App Service `${APP_SERVICE_NAME}`
-#         ...    reproduce_hint=Check `az webapp scale` command
-#         ...    details=${scale_out.stderr}
-#         ...    next_steps=Check subscription resource limits or plan constraints.
-#     END
+    IF  'ERROR' in $scaleup.stdout
+        RW.Core.Add Issue
+        ...    severity=3
+        ...    expected=Azure App Service `${APP_SERVICE_NAME}` scales up successfully
+        ...    actual=Scale-up encountered issues
+        ...    title=Scale up failed for App Service `${APP_SERVICE_NAME}`
+        ...    reproduce_hint=Check scale_up_appservice.sh logs
+        ...    details=${scaleup.stderr}
+        ...    next_steps=Review plan or SKU details, check resource group quotas, or contact Azure admin.
+    END
 
 
-# Scale In (Reduce Instances) for App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
-#     [Documentation]    Decreases the number of instances within the current App Service Plan.
-#     [Tags]
-#     ...    azure
-#     ...    appservice
-#     ...    scalein
-#     ${scale_in}=    RW.CLI.Run Cli
-#     ...    cmd=az webapp scale --name ${APP_SERVICE_NAME} --resource-group ${AZ_RESOURCE_GROUP} --number-of-workers ${SCALE_IN_WORKERS}
-#     ...    env=${env}
-#     ...    timeout_seconds=180
-#     ...    include_in_history=true
-#     RW.Core.Add Pre To Report    ----------\nScale-In Output:\n${scale_in.stdout}
+Scale Down App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]  Decreases SKU based on a predefined map (e.g. S2->S1, S1->B3, etc.)
+    [Tags]  
+    ...  azure  
+    ...  appservice  
+    ...  scaledown
+    ...  access:read-write
+    ${scaledown}=  RW.CLI.Run Bash File
+    ...    bash_file=appservice_plan_scaledown.sh
+    ...    env=${env}
+    ...    timeout_seconds=300
+    ...    include_in_history=true
+    RW.Core.Add Pre To Report  ----------\nScale-Down Script Output:\n${scaledown.stdout}
 
-#     IF    ${scale_in.stderr} != ""
-#         RW.Core.Add Issue
-#         ...    severity=3
-#         ...    expected=Azure App Service `${APP_SERVICE_NAME}` should scale in successfully
-#         ...    actual=Scale-in encountered issues
-#         ...    title=Scale in failed for App Service `${APP_SERVICE_NAME}`
-#         ...    reproduce_hint=Check `az webapp scale` command
-#         ...    details=${scale_in.stderr}
-#         ...    next_steps=Review plan or usage, ensure the requested instance count is valid.
-#     END
+    IF  'ERROR' in $scaledown.stdout
+        RW.Core.Add Issue
+        ...  severity=3
+        ...  expected=Azure App Service `${APP_SERVICE_NAME}` scales down successfully
+        ...  actual=Scale-down encountered issues
+        ...  title=Scale down failed for App Service `${APP_SERVICE_NAME}`
+        ...  reproduce_hint=Check scale_down_appservice.sh logs
+        ...  details=${scaledown.stderr}
+        ...  next_steps=Review plan or SKU details, check resource group quotas, or contact Azure admin.
+    END
+Scale Out Instances for App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}` by `${SCALE_OUT_FACTOR}`x
+    [Documentation]    Multiplies current worker count by SCALE_OUT_FACTOR
+    [Tags]    
+    ...    azure    
+    ...    appservice    
+    ...    scaleout
+    ...    access:read-write
+    ${scale_out}=    RW.CLI.Run Bash File
+    ...    bash_file=appservice_scale_out.sh
+    ...    env=${env}
+    ...    timeout_seconds=300
+    ...    include_in_history=true
+    RW.Core.Add Pre To Report    ----------\nScale-Out Factor Script Output:\n${scale_out.stdout}
+
+    IF  'ERROR' in $scale_out.stdout
+        RW.Core.Add Issue
+        ...    severity=3
+        ...    expected=Azure App Service scaled out successfully
+        ...    actual=Scale-out encountered issues
+        ...    title=Scale out failed
+        ...    reproduce_hint=Check scale_out_factor_appservice.sh logs
+        ...    details=${scale_out.stderr}
+        ...    next_steps=Check resource limits or plan constraints
+    END
 
 
-# Redeploy App Service `${APP_SERVICE_NAME}` from Latest Source in Resource Group `${AZ_RESOURCE_GROUP}`
-#     [Documentation]    Forces a re-deployment of the Azure App Service from the configured code or container source.
-#     [Tags]
-#     ...    azure
-#     ...    appservice
-#     ...    redeploy
-#     ...    force
-#     ${pre_logs}=    RW.CLI.Run Bash File
-#     ...    bash_file=appservice_logs.sh
-#     ...    env=${env}
-#     ...    timeout_seconds=180
-#     ...    include_in_history=false
-#     RW.Core.Add Pre To Report    ----------\nPre Redeploy Logs:\n${pre_logs.stdout}
 
-#     ${redeploy}=    RW.CLI.Run Cli
-#     ...    cmd=az webapp deployment source config-zip --resource-group ${AZ_RESOURCE_GROUP} --name ${APP_SERVICE_NAME} --src ${ZIP_PACKAGE_PATH}
-#     ...    env=${env}
-#     ...    timeout_seconds=300
-#     ...    include_in_history=true
-#     RW.Core.Add Pre To Report    ----------\nRedeploy Output:\n${redeploy.stdout}
+Scale In Instances for App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}` by `1/${SCALE_IN_FACTOR}`
+    [Documentation]    Decreases the number of instances within the current App Service Plan
+    [Tags]
+    ...    azure
+    ...    appservice
+    ...    scalein
+    ...    access:read-write
+    ${scale_in}=    RW.CLI.Run Bash File
+    ...    bash_file=appservice_scale_in.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    RW.Core.Add Pre To Report    ----------\nScale-In Script Output:\n${scale_in.stdout}
 
-#     IF    ${redeploy.stderr} == ""
-#         ${post_logs}=    RW.CLI.Run Bash File
-#         ...    bash_file=appservice_logs.sh
-#         ...    env=${env}
-#         ...    timeout_seconds=180
-#         ...    include_in_history=false
-#         RW.Core.Add Pre To Report    ----------\nPost Redeploy Logs:\n${post_logs.stdout}
-#     ELSE
-#         RW.Core.Add Issue
-#         ...    severity=3
-#         ...    expected=Azure App Service `${APP_SERVICE_NAME}` redeploys successfully
-#         ...    actual=Redeploy encountered issues
-#         ...    title=Redeploy failed for App Service `${APP_SERVICE_NAME}`
-#         ...    reproduce_hint=Check `az webapp deployment source config-zip` logs
-#         ...    details=${redeploy.stderr}
-#         ...    next_steps=Examine deployment logs and local code bundle for errors.
-#     END
+    IF  'ERROR' in $scale_in.stdout
+        
+        RW.Core.Add Issue
+        ...    severity=3
+        ...    expected=Azure App Service scales in successfully
+        ...    actual=Scale-in encountered issues
+        ...    title=Scale in failed
+        ...    reproduce_hint=Check scale_in_factor_unified.sh logs
+        ...    details=${scale_in.stdout}
+    END
+
+Redeploy App Service `${APP_SERVICE_NAME}` from Latest Source in Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Forces a re-deployment of the Azure App Service from the configured code or container source.
+    [Tags]
+    ...    azure
+    ...    appservice
+    ...    redeploy
+    ...    force
+    ${pre_logs}=    RW.CLI.Run Bash File
+    ...    bash_file=appservice_logs.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ----------\nPre Redeploy Logs:\n${pre_logs.stdout}
+
+    ${redeploy}=    RW.CLI.Run Cli
+    ...    cmd=az webapp deployment source config-zip --resource-group ${AZ_RESOURCE_GROUP} --name ${APP_SERVICE_NAME} --src ${ZIP_PACKAGE_PATH}
+    ...    env=${env}
+    ...    timeout_seconds=300
+    ...    include_in_history=true
+    RW.Core.Add Pre To Report    ----------\nRedeploy Output:\n${redeploy.stdout}
+
+    IF    ${redeploy.stderr} == ""
+        ${post_logs}=    RW.CLI.Run Bash File
+        ...    bash_file=appservice_logs.sh
+        ...    env=${env}
+        ...    timeout_seconds=180
+        ...    include_in_history=false
+        RW.Core.Add Pre To Report    ----------\nPost Redeploy Logs:\n${post_logs.stdout}
+    ELSE
+        RW.Core.Add Issue
+        ...    severity=3
+        ...    expected=Azure App Service `${APP_SERVICE_NAME}` redeploys successfully
+        ...    actual=Redeploy encountered issues
+        ...    title=Redeploy failed for App Service `${APP_SERVICE_NAME}`
+        ...    reproduce_hint=Check `az webapp deployment source config-zip` logs
+        ...    details=${redeploy.stderr}
+        ...    next_steps=Examine deployment logs and local code bundle for errors.
+    END
 
 
 *** Keywords ***
 Suite Initialization
-    # Reuse variables from your existing Azure codebundle
     ${AZ_RESOURCE_GROUP}=    RW.Core.Import User Variable    AZ_RESOURCE_GROUP
-    ${APP_SERVICE_NAME}=     RW.Core.Import User Variable    APP_SERVICE_NAME
-    ${azure_credentials}=    RW.Core.Import Secret    azure_credentials
-    ${TIME_PERIOD_MINUTES}=  RW.Core.Import User Variable    TIME_PERIOD_MINUTES
-    ${SCALE_OUT_WORKERS}=    RW.Core.Import User Variable    SCALE_OUT_WORKERS
-    ...    default=3
-    ${SCALE_IN_WORKERS}=     RW.Core.Import User Variable    SCALE_IN_WORKERS
-    ...    default=1
-    ${NEW_APP_SERVICE_PLAN}=     RW.Core.Import User Variable    NEW_APP_SERVICE_PLAN
-    ...    default=MyUpgradedPlan
-    ${SOURCE_SLOT}=          RW.Core.Import User Variable    SOURCE_SLOT
-    ...    default=staging
-    ${TARGET_SLOT}=          RW.Core.Import User Variable    TARGET_SLOT
-    ...    default=production
-    ${ZIP_PACKAGE_PATH}=     RW.Core.Import User Variable    ZIP_PACKAGE_PATH
-    ...    default=./appservice_package.zip
+    ...    type=string
+    ...    description=The resource group to perform actions against.
+    ...    pattern=\w*
+    ${APP_SERVICE_NAME}=    RW.Core.Import User Variable    APP_SERVICE_NAME
+    ...    type=string
+    ...    description=The Azure AppService to triage.
+    ...    pattern=\w*
+    ${azure_credentials}=    RW.Core.Import Secret
+    ...    azure_credentials
+    ...    type=string
+    ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
+    ...    pattern=\w*
+    ${TIME_PERIOD_MINUTES}=    RW.Core.Import User Variable    TIME_PERIOD_MINUTES
+    ...    type=string
+    ...    description=The time period, in minutes, to look back for activites/events. 
+    ...    pattern=\w*
+    ...    default=10
+    ${SCALE_OUT_FACTOR}=    RW.Core.Import User Variable    SCALE_OUT_FACTOR
+    ...    type=string
+    ...    description=The factor by which to increase the amount of instances within the given App Service Plan.
+    ...    pattern=\w*
+    ...    default=2
+    ${SCALE_IN_FACTOR}=     RW.Core.Import User Variable    SCALE_IN_FACTOR
+    ...    type=string
+    ...    description=The factor by which to decrease the amount of instances within the given App Service Plan.
+    ...    pattern=\w*
+    ...    default=2
+    ${SOURCE_SLOT}=     RW.Core.Import User Variable    SOURCE_SLOT
+    ...    type=string
+    ...    description=The source slot for deployment promotion.
+    ...    pattern=\w*
+    ...    example=staging
+    ...    default=""
+    ${TARGET_SLOT}=     RW.Core.Import User Variable    TARGET_SLOT
+    ...    type=string
+    ...    description=The target slot for deployment promotion.
+    ...    pattern=\w*
+    ...    default=""
+    ...    example=production
 
     # Populate env dictionary for uniform usage in tasks, matching your existing pattern
     Set Suite Variable
     ...    ${env}
-    ...    {"AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}","APP_SERVICE_NAME":"${APP_SERVICE_NAME}"}
-    # ...        "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}",
-    # ...        "APP_SERVICE_NAME":"${APP_SERVICE_NAME}",
-    # ...        "TIME_PERIOD_MINUTES":"${TIME_PERIOD_MINUTES}",
-    # ...        "SCALE_OUT_WORKERS":"${SCALE_OUT_WORKERS}",
-    # ...        "SCALE_IN_WORKERS":"${SCALE_IN_WORKERS}",
-    # ...        "NEW_APP_SERVICE_PLAN":"${NEW_APP_SERVICE_PLAN}",
-    # ...        "SOURCE_SLOT":"${SOURCE_SLOT}",
-    # ...        "TARGET_SLOT":"${TARGET_SLOT}",
-    # ...        "ZIP_PACKAGE_PATH":"${ZIP_PACKAGE_PATH}"
-    # ...    }
+    ...    {"AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}","APP_SERVICE_NAME":"${APP_SERVICE_NAME}", "SCALE_IN_FACTOR":"${SCALE_IN_FACTOR}"}
