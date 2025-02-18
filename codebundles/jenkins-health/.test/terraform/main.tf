@@ -151,19 +151,19 @@ resource "aws_instance" "jenkins_server" {
 
               # Install the Job DSL plugin
               echo "[INFO] Installing Job DSL plugin..."
-              java -jar /tmp/jenkins-cli.jar \
+              java -jar jenkins-cli.jar \
                 -s http://localhost:8080 \
                 -auth "admin:$JENKINS_PASS" \
                 install-plugin job-dsl -deploy
 
               echo "[INFO] Installing Pipeline plugin (workflow-aggregator)..."
-              java -jar /tmp/jenkins-cli.jar \
+              java -jar jenkins-cli.jar \
                 -s "http://localhost:8080" \
                 -auth "admin:$JENKINS_PASS" \
                 install-plugin workflow-aggregator -deploy
 
               echo "[INFO] Restarting Jenkins..."
-              java -jar /tmp/jenkins-cli.jar \
+              java -jar jenkins-cli.jar \
                 -s http://localhost:8080 \
                 -auth "admin:$JENKINS_PASS" \
                 safe-restart
