@@ -176,36 +176,21 @@ Redeploy App Service `${APP_SERVICE_NAME}` from Latest Source in Resource Group 
     ...    appservice
     ...    redeploy
     ...    force
-    ${pre_logs}=    RW.CLI.Run Bash File
-    ...    bash_file=appservice_logs.sh
-    ...    env=${env}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
-    RW.Core.Add Pre To Report    ----------\nPre Redeploy Logs:\n${pre_logs.stdout}
-
-    ${redeploy}=    RW.CLI.Run Cli
-    ...    cmd=az webapp deployment source config-zip --resource-group ${AZ_RESOURCE_GROUP} --name ${APP_SERVICE_NAME} --src ${ZIP_PACKAGE_PATH}
+    ...    access:read-write
+    ${redeploy}=    RW.CLI.Run Bash File
+    ...    bash_file=appservice_redeploy.sh
     ...    env=${env}
     ...    timeout_seconds=300
-    ...    include_in_history=true
     RW.Core.Add Pre To Report    ----------\nRedeploy Output:\n${redeploy.stdout}
 
-    IF    ${redeploy.stderr} == ""
-        ${post_logs}=    RW.CLI.Run Bash File
-        ...    bash_file=appservice_logs.sh
-        ...    env=${env}
-        ...    timeout_seconds=180
-        ...    include_in_history=false
-        RW.Core.Add Pre To Report    ----------\nPost Redeploy Logs:\n${post_logs.stdout}
-    ELSE
+    IF  'ERROR' in $redeploy.stdout
         RW.Core.Add Issue
-        ...    severity=3
-        ...    expected=Azure App Service `${APP_SERVICE_NAME}` redeploys successfully
-        ...    actual=Redeploy encountered issues
-        ...    title=Redeploy failed for App Service `${APP_SERVICE_NAME}`
-        ...    reproduce_hint=Check `az webapp deployment source config-zip` logs
-        ...    details=${redeploy.stderr}
-        ...    next_steps=Examine deployment logs and local code bundle for errors.
+        ...  severity=3
+        ...  expected=Redeployment successful
+        ...  actual=Errors in redeploy output
+        ...  title=Redeploy failed
+        ...  details=${redeploy.stdout}
+        ...  next_steps=Review the logs or the portal
     END
 
 
