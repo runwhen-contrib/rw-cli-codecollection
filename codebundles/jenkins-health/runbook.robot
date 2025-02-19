@@ -12,7 +12,7 @@ Library             Jenkins
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-List Failed Build Logs in Jenkins
+List Failed Build Logs in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Fetches logs from failed Jenkins builds using the Jenkins API
     [Tags]    Jenkins    Logs    Builds
     ${rsp}=    RW.CLI.Run Bash File
@@ -50,7 +50,7 @@ List Failed Build Logs in Jenkins
         RW.Core.Add Pre To Report    "No failed builds found"
     END
 
-List Long Running Builds in Jenkins
+List Long Running Builds in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Identifies Jenkins builds that have been running longer than a specified threshold
     [Tags]    Jenkins    Builds
     ${rsp}=    RW.CLI.Run Bash File
@@ -95,8 +95,8 @@ List Long Running Builds in Jenkins
         RW.Core.Add Pre To Report    "No long running builds found"
     END
 
-List Recent Failed Tests in Jenkins
-    [Documentation]    List Recent Failed Tests in Jenkins
+List Recent Failed Tests in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
+    [Documentation]    List Recent Failed Tests in Jenkins Instance
     [Tags]    Jenkins    Tests
     ${failed_tests}=    Jenkins.Get Failed Tests
     ...    jenkins_url=${JENKINS_URL}
@@ -137,7 +137,7 @@ List Recent Failed Tests in Jenkins
         RW.Core.Add Pre To Report    "No failed tests found"
     END
 
-Check Jenkins Health
+Check Jenkins Instance `${JENKINS_INSTANCE_NAME}` Health
     [Documentation]    Check if Jenkins instance is reachable and responding
     [Tags]    Jenkins    Health
     # TODO: Capture more exceptions here 
@@ -160,7 +160,7 @@ Check Jenkins Health
         ...    next_steps=- Check if Jenkins service is running\n- Verify network connectivity\n- Validate Jenkins URL\n- Check Jenkins logs for errors
     END
 
-List Long Queued Builds in Jenkins
+List Long Queued Builds in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Check for builds stuck in queue beyond threshold
     [Tags]    Jenkins    Queue    Builds
     
@@ -210,7 +210,7 @@ List Long Queued Builds in Jenkins
     END
 
 
-List Jenkins Executor Utilization
+List Executor Utilization in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Check Jenkins executor utilization across nodes
     [Tags]    Jenkins    Executors    Utilization
     
@@ -252,7 +252,7 @@ List Jenkins Executor Utilization
     END
 
 
-Fetch Jenkins Logs and Add to Report
+Fetch Jenkins Instance `${JENKINS_INSTANCE_NAME}` Logs and Add to Report
     [Documentation]    Fetches and displays Jenkins logs from the Atom feed
     [Tags]    Jenkins    Logs
     ${rsp}=    Jenkins.Parse Atom Feed
@@ -297,11 +297,18 @@ Suite Initialization
     ...    pattern=\d+
     ...    example="80"
     ...    default="80"
+    ${JENKINS_INSTANCE_NAME}=    RW.Core.Import User Variable    JENKINS_INSTANCE_NAME
+    ...    type=string
+    ...    description=Jenkins Instance Name
+    ...    pattern=\d+
+    ...    example="prod-jenkins"
+    ...    default="prod-jenkins"
     Set Suite Variable    ${LONG_RUNNING_BUILD_MAX_WAIT_TIME}    ${LONG_RUNNING_BUILD_MAX_WAIT_TIME}
     Set Suite Variable    ${JENKINS_URL}    ${JENKINS_URL}
     Set Suite Variable    ${JENKINS_USERNAME}    ${JENKINS_USERNAME}
     Set Suite Variable    ${JENKINS_TOKEN}    ${JENKINS_TOKEN}
     Set Suite Variable    ${QUEUED_BUILD_MAX_WAIT_TIME}    ${QUEUED_BUILD_MAX_WAIT_TIME}
     Set Suite Variable    ${MAX_EXECUTOR_UTILIZATION}    ${MAX_EXECUTOR_UTILIZATION}
+    Set Suite Variable    ${JENKINS_INSTANCE_NAME}    ${JENKINS_INSTANCE_NAME}
     Set Suite Variable    ${env}    {"JENKINS_URL":"${JENKINS_URL}"}
     #Set Suite Variable    ${env}    {"JENKINS_URL":"${JENKINS_URL}", "JENKINS_USERNAME":"${JENKINS_USERNAME.key}", "JENKINS_TOKEN":"${JENKINS_TOKEN.key}"}
