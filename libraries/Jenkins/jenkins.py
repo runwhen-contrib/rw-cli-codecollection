@@ -1,5 +1,7 @@
 import requests
 import time
+import re
+import json
 import xml.etree.ElementTree as ET
 from collections import defaultdict
 from thefuzz import fuzz
@@ -412,3 +414,26 @@ class Jenkins:
                 logs += f"{log_text}\n{'=' * 80}\n"
 
         return logs
+
+
+    @keyword("Analyze Logs")
+    def analyze_logs(self, logs: str, error_patterns_file: str = None):
+        """Analyzes logs for common Java/Maven errors and suggests next steps."""
+        if error_patterns_file:
+            with open(error_patterns_file, "r") as f:
+                error_patterns = json.load(f)
+
+        suggestions = []
+        for error, details in error_patterns.items():
+            pattern = details.get("pattern")
+            advice = details.get("suggestion")
+
+            if pattern and advice:
+                if re.search(pattern, logs, re.MULTILINE):
+                    suggestions.append(advice)
+
+        # Use default suggestions if no specific issues found
+        if not suggestions:
+            suggestions = ["Check detailed logs for root cause."]
+        
+        return "\n".join(suggestions)
