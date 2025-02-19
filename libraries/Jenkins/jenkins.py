@@ -384,6 +384,7 @@ class Jenkins:
     ):
         """
         Fetches and parses the Jenkins manage/log Atom feed, returning the combined log text.
+        Any sensitive information like initial admin passwords will be redacted.
 
         Example usage:
         | ${logs}= | Parse Jenkins Atom Feed | ${JENKINS_URL} | ${JENKINS_USERNAME} | ${JENKINS_TOKEN} |
@@ -404,6 +405,10 @@ class Jenkins:
         for entry in root.findall('atom:entry', namespace):
             content_elem = entry.find('atom:content', namespace)
             if content_elem is not None and content_elem.text:
-                logs += f"{content_elem.text.strip()}\n{'=' * 80}\n"
+                log_text = content_elem.text.strip()
+                # Redact initial admin password lines
+                if "Jenkins initial setup is required" in log_text and "This may also be found at:" in log_text:
+                    log_text = "Jenkins initial setup is required. [REDACTED]"
+                logs += f"{log_text}\n{'=' * 80}\n"
 
         return logs
