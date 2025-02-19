@@ -190,6 +190,77 @@
     "DEPENDENCY_RESOLUTION_ERROR": {
         "pattern": "Could not resolve dependencies for project",
         "suggestion": "Ensure the required dependencies exist in the specified repository and check the internet connection or repository credentials."
+    },
+
+
+    "SYNTAX_ERROR": {
+        "pattern": "SyntaxError: .+",
+        "suggestion": "Check for incorrect syntax, missing colons, incorrect indentation, or mismatched parentheses."
+    },
+    "INDENTATION_ERROR": {
+        "pattern": "IndentationError: .+",
+        "suggestion": "Ensure consistent indentation using spaces or tabs. Avoid mixing both."
+    },
+    "TYPE_ERROR": {
+        "pattern": "TypeError: .+",
+        "suggestion": "Check data types in function calls and operations. Convert variables if necessary."
+    },
+    "NAME_ERROR": {
+        "pattern": "NameError: name '.+' is not defined",
+        "suggestion": "Ensure the variable or function is defined before use."
+    },
+    "INDEX_ERROR": {
+        "pattern": "IndexError: list index out of range",
+        "suggestion": "Check list length before accessing elements by index."
+    },
+    "KEY_ERROR": {
+        "pattern": "KeyError: '.+'",
+        "suggestion": "Ensure the dictionary contains the key before accessing it."
+    },
+    "VALUE_ERROR": {
+        "pattern": "ValueError: .+",
+        "suggestion": "Check if the function arguments or data formats are valid."
+    },
+    "ATTRIBUTE_ERROR": {
+        "pattern": "AttributeError: '.+' object has no attribute '.+'",
+        "suggestion": "Ensure the object has the specified attribute before accessing it."
+    },
+    "MODULE_NOT_FOUND": {
+        "pattern": "ModuleNotFoundError: No module named '.+'",
+        "suggestion": "Ensure the required module is installed and the import statement is correct."
+    },
+    "IMPORT_ERROR": {
+        "pattern": "ImportError: .+",
+        "suggestion": "Check module paths and dependencies. Ensure required modules are installed."
+    },
+    "IO_ERROR": {
+        "pattern": "OSError: .+|IOError: .+",
+        "suggestion": "Check file paths, permissions, and disk space before performing I/O operations."
+    },
+    "ZERO_DIVISION_ERROR": {
+        "pattern": "ZeroDivisionError: division by zero",
+        "suggestion": "Avoid dividing by zero. Check for zero before performing division."
+    },
+    "RECURSION_ERROR": {
+        "pattern": "RecursionError: maximum recursion depth exceeded",
+        "suggestion": "Check recursive function calls to prevent infinite recursion."
+    },
+    "MEMORY_ERROR": {
+        "pattern": "MemoryError",
+        "suggestion": "Optimize memory usage. Consider processing data in smaller chunks."
+    },
+    "TIMEOUT_ERROR": {
+        "pattern": "TimeoutError",
+        "suggestion": "Increase timeout limits or optimize code to prevent long execution times."
+    },
+    "CONNECTION_ERROR": {
+        "pattern": "requests\\.exceptions\\.ConnectionError",
+        "suggestion": "Check network connectivity and ensure the server is reachable."
+    },
+    "SSL_ERROR": {
+        "pattern": "requests\\.exceptions\\.SSLError",
+        "suggestion": "Verify SSL certificates and ensure secure connections."
     }
+
       
 }
