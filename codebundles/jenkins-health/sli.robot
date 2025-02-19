@@ -13,7 +13,7 @@ Library             Jenkins
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Check For Failed Build Logs in Jenkins Instance ${JENKINS_INSTANCE_NAME}
+Check For Failed Build Logs in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Check For Failed Build Logs in Jenkins
     [Tags]    Jenkins    Logs    Builds
     ${rsp}=    RW.CLI.Run Bash File
@@ -32,7 +32,7 @@ Check For Failed Build Logs in Jenkins Instance ${JENKINS_INSTANCE_NAME}
     ${failed_builds_score}=    Evaluate    1 if int(${failed_builds}) <= int(${MAX_FAILED_BUILDS}) else 0
     Set Global Variable    ${failed_builds_score}
 
-Check For Long Running Builds in Jenkins Instance ${JENKINS_INSTANCE_NAME}
+Check For Long Running Builds in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Check Jenkins builds that have been running longer than a specified threshold
     [Tags]    Jenkins    Builds
     ${rsp}=    RW.CLI.Run Bash File
@@ -55,7 +55,7 @@ Check For Long Running Builds in Jenkins Instance ${JENKINS_INSTANCE_NAME}
     ${long_running_score}=    Evaluate    1 if int(${long_running_count}) <= int(${MAX_LONG_RUNNING_BUILDS}) else 0
     Set Global Variable    ${long_running_score}
 
-Check For Recent Failed Tests in Jenkins Instance ${JENKINS_INSTANCE_NAME}
+Check For Recent Failed Tests in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Check For Recent Failed Tests in Jenkins
     [Tags]    Jenkins    Tests
     ${failed_tests}=    Jenkins.Get Failed Tests
@@ -70,7 +70,7 @@ Check For Recent Failed Tests in Jenkins Instance ${JENKINS_INSTANCE_NAME}
         Set Global Variable    ${failed_test_score}    1
     END
 
-Check For Jenkins Instance ${JENKINS_INSTANCE_NAME} Health
+Check For Jenkins Instance `${JENKINS_INSTANCE_NAME}` Health
     [Documentation]    Check if Jenkins instance is reachable and responding
     [Tags]    Jenkins    Health
     ${rsp}=    RW.CLI.Run Cli
@@ -85,7 +85,7 @@ Check For Jenkins Instance ${JENKINS_INSTANCE_NAME} Health
         Set Global Variable    ${jenkins_health_score}    0
     END
 
-Check For Long Queued Builds in Jenkins Instance ${JENKINS_INSTANCE_NAME}
+Check For Long Queued Builds in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Check for builds stuck in queue beyond threshold and calculate SLI score
     [Tags]    Jenkins    Queue    Builds    SLI
     ${queued_builds}=    Jenkins.Get Queued Builds    
@@ -97,7 +97,7 @@ Check For Long Queued Builds in Jenkins Instance ${JENKINS_INSTANCE_NAME}
     ${queued_builds_score}=    Evaluate    1 if int(${queued_count}) <= int(${MAX_QUEUED_BUILDS}) else 0
     Set Global Variable    ${queued_builds_score}
 
-Check Jenkins Executor Utilization in Jenkins Instance ${JENKINS_INSTANCE_NAME}
+Check Jenkins Executor Utilization in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Check if Jenkins executor utilization is above 80%
     [Tags]    Jenkins    Executors    Utilization
     ${executor_utilization}=    Jenkins.Get Executor Utilization
@@ -183,7 +183,7 @@ Suite Initialization
     ${JENKINS_INSTANCE_NAME}=    RW.Core.Import User Variable    JENKINS_INSTANCE_NAME
     ...    type=string
     ...    description=Jenkins Instance Name
-    ...    pattern=\d+
+    ...    pattern=\w*
     ...    example="prod-jenkins"
     ...    default="prod-jenkins"
     Set Suite Variable    ${env}    {"JENKINS_URL":"${JENKINS_URL}"}
