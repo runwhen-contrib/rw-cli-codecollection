@@ -16,7 +16,7 @@ List Failed Build Logs in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Fetches logs from failed Jenkins builds using the Jenkins API
     [Tags]    Jenkins    Logs    Builds
     ${rsp}=    RW.CLI.Run Bash File
-    ...    bash_file=failed_build_logs.sh
+    ...    bash_file=${CURDIR}/failed_build_logs.sh
     ...    env=${env}
     ...    include_in_history=False
     ...    secret__jenkins_token=${JENKINS_TOKEN}
@@ -57,8 +57,8 @@ List Long Running Builds in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Identifies Jenkins builds that have been running longer than a specified threshold
     [Tags]    Jenkins    Builds
     ${rsp}=    RW.CLI.Run Bash File
-    ...    bash_file=long_running_builds.sh
-    ...    cmd_override=./long_running_builds.sh ${LONG_RUNNING_BUILD_MAX_WAIT_TIME}
+    ...    bash_file=${CURDIR}/long_running_builds.sh
+    ...    cmd_override=${CURDIR}/long_running_builds.sh ${LONG_RUNNING_BUILD_MAX_WAIT_TIME}
     ...    env=${env}
     ...    include_in_history=False
     ...    secret__jenkins_token=${JENKINS_TOKEN}
@@ -303,7 +303,7 @@ Suite Initialization
     ${JENKINS_INSTANCE_NAME}=    RW.Core.Import User Variable    JENKINS_INSTANCE_NAME
     ...    type=string
     ...    description=Jenkins Instance Name
-    ...    pattern=\d+
+    ...    pattern=\w*
     ...    example="prod-jenkins"
     ...    default="prod-jenkins"
     Set Suite Variable    ${LONG_RUNNING_BUILD_MAX_WAIT_TIME}    ${LONG_RUNNING_BUILD_MAX_WAIT_TIME}
