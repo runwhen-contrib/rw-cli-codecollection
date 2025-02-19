@@ -17,7 +17,7 @@ Check For Failed Build Logs in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Check For Failed Build Logs in Jenkins
     [Tags]    Jenkins    Logs    Builds
     ${rsp}=    RW.CLI.Run Bash File
-    ...    bash_file=failed_build_logs.sh
+    ...    bash_file=${CURDIR}/failed_build_logs.sh
     ...    env=${env}
     ...    include_in_history=False
     ...    secret__jenkins_token=${JENKINS_TOKEN}
@@ -36,8 +36,8 @@ Check For Long Running Builds in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Check Jenkins builds that have been running longer than a specified threshold
     [Tags]    Jenkins    Builds
     ${rsp}=    RW.CLI.Run Bash File
-    ...    bash_file=long_running_builds.sh
-    ...    cmd_override=./long_running_builds.sh ${LONG_RUNNING_BUILD_MAX_WAIT_TIME}
+    ...    bash_file=${CURDIR}/long_running_builds.sh
+    ...    cmd_override=${CURDIR}/long_running_builds.sh ${LONG_RUNNING_BUILD_MAX_WAIT_TIME}
     ...    env=${env}
     ...    include_in_history=False
     ...    secret__jenkins_token=${JENKINS_TOKEN}
