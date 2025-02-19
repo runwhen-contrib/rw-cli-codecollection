@@ -35,6 +35,9 @@ List Failed Build Logs in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
             ${formatted_results}=    RW.CLI.Run Cli
             ...    cmd=echo '${json_str}' | jq -r '["Job Name", "Build #", "Result", "URL"] as $headers | $headers, (. | [.job_name, .build_number, .result, .url]) | @tsv' | column -t -s $'\t'
             RW.Core.Add Pre To Report    Failed Builds:\n=======================================\n${formatted_results.stdout}
+            ${next_steps}=    Analyze Logs
+            ...    logs=${job['logs']}
+            ...    error_patterns_file=${CURDIR}/error_patterns.json
 
             ${pretty_item}=    Evaluate    pprint.pformat(${job})    modules=pprint
             RW.Core.Add Issue
@@ -44,7 +47,7 @@ List Failed Build Logs in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
             ...    title=Jenkins Build Failure: `${job_name}` (Build #`${build_number}`)
             ...    reproduce_hint=Navigate to Jenkins build `${job_name}` #`${build_number}`
             ...    details=${pretty_item}
-            ...    next_steps=Review Failed build logs for Jenkins job `${job_name}`
+            ...    next_steps=${next_steps}
         END
     ELSE
         RW.Core.Add Pre To Report    "No failed builds found"
