@@ -161,49 +161,6 @@ Rollback Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` to Previous
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-# Scale Down Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
-#     [Documentation]    Stops all running pods in a deployment to immediately halt a failing or runaway service.
-#     [Tags]
-#     ...    log
-#     ...    pod
-#     ...    scaledown
-#     ...    deployment
-#     ...    ${DEPLOYMENT_NAME}
-
-#     ${logs}=    RW.CLI.Run Cli
-#     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} --tail 50 -n ${NAMESPACE} --all-containers=true --max-log-requests=20 --context ${CONTEXT}
-#     ...    env=${env}
-#     ...    include_in_history=true
-#     ...    timeout_seconds=180
-#     ...    secret_file__kubeconfig=${kubeconfig}
-#     RW.Core.Add Pre To Report    ----------\nPre restart log output:\n${logs.stdout}
-
-#     ${scaledown}=    RW.CLI.Run Cli
-#     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} scale deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} --replicas=0
-#     ...    env=${env}
-#     ...    include_in_history=true
-#     ...    timeout_seconds=180
-#     ...    secret_file__kubeconfig=${kubeconfig}
-#     ${replicas}=    RW.CLI.Run Cli
-#     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} && ${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.replicas}'
-#     ...    env=${env}
-#     ...    include_in_history=true
-#     ...    secret_file__kubeconfig=${kubeconfig}
-#     RW.Core.Add Pre To Report    ----------\Scaledown Output:\n${scaledown.stdout}\nRollout and Replicas:\n${replicas.stdout}
-
-#     IF    ($scaledown.stderr) != ""
-#         RW.Core.Add Issue
-#         ...    severity=3
-#         ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should scale down successfully
-#         ...    actual=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` did not scale down successfully
-#         ...    title=Deployment `${DEPLOYMENT_NAME}` in `${NAMESPACE}` did not scale down properly
-#         ...    reproduce_hint=View Commands Used in Report Output
-#         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} generated the following output during scaledown attempt: \n${scaledown.stderr}
-#         ...    next_steps=Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`\nEscalate rollback issues to service owner.
-#     END
-#     ${history}=    RW.CLI.Pop Shell History
-#     RW.Core.Add Pre To Report    Commands Used: ${history}
-
 Scale Down Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Stops (or nearly stops) all running pods in a deployment to immediately halt a failing or runaway service.
     [Tags]
