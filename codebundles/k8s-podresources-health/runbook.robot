@@ -72,7 +72,7 @@ Show Pods Without Resource Limit or Resource Requests Set in Namespace `${NAMESP
     RW.Core.Add Pre To Report    ${summary}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Get Pod Resource Utilization with Top in Namespace `${NAMESPACE}`
+Get CPU and Memory Pod Resource Utilization with Top in Namespace `${NAMESPACE}`
     [Documentation]    Performs and a top command on list of labeled workloads to check pod resources.
     [Tags]    top    resources    utilization    pods    workloads    cpu    memory    allocation    labeled    ${NAMESPACE}
     ${pods_top}=    RW.CLI.Run Cli
@@ -89,7 +89,7 @@ Get Pod Resource Utilization with Top in Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    Pod Resources:\n${resource_util_info}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Identify VPA Pod Resource Recommendations in Namespace `${NAMESPACE}`
+Identify VPA Pod Resource Recommendations in Namespace `production`
     [Documentation]    Queries the namespace for any Vertical Pod Autoscaler resource recommendations. 
     [Tags]    recommendation    resources    utilization    pods    cpu    memory    allocation   vpa    ${NAMESPACE}
     ${vpa_usage}=    RW.CLI.Run Bash File

@@ -16,7 +16,7 @@ Library             Process
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Check AWS S3 Bucket Storage Utilization
+Check AWS S3 Bucket Storage Utilization in AWS Region `${AWS_REGION}`
     [Documentation]   This script checks and displays the storage utilization of a specified AWS S3 bucket. It uses the AWS CLI to list all objects in the bucket recursively, displaying the results in a human-readable format and providing a summary of the total storage used.
     [Tags]  Amazon Web Services    AWS S3 
     ${process}=    RW.CLI.Run Bash File    check_aws_s3_bucket_storage_utilization.sh

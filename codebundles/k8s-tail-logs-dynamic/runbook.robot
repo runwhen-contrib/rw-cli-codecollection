@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Get `${CONTAINER_NAME}` Application Logs
+Collect Application Logs for '${CONTAINER_NAME}' Workload
     [Documentation]    Collects the last approximately 300 lines of logs from the workload
     [Tags]    resource    application    workload    logs    state    ${container_name}    ${workload_name}
     ${logs}=    RW.CLI.Run Cli
@@ -27,7 +27,7 @@ Get `${CONTAINER_NAME}` Application Logs
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
+Tail Application Logs For Stacktraces in Container '${CONTAINER_NAME}'
     [Documentation]    Performs an inspection on container logs for exceptions/stacktraces, parsing them and attempts to find relevant source code information
     [Tags]
     ...    application

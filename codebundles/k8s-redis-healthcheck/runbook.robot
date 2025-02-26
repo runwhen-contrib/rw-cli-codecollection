@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Ping `${DEPLOYMENT_NAME}` Redis Workload
+Ping Redis Workload
     [Documentation]    Verifies that a PING can be peformed against the redis workload.
     [Tags]    redis    cli    ping    pong    alive    probe    ready
     ${rsp}=    RW.CLI.Run Cli
@@ -38,7 +38,7 @@ Ping `${DEPLOYMENT_NAME}` Redis Workload
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Verify `${DEPLOYMENT_NAME}` Redis Read Write Operation
+Verify `${DEPLOYMENT_NAME}` Redis Read Write Operation in `${NAMESPACE}` namespace
     [Documentation]    Attempts to perform a write and read operation on the redis workload, checking that a key can be set, incremented, and read from.
     [Tags]    redis    cli    increment    health    check    read    write
     ${set_op}=    RW.CLI.Run Cli

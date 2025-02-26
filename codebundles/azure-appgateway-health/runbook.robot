@@ -13,7 +13,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NAME}` in Azure Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the application gateway cluster
     [Tags]    aks    config
     ${resource_health}=    RW.CLI.Run Bash File
@@ -61,7 +61,7 @@ Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NA
         ...    details=${issue_list}
         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
     END
-Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Check Application Gateway Configuration Health Including Backend Health Probe in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the details and health of the application gateway configuration
     [Tags]    appgateway    logs    tail
     ${config_health}=    RW.CLI.Run Bash File
@@ -99,7 +99,7 @@ Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resou
         END
     END
 
-Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Monitor Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the health of the application gateway backend pool members
     [Tags]    appgateway    logs    tail
     ${backend_health}=    RW.CLI.Run Bash File
@@ -137,7 +137,7 @@ Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resou
         END
     END   
 
-Fetch Log Analytics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Fetch Log Analytics for Application Gateway 'MyAppGateway' In Resource Group 'MyResourceGroup'
     [Documentation]    Fetch log analytics for the application gateway
     [Tags]    appgateway    logs    analytics    uri_errors    requests    ssl    errors
     ${log_analytics}=    RW.CLI.Run Bash File
@@ -207,7 +207,7 @@ Fetch Metrics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `$
         END
     END   
 
-Check SSL Certificate Health for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Retrieve and Validate Expiry Dates of SSL Certificates for Application Gateway `${APP_GATEWAY_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch SSL certificates and validate expiry dates for Azure Application Gateway instances
     [Tags]    appgateway    ssl    expiry
     ${ssl_health}=    RW.CLI.Run Bash File
@@ -245,7 +245,7 @@ Check SSL Certificate Health for Application Gateway `${APP_GATEWAY_NAME}` In Re
         END
     END   
 
-Check Logs for Errors with Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Query Log Analytics Workspace for Errors in Application Gateway `${APP_GATEWAY_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Query log analytics workspace for common errors like IP mismatches or subnet issues
     [Tags]    appgateway    logs    network    errors
     ${log_errors}=    RW.CLI.Run Bash File
@@ -283,7 +283,7 @@ Check Logs for Errors with Application Gateway `${APP_GATEWAY_NAME}` In Resource
         END
     END   
 
-List Related Azure Resources for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+List Related Azure Resources for Application Gateway '${APP_GATEWAY_NAME}' In Resource Group '${AZ_RESOURCE_GROUP}' Including Backend Pools and HTTP Settings
     [Documentation]    Fetch a list of resources that are releated to the application gateway
     [Tags]    appgateway    resources    azure    related
     ${resources}=    RW.CLI.Run Bash File

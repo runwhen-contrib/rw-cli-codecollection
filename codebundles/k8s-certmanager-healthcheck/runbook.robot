@@ -17,7 +17,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Get Namespace Certificate Summary for Namespace `${NAMESPACE}`
+Get Cert-manager Certificate Renewal Summary for Namespace `${NAMESPACE}`
     [Documentation]    Gets a list of cert-manager certificates that are due for renewal and summarize their information for review.
     [Tags]    tls    certificates    kubernetes    objects    expiration    summary    cert-manager
     ${cert_info}=    RW.CLI.Run Cli
@@ -33,13 +33,13 @@ Get Namespace Certificate Summary for Namespace `${NAMESPACE}`
     ...    set_issue_actual=Certificates were found in the namespace `${NAMESPACE}` that are past their renewal time and not renewed
     ...    set_issue_title=Found certificates due for renewal in namespace `${NAMESPACE}` that are not renewing
     ...    set_issue_details=cert-manager certificates not renewing: "$_stdout".
-    ...    set_issue_next_steps=Find Failed Certificate Requests and Identify Issues for Namespace `${NAMESPACE}` \nCheck Logs for Cert-Manager Deployment in Cluster `${CONTEXT}`
+    ...    set_issue_next_steps=Get List of Failed Cert-manager Certificates and Summarize Issues in Namespace `${NAMESPACE}` \nCheck Logs for Cert-Manager Deployment in Cluster `${CONTEXT}`
     ...    _line__raise_issue_if_contains=Namespace
     RW.Core.Add Pre To Report    Certificate Information:\n${cert_info.stdout}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Find Unhealthy Certificates in Namespace `${NAMESPACE}`
+Find Cert-manager Certificates with Failed Status in Namespace `${NAMESPACE}`
     [Documentation]    Gets a list of cert-manager certificates are not available.
     [Tags]    tls    certificates    kubernetes    cert-manager    failed
     ${unready_certs}=    RW.CLI.Run Cli
@@ -58,7 +58,7 @@ Find Unhealthy Certificates in Namespace `${NAMESPACE}`
             ...    title= Certificate `${item["metadata"]["name"]}` is not available in namespace `${NAMESPACE}`.
             ...    reproduce_hint=${unready_certs.cmd}
             ...    details=${item}
-            ...    next_steps=Find Failed Certificate Requests and Identify Issues for Namespace `${NAMESPACE}` \nCheck Logs for cert-manager Deployment in Cluster `${CONTEXT}`
+            ...    next_steps=Get List of Failed Cert-manager Certificates and Summarize Issues in Namespace `${NAMESPACE}` \nCheck Logs for cert-manager Deployment in Cluster `${CONTEXT}`
         END
     END
 
@@ -66,7 +66,7 @@ Find Unhealthy Certificates in Namespace `${NAMESPACE}`
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Find Failed Certificate Requests and Identify Issues for Namespace `${NAMESPACE}`
+Get List of Failed Cert-manager Certificates and Summarize Issues in Namespace `${NAMESPACE}`
     [Documentation]    Gets a list of failed cert-manager certificates and summarize their issues.
     [Tags]
     ...    tls

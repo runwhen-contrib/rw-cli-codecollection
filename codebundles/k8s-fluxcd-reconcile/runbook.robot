@@ -16,7 +16,7 @@ Library             Process
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Health Check Flux Reconciliation
+Health Check Flux Reconciliation Logs and Generate Report
     [Documentation]   Fetches reconciliation logs for flux and creates a report for them.
     [Tags]  Kubernetes    Namespace    Flux
     ${process}=    RW.CLI.Run Bash File    flux_reconcile_report.sh

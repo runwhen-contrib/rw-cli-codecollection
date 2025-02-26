@@ -16,7 +16,7 @@ Library             Process
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Health Check Flux Reconciliation
+Monitor and Evaluate Failing Reconciliations for Fluxcd in Kubernetes Namespace $${FLUX_NAMESPACE}
     [Documentation]   Measures failing reconciliations for fluxcd
     [Tags]  Kubernetes    Namespace    Flux
     ${process}=    RW.CLI.Run Bash File    flux_reconcile_report.sh

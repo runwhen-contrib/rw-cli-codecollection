@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Sync Container Images into Azure Container Registry `${ACR_REGISTRY}`
+Synchronize Latest Container Images into Azure Container Registry `${ACR_REGISTRY}`
     [Documentation]    Synchronizes the latest container images into an ACR repository
     [Tags]    azure    acr    registry    runwhen
     ${az_acr_image_sync}=    RW.CLI.Run Bash File

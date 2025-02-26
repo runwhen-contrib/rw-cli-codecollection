@@ -13,7 +13,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-List all available Kustomization objects in Namespace `${NAMESPACE}`    
+List all FluxCD Kustomization objects in Namespace ${NAMESPACE}    
     [Documentation]    List all FluxCD kustomization objects found in ${NAMESPACE}
     [Tags]        FluxCD     Kustomization     Available    List    ${NAMESPACE}
     ${kustomizations}=    RW.CLI.Run Cli
@@ -26,7 +26,7 @@ List all available Kustomization objects in Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    Kustomizations available: \n ${kustomizations.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Get details for unready Kustomizations in Namespace `${NAMESPACE}`  
+Check non-ready Kustomizations in Namespace ${NAMESPACE}  
     [Documentation]    List all Kustomizations that are not found in a ready state in namespace ${NAMESPACE}  
     [Tags]        FluxCD     Kustomization    Versions    ${NAMESPACE}
     ${kustomizations_not_ready}=    RW.CLI.Run Cli

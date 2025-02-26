@@ -16,7 +16,7 @@ Library             Process
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Test `${WORKLOAD_NAME}` High Availability
+Test 'MyApp' High Availability
     [Documentation]   Kills a pod under this workload to test high availability.
     [Tags]  Kubernetes    StatefulSet    Deployments    Pods    Highly Available
     ${process}=    RW.CLI.Run Bash File
@@ -25,7 +25,7 @@ Test `${WORKLOAD_NAME}` High Availability
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ${process.stdout}
 
-OOMKill `${WORKLOAD_NAME}` Pod
+OOMKill `${WORKLOAD_NAME}` Kubernetes Pod
     [Documentation]   Kills the oldest pod running under the configured workload.
     [Tags]  Kubernetes    StatefulSet    Deployments    Pods    Highly Available    OOMkill   Memory
     ${process}=    RW.CLI.Run Bash File
@@ -34,7 +34,7 @@ OOMKill `${WORKLOAD_NAME}` Pod
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ${process.stdout}
 
-Mangle Service Selector For `${WORKLOAD_NAME}`
+Mangle Service Selector For 'MyWorkload'
     [Documentation]   Breaks a service's label selector to cause a network disruption
     [Tags]  Kubernetes    networking    Services    Selector
     ${process}=    RW.CLI.Run Bash File
@@ -43,7 +43,7 @@ Mangle Service Selector For `${WORKLOAD_NAME}`
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ${process.stdout}
 
-Mangle Service Port For `${WORKLOAD_NAME}`
+Modify Service Port For '${WORKLOAD_NAME}' to Simulate Network Disruption
     [Documentation]   Changes a service's port to cause a network disruption
     [Tags]  Kubernetes    networking    Services    Port
     ${process}=    RW.CLI.Run Bash File
@@ -52,7 +52,7 @@ Mangle Service Port For `${WORKLOAD_NAME}`
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ${process.stdout}
 
-Fill Tmp Directory Of Pod From `${WORKLOAD_NAME}`
+Fill /tmp Directory of Pod '${WORKLOAD_NAME}' with Random Data in Kubernetes
     [Documentation]   Attaches to a pod and fills the /tmp directory with random data
     [Tags]  Kubernetes    pods    volumes    tmp
     ${process}=    RW.CLI.Run Bash File    expand_tmp.sh

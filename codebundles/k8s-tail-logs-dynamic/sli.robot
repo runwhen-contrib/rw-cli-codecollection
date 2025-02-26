@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
+Tail `${CONTAINER_NAME}` Application Logs For Stacktraces in Kubernetes
     [Documentation]    Tails logs and organizes output for measuring counts.
     [Tags]    resource    application    workload    logs    state    exceptions    errors
     ${cmd}=    Set Variable

@@ -13,7 +13,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Check for Resource Health Issues Affecting Application Gateway '${APP_GATEWAY_NAME}' In Resource Group '${AZ_RESOURCE_GROUP}'
     [Documentation]    Fetch a list of issues that might affect the Application Gateway as reported from Azure. 
     [Tags]    aks    resource    health    service    azure
     ${resource_health}=    RW.CLI.Run Bash File
@@ -36,7 +36,7 @@ Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NA
     END
     Set Global Variable    ${appgw_resource_score}
 
-Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Check Configuration Health and Performance Metrics of Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the config of the AKS cluster in azure
     [Tags]    AKS    config
     ${config}=    RW.CLI.Run Bash File
@@ -55,7 +55,7 @@ Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resou
     ${appgw_config_score}=    Evaluate    1 if len(@{issue_list["issues"]}) == 0 else 0
     Set Global Variable    ${appgw_config_score}
 
-Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Fetch Application Gateway `${APP_GATEWAY_NAME}` Backend Pool Health in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the health of the application gateway backend pool members
     [Tags]    appservice    logs    tail
     ${config_health}=    RW.CLI.Run Bash File
@@ -94,7 +94,7 @@ Fetch Metrics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `$
     Set Global Variable    ${appgw_metrics_score}
   
 
-Check SSL Certificate Health for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Retrieve and Validate Expiry Dates of SSL Certificates for Application Gateway `${APP_GATEWAY_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch SSL certificates and validate expiry dates for Azure Application Gateway instances
     [Tags]    appgateway    ssl    expiry
     ${ssl_health}=    RW.CLI.Run Bash File
@@ -111,7 +111,7 @@ Check SSL Certificate Health for Application Gateway `${APP_GATEWAY_NAME}` In Re
     ${appgw_ssl_score}=    Evaluate    1 if len(@{issue_list["issues"]}) == 0 else 0
     Set Global Variable    ${appgw_ssl_score}
 
-Check Logs for Errors with Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Query Log Analytics Workspace for Errors in Application Gateway `${APP_GATEWAY_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Query log analytics workspace for common errors like IP mismatches or subnet issues
     [Tags]    appgateway    logs    network    errors
     ${log_errors}=    RW.CLI.Run Bash File
@@ -132,7 +132,7 @@ Check Logs for Errors with Application Gateway `${APP_GATEWAY_NAME}` In Resource
 
 
 
-Generate Application Gateway Health Score
+Generate Detailed Application Gateway Health Score including Latency, Throughput, and Error Rates
     ${appgw_health_score}=      Evaluate  (${appgw_resource_score} + ${appgw_config_score} + ${appgw_backend_score} + ${appgw_metrics_score} + ${appgw_ssl_score} + ${appgw_errlog_score} ) / 6
     ${health_score}=      Convert to Number    ${appgw_health_score}  2
     RW.Core.Push Metric    ${health_score}

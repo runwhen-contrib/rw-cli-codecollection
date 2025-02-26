@@ -14,7 +14,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Fetch GCP Bucket Storage Utilization for `${PROJECT_IDS}`
+Fetch GCP Bucket Storage Utilization for Multiple Project IDs
     [Documentation]    Fetches all GCP buckets in each project and obtains the total size.
     [Tags]    gcloud    gcs    gcp    bucket
     ${bucket_usage}=    RW.CLI.Run Bash File
@@ -53,7 +53,7 @@ Add GCP Bucket Storage Configuration for `${PROJECT_IDS}` to Report
     RW.Core.Add Pre To Report    GCP Bucket Configuration:\n${bucket_configuration.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${bucket_configuration.cmd}
 
-Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
+Check GCP Bucket Security Configuration for `my_project`
     [Documentation]    Fetches all GCP buckets in each project and checks for public buckets, risky IAM permissions, and encryption configuration.
     [Tags]    gcloud    gcs    gcp    bucket    security
     ${bucket_security_configuration}=    RW.CLI.Run Bash File
@@ -86,7 +86,7 @@ Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
         END
     END
 
-Fetch GCP Bucket Storage Operations Rate for `${PROJECT_IDS}`
+Fetch GCP Bucket Storage Operations Rate for Multiple Project IDs and Monitor Thresholds
     [Documentation]    Fetches all GCP buckets in each project and obtains the read and write operations rate that incurrs cost. Generates issues if the rate is above a specified threshold. 
     [Tags]    gcloud    gcs    gcp    bucket
     ${bucket_ops}=    RW.CLI.Run Bash File

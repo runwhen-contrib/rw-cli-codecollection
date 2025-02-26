@@ -13,7 +13,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Run CLI Command
+Capture CLI Command Output for Report
     [Documentation]    Runs a bare CLI command and captures the stderr and stdout for the report
     [Tags]    stdout    test    output    pods
     ${rsp}=    RW.CLI.Run Cli
@@ -23,17 +23,17 @@ Run CLI Command
     RW.Core.Add Pre To Report    Command Stdout:\n${rsp.stdout}
     RW.Core.Add Pre To Report    Command Stderr:\n${rsp.stderr}
 
-Run Bash File
+Verify Script Passthrough by Running Bash File
     [Documentation]    Runs a bash file to verify script passthrough works
     [Tags]    file    script
-    ${rsp}=    RW.CLI.Run Bash File
+    ${rsp}=    RW.CLI.Verify Script Passthrough by Running Bash File
     ...    bash_file=getdeploys.sh
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    env=${env}
     RW.Core.Add Pre To Report    Command Stdout:\n${rsp.stdout}
     RW.Core.Add Pre To Report    Command Stderr:\n${rsp.stderr}
 
-Log Suggestion
+Generate Next Step Suggestion and Log in [Location]
     [Documentation]    Generate a next step suggestion, format it, and log it
     ${next_steps}=    RW.NextSteps.Suggest    Bind Mount
     ${next_steps}=    RW.NextSteps.Format    ${next_steps}

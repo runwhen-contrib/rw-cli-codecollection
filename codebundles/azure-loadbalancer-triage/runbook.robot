@@ -14,7 +14,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check Activity Logs for Azure Load Balancer `${AZ_LB_NAME}`
+Check Activity Logs for Azure Load Balancer 'example_load_balancer_name'
     [Documentation]    Queries a Azure Loadbalancer's health probe to determine if it's in a healthy state.
     [Tags]    loadbalancer    network    azure    ${az_lb_name}
     ${activity_logs}=    RW.CLI.Run Cli

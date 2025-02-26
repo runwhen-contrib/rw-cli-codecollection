@@ -13,7 +13,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check for Node Restarts in Cluster `${CONTEXT}`
+Count Preempt/Spot Node Restarts in Cluster `${CONTEXT}`
     [Documentation]    Count preempt / spot node restarts within the configured time interval.
     [Tags]    cluster    preempt    spot    node    restart
     ${node_restart_details}=    RW.CLI.Run Bash File
@@ -28,7 +28,7 @@ Check for Node Restarts in Cluster `${CONTEXT}`
     ${event_score}=    Evaluate    1 if ${events} == 0 else 0
     Set Global Variable    ${event_score}
 
-Generate Namspace Score
+Calculate Namespace Score for Kubernetes Cluster
     ${cluster_node_score}=    Evaluate    (${event_score} / 1)
     ${health_score}=    Convert to Number    ${cluster_node_score}    2
     RW.Core.Push Metric    ${health_score}

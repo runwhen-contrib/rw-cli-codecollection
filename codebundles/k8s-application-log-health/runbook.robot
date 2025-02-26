@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 Suite Teardown      Suite Cleanup
 
 *** Tasks ***
-Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Errors in Namespace `${NAMESPACE}`
+Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Errors in Namespace `${NAMESPACE}` within Context `${CONTEXT}`
     [Documentation]    Validates if a Liveliness probe has possible misconfigurations
     [Tags]    kubernetes    logs    errors    exception    ${WORKLOAD_TYPE}
     Scan And Report Issues
@@ -24,7 +24,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Errors in Namespace `${NAMESPA
     ...    ${SHARED_TEMP_DIR}/scan_error_issues.json
     ...    GenericError,AppFailure
 
-Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Stack Traces in Namespace `${NAMESPACE}` 
+Identify and Report ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs with Stack Traces in Namespace `${NAMESPACE}` 
     [Documentation]   Identifies multi-line stack traces from application failures.
     [Tags]    kubernetes    logs    stacktraces    ${WORKLOAD_TYPE}
     Scan And Report Issues
@@ -32,7 +32,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Stack Traces in Namespace `${N
     ...    ${SHARED_TEMP_DIR}/scan_stacktrace_issues.json
     ...    StackTrace
 
-Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Connection Failures in Namespace `${NAMESPACE}`
+Scan Database `${WORKLOAD_NAME}` Logs for Connection Failures in Namespace `${NAMESPACE}`
     [Documentation]   Detects errors related to database, API, or network connectivity issues.
     [Tags]    kubernetes    logs    connection    failure    ${WORKLOAD_TYPE}
     Scan And Report Issues
@@ -40,7 +40,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Connection Failures in Namespa
     ...    ${SHARED_TEMP_DIR}/scan_conn_issues.json
     ...    Connection
 
-Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Timeout Errors in Namespace `${NAMESPACE}`
+Scan Application `${WORKLOAD_TYPE}` `${WORKLOAD_NAME}` Logs for Timeout Errors in Namespace `${NAMESPACE}`
     [Documentation]   Checks for application logs indicating request timeouts or slow responses.
     [Tags]    kubernetes    logs    timeout    failure    ${WORKLOAD_TYPE}
     Scan And Report Issues
@@ -48,7 +48,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Timeout Errors in Namespace `$
     ...    ${SHARED_TEMP_DIR}/scan_timeout_issues.json
     ...    Timeout
   
-Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Authentication and Authorization Failures in Namespace `${NAMESPACE}`
+Scan Kubernetes Pod `frontend` Logs for Authentication and Authorization Failures in Namespace `production`
     [Documentation]   Identifies issues where applications fail to authenticate or authorize users/services.
     [Tags]    kubernetes    logs    auth    failure    ${WORKLOAD_TYPE}
     Scan And Report Issues
@@ -56,7 +56,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Authentication and Authorizati
     ...    ${SHARED_TEMP_DIR}/scan_auth_issues.json
     ...    Auth
 
-Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Null Pointer and Unhandled Exceptions in Namespace `${NAMESPACE}`
+Scan Java Application `${WORKLOAD_NAME}` Logs for Null Pointer and Unhandled Exceptions in Namespace `${NAMESPACE}`
     [Documentation]   Finds critical application crashes due to unhandled exceptions in the code.
     [Tags]    kubernetes    logs    exception    ${WORKLOAD_TYPE}
     Scan And Report Issues
@@ -64,7 +64,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Null Pointer and Unhandled Exc
     ...    ${SHARED_TEMP_DIR}/scan_exception_issues.json
     ...    Exceptions
 
-Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Log Anomalies in Namespace `${NAMESPACE}`
+Scan Kubernetes Pod `frontend` for Log Anomalies in Namespace `production`
     [Documentation]   Detects repeating log messages that may indicate ongoing issues.
     [Tags]    kubernetes    logs    anomaly    ${WORKLOAD_TYPE}
     Scan And Report Issues
@@ -73,7 +73,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Log Anomalies in Namespace `${NAMES
     ...    Anomaly
  
 
-Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Application Restarts and Failures in Namespace `${NAMESPACE}`
+Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Application Restarts and Failures in Namespace `${NAMESPACE}` by Checking for Timestamped Error Messages and Pod Restart Events
     [Documentation]   Checks logs for indicators of application restarts outside Kubernetes events.
     [Tags]    kubernetes    logs    restart    ${WORKLOAD_TYPE}
     Scan And Report Issues
@@ -81,7 +81,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Application Restarts and Failu
     ...    ${SHARED_TEMP_DIR}/scan_application_restarts.json
     ...    AppRestart,AppFailure
  
-Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Memory and CPU Resource Warnings in Namespace `${NAMESPACE}`
+Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Memory and CPU Resource Warnings in Namespace `${NAMESPACE}` within Context `${CONTEXT}`
     [Documentation]   Identifies log messages related to high memory or CPU utilization warnings.
     [Tags]    kubernetes    logs    resource    ${WORKLOAD_TYPE}
     Scan And Report Issues
@@ -89,7 +89,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Memory and CPU Resource Warnin
     ...    ${SHARED_TEMP_DIR}/scan_application_restarts.json
     ...    Resource
 
-Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Service Dependency Failures in Namespace `${NAMESPACE}`
+Detect Service Dependency Failures in Kubernetes Logs for Workload `${WORKLOAD_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]   Detects failures when the application cannot reach required services (databases, queues, APIs).
     [Tags]    kubernetes    logs    service    dependency    ${WORKLOAD_TYPE}
     Scan And Report Issues

@@ -73,7 +73,7 @@ Fetch Events for Unhealthy Kubernetes PersistentVolumeClaims in Namespace `${NAM
     RW.Core.Add Pre To Report    ${unbound_pvc_events.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-List PersistentVolumeClaims in Terminating State in Namespace `${NAMESPACE}`
+List PersistentVolumeClaims in Terminating State in Namespace ${NAMESPACE}
     [Documentation]    Lists persistentvolumeclaims in a Terminating state.
     [Tags]    pvc    list    kubernetes    storage    persistentvolumeclaim    terminating        check PersistentVolumes
     ${terminating_pvcs}=    RW.CLI.Run Cli
@@ -121,7 +121,7 @@ List PersistentVolumes in Terminating State in Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    ${dangling_pvs.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-List Pods with Attached Volumes and Related PersistentVolume Details in Namespace `${NAMESPACE}`
+Retrieve Pod Details with Attached Volumes and Related PersistentVolume Information in Namespace `${NAMESPACE}`
     [Documentation]    For each pod in a namespace, collect details on configured PersistentVolumeClaim, PersistentVolume, and node.
     [Tags]    pod    storage    pvc    pv    status    csi    storagereport    ${NAMESPACE}
     ${pod_storage_report}=    RW.CLI.Run Cli
@@ -135,7 +135,7 @@ List Pods with Attached Volumes and Related PersistentVolume Details in Namespac
     RW.Core.Add Pre To Report    ${pod_storage_report.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
+Fetch Storage Utilization for PVC Mounts in Specific Namespace
     [Documentation]    For each pod in a namespace, fetch the utilization of any PersistentVolumeClaims mounted using the linux df command. Requires kubectl exec permissions.
     [Tags]    pod    storage    pvc    utilization    capacity    persistentvolumeclaims    persistentvolumeclaim    check pvc    ${NAMESPACE}
     ${pod_pvc_utilization}=    RW.CLI.Run Cli
@@ -172,7 +172,7 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    ${pod_pvc_utilization.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Check for RWO Persistent Volume Node Attachment Issues in Namespace `${NAMESPACE}`
+Improve: Check for RWO Persistent Volume Node Attachment Issues in Namespace `${NAMESPACE}`
     [Documentation]    For each pod in a namespace, check if it has an RWO persistent volume claim and if so, validate that the pod and the pv are on the same node. 
     [Tags]    pod    storage    pvc    readwriteonce    node    persistentvolumeclaims    persistentvolumeclaim    scheduled   attachment    ${NAMESPACE}
     ${pod_rwo_node_and_pod_attachment}=    RW.CLI.Run Cli

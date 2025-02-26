@@ -19,7 +19,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Inspect Warning Events in Namespace `${NAMESPACE}`
+Inspect Warning Events in Namespace `${NAMESPACE}` within Kubernetes Cluster `${CONTEXT}`
     [Documentation]    Queries all warning events in a given namespace within the user specified age,
     ...    fetches the list of involved pod names, groups the events, collects event message details
     ...    and searches for a useful next step based on these details.
@@ -87,7 +87,7 @@ Inspect Warning Events in Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    ${warning_events_by_object.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Inspect Container Restarts In Namespace `${NAMESPACE}`
+Generate Report on Container Restarts in Namespace `${NAMESPACE}`
     [Documentation]    Fetches pods that have container restarts and provides a report of the restart issues.
     [Tags]    namespace    containers    status    restarts    ${namespace}
     ${container_restart_details}=    RW.CLI.Run Cli
@@ -185,7 +185,7 @@ Inspect Pending Pods In Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    ${pending_pods.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Inspect Failed Pods In Namespace `${NAMESPACE}`
+Inspect Unready Pods in Namespace ${NAMESPACE}
     [Documentation]    Fetches all pods which are not running (unready) in the namespace and adds them to a report for future review.
     [Tags]    namespace    pods    status    unready    not starting    phase    failed    ${namespace}
     ${unreadypods_details}=    RW.CLI.Run Cli
@@ -244,7 +244,7 @@ Inspect Failed Pods In Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    ${unreadypods_details}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Inspect Workload Status Conditions In Namespace `${NAMESPACE}`
+Inspect Workload Status Conditions In Namespace '${NAMESPACE}' for Error Status
     [Documentation]    Parses all workloads in a namespace and inspects their status conditions for issues. Status conditions with a status value of False are considered an error.
     [Tags]    namespace    status    conditions    pods    reasons    workloads    ${namespace}
     ${workload_info}=    RW.CLI.Run Cli
@@ -314,7 +314,7 @@ Inspect Workload Status Conditions In Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    ${workload_info.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Get Listing Of Resources In Namespace `${NAMESPACE}`
+Get Listing Of Workload Resources In Namespace `${NAMESPACE}`
     [Documentation]    Simple fetch all to provide a snapshot of information about the workloads in the namespace for future review in a report.
     [Tags]    get all    resources    info    workloads    namespace    manifests    ${namespace}
     ${all_results}=    RW.CLI.Run Cli
@@ -329,7 +329,7 @@ Get Listing Of Resources In Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    ${all_results.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Check Event Anomalies in Namespace `${NAMESPACE}`
+Check for Event Anomalies in Namespace `${NAMESPACE}` within a Specific Timeframe
     [Documentation]    Fetches non warning events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
     [Tags]    namespace    events    info    state    anomolies    count    occurences    ${namespace}
     ${recent_events_by_object}=    RW.CLI.Run Cli
@@ -392,7 +392,7 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    ${recent_events_by_object.stdout}\n
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`
+Check Missing or Risky PodDisruptionBudget Policies in Namespace `production`
     [Documentation]    Searches through deployemnts and statefulsets to determine if PodDistruptionBudgets are missing and/or are configured in a risky way that might affect maintenance activities.
     [Tags]
     ...    poddisruptionbudget

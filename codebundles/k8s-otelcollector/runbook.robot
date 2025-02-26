@@ -33,7 +33,7 @@ Query Collector Queued Spans in Namespace `${NAMESPACE}`
     END
     RW.Core.Add Pre To Report    ${process.stdout}\n
 
-Check OpenTelemetry Collector Logs For Errors In Namespace `${NAMESPACE}`
+Fetch and Analyze OpenTelemetry Collector Logs for Errors in Namespace `${NAMESPACE}`
     [Documentation]    Fetch logs and check for errors
     [Tags]    otel collector    metrics    errors    logs
     ${process}=    RW.CLI.Run Bash File
@@ -53,7 +53,7 @@ Check OpenTelemetry Collector Logs For Errors In Namespace `${NAMESPACE}`
     END
     RW.Core.Add Pre To Report    ${process.stdout}\n
 
-Scan OpenTelemetry Logs For Dropped Spans In Namespace `${NAMESPACE}`
+Scan OpenTelemetry Logs For Dropped Spans In Namespace `NAMESPACE` and Collect Metrics for Rejected Spans
     [Documentation]    Query the collector logs for dropped spans from errors
     [Tags]    otel collector    metrics    errors    logs    dropped    rejected
     ${process}=    RW.CLI.Run Bash File

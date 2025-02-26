@@ -18,7 +18,7 @@ Suite Teardown      Suite Teardown
 
 
 *** Tasks ***
-Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
+Inspect Deployment Log for Issues with `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches recent logs for the given deployment in the namespace and checks the logs output for issues.
     [Tags]
     ...    fetch
@@ -61,7 +61,7 @@ Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
     ...    Recent logs from Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE}:\n\n${logs.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Fetch Deployments Logs for `${DEPLOYMENT_NAME}` and Add to Report
+Fetch Deployments Logs for `${DEPLOYMENT_NAME}` and Add to Weekly Status Report
     [Documentation]    Fetches logs from running pods and adds content to the report
     [Tags]
     ...    kubernetes
@@ -81,7 +81,7 @@ Fetch Deployments Logs for `${DEPLOYMENT_NAME}` and Add to Report
     RW.Core.Add Pre To Report
     ...    Recent logs from Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE}:\n\n${logs.stdout}
 
-Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
+Validate Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     [Documentation]    Validates if a Liveliness probe has possible misconfigurations
     [Tags]
     ...    liveliness
@@ -118,7 +118,7 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     RW.Core.Add Pre To Report    Liveness probe testing results:\n\n${liveness_probe_health.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${liveness_probe_health.cmd}
 
-Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
+Validate Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     [Documentation]    Validates if a readiness probe has possible misconfigurations
     [Tags]
     ...    readiness
@@ -155,7 +155,7 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${readiness_probe_health.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${readiness_probe_health.cmd}
 
-Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` Namespace `${NAMESPACE}`
+Inspect Container Restarts and Generate Report for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches pods that have container restarts and provides a report of the restart issues.
     [Tags]    namespace    containers    status    restarts    ${DEPLOYMENT_NAME}    ${NAMESPACE}
     ${container_restart_analysis}=    RW.CLI.Run Bash File
@@ -187,7 +187,7 @@ Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` Namespace `${NAME
     RW.Core.Add Pre To Report    ${container_restart_analysis.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`
+Inspect Warning Events for Deployment 'example-deployment'
     [Documentation]    Fetches warning events related to the deployment workload in the namespace and triages any issues found in the events.
     [Tags]    events    workloads    errors    warnings    get    deployment    ${DEPLOYMENT_NAME}
     ${events}=    RW.CLI.Run Cli
@@ -229,7 +229,7 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`
     RW.Core.Add Pre To Report    ${events.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Get Deployment Workload Details For `${DEPLOYMENT_NAME}` and Add to Report
+Get Details of Deployment '${DEPLOYMENT_NAME}' for Report
     [Documentation]    Fetches the current state of the deployment for future review in the report.
     [Tags]    deployment    details    manifest    info    ${DEPLOYMENT_NAME}
     ${deployment}=    RW.CLI.Run Cli
@@ -242,7 +242,7 @@ Get Deployment Workload Details For `${DEPLOYMENT_NAME}` and Add to Report
     RW.Core.Add Pre To Report    Snapshot of deployment state:\n\n${deployment.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Inspect Deployment Replicas for `${DEPLOYMENT_NAME}`
+Inspect Deployment Replicas for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Pulls the replica information for a given deployment and checks if it's highly available
     ...    , if the replica counts are the expected / healthy values, and raises issues if it is not progressing
     ...    and is missing pods.
@@ -287,7 +287,7 @@ Inspect Deployment Replicas for `${DEPLOYMENT_NAME}`
         ...    title= Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` has less than the desired availability
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment `${DEPLOYMENT_NAME}` has minimum availability, but has unready pods:\n`${deployment_status}`
-        ...    next_steps=Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`
+        ...    next_steps=Inspect Warning Events for Deployment 'example-deployment'
     END
     IF    $deployment_status["desired_replicas"] == 1
         RW.Core.Add Issue
@@ -297,13 +297,13 @@ Inspect Deployment Replicas for `${DEPLOYMENT_NAME}`
         ...    title= Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` is not configured to be highly available.
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment `${DEPLOYMENT_NAME}` is only configured to have a single pod:\n`${deployment_status}`
-        ...    next_steps=Get Deployment Workload Details For `${DEPLOYMENT_NAME}` and Add to Report\nAdjust Deployment `${DEPLOYMENT_NAME}` spec.replicas to be greater than 1.
+        ...    next_steps=Get Details of Deployment '${DEPLOYMENT_NAME}' for Report\nAdjust Deployment `${DEPLOYMENT_NAME}` spec.replicas to be greater than 1.
     END
     RW.Core.Add Pre To Report    Deployment State:\n${deployment_replicas.stdout}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`
+Check for Deployment Event Anomalies in ${DEPLOYMENT_NAME} Namespace
     [Documentation]    Parses all events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
     [Tags]
     ...    deployment
@@ -359,7 +359,7 @@ Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`
     RW.Core.Add To Report    ${anomalies_report_output}\n
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Check ReplicaSet Health for Deployment `${DEPLOYMENT_NAME}`
+Check ReplicaSet Health for Deployment 'example-deployment'
     [Documentation]    Fetches all replicasets related to deployment to ensure that conflicting versions don't exist. 
     [Tags]
     ...    replica

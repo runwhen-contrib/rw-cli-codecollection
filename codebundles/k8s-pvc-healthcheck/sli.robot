@@ -56,7 +56,7 @@ Suite Initialization
 
 
 *** Tasks ***
-Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
+Fetch Storage Utilization for PVC Mounts in Specific Namespace
     [Documentation]    For each pod in a namespace, fetch the utilization of any PersistentVolumeClaims mounted using the linux df command. Requires kubectl exec permissions.
     [Tags]    pod    storage    pvc    utilization    capacity    persistentvolumeclaims    persistentvolumeclaim    check pvc    ${NAMESPACE}
     ${pvc_utilization_script}=    RW.CLI.Run Bash File
@@ -73,7 +73,7 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
     ${pvc_utilization_score}=    Evaluate    1 if len(@{issue_list}) == 0 else 0
     Set Global Variable    ${pvc_utilization_score}
 
-Generate Namspace Score
+Generate Namespace Score for Kubernetes Distribution
     ${pvc_health_score}=      Evaluate  (${pvc_utilization_score}) / 1
     ${health_score}=      Convert to Number    ${pvc_health_score}  2
     RW.Core.Push Metric    ${health_score}

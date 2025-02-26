@@ -77,7 +77,7 @@ Fetch ArgoCD Application Sync Status & Health for `${APPLICATION}`
     RW.Core.Add Pre To Report    ${app_sync_status.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Fetch ArgoCD Application Last Sync Operation Details for `${APPLICATION}`
+Fetch ArgoCD Application Last Sync Operation Details for 'MyApplication'
     [Documentation]    Fetches the last ArgoCD Application sync operation staus. 
     [Tags]    Application    SyncOperation    History    ArgoCD
     ${last_sync_status}=    RW.CLI.Run Cli
@@ -92,7 +92,7 @@ Fetch ArgoCD Application Last Sync Operation Details for `${APPLICATION}`
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 
-Fetch Unhealthy ArgoCD Application Resources for `${APPLICATION}`
+Fetch Unhealthy ArgoCD Application Resources for `${APPLICATION}` in Namespace `${APPLICATION_TARGET_NAMESPACE}`
     [Documentation]    Displays all resources in an ArgoCD Application that are not in a healthy state. 
     [Tags]    Resources    Unhealthy    SyncStatus    ArgoCD
     ${unhealthy_resources}=    RW.CLI.Run Cli
@@ -119,7 +119,7 @@ Fetch Unhealthy ArgoCD Application Resources for `${APPLICATION}`
     RW.Core.Add Pre To Report    ${unhealthy_resources.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Scan For Errors in Pod Logs Related to ArgoCD Application `${APPLICATION}`
+Scan For Errors in Pod Logs of ArgoCD Application `${APPLICATION}` Deployed in Namespace `${APPLICATION_TARGET_NAMESPACE}`
     [Documentation]    Grep for the error pattern across all pods managed by this Applications deployments.  
     [Tags]    Error    Logs    Deployments    ArgoCD    Pods
     ${log_errors}=    RW.CLI.Run Cli
@@ -133,7 +133,7 @@ Scan For Errors in Pod Logs Related to ArgoCD Application `${APPLICATION}`
     RW.Core.Add Pre To Report    ${log_errors.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Fully Describe ArgoCD Application `${APPLICATION}`
+Fully Describe the Configuration and Deployment Details of ArgoCD Application `${APPLICATION}`
     [Documentation]    Describe all details regarding the ArgoCD Application. Useful if reviewing all content.   
     [Tags]    Application    Describe    ArgoCD
     ${application_describe}=    RW.CLI.Run Cli

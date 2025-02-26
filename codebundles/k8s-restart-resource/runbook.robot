@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Get Current Resource State with Labels `${LABELS}`
+Get Current Resource State with Labels in Kubernetes Cluster
     [Documentation]    Gets the current state of the resource before applying the restart for report review.
     [Tags]    resource    application    restart    state    yaml
     ${resource}=    RW.CLI.Run Cli
@@ -29,7 +29,7 @@ Get Current Resource State with Labels `${LABELS}`
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Get Resource Logs with Labels `${LABELS}`
+Get Resource Logs with Labels in Kubernetes Cluster
     [Documentation]    Collects the last approximately 200 lines of logs from the resource before restarting it.
     [Tags]    resource    application    workload    logs    state
     ${logs}=    RW.CLI.Run Cli
@@ -42,7 +42,7 @@ Get Resource Logs with Labels `${LABELS}`
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Restart Resource with Labels `${LABELS}`
+Restart Resource with Labels in Kubernetes Cluster
     [Documentation]    Restarts the labeled resource in an attempt to get it out of a bad state.
     [Tags]    resource    application    restart    pod    kill    rollout    revision
     ${resource_name}=    RW.CLI.Run Cli

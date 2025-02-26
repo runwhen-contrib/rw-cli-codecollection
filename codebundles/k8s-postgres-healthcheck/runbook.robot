@@ -14,7 +14,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-List Resources Related to Postgres Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
+List All Postgres Cluster Resources in Namespace `${NAMESPACE}` with Labels in Workspace `${WORKLOAD_NAME}`
     [Documentation]    Runs a simple fetch all for the resources in the given workspace under the configured labels.
     [Tags]    postgres    resources    workloads    standard    information
     ${resources}=    RW.CLI.Run Cli
@@ -62,7 +62,7 @@ Get Postgres Pod Logs & Events for Cluster `${OBJECT_NAME}` in Namespace `${NAME
     RW.Core.Add Pre To Report    Event Results:\n${found_pod_events}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Get Postgres Pod Resource Utilization for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
+Get Postgres Pod Resource Utilization for Cluster `example-cluster` in Namespace `example-namespace`
     [Documentation]    Performs and a top command on list of labeled postgres-related workloads to check pod resources.
     [Tags]    top    resources    utilization    database    workloads    cpu    memory    allocation    postgres
     ${container_resource_utilization}=    RW.CLI.Run Cli
@@ -74,7 +74,7 @@ Get Postgres Pod Resource Utilization for Cluster `${OBJECT_NAME}` in Namespace 
     RW.Core.Add Pre To Report    Pod Resource Utilization:\n${container_resource_utilization.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Get Running Postgres Configuration for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
+Retrieve Running Postgres Configuration for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches the postgres instance's configuration information.
     [Tags]    config    postgres    file    show    path    setup    configuration
     ${config_health}=    RW.CLI.Run Bash File
@@ -103,7 +103,7 @@ Get Running Postgres Configuration for Cluster `${OBJECT_NAME}` in Namespace `${
     RW.Core.Add Pre To Report    Commands Used:\n${config_health.cmd}
     RW.Core.Add Pre To Report    ${config_health.stdout}
 
-Get Patroni Output and Add to Report for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
+Retrieve Patroni Output and Include in Report for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Attempts to run the patronictl CLI within the workload if it's available to check the current state of a patroni cluster, if applicable.
     [Tags]    patroni    patronictl    list    cluster    health    check    state    postgres
     ${patroni_output}=    RW.CLI.Run Cli
@@ -115,7 +115,7 @@ Get Patroni Output and Add to Report for Cluster `${OBJECT_NAME}` in Namespace `
     RW.Core.Add Pre To Report    Patroni Output:\n${patroni_output.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Fetch Patroni Database Lag for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
+Check Patroni Database Lag for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}` using patronictl
     [Documentation]    Identifies the lag using patronictl and raises issues if necessary.
     [Tags]    patroni    patronictl    list    cluster    health    postgres    lag
     ${patroni_output}=    RW.CLI.Run Cli
@@ -143,7 +143,7 @@ Fetch Patroni Database Lag for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPAC
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${patroni_output.stdout}
 
-Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
+Check Database Backup Status for Postgres Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Checks the status of backup operations on Kubernets Postgres clusters. Raises issues if backups have not been completed or appear unhealthy.
     [Tags]    patroni    cluster    health    backup    database    postgres
     ${backup_health}=    RW.CLI.Run Bash File
@@ -171,7 +171,7 @@ Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESP
     END
     RW.Core.Add Pre To Report    ${full_report.stdout}
 
-Run DB Queries for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
+Run DB Queries for Cluster '${OBJECT_NAME}' in Namespace '${NAMESPACE}' to check for index issues, slow-queries, etc and create a report
     [Documentation]    Runs a suite of configurable queries to check for index issues, slow-queries, etc and create a report.
     [Tags]    slow queries    index    health    triage    postgres    patroni    tables
     ${dbquery}=    RW.CLI.Run Bash File

@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Fetch Nginx HTTP Errors From GMP for Ingress `${INGRESS_OBJECT_NAME}`
+Fetch Nginx HTTP Errors From GMP for Ingress `${INGRESS_OBJECT_NAME}` in Kubernetes Cluster `${NAMESPACE}`
     [Documentation]    Fetches metrics for the Nginx ingress host from GMP and performs an inspection on the results.
     ...    If there are currently any results with more than zero errors, their name will be surfaced for further troubleshooting.
     [Tags]    curl    http    ingress    latency    errors    metrics    controller    nginx    gmp    500s
@@ -69,7 +69,7 @@ Fetch Nginx HTTP Errors From GMP for Ingress `${INGRESS_OBJECT_NAME}`
     RW.Core.Add Pre To Report    Ingress Info:\n${ingress_info} Ingress Owner:${ingress_owner.stdout}
     RW.Core.Add Pre To Report    GMP Json Data:\n${gmp_json.stdout}
 
-Find Owner and Service Health for Ingress `${INGRESS_OBJECT_NAME}`
+Retrieve Owner and Service Health for Kubernetes Ingress Object `${INGRESS_OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Checks the ingress object service and endpoints. Also returns the owner of the pods that support the Ingress.
     [Tags]    owner    ingress    service    endpoints
     ${k8s_ingress_details}=    RW.CLI.Run Cli

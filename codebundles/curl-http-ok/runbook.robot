@@ -13,7 +13,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Checking HTTP URL Is Available And Timely
+Validate Availability and Response Time of HTTP URL using cURL
     [Documentation]    Use cURL to validate the http response
     [Tags]    curl    http    ingress    latency    errors
     ${curl_rsp}=    RW.CLI.Run Cli

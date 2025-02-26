@@ -14,7 +14,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Checking whether the Terraform Cloud Workspace is in a locked state
+Checking Locked State of Terraform Cloud Workspace using Curl
     [Documentation]    Use curl to check whether the Terraform Cloud Workspace is in a locked state
     [Tags]    terraform    cloud    workspace    lock
     ${curl_rsp}=    RW.CLI.Run Cli

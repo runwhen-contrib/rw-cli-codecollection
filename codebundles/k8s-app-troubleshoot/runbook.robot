@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Get `${CONTAINER_NAME}` Application Logs
+Collect Last 300 Lines of Logs from `${CONTAINER_NAME}` Application
     [Documentation]    Collects the last approximately 300 lines of logs from the workload
     [Tags]    resource    application    workload    logs    state    ${container_name}    ${workload_name}
     ${logs}=    RW.CLI.Run Cli
@@ -29,7 +29,7 @@ Get `${CONTAINER_NAME}` Application Logs
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Scan `${CONTAINER_NAME}` Application For Misconfigured Environment
+Scan `${CONTAINER_NAME}` Application For Misconfigured Security Environment
     [Documentation]    Compares codebase to configured infra environment variables and attempts to report missing environment variables in the app
     [Tags]    environment    variables    env    infra    ${container_name}    ${workload_name}
     ${script_run}=    RW.CLI.Run Bash File
@@ -41,7 +41,7 @@ Scan `${CONTAINER_NAME}` Application For Misconfigured Environment
     RW.Core.Add Pre To Report    Stdout:\n\n${script_run.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Tail `${CONTAINER_NAME}` Application Logs For Stacktraces 
+Tail Application Logs for Stacktraces in Container '${CONTAINER_NAME}' 
     [Documentation]    Performs an inspection on container logs for exceptions/stacktraces, parsing them and attempts to find relevant source code information
     [Tags]
     ...    application

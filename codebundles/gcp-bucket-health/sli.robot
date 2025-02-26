@@ -14,7 +14,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Fetch GCP Bucket Storage Utilization for `${PROJECT_IDS}`
+Fetch GCP Bucket Storage Utilization for specific project IDs
     [Documentation]    Fetches all GCP buckets in each project and obtains the total size.
     [Tags]    gcloud    gcs    gcp    bucket
     ${bucket_usage}=    RW.CLI.Run Bash File
@@ -28,7 +28,7 @@ Fetch GCP Bucket Storage Utilization for `${PROJECT_IDS}`
     ${buckets_over_utilization}=    Evaluate    1 if int(${buckets_over_threshold.stdout}) == 0 else 0
     Set Global Variable    ${buckets_over_utilization}
 
-Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
+Check GCP Bucket Security Configuration for `${PROJECT_IDS}` in GCP Project `${PROJECT_NAME}`
     [Documentation]    Fetches all GCP buckets in each project and checks for public buckets, risky IAM permissions, and encryption configuration.
     [Tags]    gcloud    gcs    gcp    bucket    security
     ${bucket_security_configuration}=    RW.CLI.Run Bash File
@@ -45,7 +45,7 @@ Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
     Set Global Variable    ${public_bucket_score}
 
 
-Fetch GCP Bucket Storage Operations Rate for `${PROJECT_IDS}`
+Fetch GCP Bucket Storage Operations Rate for `${PROJECT_IDS}` in Read and Write Operations
     [Documentation]    Fetches all GCP buckets in each project and obtains the read and write operations rate that incurrs cost.
     [Tags]    gcloud    gcs    gcp    bucket
     ${bucket_ops}=    RW.CLI.Run Bash File
@@ -60,7 +60,7 @@ Fetch GCP Bucket Storage Operations Rate for `${PROJECT_IDS}`
     ${bucket_ops_rate_score}=    Evaluate    1 if int(${buckets_over_ops_threshold.stdout}) == 0 else 0
     Set Global Variable    ${bucket_ops_rate_score}
 
-Generate Bucket Score
+Generate Bucket Score for Public Access and Usage Thresholds in Projects
     ${bucket_health_score}=      Evaluate  (${buckets_over_utilization} + ${public_bucket_score} + ${bucket_ops_rate_score}) / 3
     ${health_score}=      Convert to Number    ${bucket_health_score}  2
     RW.Core.Push Metric    ${health_score}

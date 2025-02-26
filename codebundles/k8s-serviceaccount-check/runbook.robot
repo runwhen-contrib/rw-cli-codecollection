@@ -54,7 +54,7 @@ Suite Initialization
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
 
 *** Tasks ***
-Test Service Account Access to Kubernetes API Server in Namespace `${NAMESPACE}`
+Test Service Account Access to Kubernetes API Server in Namespace `${NAMESPACE}` and Verify Access to specific API Endpoints
     [Documentation]    Runs a curl pod as a specific serviceaccount and attempts to all the Kubernetes API server with the mounted token
     [Tags]    ServiceAccount    Curl    APIServer    RBAC    ${SERVICE_ACCOUNT}    ${NAMESPACE}    
     ${sa_access}=    RW.CLI.Run Cli

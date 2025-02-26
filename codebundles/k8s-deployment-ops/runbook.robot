@@ -17,7 +17,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Restart Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
+Restart Deployment 'example-deployment' in Namespace 'example-namespace'
     [Documentation]    Perform a rollout restart on the deployment
     [Tags]
     ...    log
@@ -65,7 +65,7 @@ Restart Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Force Delete Pods in Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
+Force Delete Pods in Deployment 'example-deployment' in Namespace 'example-namespace'
     [Documentation]    Force delete all pods related to the deployment
     [Tags]
     ...    log
@@ -113,7 +113,7 @@ Force Delete Pods in Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Rollback Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` to Previous Version
+Rollback Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` to Previous Version with Kubernetes Distribution Binary `${KUBERNETES_DISTRIBUTION_BINARY}`
     [Documentation]    Perform a rollback to a known functional version
     [Tags]
     ...    log
@@ -161,7 +161,7 @@ Rollback Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` to Previous
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Scale Down Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
+Stop Running Pods in Deployment `${DEPLOYMENT_NAME}` within Namespace `${NAMESPACE}`
     [Documentation]    Stops all running pods in a deployment to immediately halt a failing or runaway service.
     [Tags]
     ...    log
@@ -204,7 +204,7 @@ Scale Down Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Scale Up Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by ${SCALE_UP_FACTOR}x
+Scale Up Deployment 'app-frontend' in Namespace 'production' by 3x
     [Documentation]    Increase deployment replicas 
     [Tags]
     ...    scaleup
@@ -238,7 +238,7 @@ Scale Up Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by ${SCALE_
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
-Clean Up Stale ReplicaSets for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
+Delete Stale ReplicaSets for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Deletes all stale replicasets.
     [Tags]
     ...    replicaset
@@ -268,7 +268,7 @@ Clean Up Stale ReplicaSets for Deployment `${DEPLOYMENT_NAME}` in Namespace `${N
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
-Scale Down Stale ReplicaSets for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
+Scale Down Stale ReplicaSets for Deployment `myapp` in Namespace `production`
     [Documentation]    Finds any old/stale replicasets that still have active pods and scales them down.
     [Tags]
     ...    replicaset

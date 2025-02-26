@@ -14,7 +14,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Identify High Utilization Nodes for Cluster `${CONTEXT}`
+Identify High Utilization Nodes in Kubernetes Cluster `${CONTEXT}` using jq
     [Documentation]    Identify nodes with high utilization . Requires jq.
     [Tags]    cluster    resources    cpu    memory    utilization    saturation    exhaustion    starvation
     ${node_usage_details}=    RW.CLI.Run Bash File
@@ -32,12 +32,12 @@ Identify High Utilization Nodes for Cluster `${CONTEXT}`
         ...    title= Node usage is too high in Cluster Context `${CONTEXT}`.
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Node CPU and Memory Utilization: ${node_list}
-        ...    next_steps=Identify Pods Causing High Node Utilization in Cluster `${CONTEXT}` \nAdd Nodes to Cluster Context `${CONTEXT}` 
+        ...    next_steps=Identify Pods Causing High Node Utilization in Cluster 'example-context' \nAdd Nodes to Cluster Context `${CONTEXT}` 
     END
     RW.Core.Add Pre To Report    Node Usage Details:\n${node_usage_details.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${node_usage_details.cmd}
 
-Identify Pods Causing High Node Utilization in Cluster `${CONTEXT}`
+Identify Pods Causing High Node Utilization in Cluster 'example-context'
     [Documentation]    Identify nodes with high utilization and match to pods that are significantly above their resource request configuration. Requires jq.
     [Tags]    pods    resources    requests    utilization    cpu    memory    exhaustion
     ${pod_and_node_usage_details}=    RW.CLI.Run Bash File

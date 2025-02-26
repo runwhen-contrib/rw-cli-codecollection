@@ -13,7 +13,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Restart App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
+Restart Azure App Service '${APP_SERVICE_NAME}' in Resource Group '${AZ_RESOURCE_GROUP}'
     [Documentation]    Restarts the Azure App Service and verifies success.
     [Tags]
     ...    azure
@@ -67,7 +67,7 @@ Swap Deployment Slots for App Service `${APP_SERVICE_NAME}` in Resource Group `$
     END
 
 
-Scale Up App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
+Scale Up App Service `${APP_SERVICE_NAME}` to Next Plan in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Scales up the App Service to the next plan from current SKU
     [Tags]    
     ...    azure    
@@ -94,7 +94,7 @@ Scale Up App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROU
     END
 
 
-Scale Down App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
+Decrease Scale of App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}` based on Predefined Map
     [Documentation]  Decreases SKU based on a predefined map (e.g. S2->S1, S1->B3, etc.)
     [Tags]  
     ...  azure  
@@ -118,7 +118,7 @@ Scale Down App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GR
         ...  details=${scaledown.stderr}
         ...  next_steps=Review plan or SKU details, check resource group quotas, or contact Azure admin.
     END
-Scale Out Instances for App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}` by ${SCALE_OUT_FACTOR}x
+Scale Out Instances for App Service 'MyAppService' in Resource Group 'MyResourceGroup' by 2x
     [Documentation]    Multiplies current worker count by SCALE_OUT_FACTOR
     [Tags]    
     ...    azure    
@@ -169,7 +169,7 @@ Scale In Instances for App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ
         ...    details=${scale_in.stdout}
     END
 
-Redeploy App Service `${APP_SERVICE_NAME}` from Latest Source in Resource Group `${AZ_RESOURCE_GROUP}`
+Redeploy App Service from Latest Source in Resource Group
     [Documentation]    Forces a re-deployment of the Azure App Service from the configured code or container source.
     [Tags]
     ...    azure

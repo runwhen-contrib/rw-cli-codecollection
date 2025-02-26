@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Remediate Readiness and Liveness Probe GitOps Manifests in Namespace `${NAMESPACE}`
+Fix Misconfigured Readiness and Liveness Probes for GitHub-managed Pods in Kubernetes Namespace ${NAMESPACE}
     [Documentation]    Fixes misconfigured readiness or liveness probe configurations for pods in a namespace that are managed in a GitHub GitOps repository
     [Tags]    readiness    liveness    probe    remediate    gitops    github    ${NAMESPACE}
     ${probe_health}=    RW.CLI.Run Bash File
@@ -54,7 +54,7 @@ Remediate Readiness and Liveness Probe GitOps Manifests in Namespace `${NAMESPAC
     RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${probe_health.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${probe_health.cmd}
 
-Increase ResourceQuota for Namespace `${NAMESPACE}`
+Increase ResourceQuota for Namespace 'production' in GitHub-managed GitOps repository
     [Documentation]    Looks for a resourcequota object in the namespace and increases it if applicable, and if it is managed in a GitHub GitOps repository
     [Tags]    resourcequota    quota    namespace    remediate    github    gitops    ${NAMESPACE}
     ${quota_usage}=    RW.CLI.Run Bash File
@@ -96,7 +96,7 @@ Increase ResourceQuota for Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    ${quota_usage.stdout}\n
     RW.Core.Add Pre To Report    Commands Used: ${quota_usage.cmd}
 
-Adjust Pod Resources to Match VPA Recommendation in `${NAMESPACE}`
+Adjust Pod Resources based on VPA Recommendation in `${NAMESPACE}` from GitOps GitHub controlled manifests
     [Documentation]    Queries the namespace for any Vertical Pod Autoscaler resource recommendations and applies them to GitOps GitHub controlled manifests. 
     [Tags]    recommendation    resources    utilization    gitops    github    pods    cpu    memory    allocation   vpa
     ${vpa_usage}=    RW.CLI.Run Bash File
@@ -138,7 +138,7 @@ Adjust Pod Resources to Match VPA Recommendation in `${NAMESPACE}`
     RW.Core.Add Pre To Report    ${vpa_usage.stdout}\n
     RW.Core.Add Pre To Report    Commands Used: ${vpa_usage.cmd}
 
-Expand Persistent Volume Claims in Namespace `${NAMESPACE}`
+Update Highly Utilized Persistent Volume Claims in Namespace `${NAMESPACE}`
     [Documentation]    Checks the disk utilization for all PVCs and updates the GitOps manifest for any that are highly utilized. 
     [Tags]    recommendation    pv    pvc    utilization    gitops    github    persistentvolumeclaim    persistentvolume    storage    capacity    ${NAMESPACE}
     ${pvc_utilization}=    RW.CLI.Run Bash File

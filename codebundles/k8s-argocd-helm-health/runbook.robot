@@ -25,7 +25,7 @@ Fetch all available ArgoCD Helm releases in namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    \n\nArgoCD Helm releases available: \n${helmreleases.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Fetch Installed ArgoCD Helm release versions in namespace `${NAMESPACE}`
+Retrieve Installed ArgoCD Helm Release Versions in Namespace `${NAMESPACE}`
     [Documentation]    Fetch Installed ArgoCD Helm release Versions.
     [Tags]    argocd    helmrelease    version    state
     ${argocd_helm_status}=    RW.CLI.Run Cli

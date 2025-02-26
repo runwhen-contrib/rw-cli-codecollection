@@ -14,7 +14,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Get DaemonSet Logs for `${DAEMONSET_NAME}` and Add to Report
+Retrieve Last 100 Lines of Logs for DaemonSet 'sample-daemonset' and Add to Report
     [Documentation]    Fetches the last 100 lines of logs for the given daemonset in the namespace.
     [Tags]    fetch    log    pod    container    errors    inspect    trace    info    daemonset    csi
     ${logs}=    RW.CLI.Run Cli
@@ -27,7 +27,7 @@ Get DaemonSet Logs for `${DAEMONSET_NAME}` and Add to Report
     RW.Core.Add Pre To Report    ${logs.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Get Related Daemonset `${DAEMONSET_NAME}` Events
+Get Events for Daemonset `${DAEMONSET_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches events related to the daemonset workload in the namespace.
     [Tags]    events    workloads    errors    warnings    get    daemonset    csi
     ${events}=    RW.CLI.Run Cli
@@ -40,7 +40,7 @@ Get Related Daemonset `${DAEMONSET_NAME}` Events
     RW.Core.Add Pre To Report    ${events.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Check Daemonset `${DAEMONSET_NAME}` Replicas
+Check Daemonset `${DAEMONSET_NAME}` Replicas Availability and Healthiness
     [Documentation]    Pulls the replica information for a given daemonset and checks if it's highly available
     ...    , if the replica counts are the expected / healthy values, and if not, what they should be.
     [Tags]

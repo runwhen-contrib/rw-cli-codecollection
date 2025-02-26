@@ -24,7 +24,7 @@ List all available FluxCD Helmreleases in Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    Helmreleases available: \n ${helmreleases.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Fetch Installed FluxCD Helmrelease Versions in Namespace `${NAMESPACE}`   
+Fetch Installed FluxCD Helmrelease Versions in Namespace `${NAMESPACE}` of Kubernetes Cluster `${CONTEXT}`   
     [Documentation]    List helmreleases and  the last attempted software version and the current running version.  
     [Tags]        FluxCD     Helmrelease    Versions    ${NAMESPACE}
     ${helmrelease_versions}=    RW.CLI.Run Cli
@@ -37,7 +37,7 @@ Fetch Installed FluxCD Helmrelease Versions in Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    Helmreleases status errors: \n ${helmrelease_versions.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Fetch Mismatched FluxCD HelmRelease Version in Namespace `${NAMESPACE}` 
+Fetch Mismatched FluxCD HelmRelease Version in Namespace `${NAMESPACE}` using jq 
     [Documentation]    List helmreleases and use jq to display any releases where the last attempted software revision doesn't match the current running revision. Requires jq.  
     [Tags]        FluxCD     Helmrelease    Version    Mismatched    Unhealthy    ${NAMESPACE}
     ${helmrelease_version_mismatches}=    RW.CLI.Run Cli

@@ -13,7 +13,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Fetch a List of Overutilization Issues Affecting AKS Cluster `${AKS_CLUSTER}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the AKS cluster
     [Tags]    aks    config
     ${resource_health}=    RW.CLI.Run Bash File
@@ -53,7 +53,7 @@ Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resou
     END
 
 
-Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` in Resource Group `${AZ_RESOURCE_GROUP}` for Performance and Security Issues
     [Documentation]    Fetch the config of the AKS cluster in azure
     [Tags]    AKS    config
     ${config}=    RW.CLI.Run Bash File
@@ -82,7 +82,7 @@ Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${
             ...    details=${item["details"]}        
         END
     END
-Check Network Configuration of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Fetch Detailed Network Configuration of AKS Cluster `${AKS_CLUSTER}` in Resource Group `${AZ_RESOURCE_GROUP}`
    [Documentation]    Fetch the network configuration, generating resource URLs and basic recommendations
    [Tags]    AKS    config    network    route    firewall
    ${network}=    RW.CLI.Run Bash File
@@ -93,7 +93,7 @@ Check Network Configuration of AKS Cluster `${AKS_CLUSTER}` In Resource Group `$
    ...    show_in_rwl_cheatsheet=true
    RW.Core.Add Pre To Report    ${network.stdout}
 
-Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}` Within Last ${TIME_PERIOD_MINUTES} Minutes
     [Documentation]    Gets the activities for the AKS cluster set and checks for errors
     [Tags]    AKS    activities    monitor    events    errors
     ${activites}=    RW.CLI.Run Bash File

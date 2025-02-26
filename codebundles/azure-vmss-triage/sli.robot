@@ -11,7 +11,7 @@ Library             RW.platform
 
 Suite Setup         Suite Initialization
 *** Tasks ***
-Check Scale Set `${VMSCALESET}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
+Check CPU and Memory Utilization of VM Scale Set `${VMSCALESET}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks key metrics of VM Scale Set for issues.
     [Tags]    Scale Set    VM    Azure    Metrics    Health
     ${process}=    RW.CLI.Run Bash File

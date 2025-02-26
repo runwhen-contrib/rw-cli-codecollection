@@ -10,7 +10,7 @@ Library             OperatingSystem
 
 Suite Setup         Suite Initialization
 *** Tasks ***
-Identify High Utilization Nodes for Cluster `${CONTEXT}` 
+Identify High Utilization Nodes for Cluster `myCluster` in Kubernetes 
     [Documentation]    Fetch utilization of each node and raise issue if CPU or Memory is above 90% utilization . Requires jq. Requires get/list of nodes in "metrics.k8s.io" 
     [Tags]        Cluster     Resources    CPU    Memory    Utilization    Saturation    Exhaustion    Starvation
     ${node_usage_details}=    RW.CLI.Run Bash File

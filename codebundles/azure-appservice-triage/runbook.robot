@@ -13,7 +13,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check for Resource Health Issues Affecting App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Check for Resource Health Issues Affecting Web App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the APP Service as reported from Azure. 
     [Tags]    aks    resource    health    service    azure
     ${resource_health}=    RW.CLI.Run Bash File
@@ -53,7 +53,7 @@ Check for Resource Health Issues Affecting App Service `${APP_SERVICE_NAME}` In 
     END
 
 
-Check App Service `${APP_SERVICE_NAME}` Health Check Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
+Check App Service `${APP_SERVICE_NAME}` Health Check Metrics (CPU usage, requests, bytes received, HTTP status codes, disk usage, average response time) In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks the health status of a appservice workload.
     [Tags]    
     ${health_check_metric}=    RW.CLI.Run Bash File
@@ -97,7 +97,7 @@ Check App Service `${APP_SERVICE_NAME}` Health Check Metrics In Resource Group `
     END
     RW.Core.Add Pre To Report    ${health_check_metric.stdout}
 
-Fetch App Service `${APP_SERVICE_NAME}` Utilization Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
+Fetch App Service `${APP_SERVICE_NAME}` Utilization Metrics (CPU, Requests, Disk Usage) in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Reviews key metrics for the app service and generates a report
     [Tags]    
     ${metric_health}=    RW.CLI.Run Bash File
@@ -143,7 +143,7 @@ Get App Service `${APP_SERVICE_NAME}` Logs In Resource Group `${AZ_RESOURCE_GROU
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${logs.stdout}
 
-Check Configuration Health of App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Check CPU, Requests, Bytes Received, Error Rates, and Disk Usage of App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the configuration health of the App Service
     [Tags]    appservice    logs    tail
     ${config_health}=    RW.CLI.Run Bash File
@@ -172,7 +172,7 @@ Check Configuration Health of App Service `${APP_SERVICE_NAME}` In Resource Grou
         END
     END
 
-Check Deployment Health of App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Fetch Deployment Health of App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch deployment health of the App Service
     [Tags]    appservice    deployment
     ${deployment_health}=    RW.CLI.Run Bash File
@@ -201,7 +201,7 @@ Check Deployment Health of App Service `${APP_SERVICE_NAME}` In Resource Group `
         END
     END
 
-Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
+Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOURCE_GROUP}` within Last ${TIME_PERIOD_MINUTES} Minutes
     [Documentation]    Gets the events of appservice and checks for errors
     [Tags]    appservice    monitor    events    errors
     ${activities}=    RW.CLI.Run Bash File

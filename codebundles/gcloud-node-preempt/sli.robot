@@ -36,7 +36,7 @@ Suite Initialization
 
 
 *** Tasks ***
-Count the number of nodes in active prempt operation
+Count the number of preempted nodes in GCP project '$${GCP_PROJECT_ID}' within the last '$${AGE}' minutes
     [Documentation]    Counts all nodes that have been preempted within the defined time interval. 
     [Tags]    Stdout    gcloud    node    preempt    gcp
     ${preempt_node_list}=    RW.CLI.Run Cli

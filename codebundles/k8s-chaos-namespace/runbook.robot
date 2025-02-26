@@ -16,7 +16,7 @@ Library             Process
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Kill Random Pods In Namespace `${NAMESPACE}`
+Kill Random Pods In Namespace `${NAMESPACE}` in Kubernetes Cluster `${CONTEXT}` to Test High Availability
     [Documentation]   Randomly selects up to 10 pods in a namespace to delete to test HA
     [Tags]  Kubernetes    Namespace    Deployments    Pods    Highly Available
     ${process}=    RW.CLI.Run Bash File
@@ -25,7 +25,7 @@ Kill Random Pods In Namespace `${NAMESPACE}`
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ${process.stdout}
 
-OOMKill Pods In Namespace `${NAMESPACE}`
+Select and OOMKill Pods in Namespace `${NAMESPACE}`
     [Documentation]   Randomly selects n number of pods to oomkill
     [Tags]  Kubernetes    Namespace    Deployments    Pods    Highly Available    OOMkill   Memory
     ${process}=    RW.CLI.Run Bash File
@@ -45,7 +45,7 @@ OOMKill Pods In Namespace `${NAMESPACE}`
 #     ...    secret_file__kubeconfig=${kubeconfig}
 #     RW.Core.Add Pre To Report    ${process.stdout}
 
-Mangle Service Selector In Namespace `${NAMESPACE}`
+Mangle Service Selector in Namespace `${NAMESPACE}` to Cause Network Disruption
     [Documentation]   Breaks a service's label selector to cause a network disruption
     [Tags]  Kubernetes    networking    Services    Selector
     ${process}=    RW.CLI.Run Bash File    change_service_selector.sh
@@ -54,7 +54,7 @@ Mangle Service Selector In Namespace `${NAMESPACE}`
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ${process.stdout}
 
-Mangle Service Port In Namespace `${NAMESPACE}`
+Mangle Service Port for Service 'example-service' in Namespace 'example-namespace'
     [Documentation]   Changes a service's port to cause a network disruption
     [Tags]  Kubernetes    networking    Services    Port
     ${process}=    RW.CLI.Run Bash File    change_service_port.sh
@@ -63,7 +63,7 @@ Mangle Service Port In Namespace `${NAMESPACE}`
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ${process.stdout}
 
-Fill Random Pod Tmp Directory In Namespace `${NAMESPACE}`
+Fill Random Data in /tmp Directory of a Specific Pod in Namespace `${NAMESPACE}` in Kubernetes
     [Documentation]   Attaches to a pod and fills the /tmp directory with random data
     [Tags]  Kubernetes    pods    volumes    tmp
     ${process}=    RW.CLI.Run Bash File    expand_tmp.sh

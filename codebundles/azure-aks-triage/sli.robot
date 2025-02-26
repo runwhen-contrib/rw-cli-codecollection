@@ -11,7 +11,7 @@ Library             RW.platform
 
 Suite Setup         Suite Initialization
 *** Tasks ***
-Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Check for AKS Cluster Health Issues in Azure Resource Group ${AZ_RESOURCE_GROUP}
     [Documentation]    Fetch a list of issues that might affect the AKS cluster as reported from Azure. 
     [Tags]    aks    resource    health    service    azure
     ${resource_health}=    RW.CLI.Run Bash File
@@ -35,7 +35,7 @@ Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resou
     Set Global Variable    ${aks_resource_score}
 
 
-Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Fetch Critical Error Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}` Within Last `${TIME_PERIOD_MINUTES}` Minutes
     [Documentation]    Gets the activities for the AKS cluster set and checks for critical or error events within the configured time period.
     [Tags]    AKS    activities    monitor    events    errors    critical
     ${activites}=    RW.CLI.Run Bash File
@@ -77,7 +77,7 @@ Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${
     ${aks_config_score}=    Evaluate    1 if len(@{issue_list["issues"]}) == 0 else 0
     Set Global Variable    ${aks_config_score}
 
-Generate AKS Cluster Health Score
+Generate AKS Cluster Health Score with CPU and Memory Utilization Metrics
     ${aks_cluster_health_score}=      Evaluate  (${aks_resource_score} + ${aks_activities_score} + ${aks_config_score}) / 3
     ${health_score}=      Convert to Number    ${aks_cluster_health_score}  2
     RW.Core.Push Metric    ${health_score}

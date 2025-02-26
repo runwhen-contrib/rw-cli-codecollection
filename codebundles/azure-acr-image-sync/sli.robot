@@ -72,7 +72,7 @@ Import Docker Secrets
     ...    pattern=\w*
 
 *** Tasks ***
-Count Outdated Images in Azure Container Registry `${ACR_REGISTRY}`
+Count Outdated Images in Azure Container Registry `ACR_REGISTRY` from Upstream Source
     [Documentation]    Counts the number of images that need updating in ACR from the upstream source. 
     [Tags]    azure    acr    registry    runwhen
     ${az_acr_image_check}=    RW.CLI.Run Bash File
