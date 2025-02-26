@@ -44,7 +44,7 @@ jobs:
 
       - uses: runwhen-contrib/github-actions/codecollection-score@feat/lint-task-access
         with:
-          directory: './codebundles'
+          directory: ./codebundles
           apply_suggestions: 'true'
           commit_changes: 'true'
           open_pr: 'true'
