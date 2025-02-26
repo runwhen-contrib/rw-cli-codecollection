@@ -29,9 +29,6 @@ jobs:
         with:
           directory: ./codebundles
           apply_suggestions: true
-          commit_changes: true
-          open_pr: true
-          pr_branch: "auto-code-updates-${{ github.run_id }}"
-          base_branch: main
+          only_changed: true
         env:
           GH_TOKEN: ${{ github.token }}
