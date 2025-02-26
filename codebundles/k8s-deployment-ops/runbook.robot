@@ -161,8 +161,51 @@ Rollback Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` to Previous
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
+# Scale Down Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
+#     [Documentation]    Stops all running pods in a deployment to immediately halt a failing or runaway service.
+#     [Tags]
+#     ...    log
+#     ...    pod
+#     ...    scaledown
+#     ...    deployment
+#     ...    ${DEPLOYMENT_NAME}
+
+#     ${logs}=    RW.CLI.Run Cli
+#     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} --tail 50 -n ${NAMESPACE} --all-containers=true --max-log-requests=20 --context ${CONTEXT}
+#     ...    env=${env}
+#     ...    include_in_history=true
+#     ...    timeout_seconds=180
+#     ...    secret_file__kubeconfig=${kubeconfig}
+#     RW.Core.Add Pre To Report    ----------\nPre restart log output:\n${logs.stdout}
+
+#     ${scaledown}=    RW.CLI.Run Cli
+#     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} scale deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} --replicas=0
+#     ...    env=${env}
+#     ...    include_in_history=true
+#     ...    timeout_seconds=180
+#     ...    secret_file__kubeconfig=${kubeconfig}
+#     ${replicas}=    RW.CLI.Run Cli
+#     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} && ${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.replicas}'
+#     ...    env=${env}
+#     ...    include_in_history=true
+#     ...    secret_file__kubeconfig=${kubeconfig}
+#     RW.Core.Add Pre To Report    ----------\Scaledown Output:\n${scaledown.stdout}\nRollout and Replicas:\n${replicas.stdout}
+
+#     IF    ($scaledown.stderr) != ""
+#         RW.Core.Add Issue
+#         ...    severity=3
+#         ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should scale down successfully
+#         ...    actual=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` did not scale down successfully
+#         ...    title=Deployment `${DEPLOYMENT_NAME}` in `${NAMESPACE}` did not scale down properly
+#         ...    reproduce_hint=View Commands Used in Report Output
+#         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} generated the following output during scaledown attempt: \n${scaledown.stderr}
+#         ...    next_steps=Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`\nEscalate rollback issues to service owner.
+#     END
+#     ${history}=    RW.CLI.Pop Shell History
+#     RW.Core.Add Pre To Report    Commands Used: ${history}
+
 Scale Down Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
-    [Documentation]    Stops all running pods in a deployment to immediately halt a failing or runaway service.
+    [Documentation]    Stops (or nearly stops) all running pods in a deployment to immediately halt a failing or runaway service.
     [Tags]
     ...    log
     ...    pod
@@ -178,18 +221,35 @@ Scale Down Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ----------\nPre restart log output:\n${logs.stdout}
 
+    # Decide whether to allow zero replicas or just go to 1.
+    IF    "${ALLOW_SCALE_TO_ZERO}" == "true"
+        ${desired_replicas}=    Set Variable    0
+    ELSE
+        ${desired_replicas}=    Set Variable    1
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` can not scale to 0
+        ...    actual=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` can not scale to 0
+        ...    title=Deployment `${DEPLOYMENT_NAME}` in `${NAMESPACE}` is not permitted to scale to 0
+        ...    reproduce_hint=View Commands Used in Report Output
+        ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} is not permitted to scale to 0 due to CodeBundle configuration
+        ...    next_steps=Reconfigure Codebundle if 0 replicas is desired. 
+    END
+
     ${scaledown}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} scale deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} --replicas=0
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} scale deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} --replicas=${desired_replicas}
     ...    env=${env}
     ...    include_in_history=true
     ...    timeout_seconds=180
     ...    secret_file__kubeconfig=${kubeconfig}
+
     ${replicas}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} && ${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.replicas}'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} 
     ...    env=${env}
     ...    include_in_history=true
     ...    secret_file__kubeconfig=${kubeconfig}
-    RW.Core.Add Pre To Report    ----------\Scaledown Output:\n${scaledown.stdout}\nRollout and Replicas:\n${replicas.stdout}
+
+    RW.Core.Add Pre To Report    ----------\nScale Down Output:\n${scaledown.stdout}\nRollout and Replicas:\n${replicas.stdout}
 
     IF    ($scaledown.stderr) != ""
         RW.Core.Add Issue
@@ -201,8 +261,10 @@ Scale Down Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} generated the following output during scaledown attempt: \n${scaledown.stderr}
         ...    next_steps=Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`\nEscalate rollback issues to service owner.
     END
+
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
+
 
 Scale Up Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by ${SCALE_UP_FACTOR}x
     [Documentation]    Increase deployment replicas 
@@ -322,6 +384,9 @@ Scale Down Stale ReplicaSets for Deployment `${DEPLOYMENT_NAME}` in Namespace `$
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
+
+
+
 *** Keywords ***
 Suite Initialization
     ${kubeconfig}=    RW.Core.Import Secret
@@ -361,6 +426,11 @@ Suite Initialization
     ...    description=The Max replicas for any scaleup activity.  
     ...    example=10
     ...    default=10
+    ${ALLOW_SCALE_TO_ZERO}=    RW.Core.Import User Variable    ALLOW_SCALE_TO_ZERO
+    ...    type=string
+    ...    description=Permit deployments to scale to 0.   
+    ...    example=false
+    ...    default=false
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
@@ -368,6 +438,7 @@ Suite Initialization
     Set Suite Variable    ${DEPLOYMENT_NAME}    ${DEPLOYMENT_NAME}
     Set Suite Variable    ${SCALE_UP_FACTOR}    ${SCALE_UP_FACTOR}
     Set Suite Variable    ${MAX_REPLICAS}    ${MAX_REPLICAS}
+    Set Suite Variable    ${ALLOW_SCALE_TO_ZERO}    ${ALLOW_SCALE_TO_ZERO}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "DEPLOYMENT_NAME": "${DEPLOYMENT_NAME}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "DEPLOYMENT_NAME": "${DEPLOYMENT_NAME}", "MAX_REPLICAS": "${MAX_REPLICAS}", "ALLOW_SCALE_TO_ZERO":"${ALLOW_SCALE_TO_ZERO}"}
