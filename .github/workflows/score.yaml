@@ -8,25 +8,8 @@ on:
       - "!src/VERSION"
 
 permissions:
-    contents: 'write'
-
-# jobs:
-#   score-codebundles:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - name: Check out the repo
-#         uses: actions/checkout@v3
-#         with:
-#           fetch-depth: 0 
-
-#       - name: Set Git user
-#         run: |
-#           git config user.name "github-actions[bot]"
-#           git config user.email "github-actions[bot]@users.noreply.github.com"
-
-#       - uses: runwhen-contrib/github-actions/codecollection-score@main
-#         with:
-#           directory: './codebundles'
+  contents: write
+  pull-requests: write
 
 jobs:
   score-codebundles:
@@ -42,13 +25,13 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - uses: runwhen-contrib/github-actions/codecollection-score@feat/lint-task-access
+      - uses: runwhen-contrib/github-actions/codecollection-score@main
         with:
           directory: ./codebundles
-          apply_suggestions: 'true'
-          commit_changes: 'true'
-          open_pr: 'true'
-          pr_branch: 'auto-code-updates'
-          base_branch: 'main'
-
-          
+          apply_suggestions: true
+          commit_changes: true
+          open_pr: true
+          pr_branch: "auto-code-updates-${{ github.run_id }}"
+          base_branch: main
+        env:
+          GH_TOKEN: ${{ github.token }}
