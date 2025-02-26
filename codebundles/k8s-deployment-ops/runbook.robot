@@ -211,28 +211,52 @@ Scale Up Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by ${SCALE_
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
 
-    ${scaleup}=    RW.CLI.Run Cli
-    # ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} scale deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} --replicas=$(($(${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.replicas}') == 0 ? 1 : $(${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.replicas}') * ${SCALE_UP_FACTOR} ))
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} scale deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} --replicas=$(( $(${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.replicas}') == 0 ? 1 : $(${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.replicas}') * ${SCALE_UP_FACTOR}))
-    ...    env=${env}
-    ...    include_in_history=true
+    ${current_result}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.replicas}'
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=True
     ...    timeout_seconds=180
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ${replicas}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} && ${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.replicas}'
     ...    env=${env}
-    ...    include_in_history=true
-    ...    secret_file__kubeconfig=${kubeconfig}
-    RW.Core.Add Pre To Report    ----------\Scaleup Output:\n${scaleup.stdout}\nRollout and Replicas:\n${replicas.stdout}
-    IF    ($scaleup.stderr) != ""
+
+    # Convert the CLI output (stdout) to an integer
+    ${current_replicas}=    Convert To Integer    ${current_result.stdout}
+
+    # If current is 0, default to 1; otherwise multiply by the factor
+    ${scaled}=    Evaluate    max(1, ${current_replicas} * ${SCALE_UP_FACTOR})
+
+    IF     ${scaled} <= ${MAX_REPLICAS}
+        ${scaleup}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} scale deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} --replicas=${scaled}
+        ...    env=${env}
+        ...    include_in_history=true
+        ...    timeout_seconds=180
+        ...    secret_file__kubeconfig=${kubeconfig}
+        ${replicas}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} && ${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.replicas}'
+        ...    env=${env}
+        ...    include_in_history=true
+        ...    secret_file__kubeconfig=${kubeconfig}
+        RW.Core.Add Pre To Report    ----------\Scaleup Output:\n${scaleup.stdout}\nRollout and Replicas:\n${replicas.stdout}
+
+        IF    ($scaleup.stderr) != ""
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should scale up successfully
+            ...    actual=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` did not scale up successfully
+            ...    title=Deployment `${DEPLOYMENT_NAME}` in `${NAMESPACE}` did not scale up properly
+            ...    reproduce_hint=View Commands Used in Report Output
+            ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} generated the following output during scaledown attempt: \n${scaleup.stderr}
+            ...    next_steps=Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`\nEscalate rollback issues to service owner.
+        END
+    ELSE
         RW.Core.Add Issue
         ...    severity=3
-        ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should scale down successfully
-        ...    actual=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` did not scale down successfully
-        ...    title=Deployment `${DEPLOYMENT_NAME}` in `${NAMESPACE}` did not scale down properly
+        ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should scale up successfully
+        ...    actual=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` did not scale up successfully
+        ...    title=Can not Scale Up `${DEPLOYMENT_NAME}` in `${NAMESPACE}` beyond ${MAX_REPLICAS}
         ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} generated the following output during scaledown attempt: \n${scaledown.stderr}
-        ...    next_steps=Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`\nEscalate rollback issues to service owner.
+        ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} has ${current_replicas} replicas.
+        ...    next_steps=Determine if `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` should scale beyond ${MAX_REPLICAS} replias
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -332,12 +356,18 @@ Suite Initialization
     ...    description=The multiple in which to increase the total amount of pods. For example, a deployment with 2 pods and a scale up factor of 2 will result in 4 pods. 
     ...    example=2
     ...    default=2
+    ${MAX_REPLICAS}=    RW.Core.Import User Variable    MAX_REPLICAS
+    ...    type=string
+    ...    description=The Max replicas for any scaleup activity.  
+    ...    example=10
+    ...    default=10
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${DEPLOYMENT_NAME}    ${DEPLOYMENT_NAME}
     Set Suite Variable    ${SCALE_UP_FACTOR}    ${SCALE_UP_FACTOR}
+    Set Suite Variable    ${MAX_REPLICAS}    ${MAX_REPLICAS}
     Set Suite Variable
     ...    ${env}
     ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "DEPLOYMENT_NAME": "${DEPLOYMENT_NAME}"}
