@@ -310,6 +310,8 @@ commands:
 
     - [Kubernetes cluster documentation](https://kubernetes.io/docs/home/){:target="_blank"}
 
+    - [Bash scripting documentation](https://www.gnu.org/software/bash/manual/bash.html){:target="_blank"}
+
     - [JSON format documentation](https://www.json.org/json-en.html){:target="_blank"}'
   explanation: This script is a bash script that fetches VPA (Vertical Pod Autoscaler)
     recommendations from the Kubernetes cluster for a specific namespace and context,
