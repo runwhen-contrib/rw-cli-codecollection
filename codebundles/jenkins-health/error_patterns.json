@@ -260,7 +260,41 @@
     "SSL_ERROR": {
         "pattern": "requests\\.exceptions\\.SSLError",
         "suggestion": "Verify SSL certificates and ensure secure connections."
-    }
-
-      
+    },
+    "GIT_TOOL_NOT_FOUND": {
+        "pattern": "Selected Git installation does not exist\\. Using Default",
+        "suggestion": "Ensure Git is installed and configured correctly in Jenkins global tool settings."
+    },
+    "NO_CREDENTIALS_SPECIFIED": {
+        "pattern": "No credentials specified",
+        "suggestion": "Add appropriate credentials in Jenkins for secure repository access."
+    },
+    "DOCKER_BUILD_ERROR": {
+        "pattern": "docker build .* failed",
+        "suggestion": "Review the Dockerfile and check for syntax errors or missing files."
+    },
+    "DOCKER_CONTAINER_NOT_RUNNING": {
+        "pattern": "Jenkins does not seem to be running inside a container",
+        "suggestion": "Ensure Jenkins is running inside a container or check the Docker configuration."
+    },
+    "JENKINS_DOCKER_PERMISSION_DENIED": {
+        "pattern": "permission denied while trying to connect to the Docker daemon socket",
+        "suggestion": "Add the Jenkins user to the Docker group and restart the service."
+    },
+    "PYTHON_REQUIREMENTS_FAIL": {
+        "pattern": "ERROR: Could not find a version that satisfies the requirement .*",
+        "suggestion": "Verify the package name and version in 'requirements.txt' and check the package index."
+    },
+    "DEBCONF_FRONTEND_ERROR": {
+        "pattern": "debconf: unable to initialize frontend",
+        "suggestion": "Set the 'DEBIAN_FRONTEND' environment variable to 'noninteractive' for Docker builds."
+    },
+    "NO_SUCH_DSL_METHOD": {
+        "pattern": "java\\.lang\\.NoSuchMethodError: No such DSL method '.*'",
+        "suggestion": "Verify the Jenkins Pipeline script and ensure all necessary plugins are installed."
+    },
+    "JUNIT_NOT_FOUND": {
+        "pattern": "No such DSL method 'junit'",
+        "suggestion": "Ensure the 'JUnit Plugin' is installed and configured in Jenkins."
+    } 
 }
