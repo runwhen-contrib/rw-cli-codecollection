@@ -16,7 +16,7 @@ echo "[DEBUG] Jenkins URL: $JENKINS_URL" >&2
 echo "[DEBUG] Username:    $USERNAME" >&2
 
 # 2) Wait for Jenkins up to MAX_ATTEMPTS
-MAX_ATTEMPTS=30
+MAX_ATTEMPTS=100
 SLEEP_SECONDS=10
 echo "[DEBUG] Checking Jenkins readiness up to $MAX_ATTEMPTS attempts..." >&2
 
