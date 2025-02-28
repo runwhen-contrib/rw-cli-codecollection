@@ -162,6 +162,12 @@ resource "aws_instance" "jenkins_server" {
                 -auth "admin:$JENKINS_PASS" \
                 install-plugin workflow-aggregator -deploy
 
+              echo "[INFO] Installing git and docker plugin..."
+              java -jar jenkins-cli.jar \
+                -s "http://localhost:8080" \
+                -auth "admin:$JENKINS_PASS" \
+                install-plugin git docker-plugin docker-workflow -deploy
+
               echo "[INFO] Restarting Jenkins..."
               java -jar jenkins-cli.jar \
                 -s http://localhost:8080 \
@@ -210,6 +216,26 @@ resource "aws_instance" "jenkins_server" {
 
               # (Optional) Additional setup commands, e.g. Docker, etc.
               # ...
+              # Add Docker's official GPG key:
+              apt-get update
+              apt-get -y install ca-certificates curl
+              install -m 0755 -d /etc/apt/keyrings
+              curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+              chmod a+r /etc/apt/keyrings/docker.asc
+
+              # Add the repository to Apt sources:
+              echo \
+                "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+                $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+                tee /etc/apt/sources.list.d/docker.list > /dev/null
+              apt-get update
+              apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin 
+
+              echo "DOCKER_OPTS=\"-H tcp://0.0.0.0:2376 -H unix:///var/run/docker.sock\"" >> /etc/default/docker
+              systemctl restart docker
+              groupadd docker
+              usermod -aG docker ubuntu
+              usermod -aG docker jenkins
               EOF
 
   tags = {
@@ -217,39 +243,6 @@ resource "aws_instance" "jenkins_server" {
     lifecycle = "deleteme"
   }
 }
-
-
-# # Instance Profile for Jenkins
-# resource "aws_iam_instance_profile" "jenkins_profile" {
-#   name = "jenkins_profile"
-#   role = aws_iam_role.jenkins_role.name
-# }
-
-# # Security Group for Jenkins Agents
-# resource "aws_security_group" "jenkins_agent_sg" {
-#   name        = "jenkins-agent-sg"
-#   description = "Security group for Jenkins agents"
-#   vpc_id      = aws_vpc.jenkins_vpc.id
-
-#   ingress {
-#     from_port       = 22
-#     to_port         = 22
-#     protocol        = "tcp"
-#     security_groups = [aws_security_group.jenkins_sg.id]
-#   }
-
-#   egress {
-#     from_port   = 0
-#     to_port     = 0
-#     protocol    = "-1"
-#     cidr_blocks = ["0.0.0.0/0"]
-#   }
-
-#   tags = {
-#     Name = "jenkins-agent-sg"
-#   }
-# }
-
 
 
 data "external" "jenkins_token" {
@@ -302,6 +295,7 @@ resource "null_resource" "create_jobs" {
       upsert_job "the-fastest-job" "long-running-job.xml"
       upsert_job "this-never-breaks" "failed-job.xml"
       upsert_job "my-fun-pipeline" "failed-pipeline.xml"
+      upsert_job "python-docker" "python-docker-pipeline.xml"
 
       # Now queue the slow jobs (build them) -- same as before
       curl -X POST -u "admin:$TOKEN" "$JENKINS_URL/job/the-fastest-job/build"
@@ -310,58 +304,13 @@ resource "null_resource" "create_jobs" {
 
       curl -X POST -u "admin:$TOKEN" "$JENKINS_URL/job/this-never-breaks/build"
       curl -X POST -u "admin:$TOKEN" "$JENKINS_URL/job/my-fun-pipeline/build"
+
+      curl -X POST -u "admin:$TOKEN" "$JENKINS_URL/job/python-docker/build"
     EOT
     # This ensures /bin/bash is used:
     interpreter = ["/bin/bash", "-c"]
   }
 }
-
-
-
-# Configure Jenkins EC2 agents
-# resource "null_resource" "configure_jenkins_agents" {
-#   depends_on = [null_resource.wait_for_jenkins]
-
-#   connection {
-#     type        = "ssh"
-#     user        = "ubuntu"
-#     private_key = tls_private_key.jenkins_key.private_key_pem
-#     host        = aws_instance.jenkins_server.public_ip
-#   }
-
-#   provisioner "file" {
-#     content     = tls_private_key.jenkins_key.private_key_pem
-#     destination = "/tmp/jenkins-key.pem"
-#   }
-
-#   provisioner "file" {
-#     content     = templatefile("${path.module}/configure_ec2_agent.groovy.tpl", {
-#       ami_id           = data.aws_ami.ubuntu.id
-#       subnet_id        = aws_subnet.jenkins_subnet.id
-#       security_group_id = aws_security_group.jenkins_sg.id
-#     })
-#     destination = "/tmp/configure_ec2_agent.groovy"
-#   }
-
-
-#   provisioner "remote-exec" {
-#     inline = [
-#       # Setup SSH key for Jenkins
-#       "sudo mkdir -p /var/lib/jenkins/.ssh",
-#       "sudo mv /tmp/jenkins-key.pem /var/lib/jenkins/.ssh/",
-#       "sudo chown -R jenkins:jenkins /var/lib/jenkins/.ssh",
-#       "sudo chmod 700 /var/lib/jenkins/.ssh",
-#       "sudo chmod 600 /var/lib/jenkins/.ssh/jenkins-key.pem",
-#       "cat /tmp/configure_ec2_agent.groovy",
-#       "wget -q http://localhost:8080/jnlpJars/jenkins-cli.jar",
-#       # Execute the Groovy script using Jenkins CLI
-#       "java -jar jenkins-cli.jar -s http://localhost:8080 -auth admin:admin123! groovy = < /tmp/configure_ec2_agent.groovy",
-
-#       # Cleanup
-#       "rm /tmp/configure_ec2_agent.groovy"
-#     ]
-#   }
-# }
 
 # Create IAM user for Jenkins
 resource "aws_iam_user" "jenkins_user" {
