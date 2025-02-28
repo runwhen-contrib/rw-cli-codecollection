@@ -423,17 +423,19 @@ class Jenkins:
             with open(error_patterns_file, "r") as f:
                 error_patterns = json.load(f)
 
-        suggestions = []
+        suggestions = set()  # Use a set for deduplication
+
         for error, details in error_patterns.items():
             pattern = details.get("pattern")
             advice = details.get("suggestion")
 
             if pattern and advice:
-                if re.search(pattern, logs, re.MULTILINE):
-                    suggestions.append(advice)
+                matches = re.findall(pattern, logs, re.MULTILINE)
+                if matches:  # Only add advice if there are matches
+                    suggestions.add(advice)
 
-        # Use default suggestions if no specific issues found
+        # Use default suggestion if no specific issues found
         if not suggestions:
-            suggestions = ["Check detailed logs for root cause."]
+            suggestions.add("Check detailed logs for root cause.")
         
         return "\n".join(suggestions)
