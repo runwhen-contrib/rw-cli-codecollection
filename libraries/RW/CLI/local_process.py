@@ -71,7 +71,8 @@ def execute_local_command(
     if env:
         run_with_env.update(env)
     try:
-        tmpdir = tempfile.mkdtemp(dir=PWD)
+        # tmpdir = tempfile.mkdtemp(dir=PWD)
+        tmpdir = tempfile.mkdtemp()
         parsed_cmd = ["bash", "-c", cmd]
         secret_keys = []
         for s in request_secrets:
