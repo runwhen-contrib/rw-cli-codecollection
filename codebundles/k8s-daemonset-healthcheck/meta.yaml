@@ -133,7 +133,7 @@ commands:
     | grep -i "${DAEMONSET_NAME}" || true
 
     '
-  name: get_related_daemonset_daemonset_name_events
+  name: get_related_daemonset_daemonset_name_events_in_namespace_namespace
   when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes cluster for potential
     issues such as CrashLoopBackoff events
 
@@ -185,7 +185,7 @@ commands:
     | grep -i "${DAEMONSET_NAME}" || true
 
     '
-  name: get_related_daemonset_daemonset_name_events
+  name: get_related_daemonset_daemonset_name_events_in_namespace_namespace
   when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes cluster for potential
     issues such as CrashLoopBackoff events
 

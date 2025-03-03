@@ -38,7 +38,7 @@ commands:
     -n ${NAMESPACE}
 
     '
-  name: fetch_vault_csi_driver_logs
+  name: fetch_vault_csi_driver_logs_in_namespace_namespace
   when_is_it_useful: '1. Investigating a Kubernetes CrashLoopBackoff event for the
     daemonset "vault-csi-provider" to identify the root cause of the issue and fix
     it.
@@ -93,7 +93,7 @@ commands:
     -n ${NAMESPACE}
 
     '
-  name: fetch_vault_csi_driver_logs
+  name: fetch_vault_csi_driver_logs_in_namespace_namespace
   when_is_it_useful: '1. Investigating a Kubernetes CrashLoopBackoff event for the
     daemonset "vault-csi-provider" to identify the root cause of the issue and fix
     it.
@@ -127,7 +127,7 @@ commands:
     \ the grep command\n# Add \"|| true\" at the end to ensure the overall command\
     \ returns a success status, even if the grep command does not find a match\n||\
     \ true"
-  name: get_vault_csi_driver_warning_events
+  name: get_vault_csi_driver_warning_events_in_namespace
   when_is_it_useful: '1. Monitoring and troubleshooting the Kubernetes cluster for
     potential issues related to the "vault-csi-provider" in a specific namespace.
 
@@ -160,7 +160,7 @@ commands:
     \ the grep command\n# Add \"|| true\" at the end to ensure the overall command\
     \ returns a success status, even if the grep command does not find a match\n||\
     \ true"
-  name: get_vault_csi_driver_warning_events
+  name: get_vault_csi_driver_warning_events_in_namespace
   when_is_it_useful: '1. Monitoring and troubleshooting the Kubernetes cluster for
     potential issues related to the "vault-csi-provider" in a specific namespace.
 
@@ -315,7 +315,7 @@ commands:
     kubectl logs --tail=100 statefulset.apps/vault --context ${CONTEXT} -n ${NAMESPACE}
 
     '
-  name: fetch_vault_logs
+  name: fetch_vault_pod_workload_logs_in_namespace_namespace_with_labels_labels
   when_is_it_useful: '1. Investigating an issue with the "vault" statefulset where
     it is reporting CrashLoopBackoff events, and troubleshooting possible reasons
     for the failures by inspecting the last 100 lines of logs.
@@ -372,7 +372,7 @@ commands:
     kubectl logs --tail=100 statefulset.apps/vault --context ${CONTEXT} -n ${NAMESPACE}
 
     '
-  name: fetch_vault_logs
+  name: fetch_vault_pod_workload_logs_in_namespace_namespace_with_labels_labels
   when_is_it_useful: '1. Investigating an issue with the "vault" statefulset where
     it is reporting CrashLoopBackoff events, and troubleshooting possible reasons
     for the failures by inspecting the last 100 lines of logs.
@@ -411,7 +411,7 @@ commands:
     \ events containing the keyword \"vault\"\n# Use the || true operator to ensure\
     \ that the overall command returns a successful exit code even if grep does not\
     \ find any matches\n| grep -i \"vault\" || true\n"
-  name: get_related_vault_events
+  name: get_related_vault_events_in_namespace_namespace
   when_is_it_useful: '1. Troubleshooting a critical production issue where the Kubernetes
     CrashLoopBackoff events are causing an application to fail or become unresponsive.
 
@@ -453,7 +453,7 @@ commands:
     \ events containing the keyword \"vault\"\n# Use the || true operator to ensure\
     \ that the overall command returns a successful exit code even if grep does not\
     \ find any matches\n| grep -i \"vault\" || true\n"
-  name: get_related_vault_events
+  name: get_related_vault_events_in_namespace_namespace
   when_is_it_useful: '1. Troubleshooting a critical production issue where the Kubernetes
     CrashLoopBackoff events are causing an application to fail or become unresponsive.
 
@@ -502,7 +502,7 @@ commands:
     kubectl get statefulset.apps/vault --context=${CONTEXT} -n ${NAMESPACE} -o yaml
 
     '
-  name: fetch_vault_statefulset_manifest_details
+  name: fetch_vault_statefulset_manifest_details_in_namespace
   when_is_it_useful: '1. Troubleshooting an issue with the statefulset named "vault"
     not starting properly in a particular namespace, and needing to investigate its
     configuration to identify any potential misconfigurations.
@@ -550,7 +550,7 @@ commands:
     kubectl get statefulset.apps/vault --context=${CONTEXT} -n ${NAMESPACE} -o yaml
 
     '
-  name: fetch_vault_statefulset_manifest_details
+  name: fetch_vault_statefulset_manifest_details_in_namespace
   when_is_it_useful: '1. Troubleshooting an issue with the statefulset named "vault"
     not starting properly in a particular namespace, and needing to investigate its
     configuration to identify any potential misconfigurations.
@@ -588,7 +588,7 @@ commands:
     NAMESPACE=my-namespace\n\n# Then, run the kubectl command with the specified flags\
     \ and options\nkubectl get daemonset.apps/vault-csi-provider \\\n  --context=${CONTEXT}\
     \ \\\n  -n ${NAMESPACE} \\\n  -o yaml\n"
-  name: fetch_vault_daemonset_manifest_details
+  name: fetch_vault_daemonset_manifest_details_in_kubernetes_cluster_namespace
   when_is_it_useful: '1. Troubleshooting CrashLoopBackoff events: DevOps or SREs might
     use this command to retrieve the configuration for a specific daemonset in order
     to debug and diagnose issues causing CrashLoopBackoff events in the Kubernetes
@@ -634,7 +634,7 @@ commands:
     NAMESPACE=my-namespace\n\n# Then, run the kubectl command with the specified flags\
     \ and options\nkubectl get daemonset.apps/vault-csi-provider \\\n  --context=${CONTEXT}\
     \ \\\n  -n ${NAMESPACE} \\\n  -o yaml\n"
-  name: fetch_vault_daemonset_manifest_details
+  name: fetch_vault_daemonset_manifest_details_in_kubernetes_cluster_namespace
   when_is_it_useful: '1. Troubleshooting CrashLoopBackoff events: DevOps or SREs might
     use this command to retrieve the configuration for a specific daemonset in order
     to debug and diagnose issues causing CrashLoopBackoff events in the Kubernetes
@@ -677,7 +677,7 @@ commands:
   multi_line_details: "# We're using curl to make a request to a vault server \n#\
     \ where ${VAULT_URL} is the URL of the vault server we want to access\n\ncurl\
     \ ${VAULT_URL}\n"
-  name: verify_vault_availability
+  name: verify_vault_availability_in_namespace_namespace_and_context_context
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
     or Site Reliability Engineer might use the cURL tool to send requests to various
     endpoints in order to diagnose the cause of the crash loop and identify any issues
@@ -718,7 +718,7 @@ commands:
   multi_line_details: "# We're using curl to make a request to a vault server \n#\
     \ where ${VAULT_URL} is the URL of the vault server we want to access\n\ncurl\
     \ ${VAULT_URL}\n"
-  name: verify_vault_availability
+  name: verify_vault_availability_in_namespace_namespace_and_context_context
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
     or Site Reliability Engineer might use the cURL tool to send requests to various
     endpoints in order to diagnose the cause of the crash loop and identify any issues
@@ -772,7 +772,7 @@ commands:
     -o json
 
     '
-  name: check_vault_statefulset_replicas
+  name: check_vault_statefulset_replicas_in_namespace
   when_is_it_useful: '1. Investigating and troubleshooting issues related to the StatefulSet
     ''vault'' in a Kubernetes cluster, such as CrashLoopBackoff events, high resource
     utilization, or deployment failures.
@@ -821,7 +821,7 @@ commands:
     -o json
 
     '
-  name: check_vault_statefulset_replicas
+  name: check_vault_statefulset_replicas_in_namespace
   when_is_it_useful: '1. Investigating and troubleshooting issues related to the StatefulSet
     ''vault'' in a Kubernetes cluster, such as CrashLoopBackoff events, high resource
     utilization, or deployment failures.

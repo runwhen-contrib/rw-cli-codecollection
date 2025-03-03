@@ -17,7 +17,7 @@ commands:
     \ \n\n# Run a curl command inside the pod to send a request to the localhost on\
     \ port 8080 and check the HTTP status code of a specific endpoint\n-- curl -s\
     \ -o /dev/null -w \"%{http_code}\" localhost:8080/login\n"
-  name: query_the_jenkins_kubernetes_workload_http_endpoint
+  name: query_the_jenkins_kubernetes_workload_http_endpoint_in_kubernetes_statefulset_statefulset_name
   when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event: When
     a pod enters the CrashLoopBackoff state, a DevOps or Site Reliability Engineer
     might use this command to investigate the issue by executing a command inside
@@ -68,7 +68,7 @@ commands:
     \ \n\n# Run a curl command inside the pod to send a request to the localhost on\
     \ port 8080 and check the HTTP status code of a specific endpoint\n-- curl -s\
     \ -o /dev/null -w \"%{http_code}\" localhost:8080/login\n"
-  name: query_the_jenkins_kubernetes_workload_http_endpoint
+  name: query_the_jenkins_kubernetes_workload_http_endpoint_in_kubernetes_statefulset_statefulset_name
   when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event: When
     a pod enters the CrashLoopBackoff state, a DevOps or Site Reliability Engineer
     might use this command to investigate the issue by executing a command inside
@@ -121,7 +121,7 @@ commands:
   multi_line_details: "\n# Set the kubectl execution command with necessary parameters\n\
     kubectl exec statefulset/${STATEFULSET_NAME} \\\n--context=${CONTEXT} \\\n-n ${NAMESPACE}\
     \ \\ \n-- curl -s localhost:8080/api/json?pretty=true \\\n--user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}\n"
-  name: query_the_jenkins_kubernetes_workload_http_endpoint
+  name: query_the_jenkins_kubernetes_workload_http_endpoint_in_kubernetes_statefulset_statefulset_name
   when_is_it_useful: '1. Troubleshooting a CrashLoopBackoff event in a StatefulSet
     to identify any issues with the container startup process.
 
@@ -156,7 +156,7 @@ commands:
   multi_line_details: "\n# Set the kubectl execution command with necessary parameters\n\
     kubectl exec statefulset/${STATEFULSET_NAME} \\\n--context=${CONTEXT} \\\n-n ${NAMESPACE}\
     \ \\ \n-- curl -s localhost:8080/api/json?pretty=true \\\n--user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}\n"
-  name: query_the_jenkins_kubernetes_workload_http_endpoint
+  name: query_the_jenkins_kubernetes_workload_http_endpoint_in_kubernetes_statefulset_statefulset_name
   when_is_it_useful: '1. Troubleshooting a CrashLoopBackoff event in a StatefulSet
     to identify any issues with the container startup process.
 
@@ -195,7 +195,7 @@ commands:
     \ items\n| jq -r '.items[] | select((.stuck == true) or (.blocked == true)) |\
     \ \"Why: \" + .why + \"\\nBlocked: \" + (.blocked|tostring) + \"\\nStuck: \" +\
     \ (.stuck|tostring)'\n"
-  name: query_for_stuck_jenkins_jobs
+  name: query_for_stuck_jenkins_jobs_in_kubernetes_statefulset_workload_statefulset_name
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
     or Site Reliability Engineer might use this command to investigate and gather
     information about stuck or blocked items in a Jenkins job queue that could be
@@ -245,7 +245,7 @@ commands:
     \ items\n| jq -r '.items[] | select((.stuck == true) or (.blocked == true)) |\
     \ \"Why: \" + .why + \"\\nBlocked: \" + (.blocked|tostring) + \"\\nStuck: \" +\
     \ (.stuck|tostring)'\n"
-  name: query_for_stuck_jenkins_jobs
+  name: query_for_stuck_jenkins_jobs_in_kubernetes_statefulset_workload_statefulset_name
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
     or Site Reliability Engineer might use this command to investigate and gather
     information about stuck or blocked items in a Jenkins job queue that could be

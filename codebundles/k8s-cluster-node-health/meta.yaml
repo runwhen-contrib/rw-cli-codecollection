@@ -59,7 +59,7 @@ commands:
     echo \"\"\necho \"Summary:\"\necho \"Unique nodes started: $unique_nodes_started\"\
     \necho \"Unique nodes stopped: $unique_nodes_stopped\"\necho \"Total start/stop\
     \ events: $total_node_events\"\n"
-  name: check_for_node_restarts_in_cluster_context
+  name: check_for_node_restarts_in_cluster_context_within_interval_interval
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
     or Site Reliability Engineer might use this script to gather node-related events
     and identify any patterns or issues that could be causing pods to enter a CrashLoopBackoff

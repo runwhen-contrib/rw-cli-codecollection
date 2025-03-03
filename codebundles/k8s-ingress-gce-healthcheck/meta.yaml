@@ -32,7 +32,7 @@ commands:
     \ field selector\n  kubectl get events -n $NAMESPACE --context $CONTEXT --field-selector\
     \ involvedObject.kind=Service,involvedObject.name=$SERVICE_NAME,type!=Normal;\
     \ \ndone"
-  name: search_for_gce_ingress_warnings_in_gke
+  name: search_for_gce_ingress_warnings_in_gke_context_context
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
     or Site Reliability Engineer might use this command to gather information on abnormal
     events related to an Ingress and its associated Services in order to identify
@@ -95,7 +95,7 @@ commands:
     \ field selector\n  kubectl get events -n $NAMESPACE --context $CONTEXT --field-selector\
     \ involvedObject.kind=Service,involvedObject.name=$SERVICE_NAME,type!=Normal;\
     \ \ndone"
-  name: search_for_gce_ingress_warnings_in_gke
+  name: search_for_gce_ingress_warnings_in_gke_context_context
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
     or Site Reliability Engineer might use this command to gather information on abnormal
     events related to an Ingress and its associated Services in order to identify
@@ -144,7 +144,7 @@ commands:
     \ -o=json | jq -r '.metadata.annotations[\"ingress.kubernetes.io/backends\"] |\
     \ fromjson | to_entries[] | select(.value != \"HEALTHY\") | \"Backend: \" + .key\
     \ + \" Status: \" + .value'"
-  name: identify_unhealthy_gce_http_ingress_backends
+  name: identify_unhealthy_gce_http_ingress_backends_in_gke_namespace_namespace
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
     or Site Reliability Engineer may use this task to quickly identify and address
     unhealthy backends that are causing CrashLoopBackoff events in a Kubernetes cluster.
@@ -187,7 +187,7 @@ commands:
     \ -o=json | jq -r '.metadata.annotations[\"ingress.kubernetes.io/backends\"] |\
     \ fromjson | to_entries[] | select(.value != \"HEALTHY\") | \"Backend: \" + .key\
     \ + \" Status: \" + .value'"
-  name: identify_unhealthy_gce_http_ingress_backends
+  name: identify_unhealthy_gce_http_ingress_backends_in_gke_namespace_namespace
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
     or Site Reliability Engineer may use this task to quickly identify and address
     unhealthy backends that are causing CrashLoopBackoff events in a Kubernetes cluster.
@@ -257,7 +257,7 @@ commands:
     \ | group_by(.message) | map(max_by(.timestamp)) | .[] | (.timestamp + \" | IP:\
     \ \" + (.ip // \"N/A\") + \" | Error: \" + .message) else \"No results found\"\
     \ end'; \ndone\n"
-  name: fetch_network_error_logs_from_gcp_operations_manager_for_ingress_backends
+  name: fetch_network_error_logs_from_gcp_operations_manager_for_ingress_backends_in_gcp_project_gcp_project_id
   when_is_it_useful: '1. Monitoring and troubleshooting an Ingress controller in Kubernetes
     when it goes into CrashLoopBackoff due to unhealthy backends.
 
@@ -318,7 +318,7 @@ commands:
     \ | group_by(.message) | map(max_by(.timestamp)) | .[] | (.timestamp + \" | IP:\
     \ \" + (.ip // \"N/A\") + \" | Error: \" + .message) else \"No results found\"\
     \ end'; \ndone\n"
-  name: fetch_network_error_logs_from_gcp_operations_manager_for_ingress_backends
+  name: fetch_network_error_logs_from_gcp_operations_manager_for_ingress_backends_in_gcp_project_gcp_project_id
   when_is_it_useful: '1. Monitoring and troubleshooting an Ingress controller in Kubernetes
     when it goes into CrashLoopBackoff due to unhealthy backends.
 
@@ -371,7 +371,7 @@ commands:
     \ -e 's|=|%3D|g' -e 's|/|%2F|g')\n\n# Constructing the GCP logs URL with the encoded\
     \ log query and the GCP project ID\nGCP_LOGS_URL=\"https://console.cloud.google.com/logs/query;query=$ENCODED_LOG_QUERY?project=$GCP_PROJECT_ID\"\
     \n\n# Printing the constructed GCP logs URL\necho $GCP_LOGS_URL"
-  name: review_gcp_operations_logging_dashboard
+  name: review_gcp_operations_logging_dashboard_in_gcp_project_gcp_project_id
   when_is_it_useful: '1. Investigating and resolving issues with a Kubernetes deployment
     that is experiencing CrashLoopBackoff events, in order to identify the root cause
     and troubleshoot the underlying problems.
@@ -431,7 +431,7 @@ commands:
     \ -e 's|=|%3D|g' -e 's|/|%2F|g')\n\n# Constructing the GCP logs URL with the encoded\
     \ log query and the GCP project ID\nGCP_LOGS_URL=\"https://console.cloud.google.com/logs/query;query=$ENCODED_LOG_QUERY?project=$GCP_PROJECT_ID\"\
     \n\n# Printing the constructed GCP logs URL\necho $GCP_LOGS_URL"
-  name: review_gcp_operations_logging_dashboard
+  name: review_gcp_operations_logging_dashboard_in_gcp_project_gcp_project_id
   when_is_it_useful: '1. Investigating and resolving issues with a Kubernetes deployment
     that is experiencing CrashLoopBackoff events, in order to identify the root cause
     and troubleshoot the underlying problems.
@@ -481,7 +481,7 @@ commands:
     \ @uri)\n\n# Construct the dashboard URL with the encoded query and GCP project\
     \ ID\nDASHBOARD_URL=\"https://console.cloud.google.com/logs/query;query=$ENCODED_QUERY?project=$GCP_PROJECT_ID\"\
     \n\n# Output the complete dashboard URL\necho $DASHBOARD_URL\n"
-  name: review_gcp_operations_logging_dashboard
+  name: review_gcp_operations_logging_dashboard_in_gcp_project_gcp_project_id
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: The DevOps
     or Site Reliability Engineer might use this command to quickly access and review
     logs for unhealthy backends in order to identify the root cause of the CrashLoopBackoff
@@ -530,7 +530,7 @@ commands:
     \ @uri)\n\n# Construct the dashboard URL with the encoded query and GCP project\
     \ ID\nDASHBOARD_URL=\"https://console.cloud.google.com/logs/query;query=$ENCODED_QUERY?project=$GCP_PROJECT_ID\"\
     \n\n# Output the complete dashboard URL\necho $DASHBOARD_URL\n"
-  name: review_gcp_operations_logging_dashboard
+  name: review_gcp_operations_logging_dashboard_in_gcp_project_gcp_project_id
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: The DevOps
     or Site Reliability Engineer might use this command to quickly access and review
     logs for unhealthy backends in order to identify the root cause of the CrashLoopBackoff

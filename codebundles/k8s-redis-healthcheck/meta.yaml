@@ -111,7 +111,7 @@ commands:
     a specific key in Redis to 0
 
     '
-  name: verify_deployment_name_redis_read_write_operation
+  name: verify_deployment_name_redis_read_write_operation_in_kubernetes
   when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event in a
     specific deployment where the Redis service is failing to maintain a healthy state.
 
@@ -174,7 +174,7 @@ commands:
     a specific key in Redis to 0
 
     '
-  name: verify_deployment_name_redis_read_write_operation
+  name: verify_deployment_name_redis_read_write_operation_in_kubernetes
   when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event in a
     specific deployment where the Redis service is failing to maintain a healthy state.
 
@@ -212,7 +212,7 @@ commands:
     \ --context=${CONTEXT} -n ${NAMESPACE} -- \n\n# Run the redis-cli tool inside\
     \ the container to increment the value of a key used for health checking in Redis\n\
     redis-cli INCR ${REDIS_HEALTHCHECK_KEY}\n"
-  name: verify_deployment_name_redis_read_write_operation
+  name: verify_deployment_name_redis_read_write_operation_in_kubernetes
   when_is_it_useful: '1. Monitoring and troubleshooting the health of a Kubernetes
     deployment by checking the status of a specific key in a Redis database within
     the container.
@@ -252,7 +252,7 @@ commands:
     \ --context=${CONTEXT} -n ${NAMESPACE} -- \n\n# Run the redis-cli tool inside\
     \ the container to increment the value of a key used for health checking in Redis\n\
     redis-cli INCR ${REDIS_HEALTHCHECK_KEY}\n"
-  name: verify_deployment_name_redis_read_write_operation
+  name: verify_deployment_name_redis_read_write_operation_in_kubernetes
   when_is_it_useful: '1. Monitoring and troubleshooting the health of a Kubernetes
     deployment by checking the status of a specific key in a Redis database within
     the container.
@@ -315,7 +315,7 @@ commands:
     -- redis-cli GET ${REDIS_HEALTHCHECK_KEY}
 
     '
-  name: verify_deployment_name_redis_read_write_operation
+  name: verify_deployment_name_redis_read_write_operation_in_kubernetes
   when_is_it_useful: '1. Troubleshooting application performance issues related to
     Redis in a Kubernetes environment.
 
@@ -370,7 +370,7 @@ commands:
     -- redis-cli GET ${REDIS_HEALTHCHECK_KEY}
 
     '
-  name: verify_deployment_name_redis_read_write_operation
+  name: verify_deployment_name_redis_read_write_operation_in_kubernetes
   when_is_it_useful: '1. Troubleshooting application performance issues related to
     Redis in a Kubernetes environment.
 

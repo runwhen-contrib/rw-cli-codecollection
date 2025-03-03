@@ -25,7 +25,7 @@ commands:
     \ the original command into smaller steps with descriptive comments for each step.\
     \ This helps them understand what each part of the command is doing and how it\
     \ contributes to the overall functionality."
-  name: list_all_nodes_in_an_active_prempt_operation_for_gcp_project_gcp_project_id
+  name: list_all_nodes_in_an_active_preempt_operation_for_gcp_project_gcp_project_id_within_the_last_age_hours
   when_is_it_useful: '1. Investigating and resolving performance issues in a Kubernetes
     cluster, such as high CPU or memory utilization, by identifying and addressing
     any bottlenecked or underperforming pods.

@@ -21,7 +21,7 @@ commands:
 
 
     kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}'
-  name: list_all_available_kustomization_objects_in_namespace_namespace
+  name: list_all_available_fluxcd_kustomization_objects_in_namespace_namespace
   when_is_it_useful: "1. Troubleshooting a CrashLoopBackoff event in Kubernetes\n\
     2. Investigating resource utilization and performance of a specific Kubernetes\
     \ resource\n3. Analyzing logs and events for a particular pod or deployment\n\
@@ -50,7 +50,7 @@ commands:
 
 
     kubectl get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}'
-  name: list_all_available_kustomization_objects_in_namespace_namespace
+  name: list_all_available_fluxcd_kustomization_objects_in_namespace_namespace
   when_is_it_useful: "1. Troubleshooting a CrashLoopBackoff event in Kubernetes\n\
     2. Investigating resource utilization and performance of a specific Kubernetes\
     \ resource\n3. Analyzing logs and events for a particular pod or deployment\n\
@@ -101,7 +101,7 @@ commands:
     By breaking down the command into multiple lines and adding explanatory comments,\
     \ newer or less experienced devops engineers can better understand the purpose\
     \ and functionality of each part of the command."
-  name: get_details_for_unready_kustomizations_in_namespace_namespace
+  name: list_unready_fluxcd_kustomizations_in_namespace_namespace
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: The DevOps
     or SRE would use this command to retrieve information about the status of the
     pods in the namespace and identify any resources that are not ready, and then

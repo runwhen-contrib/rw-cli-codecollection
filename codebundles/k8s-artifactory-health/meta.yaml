@@ -29,7 +29,7 @@ commands:
     \ to allow insecure SSL connections\n# --max-time 10 sets the maximum time for\
     \ the request to complete\nkubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT}\
     \ -n ${NAMESPACE} -- \\\n  curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/liveness\n"
-  name: check_artifactory_liveness_and_readiness_endpoints
+  name: check_artifactory_liveness_and_readiness_endpoints_in_namespace
   when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event: A DevOps
     or Site Reliability Engineer might use this command to check the liveness of an
     application running in a specific statefulset to determine if it is causing the
@@ -86,7 +86,7 @@ commands:
     \ to allow insecure SSL connections\n# --max-time 10 sets the maximum time for\
     \ the request to complete\nkubectl exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT}\
     \ -n ${NAMESPACE} -- \\\n  curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/liveness\n"
-  name: check_artifactory_liveness_and_readiness_endpoints
+  name: check_artifactory_liveness_and_readiness_endpoints_in_namespace
   when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event: A DevOps
     or Site Reliability Engineer might use this command to check the liveness of an
     application running in a specific statefulset to determine if it is causing the
@@ -138,7 +138,7 @@ commands:
     \ at `http://localhost:8091/artifactory/api/v1/system/readiness` with a maximum\
     \ timeout of 10 seconds. This can be useful for checking the readiness of an Artifactory\
     \ or similar service running within a Kubernetes cluster."
-  name: check_artifactory_liveness_and_readiness_endpoints
+  name: check_artifactory_liveness_and_readiness_endpoints_in_namespace
   when_is_it_useful: '1. Monitoring and troubleshooting the health and performance
     of a Kubernetes statefulset hosting an artifactory API endpoint.
 
@@ -181,7 +181,7 @@ commands:
     \ at `http://localhost:8091/artifactory/api/v1/system/readiness` with a maximum\
     \ timeout of 10 seconds. This can be useful for checking the readiness of an Artifactory\
     \ or similar service running within a Kubernetes cluster."
-  name: check_artifactory_liveness_and_readiness_endpoints
+  name: check_artifactory_liveness_and_readiness_endpoints_in_namespace
   when_is_it_useful: '1. Monitoring and troubleshooting the health and performance
     of a Kubernetes statefulset hosting an artifactory API endpoint.
 
