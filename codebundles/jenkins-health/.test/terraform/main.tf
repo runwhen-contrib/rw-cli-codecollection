@@ -231,8 +231,21 @@ resource "aws_instance" "jenkins_server" {
               apt-get update
               apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin 
 
-              echo "DOCKER_OPTS=\"-H tcp://0.0.0.0:2376 -H unix:///var/run/docker.sock\"" >> /etc/default/docker
-              systemctl restart docker
+              TCP_ADDRESS="tcp://127.0.0.1:2375"
+              mkdir -p /etc/systemd/system/docker.service.d
+              cat <<ELF > /etc/systemd/system/docker.service.d/override.conf
+              [Service]
+              ExecStart=
+              ExecStart=/usr/bin/dockerd -H $TCP_ADDRESS -H unix:///var/run/docker.sock
+              ELF
+
+              # Reload systemctl configuration
+              echo "Reloading systemctl configuration..."
+              systemctl daemon-reload
+
+              # Restart Docker
+              echo "Restarting Docker service..."
+              systemctl restart docker.service
               groupadd docker
               usermod -aG docker ubuntu
               usermod -aG docker jenkins
