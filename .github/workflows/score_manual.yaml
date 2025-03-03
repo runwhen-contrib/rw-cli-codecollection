@@ -59,7 +59,7 @@ jobs:
 
       # Use your composite action, passing the workflow_dispatch inputs
       - name: "Run CodeCollection Scoring"
-      - uses: runwhen-contrib/github-actions/codecollection-score@main
+        uses: runwhen-contrib/github-actions/codecollection-score@main
         with:
           directory: ${{ github.event.inputs.directory }}
           commit_results: ${{ github.event.inputs.commit_results }}
