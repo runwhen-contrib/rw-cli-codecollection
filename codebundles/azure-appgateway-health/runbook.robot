@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the application gateway cluster
-    [Tags]    aks    config
+    [Tags]    appgateway    resourcehealth   access:read-only
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_resource_health.sh
     ...    env=${env}
@@ -63,7 +63,7 @@ Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NA
     END
 Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the details and health of the application gateway configuration
-    [Tags]    appgateway    logs    tail
+    [Tags]    appgateway    logs    tail    access:read-only
     ${config_health}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_config_health.sh
     ...    env=${env}
@@ -101,7 +101,7 @@ Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resou
 
 Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the health of the application gateway backend pool members
-    [Tags]    appgateway    logs    tail
+    [Tags]    appgateway    logs    tail    access:read-only
     ${backend_health}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_backend_health.sh
     ...    env=${env}
@@ -139,7 +139,7 @@ Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resou
 
 Fetch Log Analytics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch log analytics for the application gateway
-    [Tags]    appgateway    logs    analytics    uri_errors    requests    ssl    errors
+    [Tags]    access:read-only  appgateway    logs    analytics    uri_errors    requests    ssl    errors
     ${log_analytics}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_log_analytics.sh
     ...    env=${env}
@@ -165,7 +165,7 @@ Fetch Log Analytics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Gr
 
 Fetch Metrics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch metrics for the application gateway
-    [Tags]    appgateway    metrics    analytics
+    [Tags]    access:read-only  appgateway    metrics    analytics
     ${metrics}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_metrics.sh
     ...    env=${env}
@@ -209,7 +209,7 @@ Fetch Metrics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `$
 
 Check SSL Certificate Health for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch SSL certificates and validate expiry dates for Azure Application Gateway instances
-    [Tags]    appgateway    ssl    expiry
+    [Tags]    access:read-only  appgateway    ssl    expiry
     ${ssl_health}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_ssl_certs.sh
     ...    env=${env}
@@ -247,7 +247,7 @@ Check SSL Certificate Health for Application Gateway `${APP_GATEWAY_NAME}` In Re
 
 Check Logs for Errors with Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Query log analytics workspace for common errors like IP mismatches or subnet issues
-    [Tags]    appgateway    logs    network    errors
+    [Tags]    access:read-only  appgateway    logs    network    errors
     ${log_errors}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_log_errors.sh
     ...    env=${env}
@@ -285,7 +285,7 @@ Check Logs for Errors with Application Gateway `${APP_GATEWAY_NAME}` In Resource
 
 List Related Azure Resources for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of resources that are releated to the application gateway
-    [Tags]    appgateway    resources    azure    related
+    [Tags]    access:read-only  appgateway    resources    azure    related
     ${resources}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_related_resources.sh
     ...    env=${env}

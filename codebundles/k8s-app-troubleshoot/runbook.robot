@@ -16,9 +16,9 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Get `${CONTAINER_NAME}` Application Logs
+Get `${CONTAINER_NAME}` Application Logs from Workload `${WORKLOAD_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Collects the last approximately 300 lines of logs from the workload
-    [Tags]    resource    application    workload    logs    state    ${container_name}    ${workload_name}
+    [Tags]    resource    application    workload    logs    state    ${container_name}    ${workload_name}   access:read-only
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     ...    show_in_rwl_cheatsheet=true
@@ -41,7 +41,7 @@ Scan `${CONTAINER_NAME}` Application For Misconfigured Environment
     RW.Core.Add Pre To Report    Stdout:\n\n${script_run.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Tail `${CONTAINER_NAME}` Application Logs For Stacktraces 
+Tail `${CONTAINER_NAME}` Application Logs For Stacktraces in Workload `${WORKLOAD_NAME}` 
     [Documentation]    Performs an inspection on container logs for exceptions/stacktraces, parsing them and attempts to find relevant source code information
     [Tags]
     ...    application
@@ -54,6 +54,7 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
     ...    logs
     ...    ${container_name}
     ...    ${workload_name}
+    ...    access:read-only
     ${cmd}=    Set Variable
     ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     IF    $EXCLUDE_PATTERN != ""

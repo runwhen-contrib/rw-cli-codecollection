@@ -25,6 +25,7 @@ Restart Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     ...    restart
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
+    ...    access:read-write
 
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} --tail 50 --all-containers=true --max-log-requests=20 -n ${NAMESPACE} --context ${CONTEXT}
@@ -73,6 +74,7 @@ Force Delete Pods in Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     ...    restart
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
+    ...    access:read-write
 
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} --tail 50 -n ${NAMESPACE} --all-containers=true --max-log-requests=20 --context ${CONTEXT}
@@ -121,6 +123,7 @@ Rollback Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` to Previous
     ...    rollback
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
+    ...    access:read-write
 
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} --tail 50 -n ${NAMESPACE} --all-containers=true --max-log-requests=20 --context ${CONTEXT}
@@ -169,6 +172,7 @@ Scale Down Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     ...    scaledown
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
+    ...    access:read-write
 
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} --tail 50 -n ${NAMESPACE} --all-containers=true --max-log-requests=20 --context ${CONTEXT}
@@ -229,6 +233,7 @@ Scale Up Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by ${SCALE_
     ...    scaleup
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
+    ...    access:read-write
 
     ${current_result}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.replicas}'
@@ -288,6 +293,7 @@ Clean Up Stale ReplicaSets for Deployment `${DEPLOYMENT_NAME}` in Namespace `${N
     ...    stale
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
+    ...    access:read-write
 
     ${rs_cleanup}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get rs -n ${NAMESPACE} --context ${CONTEXT} --selector=$(${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.selector.matchLabels}' | tr -d '{}" ' | tr ':' '=') -o json | jq -r '.items[] | select(.status.replicas == 0) | .metadata.name' | while read -r rs; do ${KUBERNETES_DISTRIBUTION_BINARY} delete rs "$rs" -n ${NAMESPACE} --context ${CONTEXT}; done
@@ -319,6 +325,7 @@ Scale Down Stale ReplicaSets for Deployment `${DEPLOYMENT_NAME}` in Namespace `$
     ...    scaledown
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
+    ...    access:read-write
 
     ${rs_scaledown}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} scale rs -n ${NAMESPACE} --context ${CONTEXT} -l $(${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.selector.matchLabels}' | tr -d '{}" ' | tr ':' '=') --replicas=0

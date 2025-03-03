@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Get DaemonSet Logs for `${DAEMONSET_NAME}` and Add to Report
     [Documentation]    Fetches the last 100 lines of logs for the given daemonset in the namespace.
-    [Tags]    fetch    log    pod    container    errors    inspect    trace    info    daemonset    csi
+    [Tags]    fetch    log    pod    container    errors    inspect    trace    info    daemonset    csi    access:read-only
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs --tail=100 daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     ...    env=${env}
@@ -27,9 +27,9 @@ Get DaemonSet Logs for `${DAEMONSET_NAME}` and Add to Report
     RW.Core.Add Pre To Report    ${logs.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Get Related Daemonset `${DAEMONSET_NAME}` Events
+Get Related Daemonset `${DAEMONSET_NAME}` Events in Namespace `${NAMESPACE}`
     [Documentation]    Fetches events related to the daemonset workload in the namespace.
-    [Tags]    events    workloads    errors    warnings    get    daemonset    csi
+    [Tags]    access:read-only  events    workloads    errors    warnings    get    daemonset    csi
     ${events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} | grep -i "${DAEMONSET_NAME}" || true
     ...    env=${env}
@@ -55,6 +55,7 @@ Check Daemonset `${DAEMONSET_NAME}` Replicas
     ...    rollout
     ...    stuck
     ...    pods
+    ...    access:read-only
     ${daemonset_describe}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} describe daemonset/${DAEMONSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     ...    env=${env}

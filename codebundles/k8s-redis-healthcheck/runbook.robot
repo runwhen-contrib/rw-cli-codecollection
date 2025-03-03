@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Ping `${DEPLOYMENT_NAME}` Redis Workload
     [Documentation]    Verifies that a PING can be peformed against the redis workload.
-    [Tags]    redis    cli    ping    pong    alive    probe    ready
+    [Tags]    access:read-only  redis    cli    ping    pong    alive    probe    ready
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- redis-cli PING
     ...    show_in_rwl_cheatsheet=true
@@ -38,9 +38,9 @@ Ping `${DEPLOYMENT_NAME}` Redis Workload
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Verify `${DEPLOYMENT_NAME}` Redis Read Write Operation
+Verify `${DEPLOYMENT_NAME}` Redis Read Write Operation in Kubernetes
     [Documentation]    Attempts to perform a write and read operation on the redis workload, checking that a key can be set, incremented, and read from.
-    [Tags]    redis    cli    increment    health    check    read    write
+    [Tags]    access:read-only  redis    cli    increment    health    check    read    write
     ${set_op}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec deployment/${DEPLOYMENT_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- redis-cli SET ${REDIS_HEALTHCHECK_KEY} 0
     ...    show_in_rwl_cheatsheet=true

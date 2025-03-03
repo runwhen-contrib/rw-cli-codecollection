@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Get Current Resource State with Labels `${LABELS}`
     [Documentation]    Gets the current state of the resource before applying the restart for report review.
-    [Tags]    resource    application    restart    state    yaml
+    [Tags]    access:read-only  resource    application    restart    state    yaml
     ${resource}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get daemonset,deployment,statefulset -l ${LABELS} -oyaml
     ...    show_in_rwl_cheatsheet=true
@@ -31,7 +31,7 @@ Get Current Resource State with Labels `${LABELS}`
 
 Get Resource Logs with Labels `${LABELS}`
     [Documentation]    Collects the last approximately 200 lines of logs from the resource before restarting it.
-    [Tags]    resource    application    workload    logs    state
+    [Tags]    access:read-only  resource    application    workload    logs    state
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=200 --limit-bytes=256000
     ...    show_in_rwl_cheatsheet=true
@@ -42,9 +42,9 @@ Get Resource Logs with Labels `${LABELS}`
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Restart Resource with Labels `${LABELS}`
+Restart Resource with Labels `${LABELS}` in `${CONTEXT}`
     [Documentation]    Restarts the labeled resource in an attempt to get it out of a bad state.
-    [Tags]    resource    application    restart    pod    kill    rollout    revision
+    [Tags]    access:read-write  resource    application    restart    pod    kill    rollout    revision
     ${resource_name}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get daemonset,deployment,statefulset -l ${LABELS} -o=jsonpath='{.items[0].kind}/{.items[0].metadata.name}'
     ...    show_in_rwl_cheatsheet=true

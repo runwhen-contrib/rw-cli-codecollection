@@ -15,8 +15,9 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check Loki Ring API
+Check Loki Ring API for Unhealthy Shards in Kubernetes Cluster `$${NAMESPACE}`
     [Documentation]    Request and inspect the state of the Loki hash rings for non-active (potentially unhealthy) shards.
+    [Tags]      access:read-only  Loki  
     # TODO: extend to dedicated script for parsing complex ring output/state
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} exec $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath='{.items[0].metadata.name}') -- wget -q --header="Accept: application/json" -O - http://localhost:3100/ring | jq -r '.shards[] | select(.state != "ACTIVE") | {name: .id, state: .state}'
@@ -36,8 +37,9 @@ Check Loki Ring API
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Check Loki API Ready
+Check Loki API Ready in Kubernetes Cluster `${NAMESPACE}`
     [Documentation]    Pings the internal Loki API to check it's ready.
+    [Tags]      access:read-only  Loki  
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} exec $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath='{.items[0].metadata.name}') -- wget -q --header="Accept: application/json" -O - http://localhost:3100/ready
     ...    show_in_rwl_cheatsheet=true

@@ -14,7 +14,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Fetch Patroni Database Lag
+Check Patroni Database Lag in Namespace `${NAMESPACE}` on Host `${HOSTNAME}` using `patronictl`
     [Documentation]    Identifies the lag using patronictl and raises issues if necessary.
     [Tags]    patroni    patronictl    list    cluster    health    check    state    postgres
     ${database_lag_score}=    Set Variable    1
@@ -57,7 +57,7 @@ Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESP
     END
     Set Global Variable    ${database_backup_score}
 
-Generate Namspace Score
+Generate Namespace Score for Namespace `${NAMESPACE}`
     ${postgres_health_score}=    Evaluate    (${database_lag_score} + ${database_backup_score}) / 2
     ${health_score}=    Convert to Number    ${postgres_health_score}    2
     RW.Core.Push Metric    ${postgres_health_score}

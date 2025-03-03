@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check for Resource Health Issues Affecting App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the APP Service as reported from Azure. 
-    [Tags]    aks    resource    health    service    azure
+    [Tags]    aks    resource    health    service    azure    access:read-only
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_resource_health.sh
     ...    env=${env}
@@ -53,9 +53,9 @@ Check for Resource Health Issues Affecting App Service `${APP_SERVICE_NAME}` In 
     END
 
 
-Check App Service `${APP_SERVICE_NAME}` Health Check Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
+Check App Service `${APP_SERVICE_NAME}` Health in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks the health status of a appservice workload.
-    [Tags]    
+    [Tags]    access:read-only    appservice    health
     ${health_check_metric}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_health_metric.sh
     ...    env=${env}
@@ -99,7 +99,7 @@ Check App Service `${APP_SERVICE_NAME}` Health Check Metrics In Resource Group `
 
 Fetch App Service `${APP_SERVICE_NAME}` Utilization Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Reviews key metrics for the app service and generates a report
-    [Tags]    
+    [Tags]    access:read-only     appservice    utilization
     ${metric_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_metric_health.sh
     ...    env=${env}
@@ -135,7 +135,7 @@ Fetch App Service `${APP_SERVICE_NAME}` Utilization Metrics In Resource Group `$
 
 Get App Service `${APP_SERVICE_NAME}` Logs In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch logs of appservice workload
-    [Tags]    appservice    logs    tail
+    [Tags]    appservice    logs    tail    access:read-only
     ${logs}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_logs.sh
     ...    env=${env}
@@ -145,7 +145,7 @@ Get App Service `${APP_SERVICE_NAME}` Logs In Resource Group `${AZ_RESOURCE_GROU
 
 Check Configuration Health of App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the configuration health of the App Service
-    [Tags]    appservice    logs    tail
+    [Tags]    appservice    logs    tail    access:read-only
     ${config_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_config_health.sh
     ...    env=${env}
@@ -174,7 +174,7 @@ Check Configuration Health of App Service `${APP_SERVICE_NAME}` In Resource Grou
 
 Check Deployment Health of App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch deployment health of the App Service
-    [Tags]    appservice    deployment
+    [Tags]    appservice    deployment    access:read-only
     ${deployment_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_deployment_health.sh
     ...    env=${env}
@@ -203,7 +203,7 @@ Check Deployment Health of App Service `${APP_SERVICE_NAME}` In Resource Group `
 
 Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events of appservice and checks for errors
-    [Tags]    appservice    monitor    events    errors
+    [Tags]    appservice    monitor    events    errors    access:read-only
     ${activities}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_activities.sh
     ...    env=${env}
@@ -227,7 +227,7 @@ Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOU
     END
 Check Logs for Errors in App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events of appservice and checks for errors
-    [Tags]    appservice    logs    errors
+    [Tags]    appservice    logs    errors    access:read-only
     ${log_errors}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_log_analysis.sh
     ...    env=${env}

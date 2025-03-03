@@ -27,6 +27,7 @@ Check Readiness Probe Configuration for StatefulSet `${STATEFULSET_NAME}`
     ...    get
     ...    statefulset
     ...    ${statefulset_name}
+    ...    access:read-only
     ${readiness_probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_probes.sh
     ...    cmd_overide=./validate_probes.sh readinessProbe
@@ -63,6 +64,7 @@ Check Liveness Probe Configuration for StatefulSet `${STATEFULSET_NAME}`
     ...    get
     ...    statefulset
     ...    ${statefulset_name}
+    ...    access:read-only
     ${liveness_probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_probes.sh
     ...    cmd_overide=./validate_probes.sh livenessProbe
@@ -89,7 +91,7 @@ Check Liveness Probe Configuration for StatefulSet `${STATEFULSET_NAME}`
 
 Troubleshoot StatefulSet Warning Events for `${STATEFULSET_NAME}`
     [Documentation]    Fetches warning events related to the statefulset workload in the namespace and triages any issues found in the events.
-    [Tags]    events    workloads    errors    warnings    get    statefulset    ${statefulset_name}
+    [Tags]    access:read-only  events    workloads    errors    warnings    get    statefulset    ${statefulset_name}
     ${events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '(now - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind == "StatefulSet" or .involvedObject.kind == "Pod") and (.involvedObject.name | tostring | contains("${STATEFULSET_NAME}")) and (.lastTimestamp | fromdateiso8601) >= $time_limit) | {kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp} ] | group_by([.kind, .name]) | map({kind: .[0].kind, name: .[0].name, count: length, reasons: map(.reason) | unique, messages: map(.message) | unique, firstTimestamp: map(.firstTimestamp | fromdateiso8601) | sort | .[0] | todateiso8601, lastTimestamp: map(.lastTimestamp | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'
     ...    env=${env}
@@ -120,9 +122,9 @@ Troubleshoot StatefulSet Warning Events for `${STATEFULSET_NAME}`
     RW.Core.Add Pre To Report    ${events.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Check StatefulSet Event Anomalies for `${STATEFULSET_NAME}`
+Check StatefulSet Event Anomalies for `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Parses all events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
-    [Tags]    statefulset    events    info    state    anomolies    count    occurences    ${statefulset_name}
+    [Tags]    access:read-only  statefulset    events    info    state    anomolies    count    occurences    ${statefulset_name}
     ${recent_anomalies}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '(now - (60*60)) as $time_limit | [ .items[] | select(.type != "Warning" and (.involvedObject.kind == "StatefulSet" or .involvedObject.kind == "Pod") and (.involvedObject.name | tostring | contains("${STATEFULSET_NAME}"))) | {kind: .involvedObject.kind, count: .count, name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, duration: (if (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp | fromdateiso8601)) == 0) then 1 else (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp | fromdateiso8601))/60) end) } ] | group_by([.kind, .name]) | map({kind: .[0].kind, name: .[0].name, count: (map(.count) | add), reasons: map(.reason) | unique, messages: map(.message) | unique, average_events_per_minute: (if .[0].duration == 1 then 1 else ((map(.count) | add)/.[0].duration ) end),firstTimestamp: map(.firstTimestamp | fromdateiso8601) | sort | .[0] | todateiso8601, lastTimestamp: map(.lastTimestamp | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'
     ...    env=${env}
@@ -158,9 +160,9 @@ Check StatefulSet Event Anomalies for `${STATEFULSET_NAME}`
     RW.Core.Add To Report    ${anomalies_report_output}\n
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Fetch StatefulSet Logs for `${STATEFULSET_NAME}` and Add to Report
+Fetch StatefulSet Logs for `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}` and Add to Report
     [Documentation]    Fetches the last 100 lines of logs for the given statefulset in the namespace.
-    [Tags]    fetch    log    pod    container    errors    inspect    trace    info    ${STATEFULSET_NAME}    statefulset
+    [Tags]    access:read-only  fetch    log    pod    container    errors    inspect    trace    info    ${STATEFULSET_NAME}    statefulset
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs --tail=100 statefulset/${STATEFULSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     ...    env=${env}
@@ -184,9 +186,9 @@ Get Related StatefulSet `${STATEFULSET_NAME}` Events
     RW.Core.Add Pre To Report    ${events.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Fetch Manifest Details for StatefulSet `${STATEFULSET_NAME}`
+Fetch Manifest Details for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches the current state of the statefulset manifest for inspection.
-    [Tags]    statefulset    details    manifest    info    ${STATEFULSET_NAME}
+    [Tags]    access:read-only  statefulset    details    manifest    info    ${STATEFULSET_NAME}
     ${statefulset}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${LABELS} --context=${CONTEXT} -n ${NAMESPACE} -o yaml
     ...    env=${env}
@@ -197,7 +199,7 @@ Fetch Manifest Details for StatefulSet `${STATEFULSET_NAME}`
     RW.Core.Add Pre To Report    ${statefulset.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-List StatefulSets with Unhealthy Replica Counts In Namespace `${NAMESPACE}`
+List Unhealthy Replica Counts for StatefulSets in Namespace `${NAMESPACE}`
     [Documentation]    Pulls the replica information for a given StatefulSet and checks if it's highly available
     ...    , if the replica counts are the expected / healthy values, and if not, what they should be.
     [Tags]
@@ -212,6 +214,7 @@ List StatefulSets with Unhealthy Replica Counts In Namespace `${NAMESPACE}`
     ...    stuck
     ...    pods
     ...    ${NAMESPACE}
+    ...    access:read-only
     RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset -n ${NAMESPACE} -o json --context ${CONTEXT} | jq -r '.items[] | select(.status.availableReplicas < .status.replicas) | "---\\nStatefulSet Name: " + (.metadata.name|tostring) + "\\nDesired Replicas: " + (.status.replicas|tostring) + "\\nAvailable Replicas: " + (.status.availableReplicas|tostring)'
     ...    env=${env}

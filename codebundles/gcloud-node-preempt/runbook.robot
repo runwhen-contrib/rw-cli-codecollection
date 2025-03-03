@@ -14,9 +14,9 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-List all nodes in an active prempt operation for GCP Project `${GCP_PROJECT_ID}`
+List all nodes in an active preempt operation for GCP Project `${GCP_PROJECT_ID}` within the last `${AGE}` hours
     [Documentation]    Fetches all nodes that have been preempted within the defined time interval.
-    [Tags]    stdout    gcloud    node    preempt    gcp    ${gcp_project_id}
+    [Tags]    stdout    gcloud    node    preempt    gcp    ${gcp_project_id}    access:read-only
     ${preempt_node_list}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud compute operations list --filter='operationType:(compute.instances.preempted)' --format=json --project=${GCP_PROJECT_ID} | jq -r --arg now "$(date -u +%s)" '[.[] | select((.startTime | sub("\\\\.[0-9]+"; "") | strptime("%Y-%m-%dT%H:%M:%S%z") | mktime) > ($now | tonumber - (${AGE}*60)))] '
     ...    env=${env}

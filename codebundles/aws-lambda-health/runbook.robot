@@ -16,9 +16,9 @@ Library             Process
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-List Lambda Versions and Runtimes
+List Lambda Versions and Runtimes in AWS Region `${AWS_REGION}`
     [Documentation]   This script is designed to list all the versions and runtimes of a specified AWS Lambda function.
-    [Tags]  AWS    Lambda    Versions    Runtimes    
+    [Tags]  AWS    Lambda    Versions    Runtimes    access:read-only 
     ${process}=    RW.CLI.Run Bash File    list_lambda_runtimes.sh
     ...    env=${env}
     ...    secret__AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
@@ -26,9 +26,9 @@ List Lambda Versions and Runtimes
     ...    secret__AWS_ROLE_ARN=${AWS_ROLE_ARN}
     RW.Core.Add Pre To Report    ${process.stdout}
 
-Analyze AWS Lambda Invocation Errors
+Analyze AWS Lambda Invocation Errors in Region `${AWS_REGION}`
     [Documentation]   This bash script is designed to analyze AWS Lambda Invocation Errors for a specified function within a specified region.
-    [Tags]  AWS    Lambda    Error Analysis    Invocation Errors    CloudWatch    Logs 
+    [Tags]  AWS    Lambda    Error Analysis    Invocation Errors    CloudWatch    Logs    access:read-only
     ${process}=    RW.CLI.Run Bash File    analyze_lambda_invocation_errors.sh
     ...    env=${env}
     ...    secret__AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
@@ -45,9 +45,9 @@ Analyze AWS Lambda Invocation Errors
         ...    details=${process.stdout}
     END
 
-Monitor AWS Lambda Performance Metrics
+Monitor AWS Lambda Performance Metrics in AWS Region `${AWS_REGION}`
     [Documentation]   This script is a bash utility for AWS Lambda functions the lists their notable metrics.
-    [Tags]  AWS    Lambda    CloudWatch    Logs    Metrics
+    [Tags]  AWS    Lambda    CloudWatch    Logs    Metrics   access:read-only
     ${process}=    RW.CLI.Run Bash File    monitor_aws_lambda_performance_metrics.sh
     ...    env=${env}
     ...    secret__AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}

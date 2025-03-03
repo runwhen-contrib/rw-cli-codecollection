@@ -13,9 +13,9 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-List all available Kustomization objects in Namespace `${NAMESPACE}`    
+List all available FluxCD Kustomization objects in Namespace `${NAMESPACE}`    
     [Documentation]    List all FluxCD kustomization objects found in ${NAMESPACE}
-    [Tags]        FluxCD     Kustomization     Available    List    ${NAMESPACE}
+    [Tags]            access:read-only  FluxCD     Kustomization     Available    List    ${NAMESPACE}
     ${kustomizations}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}
     ...    env=${env}
@@ -26,9 +26,9 @@ List all available Kustomization objects in Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    Kustomizations available: \n ${kustomizations.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Get details for unready Kustomizations in Namespace `${NAMESPACE}`  
+List Unready FluxCD Kustomizations in Namespace `${NAMESPACE}`  
     [Documentation]    List all Kustomizations that are not found in a ready state in namespace ${NAMESPACE}  
-    [Tags]        FluxCD     Kustomization    Versions    ${NAMESPACE}
+    [Tags]        access:read-only  FluxCD     Kustomization    Versions    ${NAMESPACE}
     ${kustomizations_not_ready}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json | jq '[.items[] | select(.status.conditions[] | select(.type == "Ready" and .status == "False")) | {KustomizationName: .metadata.name, ReadyStatus: {ready: (.status.conditions[] | select(.type == "Ready").status), message: (.status.conditions[] | select(.type == "Ready").message), reason: (.status.conditions[] | select(.type == "Ready").reason), last_transition_time: (.status.conditions[] | select(.type == "Ready").lastTransitionTime)}, ReconcileStatus: {reconciling: (.status.conditions[] | select(.type == "Reconciling").status), message: (.status.conditions[] | select(.type == "Reconciling").message)}}]'
     ...    env=${env}

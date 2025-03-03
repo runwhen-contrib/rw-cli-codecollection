@@ -33,7 +33,7 @@ Suite Initialization
     ...    default=200
     ...    example=200
 *** Tasks ***
-Checking HTTP URL Is Available And Timely
+Validate HTTP URL Availability and Timeliness for ${URL}
     [Documentation]    Use cURL to validate the http response  
     [Tags]    cURL    HTTP    Ingress    Latency    Errors
     ${curl_rsp}=    RW.CLI.Run Cli

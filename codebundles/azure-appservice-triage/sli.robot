@@ -140,7 +140,7 @@ Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOU
         END
     END
 
-Generate App Service Health Score
+Generate App Service Health Score for `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}`
     ${app_service_health_score}=      Evaluate  (${appservice_resource_score} + ${app_service_health_check_score} + ${app_service_config_score} + ${app_service_activities_score} + ${app_service_deployment_score}) / 5
     ${health_score}=      Convert to Number    ${app_service_health_score}  2
     RW.Core.Push Metric    ${health_score}
