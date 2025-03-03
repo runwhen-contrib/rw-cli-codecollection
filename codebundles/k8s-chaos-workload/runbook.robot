@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Test `${WORKLOAD_NAME}` High Availability in Namespace `${NAMESPACE}`
     [Documentation]   Kills a pod under this workload to test high availability.
-    [Tags]  Kubernetes    StatefulSet    Deployments    Pods    Highly Available
+    [Tags]  Kubernetes    StatefulSet    Deployments    Pods    Highly Available    access:read-write
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=kill_workload_pod.sh
     ...    env=${env}
@@ -27,7 +27,7 @@ Test `${WORKLOAD_NAME}` High Availability in Namespace `${NAMESPACE}`
 
 OOMKill `${WORKLOAD_NAME}` Pod
     [Documentation]   Kills the oldest pod running under the configured workload.
-    [Tags]  Kubernetes    StatefulSet    Deployments    Pods    Highly Available    OOMkill   Memory
+    [Tags]  Kubernetes    StatefulSet    Deployments    Pods    Highly Available    OOMkill   Memory    access:read-write
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=oomkill_workload_pod.sh
     ...    env=${env}
@@ -36,7 +36,7 @@ OOMKill `${WORKLOAD_NAME}` Pod
 
 Mangle Service Selector For `${WORKLOAD_NAME}` in `${NAMESPACE}`
     [Documentation]   Breaks a service's label selector to cause a network disruption
-    [Tags]  Kubernetes    networking    Services    Selector
+    [Tags]  Kubernetes    networking    Services    Selector    access:read-only
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=change_service_selector.sh
     ...    env=${env}
@@ -45,7 +45,7 @@ Mangle Service Selector For `${WORKLOAD_NAME}` in `${NAMESPACE}`
 
 Mangle Service Port For `${WORKLOAD_NAME}` in `${NAMESPACE}`
     [Documentation]   Changes a service's port to cause a network disruption
-    [Tags]  Kubernetes    networking    Services    Port
+    [Tags]  Kubernetes    networking    Services    Port    access:read-write
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=change_service_port.sh
     ...    env=${env}
@@ -54,7 +54,7 @@ Mangle Service Port For `${WORKLOAD_NAME}` in `${NAMESPACE}`
 
 Fill Tmp Directory Of Pod From `${WORKLOAD_NAME}`
     [Documentation]   Attaches to a pod and fills the /tmp directory with random data
-    [Tags]  Kubernetes    pods    volumes    tmp
+    [Tags]  Kubernetes    pods    volumes    tmp    access:read-write
     ${process}=    RW.CLI.Run Bash File    expand_tmp.sh
     ...    cmd_override=./expand_tmp.sh
     ...    env=${env}

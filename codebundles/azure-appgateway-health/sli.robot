@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the Application Gateway as reported from Azure. 
-    [Tags]    aks    resource    health    service    azure
+    [Tags]    appgateway    resource    health    service    azure    access:read-only
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_resource_health.sh
     ...    env=${env}
@@ -36,9 +36,9 @@ Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NA
     END
     Set Global Variable    ${appgw_resource_score}
 
-Fetch AKS Cluster Config in Resource Group `${AZ_RESOURCE_GROUP}`
+Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the config of the AKS cluster in azure
-    [Tags]    AKS    config
+    [Tags]    appgateway    config    access:read-only
     ${config}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_config_health.sh
     ...    env=${env}
@@ -57,7 +57,7 @@ Fetch AKS Cluster Config in Resource Group `${AZ_RESOURCE_GROUP}`
 
 Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the health of the application gateway backend pool members
-    [Tags]    appservice    logs    tail
+    [Tags]    appservice    logs    tail    access:read-only
     ${config_health}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_backend_health.sh
     ...    env=${env}

@@ -104,9 +104,9 @@ Suite Initialization
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
 
 *** Tasks ***
-Suspend the Flux Resource Reconciliation for ${FLUX_RESOURCE_NAME} in namespace ${FLUX_RESOURCE_NAMESPACE}
+Suspend the Flux Resource Reconciliation for `${FLUX_RESOURCE_NAME}` in namespace `${FLUX_RESOURCE_NAMESPACE}`
         [Documentation]    Suspends a flux resource so that it can be manipulated for chaos purposes. 
-        [Tags]    Chaos    Flux    Kubernetes    Resource    Suspend
+        [Tags]    Chaos    Flux    Kubernetes    Resource    Suspend   access:read-write
         ${suspend_flux_resource}=    RW.CLI.Run Cli
         ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} patch ${FLUX_RESOURCE_TYPE} ${FLUX_RESOURCE_NAME} -n ${FLUX_RESOURCE_NAMESPACE} --context ${CONTEXT} --type='json' -p='[{"op": "add", "path": "/spec/suspend", "value":true}]'
         ...    env=${env}
@@ -116,7 +116,7 @@ Suspend the Flux Resource Reconciliation for ${FLUX_RESOURCE_NAME} in namespace 
 
 Select Random FluxCD Workload for Chaos Target in Namespace `${FLUX_RESOURCE_NAMESPACE}`
     [Documentation]    Inspects the Flux resource and randomly selects a deployment to tickle. Tehe. Only runs if RANDOMIZE = Yes. 
-    [Tags]    Chaos    Flux    Kubernetes    Resource    Random
+    [Tags]    Chaos    Flux    Kubernetes    Resource    Random    access:read-write
     IF     "${RANDOMIZE}" == "Yes"
         ${deployments}=    RW.CLI.Run Cli
         ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployments -l kustomize.toolkit.fluxcd.io/name=${FLUX_RESOURCE_NAME} -n ${TARGET_NAMESPACE} --context ${CONTEXT} -o json
@@ -138,9 +138,9 @@ Select Random FluxCD Workload for Chaos Target in Namespace `${FLUX_RESOURCE_NAM
         Set Suite Variable    ${TARGET_RESOURCE}    deployment/${deployment_name}
     END
 
-Execute Chaos Command on ${TARGET_RESOURCE} in Namespace ${TARGET_NAMESPACE}
+Execute Chaos Command on `${TARGET_RESOURCE}` in Namespace `${TARGET_NAMESPACE}`
     [Documentation]    Run the desired chaos command within a targeted resource 
-    [Tags]    Chaos    Flux    Kubernetes    Resource    Kill    OOM
+    [Tags]    Chaos    Flux    Kubernetes    Resource    Kill    OOM   access:read-write
     FOR    ${index}    IN RANGE    ${CHAOS_COMMAND_LOOP}
         ${run_chaos_command}=    RW.CLI.Run Cli
         ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec ${TARGET_RESOURCE} -n ${TARGET_NAMESPACE} --context ${CONTEXT} -- ${CHAOS_COMMAND}
@@ -152,7 +152,7 @@ Execute Chaos Command on ${TARGET_RESOURCE} in Namespace ${TARGET_NAMESPACE}
 
 Execute Additional Chaos Command on ${FLUX_RESOURCE_TYPE} '${FLUX_RESOURCE_NAME}' in namespace '${FLUX_RESOURCE_NAMESPACE}'
     [Documentation]    Run the additional command as input, verbatim. 
-    [Tags]    Chaos    Flux    Kubernetes    Resource
+    [Tags]    Chaos    Flux    Kubernetes    Resource    access:read-write
     ${run_additional_command}=    RW.CLI.Run Cli
     ...    cmd=${ADDNL_COMMAND} -n ${TARGET_NAMESPACE} --context ${CONTEXT}
     ...    env=${env}
@@ -162,7 +162,7 @@ Execute Additional Chaos Command on ${FLUX_RESOURCE_TYPE} '${FLUX_RESOURCE_NAME}
 
 Resume Flux Resource Reconciliation in `${TARGET_NAMESPACE}`
     [Documentation]    Resumes Flux reconciliation on desired resource.  
-    [Tags]    Chaos    Flux    Kubernetes    Resource    Resume
+    [Tags]    Chaos    Flux    Kubernetes    Resource    Resume    access:read-write
     ${resume_flux}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} patch ${FLUX_RESOURCE_TYPE} ${FLUX_RESOURCE_NAME} -n ${FLUX_RESOURCE_NAMESPACE} --context ${CONTEXT} --type='json' -p='[{"op": "remove", "path": "/spec/suspend", "value":true}]'
     ...    env=${env}

@@ -31,6 +31,7 @@ Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
     ...    info
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
+    ...    access:read-only
     ${logs}=    RW.CLI.Run Bash File
     ...    bash_file=deployment_logs.sh 
     ...    cmd_override=./deployment_logs.sh | tee "${SCRIPT_TMP_DIR}/log_analysis"
@@ -69,6 +70,7 @@ Fetch Deployments Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` and 
     ...    logs
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
+    ...    access:read-only
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --tail=${LOG_LINES} --all-containers=true --max-log-requests=20 --context ${CONTEXT}
     ...    env=${env}
@@ -93,6 +95,7 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     ...    get
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
+    ...    access:read-only
     ${liveness_probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_probes.sh
     ...    cmd_override=./validate_probes.sh livenessProbe | tee "${SCRIPT_TMP_DIR}/liveness_probe_output"
@@ -130,6 +133,7 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}` in Names
     ...    get
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
+    ...    access:read-only
     ${readiness_probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_probes.sh
     ...    cmd_override=./validate_probes.sh readinessProbe | tee "${SCRIPT_TMP_DIR}/readiness_probe_output"
@@ -155,9 +159,9 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}` in Names
     RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${readiness_probe_health.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${readiness_probe_health.cmd}
 
-Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` Namespace `${NAMESPACE}`
+Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches pods that have container restarts and provides a report of the restart issues.
-    [Tags]    namespace    containers    status    restarts    ${DEPLOYMENT_NAME}    ${NAMESPACE}
+    [Tags]    access:read-only  namespace    containers    status    restarts    ${DEPLOYMENT_NAME}    ${NAMESPACE}
     ${container_restart_analysis}=    RW.CLI.Run Bash File
     ...    bash_file=container_restarts.sh
     ...    env=${env}
@@ -187,9 +191,9 @@ Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` Namespace `${NAME
     RW.Core.Add Pre To Report    ${container_restart_analysis.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`
+Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches warning events related to the deployment workload in the namespace and triages any issues found in the events.
-    [Tags]    events    workloads    errors    warnings    get    deployment    ${DEPLOYMENT_NAME}
+    [Tags]    access:read-only  events    workloads    errors    warnings    get    deployment    ${DEPLOYMENT_NAME}
     ${events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '(now - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind == "Deployment" or .involvedObject.kind == "ReplicaSet" or .involvedObject.kind == "Pod") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}")) and (.lastTimestamp | fromdateiso8601) >= $time_limit) | {kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp} ] | group_by([.kind, .name]) | map({kind: .[0].kind, name: .[0].name, count: length, reasons: map(.reason) | unique, messages: map(.message) | unique, firstTimestamp: map(.firstTimestamp | fromdateiso8601) | sort | .[0] | todateiso8601, lastTimestamp: map(.lastTimestamp | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'
     ...    env=${env}
@@ -229,9 +233,9 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`
     RW.Core.Add Pre To Report    ${events.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Fetch Deployment Workload Details For `${DEPLOYMENT_NAME}`
+Fetch Deployment Workload Details For `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches the current state of the deployment for future review in the report.
-    [Tags]    deployment    details    manifest    info    ${DEPLOYMENT_NAME}
+    [Tags]    access:read-only  deployment    details    manifest    info    ${DEPLOYMENT_NAME}
     ${deployment}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o yaml
     ...    env=${env}
@@ -258,6 +262,7 @@ Inspect Deployment Replicas for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
     ...    stuck
     ...    pods
     ...    ${DEPLOYMENT_NAME}
+    ...    access:read-only
     ${deployment_replicas}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '.status | {desired_replicas: .replicas, ready_replicas: (.readyReplicas // 0), missing_replicas: ((.replicas // 0) - (.readyReplicas // 0)), unavailable_replicas: (.unavailableReplicas // 0), available_condition: (if any(.conditions[]; .type == "Available") then (.conditions[] | select(.type == "Available")) else "Condition not available" end), progressing_condition: (if any(.conditions[]; .type == "Progressing") then (.conditions[] | select(.type == "Progressing")) else "Condition not available" end)}'
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -303,7 +308,7 @@ Inspect Deployment Replicas for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`
+Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Parses all events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
     [Tags]
     ...    deployment
@@ -315,6 +320,7 @@ Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`
     ...    occurences
     ...    connection error
     ...    ${DEPLOYMENT_NAME}
+    ...    access:read-only
     ${recent_anomalies}=    RW.CLI.Run Bash File
     ...    bash_file=event_anomalies.sh 
     ...    env=${env}
@@ -359,7 +365,7 @@ Check Deployment Event Anomalies for `${DEPLOYMENT_NAME}`
     RW.Core.Add To Report    ${anomalies_report_output}\n
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-Check ReplicaSet Health for Deployment `${DEPLOYMENT_NAME}`
+Check ReplicaSet Health for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches all replicasets related to deployment to ensure that conflicting versions don't exist. 
     [Tags]
     ...    replica
@@ -369,6 +375,7 @@ Check ReplicaSet Health for Deployment `${DEPLOYMENT_NAME}`
     ...    pods
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
+    ...    access:read-only
     ${check_replicaset}=    RW.CLI.Run Bash File
     ...    bash_file=check_replicaset.sh 
     ...    cmd_override=./check_replicaset.sh | tee "${SCRIPT_TMP_DIR}/rs_analysis"

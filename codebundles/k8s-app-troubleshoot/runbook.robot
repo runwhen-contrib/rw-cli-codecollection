@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Get `${CONTAINER_NAME}` Application Logs from Workload `${WORKLOAD_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Collects the last approximately 300 lines of logs from the workload
-    [Tags]    resource    application    workload    logs    state    ${container_name}    ${workload_name}
+    [Tags]    resource    application    workload    logs    state    ${container_name}    ${workload_name}   access:read-only
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     ...    show_in_rwl_cheatsheet=true
@@ -54,6 +54,7 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces in Workload `${WORKLOA
     ...    logs
     ...    ${container_name}
     ...    ${workload_name}
+    ...    access:read-only
     ${cmd}=    Set Variable
     ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     IF    $EXCLUDE_PATTERN != ""

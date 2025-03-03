@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Checking whether the Terraform Cloud Workspace '${TERRAFORM_WORKSPACE_NAME}' is in a locked state
     [Documentation]    Use curl to check whether the Terraform Cloud Workspace is in a locked state
-    [Tags]    terraform    cloud    workspace    lock
+    [Tags]    access:read-only  terraform    cloud    workspace    lock
     ${curl_rsp}=    RW.CLI.Run Cli
     ...    cmd=TERRAFORM_API_TOKEN_VALUE=$(cat $TERRAFORM_API_TOKEN) && curl --header "Authorization: Bearer $TERRAFORM_API_TOKEN_VALUE" --header "Content-Type: application/vnd.api+json" -s '${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}'
     ...    show_in_rwl_cheatsheet=true

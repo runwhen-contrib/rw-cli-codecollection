@@ -30,6 +30,7 @@ Show Pods Without Resource Limit or Resource Requests Set in Namespace `${NAMESP
     ...    liveness
     ...    readiness
     ...    ${NAMESPACE}
+    ...    access:read-only  
     ${pods_without_limits}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running -ojson | jq -r '[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.limits == null) | {pod: $pod.metadata.name, container_without_limits: .name}]'
     ...    env=${env}
@@ -74,7 +75,7 @@ Show Pods Without Resource Limit or Resource Requests Set in Namespace `${NAMESP
 
 Check Pod Resource Utilization with Top in Namespace `${NAMESPACE}`
     [Documentation]    Performs and a top command on list of labeled workloads to check pod resources.
-    [Tags]    top    resources    utilization    pods    workloads    cpu    memory    allocation    labeled    ${NAMESPACE}
+    [Tags]     access:read-only  top    resources    utilization    pods    workloads    cpu    memory    allocation    labeled    ${NAMESPACE}
     ${pods_top}=    RW.CLI.Run Cli
     ...    cmd=for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods ${LABELS} -n ${NAMESPACE} --context ${CONTEXT} -o custom-columns=":metadata.name" --field-selector=status.phase=Running); do ${KUBERNETES_DISTRIBUTION_BINARY} top pod $pod -n ${NAMESPACE} --context ${CONTEXT} --containers; done
     ...    env=${env}
@@ -91,7 +92,7 @@ Check Pod Resource Utilization with Top in Namespace `${NAMESPACE}`
 
 Identify VPA Pod Resource Recommendations in Namespace `${NAMESPACE}`
     [Documentation]    Queries the namespace for any Vertical Pod Autoscaler resource recommendations. 
-    [Tags]    recommendation    resources    utilization    pods    cpu    memory    allocation   vpa    ${NAMESPACE}
+    [Tags]     access:read-only  recommendation    resources    utilization    pods    cpu    memory    allocation   vpa    ${NAMESPACE}
     ${vpa_usage}=    RW.CLI.Run Bash File
     ...    bash_file=vpa_recommendations.sh
     ...    env=${env}
@@ -120,7 +121,7 @@ Identify VPA Pod Resource Recommendations in Namespace `${NAMESPACE}`
 
 Identify Overutilized Pods in Namespace `${NAMESPACE}`
     [Documentation]    Scans the namespace for pods that are over utilizing resources or may be experiencing resource problems like oomkills or restarts.
-    [Tags]    overutilized    resources    utilization    pods    cpu    memory    allocation    ${NAMESPACE}    oomkill    restarts
+    [Tags]     access:read-only  overutilized    resources    utilization    pods    cpu    memory    allocation    ${NAMESPACE}    oomkill    restarts
     ${pod_usage_analysis}=    RW.CLI.Run Bash File    identify_resource_contrained_pods.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}

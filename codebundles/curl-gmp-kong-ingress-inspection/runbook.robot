@@ -15,9 +15,9 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check If Kong Ingress HTTP Error Rate Violates HTTP Error Threshold in GCP Project `$${GCP_PROJECT_ID}`
+Check If Kong Ingress HTTP Error Rate Violates HTTP Error Threshold in GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Fetches HTTP Error metrics for the Kong ingress host and service from GMP and performs an inspection on the results. If there are currently any results with more than the defined HTTP error threshold, their route and service names will be surfaced for further troubleshooting.
-    [Tags]    curl    http    ingress    errors    metrics    kong    gmp
+    [Tags]    curl    http    ingress    errors    metrics    kong    gmp    access:read-only
     ${gmp_rsp}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && response=$(curl -s -d "query=rate(kong_http_requests_total{service='${INGRESS_SERVICE}',code=~'${HTTP_ERROR_CODES}'}[${TIME_SLICE}]) > ${HTTP_ERROR_RATE_THRESHOLD}" -H "Authorization: Bearer $(gcloud auth print-access-token)" 'https://monitoring.googleapis.com/v1/projects/runwhen-nonprod-sandbox/location/global/prometheus/api/v1/query') && echo "$response" | jq -e '.data.result | length > 0' && echo "$response" | jq -r '.data.result[] | "Route:" + .metric.route + " Service:" + .metric.service + " Kong Instance:" + .metric.instance + " HTTP Error Count:" + .value[1]' || echo "No HTTP Error threshold violations found for ${INGRESS_SERVICE}."
     ...    show_in_rwl_cheatsheet=true
@@ -48,9 +48,9 @@ Check If Kong Ingress HTTP Error Rate Violates HTTP Error Threshold in GCP Proje
     RW.Core.Add Pre To Report    HTTP Error Violation & Details:\n${gmp_rsp.stdout}
     RW.Core.Add Pre To Report    GMP Json Data:\n${gmp_json.stdout}
 
-Check If Kong Ingress HTTP Request Latency Violates Threshold for Upstream `$${INGRESS_UPSTREAM}`
+Check If Kong Ingress HTTP Request Latency Violates Threshold in GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Fetches metrics for the Kong ingress 99th percentile request latency from GMP and performs an inspection on the results. If there are currently any results with more than the defined request latency threshold, their route and service names will be surfaced for further troubleshooting.
-    [Tags]    curl    request    ingress    latency    http    kong    gmp
+    [Tags]    curl    request    ingress    latency    http    kong    gmp    access:read-only
     ${gmp_rsp}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && response=$(curl -s -d "query=histogram_quantile(0.99, sum(rate(kong_request_latency_ms_bucket{service='${INGRESS_SERVICE}'}[${TIME_SLICE}])) by (le)) > ${REQUEST_LATENCY_THRESHOLD}" -H "Authorization: Bearer $(gcloud auth print-access-token)" 'https://monitoring.googleapis.com/v1/projects/runwhen-nonprod-sandbox/location/global/prometheus/api/v1/query') && echo "$response" | jq -e '.data.result | length > 0' && echo "$response" | jq -r '.data.result[] | "Service: ${INGRESS_SERVICE}" + " HTTP Request Latency(ms):" + .value[1]' || echo "No HTTP request latency threshold violations found for ${INGRESS_SERVICE}."
     ...    show_in_rwl_cheatsheet=true
@@ -79,9 +79,9 @@ Check If Kong Ingress HTTP Request Latency Violates Threshold for Upstream `$${I
     RW.Core.Add Pre To Report    Commands Used: ${history}
     RW.Core.Add Pre To Report    HTTP Request Latency Within Acceptable Parameters:\n${gmp_rsp.stdout}
 
-Check If Kong Ingress Controller Reports Upstream Errors in GCP Project `$${GCP_PROJECT_ID}`
+Check If Kong Ingress Controller Reports Upstream Errors in GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Fetches metrics for the Kong ingress controller related to upstream healthchecks or dns errors.
-    [Tags]    curl    request    ingress    upstream    healthcheck    dns    errrors    http    kong    gmp
+    [Tags]    curl    request    ingress    upstream    healthcheck    dns    errrors    http    kong    gmp   access:read-only
     ${gmp_healthchecks_off_rsp}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && response=$(curl -s -d "query=kong_upstream_target_health{upstream='${INGRESS_UPSTREAM}',state='healthchecks_off'} > 0" -H "Authorization: Bearer $(gcloud auth print-access-token)" 'https://monitoring.googleapis.com/v1/projects/runwhen-nonprod-sandbox/location/global/prometheus/api/v1/query') && echo "$response" | jq -e '.data.result | length > 0' && echo "$response" | jq -r '.data.result[] | "Service: ${INGRESS_UPSTREAM}" + " Healthchecks Disabled!' || echo "${INGRESS_UPSTREAM} has healthchecks enabled."
     ...    show_in_rwl_cheatsheet=true

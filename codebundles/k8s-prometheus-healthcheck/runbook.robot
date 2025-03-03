@@ -18,6 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check Prometheus Service Monitors in namespace `${NAMESPACE}`
     [Documentation]    Checks the selector mappings of service monitors are valid in the namespace
+    [Tags]       access:read-only  prometheus
     ${sm_report}=    RW.CLI.Run Bash File
     ...    bash_file=validate_servicemonitors.sh
     ...    env=${env}
@@ -41,6 +42,7 @@ Check Prometheus Service Monitors in namespace `${NAMESPACE}`
 
 Check For Successful Rule Setup in Kubernetes Namespace `${NAMESPACE}`
     [Documentation]    Inspects operator instance logs for failed rules setup
+    [Tags]       access:read-only   prometheys
     Log To Console    Prometheus
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${PROM_NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/name=prometheus -o=jsonpath='{.items[0].metadata.name}') -c prometheus | grep -iP "(load.*.fail)" || true
@@ -67,6 +69,7 @@ Check For Successful Rule Setup in Kubernetes Namespace `${NAMESPACE}`
 
 Verify Prometheus RBAC Can Access ServiceMonitors in Namespace `${PROM_NAMESPACE}`
     [Documentation]    Fetch operator rbac and verify it has ServiceMonitors in rbac.
+    [Tags]       access:read-only   prometheus
     ${clusterrole}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get clusterrole/kube-prometheus-stack-operator -ojson
     ...    show_in_rwl_cheatsheet=true
@@ -89,6 +92,7 @@ Verify Prometheus RBAC Can Access ServiceMonitors in Namespace `${PROM_NAMESPACE
 
 Inspect Prometheus Operator Logs for Scraping Errors in Namespace `${NAMESPACE}`
     [Documentation]    Inspect the prometheus operator logs for scraping errors and raise issues if any found
+    [Tags]       access:read-only   prometheus    
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${PROM_NAMESPACE} logs $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/name=prometheus -o=jsonpath='{.items[0].metadata.name}') -c prometheus | grep -iP "(scrape.*.error)" || true
     ...    show_in_rwl_cheatsheet=true
@@ -114,6 +118,7 @@ Inspect Prometheus Operator Logs for Scraping Errors in Namespace `${NAMESPACE}`
 
 Check Prometheus API Healthy in Namespace `${PROM_NAMESPACE}`
     [Documentation]    Ping Prometheus healthy API endpoint for a 200 response code.
+    [Tags]       access:read-only   prometheus
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${PROM_NAMESPACE} exec $(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${PROM_NAMESPACE} get pods -l app.kubernetes.io/name=prometheus -o=jsonpath='{.items[0].metadata.name}') --container prometheus -- wget -qO- -S 127.0.0.1:9090/-/healthy 2>&1 | grep "HTTP/" | awk '{print $2}'
     ...    show_in_rwl_cheatsheet=true

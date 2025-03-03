@@ -70,7 +70,7 @@ Suite Initialization
 *** Tasks ***
 Get Error Event Count within ${EVENT_AGE} and calculate Score
     [Documentation]    Captures error events and counts them within a configurable timeframe.
-    [Tags]    Event    Count    Warning
+    [Tags]     Event    Count    Warning
     ${error_events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json
     ...    env=${env}
@@ -105,7 +105,7 @@ Get Container Restarts and Score in Namespace `${NAMESPACE}`
 
 Get NotReady Pods in `${NAMESPACE}`
     [Documentation]    Fetches a count of unready pods.
-    [Tags]    Pods    Status    Phase    Ready    Unready    Running
+    [Tags]     access:read-only  Pods    Status    Phase    Ready    Unready    Running
     ${unreadypods_results}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select(.status.conditions[]? | select(.type == "Ready" and .status == "False" and .reason != "PodCompleted")) | {kind: .kind, name: .metadata.name, conditions: .status.conditions}' | jq -s '. | length' | tr -d '\n'
     ...    env=${env}

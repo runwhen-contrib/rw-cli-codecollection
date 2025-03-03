@@ -69,7 +69,7 @@ Suite Initialization
 *** Tasks ***
 Query The Jenkins Kubernetes Workload HTTP Endpoint in Kubernetes StatefulSet `${STATEFULSET_NAME}`
     [Documentation]    Performs a curl within the jenkins statefulset kubernetes workload to determine if the pod is up and healthy, and can serve requests.
-    [Tags]    HTTP    Curl    Web    Code    OK    Available    Jenkins    HTTP    Endpoint    API
+    [Tags]    access:read-only  HTTP    Curl    Web    Code    OK    Available    Jenkins    HTTP    Endpoint    API
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- curl -s -o /dev/null -w "\%{http_code}" localhost:8080/login
     ...    show_in_rwl_cheatsheet=true
@@ -97,9 +97,9 @@ Query The Jenkins Kubernetes Workload HTTP Endpoint in Kubernetes StatefulSet `$
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
-Query For Stuck Jenkins Jobs in Kubernetes Statefulset Workload `$${STATEFULSET_NAME}`
+Query For Stuck Jenkins Jobs in Kubernetes Statefulset Workload `${STATEFULSET_NAME}`
     [Documentation]    Performs a curl within the jenkins statefulset kubernetes workload to check for stuck jobs in the jenkins piepline queue.
-    [Tags]    HTTP    Curl    Web    Code    OK    Available    Queue    Stuck    Jobs    Jenkins
+    [Tags]   access:read-only   HTTP    Curl    Web    Code    OK    Available    Queue    Stuck    Jobs    Jenkins
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- curl -s localhost:8080/queue/api/json --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key} | jq -r '.items[] | select((.stuck == true) or (.blocked == true)) | "Why: " + .why + "\\nBlocked: " + (.blocked|tostring) + "\\nStuck: " + (.stuck|tostring)'
     ...    secret__jenkins_sa_username=${JENKINS_SA_USERNAME}

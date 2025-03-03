@@ -89,7 +89,7 @@ Check App Service `${APP_SERVICE_NAME}` Configuration Health In Resource Group `
             END
         END
     END
-Fetch Deployment Health of App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
+Check Deployment Health of App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch deployment health of the App Service
     [Tags]    appservice    deployment
     ${deployment_health}=    RW.CLI.Run Bash File

@@ -13,9 +13,9 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check for Overutilization and Networking Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
+Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the AKS cluster
-    [Tags]    aks    config
+    [Tags]    aks    config    access:read-only
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=aks_resource_health.sh
     ...    env=${env}
@@ -55,7 +55,7 @@ Check for Overutilization and Networking Issues Affecting AKS Cluster `${AKS_CLU
 
 Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the config of the AKS cluster in azure
-    [Tags]    AKS    config
+    [Tags]    AKS    config   access:read-only
     ${config}=    RW.CLI.Run Bash File
     ...    bash_file=aks_cluster_health.sh
     ...    env=${env}
@@ -82,9 +82,9 @@ Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${
             ...    details=${item["details"]}        
         END
     END
-Check Network Configuration of AKS Cluster `${{AKS_CLUSTER}}` In Resource Group `${{AZ_RESOURCE_GROUP}}`
+Check Network Configuration of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
    [Documentation]    Fetch the network configuration, generating resource URLs and basic recommendations
-   [Tags]    AKS    config    network    route    firewall
+   [Tags]    AKS    config    network    route    firewall    access:read-only
    ${network}=    RW.CLI.Run Bash File
    ...    bash_file=aks_network.sh
    ...    env=${env}
@@ -95,7 +95,7 @@ Check Network Configuration of AKS Cluster `${{AKS_CLUSTER}}` In Resource Group 
 
 Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the activities for the AKS cluster set and checks for errors
-    [Tags]    AKS    activities    monitor    events    errors
+    [Tags]    AKS    activities    monitor    events    errors    access:read-only
     ${activites}=    RW.CLI.Run Bash File
     ...    bash_file=aks_activities.sh
     ...    env=${env}
