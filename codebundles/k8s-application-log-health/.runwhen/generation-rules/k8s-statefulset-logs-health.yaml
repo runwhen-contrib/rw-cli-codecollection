@@ -16,6 +16,6 @@ spec:
           baseTemplateName: k8s-ss-logs-health
           outputItems:
             - type: slx
-            - type: sli
+            # - type: sli
             - type: runbook
               templateName: k8s-ss-logs-health-taskset.yaml
