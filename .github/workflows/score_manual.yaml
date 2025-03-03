@@ -8,10 +8,6 @@ on:
         description: "Directory with .robot files (ignored if running with git-url)"
         required: false
         default: "./"
-      commit_results:
-        description: "Deprecated; sets commit_changes to true if 'true'."
-        required: false
-        default: "false"
       git_url:
         description: "Remote git URL to clone"
         required: false
@@ -24,14 +20,6 @@ on:
         description: "Analyze only changed .robot files"
         required: false
         default: "false"
-      base_sha:
-        description: "Base commit SHA"
-        required: false
-        default: ""
-      head_sha:
-        description: "Head commit SHA"
-        required: false
-        default: ""
       apply_suggestions:
         description: "If 'true', apply suggestions"
         required: false
