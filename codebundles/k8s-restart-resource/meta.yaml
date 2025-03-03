@@ -241,7 +241,7 @@ commands:
     -o=jsonpath=''{.items[0].kind}/{.items[0].metadata.name}''
 
     '
-  name: restart_resource_with_labels_labels
+  name: restart_resource_with_labels_labels_in_context
   when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
     events to identify and resolve issues that are causing applications to fail.
 
@@ -292,7 +292,7 @@ commands:
     -o=jsonpath=''{.items[0].kind}/{.items[0].metadata.name}''
 
     '
-  name: restart_resource_with_labels_labels
+  name: restart_resource_with_labels_labels_in_context
   when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
     events to identify and resolve issues that are causing applications to fail.
 
@@ -334,7 +334,7 @@ commands:
     kubectl rollout restart $resource --context=${CONTEXT} -n ${NAMESPACE}
 
     '
-  name: restart_resource_with_labels_labels
+  name: restart_resource_with_labels_labels_in_context
   when_is_it_useful: '1. A pod is experiencing a CrashLoopBackoff event due to an
     application error or configuration issue, and the DevOps or SRE needs to restart
     the pod to attempt a recovery.
@@ -382,7 +382,7 @@ commands:
     kubectl rollout restart $resource --context=${CONTEXT} -n ${NAMESPACE}
 
     '
-  name: restart_resource_with_labels_labels
+  name: restart_resource_with_labels_labels_in_context
   when_is_it_useful: '1. A pod is experiencing a CrashLoopBackoff event due to an
     application error or configuration issue, and the DevOps or SRE needs to restart
     the pod to attempt a recovery.

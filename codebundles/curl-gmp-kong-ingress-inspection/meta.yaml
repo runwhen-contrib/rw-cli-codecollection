@@ -41,7 +41,7 @@ commands:
     \ for error rate data. Finally, we use jq to parse and display the results based\
     \ on certain conditions, outputting relevant information if HTTP error threshold\
     \ violations are found or a message indicating none were found."
-  name: check_if_kong_ingress_http_error_rate_violates_http_error_threshold
+  name: check_if_kong_ingress_http_error_rate_violates_http_error_threshold_in_gcp_project_gcp_project_id
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
     or Site Reliability Engineer may use this command to monitor HTTP error rates
     for a specific service running on Google Cloud, in order to identify and resolve
@@ -114,7 +114,7 @@ commands:
     \ for error rate data. Finally, we use jq to parse and display the results based\
     \ on certain conditions, outputting relevant information if HTTP error threshold\
     \ violations are found or a message indicating none were found."
-  name: check_if_kong_ingress_http_error_rate_violates_http_error_threshold
+  name: check_if_kong_ingress_http_error_rate_violates_http_error_threshold_in_gcp_project_gcp_project_id
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
     or Site Reliability Engineer may use this command to monitor HTTP error rates
     for a specific service running on Google Cloud, in order to identify and resolve
@@ -196,7 +196,7 @@ commands:
     ${INGRESS_SERVICE}."
 
     '
-  name: check_if_kong_ingress_http_request_latency_violates_threshold
+  name: check_if_kong_ingress_http_request_latency_violates_threshold_in_gcp_project_gcp_project_id
   when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event: DevOps
     or SRE may need to use this command to monitor the request latency for services
     running on Kubernetes to identify if any service is causing the crash loop.
@@ -267,7 +267,7 @@ commands:
     ${INGRESS_SERVICE}."
 
     '
-  name: check_if_kong_ingress_http_request_latency_violates_threshold
+  name: check_if_kong_ingress_http_request_latency_violates_threshold_in_gcp_project_gcp_project_id
   when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event: DevOps
     or SRE may need to use this command to monitor the request latency for services
     running on Kubernetes to identify if any service is causing the crash loop.
@@ -313,7 +313,7 @@ commands:
     \ for the specified upstream target\necho \"$response\" | jq -r '.data.result[]\
     \ | \"Service: ${INGRESS_UPSTREAM}\" + \" Healthchecks Disabled!' || echo \"${INGRESS_UPSTREAM}\
     \ has healthchecks enabled.\"\n"
-  name: check_if_kong_ingress_controller_reports_upstream_errors
+  name: check_if_kong_ingress_controller_reports_upstream_errors_in_gcp_project_gcp_project_id
   when_is_it_useful: '1. Monitoring and troubleshooting the health status of an application
     deployed on Kubernetes cluster to ensure high availability and reliability.
 
@@ -354,7 +354,7 @@ commands:
     \ for the specified upstream target\necho \"$response\" | jq -r '.data.result[]\
     \ | \"Service: ${INGRESS_UPSTREAM}\" + \" Healthchecks Disabled!' || echo \"${INGRESS_UPSTREAM}\
     \ has healthchecks enabled.\"\n"
-  name: check_if_kong_ingress_controller_reports_upstream_errors
+  name: check_if_kong_ingress_controller_reports_upstream_errors_in_gcp_project_gcp_project_id
   when_is_it_useful: '1. Monitoring and troubleshooting the health status of an application
     deployed on Kubernetes cluster to ensure high availability and reliability.
 
@@ -401,7 +401,7 @@ commands:
     \ controller.\"\n\nIn this multi-line command, each line includes a helpful comment\
     \ explaining what the command does. This should help newer or less experienced\
     \ devops engineers understand the purpose of each step in the command."
-  name: check_if_kong_ingress_controller_reports_upstream_errors
+  name: check_if_kong_ingress_controller_reports_upstream_errors_in_gcp_project_gcp_project_id
   when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
     events to identify the root cause of application crashes and implement remediation
     strategies.
@@ -449,7 +449,7 @@ commands:
     \ controller.\"\n\nIn this multi-line command, each line includes a helpful comment\
     \ explaining what the command does. This should help newer or less experienced\
     \ devops engineers understand the purpose of each step in the command."
-  name: check_if_kong_ingress_controller_reports_upstream_errors
+  name: check_if_kong_ingress_controller_reports_upstream_errors_in_gcp_project_gcp_project_id
   when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
     events to identify the root cause of application crashes and implement remediation
     strategies.

@@ -22,7 +22,7 @@ commands:
     \ the actual URL that you want to send the request to.\n\ncurl -o /dev/null \\\
     \n  -w '{\"http_code\": %{http_code}, \"time_total\": %{time_total}}' \\\n  -s\
     \ ${URL}"
-  name: checking_http_url_is_available_and_timely
+  name: check_http_url_availability_and_timeliness_for_url
   when_is_it_useful: '1. Monitoring the uptime and response time of a web server or
     service
 
@@ -59,7 +59,7 @@ commands:
     \ the actual URL that you want to send the request to.\n\ncurl -o /dev/null \\\
     \n  -w '{\"http_code\": %{http_code}, \"time_total\": %{time_total}}' \\\n  -s\
     \ ${URL}"
-  name: checking_http_url_is_available_and_timely
+  name: check_http_url_availability_and_timeliness_for_url
   when_is_it_useful: '1. Monitoring the uptime and response time of a web server or
     service
 

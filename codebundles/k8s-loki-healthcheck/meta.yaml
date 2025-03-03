@@ -7,6 +7,8 @@ commands:
 
     - [kubectl command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 
+    - [wget command](https://www.gnu.org/software/wget/manual/wget.html){:target="_blank"}
+
     - [JSON data retrieval](https://www.json.org/json-en.html){:target="_blank"}
 
     - [jq filtering](https://stedolan.github.io/jq/manual/){:target="_blank"}'
@@ -23,7 +25,7 @@ commands:
     \ displaying only the shards with state not equal to \"ACTIVE\" \nwget -q --header=\"\
     Accept: application/json\" -O - http://localhost:3100/ring | jq -r '.shards[]\
     \ | select(.state != \"ACTIVE\") | {name: .id, state: .state}'\n"
-  name: check_loki_ring_api
+  name: check_loki_ring_api_for_unhealthy_shards_in_kubernetes_cluster_namespace
   when_is_it_useful: '1. Investigating and troubleshooting the cause of Kubernetes
     CrashLoopBackoff events in a specific pod or namespace.
 
@@ -46,6 +48,8 @@ commands:
 
     - [kubectl command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 
+    - [wget command](https://www.gnu.org/software/wget/manual/wget.html){:target="_blank"}
+
     - [JSON data retrieval](https://www.json.org/json-en.html){:target="_blank"}
 
     - [jq filtering](https://stedolan.github.io/jq/manual/){:target="_blank"}'
@@ -62,7 +66,7 @@ commands:
     \ displaying only the shards with state not equal to \"ACTIVE\" \nwget -q --header=\"\
     Accept: application/json\" -O - http://localhost:3100/ring | jq -r '.shards[]\
     \ | select(.state != \"ACTIVE\") | {name: .id, state: .state}'\n"
-  name: check_loki_ring_api
+  name: check_loki_ring_api_for_unhealthy_shards_in_kubernetes_cluster_namespace
   when_is_it_useful: '1. Investigating and troubleshooting the cause of Kubernetes
     CrashLoopBackoff events in a specific pod or namespace.
 
@@ -118,7 +122,7 @@ commands:
     understandable steps with helpful comments to explain each part. This can help
     newer or less experienced devops engineers understand the purpose and functionality
     of the original command.'
-  name: check_loki_api_ready
+  name: check_loki_api_ready_in_kubernetes_cluster_namespace
   when_is_it_useful: '1. Debugging a failing deployment: When a Kubernetes pod goes
     into CrashLoopBackoff, a DevOps or SRE may need to use this command to run an
     operation inside the container to troubleshoot and diagnose the issue.
@@ -184,7 +188,7 @@ commands:
     understandable steps with helpful comments to explain each part. This can help
     newer or less experienced devops engineers understand the purpose and functionality
     of the original command.'
-  name: check_loki_api_ready
+  name: check_loki_api_ready_in_kubernetes_cluster_namespace
   when_is_it_useful: '1. Debugging a failing deployment: When a Kubernetes pod goes
     into CrashLoopBackoff, a DevOps or SRE may need to use this command to run an
     operation inside the container to troubleshoot and diagnose the issue.

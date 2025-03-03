@@ -30,7 +30,7 @@ commands:
     --all-containers=true --max-log-requests=20
 
     '
-  name: fetch_deployments_logs_for_deployment_name_and_add_to_report
+  name: fetch_deployments_logs_for_deployment_name_in_namespace_namespace_and_add_to_report
   when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event: The
     DevOps or Site Reliability Engineer may need to use this command to view the logs
     of the deployment to identify any errors or issues causing the pod to continuously
@@ -241,7 +241,7 @@ commands:
     \ be shown as Next Steps\nif [[ ${#next_steps[@]} -ne 0 ]]; then  # Check if there\
     \ are any next steps\n    printf \"\\nRecommended Next Steps: \\n\"\n    printf\
     \ \"%s\\n\" \"${next_steps[@]}\" | sort -u  # Print unique next steps\nfi\n"
-  name: check_readiness_probe_configuration_for_deployment_deployment_name
+  name: check_readiness_probe_configuration_for_deployment_deployment_name_in_namespace_namespace
   when_is_it_useful: '1. Deploying a new application or service to a Kubernetes cluster
     and wanting to ensure that the probes are correctly configured to monitor the
     health and readiness of the application.
@@ -308,7 +308,7 @@ commands:
     \ \n     messages: map(.message) | unique, \n     firstTimestamp: map(.firstTimestamp\
     \ | fromdateiso8601) | sort | .[0] | todateiso8601, \n     lastTimestamp: map(.lastTimestamp\
     \ | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'\n"
-  name: inspect_deployment_warning_events_for_deployment_name
+  name: inspect_deployment_warning_events_for_deployment_name_in_namespace_namespace
   when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes applications: A
     DevOps or Site Reliability Engineer might use this command to quickly identify
     and address warning events related to Deployments, ReplicaSets, or Pods within
@@ -382,7 +382,7 @@ commands:
     \ \n     messages: map(.message) | unique, \n     firstTimestamp: map(.firstTimestamp\
     \ | fromdateiso8601) | sort | .[0] | todateiso8601, \n     lastTimestamp: map(.lastTimestamp\
     \ | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'\n"
-  name: inspect_deployment_warning_events_for_deployment_name
+  name: inspect_deployment_warning_events_for_deployment_name_in_namespace_namespace
   when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes applications: A
     DevOps or Site Reliability Engineer might use this command to quickly identify
     and address warning events related to Deployments, ReplicaSets, or Pods within
@@ -429,7 +429,7 @@ commands:
     \ ${CONTEXT}\n\n# Specify the namespace where the deployment is located\n-n ${NAMESPACE}\
     \ \n\n# Output the details in YAML format for easier reading and manipulation\n\
     -o yaml\n"
-  name: get_deployment_workload_details_for_deployment_name_and_add_to_report
+  name: fetch_deployment_workload_details_for_deployment_name_in_namespace_namespace
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: When
     a deployment is continuously crashing and restarting, a DevOps or SRE might use
     this command to retrieve the YAML configuration in order to review the settings
@@ -470,7 +470,7 @@ commands:
     \ ${CONTEXT}\n\n# Specify the namespace where the deployment is located\n-n ${NAMESPACE}\
     \ \n\n# Output the details in YAML format for easier reading and manipulation\n\
     -o yaml\n"
-  name: get_deployment_workload_details_for_deployment_name_and_add_to_report
+  name: fetch_deployment_workload_details_for_deployment_name_in_namespace_namespace
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: When
     a deployment is continuously crashing and restarting, a DevOps or SRE might use
     this command to retrieve the YAML configuration in order to review the settings
@@ -524,7 +524,7 @@ commands:
     ) then \n                                  (.conditions[] | select(.type == \"\
     Progressing\")) \n                                else \"Condition not available\"\
     \ end)\n    }'\n"
-  name: inspect_deployment_replicas_for_deployment_name
+  name: inspect_deployment_replicas_for_deployment_name_in_namespace_namespace
   when_is_it_useful: '1. Monitoring the health and status of a specific deployment
     in a Kubernetes cluster to ensure that it is functioning as expected.
 
@@ -569,7 +569,7 @@ commands:
     ) then \n                                  (.conditions[] | select(.type == \"\
     Progressing\")) \n                                else \"Condition not available\"\
     \ end)\n    }'\n"
-  name: inspect_deployment_replicas_for_deployment_name
+  name: inspect_deployment_replicas_for_deployment_name_in_namespace_namespace
   when_is_it_useful: '1. Monitoring the health and status of a specific deployment
     in a Kubernetes cluster to ensure that it is functioning as expected.
 
@@ -587,6 +587,8 @@ commands:
     its configuration.'
 - command: bash 'event_anomalies.sh'
   doc_links: '
+
+    - [Bash Shell Documentation](https://www.gnu.org/software/bash/manual/bash.html){:target="_blank"}
 
     - [Kubernetes Events API Reference](https://kubernetes.io/docs/reference/using-api/api-concepts/#kubernetes-events){:target="_blank"}
 
@@ -632,7 +634,7 @@ commands:
     \ | sort | .[0] | todateiso8601),  # Finding first and last timestamp of events\n\
     \      lastTimestamp: (map(.lastTimestamp | fromdateiso8601) | sort | reverse\
     \ | .[0] | todateiso8601)\n    })\n')\n\necho \"${PROCESSED_EVENTS}\"\n"
-  name: check_deployment_event_anomalies_for_deployment_name
+  name: check_deployment_event_anomalies_for_deployment_name_in_namespace_namespace
   when_is_it_useful: '1. Monitoring Kubernetes deployments for any CrashLoopBackoff
     events, which could indicate a problem with the application or its environment.
 
@@ -767,7 +769,7 @@ commands:
     \n# Display all unique recommendations that can be shown as Next Steps\nif [ -n\
     \ \"$issues\" ]; then\n    echo -e \"\\nRecommended Next Steps: \\n\"\n    echo\
     \ \"$issues\"\nfi\n"
-  name: check_replicaset_health_for_deployment_deployment_name
+  name: check_replicaset_health_for_deployment_deployment_name_in_namespace_namespace
   when_is_it_useful: '1. During a routine health check of the Kubernetes cluster,
     the DevOps or Site Reliability Engineer may run this script to ensure that all
     ReplicaSets are functioning properly and there are no conflicts or inactive ReplicaSets

@@ -23,7 +23,7 @@ commands:
     \ comments to explain each step. This is useful for newer or less experienced\
     \ devops engineers who may be unfamiliar with the syntax and behavior of the individual\
     \ commands used in the original command."
-  name: checking_whether_the_terraform_cloud_workspace_is_in_a_locked_state
+  name: checking_whether_the_terraform_cloud_workspace_terraform_workspace_name_is_in_a_locked_state
   when_is_it_useful: '1. Deploying a new application or service to a Kubernetes cluster
     and needing to retrieve information from the Terraform API to ensure the workspace
     is correctly configured before deployment.
@@ -67,7 +67,7 @@ commands:
     \ comments to explain each step. This is useful for newer or less experienced\
     \ devops engineers who may be unfamiliar with the syntax and behavior of the individual\
     \ commands used in the original command."
-  name: checking_whether_the_terraform_cloud_workspace_is_in_a_locked_state
+  name: checking_whether_the_terraform_cloud_workspace_terraform_workspace_name_is_in_a_locked_state
   when_is_it_useful: '1. Deploying a new application or service to a Kubernetes cluster
     and needing to retrieve information from the Terraform API to ensure the workspace
     is correctly configured before deployment.

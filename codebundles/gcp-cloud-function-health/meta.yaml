@@ -39,7 +39,7 @@ commands:
     for a specific function
 
     echo "Run ''gcloud functions describe [name]'' for full details."'
-  name: list_unhealhy_cloud_functions_in_gcp_project_gcp_project_id
+  name: list_unhealthy_cloud_functions_in_gcp_project_gcp_project_id
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events to identify
     and resolve issues with the containerized applications running on the cluster.
 

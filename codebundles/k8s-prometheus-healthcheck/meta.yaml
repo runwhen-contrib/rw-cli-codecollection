@@ -44,7 +44,7 @@ commands:
     process
 
     '
-  name: check_for_successful_rule_setup
+  name: check_for_successful_rule_setup_in_kubernetes_namespace_namespace
   when_is_it_useful: '1. Monitoring and troubleshooting the overall health and performance
     of Kubernetes clusters
 
@@ -104,7 +104,7 @@ commands:
     process
 
     '
-  name: check_for_successful_rule_setup
+  name: check_for_successful_rule_setup_in_kubernetes_namespace_namespace
   when_is_it_useful: '1. Monitoring and troubleshooting the overall health and performance
     of Kubernetes clusters
 
@@ -150,7 +150,7 @@ commands:
     kubectl get clusterrole/kube-prometheus-stack-operator -ojson
 
     '
-  name: verify_prometheus_rbac_can_access_servicemonitors
+  name: verify_prometheus_rbac_can_access_servicemonitors_in_namespace_prom_namespace
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
     or Site Reliability Engineer might use this command to retrieve the details of
     a specific ClusterRole in order to investigate if the role permissions are causing
@@ -211,7 +211,7 @@ commands:
     kubectl get clusterrole/kube-prometheus-stack-operator -ojson
 
     '
-  name: verify_prometheus_rbac_can_access_servicemonitors
+  name: verify_prometheus_rbac_can_access_servicemonitors_in_namespace_prom_namespace
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
     or Site Reliability Engineer might use this command to retrieve the details of
     a specific ClusterRole in order to investigate if the role permissions are causing
@@ -277,7 +277,7 @@ commands:
     | grep -iP "(scrape.*.error)" || true
 
     '
-  name: identify_endpoint_scraping_errors
+  name: inspect_prometheus_operator_logs_for_scraping_errors_in_namespace_namespace
   when_is_it_useful: "1. Monitoring the health and performance of the Prometheus container\
     \ in a Kubernetes environment\n2. Troubleshooting issues with data scraping or\
     \ ingestion in a Prometheus instance running in a Kubernetes cluster\n3. Investigating\
@@ -322,7 +322,7 @@ commands:
     | grep -iP "(scrape.*.error)" || true
 
     '
-  name: identify_endpoint_scraping_errors
+  name: inspect_prometheus_operator_logs_for_scraping_errors_in_namespace_namespace
   when_is_it_useful: "1. Monitoring the health and performance of the Prometheus container\
     \ in a Kubernetes environment\n2. Troubleshooting issues with data scraping or\
     \ ingestion in a Prometheus instance running in a Kubernetes cluster\n3. Investigating\
@@ -374,7 +374,7 @@ commands:
     ''{print $2}''
 
     '
-  name: check_prometheus_api_healthy
+  name: check_prometheus_api_healthy_in_namespace_prom_namespace
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
     or Site Reliability Engineer might use this command to check the health status
     of the Prometheus container after it experiences CrashLoopBackoff events, in order
@@ -448,7 +448,7 @@ commands:
     ''{print $2}''
 
     '
-  name: check_prometheus_api_healthy
+  name: check_prometheus_api_healthy_in_namespace_prom_namespace
   when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
     or Site Reliability Engineer might use this command to check the health status
     of the Prometheus container after it experiences CrashLoopBackoff events, in order

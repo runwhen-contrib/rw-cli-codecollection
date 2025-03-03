@@ -157,7 +157,7 @@ commands:
     \ ) \n      end\n    ),\n    firstTimestamp: map(.firstTimestamp | fromdateiso8601)\
     \ | sort | .[0] | todateiso8601, \n    lastTimestamp: map(.lastTimestamp | fromdateiso8601)\
     \ | sort | reverse | .[0] | todateiso8601\n  })'\n"
-  name: check_statefulset_event_anomalies_for_statefulset_name
+  name: check_statefulset_event_anomalies_for_statefulset_name_in_namespace_namespace
   when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
     events in a specific StatefulSet, such as identifying the root cause of the continuous
     crashing and restarting of pods within the set.
@@ -228,7 +228,7 @@ commands:
     \ ) \n      end\n    ),\n    firstTimestamp: map(.firstTimestamp | fromdateiso8601)\
     \ | sort | .[0] | todateiso8601, \n    lastTimestamp: map(.lastTimestamp | fromdateiso8601)\
     \ | sort | reverse | .[0] | todateiso8601\n  })'\n"
-  name: check_statefulset_event_anomalies_for_statefulset_name
+  name: check_statefulset_event_anomalies_for_statefulset_name_in_namespace_namespace
   when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
     events in a specific StatefulSet, such as identifying the root cause of the continuous
     crashing and restarting of pods within the set.
@@ -280,7 +280,7 @@ commands:
     ${NAMESPACE}
 
     '
-  name: fetch_statefulset_logs_for_statefulset_name_and_add_to_report
+  name: fetch_statefulset_logs_for_statefulset_name_in_namespace_namespace_and_add_to_report
   when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event for a
     specific StatefulSet in a critical production environment to identify the root
     cause of the issue and minimize downtime.
@@ -329,7 +329,7 @@ commands:
     ${NAMESPACE}
 
     '
-  name: fetch_statefulset_logs_for_statefulset_name_and_add_to_report
+  name: fetch_statefulset_logs_for_statefulset_name_in_namespace_namespace_and_add_to_report
   when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event for a
     specific StatefulSet in a critical production environment to identify the root
     cause of the issue and minimize downtime.
@@ -486,7 +486,7 @@ commands:
     \ the context of the Kubernetes cluster\n  -n ${NAMESPACE} \\                \
     \ # Specifying the namespace where the stateful set is located\n  -o yaml    \
     \                       # Outputting the result in YAML format\n"
-  name: fetch_manifest_details_for_statefulset_statefulset_name
+  name: fetch_manifest_details_for_statefulset_statefulset_name_in_namespace_namespace
   when_is_it_useful: '1. Troubleshooting a database stateful set that is experiencing
     performance issues or other errors, and needing to review the configuration for
     potential problems.
@@ -524,7 +524,7 @@ commands:
     \ the context of the Kubernetes cluster\n  -n ${NAMESPACE} \\                \
     \ # Specifying the namespace where the stateful set is located\n  -o yaml    \
     \                       # Outputting the result in YAML format\n"
-  name: fetch_manifest_details_for_statefulset_statefulset_name
+  name: fetch_manifest_details_for_statefulset_statefulset_name_in_namespace_namespace
   when_is_it_useful: '1. Troubleshooting a database stateful set that is experiencing
     performance issues or other errors, and needing to review the configuration for
     potential problems.
@@ -573,7 +573,7 @@ commands:
     \ name, desired replicas, and available replicas with a separator. This can be\
     \ useful for identifying any StatefulSets that may not have the correct number\
     \ of replicas running."
-  name: list_statefulsets_with_unhealthy_replica_counts_in_namespace_namespace
+  name: list_unhealthy_replica_counts_for_statefulsets_in_namespace_namespace
   when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes stateful sets to
     ensure that the desired number of replicas are running and available.
 
@@ -620,7 +620,7 @@ commands:
     \ name, desired replicas, and available replicas with a separator. This can be\
     \ useful for identifying any StatefulSets that may not have the correct number\
     \ of replicas running."
-  name: list_statefulsets_with_unhealthy_replica_counts_in_namespace_namespace
+  name: list_unhealthy_replica_counts_for_statefulsets_in_namespace_namespace
   when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes stateful sets to
     ensure that the desired number of replicas are running and available.
 
