@@ -7,8 +7,6 @@ commands:
 
     - [kubectl command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
 
-    - [wget command](https://www.gnu.org/software/wget/manual/wget.html){:target="_blank"}
-
     - [JSON data retrieval](https://www.json.org/json-en.html){:target="_blank"}
 
     - [jq filtering](https://stedolan.github.io/jq/manual/){:target="_blank"}'
@@ -47,8 +45,6 @@ commands:
   doc_links: '
 
     - [kubectl command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
-
-    - [wget command](https://www.gnu.org/software/wget/manual/wget.html){:target="_blank"}
 
     - [JSON data retrieval](https://www.json.org/json-en.html){:target="_blank"}
 

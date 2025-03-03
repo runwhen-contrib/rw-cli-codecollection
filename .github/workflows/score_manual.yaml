@@ -1,0 +1,89 @@
+name: "Manual CodeCollection Scoring"
+
+on:
+  # Trigger this workflow manually from the GitHub Actions tab
+  workflow_dispatch:
+    inputs:
+      directory:
+        description: "Directory with .robot files (ignored if running with git-url)"
+        required: false
+        default: "./"
+      commit_results:
+        description: "Deprecated; sets commit_changes to true if 'true'."
+        required: false
+        default: "false"
+      git_url:
+        description: "Remote git URL to clone"
+        required: false
+        default: ""
+      branch:
+        description: "Branch to checkout after cloning"
+        required: false
+        default: "main"
+      only_changed:
+        description: "Analyze only changed .robot files"
+        required: false
+        default: "false"
+      base_sha:
+        description: "Base commit SHA"
+        required: false
+        default: ""
+      head_sha:
+        description: "Head commit SHA"
+        required: false
+        default: ""
+      apply_suggestions:
+        description: "If 'true', apply suggestions"
+        required: false
+        default: "false"
+      commit_changes:
+        description: "If 'true', commit local changes"
+        required: false
+        default: "false"
+      open_pr:
+        description: "If 'true', open a PR"
+        required: false
+        default: "false"
+      pr_branch:
+        description: "Branch to push changes to"
+        required: false
+        default: "auto-task-analysis"
+      base_branch:
+        description: "Branch to merge PR into"
+        required: false
+        default: "main"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  run-scoring:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+            fetch-depth: 0
+      - name: Set Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      # Use your composite action, passing the workflow_dispatch inputs
+      - name: "Run CodeCollection Scoring"
+      - uses: runwhen-contrib/github-actions/codecollection-score@main
+        with:
+          directory: ${{ github.event.inputs.directory }}
+          commit_results: ${{ github.event.inputs.commit_results }}
+          git_url: ${{ github.event.inputs.git_url }}
+          branch: ${{ github.event.inputs.branch }}
+          only_changed: ${{ github.event.inputs.only_changed }}
+          base_sha: ${{ github.event.inputs.base_sha }}
+          head_sha: ${{ github.event.inputs.head_sha }}
+          apply_suggestions: ${{ github.event.inputs.apply_suggestions }}
+          commit_changes: ${{ github.event.inputs.commit_changes }}
+          open_pr: ${{ github.event.inputs.open_pr }}
+          pr_branch: ${{ github.event.inputs.pr_branch }}
+          base_branch: ${{ github.event.inputs.base_branch }}
+        env:
+          GH_TOKEN: ${{ github.token }}

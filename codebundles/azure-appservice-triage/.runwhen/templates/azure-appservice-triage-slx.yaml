@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/app%20services/10035-icon-service-App-Services.svg
-  alias: Azure App Service Web App {{match_resource.resource.name}} in resource group {{resource_group.name}}
+  alias: Azure App Service Health for {{match_resource.resource.name}} in resource group {{resource_group.name}}
   asMeasuredBy: An aggregate score that is evaluated from configuration, metric, event or log issues. 
   configProvided:
   - name: AZ_RESOURCE_GROUP

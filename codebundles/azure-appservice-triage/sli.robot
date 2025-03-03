@@ -2,7 +2,7 @@
 Documentation       Queries the health status of an App Service, and returns 0 when it's not healthy, and 1 when it is.
 Metadata            Author    stewartshea
 Metadata            Display Name    Azure App Service Triage
-Metadata            Supports    Azure    App Service    Health
+Metadata            Supports    Azure    AppService    Health
 
 Library             BuiltIn
 Library             RW.Core
