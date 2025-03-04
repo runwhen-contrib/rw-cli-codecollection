@@ -40,14 +40,22 @@ List Failed Build Logs in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
             ...    error_patterns_file=${CURDIR}/error_patterns.json
 
             ${pretty_item}=    Evaluate    pprint.pformat(${job})    modules=pprint
+            
+            ${suggestions}=    Set Variable    ${EMPTY}
+            ${logs_details}=    Set Variable    ${EMPTY}
+            FOR    ${step}    IN    @{next_steps}
+                ${suggestions}=    Set Variable    ${suggestions}${step['suggestion']}\n
+                ${logs_details}=    Set Variable    ${logs_details}Log: ${step['log']}\n
+            END
+
             RW.Core.Add Issue
             ...    severity=3
             ...    expected=Jenkins job `${job_name}` should complete successfully
             ...    actual=Jenkins job `${job_name}` build #`${build_number}` failed
             ...    title=Jenkins Build Failure: `${job_name}` (Build #`${build_number}`)
             ...    reproduce_hint=Navigate to Jenkins build `${job_name}` #`${build_number}`
-            ...    details=${pretty_item}
-            ...    next_steps=${next_steps}
+            ...    details=Error Logs:\n${logs_details}
+            ...    next_steps=${suggestions}
         END
     ELSE
         RW.Core.Add Pre To Report    "No failed builds found"
