@@ -1,0 +1,268 @@
+{
+    "COMPILATION_ERROR": {
+        "pattern": "\\[ERROR\\] COMPILATION ERROR",
+        "suggestion": "Check detailed logs above for root cause and retry build after fixing issues."
+    },
+    "TEST_FAILURE": {
+        "pattern": "\\[ERROR\\] Failures:",
+        "suggestion": "Review failed test cases and ensure test data is correct."
+    },
+    "DEPENDENCY_ERROR": {
+        "pattern": "Could not resolve dependencies",
+        "suggestion": "Verify dependency versions in pom.xml and check repository accessibility."
+    },
+    "CHECKSTYLE_ERROR": {
+        "pattern": "\\[ERROR\\] Failed to execute goal org\\.apache\\.maven\\.plugins:maven-checkstyle-plugin",
+        "suggestion": "Fix code style violations and check checkstyle configuration."
+    },
+    "JAVA_VERSION_MISMATCH": {
+        "pattern": "Unsupported major\\.minor version",
+        "suggestion": "Verify Java version in build environment and pom.xml."
+    },
+    "OUT_OF_MEMORY": {
+        "pattern": "java\\.lang\\.OutOfMemoryError",
+        "suggestion": "Increase memory allocation for the build or optimize memory usage."
+    },
+    "MAVEN_PLUGIN_ERROR": {
+        "pattern": "\\[ERROR\\] Failed to execute goal .*:maven-.*-plugin",
+        "suggestion": "Ensure the required Maven plugin is installed and correctly configured."
+    },
+    "MISSING_CLASS": {
+        "pattern": "java\\.lang\\.NoClassDefFoundError",
+        "suggestion": "Verify classpath configuration and ensure dependencies are properly included."
+    },
+    "CONNECTION_TIMEOUT": {
+        "pattern": "Connection timed out",
+        "suggestion": "Check network connectivity and increase connection timeout in Maven settings."
+    },
+    "AUTHENTICATION_FAILURE": {
+        "pattern": "401 Unauthorized|403 Forbidden",
+        "suggestion": "Verify credentials in settings.xml and check user permissions."
+    },
+    "GIT_ERROR": {
+        "pattern": "fatal: .+",
+        "suggestion": "Check Git repository URL, credentials, and branch availability."
+    },
+    "SSL_ERROR": {
+        "pattern": "javax.net.ssl.SSLException",
+        "suggestion": "Verify SSL certificates and Java keystore settings."
+    },
+    "JAR_NOT_FOUND": {
+        "pattern": "Could not find artifact .+ in central",
+        "suggestion": "Ensure the artifact exists in Maven repository or check repository settings."
+    },
+    "MAVEN_COMPATIBILITY_ERROR": {
+        "pattern": "Non-resolvable parent POM",
+        "suggestion": "Ensure parent POM exists and is accessible."
+    },
+    "FORK_FAILURE": {
+        "pattern": "Execution default-test of goal org.apache.maven.plugins:maven-surefire-plugin failed",
+        "suggestion": "Check for missing dependencies or configuration issues in Surefire plugin."
+    },
+    "PORT_BIND_ERROR": {
+        "pattern": "Address already in use",
+        "suggestion": "Ensure the port is not already occupied by another process."
+    },
+    "GROOVY_COMPILATION_ERROR": {
+        "pattern": "org\\.codehaus\\.groovy\\.control\\.MultipleCompilationErrorsException",
+        "suggestion": "Ensure that all required tools (e.g., Maven) are correctly installed and configured in Jenkins global tool settings."
+    },
+    "MAVEN_TOOL_NOT_FOUND": {
+        "pattern": "Tool type \\\"maven\\\" does not have an install of \\\".*\\\" configured",
+        "suggestion": "Check Jenkins global tool configuration to ensure Maven is installed and referenced correctly in the pipeline script."
+    },
+        "COMPILATION_ERROR": {
+        "pattern": "\\[ERROR\\] COMPILATION ERROR",
+        "suggestion": "Check detailed logs above for root cause and retry build after fixing issues."
+    },
+    "TEST_FAILURE": {
+        "pattern": "\\[ERROR\\] Failures:",
+        "suggestion": "Review failed test cases and ensure test data is correct."
+    },
+    "DEPENDENCY_ERROR": {
+        "pattern": "Could not resolve dependencies",
+        "suggestion": "Verify dependency versions in pom.xml and check repository accessibility."
+    },
+    "CHECKSTYLE_ERROR": {
+        "pattern": "\\[ERROR\\] Failed to execute goal org\\.apache\\.maven\\.plugins:maven-checkstyle-plugin",
+        "suggestion": "Fix code style violations and check checkstyle configuration."
+    },
+    "JAVA_VERSION_MISMATCH": {
+        "pattern": "Unsupported major\\.minor version",
+        "suggestion": "Verify Java version in build environment and pom.xml."
+    },
+    "OUT_OF_MEMORY": {
+        "pattern": "java\\.lang\\.OutOfMemoryError",
+        "suggestion": "Increase memory allocation for the build or optimize memory usage."
+    },
+    "MAVEN_PLUGIN_ERROR": {
+        "pattern": "\\[ERROR\\] Failed to execute goal .*:maven-.*-plugin",
+        "suggestion": "Ensure the required Maven plugin is installed and correctly configured."
+    },
+    "MISSING_CLASS": {
+        "pattern": "java\\.lang\\.NoClassDefFoundError",
+        "suggestion": "Verify classpath configuration and ensure dependencies are properly included."
+    },
+    "CONNECTION_TIMEOUT": {
+        "pattern": "Connection timed out",
+        "suggestion": "Check network connectivity and increase connection timeout in Maven settings."
+    },
+    "AUTHENTICATION_FAILURE": {
+        "pattern": "401 Unauthorized|403 Forbidden",
+        "suggestion": "Verify credentials in settings.xml and check user permissions."
+    },
+    "GROOVY_COMPILATION_ERROR": {
+        "pattern": "org\\.codehaus\\.groovy\\.control\\.MultipleCompilationErrorsException",
+        "suggestion": "Ensure that all required tools (e.g., Maven) are correctly installed and configured in Jenkins global tool settings."
+    },
+    "MAVEN_TOOL_NOT_FOUND": {
+        "pattern": "Tool type \\\"maven\\\" does not have an install of \\\".*\\\" configured",
+        "suggestion": "Check Jenkins global tool configuration to ensure Maven is installed and referenced correctly in the pipeline script."
+    },
+    "JENKINS_STARTUP_FAILURE": {
+        "pattern": "SEVERE: Failed to initialize Jenkins",
+        "suggestion": "This error usually indicates a corrupted Jenkins configuration file or plugin. Review the Jenkins logs to identify the problematic configuration or plugin and rectify it."
+    },
+    "GROOVY_CLASS_RESOLUTION_ERROR": {
+        "pattern": "unable to resolve class",
+        "suggestion": "This error suggests that the Groovy script is unable to find a specified class. Ensure that all necessary classes are imported correctly and that the classpath is properly configured."
+    },
+    "MISSING_FILE_OR_DIRECTORY": {
+        "pattern": "No such file or directory",
+        "suggestion": "This error indicates that Jenkins is unable to find the specified file or directory. Verify the path provided in your Jenkins job configuration and ensure the file or directory exists at the specified location."
+    },
+    "JENKINS_PIPELINE_SYNTAX_ERROR": {
+        "pattern": "WorkflowScript: .*: Expected .* but found .*",
+        "suggestion": "This error points to a syntax issue in your Jenkins Pipeline script. Use the Jenkins Pipeline Syntax tool to validate the script and identify any errors or warnings."
+    },
+    "JENKINS_GROOVY_SCRIPT_ERROR": {
+        "pattern": "groovy.lang.MissingPropertyException",
+        "suggestion": "This error occurs when a Groovy script tries to access a property that doesn't exist. Check the script for typos or incorrect property names."
+    },
+    "JENKINS_DISK_SPACE_ERROR": {
+        "pattern": "No space left on device",
+        "suggestion": "Jenkins is unable to write to disk due to insufficient space. Free up disk space on the Jenkins server and consider setting up disk usage monitoring."
+    },
+    "JENKINS_AGENT_CONNECTION_ERROR": {
+        "pattern": "java\\.io\\.IOException: Connection reset by peer",
+        "suggestion": "This error indicates a loss of connection between the Jenkins master and agent. Check the network connectivity and firewall settings between the master and agent machines."
+    },
+    "JENKINS_GIT_AUTHENTICATION_ERROR": {
+        "pattern": "Authentication failed for 'https://.*'",
+        "suggestion": "Jenkins is unable to authenticate with the Git repository. Verify the credentials and ensure they are correctly configured in Jenkins."
+    },
+    "JENKINS_SCM_ERROR": {
+        "pattern": "hudson\\.plugins\\.git\\.GitException: Command \"git .*\" returned status code 128",
+        "suggestion": "This error suggests an issue with the Source Code Management (SCM) configuration. Check the repository URL and credentials."
+    },
+    "JENKINS_MAVEN_BUILD_FAILURE": {
+        "pattern": "\\[ERROR\\] BUILD FAILURE",
+        "suggestion": "The Maven build has failed. Review the error messages above this line in the log to identify the cause and address it accordingly."
+    },
+    "JENKINS_MAVEN_COMPILATION_FAILURE": {
+        "pattern": "\\[ERROR\\] COMPILATION ERROR",
+        "suggestion": "There are compilation errors in the Maven build. Check the detailed error messages to identify and fix the issues in the code."
+    },
+    "JENKINS_MAVEN_TEST_FAILURE": {
+        "pattern": "\\[ERROR\\] Failed to execute goal org\\.apache\\.maven\\.plugins:maven-surefire-plugin",
+        "suggestion": "Test execution has failed. Review the test results to identify failing tests and address the underlying issues."
+    },
+    "DEPENDENCY_RESOLUTION_ERROR": {
+        "pattern": "Could not resolve dependencies for project",
+        "suggestion": "Ensure the required dependencies exist in the specified repository and check the internet connection or repository credentials."
+    },
+
+
+    "SYNTAX_ERROR": {
+        "pattern": "SyntaxError: .+",
+        "suggestion": "Check for incorrect syntax, missing colons, incorrect indentation, or mismatched parentheses."
+    },
+    "INDENTATION_ERROR": {
+        "pattern": "IndentationError: .+",
+        "suggestion": "Ensure consistent indentation using spaces or tabs. Avoid mixing both."
+    },
+    "TYPE_ERROR": {
+        "pattern": "TypeError: .+",
+        "suggestion": "Check data types in function calls and operations. Convert variables if necessary."
+    },
+    "NAME_ERROR": {
+        "pattern": "NameError: name '.+' is not defined",
+        "suggestion": "Ensure the variable or function is defined before use."
+    },
+    "INDEX_ERROR": {
+        "pattern": "IndexError: list index out of range",
+        "suggestion": "Check list length before accessing elements by index."
+    },
+    "KEY_ERROR": {
+        "pattern": "KeyError: '.+'",
+        "suggestion": "Ensure the dictionary contains the key before accessing it."
+    },
+    "VALUE_ERROR": {
+        "pattern": "ValueError: .+",
+        "suggestion": "Check if the function arguments or data formats are valid."
+    },
+    "ATTRIBUTE_ERROR": {
+        "pattern": "AttributeError: '.+' object has no attribute '.+'",
+        "suggestion": "Ensure the object has the specified attribute before accessing it."
+    },
+    "MODULE_NOT_FOUND": {
+        "pattern": "ModuleNotFoundError: No module named '.+'",
+        "suggestion": "Ensure the required module is installed and the import statement is correct."
+    },
+    "IMPORT_ERROR": {
+        "pattern": "ImportError: .+",
+        "suggestion": "Check module paths and dependencies. Ensure required modules are installed."
+    },
+    "IO_ERROR": {
+        "pattern": "OSError: .+|IOError: .+",
+        "suggestion": "Check file paths, permissions, and disk space before performing I/O operations."
+    },
+    "ZERO_DIVISION_ERROR": {
+        "pattern": "ZeroDivisionError: division by zero",
+        "suggestion": "Avoid dividing by zero. Check for zero before performing division."
+    },
+    "RECURSION_ERROR": {
+        "pattern": "RecursionError: maximum recursion depth exceeded",
+        "suggestion": "Check recursive function calls to prevent infinite recursion."
+    },
+    "MEMORY_ERROR": {
+        "pattern": "MemoryError",
+        "suggestion": "Optimize memory usage. Consider processing data in smaller chunks."
+    },
+    "TIMEOUT_ERROR": {
+        "pattern": "TimeoutError",
+        "suggestion": "Increase timeout limits or optimize code to prevent long execution times."
+    },
+    "CONNECTION_ERROR": {
+        "pattern": "requests\\.exceptions\\.ConnectionError",
+        "suggestion": "Check network connectivity and ensure the server is reachable."
+    },
+    "SSL_ERROR": {
+        "pattern": "requests\\.exceptions\\.SSLError",
+        "suggestion": "Verify SSL certificates and ensure secure connections."
+    },
+    "DOCKER_BUILD_ERROR": {
+        "pattern": "docker build .* failed",
+        "suggestion": "Review the Dockerfile and check for syntax errors or missing files."
+    },
+    "DOCKER_CONTAINER_NOT_RUNNING": {
+        "pattern": "Jenkins does not seem to be running inside a container",
+        "suggestion": "Ensure Jenkins is running inside a container or check the Docker configuration."
+    },
+    "DOCKER_PERMISSION_DENIED": {
+        "pattern": "ERROR: permission denied while trying to connect to the Docker daemon socket",
+        "suggestion": "Add the Jenkins user to the Docker group with `sudo usermod -aG docker jenkins`, then restart Jenkins with `sudo systemctl restart jenkins`."
+    },
+    "PYTHON_REQUIREMENTS_FAIL": {
+        "pattern": "ERROR: Could not find a version that satisfies the requirement .*",
+        "suggestion": "Verify the package name and version in 'requirements.txt' and check the package index."
+    },
+    "DEBCONF_FRONTEND_ERROR": {
+        "pattern": "debconf: unable to initialize frontend",
+        "suggestion": "Set the 'DEBIAN_FRONTEND' environment variable to 'noninteractive' for Docker builds."
+    },
+    "NO_SUCH_DSL_METHOD": {
+        "pattern": "java\\.lang\\.NoSuchMethodError: No such DSL method '([^']+)'",
+        "suggestion": "Check if the plugin providing '{match}' is installed and up-to-date."
+    }
+}
