@@ -31,10 +31,6 @@
         "pattern": "java\\.lang\\.NoClassDefFoundError",
         "suggestion": "Verify classpath configuration and ensure dependencies are properly included."
     },
-    "MISSING_METHOD": {
-        "pattern": "java\\.lang\\.NoSuchMethodError",
-        "suggestion": "Check if the method exists in the correct version of the dependency."
-    },
     "CONNECTION_TIMEOUT": {
         "pattern": "Connection timed out",
         "suggestion": "Check network connectivity and increase connection timeout in Maven settings."
@@ -42,10 +38,6 @@
     "AUTHENTICATION_FAILURE": {
         "pattern": "401 Unauthorized|403 Forbidden",
         "suggestion": "Verify credentials in settings.xml and check user permissions."
-    },
-    "PERMISSION_DENIED": {
-        "pattern": "Permission denied",
-        "suggestion": "Ensure appropriate file permissions and user access rights."
     },
     "GIT_ERROR": {
         "pattern": "fatal: .+",
@@ -111,10 +103,6 @@
         "pattern": "java\\.lang\\.NoClassDefFoundError",
         "suggestion": "Verify classpath configuration and ensure dependencies are properly included."
     },
-    "MISSING_RESOURCE": {
-        "pattern": "java\\.lang\\.NoSuchMethodError",
-        "suggestion": "Check if the method exists in the correct version of the dependency."
-    },
     "CONNECTION_TIMEOUT": {
         "pattern": "Connection timed out",
         "suggestion": "Check network connectivity and increase connection timeout in Maven settings."
@@ -151,17 +139,9 @@
         "pattern": "groovy.lang.MissingPropertyException",
         "suggestion": "This error occurs when a Groovy script tries to access a property that doesn't exist. Check the script for typos or incorrect property names."
     },
-    "JENKINS_PLUGIN_ERROR": {
-        "pattern": "java.lang.NoSuchMethodError",
-        "suggestion": "This error often arises from plugin incompatibilities. Ensure all Jenkins plugins are up-to-date and compatible with your Jenkins version."
-    },
     "JENKINS_DISK_SPACE_ERROR": {
         "pattern": "No space left on device",
         "suggestion": "Jenkins is unable to write to disk due to insufficient space. Free up disk space on the Jenkins server and consider setting up disk usage monitoring."
-    },
-    "JENKINS_PERMISSION_DENIED_ERROR": {
-        "pattern": "Permission denied",
-        "suggestion": "Jenkins does not have the necessary permissions to execute a script or access a file. Verify the permissions of the Jenkins user and adjust them as needed."
     },
     "JENKINS_AGENT_CONNECTION_ERROR": {
         "pattern": "java\\.io\\.IOException: Connection reset by peer",
@@ -261,14 +241,6 @@
         "pattern": "requests\\.exceptions\\.SSLError",
         "suggestion": "Verify SSL certificates and ensure secure connections."
     },
-    "GIT_TOOL_NOT_FOUND": {
-        "pattern": "Selected Git installation does not exist\\. Using Default",
-        "suggestion": "Ensure Git is installed and configured correctly in Jenkins global tool settings."
-    },
-    "NO_CREDENTIALS_SPECIFIED": {
-        "pattern": "No credentials specified",
-        "suggestion": "Add appropriate credentials in Jenkins for secure repository access."
-    },
     "DOCKER_BUILD_ERROR": {
         "pattern": "docker build .* failed",
         "suggestion": "Review the Dockerfile and check for syntax errors or missing files."
@@ -277,9 +249,9 @@
         "pattern": "Jenkins does not seem to be running inside a container",
         "suggestion": "Ensure Jenkins is running inside a container or check the Docker configuration."
     },
-    "JENKINS_DOCKER_PERMISSION_DENIED": {
-        "pattern": "permission denied while trying to connect to the Docker daemon socket",
-        "suggestion": "Add the Jenkins user to the Docker group and restart the service."
+    "DOCKER_PERMISSION_DENIED": {
+        "pattern": "ERROR: permission denied while trying to connect to the Docker daemon socket",
+        "suggestion": "Add the Jenkins user to the Docker group with `sudo usermod -aG docker jenkins`, then restart Jenkins with `sudo systemctl restart jenkins`."
     },
     "PYTHON_REQUIREMENTS_FAIL": {
         "pattern": "ERROR: Could not find a version that satisfies the requirement .*",
@@ -290,11 +262,7 @@
         "suggestion": "Set the 'DEBIAN_FRONTEND' environment variable to 'noninteractive' for Docker builds."
     },
     "NO_SUCH_DSL_METHOD": {
-        "pattern": "java\\.lang\\.NoSuchMethodError: No such DSL method '.*'",
-        "suggestion": "Verify the Jenkins Pipeline script and ensure all necessary plugins are installed."
-    },
-    "JUNIT_NOT_FOUND": {
-        "pattern": "No such DSL method 'junit'",
-        "suggestion": "Ensure the 'JUnit Plugin' is installed and configured in Jenkins."
-    } 
+        "pattern": "java\\.lang\\.NoSuchMethodError: No such DSL method '([^']+)'",
+        "suggestion": "Check if the plugin providing '{match}' is installed and up-to-date."
+    }
 }
