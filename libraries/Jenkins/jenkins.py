@@ -10,6 +10,13 @@ from thefuzz import process as fuzzprocessor
 from robot.api.deco import keyword
 from RW import platform
 
+def normalize_log(log: str) -> str:
+    """Normalize logs to improve pattern matching."""
+    log = log.lower()  # Convert to lowercase for case-insensitive matching
+    log = re.sub(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z', '{timestamp}', log)  # Remove timestamps
+    log = re.sub(r'[a-f0-9]{12,}', '{hash}', log)  # Replace long hashes or container IDs
+    log = re.sub(r'\s+', ' ', log).strip()  # Collapse multiple spaces
+    return log
 
 class Jenkins:
     """
@@ -418,24 +425,76 @@ class Jenkins:
 
     @keyword("Analyze Logs")
     def analyze_logs(self, logs: str, error_patterns_file: str = None):
-        """Analyzes logs for common Java/Maven errors and suggests next steps."""
+        """Analyzes logs for common errors, prioritizing lines with ERROR, and suggests next steps."""
         if error_patterns_file:
             with open(error_patterns_file, "r") as f:
                 error_patterns = json.load(f)
 
-        suggestions = set()  # Use a set for deduplication
-
+        suggestions = []      # Collect suggestions with error lines
+        error_lines = []      # Store error-prone log sections
+        normalized_logs = normalize_log(logs)
         for error, details in error_patterns.items():
             pattern = details.get("pattern")
             advice = details.get("suggestion")
 
             if pattern and advice:
-                matches = re.findall(pattern, logs, re.MULTILINE)
-                if matches:  # Only add advice if there are matches
-                    suggestions.add(advice)
+                matches = re.finditer(pattern.lower(), normalized_logs, re.MULTILINE)
+                for match in matches:
+                    matched_line = match.group(0)
+                    # Get context around the error
+                    start = max(0, match.start() - 100)  # Get 100 chars before match
+                    end = min(len(normalized_logs), match.end() + 100)  # Get 100 chars after match
+                    context = normalized_logs[start:end]
+                    
+                    # Format advice with matches if needed
+                    formatted_advice = advice
+                    if '{match}' in advice:
+                        # Replace all {match} placeholders with corresponding group matches
+                        formatted_advice = advice
+                        for i, group in enumerate(match.groups(), start=1):
+                            formatted_advice = formatted_advice.replace('{match}', group, 1)
+
+                    # Prioritize lines with ERROR or FAILURE
+                    if re.search(r"(ERROR|error|FAILURE)", matched_line):
+                        error_lines.insert(0, (formatted_advice, context))  # Add to the front for higher priority
+                    else:
+                        error_lines.append((formatted_advice, context))  # Add normally
+
+        # Collect unique suggestions in order of priority
+        seen_advice = set()
+        for advice, line in error_lines:
+            if advice not in seen_advice:
+                suggestions.append({"suggestion": advice, "log": line})
+                seen_advice.add(advice)
 
         # Use default suggestion if no specific issues found
         if not suggestions:
-            suggestions.add("Check detailed logs for root cause.")
-        
-        return "\n".join(suggestions)
+            # Find all error/failure lines with context (5 lines before and after)
+            error_blocks = []
+            for match in re.finditer(r'.*\b(error|failure)\b.*', normalized_logs, re.MULTILINE | re.IGNORECASE):
+                start = max(0, match.start() - 500)  # Get 500 chars before for context
+                end = min(len(normalized_logs), match.end() + 500)  # Get 500 chars after for context
+                error_blocks.append(normalized_logs[start:end])
+
+            if error_blocks:
+                # Deduplicate while preserving order
+                unique_errors = []
+                seen = set()
+                for block in error_blocks:
+                    if block not in seen:
+                        seen.add(block)
+                        unique_errors.append(block)
+                
+                suggestions.append({
+                    "suggestion": "Check detailed logs for root cause.",
+                    "log": "\n---\n".join(unique_errors)
+                })
+            else:
+                # Provide more specific guidance when no errors found
+                suggestions.append({
+                    "suggestion": "Check detailed logs for root cause.",
+                    "log": logs
+                })
+
+        return suggestions
+
