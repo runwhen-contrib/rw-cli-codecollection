@@ -1,3 +1,4 @@
+# .github/workflows/pypi.yaml
 name: Publish Pypi Package
 
 on:
@@ -8,7 +9,7 @@ on:
       - VERSION
   workflow_dispatch:
 
-env: 
+env:
   PIP_PACKAGE_NAME: rw_cli_keywords
 
 jobs:
@@ -17,6 +18,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+
       - name: Get version
         run: |-
           if [[ -s VERSION ]]; then
@@ -28,18 +30,29 @@ jobs:
             exit 1
           fi
 
-      - name: Build Package
-        run: |-
-          pip install setuptools wheel twine
-          ln -s libraries/RW RW
-          python setup.py sdist bdist_wheel
+      - name: Install dependencies
+        run: |
+          pip install --upgrade packaging setuptools wheel build twine
+
+      - name: Build Package (PEP 517)
+        run: |
+          # Clean old build artifacts first:
+          rm -rf dist build *.egg-info
+          # Use the modern build command:
+          python -m build
+
+      - name: Check distribution
+        run: |
+          twine check dist/*
+
       - name: Publish
-        run: |-
+        run: |
           twine upload dist/* -u __token__ -p ${{ secrets.PYPI_TOKEN }}
+
       - name: Notify Slack of pip update
         uses: slackapi/slack-github-action@v1.19.0
         with:
-          channel-id: "#codecollections" # Slack channel id or name to post message. https://api.slack.com/methods/chat.postMessage#channels
-          slack-message: "Just deployed version ${{ env.VERSION }} of ${{ env.PIP_PACKAGE_NAME}}  to https://pypi.org/project/${{ env.PIP_PACKAGE_NAME }}"
+          channel-id: "#codecollections"
+          slack-message: "Just deployed version ${{ env.VERSION }} of ${{ env.PIP_PACKAGE_NAME}} to https://pypi.org/project/${{ env.PIP_PACKAGE_NAME }}"
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

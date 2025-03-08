@@ -54,21 +54,22 @@ def execute_command(
     files: dict = None,
     timeout_seconds: int = 60,
 ) -> platform.ShellServiceResponse:
-    """Handle split between shellservice command and local process discretely.
-    If the user provides a service, use the traditional shellservice flow.
-    Otherwise we fake a ShellRequest and process it locally with a local subprocess.
-    Somewhat hacky as we're faking ShellResponses. Revisit this.
-
-    Args:
-        cmd (str): the shell command to run
-        service (Service, optional): the remote shellservice API to send the command to, if left empty defaults to run locally. Defaults to None.
-        request_secrets (List[ShellServiceRequestSecret], optional): a list of secret objects to include in the request. Defaults to None.
-        env (dict, optional): environment variables to set during the running of the command. Defaults to None.
-        files (dict, optional): a list of files to include in the environment during the command. Defaults to None.
-
-    Returns:
-        ShellServiceResponse: _description_
     """
+    If 'service' is None, run the command locally via 'execute_local_command'.
+    Otherwise, run it via platform.execute_shell_command().
+    Automatically copies AZURE_CONFIG_DIR from the parent environment
+    so the user doesn't have to pass it manually.
+    """
+    if env is None:
+        env = {}
+
+    # 1) If AZURE_CONFIG_DIR is set in this process, copy it
+    #    so that local subprocesses can pick it up
+    azure_config_dir = os.getenv("AZURE_CONFIG_DIR")
+    if azure_config_dir and "AZURE_CONFIG_DIR" not in env:
+        env["AZURE_CONFIG_DIR"] = azure_config_dir
+        logger.debug(f"Propagating AZURE_CONFIG_DIR={azure_config_dir} into subprocess env")
+
     if not service:
         return execute_local_command(
             cmd=cmd,
@@ -85,7 +86,6 @@ def execute_command(
             env=env,
             files=files,
         )
-
 
 def _create_kubernetes_remote_exec(
     cmd: str,
@@ -230,6 +230,8 @@ def run_bash_file(
     Returns:
         platform.ShellServiceResponse: structured response from the command execution.
     """
+    if env is None:
+        env = {}
 
     # --- 1) Check if bash_file exists in the current working directory ---
     if os.path.exists(bash_file):
@@ -364,6 +366,9 @@ def run_cli(
     logger.info(
         f"Requesting command: {cmd} with service: {target_service} - None indicates run local"
     )
+    if env is None:
+        env = {}
+
     if run_in_workload_with_labels or run_in_workload_with_name:
         cmd = _create_kubernetes_remote_exec(
             cmd=cmd,
