@@ -45,7 +45,6 @@ def pop_shell_history() -> str:
     SHELL_HISTORY = []
     return history
 
-
 def execute_command(
     cmd: str,
     service: platform.Service = None,
