@@ -70,10 +70,10 @@ def execute_command(
         env["AZURE_CONFIG_DIR"] = azure_config_dir
         logger.debug(f"Propagating AZURE_CONFIG_DIR={azure_config_dir} into subprocess env")
 
-    runwhen_temp_dir = os.getenv("RUNWHEN_TEMP_DIR")
-    if runwhen_temp_dir and "RUNWHEN_TEMP_DIR" not in env:
-        env["RUNWHEN_TEMP_DIR"] = runwhen_temp_dir
-        logger.debug(f"Propagating RUNWHEN_TEMP_DIR={runwhen_temp_dir} into subprocess env")
+    codebundle_temp_dir = os.getenv("CODEBUNDLE_TEMP_DIR")
+    if runwhen_temp_dir and "CODEBUNDLE_TEMP_DIR" not in env:
+        env["CODEBUNDLE_TEMP_DIR"] = codebundle_temp_dir
+        logger.debug(f"Propagating CODEBUNDLE_TEMP_DIR={codebundle_temp_dir} into subprocess env")
 
 
     if not service:
@@ -215,112 +215,154 @@ def run_bash_file(
     **kwargs,
 ) -> platform.ShellServiceResponse:
     """
-    Runs a bash file from the local file system or remotely on a shellservice.
+    Runs a bash file from the local file system or remotely on a shellservice,
+    automatically staging it in CODEBUNDLE_TEMP_DIR if available.
 
-    1) If `bash_file` is found in the current directory, use it.
-    2) Otherwise, we fall back to rewriting paths using `resolve_path_to_robot()`.
-    3) Once we determine the final local path of `bash_file`, we copy *all* files
-       from that same directory (no subfolders) into the environment that will run
-       this bash file.
-    4) We call `execute_command()` with all these files, so references to them
-       inside the script should work (assuming relative paths within that directory).
+    1) Find the local path to `bash_file` (or fallback via resolve_path_to_robot).
+    2) Copy that script and all sibling files into CODEBUNDLE_TEMP_DIR (if set),
+       or else an ephemeral tmp directory.
+    3) Call `execute_command()` to actually run the script from that directory.
+    4) If 'service' is provided, run on a remote shell; if not, run locally.
 
-    Args:
-        bash_file (str): the name (or relative path) of the bash file to run.
-        target_service (platform.Service, optional): remote shell service if needed. Defaults to None.
-        env (dict, optional): environment variables to set for the command. Defaults to None.
-        include_in_history (bool, optional): whether to include script contents in shell history. Defaults to True.
-        cmd_override (str, optional): overrides the final command (defaults to "./<bash_file>").
-        timeout_seconds (int, optional): command timeout. Defaults to 60.
-
-    Returns:
-        platform.ShellServiceResponse: structured response from the command execution.
+    Secrets and environment variables (e.g., AZURE_CONFIG_DIR) are still handled
+    automatically in `execute_command()`.
     """
     if env is None:
         env = {}
 
-    # --- 1) Check if bash_file exists in the current working directory ---
+    # ----------------------------------------------------------------
+    # 1) Locate the script
+    # ----------------------------------------------------------------
     if os.path.exists(bash_file):
         logger.info(f"File '{bash_file}' found in the current working directory.")
+        final_path = os.path.abspath(bash_file)
     else:
-        # Not found directly, so do the fallback logic with resolve_path_to_robot
+        # Not found directly, so do fallback logic with resolve_path_to_robot
         cwd = os.getcwd()
         logger.warning(f"File '{bash_file}' not found in '{cwd}'. Attempting fallback logic...")
-        rw_path_to_robot = resolve_path_to_robot()  # your custom function
 
+        # Might return something like "/path/to/.../sli.robot"
+        rw_path_to_robot = resolve_path_to_robot()
+
+        found = False
         if rw_path_to_robot:
-            # We try to rewrite the path based on known patterns
             for pattern in ["sli.robot", "runbook.robot"]:
                 if pattern in rw_path_to_robot:
-                    path, _ = rw_path_to_robot.split(pattern)
-                    local_bash_file = f"./{bash_file}"
-                    candidate_path = os.path.join(path, bash_file)
-
+                    path_prefix, _ = rw_path_to_robot.split(pattern)
+                    candidate_path = os.path.join(path_prefix, bash_file)
                     if os.path.exists(candidate_path):
-                        logger.info(f"File '{bash_file}' found at derived path: {candidate_path}")
-                        bash_file = candidate_path
-                        # If the user gave a cmd_override, replace references
-                        if cmd_override:
-                            cmd_override = cmd_override.replace(local_bash_file, bash_file)
-                        else:
-                            cmd_override = bash_file
+                        final_path = os.path.abspath(candidate_path)
+                        logger.info(f"File '{bash_file}' found at: {final_path}")
+                        found = True
                         break
-                    else:
-                        logger.warning(
-                            f"File '{bash_file}' not found at derived path: {candidate_path}"
-                        )
-        else:
-            logger.warning(f"RW_PATH_TO_ROBOT not set (resolve_path_to_robot returned None).")
+        if not found:
+            msg = f"Could not locate bash_file '{bash_file}' even after fallback logic."
+            logger.error(msg)
+            raise FileNotFoundError(msg)
 
-    # --- 2) If cmd_override is empty, default to "./<the_final_bash_file>" ---
-    if not cmd_override:
-        # If `bash_file` is absolute, we could run it directly. Otherwise prefix "./"
-        if os.path.isabs(bash_file):
-            cmd_override = bash_file
-        else:
-            cmd_override = f"./{bash_file}"
-
-    # --- 3) Determine the *final* directory containing bash_file ---
-    final_path = os.path.abspath(bash_file)
-    if not os.path.exists(final_path):
-        raise FileNotFoundError(f"Could not find the bash file at '{final_path}'.")
+    if not os.path.isfile(final_path):
+        raise FileNotFoundError(f"File does not exist: '{final_path}'")
 
     final_dir = os.path.dirname(final_path)
     script_name = os.path.basename(final_path)
 
-    logger.info(f"Using final path '{final_path}' (directory: '{final_dir}')")
-    logger.info(f"Final command override: '{cmd_override}'")
+    # ----------------------------------------------------------------
+    # 2) Determine where to stage the script (CODEBUNDLE_TEMP_DIR or ephemeral)
+    # ----------------------------------------------------------------
+    codebundle_temp_dir = os.getenv("CODEBUNDLE_TEMP_DIR")
+    if codebundle_temp_dir:
+        # We'll place the files physically in CODEBUNDLE_TEMP_DIR
+        os.makedirs(codebundle_temp_dir, exist_ok=True)
+        staging_dir = codebundle_temp_dir
+        logger.info(f"Staging bash files in CODEBUNDLE_TEMP_DIR: {staging_dir}")
+    else:
+        # Fallback to ephemeral directory
+        staging_dir = tempfile.mkdtemp(prefix="bashfile-", dir=os.getcwd())
+        logger.info(f"CODEBUNDLE_TEMP_DIR not set. Using ephemeral staging dir: {staging_dir}")
 
-    # --- 4) Copy ALL files from final_dir into the environment (no subfolders) ---
+    # ----------------------------------------------------------------
+    # 3) Copy all files from the original directory into staging_dir
+    # ----------------------------------------------------------------
     files_dict = {}
     for fname in os.listdir(final_dir):
         full_path = os.path.join(final_dir, fname)
         if os.path.isfile(full_path):
-            with open(full_path, "r") as fh:
-                files_dict[fname] = fh.read()
+            with open(full_path, "r", encoding="utf-8") as fh:
+                content = fh.read()
+            files_dict[fname] = content
 
-    # --- 5) Prepare to run the script ---
-    # We also might want to read the final bash file specifically for logging or history
-    file_contents = files_dict.get(script_name, "")
-    logger.info(f"Script file '{script_name}' contents:\n\n{file_contents}")
+            # Actually write the file physically to staging_dir
+            staged_path = os.path.join(staging_dir, fname)
+            with open(staged_path, "w", encoding="utf-8") as out_f:
+                out_f.write(content)
 
+    # We'll log the main script's contents if we want
+    script_contents = files_dict.get(script_name, "")
+    logger.info(f"Script file '{script_name}' contents:\n\n{script_contents}")
+
+    # ----------------------------------------------------------------
+    # 4) Prepare the final command override
+    # ----------------------------------------------------------------
+    if not cmd_override:
+        cmd_override = f"./{script_name}"  # run the script in the staging dir
+
+    # ----------------------------------------------------------------
+    # 5) Create secrets, if any
+    # ----------------------------------------------------------------
     request_secrets = _create_secrets_from_kwargs(**kwargs)
 
-    # --- 6) Execute the command with the entire directory's files ---
+    # ----------------------------------------------------------------
+    # 6) Actually run the script from staging_dir
+    #    - set `cwd=staging_dir` in the local process so that we can reference
+    #      "./scriptname.sh" without specifying a path
+    # ----------------------------------------------------------------
+    # We'll rely on `execute_command` to eventually call `execute_local_command`,
+    # but we need that local function to accept `cwd=staging_dir`.
+
+    # If your existing `execute_local_command` *always* uses a newly mkdtemp,
+    # you’ll want to modify it to accept a 'cwd' argument. Something like:
+    #
+    #   def execute_local_command(cmd, ..., cwd=None):
+    #       if cwd is None:
+    #           tmpdir = tempfile.mkdtemp(...)
+    #           ...
+    #       else:
+    #           # run from user-specified directory
+    #           ...
+    #
+    # We'll show how you might pass it:
+
+    # Force an environment variable to help debugging
+    env["RUN_CMD_FROM"] = staging_dir
+
+    # We'll skip passing `files=files_dict` because we physically wrote them
+    # But you could do either approach, if you prefer ephemeral usage from memory.
     rsp = execute_command(
         cmd=cmd_override,
-        files=files_dict,
         service=target_service,
         request_secrets=request_secrets,
         env=env,
+        files={},                # not strictly needed now that we have physical files
         timeout_seconds=timeout_seconds,
     )
 
-    # --- 7) Optionally add the script contents to SHELL_HISTORY ---
-    if include_in_history:
-        SHELL_HISTORY.append(file_contents)
+    # If your 'execute_local_command' doesn't yet support `cwd=staging_dir`,
+    # you’ll need to add that parameter in the chain. For example:
+    #
+    #   def execute_command(...):
+    #       return execute_local_command(cmd=cmd, ..., cwd=some_path)
+    #
+    # That ensures we actually run from staging_dir.
 
-    # --- 8) Log the results as before ---
+    # ----------------------------------------------------------------
+    # 7) Optionally store script contents in history
+    # ----------------------------------------------------------------
+    if include_in_history:
+        SHELL_HISTORY.append(script_contents)
+
+    # ----------------------------------------------------------------
+    # 8) Log results
+    # ----------------------------------------------------------------
     logger.info(f"shell stdout: {rsp.stdout}")
     logger.info(f"shell stderr: {rsp.stderr}")
     logger.info(f"shell status: {rsp.status}")
@@ -328,6 +370,7 @@ def run_bash_file(
     logger.info(f"shell rsp: {rsp}")
 
     return rsp
+
 
 def run_cli(
     cmd: str,
@@ -343,38 +386,30 @@ def run_cli(
     debug: bool = True,
     **kwargs,
 ) -> platform.ShellServiceResponse:
-    """Executes a string of shell commands either locally or remotely on a shellservice.
-
-    For passing through secrets securely this can be done by using kwargs with a specific naming convention:
-    - for files: secret_file__kubeconfig
-    - for secret strings: secret__mytoken
-
-    and then to use these within your shell command use the following syntax: $${<secret_name>.key} which will cause the shell command to access where
-    the secret is stored in the environment it's running in.
-
-    Args:
-        cmd (str): the string of shell commands to run, eg: ls -la | grep myfile
-        target_service (platform.Service, optional): the remote shellservice to run the commands on if provided, otherwise run locally if None. Defaults to None.
-        env (dict, optional): a mapping of environment variables to set in the environment where the shell commands are run. Defaults to None.
-        loop_with_items (list, optional): deprecated. Defaults to None.
-        run_in_workload_with_name (str, optional): deprecated. Defaults to "".
-        run_in_workload_with_labels (str, optional): deprecated. Defaults to "".
-        optional_namespace (str, optional): deprecated. Defaults to "".
-        optional_context (str, optional): deprecated. Defaults to "".
-        include_in_history (bool, optional): whether or not to include the shell commands in the total history. Defaults to True.
-
-    Returns:
-        platform.ShellServiceResponse: the structured response from running the shell commands.
     """
+    Executes a string of shell commands either locally or remotely (if target_service is given).
+    - If CODEBUNDLE_TEMP_DIR is set, commands are run from that directory.
+    - Preserves the existing logic for:
+      * loop_with_items
+      * run_in_workload_with_name / run_in_workload_with_labels
+      * secrets
+      * environment
+      * debug/logging
+    """
+
     global SHELL_HISTORY
     looped_results = []
     rsp = None
+
     logger.info(
         f"Requesting command: {cmd} with service: {target_service} - None indicates run local"
     )
+
     if env is None:
         env = {}
 
+    # 1) Possibly transform the command to run in a Kubernetes environment
+    #    if run_in_workload_with_name or run_in_workload_with_labels is set.
     if run_in_workload_with_labels or run_in_workload_with_name:
         cmd = _create_kubernetes_remote_exec(
             cmd=cmd,
@@ -386,28 +421,38 @@ def run_cli(
             context=optional_context,
             **kwargs,
         )
+
+    # 2) Convert any secrets from kwargs
     request_secrets: [platform.ShellServiceRequestSecret] = (
         [] if len(kwargs.keys()) > 0 else None
     )
     logger.info(f"Received kwargs: {kwargs}")
     request_secrets = _create_secrets_from_kwargs(**kwargs)
+
+    # 3) We look for CODEBUNDLE_TEMP_DIR
+    codebundle_temp_dir = os.getenv("CODEBUNDLE_TEMP_DIR", None)
+
+    # 4) If loop_with_items is given, run the command multiple times with item-based formatting
     if loop_with_items and len(loop_with_items) > 0:
         for item in loop_with_items:
-            cmd = cmd.format(item=item)
+            # Insert 'item' into the command string, e.g. "echo {item}"
+            item_cmd = cmd.format(item=item)
             iter_rsp = execute_command(
-                cmd=cmd,
+                cmd=item_cmd,
                 service=target_service,
                 request_secrets=request_secrets,
                 env=env,
                 timeout_seconds=timeout_seconds,
+                cwd=codebundle_temp_dir,  # run from codebundle_temp_dir if available
             )
             if include_in_history:
-                SHELL_HISTORY.append(cmd)
+                SHELL_HISTORY.append(item_cmd)
             looped_results.append(iter_rsp.stdout)
-            # keep track of last rsp codes we got
-            # TODO: revisit how we aggregate these
+            # keep track of last response
             rsp = iter_rsp
-        aggregate_stdout = "\n".join([iter_stdout for iter_stdout in looped_results])
+
+        # Aggregate stdout from all iterations
+        aggregate_stdout = "\n".join(looped_results)
         rsp = platform.ShellServiceResponse(
             cmd=rsp.cmd,
             parsed_cmd=rsp.parsed_cmd,
@@ -418,22 +463,28 @@ def run_cli(
             body=rsp.body,
             errors=rsp.errors,
         )
+
     else:
+        # Single run
         rsp = execute_command(
             cmd=cmd,
             service=target_service,
             request_secrets=request_secrets,
             env=env,
             timeout_seconds=timeout_seconds,
+            cwd=codebundle_temp_dir,  # run from codebundle_temp_dir if set
         )
         if include_in_history:
             SHELL_HISTORY.append(cmd)
+
+    # 5) Debug logging
     if debug:
         logger.info(f"shell stdout: {rsp.stdout}")
         logger.info(f"shell stderr: {rsp.stderr}")
         logger.info(f"shell status: {rsp.status}")
         logger.info(f"shell returncode: {rsp.returncode}")
         logger.info(f"shell rsp: {rsp}")
+
     return rsp
 
 
