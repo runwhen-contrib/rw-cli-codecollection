@@ -53,45 +53,47 @@ def execute_command(
     env: dict = None,
     files: dict = None,
     timeout_seconds: int = 60,
+    cwd: str = None, 
 ) -> platform.ShellServiceResponse:
     """
     If 'service' is None, run the command locally via 'execute_local_command'.
-    Otherwise, run it via platform.execute_shell_command().
-    Automatically copies AZURE_CONFIG_DIR,CODEBUNDLE_TEMP_DIR  from the parent environment
-    so the user doesn't have to pass it manually.
+    Otherwise, run it via 'platform.execute_shell_command'.
     """
     if env is None:
         env = {}
 
-    # 1) If AZURE_CONFIG_DIR is set in this process, copy it
-    #    so that local subprocesses can pick it up
     azure_config_dir = os.getenv("AZURE_CONFIG_DIR")
     if azure_config_dir and "AZURE_CONFIG_DIR" not in env:
         env["AZURE_CONFIG_DIR"] = azure_config_dir
-        logger.debug(f"Propagating AZURE_CONFIG_DIR={azure_config_dir} into subprocess env")
 
     codebundle_temp_dir = os.getenv("CODEBUNDLE_TEMP_DIR")
     if codebundle_temp_dir and "CODEBUNDLE_TEMP_DIR" not in env:
         env["CODEBUNDLE_TEMP_DIR"] = codebundle_temp_dir
-        logger.debug(f"Propagating CODEBUNDLE_TEMP_DIR={codebundle_temp_dir} into subprocess env")
 
-
-    if not service:
-        return execute_local_command(
-            cmd=cmd,
-            request_secrets=request_secrets,
-            env=env,
-            files=files,
-            timeout_seconds=timeout_seconds,
-        )
-    else:
+    # Possibly pass 'files' as well
+    # request_secrets is already handled
+    if service:
+        # For a remote service, 'cwd' typically doesn't apply 
+        # unless the remote shell supports specifying a directory.
         return platform.execute_shell_command(
             cmd=cmd,
             service=service,
             request_secrets=request_secrets,
             env=env,
             files=files,
+            # There's no 'cwd' usage in remote calls, so we omit it
         )
+    else:
+        # Local
+        return execute_local_command(
+            cmd=cmd,
+            request_secrets=request_secrets,
+            env=env,
+            files=files,
+            timeout_seconds=timeout_seconds,
+            cwd=cwd,  # <-- pass it along
+        )
+
 
 def _create_kubernetes_remote_exec(
     cmd: str,
