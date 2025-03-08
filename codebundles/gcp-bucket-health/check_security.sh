@@ -110,8 +110,8 @@ echo "Security Issues:"
 if [ ${#ISSUES[@]} -eq 0 ]; then
   echo "No security issues found."
   # Add empty json list to file so that json loads doesn't fail.
-  echo "[{}]" > ${RUNWHEN_TEMP_DIR}/bucket_security_issues.json
+  echo "[{}]" > ${CODEBUNDLE_TEMP_DIR}/bucket_security_issues.json
 else
-  echo "${ISSUES[@]}" | jq -s . > ${RUNWHEN_TEMP_DIR}/bucket_security_issues.json
-  cat ${RUNWHEN_TEMP_DIR}/bucket_security_issues.json
+  echo "${ISSUES[@]}" | jq -s . > ${CODEBUNDLE_TEMP_DIR}/bucket_security_issues.json
+  cat ${CODEBUNDLE_TEMP_DIR}/bucket_security_issues.json
 fi
