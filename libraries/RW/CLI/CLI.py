@@ -57,7 +57,7 @@ def execute_command(
     """
     If 'service' is None, run the command locally via 'execute_local_command'.
     Otherwise, run it via platform.execute_shell_command().
-    Automatically copies AZURE_CONFIG_DIR from the parent environment
+    Automatically copies AZURE_CONFIG_DIR,RUNWHEN_TEMP_DIR  from the parent environment
     so the user doesn't have to pass it manually.
     """
     if env is None:
@@ -69,6 +69,12 @@ def execute_command(
     if azure_config_dir and "AZURE_CONFIG_DIR" not in env:
         env["AZURE_CONFIG_DIR"] = azure_config_dir
         logger.debug(f"Propagating AZURE_CONFIG_DIR={azure_config_dir} into subprocess env")
+
+    runwhen_temp_dir = os.getenv("RUNWHEN_TEMP_DIR")
+    if runwhen_temp_dir and "RUNWHEN_TEMP_DIR" not in env:
+        env["RUNWHEN_TEMP_DIR"] = runwhen_temp_dir
+        logger.debug(f"Propagating RUNWHEN_TEMP_DIR={runwhen_temp_dir} into subprocess env")
+
 
     if not service:
         return execute_local_command(
