@@ -90,7 +90,7 @@ def execute_command(
             env=env,
             files=files,
             timeout_seconds=timeout_seconds,
-            cwd=cwd,  # <-- pass it along
+            cwd=cwd, 
         )
 
 

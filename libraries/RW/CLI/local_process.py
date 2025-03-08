@@ -33,6 +33,7 @@ def execute_local_command(
     env: dict = None,
     files: dict = None,
     timeout_seconds: int = 60,
+    cwd: str = None, 
 ) -> platform.ShellServiceResponse:
     """
     Runs a local bash command via subprocess, with optional secrets, environment, and file copying.
