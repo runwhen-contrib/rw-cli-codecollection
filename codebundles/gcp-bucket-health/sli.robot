@@ -11,7 +11,6 @@ Library             RW.platform
 Library             OperatingSystem
 
 Suite Setup         Suite Initialization
-Suite Teardown      Suite Teardown
 
 
 *** Tasks ***
@@ -96,7 +95,6 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=10
     ...    default=10
-    RW.Core.Create RunWhen Temp Dir
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${OPS_RATE_THRESHOLD}    ${OPS_RATE_THRESHOLD}
     Set Suite Variable      ${USAGE_THRESHOLD}    ${USAGE_THRESHOLD}
@@ -106,5 +104,3 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}","PATH":"$PATH:${OS_PATH}", "PROJECT_IDS":"${PROJECT_IDS}"}
-Suite Teardown   
-    RW.Core.Remove RunWhen Temp Dir
