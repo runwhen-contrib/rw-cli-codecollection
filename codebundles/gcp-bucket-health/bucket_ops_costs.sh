@@ -168,5 +168,5 @@ for project_id in "${projects[@]}"; do
 done
 
 # Output the result in JSON format
-echo "["$(IFS=,; echo "${bucket_ops[*]}")"]" > $HOME/bucket_ops_report.json
-cat $HOME/bucket_ops_report.json | jq 'sort_by(.total_ops) | reverse'
+echo "["$(IFS=,; echo "${bucket_ops[*]}")"]" > ${RUNWHEN_TEMP_DIR}/bucket_ops_report.json
+cat ${RUNWHEN_TEMP_DIR}/bucket_ops_report.json | jq 'sort_by(.total_ops) | reverse'

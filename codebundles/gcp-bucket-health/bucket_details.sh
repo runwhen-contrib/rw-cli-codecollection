@@ -75,8 +75,8 @@ for project_id in "${projects[@]}"; do
 
     for bucket_name in $buckets; do
             metadata=$(get_bucket_metadata "$bucket_name" "$access_token")
-            echo $metadata >> $HOME/bucket_configuration.json
+            echo $metadata >> ${RUNWHEN_TEMP_DIR}/bucket_configuration.json
     done
 done
 
-cat $HOME/bucket_configuration.json | jq .
+cat ${RUNWHEN_TEMP_DIR}/bucket_configuration.json | jq .
