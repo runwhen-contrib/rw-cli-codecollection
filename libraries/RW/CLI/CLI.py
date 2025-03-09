@@ -69,6 +69,10 @@ def execute_command(
     if codebundle_temp_dir and "CODEBUNDLE_TEMP_DIR" not in env:
         env["CODEBUNDLE_TEMP_DIR"] = codebundle_temp_dir
 
+    gcloud_config_dir = os.getenv("CLOUDSDK_CONFIG")
+    if gcloud_config_dir and "CLOUDSDK_CONFIG" not in env:
+        env["CLOUDSDK_CONFIG"] = gcloud_config_dir
+
     # Possibly pass 'files' as well
     # request_secrets is already handled
     if service:
