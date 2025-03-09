@@ -25,7 +25,7 @@ Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resou
     RW.Core.Add Pre To Report    ${resource_health.stdout}
 
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/az_resource_health.json
+    ...    cmd=cat az_resource_health.json
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -65,7 +65,7 @@ Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${
     RW.Core.Add Pre To Report    ${config.stdout}
 
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/az_cluster_health.json
+    ...    cmd=cat az_cluster_health.json
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -151,4 +151,4 @@ Suite Initialization
     Set Suite Variable    ${TIME_PERIOD_MINUTES}    ${TIME_PERIOD_MINUTES}
     Set Suite Variable
     ...    ${env}
-    ...    {"AKS_CLUSTER":"${AKS_CLUSTER}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "OUTPUT_DIR":"${OUTPUT DIR}", "TIME_PERIOD_MINUTES": "${TIME_PERIOD_MINUTES}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}
+    ...    {"AKS_CLUSTER":"${AKS_CLUSTER}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "TIME_PERIOD_MINUTES": "${TIME_PERIOD_MINUTES}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}

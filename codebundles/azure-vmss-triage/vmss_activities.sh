@@ -7,11 +7,8 @@
 # AZ_TENANT
 # VMSCALESET
 # AZ_RESOURCE_GROUP
-# OUTPUT_DIR
 # TIME_PERIOD_MINUTES (Optional, default is 60)
 
-# Ensure OUTPUT_DIR is set
-: "${OUTPUT_DIR:?OUTPUT_DIR variable is not set}"
 
 # Set the default time period to 60 minutes if not provided
 TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-60}"
@@ -42,7 +39,7 @@ az account set --subscription "$subscription" || { echo "Failed to set subscript
 # az account set --subscription "$AZ_SUBSCRIPTION"
 
 # Remove previous issues.json file if it exists
-[ -f "$OUTPUT_DIR/issues.json" ] && rm "$OUTPUT_DIR/issues.json"
+[ -f "issues.json" ] && rm "issues.json"
 
 # Fetch the resource ID
 resource_id=$(az vmss show --name "$VMSCALESET" --resource-group "$AZ_RESOURCE_GROUP" --query "id" -o tsv)
@@ -97,4 +94,4 @@ for level in "${!log_levels[@]}"; do
 done
 
 # Save the structured JSON data to issues.json
-echo "$issues_json" > "$OUTPUT_DIR/issues.json"
+echo "$issues_json" > "issues.json"

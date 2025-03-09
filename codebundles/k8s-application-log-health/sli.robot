@@ -166,12 +166,12 @@ Suite Initialization
     ${pods}=    RW.CLI.Run Bash File
     ...    bash_file=get_pod_logs_for_workload.sh
     ...    cmd_override=./get_pod_logs_for_workload.sh ${WORKLOAD_TYPE} ${WORKLOAD_NAME} ${NAMESPACE} ${CONTEXT}
-    ...    env={"LOG_AGE":"${LOG_AGE}", "SHARED_TEMP_DIR":"${SHARED_TEMP_DIR}","KUBECONFIG":"./${kubeconfig.key}", "OUTPUT_DIR":"${OUTPUT_DIR}"}
+    ...    env={"LOG_AGE":"${LOG_AGE}", "SHARED_TEMP_DIR":"${SHARED_TEMP_DIR}","KUBECONFIG":"./${kubeconfig.key}"}
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
     Set Suite Variable
     ...    ${env}
-    ...    {"SHARED_TEMP_DIR":"${SHARED_TEMP_DIR}","CURDIR":"${CURDIR}","KUBECONFIG":"./${kubeconfig.key}","WORKLOAD_TYPE":"${WORKLOAD_TYPE}", "WORKLOAD_NAME":"${WORKLOAD_NAME}", "NAMESPACE":"${NAMESPACE}", "CONTEXT":"${CONTEXT}", "OUTPUT_DIR":"${OUTPUT_DIR}"}
+    ...    {"SHARED_TEMP_DIR":"${SHARED_TEMP_DIR}","CURDIR":"${CURDIR}","KUBECONFIG":"./${kubeconfig.key}","WORKLOAD_TYPE":"${WORKLOAD_TYPE}", "WORKLOAD_NAME":"${WORKLOAD_NAME}", "NAMESPACE":"${NAMESPACE}", "CONTEXT":"${CONTEXT}"}
 
 Suite Cleanup
     Remove Directory    ${SHARED_TEMP_DIR}    recurse=True

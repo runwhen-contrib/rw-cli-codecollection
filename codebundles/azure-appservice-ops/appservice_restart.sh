@@ -14,7 +14,6 @@
 #   APP_SERVICE_NAME  - The name of your App Service.
 #
 # Optional ENV vars:
-#   OUTPUT_DIR        - Where logs (ZIP/unzipped) will be stored (default: ./output).
 #   RESTART_LOOKBACK  - How many minutes to look back in the Activity Log (default: 15).
 #   TAIL_LINES        - How many lines of each log file to display (default: 50).
 #   AZ_SUBSCRIPTION_ID - (Optional) subscription ID to build a direct portal link.
@@ -33,12 +32,9 @@
 : "${AZ_RESOURCE_GROUP:?Need to set AZ_RESOURCE_GROUP}"
 : "${APP_SERVICE_NAME:?Need to set APP_SERVICE_NAME}"
 
-OUTPUT_DIR="${OUTPUT_DIR:-./output}"
 RESTART_LOOKBACK="${RESTART_LOOKBACK:-15}"   # minutes
 TAIL_LINES="${TAIL_LINES:-50}"
 AZ_SUBSCRIPTION_ID="${AZ_SUBSCRIPTION_ID:-}"
-
-mkdir -p "${OUTPUT_DIR}"
 
 ##############################################################################
 # 1) Function: Download logs & tail last N lines
@@ -49,8 +45,8 @@ function fetch_and_tail_logs() {
   echo "===== [${label}] Downloading logs for App Service '${APP_SERVICE_NAME}' ====="
   local timestamp
   timestamp="$(date +%Y%m%d%H%M%S)"
-  local zip_file="${OUTPUT_DIR}/${APP_SERVICE_NAME}_logs_${label}_${timestamp}.zip"
-  local unzip_dir="${OUTPUT_DIR}/${APP_SERVICE_NAME}_logs_${label}_${timestamp}"
+  local zip_file="${APP_SERVICE_NAME}_logs_${label}_${timestamp}.zip"
+  local unzip_dir="${APP_SERVICE_NAME}_logs_${label}_${timestamp}"
 
   # Download logs
   az webapp log download \

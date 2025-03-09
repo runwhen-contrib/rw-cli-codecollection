@@ -108,8 +108,8 @@ unzip -o artifact.zip -d artifact_contents || error_exit "Failed to unzip the ar
 RESULT_PATH="artifact_contents/$RESULT_FILE"
 if [ -f "$RESULT_PATH" ]; then
     echo "Analyzing result file: $RESULT_FILE"
-    cat $RESULT_PATH | eval "$ANALYSIS_COMMAND" >> $SCRIPT_TMP_DIR/report.txt
-    cat $SCRIPT_TMP_DIR/report.txt
+    cat $RESULT_PATH | eval "$ANALYSIS_COMMAND" >> report.txt
+    cat report.txt
 else
     error_exit "Result file $RESULT_FILE not found in the artifact."
 fi

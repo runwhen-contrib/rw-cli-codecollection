@@ -168,8 +168,7 @@ update_github_manifests () {
     git config --global user.name "RunWhen Runsession Bot" 2>&1
     git config --global pull.rebase false 2>&1
 
-    # Create a temporary directory in $HOME
-    tempdir=$(mktemp -d "$HOME/tempdir.XXXXXX")
+    tempdir=$(mktemp -d "./tempdir.XXXXXX")
     trap 'rm -rf -- "$tempdir"' EXIT
     workdir="$tempdir"
     cd $workdir

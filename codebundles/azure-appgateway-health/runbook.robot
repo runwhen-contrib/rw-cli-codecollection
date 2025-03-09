@@ -35,7 +35,7 @@ Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NA
     END
 
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/app_gateway_health.json
+    ...    cmd=cat app_gateway_health.json
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -81,7 +81,7 @@ Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resou
         ...    details=${config_health.stderrt}
     END
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/app_gateway_config_health.json
+    ...    cmd=cat app_gateway_config_health.json
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -119,7 +119,7 @@ Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resou
         ...    details=${backend_health.stderr}
     END
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/backend_pool_members_health.json
+    ...    cmd=cat backend_pool_members_health.json
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -157,7 +157,7 @@ Fetch Log Analytics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Gr
         ...    details=${log_analytics.stderr}
     END
     ${analytics}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/app_gateway_log_metrics.json | jq . 
+    ...    cmd=cat app_gateway_log_metrics.json | jq . 
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -183,13 +183,13 @@ Fetch Metrics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `$
         ...    details=${metrics.stderr}
     END
     ${metrics_output}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/app_gateway_metrics.json | jq '.metrics'
+    ...    cmd=cat app_gateway_metrics.json | jq '.metrics'
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${metrics_output.stdout}
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/app_gateway_metrics.json | jq '.issues'
+    ...    cmd=cat app_gateway_metrics.json | jq '.issues'
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -227,7 +227,7 @@ Check SSL Certificate Health for Application Gateway `${APP_GATEWAY_NAME}` In Re
         ...    details=${ssl_health.stderr}
     END
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/appgw_ssl_certificate_checks.json | jq '.issues'
+    ...    cmd=cat appgw_ssl_certificate_checks.json | jq '.issues'
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -265,7 +265,7 @@ Check Logs for Errors with Application Gateway `${APP_GATEWAY_NAME}` In Resource
         ...    details=${log_errors.stderr}
     END
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/appgw_diagnostic_log_issues.json | jq '.issues'
+    ...    cmd=cat appgw_diagnostic_log_issues.json | jq '.issues'
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -294,7 +294,7 @@ List Related Azure Resources for Application Gateway `${APP_GATEWAY_NAME}` In Re
     RW.Core.Add Pre To Report    ${resources.stdout}
 
     ${resource_table}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/appgw_resource_discovery.json | jq -r '.discoveries | (["POOL","ADDRESS","TYPE","RESOURCE_ID"]|@tsv),(["----","----","----","----"]|@tsv),(.[ ]|[.backendPoolName,.address,.resource_type,.resource_id]|@tsv)' | column -t -s $'\t'
+    ...    cmd=cat appgw_resource_discovery.json | jq -r '.discoveries | (["POOL","ADDRESS","TYPE","RESOURCE_ID"]|@tsv),(["----","----","----","----"]|@tsv),(.[ ]|[.backendPoolName,.address,.resource_type,.resource_id]|@tsv)' | column -t -s $'\t'
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false 
@@ -327,4 +327,4 @@ Suite Initialization
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable
     ...    ${env}
-    ...    {"APP_GATEWAY_NAME":"${APP_GATEWAY_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "OUTPUT_DIR":"${OUTPUT_DIR}"}
+    ...    {"APP_GATEWAY_NAME":"${APP_GATEWAY_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}

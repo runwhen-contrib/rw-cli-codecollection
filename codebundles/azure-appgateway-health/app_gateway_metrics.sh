@@ -45,7 +45,6 @@ METRICS_TO_FETCH=(
 #
 # OPTIONAL:
 #   METRIC_TIME_RANGE  (default: PT1H)
-#   OUTPUT_DIR         (default: ./output)
 #
 # This script:
 #  1) Gets the Application Gateway resource ID
@@ -59,9 +58,7 @@ METRICS_TO_FETCH=(
 : "${AZ_RESOURCE_GROUP:?Must set AZ_RESOURCE_GROUP}"
 
 METRIC_TIME_RANGE="${METRIC_TIME_RANGE:-PT1H}"
-OUTPUT_DIR="${OUTPUT_DIR:-./output}"
-mkdir -p "$OUTPUT_DIR"
-OUTPUT_FILE="${OUTPUT_DIR}/app_gateway_metrics.json"
+OUTPUT_FILE="app_gateway_metrics.json"
 
 echo "Fetching metrics for Application Gateway \`$APP_GATEWAY_NAME\` in resource group \`$AZ_RESOURCE_GROUP\` over $METRIC_TIME_RANGE..."
 
@@ -151,13 +148,13 @@ for metric_name in "${METRICS_TO_FETCH[@]}"; do
   echo "Querying metric \`$metric_name\` with aggregator \`$aggregator\`..."
   echo "Command: $cmd"
 
-  # Capture stdout in cli_stdout, stderr in $OUTPUT_DIR/app_gw_metrics_errors.log
-  if ! cli_stdout=$(eval "$cmd" 2>$OUTPUT_DIR/app_gw_metrics_errors.log); then
+  # Capture stdout in cli_stdout, stderr in app_gw_metrics_errors.log
+  if ! cli_stdout=$(eval "$cmd" 2>app_gw_metrics_errors.log); then
     echo "ERROR: aggregator=$aggregator for metric=$metric_name"
-    cat $OUTPUT_DIR/app_gw_metrics_errors.log
+    cat app_gw_metrics_errors.log
     issues_json=$(echo "$issues_json" | jq \
       --arg title "Failed to Fetch Metric \`$metric_name\` for Application Gateway \`$APP_GATEWAY_NAME\`" \
-      --arg details "$(cat $OUTPUT_DIR/app_gw_metrics_errors.log)" \
+      --arg details "$(cat app_gw_metrics_errors.log)" \
       --arg severity "4" \
       --arg nextStep "Check aggregator or permissions. Possibly not supported in your tier/region." \
       '.issues += [{
@@ -169,10 +166,10 @@ for metric_name in "${METRICS_TO_FETCH[@]}"; do
     metrics_json=$(echo "$metrics_json" | jq \
       --arg m "$metric_name" --argjson val 0 \
       '. + {($m): $val}')
-    rm -f $OUTPUT_DIR/app_gw_metrics_errors.log
+    rm -f app_gw_metrics_errors.log
     continue
   fi
-  rm -f $OUTPUT_DIR/app_gw_metrics_errors.log
+  rm -f app_gw_metrics_errors.log
 
   # echo "Raw CLI output for \`$metric_name\`, aggregator=\`$aggregator\`:"
   # echo "$cli_stdout"
