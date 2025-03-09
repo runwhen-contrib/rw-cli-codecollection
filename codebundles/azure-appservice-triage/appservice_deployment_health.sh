@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # Environment variables
-OUTPUT_DIR="${OUTPUT_DIR:-"./output"}"
 CHECK_PERIOD="${CHECK_PERIOD:-24}" # Period in hours to check for recent failed deployments
 
 # Ensure required variables are set
@@ -123,6 +122,5 @@ else
 fi
 
 # Output results
-mkdir -p "$OUTPUT_DIR"
-echo "$issues_json" | jq '.' > "$OUTPUT_DIR/deployment_health.json"
-echo "Deployment health check completed. Results saved to $OUTPUT_DIR/deployment_health.json"
+echo "$issues_json" | jq '.' > "deployment_health.json"
+echo "Deployment health check completed. Results saved to deployment_health.json"

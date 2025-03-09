@@ -7,11 +7,8 @@
 # AZ_TENANT
 # APP_SERVICE_NAME
 # AZ_RESOURCE_GROUP
-# OUTPUT_DIR
 # TIME_PERIOD_MINUTES (Optional, default is 60)
 
-# Ensure OUTPUT_DIR is set
-: "${OUTPUT_DIR:?OUTPUT_DIR variable is not set}"
 
 # Set the default time period to 60 minutes if not provided
 TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-60}"
@@ -28,7 +25,7 @@ subscription_id=$(az account show --query "id" -o tsv)
 az account set --subscription "$subscription_id"
 
 # Remove previous issues.json file if it exists
-[ -f "$OUTPUT_DIR/issues.json" ] && rm "$OUTPUT_DIR/issues.json"
+[ -f "issues.json" ] && rm "issues.json"
 
 echo "Azure App Service $APP_SERVICE_NAME activity logs (recent):"
 
@@ -90,4 +87,4 @@ for level in "${!log_levels[@]}"; do
 done
 
 # Save the structured JSON data to issues.json
-echo "$issues_json" > "$OUTPUT_DIR/app_service_activities_issues.json"
+echo "$issues_json" > "app_service_activities_issues.json"
