@@ -126,7 +126,8 @@ Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOU
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${activities.stdout}
 
-    ${issues}=    RW.CLI.Run Cli    cmd=cat ${OUTPUT DIR}/app_service_activities_issues.json
+    ${issues}=    RW.CLI.Run Cli    
+    ...    cmd=cat app_service_activities_issues.json
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     Set Global Variable     ${app_service_activities_score}    1
     IF    len(@{issue_list["issues"]}) > 0

@@ -211,7 +211,8 @@ Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOU
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${activities.stdout}
 
-    ${issues}=    RW.CLI.Run Cli    cmd=cat ${OUTPUT DIR}/app_service_activities_issues.json
+    ${issues}=    RW.CLI.Run Cli    
+    ...    cmd=cat app_service_activities_issues.json
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
@@ -235,7 +236,8 @@ Check Logs for Errors in App Service `${APP_SERVICE_NAME}` In Resource Group `${
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${log_errors.stdout}
 
-    ${issues}=    RW.CLI.Run Cli    cmd=cat ${OUTPUT DIR}/app_service_log_issues_report.json
+    ${issues}=    RW.CLI.Run Cli    
+    ...    cmd=cat app_service_log_issues_report.json
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
