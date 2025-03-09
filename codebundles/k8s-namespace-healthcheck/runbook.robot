@@ -25,7 +25,7 @@ Inspect Warning Events in Namespace `${NAMESPACE}`
     ...    and searches for a useful next step based on these details.
     [Tags]    namespace    trace    error    pods    events    logs    grep    ${NAMESPACE}
     ${warning_events_by_object}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json > $RUNWHEN_TEMP_DIR/warning_events.json && cat $RUNWHEN_TEMP_DIR/warning_events.json | jq -r '[.items[] | {namespace: .involvedObject.namespace, kind: .involvedObject.kind, baseName: ((if .involvedObject.kind == "Pod" then (.involvedObject.name | split("-")[:-1] | join("-")) else .involvedObject.name end) // ""), count: .count, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, reason: .reason, message: .message}] | group_by(.namespace, .kind, .baseName) | map({object: (.[0].namespace + "/" + .[0].kind + "/" + .[0].baseName), total_events: (reduce .[] as $event (0; . + $event.count)), summary_messages: (map(.message) | unique | join("; ")), oldest_timestamp: (map(.firstTimestamp) | sort | first), most_recent_timestamp: (map(.lastTimestamp) | sort | last)}) | map(select((now - ((.most_recent_timestamp | fromdateiso8601)))/60 <= ${EVENT_AGE} ))'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json > warning_events.json && cat warning_events.json | jq -r '[.items[] | {namespace: .involvedObject.namespace, kind: .involvedObject.kind, baseName: ((if .involvedObject.kind == "Pod" then (.involvedObject.name | split("-")[:-1] | join("-")) else .involvedObject.name end) // ""), count: .count, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, reason: .reason, message: .message}] | group_by(.namespace, .kind, .baseName) | map({object: (.[0].namespace + "/" + .[0].kind + "/" + .[0].baseName), total_events: (reduce .[] as $event (0; . + $event.count)), summary_messages: (map(.message) | unique | join("; ")), oldest_timestamp: (map(.firstTimestamp) | sort | first), most_recent_timestamp: (map(.lastTimestamp) | sort | last)}) | map(select((now - ((.most_recent_timestamp | fromdateiso8601)))/60 <= ${EVENT_AGE} ))'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
@@ -102,7 +102,7 @@ Inspect Container Restarts In Namespace `${NAMESPACE}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    include_in_history=False
     ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=cat ${RUNWHEN_TEMP_DIR}/container_restart_issues.json
+    ...    cmd=cat container_restart_issues.json
     ...    env=${env}
     ...    include_in_history=false
     IF    $recommendations.stdout != ""
@@ -333,7 +333,7 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
     [Documentation]    Fetches non warning events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
     [Tags]    namespace    events    info    state    anomolies    count    occurences    ${namespace}
     ${recent_events_by_object}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json > $RUNWHEN_TEMP_DIR/events.json && cat $RUNWHEN_TEMP_DIR/events.json | jq -r '[.items[] | {namespace: .involvedObject.namespace, kind: .involvedObject.kind, name: ((if .involvedObject and .involvedObject.kind == "Pod" then (.involvedObject.name | split("-")[:-1] | join("-")) else .involvedObject.name end) // ""), count: .count, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, reason: .reason, message: .message}] | group_by(.namespace, .kind, .name) | .[] | {(.[0].namespace + "/" + .[0].kind + "/" + .[0].name): {events: .}}' | jq -r --argjson threshold "${ANOMALY_THRESHOLD}" 'to_entries[] | {object: .key, oldest_timestamp: ([.value.events[] | .firstTimestamp] | min), most_recent_timestamp: ([.value.events[] | .lastTimestamp] | max), events_per_minute: (reduce .value.events[] as $event (0; . + $event.count) / (((([.value.events[] | .lastTimestamp | fromdateiso8601] | max) - ([.value.events[] | .firstTimestamp | fromdateiso8601] | min)) / 60) | if . < 1 then 1 else . end)), total_events: (reduce .value.events[] as $event (0; . + $event.count)), summary_messages: [.value.events[] | .message] | unique | join("; ")} | select(.events_per_minute > $threshold)' | jq -s '.'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json > events.json && cat events.json | jq -r '[.items[] | {namespace: .involvedObject.namespace, kind: .involvedObject.kind, name: ((if .involvedObject and .involvedObject.kind == "Pod" then (.involvedObject.name | split("-")[:-1] | join("-")) else .involvedObject.name end) // ""), count: .count, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, reason: .reason, message: .message}] | group_by(.namespace, .kind, .name) | .[] | {(.[0].namespace + "/" + .[0].kind + "/" + .[0].name): {events: .}}' | jq -r --argjson threshold "${ANOMALY_THRESHOLD}" 'to_entries[] | {object: .key, oldest_timestamp: ([.value.events[] | .firstTimestamp] | min), most_recent_timestamp: ([.value.events[] | .lastTimestamp] | max), events_per_minute: (reduce .value.events[] as $event (0; . + $event.count) / (((([.value.events[] | .lastTimestamp | fromdateiso8601] | max) - ([.value.events[] | .firstTimestamp | fromdateiso8601] | min)) / 60) | if . < 1 then 1 else . end)), total_events: (reduce .value.events[] as $event (0; . + $event.count)), summary_messages: [.value.events[] | .message] | unique | join("; ")} | select(.events_per_minute > $threshold)' | jq -s '.'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
@@ -532,4 +532,4 @@ Suite Initialization
     Set Suite Variable    ${CONTAINER_RESTART_AGE}    ${CONTAINER_RESTART_AGE}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "RUNWHEN_TEMP_DIR":"${RUNWHEN_TEMP_DIR}", "CONTAINER_RESTART_AGE": "${CONTAINER_RESTART_AGE}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "CONTAINER_RESTART_AGE": "${CONTAINER_RESTART_AGE}"}

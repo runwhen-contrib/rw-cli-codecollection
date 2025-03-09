@@ -271,5 +271,5 @@ recommendations_json=$(printf '%s\n' "${recommendations[@]}" | jq -s 'unique_by(
 if [ -n "$recommendations_json" ]; then
     echo -e "\nRecommended Next Steps: \n"
     echo "$recommendations_json"
-    echo "$recommendations_json" > $RUNWHEN_TEMP_DIR/container_restart_issues.json
+    echo "$recommendations_json" > container_restart_issues.json
 fi
