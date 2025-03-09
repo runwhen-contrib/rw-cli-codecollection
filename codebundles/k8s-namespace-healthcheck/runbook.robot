@@ -16,7 +16,6 @@ Library             Collections
 Library             String
 
 Suite Setup         Suite Initialization
-Suite Teardown      Suite Teardown
 
 
 *** Tasks ***
@@ -524,7 +523,6 @@ Suite Initialization
     ...    pattern=((\d+?)m)?
     ...    example=4h
     ...    default=4h
-    RW.Core.Create RunWhen Temp Dir
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
@@ -535,5 +533,3 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "RUNWHEN_TEMP_DIR":"${RUNWHEN_TEMP_DIR}", "CONTAINER_RESTART_AGE": "${CONTAINER_RESTART_AGE}"}
-Suite Teardown   
-    RW.Core.Remove RunWhen Temp Dir
