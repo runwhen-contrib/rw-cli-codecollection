@@ -172,5 +172,5 @@ for project_id in "${projects[@]}"; do
 done
 
 # Output the result in JSON format
-echo "["$(IFS=,; echo "${bucket_sizes[*]}")"]" > $HOME/bucket_report.json
-cat $HOME/bucket_report.json | jq 'sort_by(.size_tb) | reverse'
+echo "["$(IFS=,; echo "${bucket_sizes[*]}")"]" > bucket_report.json
+cat bucket_report.json | jq 'sort_by(.size_tb) | reverse'

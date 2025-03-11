@@ -8,7 +8,7 @@
 # APP_SERVICE_NAME
 # AZ_RESOURCE_GROUP
 
-LOG_PATH="/$OUTPUT_DIR/_rw_logs_$APP_SERVICE_NAME.zip"
+LOG_PATH="_rw_logs_$APP_SERVICE_NAME.zip"
 subscription_id=$(az account show --query "id" -o tsv)
 
 # # Set the subscription

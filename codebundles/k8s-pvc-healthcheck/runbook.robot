@@ -151,7 +151,7 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${pvc_recommendations}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/pvc_issues.json
+    ...    cmd=cat pvc_issues.json
     ...    env=${env}
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${pvc_recommendations.stdout}''')    json
@@ -221,15 +221,8 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=otel-demo
     ...    default=
-    ${HOME}=    RW.Core.Import User Variable    HOME
-    ...    type=string
-    ...    description=The home path of the runner
-    ...    pattern=\w*
-    ...    example=/home/runwhen
-    ...    default=/home/runwhen
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
-    Set Suite Variable    ${HOME}    ${HOME}
-    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "HOME":"${HOME}", "OUTPUT_DIR":"${OUTPUT_DIR}"}
+    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}"}

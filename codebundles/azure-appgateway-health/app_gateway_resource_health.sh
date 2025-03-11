@@ -1,9 +1,7 @@
 #!/bin/bash
 
-# Ensure output directory exists
-OUTPUT_DIR=${OUTPUT_DIR:-"./output"}
-mkdir -p "$OUTPUT_DIR"
-HEALTH_OUTPUT="${OUTPUT_DIR}/app_gateway_health.json"
+
+HEALTH_OUTPUT="app_gateway_health.json"
 echo "[]" > "$HEALTH_OUTPUT"
 
 # Get or set subscription ID

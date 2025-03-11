@@ -9,7 +9,6 @@ set -euo pipefail
 # OPTIONAL ENV VARS:
 #   WARNINGS_THRESHOLD: Integer threshold for matching warnings (default=1)
 #   TIME_RANGE:         Kusto time window to look back (default=PT1H)
-#   OUTPUT_DIR:         Where to store the resulting JSON (default=./output)
 #
 # This script:
 #   1) Retrieves the Application Gateway Resource ID by name/RG
@@ -25,9 +24,7 @@ set -euo pipefail
 
 WARNINGS_THRESHOLD="${WARNINGS_THRESHOLD:-1}"
 TIME_RANGE="${TIME_RANGE:-1h}"
-OUTPUT_DIR="${OUTPUT_DIR:-./output}"
-mkdir -p "$OUTPUT_DIR"
-OUTPUT_FILE="${OUTPUT_DIR}/appgw_diagnostic_log_issues.json"
+OUTPUT_FILE="appgw_diagnostic_log_issues.json"
 
 issues_json='{"issues": []}'
 
@@ -45,9 +42,9 @@ echo "Retrieving the App Gateway resource ID..."
 if ! AGW_RESOURCE_ID=$(az network application-gateway show \
       --name "$APP_GATEWAY_NAME" \
       --resource-group "$AZ_RESOURCE_GROUP" \
-      --query "id" -o tsv 2>$OUTPUT_DIR/agw_show_err.log); then
-  err_msg=$(cat $OUTPUT_DIR/agw_show_err.log)
-  rm -f $OUTPUT_DIR/agw_show_err.log
+      --query "id" -o tsv 2>agw_show_err.log); then
+  err_msg=$(cat agw_show_err.log)
+  rm -f agw_show_err.log
 
   echo "ERROR: Could not fetch App Gateway resource ID."
   issues_json=$(echo "$issues_json" | jq \
@@ -64,7 +61,7 @@ if ! AGW_RESOURCE_ID=$(az network application-gateway show \
   echo "$issues_json" > "$OUTPUT_FILE"
   exit 1
 fi
-rm -f $OUTPUT_DIR/agw_show_err.log
+rm -f agw_show_err.log
 
 if [[ -z "$AGW_RESOURCE_ID" ]]; then
   echo "No resource ID returned. Possibly the App Gateway doesn't exist in that RG."
@@ -89,12 +86,12 @@ echo "App Gateway Resource ID: $AGW_RESOURCE_ID"
 # 2) Check Diagnostic Settings to see if logs are sent to a Log Analytics workspace
 # -----------------------------------------------------------------------------
 echo "Checking diagnostic settings for resource: $AGW_RESOURCE_ID"
-diag_settings_json=$(az monitor diagnostic-settings list --resource "$AGW_RESOURCE_ID" -o json 2>$OUTPUT_DIR/diag_err.log || true)
+diag_settings_json=$(az monitor diagnostic-settings list --resource "$AGW_RESOURCE_ID" -o json 2>diag_err.log || true)
 
 if [[ -z "$diag_settings_json" || "$diag_settings_json" == "[]" ]]; then
   echo "No diagnostic settings found for App Gateway resource."
-  err_msg=$(cat $OUTPUT_DIR/diag_err.log)
-  rm -f $OUTPUT_DIR/diag_err.log
+  err_msg=$(cat diag_err.log)
+  rm -f diag_err.log
 
   issues_json=$(echo "$issues_json" | jq \
     --arg title "No Diagnostic Settings Found" \
@@ -110,7 +107,7 @@ if [[ -z "$diag_settings_json" || "$diag_settings_json" == "[]" ]]; then
   echo "$issues_json" > "$OUTPUT_FILE"
   exit 0
 fi
-rm -f $OUTPUT_DIR/diag_err.log
+rm -f diag_err.log
 
 echo "Diagnostic Settings JSON:"
 echo "$diag_settings_json" | jq .
@@ -140,9 +137,9 @@ echo "Found workspace resource ID: $WS_RESOURCE_ID"
 echo "Retrieving Log Analytics Workspace GUID..."
 if ! WORKSPACE_ID=$(az monitor log-analytics workspace show \
       --ids "$WS_RESOURCE_ID" \
-      --query "customerId" -o tsv 2>$OUTPUT_DIR/la_guid_err.log); then
-  err_msg=$(cat $OUTPUT_DIR/la_guid_err.log)
-  rm -f $OUTPUT_DIR/la_guid_err.log
+      --query "customerId" -o tsv 2>la_guid_err.log); then
+  err_msg=$(cat la_guid_err.log)
+  rm -f la_guid_err.log
   echo "ERROR: Could not retrieve workspace GUID."
   issues_json=$(echo "$issues_json" | jq \
     --arg title "Failed to Get Workspace GUID" \
@@ -158,7 +155,7 @@ if ! WORKSPACE_ID=$(az monitor log-analytics workspace show \
   echo "$issues_json" > "$OUTPUT_FILE"
   exit 1
 fi
-rm -f $OUTPUT_DIR/la_guid_err.log
+rm -f la_guid_err.log
 
 echo "Using Workspace GUID: $WORKSPACE_ID"
 
@@ -184,9 +181,9 @@ echo "$KUSTO_QUERY"
 if ! query_output=$(az monitor log-analytics query \
       --workspace "$WORKSPACE_ID" \
       --analytics-query "$KUSTO_QUERY" \
-      -o json 2>$OUTPUT_DIR/la_query_err.log); then
-  err_msg=$(cat $OUTPUT_DIR/la_query_err.log)
-  rm -f $OUTPUT_DIR/la_query_err.log
+      -o json 2>la_query_err.log); then
+  err_msg=$(cat la_query_err.log)
+  rm -f la_query_err.log
   echo "ERROR: 'az monitor log-analytics query' command failed."
   issues_json=$(echo "$issues_json" | jq \
     --arg title "Failed Log Analytics Query" \
@@ -202,7 +199,7 @@ if ! query_output=$(az monitor log-analytics query \
   echo "$issues_json" > "$OUTPUT_FILE"
   exit 1
 fi
-rm -f $OUTPUT_DIR/la_query_err.log
+rm -f la_query_err.log
 
 echo "Raw query output:"
 echo "$query_output"

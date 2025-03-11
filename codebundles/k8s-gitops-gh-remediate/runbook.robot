@@ -210,12 +210,6 @@ Suite Initialization
     ...    enum=[kubectl,oc]
     ...    example=kubectl
     ...    default=kubectl
-    ${HOME}=    RW.Core.Import User Variable    HOME
-    ...    type=string
-    ...    description=The home path of the runner
-    ...    pattern=\w*
-    ...    example=/home/runwhen
-    ...    default=/home/runwhen
     ${RW_TASK_TITLES}=    Get Environment Variable    RW_TASK_TITLES    "[]"
     ${RW_TASK_STRING}=    Evaluate    ${RW_TASK_TITLES}    json
     ${RW_TASK_STRING}=    Evaluate    ', '.join(${RW_TASK_STRING})    json
@@ -228,7 +222,6 @@ Suite Initialization
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
-    Set Suite Variable    ${HOME}    ${HOME}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "HOME":"${HOME}", "GITHUB_TOKEN":"${github_token.value}", "RW_TASK_TITLES":"${RW_TASK_STRING}", "RW_FRONTEND_URL":"${RW_FRONTEND_URL}", "RW_SESSION_ID":"${RW_SESSION_ID}", "RW_USERNAME": "${RW_USERNAME}", "RW_WORKSPACE":"${RW_WORKSPACE}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "GITHUB_TOKEN":"${github_token.value}", "RW_TASK_TITLES":"${RW_TASK_STRING}", "RW_FRONTEND_URL":"${RW_FRONTEND_URL}", "RW_SESSION_ID":"${RW_SESSION_ID}", "RW_USERNAME": "${RW_USERNAME}", "RW_WORKSPACE":"${RW_WORKSPACE}"}

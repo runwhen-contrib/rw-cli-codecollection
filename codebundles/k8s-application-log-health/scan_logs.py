@@ -10,13 +10,13 @@ def main():
     namespace = os.getenv("NAMESPACE")
     workload_type = os.getenv("WORKLOAD_TYPE")
     workload_name = os.getenv("WORKLOAD_NAME")
-    output_dir = os.getenv("SHARED_TEMP_DIR")
+    output_dir = "./"
     error_json = os.getenv("ERROR_JSON", "error_patterns.json")
     categories_str = os.getenv("CATEGORIES", "GenericError,AppFailure")
     issue_file = os.getenv("ISSUE_FILE")
     categories_to_match = [c.strip() for c in categories_str.split(",") if c.strip()]
 
-    for var_name in ["NAMESPACE", "WORKLOAD_TYPE", "WORKLOAD_NAME", "OUTPUT_DIR"]:
+    for var_name in ["NAMESPACE", "WORKLOAD_TYPE", "WORKLOAD_NAME"]:
         if not os.getenv(var_name):
             print(f"ERROR: Environment variable {var_name} is not set.", file=sys.stderr)
             sys.exit(1)

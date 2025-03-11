@@ -4,7 +4,6 @@
 subscription=$(az account show --query "id" -o tsv)
 issues_json='{"issues": []}'
 
-OUTPUT_DIR="$OUTPUT_DIR"
 
 echo "Processing app service $APP_SERVICE_NAME in resource group $AZ_RESOURCE_GROUP"
 
@@ -92,7 +91,6 @@ else
 fi
 
 # Dump the issues into a JSON list for processing
-mkdir -p "$OUTPUT_DIR"
-echo "$issues_json" > "$OUTPUT_DIR/az_app_service_health.json"
+echo "$issues_json" > "az_app_service_health.json"
 
-echo "Health check completed. Results saved to $OUTPUT_DIR/az_app_service_health.json"
+echo "Health check completed. Results saved to az_app_service_health.json"

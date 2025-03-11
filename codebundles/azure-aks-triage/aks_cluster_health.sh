@@ -92,4 +92,4 @@ else
 fi
 
 # Dump the issues into a json list for processing
-echo "$issues_json" > "$OUTPUT_DIR/az_cluster_health.json"
+echo "$issues_json" > "az_cluster_health.json"

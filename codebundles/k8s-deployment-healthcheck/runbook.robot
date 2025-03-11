@@ -34,17 +34,17 @@ Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
     ...    access:read-only
     ${logs}=    RW.CLI.Run Bash File
     ...    bash_file=deployment_logs.sh 
-    ...    cmd_override=./deployment_logs.sh | tee "${SCRIPT_TMP_DIR}/log_analysis"
+    ...    cmd_override=./deployment_logs.sh | tee "log_analysis"
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=awk "/Recommended Next Steps:/ {start=1; getline} start" "${SCRIPT_TMP_DIR}/log_analysis"
+    ...    cmd=awk "/Recommended Next Steps:/ {start=1; getline} start" "log_analysis"
     ...    env=${env}
     ...    include_in_history=false
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=awk '/Issues Identified:/ {start=1; next} /The namespace `${NAMESPACE}` has produced the following interesting events:/ {start=0} start' "${SCRIPT_TMP_DIR}/log_analysis"
+    ...    cmd=awk '/Issues Identified:/ {start=1; next} /The namespace `${NAMESPACE}` has produced the following interesting events:/ {start=0} start' "log_analysis"
     ...    env=${env}
     ...    include_in_history=false
     IF    len($issues.stdout) > 0
@@ -98,13 +98,13 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     ...    access:read-only
     ${liveness_probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_probes.sh
-    ...    cmd_override=./validate_probes.sh livenessProbe | tee "${SCRIPT_TMP_DIR}/liveness_probe_output"
+    ...    cmd_override=./validate_probes.sh livenessProbe | tee "liveness_probe_output"
     ...    env=${env}
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' "${SCRIPT_TMP_DIR}/liveness_probe_output"
+    ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' "liveness_probe_output"
     ...    env=${env}
     ...    include_in_history=false
     IF    len($recommendations.stdout) > 0
@@ -136,13 +136,13 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}` in Names
     ...    access:read-only
     ${readiness_probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_probes.sh
-    ...    cmd_override=./validate_probes.sh readinessProbe | tee "${SCRIPT_TMP_DIR}/readiness_probe_output"
+    ...    cmd_override=./validate_probes.sh readinessProbe | tee "readiness_probe_output"
     ...    env=${env}
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' "${SCRIPT_TMP_DIR}/readiness_probe_output"
+    ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' "readiness_probe_output"
     ...    env=${env}
     ...    include_in_history=false
     IF    len($recommendations.stdout) > 0
@@ -378,14 +378,14 @@ Check ReplicaSet Health for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAME
     ...    access:read-only
     ${check_replicaset}=    RW.CLI.Run Bash File
     ...    bash_file=check_replicaset.sh 
-    ...    cmd_override=./check_replicaset.sh | tee "${SCRIPT_TMP_DIR}/rs_analysis"
+    ...    cmd_override=./check_replicaset.sh | tee "rs_analysis"
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=180
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=awk "/Recommended Next Steps:/ {start=1; getline} start" "${SCRIPT_TMP_DIR}/rs_analysis"
+    ...    cmd=awk "/Recommended Next Steps:/ {start=1; getline} start" "rs_analysis"
     ...    env=${env}
     ...    include_in_history=false
     IF    $recommendations.stdout != ""
@@ -461,12 +461,6 @@ Suite Initialization
     ...    enum=[kubectl,oc]
     ...    example=kubectl
     ...    default=kubectl
-    ${HOME}=    RW.Core.Import User Variable    HOME
-    ...    type=string
-    ...    description=The home path of the runner
-    ...    pattern=\w*
-    ...    example=/home/runwhen
-    ...    default=/home/runwhen 
     ${LOG_LINES}=    RW.Core.Import User Variable    LOG_LINES
     ...    type=string
     ...    description=The number of lines to fetch when adding logs to the report
@@ -483,11 +477,6 @@ Suite Initialization
     Set Suite Variable    ${ANOMALY_THRESHOLD}    ${ANOMALY_THRESHOLD}
     Set Suite Variable    ${LOGS_ERROR_PATTERN}    ${LOGS_ERROR_PATTERN}
     Set Suite Variable    ${LOGS_EXCLUDE_PATTERN}    ${LOGS_EXCLUDE_PATTERN}
-    Set Suite Variable    ${HOME}    ${HOME}
-    ${temp_dir}=    RW.CLI.Run Cli    cmd=mktemp -d ${HOME}/k8s-deployment-healthcheck-XXXXXXXXXX | tr -d '\n'
-    Set Suite Variable    ${SCRIPT_TMP_DIR}    ${temp_dir.stdout}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "LOGS_ERROR_PATTERN":"${LOGS_ERROR_PATTERN}", "LOGS_EXCLUDE_PATTERN":"${LOGS_EXCLUDE_PATTERN}", "ANOMALY_THRESHOLD":"${ANOMALY_THRESHOLD}", "DEPLOYMENT_NAME": "${DEPLOYMENT_NAME}", "HOME":"${HOME}"}
-Suite Teardown
-     RW.CLI.Run Cli    cmd=rm -rf ${SCRIPT_TMP_DIR}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "LOGS_ERROR_PATTERN":"${LOGS_ERROR_PATTERN}", "LOGS_EXCLUDE_PATTERN":"${LOGS_EXCLUDE_PATTERN}", "ANOMALY_THRESHOLD":"${ANOMALY_THRESHOLD}", "DEPLOYMENT_NAME": "${DEPLOYMENT_NAME}"}

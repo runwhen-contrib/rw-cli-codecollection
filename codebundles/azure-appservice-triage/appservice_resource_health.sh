@@ -2,7 +2,6 @@
 
 # Set subscription ID and resource details
 subscription=$(az account show --query "id" -o tsv)
-: "${OUTPUT_DIR:?OUTPUT_DIR variable is not set}"
 
 # Check if Microsoft.ResourceHealth provider is already registered
 echo "Checking registration status of Microsoft.ResourceHealth provider..."
@@ -38,11 +37,11 @@ fi
 echo "Retrieving health status for Azure App Service..."
 healthUrl="https://management.azure.com/subscriptions/$subscription/resourceGroups/$AZ_RESOURCE_GROUP/providers/Microsoft.Web/sites/$APP_SERVICE_NAME/providers/Microsoft.ResourceHealth/availabilityStatuses/current?api-version=2023-07-01-preview"
 
-az rest --method get --url "$healthUrl" > "${OUTPUT_DIR}/app_service_health.json"
+az rest --method get --url "$healthUrl" > "app_service_health.json"
 
 if [[ $? -eq 0 ]]; then
-    echo "Health status retrieved successfully. Output saved to ${OUTPUT_DIR}/app_service_health.json"
-    cat "${OUTPUT_DIR}/app_service_health.json"
+    echo "Health status retrieved successfully. Output saved to app_service_health.json"
+    cat "app_service_health.json"
 else
     echo "Error: Failed to retrieve health status for Azure App Service."
     exit 1

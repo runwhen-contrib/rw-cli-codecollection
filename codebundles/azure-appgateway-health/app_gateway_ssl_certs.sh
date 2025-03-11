@@ -8,7 +8,6 @@
 #
 # OPTIONAL:
 #   DAYS_THRESHOLD     (Integer) - days before expiry to warn, default=30
-#   OUTPUT_DIR         - directory to store the resulting JSON, default=./output
 #
 # The script:
 #   1) Retrieves the Application Gateway JSON
@@ -29,9 +28,7 @@
 
 newline=$'\n'
 DAYS_THRESHOLD="${DAYS_THRESHOLD:-30}"
-OUTPUT_DIR="${OUTPUT_DIR:-./output}"
-mkdir -p "$OUTPUT_DIR"
-OUTPUT_FILE="${OUTPUT_DIR}/appgw_ssl_certificate_checks.json"
+OUTPUT_FILE="appgw_ssl_certificate_checks.json"
 
 issues_json='{"issues": []}'
 
@@ -165,7 +162,7 @@ parse_live_tls_expiry() {
 # 1) Retrieve the AppGw main JSON
 ##################################
 echo "Fetching Application Gateway configuration..."
-OUTPUT_ERR="$OUTPUT_DIR/appgw_err.log"
+OUTPUT_ERR="appgw_err.log"
 if ! appgw_json=$(az network application-gateway show \
   --name "$APP_GATEWAY_NAME" \
   --resource-group "$AZ_RESOURCE_GROUP" \
@@ -185,8 +182,8 @@ rm -f "$OUTPUT_ERR"
 ##################################
 # DEBUG: Dump some partial JSON
 ##################################
-echo "DEBUG: Dumping .httpListeners, .listeners => $OUTPUT_DIR/listeners_debug.json"
-echo "$appgw_json" | jq '{httpListeners: .httpListeners, listeners: .listeners}' > "$OUTPUT_DIR/listeners_debug.json"
+echo "DEBUG: Dumping .httpListeners, .listeners => listeners_debug.json"
+echo "$appgw_json" | jq '{httpListeners: .httpListeners, listeners: .listeners}' > "listeners_debug.json"
 
 ##################################
 # 2) Identify "effective" array of listeners
@@ -385,7 +382,7 @@ while IFS= read -r cert_json; do
   # (B) If no valid epoch yet, call ssl-cert show
   if [[ "$expiry_epoch" == "0" ]]; then
     echo "No valid .expiry, calling ssl-cert show for $c_name..."
-    show_err="$OUTPUT_DIR/ssl_cert_show_err.log"
+    show_err="ssl_cert_show_err.log"
     ssl_show_json=$(az network application-gateway ssl-cert show \
       --resource-group "$AZ_RESOURCE_GROUP" \
       --gateway-name "$APP_GATEWAY_NAME" \

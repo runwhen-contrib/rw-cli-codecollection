@@ -24,7 +24,7 @@ Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NA
     ...    show_in_rwl_cheatsheet=true
 
     ${resource_health_output}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/app_gateway_health.json | tr -d '\n'
+    ...    cmd=cat app_gateway_health.json | tr -d '\n'
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -47,7 +47,7 @@ Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resou
     ...    show_in_rwl_cheatsheet=true
 
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/app_gateway_config_health.json | jq '{issues: [.issues[] | select(.severity < 4)]}'
+    ...    cmd=cat app_gateway_config_health.json | jq '{issues: [.issues[] | select(.severity < 4)]}'
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -65,7 +65,7 @@ Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resou
     ...    include_in_history=false
 
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/backend_pool_members_health.json | jq '{issues: [.issues[] | select(.severity < 4)]}'
+    ...    cmd=cat backend_pool_members_health.json | jq '{issues: [.issues[] | select(.severity < 4)]}'
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -84,7 +84,7 @@ Fetch Metrics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `$
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/app_gateway_metrics.json | jq '{issues: [.issues[] | select(.severity < 4)]}'
+    ...    cmd=cat app_gateway_metrics.json | jq '{issues: [.issues[] | select(.severity < 4)]}'
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -102,7 +102,7 @@ Check SSL Certificate Health for Application Gateway `${APP_GATEWAY_NAME}` In Re
     ...    env=${env}
     ...    timeout_seconds=180
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/appgw_ssl_certificate_checks.json | jq '{issues: [.issues[] | select(.severity < 4)]}'
+    ...    cmd=cat appgw_ssl_certificate_checks.json | jq '{issues: [.issues[] | select(.severity < 4)]}'
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -120,7 +120,7 @@ Check Logs for Errors with Application Gateway `${APP_GATEWAY_NAME}` In Resource
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/appgw_diagnostic_log_issues.json | jq '{issues: [.issues[] | select(.severity < 4)]}'
+    ...    cmd=cat appgw_diagnostic_log_issues.json | jq '{issues: [.issues[] | select(.severity < 4)]}'
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -162,4 +162,4 @@ Suite Initialization
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable
     ...    ${env}
-    ...    {"APP_GATEWAY_NAME":"${APP_GATEWAY_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "OUTPUT_DIR":"${OUTPUT_DIR}"}
+    ...    {"APP_GATEWAY_NAME":"${APP_GATEWAY_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}

@@ -13,7 +13,6 @@ Library             OperatingSystem
 
 
 Suite Setup         Suite Initialization
-Suite Teardown      Suite Cleanup
 
 *** Tasks ***
 Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Errors in Namespace `${NAMESPACE}`
@@ -21,7 +20,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Errors in Namespace `${NAMESPA
     [Tags]    kubernetes    logs    errors    exception    ${WORKLOAD_TYPE}
     Scan And Report Issues
     ...    scan_error_logs.sh
-    ...    ${SHARED_TEMP_DIR}/scan_error_issues.json
+    ...    scan_error_issues.json
     ...    GenericError,AppFailure
 
 Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Stack Traces in Namespace `${NAMESPACE}` 
@@ -29,7 +28,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Stack Traces in Namespace `${N
     [Tags]    kubernetes    logs    stacktraces    ${WORKLOAD_TYPE}
     Scan And Report Issues
     ...    scan_stack_traces.sh
-    ...    ${SHARED_TEMP_DIR}/scan_stacktrace_issues.json
+    ...    scan_stacktrace_issues.json
     ...    StackTrace
 
 Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Connection Failures in Namespace `${NAMESPACE}`
@@ -37,7 +36,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Connection Failures in Namespa
     [Tags]    kubernetes    logs    connection    failure    ${WORKLOAD_TYPE}
     Scan And Report Issues
     ...    scan_connection_failures.sh
-    ...    ${SHARED_TEMP_DIR}/scan_conn_issues.json
+    ...    scan_conn_issues.json
     ...    Connection
 
 Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Timeout Errors in Namespace `${NAMESPACE}`
@@ -45,7 +44,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Timeout Errors in Namespace `$
     [Tags]    kubernetes    logs    timeout    failure    ${WORKLOAD_TYPE}
     Scan And Report Issues
     ...    scan_timeout_errors.sh
-    ...    ${SHARED_TEMP_DIR}/scan_timeout_issues.json
+    ...    scan_timeout_issues.json
     ...    Timeout
   
 Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Authentication and Authorization Failures in Namespace `${NAMESPACE}`
@@ -53,7 +52,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Authentication and Authorizati
     [Tags]    kubernetes    logs    auth    failure    ${WORKLOAD_TYPE}
     Scan And Report Issues
     ...    scan_auth_failures.sh
-    ...    ${SHARED_TEMP_DIR}/scan_auth_issues.json
+    ...    scan_auth_issues.json
     ...    Auth
 
 Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Null Pointer and Unhandled Exceptions in Namespace `${NAMESPACE}`
@@ -61,7 +60,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Null Pointer and Unhandled Exc
     [Tags]    kubernetes    logs    exception    ${WORKLOAD_TYPE}
     Scan And Report Issues
     ...    scan_null_pointer_exceptions.sh
-    ...    ${SHARED_TEMP_DIR}/scan_exception_issues.json
+    ...    scan_exception_issues.json
     ...    Exceptions
 
 Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Log Anomalies in Namespace `${NAMESPACE}`
@@ -69,7 +68,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` for Log Anomalies in Namespace `${NAMES
     [Tags]    kubernetes    logs    anomaly    ${WORKLOAD_TYPE}
     Scan And Report Issues
     ...    scan_log_anomalies.sh
-    ...    ${SHARED_TEMP_DIR}/scan_anomoly_issues.json
+    ...    scan_anomoly_issues.json
     ...    Anomaly
  
 
@@ -78,7 +77,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Application Restarts and Failu
     [Tags]    kubernetes    logs    restart    ${WORKLOAD_TYPE}
     Scan And Report Issues
     ...    scan_application_restarts.sh
-    ...    ${SHARED_TEMP_DIR}/scan_application_restarts.json
+    ...    scan_application_restarts.json
     ...    AppRestart,AppFailure
  
 Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Memory and CPU Resource Warnings in Namespace `${NAMESPACE}`
@@ -86,7 +85,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Memory and CPU Resource Warnin
     [Tags]    kubernetes    logs    resource    ${WORKLOAD_TYPE}
     Scan And Report Issues
     ...    scan_application_restarts.sh
-    ...    ${SHARED_TEMP_DIR}/scan_application_restarts.json
+    ...    scan_application_restarts.json
     ...    Resource
 
 Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Service Dependency Failures in Namespace `${NAMESPACE}`
@@ -94,7 +93,7 @@ Scan ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Logs for Service Dependency Failures in
     [Tags]    kubernetes    logs    service    dependency    ${WORKLOAD_TYPE}
     Scan And Report Issues
     ...    scan_service_dependency_failures.sh
-    ...    ${SHARED_TEMP_DIR}/scan_service_issues.json
+    ...    scan_service_issues.json
     ...    Connection,Timeout,Auth
 
 *** Keywords ***
@@ -142,31 +141,22 @@ Suite Initialization
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
 
-    ${temp_dir}=  Set Variable   ${CURDIR}/.suite_temp
-    Create Directory    ${temp_dir}
-    Set Suite Variable  ${SHARED_TEMP_DIR}  ${temp_dir}
-    Log   Created shared temp directory: ${SHARED_TEMP_DIR}
-
     ${pods}=    RW.CLI.Run Bash File
     ...    bash_file=get_pod_logs_for_workload.sh
     ...    cmd_override=./get_pod_logs_for_workload.sh ${WORKLOAD_TYPE} ${WORKLOAD_NAME} ${NAMESPACE} ${CONTEXT}
-    ...    env={"LOG_AGE":"${LOG_AGE}", "SHARED_TEMP_DIR":"${SHARED_TEMP_DIR}","KUBECONFIG":"./${kubeconfig.key}", "OUTPUT_DIR":"${OUTPUT_DIR}"}
+    ...    env={"LOG_AGE":"${LOG_AGE}","KUBECONFIG":"./${kubeconfig.key}"}
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
     Set Suite Variable
     ...    ${env}
-    ...    {"SHARED_TEMP_DIR":"${SHARED_TEMP_DIR}","CURDIR":"${CURDIR}","KUBECONFIG":"./${kubeconfig.key}","WORKLOAD_TYPE":"${WORKLOAD_TYPE}", "WORKLOAD_NAME":"${WORKLOAD_NAME}", "NAMESPACE":"${NAMESPACE}", "CONTEXT":"${CONTEXT}", "OUTPUT_DIR":"${OUTPUT_DIR}"}
-
-Suite Cleanup
-    Remove Directory    ${SHARED_TEMP_DIR}    recurse=True
-    Log   Removed suite temp directory: ${SHARED_TEMP_DIR}
+    ...    {"CURDIR":"${CURDIR}","KUBECONFIG":"./${kubeconfig.key}","WORKLOAD_TYPE":"${WORKLOAD_TYPE}", "WORKLOAD_NAME":"${WORKLOAD_NAME}", "NAMESPACE":"${NAMESPACE}", "CONTEXT":"${CONTEXT}"}
 
 Scan And Report Issues
     [Arguments]    ${SCAN_SCRIPT}    ${ISSUE_FILE}    ${CATEGORIES}
 
     ${cli_result}=    RW.CLI.Run Bash File
     ...    bash_file=${SCAN_SCRIPT}
-    ...    cmd_override=ISSUE_FILE=${ISSUE_FILE} SHARED_TEMP_DIR=${SHARED_TEMP_DIR} CATEGORIES=${CATEGORIES} ${SCAN_SCRIPT}
+    ...    cmd_override=ISSUE_FILE=${ISSUE_FILE} CATEGORIES=${CATEGORIES} ${SCAN_SCRIPT}
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=False
@@ -187,9 +177,9 @@ Scan And Report Issues
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list}) > 0
         FOR    ${item}    IN    @{issue_list}
-            Create File    ${SHARED_TEMP_DIR}/${SCAN_SCRIPT}_details.log    "${item['details']}" 
+            Create File    ${SCAN_SCRIPT}_details.log    "${item['details']}" 
             ${log_summary}=    RW.CLI.Run Cli
-            ...    cmd=python3 ${CURDIR}/summarize.py < ${SHARED_TEMP_DIR}/${SCAN_SCRIPT}_details.log
+            ...    cmd=python3 ${CURDIR}/summarize.py < ${SCAN_SCRIPT}_details.log
 
             ${next_steps}=    Catenate    SEPARATOR=\n   @{item["next_steps"]}
 

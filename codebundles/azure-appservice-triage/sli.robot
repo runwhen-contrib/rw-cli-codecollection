@@ -24,7 +24,7 @@ Check for Resource Health Issues Affecting App Service `${APP_SERVICE_NAME}` In 
     ...    show_in_rwl_cheatsheet=true
 
     ${resource_health_output}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/app_service_health.json | tr -d '\n'
+    ...    cmd=cat app_service_health.json | tr -d '\n'
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -47,7 +47,7 @@ Check App Service `${APP_SERVICE_NAME}` Health Check Metrics In Resource Group `
     ...    include_in_history=false
 
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/app_service_health_check_issues.json
+    ...    cmd=cat app_service_health_check_issues.json
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -73,7 +73,7 @@ Check App Service `${APP_SERVICE_NAME}` Configuration Health In Resource Group `
     ...    include_in_history=false
 
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/az_app_service_health.json
+    ...    cmd=cat az_app_service_health.json
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -99,7 +99,7 @@ Check Deployment Health of App Service `${APP_SERVICE_NAME}` In Resource Group `
     ...    include_in_history=false
 
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/deployment_health.json
+    ...    cmd=cat deployment_health.json
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -126,7 +126,8 @@ Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOU
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${activities.stdout}
 
-    ${issues}=    RW.CLI.Run Cli    cmd=cat ${OUTPUT DIR}/app_service_activities_issues.json
+    ${issues}=    RW.CLI.Run Cli    
+    ...    cmd=cat app_service_activities_issues.json
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     Set Global Variable     ${app_service_activities_score}    1
     IF    len(@{issue_list["issues"]}) > 0
@@ -220,4 +221,4 @@ Suite Initialization
 
     Set Suite Variable
     ...    ${env}
-    ...    {"APP_SERVICE_NAME":"${APP_SERVICE_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "OUTPUT_DIR":"${OUTPUT DIR}", "TIME_PERIOD_MINUTES":"${TIME_PERIOD_MINUTES}","CPU_THRESHOLD":"${CPU_THRESHOLD}", "REQUESTS_THRESHOLD":"${REQUESTS_THRESHOLD}", "BYTES_RECEIVED_THRESHOLD":"${BYTES_RECEIVED_THRESHOLD}", "HTTP5XX_THRESHOLD":"${HTTP5XX_THRESHOLD}","HTTP2XX_THRESHOLD":"${HTTP2XX_THRESHOLD}", "HTTP4XX_THRESHOLD":"${HTTP4XX_THRESHOLD}", "DISK_USAGE_THRESHOLD":"${DISK_USAGE_THRESHOLD}", "AVG_RSP_TIME":"${AVG_RSP_TIME}"}
+    ...    {"APP_SERVICE_NAME":"${APP_SERVICE_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "TIME_PERIOD_MINUTES":"${TIME_PERIOD_MINUTES}","CPU_THRESHOLD":"${CPU_THRESHOLD}", "REQUESTS_THRESHOLD":"${REQUESTS_THRESHOLD}", "BYTES_RECEIVED_THRESHOLD":"${BYTES_RECEIVED_THRESHOLD}", "HTTP5XX_THRESHOLD":"${HTTP5XX_THRESHOLD}","HTTP2XX_THRESHOLD":"${HTTP2XX_THRESHOLD}", "HTTP4XX_THRESHOLD":"${HTTP4XX_THRESHOLD}", "DISK_USAGE_THRESHOLD":"${DISK_USAGE_THRESHOLD}", "AVG_RSP_TIME":"${AVG_RSP_TIME}"}

@@ -81,19 +81,12 @@ Suite Initialization
     ...    enum=[kubectl,oc]
     ...    example=kubectl
     ...    default=kubectl
-    ${HOME}=    RW.Core.Import User Variable    HOME
-    ...    type=string
-    ...    description=The home path of the runner
-    ...    pattern=\w*
-    ...    example=/home/runwhen
-    ...    default=/home/runwhen
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${SERVICE_EXCLUSIONS}    ${SERVICE_EXCLUSIONS}
     Set Suite Variable    ${LOOKBACK}    ${LOOKBACK}
-    Set Suite Variable    ${HOME}    ${HOME}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "HOME":"${HOME}", "SERVICE_EXCLUSIONS":"${SERVICE_EXCLUSIONS}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "SERVICE_EXCLUSIONS":"${SERVICE_EXCLUSIONS}"}

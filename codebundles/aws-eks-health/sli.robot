@@ -57,3 +57,4 @@ Suite Initialization
     Set Suite Variable
     ...    &{env}
     ...    AWS_REGION=${AWS_REGION}
+    
