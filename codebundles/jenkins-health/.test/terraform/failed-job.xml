@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project>
+  <actions/>
+  <description>A Freestyle job deliberately configured to fail for testing.</description>
+  <keepDependencies>false</keepDependencies>
+  <properties/>
+  
+  <!-- No SCM -->
+  <scm class="hudson.scm.NullSCM"/>
+  
+  <canRoam>true</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  
+  <triggers/>
+  <concurrentBuild>false</concurrentBuild>
+  
+  <builders>
+    <hudson.tasks.Shell>
+      <!-- This script has intentionally bad syntax to cause a failure -->
+      <command><![CDATA[
+#!/bin/bash
+
+echo "Starting a failing build..."
+
+# Intentionally invalid syntax below:
+if [ "test" = "test" 
+  echo "You should never see this line"
+done
+
+echo "End of script."
+]]></command>
+    </hudson.tasks.Shell>
+  </builders>
+  
+  <publishers/>
+  <buildWrappers/>
+</project>
