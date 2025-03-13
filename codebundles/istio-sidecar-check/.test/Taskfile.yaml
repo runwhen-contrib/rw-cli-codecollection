@@ -15,7 +15,7 @@ tasks:
   generate-rwl-config:
     desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
     env:
-      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "ifc-sre-stack"}}'
     cmds:
       - |
         repo_url=$(git config --get remote.origin.url)
@@ -78,6 +78,7 @@ tasks:
     desc: Check if env vars are set for RunWhen Platform
     cmds:
       - |
+        source terraform/rw.secret
         missing_vars=()
 
         if [ -z "$RW_WORKSPACE" ]; then
@@ -107,6 +108,7 @@ tasks:
     cmds:
       - task: check-rwp-config
       - |
+        source terraform/rw.secret
         BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
         if [ ! -d "$BASE_DIR" ]; then
           echo "Directory $BASE_DIR does not exist. Upload aborted."
