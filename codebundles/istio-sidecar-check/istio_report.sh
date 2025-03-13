@@ -86,7 +86,7 @@ if [ -f "report.txt" ]; then
     DEPLOYMENTS_WITH_SIDECAR=$(grep "✓.*sidecar properly configured" report.txt | sed -E "s/.*Deployment '(.*)' in namespace '(.*)' has sidecar properly configured.*/\1|\2/" | column -t -s '|')
     DEPLOYMENTS_MISSING_SIDECAR=$(grep "WARNING.*No pods have sidecar\|WARNING.*No sidecar found" report.txt | sed -E "s/WARNING.*Deployment '(.*)' in namespace '(.*)' has no sidecar.*/\1|\2/" | column -t -s '|')
     DEPLOYMENTS_NOT_CONFIGURED=$(grep --color=never "✓" report.txt | sed -E "s/.*Deployment '(.*)' in namespace '(.*)' has sidecar properly configured.*/\1|\2/" | column -t -s '|')
-)
+
 
     # Print summary in tabular format
     echo
