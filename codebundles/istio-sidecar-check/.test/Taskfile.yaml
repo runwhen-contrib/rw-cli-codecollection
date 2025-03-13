@@ -62,7 +62,7 @@ tasks:
 
         echo "Starting new container $CONTAINER_NAME..."
 
-        docker run --name $CONTAINER_NAME -p 8081:8081 -e TMPDIR="/tmp/runwhen" -v "$(pwd)":/shared -d ghcr.io/runwhen-contrib/runwhen-local:0.9.4 || {
+        docker run --name $CONTAINER_NAME -p 8081:8081 -e TMPDIR="/tmp/runwhen" -v "$(pwd)":/shared -d ghcr.io/runwhen-contrib/runwhen-local:latest || {
           echo "Failed to start container"; exit 1;
         }
 
@@ -152,6 +152,7 @@ tasks:
     cmds:
       - task: check-rwp-config
       - |
+        source terraform/rw.secret
         BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
         if [ ! -d "$BASE_DIR" ]; then
           echo "Directory $BASE_DIR does not exist. Deletion aborted."
