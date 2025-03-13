@@ -1,0 +1,21 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+    - resourceTypes:
+        - namespace
+      matchRules:
+        - type: pattern
+          pattern: "istio-system"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: istio-sidecar-check
+          levelOfDetail: detailed
+          qualifiers: ["cluster"]
+          baseTemplateName: istio-sidecar-check
+          outputItems:
+            # - type: slx
+            # - type: sli
+            - type: runbook
+              templateName: istio-sidecar-check-taskset.yaml
