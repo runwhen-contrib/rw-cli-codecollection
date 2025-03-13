@@ -92,6 +92,26 @@ Check Deployments For Istio Sidecar Injection
 
 *** Keywords ***
 Suite Initialization
+    ${AWS_REGION}=    RW.Core.Import User Variable    AWS_REGION
+    ...    type=string
+    ...    description=AWS Region
+    ...    pattern=\w*
+    ${AWS_ACCOUNT_ID}=    RW.Core.Import User Variable   AWS_ACCOUNT_ID
+    ...    type=string
+    ...    description=AWS Account ID
+    ...    pattern=\w*
+    ${AWS_ACCESS_KEY_ID}=    RW.Core.Import Secret   AWS_ACCESS_KEY_ID
+    ...    type=string
+    ...    description=AWS Access Key ID
+    ...    pattern=\w*
+    ${AWS_SECRET_ACCESS_KEY}=    RW.Core.Import Secret   AWS_SECRET_ACCESS_KEY
+    ...    type=string
+    ...    description=AWS Access Key Secret
+    ...    pattern=\w*
+    ${AWS_SESSION_TOKEN}=    RW.Core.Import Secret   AWS_SESSION_TOKEN
+    ...    type=string
+    ...    description=AWS Session Token
+    ...    pattern=\w*
     ${kubeconfig}=    RW.Core.Import Secret
     ...    kubeconfig
     ...    type=string
@@ -123,7 +143,11 @@ Suite Initialization
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${EXCLUDED_NAMESPACES}    ${EXCLUDED_NAMESPACES}
-
+    Set Suite Variable    ${AWS_REGION}    ${AWS_REGION}
+    Set Suite Variable    ${AWS_ACCOUNT_ID}    ${AWS_ACCOUNT_ID}
+    Set Suite Variable    ${AWS_ACCESS_KEY_ID}    ${AWS_ACCESS_KEY_ID}
+    Set Suite Variable    ${AWS_SECRET_ACCESS_KEY}    ${AWS_SECRET_ACCESS_KEY}
+    Set Suite Variable    ${AWS_SESSION_TOKEN}    ${AWS_SESSION_TOKEN}
     Set Suite Variable
     ...    ${env}
     ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "EXCLUDED_NAMESPACES":"${EXCLUDED_NAMESPACES}"}
