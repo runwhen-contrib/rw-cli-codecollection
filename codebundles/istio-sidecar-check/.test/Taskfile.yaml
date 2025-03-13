@@ -62,7 +62,7 @@ tasks:
 
         echo "Starting new container $CONTAINER_NAME..."
 
-        docker run --name $CONTAINER_NAME -p 8081:8081 -e TMPDIR="/tmp/runwhen" -v "$(pwd)":/shared -d ghcr.io/runwhen-contrib/runwhen-local:latest || {
+        docker run --name $CONTAINER_NAME -p 8081:8081 -e TMPDIR="/tmp/runwhen" -v "$(pwd)":/shared -d ghcr.io/runwhen-contrib/runwhen-local:0.9.4 || {
           echo "Failed to start container"; exit 1;
         }
 
