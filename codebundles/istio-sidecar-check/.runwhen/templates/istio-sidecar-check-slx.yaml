@@ -11,8 +11,8 @@ spec:
   alias: Istio sidecar check for cluster
   asMeasuredBy: ""
   configProvided:
-  - name: SLX_PLACEHOLDER
-    value: SLX_PLACEHOLDER
+  - name: OBJECT_NAME
+    value: {{match_resource.resource.metadata.name}}
   owners:
   - {{workspace.owner_email}}
   statement: Check for Istio sidecar for deployments
