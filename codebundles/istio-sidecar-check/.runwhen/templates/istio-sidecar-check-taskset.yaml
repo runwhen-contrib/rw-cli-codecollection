@@ -8,6 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec: 
   location: {{default_location}}
+  description: istio sidecar check
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}

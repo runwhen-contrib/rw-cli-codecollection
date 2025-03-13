@@ -15,7 +15,7 @@ spec:
           qualifiers: ["cluster"]
           baseTemplateName: istio-sidecar-check
           outputItems:
-            # - type: slx
+             - type: slx
             # - type: sli
             - type: runbook
               templateName: istio-sidecar-check-taskset.yaml
