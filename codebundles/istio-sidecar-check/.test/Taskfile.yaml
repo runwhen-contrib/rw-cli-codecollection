@@ -38,6 +38,7 @@ tasks:
         custom: 
           kubernetes_distribution_binary: kubectl
           excluded_namespaces: kube-system
+          kubeconfig_secret_name: "kubeconfig"
         EOF
     silent: false
 
