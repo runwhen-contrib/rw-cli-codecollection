@@ -82,13 +82,13 @@ if [ -f "report.txt" ]; then
     TOTAL_NS=$(grep -c "=== Analyzing namespace:" report.txt)
     NAMESPACES_WITHOUT_INJECTION=$(grep -B1 "Namespace does not have injection enabled" report.txt | grep "=== Analyzing namespace:" | sed -e 's/=== Analyzing namespace: //g' | tr '\n' ',' | sed 's/,$//')
 
-    TOTAL_SUCCESS=$(grep -c "✓.*sidecar properly configured" report.txt)
+    TOTAL_SUCCESS=$(grep -c "*sidecar properly configured" report.txt)
     TOTAL_ISSUES=$(grep -c "WARNING.*No pods have sidecar\|WARNING.*No sidecar found" report.txt)
-    TOTAL_NOT_CONFIGURED=$(grep -c "❌ Deployment '.*' in namespace '.*' is NOT properly configured" report.txt)
+    TOTAL_NOT_CONFIGURED=$(grep -c "Deployment '.*' in namespace '.*' is NOT properly configured" report.txt)
 
-    DEPLOYMENTS_WITH_SIDECAR=$(grep "✓.*sidecar properly configured" report.txt | sed -E "s/.*Deployment '(.*)' in namespace '(.*)' has sidecar properly configured.*/\1|\2/" | column -t -s '|')
+    DEPLOYMENTS_WITH_SIDECAR=$(grep "*sidecar properly configured" report.txt | sed -E "s/.*Deployment '(.*)' in namespace '(.*)' has sidecar properly configured.*/\1|\2/" | column -t -s '|')
     DEPLOYMENTS_MISSING_SIDECAR=$(grep "WARNING.*No pods have sidecar\|WARNING.*No sidecar found" report.txt | sed -E "s/WARNING.*Deployment '(.*)' in namespace '(.*)' has no sidecar.*/\1|\2/" | column -t -s '|')
-    DEPLOYMENTS_NOT_CONFIGURED=$(grep --color=never "✓" report.txt | sed -E "s/.*Deployment '(.*)' in namespace '(.*)' has sidecar properly configured.*/\1|\2/" | column -t -s '|')
+    DEPLOYMENTS_NOT_CONFIGURED=$(grep --color=never report.txt | sed -E "s/.*Deployment '(.*)' in namespace '(.*)' has sidecar properly configured.*/\1|\2/" | column -t -s '|')
 
 
     # Print summary in tabular format
@@ -154,16 +154,16 @@ if [ -f "report.txt" ]; then
         echo "$line"
     # If line starts with WARNING it's an issue
     elif [[ $line == "WARNING"* ]]; then
-        echo "⚠️  $line"
+        echo "$line"
     # If line starts with Error it's an error
     elif [[ $line == "Error"* ]]; then
-        echo "❌ $line"
+        echo "$line"
     # If line starts with ✓ it's a success
-    elif [[ $line == "✓"* ]]; then
-        echo "✅ $line"
+    elif [[ $line == * ]]; then
+        echo "$line"
     # If line starts with ℹ it's informational
-    elif [[ $line == "ℹ"* ]]; then
-        echo "ℹ️  $line"
+    elif [[ $line == * ]]; then
+        echo "$line"
     else
         echo "   $line"
     fi
