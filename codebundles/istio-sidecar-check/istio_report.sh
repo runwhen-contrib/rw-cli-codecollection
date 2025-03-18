@@ -1,8 +1,5 @@
 #!/bin/bash
 
-set -x
-ls
-
 # Function to format section header
 function print_section_header() {
     echo "=== $1 ==="
@@ -22,73 +19,27 @@ function format_command_output() {
 # Start building the report
 print_section_header "Istio Sidecar Injection Status Check"
 
-# Get the command history
-# if [ -f "command_history.txt" ]; then
-#     print_section_header "Commands Used"
-#     cat command_history.txt
-#     echo
-# fi
-
 # Get the check results
-print_section_header "Namespace Analysis"
 
 # Process each namespace's results
 if [ -f "report.txt" ]; then
-    # Add summary section
-    # print_section_header "Summary"
-    # TOTAL_NS=$(grep -c "=== Analyzing namespace:" report.txt)
-    # # Get list of namespaces without injection
-    # NAMESPACES_WITHOUT_INJECTION=$(grep -B1 "Namespace does not have injection enabled" report.txt | grep "=== Analyzing namespace:" | sed -e 's/=== Analyzing namespace: //g' | tr '\n' ',' | sed 's/,$//')
-    
-    # # Get deployment counts by status
-    # TOTAL_SUCCESS=$(grep -c "✓.*sidecar properly configured" report.txt)
-    # TOTAL_ISSUES=$(grep -c "WARNING.*No pods have sidecar\|WARNING.*No sidecar found" report.txt)
-    # # Count deployments where both namespace doesn't have injection and no annotation exists
-    # TOTAL_NOT_CONFIGURED=$(grep -c "❌ Deployment '.*' in namespace '.*' is NOT properly configured" report.txt)
-    
-    # # Get lists of deployments by status
-    # DEPLOYMENTS_WITH_SIDECAR=$(grep "✓.*sidecar properly configured" report.txt | sed -e 's/.*Deployment '\''//g' -e "s/'\'' in namespace.*//g" | tr '\n' ',' | sed 's/,$//')
-    # DEPLOYMENTS_MISSING_SIDECAR=$(grep "WARNING.*No pods have sidecar\|WARNING.*No sidecar found" report.txt | sed -e 's/.*Deployment //g' -e "s/ in namespace.*//g" | tr '\n' ',' | sed 's/,$//')
-    # # Get deployments not configured for injection (both namespace and deployment level)
-    # DEPLOYMENTS_NOT_CONFIGURED=$(grep "❌ Deployment '.*' in namespace '.*' is NOT properly configured" report.txt | \
-    #     sed -E "s/❌ Deployment '(.*)' in namespace '(.*)' is NOT properly configured.*/\1 (\2)/" | \
-    #     paste -sd ',' -)
-    
-
-    # echo "Namespace Analysis:"
-    # echo "  - Total namespaces analyzed: $TOTAL_NS"
-    # if [ -n "$NAMESPACES_WITHOUT_INJECTION" ]; then
-    #     echo "  - Namespaces without injection enabled: $NAMESPACES_WITHOUT_INJECTION"
-    # fi
-    # echo
-    # echo "Deployment Status:"
-    # echo "  - Deployments with sidecar properly configured: $TOTAL_SUCCESS"
-    # if [ -n "$DEPLOYMENTS_WITH_SIDECAR" ]; then
-    #     echo "    Deployments: $DEPLOYMENTS_WITH_SIDECAR"
-    # fi
-    # echo "  - Deployments with missing sidecar: $TOTAL_ISSUES"
-    # if [ -n "$DEPLOYMENTS_MISSING_SIDECAR" ]; then
-    #     echo "    Deployments: $DEPLOYMENTS_MISSING_SIDECAR"
-    # fi
-    # echo "  - Deployments not configured for injection: $TOTAL_NOT_CONFIGURED"
-    # echo "DEBUG: DEPLOYMENTS_NOT_CONFIGURED='$DEPLOYMENTS_NOT_CONFIGURED'"
-    # if [ -n "$DEPLOYMENTS_NOT_CONFIGURED" ]; then
-    #     echo "    Deployments (namespace): $DEPLOYMENTS_NOT_CONFIGURED"
-    #     echo "    Note: These deployments are in namespaces without injection enabled and have no injection annotation"
-    # fi
     
     print_section_header "Summary"
 
     TOTAL_NS=$(grep -c "=== Analyzing namespace:" report.txt)
     NAMESPACES_WITHOUT_INJECTION=$(grep -B1 "Namespace does not have injection enabled" report.txt | grep "=== Analyzing namespace:" | sed -e 's/=== Analyzing namespace: //g' | tr '\n' ',' | sed 's/,$//')
 
-    TOTAL_SUCCESS=$(grep -c "*sidecar properly configured" report.txt)
+    #TOTAL_SUCCESS=$(grep -c "*sidecar properly configured" report.txt)
+    TOTAL_SUCCESS=$(grep -c "Deployment '.*' in namespace '.*' has Istio sidecar properly configured" report.txt)
+    #TOTAL_ISSUES=$(grep -c "WARNING.*No pods have sidecar\|WARNING.*No sidecar found" report.txt)
     TOTAL_ISSUES=$(grep -c "WARNING.*No pods have sidecar\|WARNING.*No sidecar found" report.txt)
     TOTAL_NOT_CONFIGURED=$(grep -c "Deployment '.*' in namespace '.*' is NOT properly configured" report.txt)
 
-    DEPLOYMENTS_WITH_SIDECAR=$(grep "*sidecar properly configured" report.txt | sed -E "s/.*Deployment '(.*)' in namespace '(.*)' has sidecar properly configured.*/\1|\2/" | column -t -s '|')
+    #DEPLOYMENTS_WITH_SIDECAR=$(grep "*sidecar properly configured" report.txt | sed -E "s/.*Deployment '(.*)' in namespace '(.*)' has sidecar properly configured.*/\1|\2/" | column -t -s '|')
+    DEPLOYMENTS_WITH_SIDECAR=$(grep "Deployment '.*' in namespace '.*' has Istio sidecar properly configured" report.txt | sed -E "s/.*Deployment '(.*)' in namespace '(.*)' has Istio sidecar properly configured.*/\1|\2/" | column -t -s '|')
     DEPLOYMENTS_MISSING_SIDECAR=$(grep "WARNING.*No pods have sidecar\|WARNING.*No sidecar found" report.txt | sed -E "s/WARNING.*Deployment '(.*)' in namespace '(.*)' has no sidecar.*/\1|\2/" | column -t -s '|')
-    DEPLOYMENTS_NOT_CONFIGURED=$(grep --color=never report.txt | sed -E "s/.*Deployment '(.*)' in namespace '(.*)' has sidecar properly configured.*/\1|\2/" | column -t -s '|')
+    #DEPLOYMENTS_NOT_CONFIGURED=$(grep --color=never report.txt | sed -E "s/.*Deployment '(.*)' in namespace '(.*)' has sidecar properly configured.*/\1|\2/" | column -t -s '|')
+    DEPLOYMENTS_NOT_CONFIGURED=$(grep "Deployment '.*' in namespace '.*' is NOT properly configured" report.txt | sed -E "s/.*Deployment '(.*)' in namespace '(.*)' is NOT properly configured.*/\1|\2/" | column -t -s '|')
 
 
     # Print summary in tabular format
@@ -146,6 +97,7 @@ if [ -f "report.txt" ]; then
         echo
     fi
 
+    print_section_header "Namespace Analysis"
 
     while IFS= read -r line; do
     # If line starts with === it's a namespace header
