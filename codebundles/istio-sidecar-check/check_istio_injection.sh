@@ -124,7 +124,7 @@ for ns in $FILTERED_NAMESPACES; do
             echo "Injection annotation: '$INJECTION_ANNOTATION'"
             
             if [ "$INJECTION_ANNOTATION" == "false" ]; then
-                echo "ℹ Deployment '$deployment' in namespace '$ns' has explicitly disabled Istio injection"
+                echo "Deployment '$deployment' in namespace '$ns' has explicitly disabled Istio injection"
                 continue
             fi
             
@@ -181,7 +181,7 @@ for ns in $FILTERED_NAMESPACES; do
                 all_issues+=("$issue")
                 deployments_missing_sidecar+=("$deployment")
             else
-                echo "✓ Deployment '$deployment' in namespace '$ns' has pods with Istio sidecar properly configured"
+                echo "Deployment '$deployment' in namespace '$ns' has pods with Istio sidecar properly configured"
                 deployments_with_sidecar+=("$deployment")
             fi
         else
@@ -198,7 +198,7 @@ for ns in $FILTERED_NAMESPACES; do
             
             if echo "$DEPLOYMENTS" | jq -e --arg deployment "$deployment" '.items[] | select(.metadata.name == $deployment) | .spec.template.metadata.annotations | has("sidecar.istio.io/inject")' >/dev/null; then
                 if [ "$INJECTION_ANNOTATION" == "true" ] && [ -z "$HAS_SIDECAR" ]; then
-                    echo "❌ Deployment '$deployment' in namespace '$ns' is missing Istio sidecar (deployment injection enabled)."
+                    echo "Deployment '$deployment' in namespace '$ns' is missing Istio sidecar (deployment injection enabled)."
                     deployments_missing_sidecar+=("$deployment")
                     issue=$(jq -n \
                         --arg ns "$ns" \
@@ -222,11 +222,11 @@ for ns in $FILTERED_NAMESPACES; do
                         }')
                     all_issues+=("$issue")
                 else
-                    echo "✓ Deployment '$deployment' in namespace '$ns' has Istio sidecar properly configured"
+                    echo "Deployment '$deployment' in namespace '$ns' has Istio sidecar properly configured"
                     deployments_with_sidecar+=("$deployment")
                 fi
             else
-                echo "❌ Deployment '$deployment' in namespace '$ns' is NOT properly configured (no injection label, no annotation)."
+                echo "Deployment '$deployment' in namespace '$ns' is NOT properly configured (no injection label, no annotation)."
                 deployments_not_configured+=("$deployment")
                 issue=$(jq -n \
                     --arg ns "$ns" \
