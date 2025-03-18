@@ -1,5 +1,8 @@
 #!/bin/bash
 
+set -x
+ls
+
 # Function to format section header
 function print_section_header() {
     echo "=== $1 ==="
@@ -20,11 +23,11 @@ function format_command_output() {
 print_section_header "Istio Sidecar Injection Status Check"
 
 # Get the command history
-if [ -f "command_history.txt" ]; then
-    print_section_header "Commands Used"
-    cat command_history.txt
-    echo
-fi
+# if [ -f "command_history.txt" ]; then
+#     print_section_header "Commands Used"
+#     cat command_history.txt
+#     echo
+# fi
 
 # Get the check results
 print_section_header "Namespace Analysis"
