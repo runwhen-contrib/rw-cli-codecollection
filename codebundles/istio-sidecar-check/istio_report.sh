@@ -27,7 +27,7 @@ if [ -f "report.txt" ]; then
     print_section_header "Summary"
 
     TOTAL_NS=$(grep -c "=== Analyzing namespace:" report.txt)
-    NAMESPACES_WITHOUT_INJECTION=$(grep -B1 "Namespace does not have injection enabled" report.txt | grep "=== Analyzing namespace:" | sed -e 's/=== Analyzing namespace: //g' | tr '\n' ',' | sed 's/,$//')
+    NAMESPACES_WITHOUT_INJECTION=$(grep -B1 "Namespace does not have injection enabled" report.txt | grep "=== Analyzing namespace:" | sed -E 's/=== Analyzing namespace: (.*) ===/\1/' | tr '\n' ',' | sed 's/,$//')
 
     #TOTAL_SUCCESS=$(grep -c "*sidecar properly configured" report.txt)
     TOTAL_SUCCESS=$(grep -c "Deployment '.*' in namespace '.*' has Istio sidecar properly configured" report.txt)
