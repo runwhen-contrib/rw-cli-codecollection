@@ -27,7 +27,7 @@ if [ -f "report.txt" ]; then
     print_section_header "Summary"
 
     TOTAL_NS=$(grep -c "=== Analyzing namespace:" report.txt)
-    NAMESPACES_WITHOUT_INJECTION=$(grep -B1 "Namespace does not have injection enabled" report.txt | grep "=== Analyzing namespace:" | sed -E 's/=== Analyzing namespace: (.*) ===/\1/' | tr '\n' ',' | sed 's/,$//')
+    NAMESPACES_WITHOUT_INJECTION=$(grep -B4 "Namespace does not have injection enabled" report.txt | grep "=== Analyzing namespace:" | sed -E 's/=== Analyzing namespace: (.*) ===/\1/' | tr '\n' ',' | sed 's/,$//')
 
     #TOTAL_SUCCESS=$(grep -c "*sidecar properly configured" report.txt)
     TOTAL_SUCCESS=$(grep -c "Deployment '.*' in namespace '.*' has Istio sidecar properly configured" report.txt)
@@ -69,7 +69,7 @@ if [ -f "report.txt" ]; then
         echo "=============================================================="
         printf "%-35s %-25s\n" "Deployment Name" "Namespace"
         echo "--------------------------------------------------------------"
-        echo echo "$DEPLOYMENTS_WITH_SIDECAR" | awk '{printf "%-35s %-25s\n", $1, $2}'
+        echo "$DEPLOYMENTS_WITH_SIDECAR" | awk '{printf "%-35s %-25s\n", $1, $2}'
         echo
     fi
 
@@ -79,7 +79,7 @@ if [ -f "report.txt" ]; then
         echo "=============================================================="
         printf "%-35s %-25s\n" "Deployment Name" "Namespace"
         echo "--------------------------------------------------------------"
-        echo echo "$DEPLOYMENTS_MISSING_SIDECAR" | awk '{printf "%-35s %-25s\n", $1, $2}'
+        echo "$DEPLOYMENTS_MISSING_SIDECAR" | awk '{printf "%-35s %-25s\n", $1, $2}'
         echo
     fi
 
@@ -89,7 +89,7 @@ if [ -f "report.txt" ]; then
         echo "=============================================================="
         printf "%-35s %-25s\n" "Deployment Name" "Namespace"
         echo "--------------------------------------------------------------"
-        echo echo "$DEPLOYMENTS_NOT_CONFIGURED" | awk '{printf "%-35s %-25s\n", $1, $2}'
+        echo "$DEPLOYMENTS_NOT_CONFIGURED" | awk '{printf "%-35s %-25s\n", $1, $2}'
         echo
         echo
         echo "Note: These deployments are in namespaces without injection enabled and have no injection annotation."
