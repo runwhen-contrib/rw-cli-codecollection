@@ -43,7 +43,6 @@ if [ -f "report.txt" ]; then
 
 
     # Print summary in tabular format
-    echo
     echo "=============================================================="
     echo "                        SUMMARY REPORT                        "
     echo "=============================================================="
@@ -70,7 +69,7 @@ if [ -f "report.txt" ]; then
         echo "=============================================================="
         printf "%-35s %-25s\n" "Deployment Name" "Namespace"
         echo "--------------------------------------------------------------"
-        echo "$DEPLOYMENTS_WITH_SIDECAR"
+        echo echo "$DEPLOYMENTS_WITH_SIDECAR" | awk '{printf "%-35s %-25s\n", $1, $2}'
         echo
     fi
 
@@ -80,7 +79,7 @@ if [ -f "report.txt" ]; then
         echo "=============================================================="
         printf "%-35s %-25s\n" "Deployment Name" "Namespace"
         echo "--------------------------------------------------------------"
-        echo "$DEPLOYMENTS_MISSING_SIDECAR"
+        echo echo "$DEPLOYMENTS_MISSING_SIDECAR" | awk '{printf "%-35s %-25s\n", $1, $2}'
         echo
     fi
 
@@ -90,35 +89,35 @@ if [ -f "report.txt" ]; then
         echo "=============================================================="
         printf "%-35s %-25s\n" "Deployment Name" "Namespace"
         echo "--------------------------------------------------------------"
-        echo "$DEPLOYMENTS_NOT_CONFIGURED"
+        echo echo "$DEPLOYMENTS_NOT_CONFIGURED" | awk '{printf "%-35s %-25s\n", $1, $2}'
         echo
         echo
         echo "Note: These deployments are in namespaces without injection enabled and have no injection annotation."
         echo
     fi
 
+    echo
+    echo
     print_section_header "Namespace Analysis"
 
     while IFS= read -r line; do
-    # If line starts with === it's a namespace header
-    if [[ $line == "==="* ]]; then
-        echo
-        echo "$line"
-    # If line starts with WARNING it's an issue
-    elif [[ $line == "WARNING"* ]]; then
-        echo "$line"
-    # If line starts with Error it's an error
-    elif [[ $line == "Error"* ]]; then
-        echo "$line"
-    # If line starts with ✓ it's a success
-    elif [[ $line == * ]]; then
-        echo "$line"
-    # If line starts with ℹ it's informational
-    elif [[ $line == * ]]; then
-        echo "$line"
-    else
-        echo "   $line"
-    fi
+        # Skip "=== Deployment Summary ==="
+        if [[ "$line" == "=== Deployment Summary ===" ]]; then
+            continue
+        fi
+        # If line starts with === it's a namespace header
+        if [[ $line == "==="* ]]; then
+            echo
+            echo "$line"
+        # If line starts with WARNING it's an issue
+        elif [[ $line == "WARNING"* ]]; then
+            echo "$line"
+        # If line starts with Error it's an error
+        elif [[ $line == "Error"* ]]; then
+            echo "$line"
+        else
+            echo "$line"
+        fi
     done < report.txt
 
 else
