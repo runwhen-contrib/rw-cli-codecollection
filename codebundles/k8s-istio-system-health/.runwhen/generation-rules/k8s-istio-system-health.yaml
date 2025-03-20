@@ -10,12 +10,12 @@ spec:
           properties: [name]
           mode: substring
       slxs:
-        - baseName: istio-sidecar-check
+        - baseName: k8s-istio-system-health
           levelOfDetail: detailed
           qualifiers: ["cluster"]
-          baseTemplateName: istio-sidecar-check
+          baseTemplateName: k8s-istio-system-health
           outputItems:
             - type: slx
             # - type: sli
             - type: runbook
-              templateName: istio-sidecar-check-taskset.yaml
+              templateName: k8s-istio-system-health-taskset.yaml

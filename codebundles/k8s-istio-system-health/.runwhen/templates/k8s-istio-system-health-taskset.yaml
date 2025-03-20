@@ -20,7 +20,7 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/istio-sidecar-check/runbook.robot
+    pathToRobot: codebundles/k8s-istio-system-health/runbook.robot
   configProvided:
     - name: CONTEXT
       value: {{context}}

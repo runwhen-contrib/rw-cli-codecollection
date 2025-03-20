@@ -19,27 +19,28 @@ function format_command_output() {
 # Start building the report
 print_section_header "Istio Sidecar Injection Status Check"
 
-# Get the check results
+# Set the report file path
+REPORT_FILE="${OUTPUT_DIR}/report.txt"
 
 # Process each namespace's results
-if [ -f "report.txt" ]; then
+if [ -f $REPORT_FILE ]; then
     
     print_section_header "Summary"
 
-    TOTAL_NS=$(grep -c "=== Analyzing namespace:" report.txt)
-    NAMESPACES_WITHOUT_INJECTION=$(grep -B4 "Namespace does not have injection enabled" report.txt | grep "=== Analyzing namespace:" | sed -E 's/=== Analyzing namespace: (.*) ===/\1/' | tr '\n' ',' | sed 's/,$//')
+    TOTAL_NS=$(grep -c "=== Analyzing namespace:" $REPORT_FILE)
+    NAMESPACES_WITHOUT_INJECTION=$(grep -B4 "Namespace does not have injection enabled" $REPORT_FILE | grep "=== Analyzing namespace:" | sed -E 's/=== Analyzing namespace: (.*) ===/\1/' | tr '\n' ',' | sed 's/,$//')
 
     #TOTAL_SUCCESS=$(grep -c "*sidecar properly configured" report.txt)
-    TOTAL_SUCCESS=$(grep -c "Deployment '.*' in namespace '.*' has Istio sidecar properly configured" report.txt)
+    TOTAL_SUCCESS=$(grep -c "Deployment '.*' in namespace '.*' has Istio sidecar properly configured" $REPORT_FILE)
     #TOTAL_ISSUES=$(grep -c "WARNING.*No pods have sidecar\|WARNING.*No sidecar found" report.txt)
-    TOTAL_ISSUES=$(grep -c "WARNING.*No pods have sidecar\|WARNING.*No sidecar found" report.txt)
-    TOTAL_NOT_CONFIGURED=$(grep -c "Deployment '.*' in namespace '.*' is NOT properly configured" report.txt)
+    TOTAL_ISSUES=$(grep -c "WARNING.*No pods have sidecar\|WARNING.*No sidecar found" $REPORT_FILE)
+    TOTAL_NOT_CONFIGURED=$(grep -c "Deployment '.*' in namespace '.*' is NOT properly configured" $REPORT_FILE)
 
     #DEPLOYMENTS_WITH_SIDECAR=$(grep "*sidecar properly configured" report.txt | sed -E "s/.*Deployment '(.*)' in namespace '(.*)' has sidecar properly configured.*/\1|\2/" | column -t -s '|')
-    DEPLOYMENTS_WITH_SIDECAR=$(grep "Deployment '.*' in namespace '.*' has Istio sidecar properly configured" report.txt | sed -E "s/.*Deployment '(.*)' in namespace '(.*)' has Istio sidecar properly configured.*/\1|\2/" | column -t -s '|')
-    DEPLOYMENTS_MISSING_SIDECAR=$(grep "WARNING.*No pods have sidecar\|WARNING.*No sidecar found" report.txt | sed -E "s/WARNING.*Deployment '(.*)' in namespace '(.*)' has no sidecar.*/\1|\2/" | column -t -s '|')
+    DEPLOYMENTS_WITH_SIDECAR=$(grep "Deployment '.*' in namespace '.*' has Istio sidecar properly configured" $REPORT_FILE | sed -E "s/.*Deployment '(.*)' in namespace '(.*)' has Istio sidecar properly configured.*/\1|\2/" | column -t -s '|')
+    DEPLOYMENTS_MISSING_SIDECAR=$(grep "WARNING.*No pods have sidecar\|WARNING.*No sidecar found" $REPORT_FILE | sed -E "s/WARNING.*Deployment '(.*)' in namespace '(.*)' has no sidecar.*/\1|\2/" | column -t -s '|')
     #DEPLOYMENTS_NOT_CONFIGURED=$(grep --color=never report.txt | sed -E "s/.*Deployment '(.*)' in namespace '(.*)' has sidecar properly configured.*/\1|\2/" | column -t -s '|')
-    DEPLOYMENTS_NOT_CONFIGURED=$(grep "Deployment '.*' in namespace '.*' is NOT properly configured" report.txt | sed -E "s/.*Deployment '(.*)' in namespace '(.*)' is NOT properly configured.*/\1|\2/" | column -t -s '|')
+    DEPLOYMENTS_NOT_CONFIGURED=$(grep "Deployment '.*' in namespace '.*' is NOT properly configured" $REPORT_FILE | sed -E "s/.*Deployment '(.*)' in namespace '(.*)' is NOT properly configured.*/\1|\2/" | column -t -s '|')
 
 
     # Print summary in tabular format
@@ -118,7 +119,7 @@ if [ -f "report.txt" ]; then
         else
             echo "$line"
         fi
-    done < report.txt
+    done < $REPORT_FILE
 
 else
     echo "No report file found."

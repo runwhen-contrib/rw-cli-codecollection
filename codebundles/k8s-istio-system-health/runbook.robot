@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       Checks for Istio sidecar injection across deployments in all namespaces.
-Metadata           Author    Helpful Assistant
+Metadata           Author    Nbarola
 Metadata           Display Name    Istio Sidecar Injection Check
 Metadata           Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 
@@ -27,61 +27,34 @@ Check Deployments For Istio Sidecar Injection
     ...    bash_file=check_istio_injection.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    include_in_history=true
+    ...    include_in_history=false
     
-    # Save command history for report
-    ${history}=    RW.CLI.Pop Shell History
-    ${commands_used}=    Set Variable    ${history.strip()}
-    Create File    command_history.txt    Commands Used:\n${commands_used}
+ 
+    ${issues_list}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/issues.json
+    ...    env=${env}
+    ...    include_in_history=false
 
-    # Extract issues and report from stdout
-    ${stdout_lines}=    Split To Lines    ${results.stdout}
-    # Find marker indices
-    ${issues_start}=    Set Variable    -1
-    ${issues_end}=    Set Variable    -1
-    ${report_start}=    Set Variable    -1
-    ${report_end}=    Set Variable    -1
-    FOR    ${index}    ${line}    IN ENUMERATE    @{stdout_lines}
-        IF    $line == "===ISSUES_START==="
-            ${issues_start}=    Set Variable    ${index}
-        ELSE IF    $line == "===ISSUES_END==="
-            ${issues_end}=    Set Variable    ${index}
-        ELSE IF    $line == "===REPORT_START==="
-            ${report_start}=    Set Variable    ${index}
-        ELSE IF    $line == "===REPORT_END==="
-            ${report_end}=    Set Variable    ${index}
-        END
-    END
-
-    # Get issues JSON
-    ${issues_json}=    Set Variable    ${stdout_lines[${issues_start}+1:${issues_end}]}
-    ${issues_json}=    Evaluate    "\\n".join(${issues_json})
-    Create File    issues.json    ${issues_json}
 
     # Get report text
-    ${report_text}=    Set Variable    ${stdout_lines[${report_start}+1:${report_end}]}
-    ${report_text}=    Evaluate    "\\n".join(${report_text})
-    Create File    report.txt    ${report_text}
+    #${report_text}=    Set Variable    ${stdout_lines[${report_start}+1:${report_end}]}
+    #${report_text}=    Evaluate    "\\n".join(${report_text})
+    #Create File    report.txt    ${report_text}
 
     # Process issues if any were found
-    ${rc}=    Run Keyword And Return Status    File Should Exist    issues.json
-    IF    ${rc} == ${TRUE}
-        ${issues}=    Evaluate    json.loads(r'''${issues_json}''')    json
-        
-        FOR    ${issue}    IN    @{issues}
-            ${reproduce_cmd}=    Set Variable    kubectl get pods -n ${issue['namespace']} -l app=${issue['deployment']} -o jsonpath='{.items[*].spec.containers[*].name}'
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=Deployment should have Istio sidecar injection configured properly
-            ...    actual=${issue['details']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${reproduce_cmd}
-            ...    next_steps=${issue['next_steps']}
-        END
+    ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
+    
+    FOR    ${issue}    IN    @{issues}
+        ${reproduce_cmd}=    Set Variable    kubectl get pods -n ${issue['namespace']} -l app=${issue['deployment']} -o jsonpath='{.items[*].spec.containers[*].name}'
+        RW.Core.Add Issue
+        ...    severity=${issue['severity']}
+        ...    expected=Deployment should have Istio sidecar injection configured properly
+        ...    actual=${issue['details']}
+        ...    title=${issue['title']}
+        ...    reproduce_hint=${reproduce_cmd}
+        ...    next_steps=${issue['next_steps']}
     END
 
-    # Save script output for report
-    #Create File    report.txt    ${results.stdout}
 
     # Generate and add the formatted report
     ${formatted_report}=    RW.CLI.Run Bash File
@@ -125,5 +98,5 @@ Suite Initialization
     Set Suite Variable    ${EXCLUDED_NAMESPACES}    ${EXCLUDED_NAMESPACES}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "EXCLUDED_NAMESPACES":"${EXCLUDED_NAMESPACES}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "EXCLUDED_NAMESPACES":"${EXCLUDED_NAMESPACES}", "OUTPUT_DIR":"${OUTPUT_DIR}"}
 
