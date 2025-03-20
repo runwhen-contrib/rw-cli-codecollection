@@ -1,7 +1,7 @@
 *** Settings ***
 Documentation       Checks for Istio sidecar injection across deployments in all namespaces.
 Metadata           Author    Nbarola
-Metadata           Display Name    Istio Sidecar Injection Check
+Metadata           Display Name    Kubernetes Istio System Health
 Metadata           Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 
 Library             BuiltIn
