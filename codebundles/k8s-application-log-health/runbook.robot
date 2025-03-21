@@ -149,7 +149,7 @@ Suite Initialization
     ...    secret_file__kubeconfig=${kubeconfig}
     Set Suite Variable
     ...    ${env}
-    ...    {"CURDIR":"${CURDIR}","KUBECONFIG":"./${kubeconfig.key}","WORKLOAD_TYPE":"${WORKLOAD_TYPE}", "WORKLOAD_NAME":"${WORKLOAD_NAME}", "NAMESPACE":"${NAMESPACE}", "CONTEXT":"${CONTEXT}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}","WORKLOAD_TYPE":"${WORKLOAD_TYPE}", "WORKLOAD_NAME":"${WORKLOAD_NAME}", "NAMESPACE":"${NAMESPACE}", "CONTEXT":"${CONTEXT}"}
 
 Scan And Report Issues
     [Arguments]    ${SCAN_SCRIPT}    ${ISSUE_FILE}    ${CATEGORIES}
@@ -179,7 +179,7 @@ Scan And Report Issues
         FOR    ${item}    IN    @{issue_list}
             Create File    ${SCAN_SCRIPT}_details.log    "${item['details']}" 
             ${log_summary}=    RW.CLI.Run Cli
-            ...    cmd=python3 ${CURDIR}/summarize.py < ${SCAN_SCRIPT}_details.log
+            ...    cmd=python3 summarize.py < ${SCAN_SCRIPT}_details.log
 
             ${next_steps}=    Catenate    SEPARATOR=\n   @{item["next_steps"]}
 

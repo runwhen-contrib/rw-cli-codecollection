@@ -1,3 +1,3 @@
 # #!/bin/bash
 
-python3 ${CURDIR}/scan_logs.py
+python3 scan_logs.py

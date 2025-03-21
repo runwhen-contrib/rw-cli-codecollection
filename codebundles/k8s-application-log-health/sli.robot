@@ -166,7 +166,7 @@ Suite Initialization
     ...    secret_file__kubeconfig=${kubeconfig}
     Set Suite Variable
     ...    ${env}
-    ...    {"CURDIR":"${CURDIR}","KUBECONFIG":"./${kubeconfig.key}","WORKLOAD_TYPE":"${WORKLOAD_TYPE}", "WORKLOAD_NAME":"${WORKLOAD_NAME}", "NAMESPACE":"${NAMESPACE}", "CONTEXT":"${CONTEXT}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}","WORKLOAD_TYPE":"${WORKLOAD_TYPE}", "WORKLOAD_NAME":"${WORKLOAD_NAME}", "NAMESPACE":"${NAMESPACE}", "CONTEXT":"${CONTEXT}"}
 
 Scan And Score Issues
     [Arguments]    ${TASK}    ${SCAN_SCRIPT}    ${ISSUE_FILE}    ${CATEGORIES}
