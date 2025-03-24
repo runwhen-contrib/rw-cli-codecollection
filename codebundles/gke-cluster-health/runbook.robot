@@ -26,12 +26,17 @@ Suite Initialization
     ...    description=The GCP Project ID to scope the API to.
     ...    pattern=\w*
     ...    example=myproject-ID
+    ${CRITICAL_NAMESPACES}=    RW.Core.Import User Variable    CRITICAL_NAMESPACES
+    ...    type=string
+    ...    description=A comma separated list of namespaces which are critical. If pods are unhealthy in these namespaces, a severity 1 issue is raised. 
+    ...    pattern=\w*
+    ...    example=kube-system,flux-system,cert-manager
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
     Set Suite Variable
     ...    ${env}
-    ...    {"PATH": "$PATH:${OS_PATH}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}", "GCP_PROJECT_ID":"${GCP_PROJECT_ID}"}
+    ...    {"CRITICAL_NAMESPACES":"${CRITICAL_NAMESPACES}","PATH": "$PATH:${OS_PATH}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}", "GCP_PROJECT_ID":"${GCP_PROJECT_ID}"}
 
 *** Tasks ***
 Identify GKE Service Account Issues in GCP Project `${GCP_PROJECT_ID}`
@@ -58,5 +63,65 @@ Identify GKE Service Account Issues in GCP Project `${GCP_PROJECT_ID}`
             ...    reproduce_hint=${sa_check.cmd}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["next_steps"]}
+        END
+    END
+
+Fetch GKE Recommendations for GCP Project `${GCP_PROJECT_ID}`
+    [Documentation]    Fetch and summarize GCP Recommendations for GKE Clusters
+    [Tags]    recommendations    gcloud    gke    gcp    access:read-only
+
+    ${gcp_recommendations}=    RW.CLI.Run Bash File
+    ...    bash_file=gcp_recommendations.sh
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ${report}=     RW.CLI.Run Cli
+    ...    cmd=cat recommendations_report.txt
+    RW.Core.Add Pre To Report    GKE Recommendation Output:\n${report.stdout}
+
+
+    ${issues}=     RW.CLI.Run Cli
+    ...    cmd=cat recommendations_issues.json
+    
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list}) > 0
+        FOR    ${issue}    IN    @{issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    expected=No recommendations should exist for GKE clusters in the location
+            ...    actual=Recommendations exist for GKE clusters in the location
+            ...    title= ${issue["title"]}
+            ...    reproduce_hint=${gcp_recommendations.cmd}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["suggested"]}
+        END
+    END
+
+Fetch GKE Cluster Health for GCP Project `${GCP_PROJECT_ID}`
+    [Documentation]    Using kubectl, fetch overall basic health of the cluster by checking unhealth pods and overutilized nodes. Useful when stackdriver is not available. Requires iam permissions to fetch cluster credentials with viewer rights. 
+    [Tags]    health    crashloopbackoff    gcloud    gke    gcp    access:read-only
+
+    ${cluster_health}=    RW.CLI.Run Bash File
+    ...    bash_file=cluster_health.sh
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+
+    ${report}=     RW.CLI.Run Cli
+    ...    cmd=cat cluster_health_report.txt
+    RW.Core.Add Pre To Report    Cluster Health Output:\n${report.stdout}
+
+    ${issues}=     RW.CLI.Run Cli
+    ...    cmd=cat cluster_health_issues.json
+    
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list}) > 0
+        FOR    ${issue}    IN    @{issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    expected=GKE Clusters should have available capacity and no pods in crashloopbackoff
+            ...    actual=GKE Clusters have capcity or pod functionality issues
+            ...    title= ${issue["title"]}
+            ...    reproduce_hint=${cluster_health.cmd}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["suggested"]}
         END
     END
