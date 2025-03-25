@@ -71,12 +71,13 @@ tasks:
         workspaceOwnerEmail: authors@runwhen.com
         defaultLocation: location-01-us-west1
         defaultLOD: detailed
-        gcp:
-          applicationCredentialsFile: /shared/gcp.json.secret
-          projects:
-          - $GCP_PROJECT_ID
-          projectLevelOfDetails:
-            $GCP_PROJECT_ID: basic
+        cloudConfig: 
+          gcp:
+            applicationCredentialsFile: /shared/gcp.json.secret
+            projects:
+            - $GCP_PROJECT_ID
+            projectLevelOfDetails:
+              $GCP_PROJECT_ID: basic
         codeCollections:
         - repoURL: "$repo_url"
           branch: "$branch_name"
