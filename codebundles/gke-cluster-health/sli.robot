@@ -106,19 +106,46 @@ Fetch GKE Cluster Health for GCP Project `${GCP_PROJECT_ID}`
     ...    cmd=cat cluster_health_issues.json
     
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    Set Global Variable     ${gke_cluster_health_core}    1
+    Set Global Variable     ${gke_cluster_health_score}    1
     IF    len(@{issue_list}) > 0
         FOR    ${item}    IN    @{issue_list}
             IF    ${item["severity"]} == 1 or ${item["severity"]} == 2
-                Set Global Variable    ${gke_cluster_health_core}    0
+                Set Global Variable    ${gke_cluster_health_score}    0
                 Exit For Loop
             ELSE IF    ${item["severity"]} > 2
-                Set Global Variable    ${gke_cluster_health_core}    1
+                Set Global Variable    ${gke_cluster_health_score}    1
             END
         END
     END
 
+
+Check for Quota Related GKE Autoscaling Issues in GCP Project `${GCP_PROJECT_ID}`
+    [Documentation]    Ensure that GKE Autoscaling will not be blocked by Quota constraints
+    [Tags]    quota    autoscaling    gcloud    gke    gcp    access:read-only
+
+    ${quota_check}=    RW.CLI.Run Bash File
+    ...    bash_file=quota_check.sh
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    timeout_seconds=120
+
+    ${issues}=     RW.CLI.Run Cli
+    ...    cmd=cat region_quota_issues.json
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+
+    Set Global Variable     ${gke_quota_score}    1
+    IF    len(@{issue_list}) > 0
+        FOR    ${item}    IN    @{issue_list}
+            IF    ${item["severity"]} == 1 or ${item["severity"]} == 2
+                Set Global Variable    ${gke_quota_score}    0
+                Exit For Loop
+            ELSE IF    ${item["severity"]} > 2
+                Set Global Variable    ${gke_quota_score}    1
+            END
+        END
+    END    
+
 Generate GKE Cluster Health Score
-    ${gke_cluster_health_score}=      Evaluate  (${gke_sa_score} + ${gke_recommendations_score} + ${gke_cluster_health_core}) / 3
+    ${gke_cluster_health_score}=      Evaluate  (${gke_sa_score} + ${gke_recommendations_score} + ${gke_cluster_health_sore} +${gke_quota_score}) / 4
     ${health_score}=      Convert to Number    ${gke_cluster_health_score}  2
     RW.Core.Push Metric    ${health_score}
