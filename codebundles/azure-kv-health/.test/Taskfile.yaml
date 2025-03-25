@@ -1,0 +1,409 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Run/refresh config"
+    cmds:
+      - task: check-unpushed-commits
+      - task: generate-rwl-config
+      - task: run-rwl-discovery
+
+  clean:
+    desc: "Run cleanup tasks"
+    cmds:
+      - task: check-and-cleanup-terraform
+      - task: delete-slxs
+      - task: clean-rwl-discovery
+
+  build-infra:
+    desc: "Build test infrastructure"
+    cmds:
+      - task: build-terraform-infra
+
+  check-unpushed-commits:
+    desc: Check if outstanding commits or file updates need to be pushed before testing.
+    vars:
+      # Specify the base directory relative to your Taskfile location
+      BASE_DIR: "../"
+    cmds:
+      - |
+        echo "Checking for uncommitted changes in $BASE_DIR and $BASE_DIR.runwhen, excluding '.test'..."
+        UNCOMMITTED_FILES=$(git diff --name-only HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNCOMMITTED_FILES" ]; then
+          echo "✗"
+          echo "Uncommitted changes found:"
+          echo "$UNCOMMITTED_FILES"
+          echo "Remember to commit & push changes before executing the `run-rwl-discovery` task."
+          echo "------------"
+          exit 1    
+        else
+          echo "√"
+          echo "No uncommitted changes in specified directories."
+          echo "------------"        
+        fi
+      - |
+        echo "Checking for unpushed commits in $BASE_DIR and $BASE_DIR.runwhen, excluding '.test'..."
+        git fetch origin
+        UNPUSHED_FILES=$(git diff --name-only origin/$(git rev-parse --abbrev-ref HEAD) HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNPUSHED_FILES" ]; then
+          echo "✗"
+          echo "Unpushed commits found:"
+          echo "$UNPUSHED_FILES"
+          echo "Remember to push changes before executing the `run-rwl-discovery` task."
+          echo "------------"
+          exit 1        
+        else
+          echo "√"
+          echo "No unpushed commits in specified directories."
+          echo "------------"        
+        fi
+    silent: true
+  generate-rwl-config:
+    desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
+    env:
+      ARM_SUBSCRIPTION_ID: "{{.ARM_SUBSCRIPTION_ID}}"
+      AZ_TENANT_ID: "{{.AZ_TENANT_ID}}"
+      AZ_CLIENT_SECRET: "{{.AZ_CLIENT_SECRET}}"
+      AZ_CLIENT_ID: "{{.AZ_CLIENT_ID}}"
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+    cmds:
+      - |
+        source terraform/tf.secret
+        repo_url=$(git config --get remote.origin.url)
+        branch_name=$(git rev-parse --abbrev-ref HEAD)
+        codebundle=$(basename "$(dirname "$PWD")")
+        AZURE_SUBSCRIPTION_ID=$ARM_SUBSCRIPTION_ID
+        subscription_name=$(az account show --subscription ${AZURE_SUBSCRIPTION_ID} --query name -o tsv)
+        # Fetch individual cluster details from Terraform state
+        pushd terraform > /dev/null
+        resource_group=$(terraform show -json terraform.tfstate | jq -r '
+          .values.root_module.resources[] | 
+          select(.type == "azurerm_resource_group") | .values.name')
+        popd > /dev/null
+
+        # Check if any of the required cluster variables are empty
+        if [ -z "$resource_group" ]; then
+          echo "Error: Missing resource_group details. Ensure Terraform plan has been applied."
+          exit 1
+        fi
+        source terraform/cb.secret
+        # Generate workspaceInfo.yaml with fetched resource_group details
+        cat <<EOF > workspaceInfo.yaml
+        workspaceName: "$RW_WORKSPACE"
+        workspaceOwnerEmail: authors@runwhen.com
+        defaultLocation: location-01-us-west1
+        defaultLOD: detailed
+        cloudConfig:
+          azure:
+            subscriptionId: "$ARM_SUBSCRIPTION_ID"
+            tenantId: "$AZ_TENANT_ID"
+            clientId: "$AZ_CLIENT_ID"
+            clientSecret: "$AZ_CLIENT_SECRET"
+            resourceGroupLevelOfDetails:
+              $resource_group: detailed
+        codeCollections:
+        - repoURL: "$repo_url"
+          branch: "$branch_name"
+          codeBundles: ["$codebundle"]
+        custom:
+          subscription_name: $subscription_name
+        EOF
+    silent: true
+
+  run-rwl-discovery:
+    desc: "Run RunWhen Local Discovery on test infrastructure"
+    cmds:
+      - |
+        source terraform/cb.secret
+        CONTAINER_NAME="RunWhenLocal"
+        if docker ps -q --filter "name=$CONTAINER_NAME" | grep -q .; then
+          echo "Stopping and removing existing container $CONTAINER_NAME..."
+          docker stop $CONTAINER_NAME && docker rm $CONTAINER_NAME
+        elif docker ps -a -q --filter "name=$CONTAINER_NAME" | grep -q .; then
+          echo "Removing existing stopped container $CONTAINER_NAME..."
+          docker rm $CONTAINER_NAME
+        else
+          echo "No existing container named $CONTAINER_NAME found."
+        fi
+
+        echo "Cleaning up output directory..."
+        sudo rm -rf output || { echo "Failed to remove output directory"; exit 1; }
+        mkdir output && chmod 777 output || { echo "Failed to set permissions"; exit 1; }
+
+        echo "Starting new container $CONTAINER_NAME..."
+
+        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d ghcr.io/runwhen-contrib/runwhen-local:latest || {
+          echo "Failed to start container"; exit 1;
+        }
+
+        echo "Running workspace builder script in container..."
+        docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh $1 --verbose || {
+          echo "Error executing script in container"; exit 1;
+        }
+
+        echo "Review generated config files under output/workspaces/"
+    silent: true
+
+  validate-generation-rules:
+    desc: "Validate YAML files in .runwhen/generation-rules"
+    cmds:
+      - |
+        for cmd in curl yq ajv; do
+          if ! command -v $cmd &> /dev/null; then
+            echo "Error: $cmd is required but not installed."
+            exit 1
+          fi
+        done
+
+        temp_dir=$(mktemp -d)
+        curl -s -o "$temp_dir/generation-rule-schema.json" https://raw.githubusercontent.com/runwhen-contrib/runwhen-local/refs/heads/main/src/generation-rule-schema.json
+
+        for yaml_file in ../.runwhen/generation-rules/*.yaml; do
+          echo "Validating $yaml_file"
+          json_file="$temp_dir/$(basename "${yaml_file%.*}.json")"
+          yq -o=json "$yaml_file" > "$json_file"
+          ajv validate -s "$temp_dir/generation-rule-schema.json" -d "$json_file" --spec=draft2020 --strict=false \
+          && echo "$yaml_file is valid." || echo "$yaml_file is invalid."
+        done
+
+        rm -rf "$temp_dir"
+    silent: true
+
+  check-rwp-config:
+    desc: Check if env vars are set for RunWhen Platform
+    cmds:
+      - |
+        source terraform/tf.secret
+        missing_vars=()
+
+        if [ -z "$RW_WORKSPACE" ]; then
+          missing_vars+=("RW_WORKSPACE")
+        fi
+
+        if [ -z "$RW_API_URL" ]; then
+          missing_vars+=("RW_API_URL")
+        fi
+
+        if [ -z "$RW_PAT" ]; then
+          missing_vars+=("RW_PAT")
+        fi
+
+        if [ ${#missing_vars[@]} -ne 0 ]; then
+          echo "The following required environment variables are missing: ${missing_vars[*]}"
+          exit 1
+        fi
+    silent: true
+
+  upload-slxs:
+    desc: "Upload SLX files to the appropriate URL"
+    env:
+      RW_WORKSPACE: "{{.RW_WORKSPACE}}"
+      RW_API_URL: "{{.RW_API}}"
+      RW_PAT: "{{.RW_PAT}}"
+    cmds:
+      - task: check-rwp-config
+      - |
+        source terraform/cb.secret
+        BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
+        if [ ! -d "$BASE_DIR" ]; then
+          echo "Directory $BASE_DIR does not exist. Upload aborted."
+          exit 1
+        fi
+
+        # Create Secrets
+        URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/secrets"
+        PAYLOAD="{\"secrets\": {\"az_subscriptionId\": \"${ARM_SUBSCRIPTION_ID}\", \"az_clientId\": \"${AZ_CLIENT_ID}\", \"az_tenantId\": \"${AZ_TENANT_ID}\", \"az_clientSecret\": \"${AZ_CLIENT_SECRET}\"}}"
+        echo "Uploading secrets to $URL"
+        response_code=$(curl -X POST "$URL" \
+          -H "Authorization: Bearer $RW_PAT" \
+          -H "Content-Type: application/json" \
+          -d "$PAYLOAD" \
+          -w "%{http_code}" -o /dev/null -s)
+        if [[ "$response_code" == "200" || "$response_code" == "201" ]]; then
+          echo "Successfully uploaded secrets to $URL"
+        else
+          echo "Failed to upload secrets: $SLX_NAME to $URL. Unexpected response code: $response_code"
+        fi
+
+
+        for dir in "$BASE_DIR"/*; do
+          if [ -d "$dir" ]; then
+            SLX_NAME=$(basename "$dir")
+            PAYLOAD=$(jq -n --arg commitMsg "Creating new SLX $SLX_NAME" '{ commitMsg: $commitMsg, files: {} }')
+            for file in slx.yaml runbook.yaml sli.yaml; do
+              if [ -f "$dir/$file" ]; then
+                CONTENT=$(cat "$dir/$file")
+                PAYLOAD=$(echo "$PAYLOAD" | jq --arg fileContent "$CONTENT" --arg fileName "$file" '.files[$fileName] = $fileContent')
+              fi
+            done
+
+            URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/${SLX_NAME}"
+            echo "Uploading SLX: $SLX_NAME to $URL"
+            
+            response=$(curl -v -X POST "$URL" \
+              -H "Authorization: Bearer $RW_PAT" \
+              -H "Content-Type: application/json" \
+              -d "$PAYLOAD" -w "%{http_code}" -o /dev/null -s 2>&1)
+            
+            if [[ "$response" =~ 200|201 ]]; then
+              echo "Successfully uploaded SLX: $SLX_NAME to $URL"
+            else
+              echo "Failed to upload SLX: $SLX_NAME to $URL. Response:"
+              echo "$response"
+            fi
+          fi
+        done
+    silent: true
+  delete-slxs:
+    desc: "Delete SLX objects from the appropriate URL"
+    env:
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+      RW_API_URL: "{{.RW_API}}"
+      RW_PAT: "{{.RW_PAT}}"
+    cmds:
+      - task: check-rwp-config
+      - |
+        source terraform/cb.secret
+        BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
+        if [ ! -d "$BASE_DIR" ]; then
+          echo "Directory $BASE_DIR does not exist. Deletion aborted."
+          exit 1
+        fi
+
+        for dir in "$BASE_DIR"/*; do
+          if [ -d "$dir" ]; then
+            SLX_NAME=$(basename "$dir")
+            URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/${SLX_NAME}"
+            echo "Deleting SLX: $SLX_NAME from $URL"
+            response=$(curl -v -X DELETE "$URL" \
+              -H "Authorization: Bearer $RW_PAT" \
+              -H "Content-Type: application/json" -w "%{http_code}" -o /dev/null -s 2>&1)
+
+            if [[ "$response" =~ 200|204 ]]; then
+              echo "Successfully deleted SLX: $SLX_NAME from $URL"
+            else
+              echo "Failed to delete SLX: $SLX_NAME from $URL. Response:"
+              echo "$response"
+            fi
+          fi
+        done
+    silent: true
+
+  check-terraform-infra:
+    desc: "Check if Terraform has any deployed infrastructure in the terraform subdirectory"
+    cmds:
+      - |
+        # Source Envs for Auth
+        source terraform/tf.secret
+
+        # Set Additional env
+        export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)
+        export TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
+        export TF_VAR_tenant_id=$AZ_TENANT_ID
+
+        # Navigate to the Terraform directory
+        if [ ! -d "terraform" ]; then
+          echo "Terraform directory not found."
+          exit 1
+        fi
+        cd terraform
+
+        # Check if Terraform state file exists
+        if [ ! -f "terraform.tfstate" ]; then
+          echo "No Terraform state file found in the terraform directory. No infrastructure is deployed."
+          exit 0
+        fi
+
+        # List resources in Terraform state
+        resources=$(terraform state list)
+
+        # Check if any resources are listed in the state file
+        if [ -n "$resources" ]; then
+          echo "Deployed infrastructure detected."
+          echo "$resources"
+          exit 0
+        else
+          echo "No deployed infrastructure found in Terraform state."
+          exit 0
+        fi
+    silent: true
+
+  build-terraform-infra:
+    desc: "Run terraform apply"
+    cmds:
+      - |
+        # Source Envs for Auth
+        source terraform/tf.secret
+
+        # Set Additional env
+        export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)
+        export TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
+        export TF_VAR_tenant_id=$AZ_TENANT_ID
+
+        # Navigate to the Terraform directory
+        if [ -d "terraform" ]; then
+          cd terraform
+        else
+          echo "Terraform directory not found. Terraform apply aborted."
+          exit 1
+        fi
+        task format-and-init-terraform
+        echo "Starting Terraform Build of Terraform infrastructure..."
+        terraform apply -auto-approve || {
+          echo "Failed to clean up Terraform infrastructure."
+          exit 1
+        }
+        echo "Terraform infrastructure build completed."
+    silent: true
+
+  cleanup-terraform-infra:
+    desc: "Cleanup deployed Terraform infrastructure"
+    cmds:
+      - |
+        # Source Envs for Auth
+        source terraform/tf.secret
+
+        # Set Additional env
+        export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)
+        export TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
+        export TF_VAR_tenant_id=$AZ_TENANT_ID
+
+        # Navigate to the Terraform directory
+        if [ -d "terraform" ]; then
+          cd terraform
+        else
+          echo "Terraform directory not found. Cleanup aborted."
+          exit 1
+        fi
+
+        echo "Starting cleanup of Terraform infrastructure..."
+        terraform destroy -auto-approve || {
+          echo "Failed to clean up Terraform infrastructure."
+          exit 1
+        }
+        echo "Terraform infrastructure cleanup completed."
+    silent: true
+
+  check-and-cleanup-terraform:
+    desc: "Check and clean up deployed Terraform infrastructure if it exists"
+    cmds:
+      - |
+        # Capture the output of check-terraform-infra
+        infra_output=$(task check-terraform-infra | tee /dev/tty)
+
+        # Check if output contains indication of deployed infrastructure
+        if echo "$infra_output" | grep -q "Deployed infrastructure detected"; then
+          echo "Infrastructure detected; proceeding with cleanup."
+          task cleanup-terraform-infra
+        else
+          echo "No deployed infrastructure found; no cleanup required."
+        fi
+    silent: true
+
+  clean-rwl-discovery:
+    desc: "Check and clean up RunWhen Local discovery output"
+    cmds:
+      - |
+        sudo rm -rf output
+        rm workspaceInfo.yaml
+    silent: true
