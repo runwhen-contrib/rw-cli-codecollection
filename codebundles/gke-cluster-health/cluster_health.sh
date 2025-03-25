@@ -25,6 +25,9 @@ if ! command -v kubectl &>/dev/null; then
   exit 1
 fi
 
+# Set KUBECONFIG so that gcloud can configure it with the appropriate credentials
+export KUBECONFIG="kubeconfig"
+
 # Comma-separated list of critical namespaces. If any CrashLoop pod is in one of these => severity=1, else 4.
 CRITICAL_NAMESPACES="${CRITICAL_NAMESPACES:-kube-system}"
 
@@ -69,8 +72,6 @@ for i in $(seq 0 $((NUM_CLUSTERS - 1))); do
   if [ -z "$CLUSTER_NAME" ] || [ "$CLUSTER_NAME" = "null" ]; then
     continue
   fi
-
-  echo "Cluster: $CLUSTER_NAME (Location: $CLUSTER_LOC)" | tee -a "$REPORT_FILE"
 
   # Attempt to get credentials. If we fail, create an issue and skip.
   if ! gcloud container clusters get-credentials "$CLUSTER_NAME" \
