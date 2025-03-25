@@ -23,7 +23,7 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/gke-cluster-health/runbook.robot
+    pathToRobot: codebundles/gke-cluster-health/sli.robot
   intervalStrategy: intermezzo
   intervalSeconds: 600
   configProvided:
