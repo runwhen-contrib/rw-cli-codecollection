@@ -48,6 +48,7 @@ Identify GKE Service Account Issues in GCP Project `${GCP_PROJECT_ID}`
     ...    bash_file=sa_check.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    timeout_seconds=120
 
     ${issues}=     RW.CLI.Run Cli
     ...    cmd=cat issues.json
@@ -73,6 +74,7 @@ Fetch GKE Recommendations for GCP Project `${GCP_PROJECT_ID}`
     ...    bash_file=gcp_recommendations.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    timeout_seconds=120
 
     ${issues}=     RW.CLI.Run Cli
     ...    cmd=cat recommendations_issues.json
@@ -98,6 +100,7 @@ Fetch GKE Cluster Health for GCP Project `${GCP_PROJECT_ID}`
     ...    bash_file=cluster_health.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    timeout_seconds=120
 
     ${issues}=     RW.CLI.Run Cli
     ...    cmd=cat cluster_health_issues.json

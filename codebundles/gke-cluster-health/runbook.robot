@@ -48,6 +48,7 @@ Identify GKE Service Account Issues in GCP Project `${GCP_PROJECT_ID}`
     ...    bash_file=sa_check.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    timeout_seconds=120
     RW.Core.Add Pre To Report    GKE Service Account Check Output:\n${sa_check.stdout}
 
     ${issues}=     RW.CLI.Run Cli
@@ -75,6 +76,7 @@ Fetch GKE Recommendations for GCP Project `${GCP_PROJECT_ID}`
     ...    bash_file=gcp_recommendations.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    timeout_seconds=120
     ${report}=     RW.CLI.Run Cli
     ...    cmd=cat recommendations_report.txt
     RW.Core.Add Pre To Report    GKE Recommendation Output:\n${report.stdout}
@@ -93,7 +95,7 @@ Fetch GKE Recommendations for GCP Project `${GCP_PROJECT_ID}`
             ...    title= ${issue["title"]}
             ...    reproduce_hint=${gcp_recommendations.cmd}
             ...    details=${issue["details"]}
-            ...    next_steps=${issue["suggested"]}
+            ...    next_steps=${issue["next_steps"]}
         END
     END
 
@@ -105,7 +107,7 @@ Fetch GKE Cluster Health for GCP Project `${GCP_PROJECT_ID}`
     ...    bash_file=cluster_health.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
-
+    ...    timeout_seconds=120
     ${report}=     RW.CLI.Run Cli
     ...    cmd=cat cluster_health_report.txt
     RW.Core.Add Pre To Report    Cluster Health Output:\n${report.stdout}
@@ -122,6 +124,36 @@ Fetch GKE Cluster Health for GCP Project `${GCP_PROJECT_ID}`
             ...    actual=GKE Clusters have capcity or pod functionality issues
             ...    title= ${issue["title"]}
             ...    reproduce_hint=${cluster_health.cmd}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["suggested"]}
+        END
+    END
+
+Check for Quota Related GKE Autoscaling Issues in GCP Project `${GCP_PROJECT_ID}`
+    [Documentation]    Ensure that GKE Autoscaling will not be blocked by Quota constraints
+    [Tags]    quota    autoscaling    gcloud    gke    gcp    access:read-only
+
+    ${quota_check}=    RW.CLI.Run Bash File
+    ...    bash_file=quota_check.sh
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    timeout_seconds=120
+    ${report}=     RW.CLI.Run Cli
+    ...    cmd=cat region_quota_report.txt
+    RW.Core.Add Pre To Report    Cluster Health Output:\n${report.stdout}
+
+    ${issues}=     RW.CLI.Run Cli
+    ...    cmd=cat region_quota_issues.json
+    
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list}) > 0
+        FOR    ${issue}    IN    @{issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    expected=GKE Clusters should have available quota to scale
+            ...    actual=GKE Clusters are limited by available quota
+            ...    title= ${issue["title"]}
+            ...    reproduce_hint=${quota_check.cmd}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["suggested"]}
         END

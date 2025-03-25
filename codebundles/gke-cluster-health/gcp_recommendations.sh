@@ -68,7 +68,6 @@ fi
 
 # For each cluster location, fetch recommendations in JSON and parse relevant fields.
 for loc in $LOCATIONS; do
-  echo "Fetching recommendations for location '$loc'..."
   {
     echo ""
     echo "Location: $loc"
@@ -107,20 +106,13 @@ for loc in $LOCATIONS; do
     TARGET_RESOURCES="$(echo "$RECOMMENDATIONS_JSON" | jq -r ".[$i].targetResources[]?" | paste -sd "\n" -)"
 
     # content.overview => might have "targetClusters" or "podDisruptionRecommendation".
-    # We'll parse them carefully.
     CONTENT_OVERVIEW="$(echo "$RECOMMENDATIONS_JSON" | jq ".[$i].content.overview")"
 
-    # We'll do the same cluster-name placeholder replacement if needed.
     # Attempt to extract a cluster name from "targetResources" or "targetClusters" if we see one.
-    # Failing that, we parse from the 'name' field.
-    # By default, we try the resource name in the path:
     CLUSTER="$(echo "$NAME" | sed -n 's|.*/clusters/\([^/]*\)/.*|\1|p')"
     if [ -z "$CLUSTER" ]; then
       CLUSTER="UnknownCluster"
     fi
-    # If "targetClusters" has a clusterUri with a different name, use that.
-    # We'll just pick the first if multiple exist.
-    # E.g. content.overview.targetClusters[0].clusterUri => .../clusters/platform-cluster-01
     ALT_CLUSTER="$(echo "$CONTENT_OVERVIEW" | jq -r '.targetClusters[0].clusterUri // empty' 2>/dev/null | sed 's|.*/clusters/\([^/]*\)$|\1|')"
     if [ -n "$ALT_CLUSTER" ] && [ "$ALT_CLUSTER" != "null" ]; then
       CLUSTER="$ALT_CLUSTER"
@@ -131,68 +123,79 @@ for loc in $LOCATIONS; do
       DESCRIPTION="$(printf "$DESCRIPTION" "$CLUSTER")"
     fi
 
-    # === Build up a "details" string that includes everything we want. ===
+    # Build a multi-line "details" string with real newlines.
+    # We'll just keep appending with shell newlines, so the final text is truly multiline.
     DETAILS="$DESCRIPTION"
 
-    # Append associated insights:
+    # If we have associated insights, add them on new lines.
     if [ -n "$ASSOC_INSIGHTS" ]; then
-      DETAILS+="\n\nAssociated Insights:\n$ASSOC_INSIGHTS"
+      DETAILS+="
+Associated Insights:
+$ASSOC_INSIGHTS"
     fi
 
-    DETAILS+="\n\nContent Overview:"
+    DETAILS+="
 
-    # We can parse targetClusters from the overview:
+Content Overview:
+"
+
+    # Parse targetClusters from the overview:
     TGT_CLUSTERS="$(echo "$CONTENT_OVERVIEW" | jq -r '.targetClusters[]? | "- ClusterID: " + .clusterId + ", URI: " + .clusterUri' 2>/dev/null || true)"
     if [ -n "$TGT_CLUSTERS" ]; then
-      DETAILS+="\nTarget Clusters:\n$TGT_CLUSTERS"
+      DETAILS+="Target Clusters:
+$TGT_CLUSTERS
+
+"
     fi
 
     # Next, parse the "podDisruptionRecommendation" array if it exists:
     POD_DISRUPT="$(echo "$CONTENT_OVERVIEW" | jq '.podDisruptionRecommendation // empty' 2>/dev/null || true)"
     if [ -n "$POD_DISRUPT" ] && [ "$POD_DISRUPT" != "null" ]; then
-      # It's an array of objects. We'll loop in bash for clarity (though you could do it purely in jq).
       COUNT_POD="$(echo "$POD_DISRUPT" | jq length)"
       if [ "$COUNT_POD" != "0" ]; then
-        DETAILS+="\n\nPod Disruption Recommendations:"
+        DETAILS+="Pod Disruption Recommendations:"
         for pidx in $(seq 0 $((COUNT_POD - 1))); do
-          # For each item, we get the pdbInfo + statefulSetInfo.
           PDB_INFO="$(echo "$POD_DISRUPT" | jq ".[$pidx].pdbInfo")"
           STF_INFO="$(echo "$POD_DISRUPT" | jq ".[$pidx].statefulSetInfo")"
 
           # recommendedSelectorMatchLabels => array of {labelName, labelValue}
-          # We'll join them into labelName=labelValue strings.
           LABELS="$(echo "$PDB_INFO" | jq -r '.recommendedSelectorMatchLabels[]? | "\(.labelName)=\(.labelValue)"' | paste -sd ", " -)"
           [ -z "$LABELS" ] && LABELS="(none)"
 
-          # parse out statefulSetName, statefulSetNamespace, statefulSetUid
           SS_NAME="$(echo "$STF_INFO" | jq -r '.statefulSetName // "N/A"')"
           SS_NS="$(echo "$STF_INFO" | jq -r '.statefulSetNamespace // "N/A"')"
           SS_UID="$(echo "$STF_INFO" | jq -r '.statefulSetUid // "N/A"')"
 
-          DETAILS+="\n - StatefulSet: $SS_NAME (Namespace: $SS_NS, UID: $SS_UID)"
-          DETAILS+="\n   Recommended Labels: $LABELS"
+          DETAILS+="
+ - StatefulSet: $SS_NAME (Namespace: $SS_NS, UID: $SS_UID)
+   Recommended Labels: $LABELS"
         done
+        DETAILS+="
+
+"
       fi
     fi
 
-    # Also append top-level fields from the recommendation:
-    if [ -n "$RECOMMENDER_SUBTYPE" ] && [ "$RECOMMENDER_SUBTYPE" != "null" ]; then
-      DETAILS+="\n\nRecommender Subtype: $RECOMMENDER_SUBTYPE"
-    fi
-    if [ -n "$PRIMARY_IMPACT" ] && [ "$PRIMARY_IMPACT" != "null" ]; then
-      DETAILS+="\nPrimary Impact: $PRIMARY_IMPACT"
-    fi
-    if [ -n "$STATE" ] && [ "$STATE" != "null" ]; then
-      DETAILS+="\nState: $STATE"
-    fi
-    if [ -n "$ETAG" ] && [ "$ETAG" != "null" ]; then
-      DETAILS+="\nETag: $ETAG"
-    fi
-    if [ -n "$REFRESH" ] && [ "$REFRESH" != "null" ]; then
-      DETAILS+="\nLast Refresh Time: $REFRESH"
-    fi
+    # Append top-level fields
+    [ -n "$RECOMMENDER_SUBTYPE" ] && [ "$RECOMMENDER_SUBTYPE" != "null" ] && \
+      DETAILS+="Recommender Subtype: $RECOMMENDER_SUBTYPE
+"
+    [ -n "$PRIMARY_IMPACT" ] && [ "$PRIMARY_IMPACT" != "null" ] && \
+      DETAILS+="Primary Impact: $PRIMARY_IMPACT
+"
+    [ -n "$STATE" ] && [ "$STATE" != "null" ] && \
+      DETAILS+="State: $STATE
+"
+    [ -n "$ETAG" ] && [ "$ETAG" != "null" ] && \
+      DETAILS+="ETag: $ETAG
+"
+    [ -n "$REFRESH" ] && [ "$REFRESH" != "null" ] && \
+      DETAILS+="Last Refresh Time: $REFRESH
+"
     if [ -n "$TARGET_RESOURCES" ]; then
-      DETAILS+="\nTarget Resources:\n$TARGET_RESOURCES"
+      DETAILS+="Target Resources:
+$TARGET_RESOURCES
+"
     fi
 
     # priority => severity
@@ -205,24 +208,22 @@ for loc in $LOCATIONS; do
       *)    SEVERITY=4;;
     esac
 
-    # Build the final title: e.g., "Recommendation: Create a backup plan for location-01-us-west1 in GKE Cluster location-01-us-west1"
-    # We'll just take the first sentence from the updated DESCRIPTION plus the cluster name.
-    TITLE="Recommendation: ${DESCRIPTION%%.*} in GKE Cluster ${CLUSTER}"
+    # Create a short Title (first sentence) plus cluster name.
+    TITLE="${DESCRIPTION%%.*} in GKE Cluster \`${CLUSTER}\`"
 
-    # Create suggested steps.
-    SUGGESTED="Review the recommendation in the GCP Console and run: gcloud recommender recommendations accept ${NAME} --project=${PROJECT} --location=${loc} --etag=<ETAG>"
+    # Provide a direct single-sentence "next steps" line.
+    SUGGESTED="Open https://console.cloud.google.com/home/recommendations?project=${PROJECT} to review and apply."
 
-    # Append to the human-readable report.
+    # Write human-readable report with actual newlines:
     {
-      echo "Issue: $TITLE"
-      echo "Details: $DETAILS"
-      echo "Severity: $SEVERITY"
-      echo "Suggested Next Steps: $SUGGESTED"
+      printf "Issue: %s\n" "$TITLE"
+      printf "Details:\n%s\n" "$DETAILS"
+      printf "Severity: %s\n" "$SEVERITY"
+      printf "Suggested Next Steps: %s\n" "$SUGGESTED"
       echo "-------------------------------------"
     } >> "$REPORT_FILE"
 
-    # Append to the JSON issues file.
-    # The "kwargs" is just an empty JSON object for extensibility.
+    # Append to the JSON issues file. Newlines in $DETAILS become escaped \n in JSON (which is normal).
     if [ "$first_issue" = true ]; then
       first_issue=false
     else
@@ -231,9 +232,9 @@ for loc in $LOCATIONS; do
     ISSUE_JSON="$(jq -n \
       --arg title "$TITLE" \
       --arg details "$DETAILS" \
-      --arg suggested "$SUGGESTED" \
+      --arg next_steps "$SUGGESTED" \
       --argjson severity "$SEVERITY" \
-      '{title: $title, details: $details, severity: $severity, suggested: $suggested, kwargs: {}}')"
+      '{title: $title, details: $details, severity: $severity, next_steps: $next_steps}')"
     echo "$ISSUE_JSON" >> "$TEMP_ISSUES"
   done
 done
@@ -243,4 +244,3 @@ mv "$TEMP_ISSUES" "$ISSUES_FILE"
 
 echo "Report generated: $REPORT_FILE"
 echo "Issues file generated: $ISSUES_FILE"
-

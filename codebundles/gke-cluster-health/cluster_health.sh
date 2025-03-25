@@ -128,9 +128,9 @@ for i in $(seq 0 $((NUM_CLUSTERS - 1))); do
   NOT_READY="$(echo "$NODE_STATUSES" | grep -v " Ready " || true)"
   if [ -n "$NOT_READY" ]; then
     T="Node(s) Not Ready in GKE Cluster \`$CLUSTER_NAME\`"
-    D="The following nodes are not Ready:\n$NOT_READY"
+    D="The following nodes are not Ready:  $NOT_READY"
     S=2
-    R="Use 'kubectl describe node <NAME>' or check underlying VM health."
+    R="Describe and get events for NotReady nodes in GKE Cluster \`$CLUSTER_NAME\`"
 
     {
       echo "Issue: $T"
@@ -211,7 +211,7 @@ for i in $(seq 0 $((NUM_CLUSTERS - 1))); do
         fi
       done
       T="High CPU usage in GKE cluster \`$CLUSTER_NAME\`, nodepool \`$pool\`"
-      D="Nodes exceeding 75% CPU:\n$(echo "$entries" | sed 's/;/\n/g')"
+      D="Nodes exceeding 75% CPU:  $(echo "$entries" | sed 's/;/\n/g')"
       R="Consider scaling or investigating CPU usage on node pool \`$pool\`."
 
       {
@@ -244,7 +244,7 @@ for i in $(seq 0 $((NUM_CLUSTERS - 1))); do
         fi
       done
       T="High memory usage in cluster \`$CLUSTER_NAME\`, nodepool \`$pool\`"
-      D="Nodes exceeding 75% memory:\n$(echo "$entries" | sed 's/;/\n/g')"
+      D="Nodes exceeding 75% memory:  $(echo "$entries" | sed 's/;/\n/g')"
       R="Consider investigating memory usage or resizing node pool \`$pool\`."
 
       {
@@ -302,12 +302,10 @@ for i in $(seq 0 $((NUM_CLUSTERS - 1))); do
     fi
 
     T="Pods in CrashLoopBackOff in GKE cluster \`$CLUSTER_NAME\`"
-    D="Found $countCrash crashing pods:\n$CRASHLOOP"
+    D="Found $countCrash crashing pods:  $CRASHLOOP"
 
     # Build a next-steps message that includes "Check Namespace Health" for each namespace
-    R="Check the health of these namespaces: $all_crash_ns.
-Use 'kubectl logs -n <namespace> <pod>' and check the controlling Deployment/StatefulSet.
-If the namespace is in '$CRITICAL_NAMESPACES', treat as urgent."
+    R="Check namespace health \`$all_crash_ns\` in GKE Cluster \`$CLUSTER_NAME\`"
 
     {
       echo "Issue: $T"
