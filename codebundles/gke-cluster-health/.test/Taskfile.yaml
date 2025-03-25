@@ -28,7 +28,7 @@ tasks:
           echo "✗"
           echo "Uncommitted changes found:"
           echo "$UNCOMMITTED_FILES"
-          echo "Remember to commit & push changes before executing the `run-rwl-discovery` task."
+          echo "Remember to commit & push changes before executing the run-rwl-discovery task."
           echo "------------"
           exit 1    
         else
