@@ -30,6 +30,7 @@ Suite Initialization
     ...    type=string
     ...    description=A comma separated list of namespaces which are critical. If pods are unhealthy in these namespaces, a severity 1 issue is raised. 
     ...    pattern=\w*
+    ...    default=kube-system,flux-system,cert-manager
     ...    example=kube-system,flux-system,cert-manager
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}

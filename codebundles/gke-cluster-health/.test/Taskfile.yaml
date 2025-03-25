@@ -199,7 +199,7 @@ tasks:
               -H "Authorization: Bearer $RW_PAT" \
               -H "Content-Type: application/json" \
               -d "$PAYLOAD" -w "%{http_code}" -o /dev/null -s 2>&1)
-            
+
             if [[ "$response" =~ 200|201 ]]; then
               echo "Successfully uploaded SLX: $SLX_NAME to $URL"
             else
