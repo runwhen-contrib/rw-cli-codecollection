@@ -146,6 +146,6 @@ Check for Quota Related GKE Autoscaling Issues in GCP Project `${GCP_PROJECT_ID}
     END    
 
 Generate GKE Cluster Health Score
-    ${gke_cluster_health_score}=      Evaluate  (${gke_sa_score} + ${gke_recommendations_score} + ${gke_cluster_health_sore} +${gke_quota_score}) / 4
+    ${gke_cluster_health_score}=      Evaluate  (${gke_sa_score} + ${gke_recommendations_score} + ${gke_cluster_health_score} +${gke_quota_score}) / 4
     ${health_score}=      Convert to Number    ${gke_cluster_health_score}  2
     RW.Core.Push Metric    ${health_score}
