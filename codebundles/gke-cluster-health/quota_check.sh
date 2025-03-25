@@ -18,10 +18,7 @@
 
 set -euo pipefail
 
-# If you rely on a service account JSON, uncomment or adapt. If it's not needed, remove this line.
-gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" || true
-
-DEBUG="${DEBUG:-true}"
+DEBUG="${DEBUG:-false}"
 
 function dbg() {
   if [ "$DEBUG" = "true" ]; then

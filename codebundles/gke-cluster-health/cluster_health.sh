@@ -16,8 +16,6 @@
 
 set -euo pipefail
 
-gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS"
-
 if ! command -v gcloud &>/dev/null; then
   echo "Error: gcloud not found." >&2
   exit 1

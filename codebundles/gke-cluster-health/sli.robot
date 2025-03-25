@@ -38,6 +38,10 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"CRITICAL_NAMESPACES":"${CRITICAL_NAMESPACES}","PATH": "$PATH:${OS_PATH}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}", "GCP_PROJECT_ID":"${GCP_PROJECT_ID}"}
+    RW.CLI.Run CLI
+    ...    cmd=gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" || true
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
 
 *** Tasks ***
 Identify GKE Service Account Issues in GCP Project `${GCP_PROJECT_ID}`

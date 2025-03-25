@@ -1,6 +1,5 @@
 #!/bin/bash
 
-gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS"
 project_id="$GCP_PROJECT_ID"
 project_number=$(gcloud projects describe "$project_id" --format="value(projectNumber)")
 
