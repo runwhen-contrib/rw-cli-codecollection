@@ -15,6 +15,8 @@
 
 set -euo pipefail
 
+gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS"
+
 # Ensure required commands are installed.
 if ! command -v gcloud &>/dev/null; then
   echo "Error: gcloud not found on PATH." >&2
