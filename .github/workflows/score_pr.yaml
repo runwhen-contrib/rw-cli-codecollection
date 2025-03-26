@@ -27,7 +27,7 @@ jobs:
 
       - uses: runwhen-contrib/github-actions/codecollection-score@fix/partial-score
         with:
-          directory: ./codebundles
+          directory: .
           apply_suggestions: true
           only_changed: true
         env:
