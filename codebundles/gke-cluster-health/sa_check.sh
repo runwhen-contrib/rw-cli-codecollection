@@ -199,6 +199,7 @@ else
     {
       "title": "Service account missing permissions: $sa",
       "details": "The service account $sa is missing the following permissions: $missing_perms",
+      "severity": "2",
       "next_steps": "Grant 'roles/container.defaultNodeServiceAccount' or other appropriate roles to fix these permissions."
     }$( [[ $counter -lt $total ]] && echo "," )
 EOF
