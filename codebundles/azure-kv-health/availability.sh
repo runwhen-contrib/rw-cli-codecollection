@@ -6,9 +6,8 @@ resource_group="$AZURE_RESOURCE_GROUP"
 json_output='{"metrics":['
 first=true
 
-for kv in $(az keyvault list --subscription "$subscription_id" --query "[].name" -o tsv); do
+for kv in $(az keyvault list -g "$resource_group" --subscription "$subscription_id" --query "[].name" -o tsv); do
   
-  availability
   availability=$(az monitor metrics list \
     --resource "/subscriptions/$subscription_id/resourceGroups/$resource_group/providers/Microsoft.KeyVault/vaults/$kv" \
     --metric Availability \

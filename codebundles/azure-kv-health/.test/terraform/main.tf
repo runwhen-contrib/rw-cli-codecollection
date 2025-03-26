@@ -15,7 +15,7 @@ resource "azurerm_key_vault" "kv" {
   purge_protection_enabled   = false
   soft_delete_retention_days = 7
 
-
+  tags                       = var.tags
   access_policy {
     tenant_id           = data.azurerm_client_config.current.tenant_id
     object_id           = data.azurerm_client_config.current.object_id
@@ -24,6 +24,74 @@ resource "azurerm_key_vault" "kv" {
     storage_permissions = ["Get", ]
   }
 }
+
+resource "azurerm_key_vault_secret" "expiring_secret" {
+  name         = "expiring-secret"
+  value        = "ThisIsASecret"
+  key_vault_id = azurerm_key_vault.kv.id
+
+  # Set an expiration date (e.g., 1 day from now)
+  expiration_date = timeadd(timestamp(), "24h")
+  tags            = var.tags
+}
+
+resource "azurerm_key_vault_key" "expiring_key" {
+  name         = "expiring-key"
+  key_vault_id = azurerm_key_vault.kv.id
+  key_type     = "RSA"
+  key_size     = 2048
+
+  # Set an expiration date (e.g., 1 day from now)
+  expiration_date = timeadd(timestamp(), "24h")
+
+  key_opts = ["encrypt", "decrypt", "sign", "verify"]
+  tags     = var.tags
+}
+
+resource "azurerm_key_vault_certificate" "expiring_cert" {
+  name         = "expiring-cert"
+  key_vault_id = azurerm_key_vault.kv.id
+
+  certificate_policy {
+    issuer_parameters {
+      name = "Self"
+    }
+
+    key_properties {
+      exportable = true
+      key_size   = 2048
+      key_type   = "RSA"
+      reuse_key  = true
+    }
+
+    lifetime_action {
+      action {
+        action_type = "AutoRenew"
+      }
+
+      trigger {
+        days_before_expiry = 1
+      }
+    }
+
+    secret_properties {
+      content_type = "application/x-pkcs12"
+    }
+
+    x509_certificate_properties {
+      key_usage = [
+        "digitalSignature",
+        "keyEncipherment"
+      ]
+
+      subject            = "CN=expiring-cert"
+      validity_in_months = 1 # Expires in 1 month
+    }
+  }
+  tags = var.tags
+}
+
+
 
 output "keyvault_name" {
   value = azurerm_key_vault.kv.name

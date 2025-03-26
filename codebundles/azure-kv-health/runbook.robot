@@ -15,8 +15,8 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Get Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
-    [Documentation]    Gets availability metrics for Key Vaults in the resource group
+List Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    List availability metrics for Key Vaults in the resource group
     [Tags]    KeyVault    Azure    Health    Monitoring    access:read-only
     ${availability_output}=    RW.CLI.Run Bash File
     ...    bash_file=availability.sh
@@ -52,6 +52,58 @@ Get Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}` in Subscr
         END
     ELSE
         RW.Core.Add Pre To Report    "No Key Vault availability data found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+    END
+
+Check Key Vault Configuration in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    List configuration details for Key Vaults in the resource group
+    [Tags]    KeyVault    Azure    Configuration    access:read-only
+    ${config_output}=    RW.CLI.Run Bash File
+    ...    bash_file=kv_config.sh
+    ...    env=${env}
+    ...    secret__azure_credentials=${azure_credentials}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+
+    TRY
+        ${config_data}=    Evaluate    json.loads(r'''${config_output.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${config_data}=    Create Dictionary    keyVaults=[]
+    END
+
+    IF    len(${config_data['keyVaults']}) > 0
+        ${formatted_results}=    RW.CLI.Run Cli
+        ...    cmd=jq -r '["KeyVault_Name", "Soft_Delete", "Purge_Protection", "Resource_URL"], (.keyVaults[] | [ .kv_name, .soft_delete, .purge_protection, .resource_url ]) | @tsv' <<< '${config_output.stdout}' | column -t
+        RW.Core.Add Pre To Report    Key Vault Configuration Summary:\n==============================\n${formatted_results.stdout}
+
+        FOR    ${kv}    IN    @{config_data['keyVaults']}
+            ${kv_name}=    Set Variable    ${kv['kv_name']}
+            ${soft_delete}=    Set Variable    ${kv['soft_delete']}
+            ${purge_protection}=    Set Variable    ${kv['purge_protection']}
+            ${resource_url}=    Set Variable    ${kv['resource_url']}
+            
+            IF    '${soft_delete}' != 'true'
+                RW.Core.Add Issue
+                ...    severity=2
+                ...    expected=Key Vault `${kv_name}` should have Soft Delete enabled in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    actual=Key Vault `${kv_name}` has Soft Delete set to ${soft_delete} in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    title=Key Vault `${kv_name}` Soft Delete Not Enabled in Resource Group `${AZURE_RESOURCE_GROUP}`
+                ...    reproduce_hint=${config_output.cmd}
+                ...    next_steps=Enable Soft Delete for Key Vault `${kv_name}` in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            END
+            
+            IF    '${purge_protection}' != 'true'
+                RW.Core.Add Issue
+                ...    severity=1
+                ...    expected=Key Vault `${kv_name}` should have Purge Protection enabled in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    actual=Key Vault `${kv_name}` has Purge Protection set to ${purge_protection} in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    title=Key Vault `${kv_name}` Purge Protection Not Enabled in Resource Group `${AZURE_RESOURCE_GROUP}`
+                ...    reproduce_hint=${config_output.cmd}
+                ...    next_steps=Consider enabling Purge Protection for Key Vault `${kv_name}` in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            END
+        END
+    ELSE
+        RW.Core.Add Pre To Report    "No Key Vaults found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
     END
 
 
