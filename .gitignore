@@ -51,3 +51,5 @@ build
 **.secret**
 **.pem
 **.pfx
+**gcp_credentials_json
+**bashfile-**

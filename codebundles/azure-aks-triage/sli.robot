@@ -44,7 +44,8 @@ Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOUR
     ...    timeout_seconds=180
     ...    include_in_history=false
 
-    ${issues}=    RW.CLI.Run Cli    cmd=cat ${OUTPUT DIR}/aks_activities_issues.json
+    ${issues}=    RW.CLI.Run Cli    
+    ...    cmd=cat aks_activities_issues.json
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     Set Global Variable     ${aks_activities_score}    1
     IF    len(@{issue_list["issues"]}) > 0
