@@ -205,6 +205,11 @@ for ns in $FILTERED_NAMESPACES; do
             check_jq_error
             echo "Injection annotation: '$INJECTION_ANNOTATION'"
             
+            if [ "$INJECTION_ANNOTATION" == "false" ]; then
+                echo "Deployment '$deployment' in namespace '$ns' has explicitly disabled Istio injection" | tee -a "$REPORT_FILE"
+                continue
+            fi
+            
             if echo "$DEPLOYMENTS" | jq -e --arg deployment "$deployment" '.items[] | select(.metadata.name == $deployment) | .spec.template.metadata.annotations | has("sidecar.istio.io/inject")' >/dev/null; then
                 if [ "$INJECTION_ANNOTATION" == "true" ] && [ -z "$HAS_SIDECAR" ]; then
                     echo "Deployment '$deployment' in namespace '$ns' is missing Istio sidecar (deployment injection enabled)." | tee -a "$REPORT_FILE"

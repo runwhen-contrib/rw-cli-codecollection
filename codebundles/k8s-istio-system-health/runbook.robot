@@ -36,11 +36,6 @@ Check Deployments For Istio Sidecar Injection
     ...    include_in_history=false
 
 
-    # Get report text
-    #${report_text}=    Set Variable    ${stdout_lines[${report_start}+1:${report_end}]}
-    #${report_text}=    Evaluate    "\\n".join(${report_text})
-    #Create File    report.txt    ${report_text}
-
     # Process issues if any were found
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
     
@@ -62,6 +57,59 @@ Check Deployments For Istio Sidecar Injection
     ...    env=${env}
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${formatted_report.stdout}
+
+Check Istio Sidecar resources usage
+    [Documentation]    Checks all pods in specified namespaces for Istio sidecar resources usage
+    [Tags]    
+    ...    istio
+    ...    sidecar
+    ...    resources 
+    ...    usage
+    ${results}=    RW.CLI.Run Bash File
+    ...    bash_file=istio_sidecar_resource_usage.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report   ${results.stdout}
+
+#issue and report
+
+Verify Istio Istallation
+    [Documentation]    Verify Istio Istallation
+    [Tags]    
+    ...    istio
+    ...    installation
+    ${results}=    RW.CLI.Run Bash File
+    ...    bash_file=istio_installation_verify.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report   ${results.stdout}
+
+
+Check controlplane logs for errors and warnings
+    [Documentation]    Check controlplane logs for known erros and warnings
+    ...    istio
+    ...    logs
+    ${results}=    RW.CLI.Run Bash File
+    ...    bash_file=istio_controlplane_logs.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report   ${results.stdout}
+
+Check Istio Certificates
+    [Documentation]    Check Istio valid Root CA and mTLS Certificates
+    ...    istio
+    ...    mtls
+    ${results}=    RW.CLI.Run Bash File
+    ...    bash_file=istio_mtls_check.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report   ${results.stdout}
+
+
 
 *** Keywords ***
 Suite Initialization
