@@ -1,13 +1,15 @@
 #!/bin/bash
 
+subscription_id="$AZURE_SUBSCRIPTION_ID"
+resource_group="$AZURE_RESOURCE_GROUP"
 # Set expiration threshold in days (e.g., 30 days)
-THRESHOLD_DAYS=30
+threshold_days="$THRESHOLD_DAYS"
 
 # Get current date in Unix timestamp format
 CURRENT_DATE=$(date +%s)
 
 # Get a list of all Key Vaults in the subscription
-keyvaults=$(az keyvault list --query "[].{name:name, resourceGroup:resourceGroup}" -o json)
+keyvaults=$(az keyvault list -g "$resource_group" --subscription "$subscription_id" --query "[].{id:id,name:name, resourceGroup:resourceGroup}" -o json)
 
 # Initialize an empty JSON array
 result="[]"
@@ -16,8 +18,8 @@ result="[]"
 for row in $(echo "${keyvaults}" | jq -c '.[]'); do
     name=$(echo $row | jq -r '.name')
     resourceGroup=$(echo $row | jq -r '.resourceGroup')
-
-    echo "Checking Key Vault: $name in Resource Group: $resourceGroup..."
+    resource_id=$(echo $row | jq -r '.id')
+    resource_url="https://portal.azure.com/#@/resource${resource_id}"
 
     # ------------------------
     # Check Expiring Secrets
@@ -33,8 +35,8 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
             expiryTimestamp=$(date -d "$expiryDate" +%s)
             remainingDays=$(( (expiryTimestamp - CURRENT_DATE) / 86400 ))
 
-            if [[ $remainingDays -lt 0 || $remainingDays -lt $THRESHOLD_DAYS ]]; then
-                result=$(echo $result | jq --arg name "$name" --arg resourceGroup "$resourceGroup" --arg type "Secret" --arg item "$secretName" --argjson remainingDays "$remainingDays" '. + [{keyVault: $name, resourceGroup: $resourceGroup, type: $type, name: $item, remainingDays: $remainingDays}]')
+            if [[ $remainingDays -lt 0 || $remainingDays -lt $threshold_days ]]; then
+                result=$(echo $result | jq --arg name "$name" --arg resourceGroup "$resourceGroup" --arg type "Secret" --arg item "$secretName" --argjson remainingDays "$remainingDays" --arg resourceUrl "$resource_url/secrets" '. + [{keyVault: $name, resourceGroup: $resourceGroup, type: $type, name: $item, remainingDays: $remainingDays, resourceUrl: $resourceUrl}]')
             fi
         fi
     done
@@ -52,9 +54,8 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
         if [[ -n "$expiryDate" && "$expiryDate" != "null" ]]; then
             expiryTimestamp=$(date -d "$expiryDate" +%s)
             remainingDays=$(( (expiryTimestamp - CURRENT_DATE) / 86400 ))
-
-            if [[ $remainingDays -lt 0 || $remainingDays -lt $THRESHOLD_DAYS ]]; then
-                result=$(echo $result | jq --arg name "$name" --arg resourceGroup "$resourceGroup" --arg type "Certificate" --arg item "$certName" --argjson remainingDays "$remainingDays" '. + [{keyVault: $name, resourceGroup: $resourceGroup, type: $type, name: $item, remainingDays: $remainingDays}]')
+            if [[ $remainingDays -lt 0 || $remainingDays -lt $threshold_days ]]; then
+                result=$(echo $result | jq --arg name "$name" --arg resourceGroup "$resourceGroup" --arg type "Certificate" --arg item "$certName" --argjson remainingDays "$remainingDays" --arg resourceUrl "$resource_url/certificates" '. + [{keyVault: $name, resourceGroup: $resourceGroup, type: $type, name: $item, remainingDays: $remainingDays, resourceUrl: $resourceUrl}]')
             fi
         fi
     done
@@ -62,19 +63,17 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
     # ------------------------
     # Check Expiring Keys
     # ------------------------
-    keys=$(az keyvault key list --vault-name "$name" --query "[].{id:id, name:name}" -o json)
+    keys=$(az keyvault key list --vault-name "$name" -o json)
     for key in $(echo "${keys}" | jq -c '.[]'); do
         keyName=$(echo $key | jq -r '.name')
-        keyId=$(echo $key | jq -r '.id')
-
-        expiryDate=$(az keyvault key show --id "$keyId" --query "attributes.expires" -o tsv)
+        expiryDate=$(echo $key | jq -r '.attributes.expires')
 
         if [[ -n "$expiryDate" && "$expiryDate" != "null" ]]; then
             expiryTimestamp=$(date -d "$expiryDate" +%s)
             remainingDays=$(( (expiryTimestamp - CURRENT_DATE) / 86400 ))
 
-            if [[ $remainingDays -lt 0 || $remainingDays -lt $THRESHOLD_DAYS ]]; then
-                result=$(echo $result | jq --arg name "$name" --arg resourceGroup "$resourceGroup" --arg type "Key" --arg item "$keyName" --argjson remainingDays "$remainingDays" '. + [{keyVault: $name, resourceGroup: $resourceGroup, type: $type, name: $item, remainingDays: $remainingDays}]')
+            if [[ $remainingDays -lt 0 || $remainingDays -lt $threshold_days ]]; then
+                result=$(echo $result | jq --arg name "$name" --arg resourceGroup "$resourceGroup" --arg type "Key" --arg item "$keyName" --argjson remainingDays "$remainingDays" --arg resourceUrl "$resource_url/keys" '. + [{keyVault: $name, resourceGroup: $resourceGroup, type: $type, name: $item, remainingDays: $remainingDays, resourceUrl: $resourceUrl}]')
             fi
         fi
     done

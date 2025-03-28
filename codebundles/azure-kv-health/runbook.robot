@@ -106,6 +106,56 @@ Check Key Vault Configuration in resource group `${AZURE_RESOURCE_GROUP}` in Sub
         RW.Core.Add Pre To Report    "No Key Vaults found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
     END
 
+Check Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Check for expiring secrets, certificates, and keys in Key Vaults
+    [Tags]    KeyVault    Azure    Expiry    access:read-only
+    ${expiry_output}=    RW.CLI.Run Bash File
+    ...    bash_file=expiry-checks.sh
+    ...    env=${env}
+    ...    secret__azure_credentials=${azure_credentials}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+
+    TRY
+        ${expiry_data}=    Evaluate    json.loads(r'''${expiry_output.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${expiry_data}=    Create List
+    END
+
+    IF    len(${expiry_data}) > 0
+        ${formatted_results}=    RW.CLI.Run Cli
+        ...    cmd=jq -r '["KeyVault", "ResourceGroup", "Type", "Name", "RemainingDays"], (.[] | [ .keyVault, .resourceGroup, .type, .name, .remainingDays ]) | @tsv' <<< '${expiry_output.stdout}' | column -t
+        RW.Core.Add Pre To Report    Expiring Key Vault Items Summary:\n==================================\n${formatted_results.stdout}
+
+        FOR    ${item}    IN    @{expiry_data}
+            ${kv_name}=    Set Variable    ${item['keyVault']}
+            ${resource_group}=    Set Variable    ${item['resourceGroup']}
+            ${type}=    Set Variable    ${item['type']}
+            ${name}=    Set Variable    ${item['name']}
+            ${remaining_days}=    Set Variable    ${item['remainingDays']}
+            
+            IF    ${remaining_days} == 0
+                RW.Core.Add Issue
+                ...    severity=1
+                ...    expected=${type} `${name}` in Key Vault `${kv_name}` should be renewed before expiration in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    actual=${type} `${name}` in Key Vault `${kv_name}` has expired in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    title=Expired ${type} in Key Vault `${kv_name}` in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    reproduce_hint=${expiry_output.cmd}
+                ...    next_steps=Immediately renew or rotate ${type} `${name}` in Key Vault in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ELSE IF    ${remaining_days} > 0 and ${remaining_days} < ${THRESHOLD_DAYS}
+                RW.Core.Add Issue
+                ...    severity=3
+                ...    expected=${type} `${name}` in Key Vault `${kv_name}` should be renewed before expiration in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    actual=${type} `${name}` in Key Vault `${kv_name}` will expire in ${remaining_days} days in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    title=${type} Nearing Expiration in Key Vault `${kv_name}` in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    reproduce_hint=${expiry_output.cmd}
+                ...    next_steps=Renew or rotate ${type} `${name}` in Key Vault `${kv_name}` in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}` before expiration
+            END
+        END
+    ELSE
+        RW.Core.Add Pre To Report    "No expiring items found in Key Vaults in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+    END
 
 
 *** Keywords ***
@@ -129,9 +179,14 @@ Suite Initialization
     ...    type=string
     ...    description=Azure resource group.
     ...    pattern=\w*
+    ${THRESHOLD_DAYS}=    RW.Core.Import User Variable    THRESHOLD_DAYS
+    ...    type=integer
+    ...    description=Number of days before expiration to trigger alerts
+    ...    default=31
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
+    Set Suite Variable    ${THRESHOLD_DAYS}    ${THRESHOLD_DAYS}
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "THRESHOLD_DAYS":"${THRESHOLD_DAYS}"}

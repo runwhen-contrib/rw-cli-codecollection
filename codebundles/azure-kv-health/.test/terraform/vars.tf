@@ -15,3 +15,7 @@ variable "tags" {
 variable "sp_principal_id" {
   type = string
 }
+
+variable "kv_name" {
+  type = string
+}

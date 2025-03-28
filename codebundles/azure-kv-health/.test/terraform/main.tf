@@ -6,27 +6,26 @@ resource "azurerm_resource_group" "rg" {
 data "azurerm_client_config" "current" {}
 
 resource "azurerm_key_vault" "kv" {
-  name                       = "yoko-ono-kv"
+  name                       = var.kv_name
   location                   = azurerm_resource_group.rg.location
   resource_group_name        = azurerm_resource_group.rg.name
   sku_name                   = "standard"
-  enable_rbac_authorization  = true
+  enable_rbac_authorization  = false # Disable RBAC to use access policies
   tenant_id                  = data.azurerm_client_config.current.tenant_id
   purge_protection_enabled   = false
-  soft_delete_retention_days = 7
-
+  soft_delete_retention_days = 7 # Minimum allowed value is 7 days
   tags                       = var.tags
   access_policy {
-    tenant_id           = data.azurerm_client_config.current.tenant_id
-    object_id           = data.azurerm_client_config.current.object_id
-    key_permissions     = ["Get", ]
-    secret_permissions  = ["Get", ]
-    storage_permissions = ["Get", ]
+    tenant_id               = data.azurerm_client_config.current.tenant_id
+    object_id               = data.azurerm_client_config.current.object_id
+    key_permissions         = ["Backup", "Create", "Decrypt", "Delete", "Encrypt", "Get", "Import", "List", "Purge", "Recover", "Restore", "Sign", "UnwrapKey", "Update", "Verify", "WrapKey", "GetRotationPolicy", "SetRotationPolicy"]
+    secret_permissions      = ["Get", "List", "Set", "Delete", "Purge", "Recover"]
+    certificate_permissions = ["Get", "Create", "Update", "Delete", "Recover", "Purge"]
   }
 }
 
 resource "azurerm_key_vault_secret" "expiring_secret" {
-  name         = "expiring-secret"
+  name         = "${var.kv_name}-secret"
   value        = "ThisIsASecret"
   key_vault_id = azurerm_key_vault.kv.id
 
@@ -36,7 +35,7 @@ resource "azurerm_key_vault_secret" "expiring_secret" {
 }
 
 resource "azurerm_key_vault_key" "expiring_key" {
-  name         = "expiring-key"
+  name         = "${var.kv_name}-key"
   key_vault_id = azurerm_key_vault.kv.id
   key_type     = "RSA"
   key_size     = 2048
@@ -49,7 +48,7 @@ resource "azurerm_key_vault_key" "expiring_key" {
 }
 
 resource "azurerm_key_vault_certificate" "expiring_cert" {
-  name         = "expiring-cert"
+  name         = "${var.kv_name}-cert"
   key_vault_id = azurerm_key_vault.kv.id
 
   certificate_policy {
