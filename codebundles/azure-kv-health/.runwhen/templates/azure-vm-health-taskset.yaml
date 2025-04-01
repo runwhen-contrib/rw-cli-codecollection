@@ -1,0 +1,37 @@
+apiVersion: runwhen.com/v1
+kind: Runbook
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  location: {{default_location}}
+  description: Monitors and reports on Azure Key Vault health metrics including availability, authentication failures, certificate/secret/keys expiration and key vaults failed logs
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/azure-kv-health/runbook.robot
+  configProvided:
+    - name: AZURE_RESOURCE_GROUP
+      value: "{{resource_group.name}}"
+    - name: AZURE_SUBSCRIPTION_NAME
+      value: "{{ custom.subscription_name }}"
+    - name: AZURE_SUBSCRIPTION_ID
+      value: "{{ match_resource.subscription_id }}"
+  secretsProvided:
+  {% if wb_version %}
+    {% include "azure-auth.yaml" ignore missing %}
+  {% else %}
+    - name: azure_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}
