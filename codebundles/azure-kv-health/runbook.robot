@@ -109,6 +109,8 @@ Check Key Vault Configuration in resource group `${AZURE_RESOURCE_GROUP}` in Sub
 Check Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Check for expiring secrets, certificates, and keys in Key Vaults
     [Tags]    KeyVault    Azure    Expiry    access:read-only
+
+    # Run expiry checks script which generates kv_expiry_issues.json
     ${expiry_output}=    RW.CLI.Run Bash File
     ...    bash_file=expiry-checks.sh
     ...    env=${env}
@@ -116,47 +118,38 @@ Check Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}` in Su
     ...    timeout_seconds=180
     ...    include_in_history=false
 
+    # Load issues from generated JSON file
     TRY
-        ${expiry_data}=    Evaluate    json.loads(r'''${expiry_output.stdout}''')    json
+        ${expiry_data}=    Evaluate    json.load(open('kv_expiry_issues.json'))    json
     EXCEPT
-        Log    Failed to load JSON payload, defaulting to empty list.    WARN
-        ${expiry_data}=    Create List
+        Log    Failed to load JSON file, defaulting to empty list.    WARN
+        ${expiry_data}=    Create Dictionary    issues=[]
     END
 
-    IF    len(${expiry_data}) > 0
+    IF    len(${expiry_data['issues']}) > 0
+        # Format and display results
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '["KeyVault", "ResourceGroup", "Type", "Name", "RemainingDays"], (.[] | [ .keyVault, .resourceGroup, .type, .name, .remainingDays ]) | @tsv' <<< '${expiry_output.stdout}' | column -t
-        RW.Core.Add Pre To Report    Expiring Key Vault Items Summary:\n==================================\n${formatted_results.stdout}
+        ...    cmd=jq -r '["Name", "Item", "Resource-URL", "Remaining-Days"], (.issues[] | [ .name, .item, .resource_url, .remaining_days ]) | @tsv' kv_expiry_issues.json | column -t
+        RW.Core.Add Pre To Report    Key Vault Expiry Issues Summary:\n===================================\n${formatted_results.stdout}
 
-        FOR    ${item}    IN    @{expiry_data}
-            ${kv_name}=    Set Variable    ${item['keyVault']}
-            ${resource_group}=    Set Variable    ${item['resourceGroup']}
-            ${type}=    Set Variable    ${item['type']}
-            ${name}=    Set Variable    ${item['name']}
-            ${remaining_days}=    Set Variable    ${item['remainingDays']}
-            
-            IF    ${remaining_days} == 0
-                RW.Core.Add Issue
-                ...    severity=1
-                ...    expected=${type} `${name}` in Key Vault `${kv_name}` should be renewed before expiration in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-                ...    actual=${type} `${name}` in Key Vault `${kv_name}` has expired in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-                ...    title=Expired ${type} in Key Vault `${kv_name}` in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-                ...    reproduce_hint=${expiry_output.cmd}
-                ...    next_steps=Immediately renew or rotate ${type} `${name}` in Key Vault in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ELSE IF    ${remaining_days} > 0 and ${remaining_days} < ${THRESHOLD_DAYS}
-                RW.Core.Add Issue
-                ...    severity=3
-                ...    expected=${type} `${name}` in Key Vault `${kv_name}` should be renewed before expiration in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-                ...    actual=${type} `${name}` in Key Vault `${kv_name}` will expire in ${remaining_days} days in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-                ...    title=${type} Nearing Expiration in Key Vault `${kv_name}` in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-                ...    reproduce_hint=${expiry_output.cmd}
-                ...    next_steps=Renew or rotate ${type} `${name}` in Key Vault `${kv_name}` in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}` before expiration
-            END
+        # Create issues for each finding
+        FOR    ${issue}    IN    @{expiry_data['issues']}
+            RW.Core.Add Issue
+            ...    severity=${issue['severity']}
+            ...    expected=Azure Key Vault should not contain any expired or expiring secrets, certificates, or keys in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    actual=${issue['title']}
+            ...    title=${issue['title']}
+            ...    reproduce_hint=${expiry_output.cmd}
+            ...    next_steps=${issue['next_step']}
+            ...    details=${issue['details']}
         END
     ELSE
         RW.Core.Add Pre To Report    "No expiring items found in Key Vaults in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
     END
 
+    # Clean up generated file
+    ${remove_file}=    RW.CLI.Run Cli
+    ...    cmd=rm -f kv_expiry_issues.json
 
 Check Key Vault Logs for Issues in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Check Key Vault logs for authentication failures and expired secrets/keys
@@ -183,7 +176,7 @@ Check Key Vault Logs for Issues in resource group `${AZURE_RESOURCE_GROUP}` in S
         FOR    ${issue}    IN    @{log_data['issues']}
             RW.Core.Add Issue
             ...    severity=${issue['severity']}
-            ...    expected=No issues found in Key Vault logs in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    expected=No issues should be found in Key Vault logs in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    actual=${issue['title']}
             ...    title=${issue['title']}
             ...    reproduce_hint=${cmd.cmd}
