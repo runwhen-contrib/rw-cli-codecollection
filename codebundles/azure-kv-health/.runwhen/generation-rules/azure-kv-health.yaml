@@ -4,7 +4,7 @@ spec:
   platform: azure
   generationRules:
     - resourceTypes:
-        - azure_keyvault_keyvaults
+        - azure_keyvault_keyvault
       matchRules:
         - type: pattern
           pattern: ".+"
