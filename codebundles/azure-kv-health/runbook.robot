@@ -189,6 +189,47 @@ Check Key Vault Logs for Issues in resource group `${AZURE_RESOURCE_GROUP}` in S
     ${remove_file}=    RW.CLI.Run Cli
     ...    cmd=rm -f kv_log_issues.json
 
+Check Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Check Key Vault performance metrics for excessive requests and high latency
+    [Tags]    KeyVault    Azure    Metrics    access:read-only
+    ${cmd}=    RW.CLI.Run Bash File
+    ...    bash_file=performance_metrics.sh
+    ...    env=${env}
+    ...    secret__azure_credentials=${azure_credentials}
+    ...    timeout_seconds=300
+    ...    include_in_history=false
+
+    TRY
+        ${metrics_data}=    Evaluate    json.load(open('azure_keyvault_performance_metrics.json'))    json
+    EXCEPT
+        Log    Failed to load JSON file, defaulting to empty list.    WARN
+        ${metrics_data}=    Create Dictionary    issues=[]
+    END
+
+    IF    len(${metrics_data['issues']}) > 0
+        ${formatted_results}=    RW.CLI.Run Cli
+        ...    cmd=jq -r '["KeyVault", "Metric", "Value", "Threshold", "Resource URL"], (.issues[] | [.name, .metric, .value, .threshold, .resource_url]) | @tsv' azure_keyvault_performance_metrics.json | column -t
+        RW.Core.Add Pre To Report    Key Vault Performance Metrics Issues:\n==========================================\n${formatted_results.stdout}
+
+        FOR    ${issue}    IN    @{metrics_data['issues']}
+            RW.Core.Add Issue
+            ...    severity=${issue['severity']}
+            ...    expected=${issue['expected']}
+            ...    actual=${issue['actual']}
+            ...    title=${issue['title']}
+            ...    reproduce_hint=${issue['reproduce_hint']}
+            ...    next_steps=${issue['next_step']}
+            ...    details=${issue['details']}
+        END
+    ELSE
+        RW.Core.Add Pre To Report    "No performance issues found in Key Vaults in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+    END
+
+    ${remove_file}=    RW.CLI.Run Cli
+    ...    cmd=rm -f azure_keyvault_performance_metrics.json
+
+
+
 *** Keywords ***
 Suite Initialization
     ${azure_credentials}=    RW.Core.Import Secret
@@ -214,10 +255,40 @@ Suite Initialization
     ...    type=integer
     ...    description=Number of days before expiration to trigger alerts
     ...    default=31
+    ${REQUEST_THRESHOLD}=    RW.Core.Import User Variable    REQUEST_THRESHOLD
+    ...    type=integer
+    ...    description=Threshold for excessive requests (requests/hour)
+    ...    default=1000
+    ...    example=1000
+    ${LATENCY_THRESHOLD}=    RW.Core.Import User Variable    LATENCY_THRESHOLD
+    ...    type=integer
+    ...    description=Threshold for high latency (milliseconds)
+    ...    default=1
+    ...    example=500
+    ${REQUEST_INTERVAL}=    RW.Core.Import User Variable    REQUEST_INTERVAL
+    ...    type=string
+    ...    description=Interval for request count metrics (format: PT1H, PT30M, PT5M, etc.)
+    ...    default=PT1H
+    ...    example=PT1M
+    ${LATENCY_INTERVAL}=    RW.Core.Import User Variable    LATENCY_INTERVAL
+    ...    type=string
+    ...    description=Interval for latency metrics (format: PT1H, PT30M, PT5M, etc.)
+    ...    default=PT1H
+    ...    example=PT5M
+    ${TIME_RANGE}=    RW.Core.Import User Variable    TIME_RANGE
+    ...    type=integer
+    ...    description=Time range in hours to look back for metrics
+    ...    default=24
+    ...    example=24
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${THRESHOLD_DAYS}    ${THRESHOLD_DAYS}
+    Set Suite Variable    ${REQUEST_THRESHOLD}    ${REQUEST_THRESHOLD}
+    Set Suite Variable    ${LATENCY_THRESHOLD}    ${LATENCY_THRESHOLD}
+    Set Suite Variable    ${REQUEST_INTERVAL}    ${REQUEST_INTERVAL}
+    Set Suite Variable    ${LATENCY_INTERVAL}    ${LATENCY_INTERVAL}
+    Set Suite Variable    ${TIME_RANGE}    ${TIME_RANGE}
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}", "THRESHOLD_DAYS":"${THRESHOLD_DAYS}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}", "THRESHOLD_DAYS":"${THRESHOLD_DAYS}", "REQUEST_THRESHOLD":"${REQUEST_THRESHOLD}", "LATENCY_THRESHOLD":"${LATENCY_THRESHOLD}", "REQUEST_INTERVAL":"${REQUEST_INTERVAL}", "LATENCY_INTERVAL":"${LATENCY_INTERVAL}", "TIME_RANGE":"${TIME_RANGE}"}
