@@ -27,6 +27,8 @@ List Suspended FluxCD Kustomization objects in Namespace `${NAMESPACE}` in Clust
     ${suspended_kustomization_list}=    Evaluate    json.loads(r'''${suspended_kustomizations.stdout}''')    json
     IF    len(@{suspended_kustomization_list}) > 0 
         ${suspended_kustomization_score}=    Set Variable    0
+    ELSE
+        ${suspended_kustomization_score}=    Set Variable    1
     END
     Set Global Variable    ${suspended_kustomization_score}
 
@@ -44,6 +46,8 @@ List Unready FluxCD Kustomizations in Namespace `${NAMESPACE}` in Cluster `${CON
     ${unready_kustomization_score}=    Set Variable    0
     IF    len(@{kustomizations_not_ready_list}) > 0 
         ${unready_kustomization_score}=    Set Variable    0
+    ELSE
+        ${unready_kustomization_score}=    Set Variable    1
     END
     Set Global Variable    ${unready_kustomization_score}
 
