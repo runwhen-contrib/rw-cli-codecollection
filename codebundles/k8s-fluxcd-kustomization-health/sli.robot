@@ -1,7 +1,7 @@
 *** Settings ***
-Documentation       This codebundle runs a series of tasks to identify potential Kustomization issues related to Flux managed Kustomization objects. 
+Documentation       This codebundle checks for unhealthy or suspended FluxCD Kustomization objects. 
 Metadata            Author    stewartshea
-Metadata            Display Name    Kubernetes FluxCD Kustomization TaskSet
+Metadata            Display Name    Kubernetes FluxCD Kustomization Health
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,FluxCD
 Library             RW.Core
 Library             RW.CLI
@@ -13,19 +13,6 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-List All FluxCD Kustomization objects in Namespace `${NAMESPACE}` in Cluster `${CONTEXT}`
-    [Documentation]    List all FluxCD kustomization objects. 
-    [Tags]            access:read-only  FluxCD     Kustomization     Available    List    ${NAMESPACE}
-    ${kustomizations}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${KUBECONFIG}
-    ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Kustomizations available: \n ${kustomizations.stdout}
-    RW.Core.Add Pre To Report    Commands Used:\n${history}
-
 List Suspended FluxCD Kustomization objects in Namespace `${NAMESPACE}` in Cluster `${CONTEXT}`  
     [Documentation]    List Suspended FluxCD kustomization objects.
     [Tags]            access:read-only  FluxCD     Kustomization     Suspended    List
@@ -36,20 +23,13 @@ List Suspended FluxCD Kustomization objects in Namespace `${NAMESPACE}` in Clust
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
+    ${suspended_kustomization_score}=    Set Variable    0
     ${suspended_kustomization_list}=    Evaluate    json.loads(r'''${suspended_kustomizations.stdout}''')    json
-    IF    len(@{suspended_kustomization_list}) > 0
-        RW.Core.Add Issue
-        ...    severity=4
-        ...    expected=Kustomizations should not be suspended.    
-        ...    actual=Kustomizations are suspended.
-        ...    title=GitOps Resources are Suspended in Namespace \`${NAMESPACE}\`
-        ...    reproduce_hint=${suspended_kustomizations.cmd}
-        ...    details=Suspended Kustomizations:\n${suspended_kustomizations}
-        ...    next_steps=Resume suspended Kustomizations in \`${NAMESPACE}\` in Cluster \`${CONTEXT}\`  
+    IF    len(@{suspended_kustomization_list}) > 0 
+        ${suspended_kustomization_score}=    Set Variable    0
     END
+    Set Global Variable    ${suspended_kustomization_score}
 
-    RW.Core.Add Pre To Report    Suspended Kustomizations:\n${suspended_kustomizations.stdout}
-    RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 
 List Unready FluxCD Kustomizations in Namespace `${NAMESPACE}` in Cluster `${CONTEXT}` 
@@ -61,33 +41,16 @@ List Unready FluxCD Kustomizations in Namespace `${NAMESPACE}` in Cluster `${CON
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
     ${kustomizations_not_ready_list}=    Evaluate    json.loads(r'''${kustomizations_not_ready.stdout}''')    json
-    IF    len(@{kustomizations_not_ready_list}) > 0
-        FOR    ${item}    IN    @{kustomizations_not_ready_list}               
-            ${messages}=    Replace String    ${item["ReadyStatus"]["message"]}   "    ${EMPTY}
-            ${item_next_steps}=    RW.CLI.Run Bash File
-            ...    bash_file=workload_next_steps.sh
-            ...    cmd_override=./workload_next_steps.sh "${messages}"
-            ...    env=${env}
-            ...    include_in_history=False
-            RW.Core.Add Issue
-            ...    severity=2
-            ...    expected=Kustomizations should be synced and ready.   
-            ...    actual=Objects are not ready.
-            ...    title=GitOps Resources are Unhealthy in Namespace \`${NAMESPACE}\`
-            ...    reproduce_hint=${kustomizations_not_ready.cmd}
-            ...    details=Kustomization is not in a ready state ${item["KustomizationName"]} in Namespace ${NAMESPACE}\n${item}
-            ...    next_steps=${item_next_steps.stdout}
-        END
+    ${unready_kustomization_score}=    Set Variable    0
+    IF    len(@{kustomizations_not_ready_list}) > 0 
+        ${unready_kustomization_score}=    Set Variable    0
     END
-    ${history}=    RW.CLI.Pop Shell History
-    IF    """${kustomizations_not_ready.stdout}""" == ""
-        ${kustomizations_not_ready}=    Set Variable    No Kustomizations Pending Found
-    ELSE
-        ${kustomizations_not_ready}=    Set Variable    ${kustomizations_not_ready.stdout}
-    END
-    RW.Core.Add Pre To Report    Kustomizations with: \n ${kustomizations_not_ready}
-    RW.Core.Add Pre To Report    Commands Used:\n${history}
+    Set Global Variable    ${unready_kustomization_score}
 
+Generate FluxCD Kustomization Health Score for Namespace `${NAMESPACE}` in Cluster `${CONTEXT}`
+    ${kustomization_health_score}=      Evaluate  (${unready_kustomization_score} + ${suspended_kustomization_score}) / 2
+    ${health_score}=      Convert to Number    ${kustomization_health_score}  2
+    RW.Core.Push Metric    ${health_score}
 
 *** Keywords ***
 Suite Initialization
