@@ -33,7 +33,7 @@ def execute_local_command(
     env: dict = None,
     files: dict = None,
     timeout_seconds: int = 60,
-    cwd: str = None, 
+    cwd: str = None,
 ) -> platform.ShellServiceResponse:
     """
     Runs a local bash command via subprocess, with optional secrets, environment, and file copying.
@@ -60,9 +60,7 @@ def execute_local_command(
     # 1) Clean up Robot-specific escapes
     cmd = RF_ENV_PATTERN.sub("%", cmd)
 
-    # 2) Determine the final working directory
-    #    - If CODEBUNDLE_TEMP_DIR is set, use it
-    #    - Otherwise fallback to the current directory.
+    # 2) Determine working directory
     codebundle_temp_dir = os.getenv("CODEBUNDLE_TEMP_DIR")
     if codebundle_temp_dir:
         os.makedirs(codebundle_temp_dir, exist_ok=True)
@@ -72,9 +70,7 @@ def execute_local_command(
         final_cwd = os.path.abspath(PWD)
         logger.debug(f"CODEBUNDLE_TEMP_DIR not set; using PWD for local command: {final_cwd}")
 
-    # 3) Prepare the environment
-    #    a) Start with certain environment variables from the OS (like proxy/SSL)
-    #    b) Overlay any new environment variables from `env`
+    # 3) Start building the environment
     run_with_env = {}
     keys_to_check = [
         "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
@@ -86,11 +82,12 @@ def execute_local_command(
         if val:
             run_with_env[key] = val
 
-    run_with_env.update(env)  # overlay user-provided
+    # Overlay user-provided env
+    run_with_env.update(env)
 
     # 4) Deserialize secrets. If as_file=True, write a file in final_cwd
-    secret_keys = []
     ds_secrets = _deserialize_secrets(request_secrets)
+    secret_keys = []
     for s in ds_secrets:
         if s["file"]:
             secret_key = s["key"]
@@ -104,18 +101,18 @@ def execute_local_command(
             # inline secret as environment variable
             run_with_env[s["key"]] = s["value"]
 
-    # 5) Copy any additional 'files' into final_cwd
+    # 5) Write additional files to final_cwd
     for fname, content in files.items():
         file_path = os.path.join(final_cwd, fname)
         with open(file_path, "w") as tmpf:
             tmpf.write(content)
 
-    # 6) We might also set ownership/permissions if needed
+    # 6) Adjust ownership/permissions as needed
     user_env = os.getenv("USER", getpass.getuser())
     try:
         subprocess.run(
             ["chown", user_env, final_cwd],
-            check=False,  # ignore errors if not root
+            check=False,
             text=True,
             capture_output=True,
             timeout=timeout_seconds
@@ -130,7 +127,22 @@ def execute_local_command(
     except Exception as e:
         logger.debug(f"Ignoring error while adjusting permissions in {final_cwd}: {e}")
 
-    # 7) Run the command
+    # 7) Filter & log environment before subprocess.run
+    none_keys = [k for k, v in run_with_env.items() if v is None]
+    if none_keys:
+        logger.info(f"Removing env vars with None values: {none_keys}")
+
+    # Convert all remaining values to string, skip the None ones
+    final_env = {k: str(v) for k, v in run_with_env.items() if v is not None}
+
+    logger.info(
+        "Environment prepared: removed %d None-valued vars, kept %d vars total.",
+        len(none_keys),
+        len(final_env)
+    )
+    logger.debug("Final environment keys: %s", list(final_env.keys()))
+
+    # 8) Run the command
     out, err = None, None
     rc = -1
     errors = []
@@ -138,7 +150,7 @@ def execute_local_command(
 
     logger.debug(
         f"Running command {parsed_cmd} in cwd={final_cwd}, "
-        f"env={list(run_with_env.keys())}, secrets={secret_keys}, files={list(files.keys())}"
+        f"env={list(final_env.keys())}, secrets={secret_keys}, files={list(files.keys())}"
     )
 
     try:
@@ -147,28 +159,27 @@ def execute_local_command(
             text=True,
             capture_output=True,
             timeout=timeout_seconds,
-            env=run_with_env,
+            env=final_env,
             cwd=final_cwd
         )
         out = p.stdout
         err = p.stderr
         rc = p.returncode
-        logger.debug(
-            f"Command finished with returncode={rc}, stdout={out}, stderr={err}"
-        )
+        logger.debug(f"Command finished with returncode={rc}, stdout={out}, stderr={err}")
     except Exception as e:
         trace = traceback.format_exception(*sys.exc_info())
-        msg = (f"Exception while running {parsed_cmd} in {final_cwd}:\n"
-               f"{type(e)}: {e}\n{''.join(trace)}")
+        msg = (
+            f"Exception while running {parsed_cmd} in {final_cwd}:\n"
+            f"{type(e)}: {e}\n{''.join(trace)}"
+        )
         logger.error(msg)
         errors.append(msg)
 
-    # 8) Build the ShellServiceResponse
     proc_data = {
         "cmd": cmd,
         "parsedCmd": parsed_cmd,
-        "stdout": out,
-        "stderr": err,
+        "stdout": out or "",
+        "stderr": err or "",
         "returncode": rc,
         "errors": errors,
     }
