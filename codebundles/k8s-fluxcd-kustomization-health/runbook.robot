@@ -44,8 +44,8 @@ List Suspended FluxCD Kustomization objects in Namespace `${NAMESPACE}` in Clust
         ...    actual=Kustomizations are suspended.
         ...    title=GitOps Resources are Suspended in Namespace \`${NAMESPACE}\`
         ...    reproduce_hint=${suspended_kustomizations.cmd}
-        ...    details=Suspended Kustomizations:\n${suspended_kustomizations}
-        ...    next_steps=Resume suspended Kustomizations in \`${NAMESPACE}\` in Cluster \`${CONTEXT}\`  
+        ...    details=Suspended Kustomizations:\n${suspended_kustomizations.stdout}
+        ...    next_steps=Resume suspended Kustomizations in namespace \`${NAMESPACE}\` in Cluster \`${CONTEXT}\`  
     END
 
     RW.Core.Add Pre To Report    Suspended Kustomizations:\n${suspended_kustomizations.stdout}
