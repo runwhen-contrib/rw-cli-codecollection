@@ -70,7 +70,7 @@ Identify Pods Causing High Node Utilization in Cluster `${CONTEXT}`
 
 Identify Pods with Resource Limits Exceeding Node Capacity in Cluster `${CONTEXT}`
     [Documentation]    Identify any Pods in the Cluster `${CONTEXT}` with resource limits (CPU or Memory) larger than the Node's allocatable capacity.
-    [Tags]    cluster    utilization    saturation    exhaustion    access:read-only
+    [Tags]    nodes    limits    utilization    saturation    exhaustion    access:read-only
     ${overlimit_details}=    RW.CLI.Run Bash File
     ...    bash_file=overlimit_check.sh
     ...    env=${env}
