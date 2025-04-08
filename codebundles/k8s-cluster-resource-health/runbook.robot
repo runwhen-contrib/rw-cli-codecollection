@@ -46,8 +46,10 @@ Identify Pods Causing High Node Utilization in Cluster `${CONTEXT}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    include_in_history=False
     ...    show_in_rwl_cheatsheet=true
-    
-    ${namespace_list}=    Evaluate    json.loads(r'''${pod_and_node_usage_details.stdout}''')    json
+    ${pod_list}=    RW.CLI.Run Cli
+    ...    cmd=cat pods_exceeding_requests.json 
+
+    ${namespace_list}=    Evaluate    json.loads(r'''${pod_list.stdout}''')    json
 
     IF    len(@{namespace_list}) > 0
         FOR    ${item}    IN    @{namespace_list}
@@ -66,6 +68,30 @@ Identify Pods Causing High Node Utilization in Cluster `${CONTEXT}`
     RW.Core.Add Pre To Report    Pods Needing Adjustment:\n${pod_and_node_usage_details.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${pod_and_node_usage_details.cmd}
 
+Identify Pods with Resource Limits Exceeding Node Capacity in Cluster `${CONTEXT}`
+    [Documentation]    Identify any Pods in the Cluster `${CONTEXT}` with resource limits (CPU or Memory) larger than the Node's allocatable capacity.
+    [Tags]    cluster    utilization    saturation    exhaustion    access:read-only
+    ${overlimit_details}=    RW.CLI.Run Bash File
+    ...    bash_file=overlimit_check.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=False
+    ...    show_in_rwl_cheatsheet=true
+    RW.Core.Add Pre To Report    Over-limit Pod Details:\n${overlimit_details.stdout}
+    ${overlimit_events}=    RW.CLI.Run CLI
+    ...    cmd= grep "Total pods flagged" <<< "${overlimit_details.stdout}" | awk -F ":" '{print $2}'
+    ${events}=    Convert To Number    ${overlimit_events.stdout}
+    IF    ${events} > 0
+       RW.Core.Add Issue
+       ...    severity=4
+       ...    expected=No pods in Cluster `${CONTEXT}` should exceed the node's allocatable capacity.
+       ...    actual=${events} pods in Cluster `${CONTEXT}` have resource limits exceeding node capacity.
+       ...    title= Pods in Cluster `${CONTEXT}` exceed node capacity.
+       ...    reproduce_hint=View Commands Used in Report Output
+       ...    details=${overlimit_details.stdout}
+       ...    next_steps=Investigate the listed pods and adjust resource limits accordingly.
+    END
+    RW.Core.Add Pre To Report    Total Pods Over Limit:\n${events}
 
 *** Keywords ***
 Suite Initialization
@@ -87,7 +113,28 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=default
     ...    example=my-main-cluster
+    ${MAX_LIMIT_PERCENTAGE}=    RW.Core.Import User Variable    MAX_LIMIT_PERCENTAGE
+    ...    type=string
+    ...    description=The maximum % that a limit can be in regards to the underlying node capacity.
+    ...    pattern=\d.
+    ...    default=90
+    ...    example=90
+    Set Suite Variable    ${MAX_LIMIT_PERCENTAGE}    ${MAX_LIMIT_PERCENTAGE}
+    ${MEM_USAGE_MIN}=    RW.Core.Import User Variable    MEM_USAGE_MIN
+    ...    type=string
+    ...    description=The minimum value (in MB) in which to evaluate requests vs usage. Usage below this value are not evaluated. 
+    ...    pattern=\d.
+    ...    default=100
+    ...    example=100
+    Set Suite Variable    ${MEM_USAGE_MIN}    ${MEM_USAGE_MIN}
+    ${CPU_USAGE_MIN}=    RW.Core.Import User Variable    CPU_USAGE_MIN
+    ...    type=string
+    ...    description=The minimum value (in millicores) in which to evaluate requests vs usage. Usage below this value are not evaluated. 
+    ...    pattern=\d.
+    ...    default=100
+    ...    example=100
+    Set Suite Variable    ${CPU_USAGE_MIN}    ${CPU_USAGE_MIN}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
-    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
+    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "MAX_LIMIT_PERCENTAGE":"${MAX_LIMIT_PERCENTAGE}", "MEM_USAGE_MIN":"${MEM_USAGE_MIN}", "CPU_USAGE_MIN":"${CPU_USAGE_MIN}"}
