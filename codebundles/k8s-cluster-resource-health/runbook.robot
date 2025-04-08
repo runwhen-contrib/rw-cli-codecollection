@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Identify High Utilization Nodes for Cluster `${CONTEXT}`
     [Documentation]    Identify nodes with high utilization . Requires jq.
-    [Tags]    cluster    resources    cpu    memory    utilization    saturation    exhaustion    starvation
+    [Tags]    cluster    resources    cpu    memory    utilization    saturation    exhaustion    starvation    access:read-only
     ${node_usage_details}=    RW.CLI.Run Bash File
     ...    bash_file=get_high_use_nodes.sh
     ...    env=${env}
@@ -39,7 +39,7 @@ Identify High Utilization Nodes for Cluster `${CONTEXT}`
 
 Identify Pods Causing High Node Utilization in Cluster `${CONTEXT}`
     [Documentation]    Identify nodes with high utilization and match to pods that are significantly above their resource request configuration. Requires jq.
-    [Tags]    pods    resources    requests    utilization    cpu    memory    exhaustion
+    [Tags]    pods    resources    requests    utilization    cpu    memory    exhaustion    access:read-only
     ${pod_and_node_usage_details}=    RW.CLI.Run Bash File
     ...    bash_file=pods_impacting_high_use_nodes.sh
     ...    env=${env}
