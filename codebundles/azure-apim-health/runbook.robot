@@ -42,45 +42,63 @@ Gather APIM Resource Information for APIM `${APIM_NAME}` in Resource Group `${AZ
         END
     END
 
-# Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
-#     [Documentation]    Fetch a list of issues that might affect the AKS cluster
-#     [Tags]    aks    config    access:read-only
-#     ${resource_health}=    RW.CLI.Run Bash File
-#     ...    bash_file=aks_resource_health.sh
-#     ...    env=${env}
-#     ...    timeout_seconds=60
-#     ...    include_in_history=false
-#     ...    show_in_rwl_cheatsheet=true
-#     RW.Core.Add Pre To Report    ${resource_health.stdout}
+Check for Resource Health Issues Affecting APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Fetch Resource Health status and evaluate any reported issues for the APIM instance.
+    [Tags]    apim    resourcehealth    access:read-only
 
-#     ${issues}=    RW.CLI.Run Cli
-#     ...    cmd=cat az_resource_health.json
-#     ...    env=${env}
-#     ...    timeout_seconds=180
-#     ...    include_in_history=false
-#     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-#     IF    len(@{issue_list}) > 0 
-#         IF    "${issue_list["properties"]["title"]}" != "Available"
-#             RW.Core.Add Issue
-#             ...    severity=2
-#             ...    expected=Azure resources should be available for AKS Cluster `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
-#             ...    actual=Azure resources are unhealthy for AKS Cluster `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
-#             ...    title=Azure reports an `${issue_list["properties"]["title"]}` Issue for AKS Cluster `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
-#             ...    reproduce_hint=${resource_health.cmd}
-#             ...    details=${issue_list}
-#             ...    next_steps=Please escalate to the Azure service owner or check back later.
-#         END
-#     ELSE
-#         RW.Core.Add Issue
-#         ...    severity=4
-#         ...    expected=Azure resources health should be enabled for AKS Cluster `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
-#         ...    actual=Azure resource health appears unavailable for AKS Cluster `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
-#         ...    title=Azure resource health is unavailable for AKS Cluster `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
-#         ...    reproduce_hint=${resource_health.cmd}
-#         ...    details=${issue_list}
-#         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
-#     END
+    ${resource_health}=    RW.CLI.Run Bash File
+    ...    bash_file=apim_resource_health.sh
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
 
+    RW.Core.Add Pre To Report    ${resource_health.stdout}
+
+    IF    "${resource_health.stderr}" != ''
+        RW.Core.Add Issue
+        ...    title=Warnings/Errors running APIM Resource Health script
+        ...    severity=3
+        ...    next_steps=Review debug logs in the Robot report
+        ...    expected=No stderr output
+        ...    actual=stderr encountered
+        ...    reproduce_hint=${resource_health.cmd}
+        ...    details=${resource_health.stderr}
+    END
+
+    # 4) Read the JSON output from apim_resource_health.json
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat apim_resource_health.json
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+
+    IF    len(${issue_list}) > 0
+        # We assume the returned JSON is an object, not an array. Adjust accordingly if it's different.
+        ${status_title}=    Set Variable    ${issue_list["properties"]["title"]}
+
+        IF    "${status_title}" != "Available"
+            RW.Core.Add Issue
+            ...    severity=2
+            ...    expected=APIM should be marked "Available" in Resource Health
+            ...    actual=Azure resources are unhealthy for APIM `${APIM_NAME}` in `${AZ_RESOURCE_GROUP}`
+            ...    title=Azure reports a `${status_title}` issue for APIM `${APIM_NAME}` in `${AZ_RESOURCE_GROUP}`
+            ...    reproduce_hint=${resource_health.cmd}
+            ...    details=${issue_list}
+            ...    next_steps=Consult Azure Resource Health documentation or escalate to service owner.
+        END
+    ELSE
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=APIM Resource Health should return a valid status
+        ...    actual=No valid data returned or JSON was empty
+        ...    title=APIM Resource Health is unavailable for `${APIM_NAME}` in `${AZ_RESOURCE_GROUP}`
+        ...    reproduce_hint=${resource_health.cmd}
+        ...    details=${issue_list}
+        ...    next_steps=Enable Resource Health or check provider registration for Microsoft.ResourceHealth
+    END
 
 *** Keywords ***
 Suite Initialization
