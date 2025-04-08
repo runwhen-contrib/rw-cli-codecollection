@@ -100,6 +100,239 @@ Check for Resource Health Issues Affecting APIM `${APIM_NAME}` in Resource Group
         ...    next_steps=Enable Resource Health or check provider registration for Microsoft.ResourceHealth
     END
 
+Fetch Key Metrics for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Gather APIM metrics from Azure Monitor. Raises issues if thresholds are violated.
+    [Tags]    apim    metrics    analytics    access:read-only
+
+    ${run_metrics}=    RW.CLI.Run Bash File
+    ...    bash_file=apim_metrics.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+
+    RW.Core.Add Pre To Report    ${run_metrics.stdout}
+
+    IF    "${run_metrics.stderr}" != ''
+        RW.Core.Add Issue
+        ...    title=Error retrieving APIM metrics
+        ...    severity=3
+        ...    next_steps=Check debug logs in report
+        ...    expected=No stderr output
+        ...    actual=Stderr encountered
+        ...    reproduce_hint=${run_metrics.cmd}
+        ...    details=${run_metrics.stderr}
+    END
+
+    ${metrics_output}=    RW.CLI.Run Cli
+    ...    cmd=cat apim_metrics.json
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+
+    ${parsed}=    Evaluate    json.loads(r'''${metrics_output.stdout}''')    json
+    ${issues}=    Set Variable    ${parsed["issues"]}
+
+    IF    len(@{issues}) > 0
+        FOR    ${issue}    IN    @{issues}
+            RW.Core.Add Issue
+            ...    title=${issue["title"]}
+            ...    severity=${issue["severity"]}
+            ...    next_steps=${issue["next_steps"]}
+            ...    expected=APIM performance should remain within healthy thresholds
+            ...    actual=Potential problem flagged in metrics
+            ...    reproduce_hint=${run_metrics.cmd}
+            ...    details=${issue["details"]}
+        END
+    END
+
+Check Logs for Errors with APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Run apim_diagnostic_logs.sh, parse results, raise issues if logs exceed thresholds.
+    [Tags]    apim    logs    diagnostics    access:read-only
+
+    ${diag_run}=    RW.CLI.Run Bash File
+    ...    bash_file=apim_diagnostic_logs.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+
+    RW.Core.Add Pre To Report    ${diag_run.stdout}
+
+    IF    "${diag_run.stderr}" != ''
+        RW.Core.Add Issue
+        ...    title=Error/Warning Running APIM Diagnostic Script
+        ...    severity=3
+        ...    next_steps=Review debug logs in report
+        ...    expected=No stderr output
+        ...    actual=stderr encountered
+        ...    reproduce_hint=${diag_run.cmd}
+        ...    details=${diag_run.stderr}
+    END
+
+    # Parse the JSON file for issues
+    ${log_json}=    RW.CLI.Run Cli
+    ...    cmd=cat apim_diagnostic_log_issues.json
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+
+    ${parsed}=    Evaluate    json.loads(r'''${log_json.stdout}''')    json
+    ${apim_log_issues}=    Set Variable    ${parsed["issues"]}
+
+    IF    len(@{apim_log_issues}) > 0
+        FOR    ${item}    IN    @{apim_log_issues}
+            RW.Core.Add Issue
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_steps"]}
+            ...    expected=APIM logs show no repeated errors/warnings
+            ...    actual=Some errors/warnings found above threshold
+            ...    reproduce_hint=${diag_run.cmd}
+            ...    details=${item["details"]}
+        END
+    END
+
+Verify APIM Policy Configurations for `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Runs a shell script to enumerate all APIM policies and check for missing tags.
+    [Tags]    apim    policy    config    access:read-only
+
+    ${policy_check}=    RW.CLI.Run Bash File
+    ...    bash_file=verify_apim_policies.sh
+    ...    env=${env}
+    ...    timeout_seconds=300
+    ...    include_in_history=false
+
+    # Include script stdout in the test report
+    RW.Core.Add Pre To Report    ${policy_check.stdout}
+
+    # If there's any stderr, raise an immediate issue
+    IF    "${policy_check.stderr}" != ''
+        RW.Core.Add Issue
+        ...    title=Errors while verifying APIM policies
+        ...    severity=3
+        ...    next_steps=Review the debug logs in the report
+        ...    expected=No stderr output
+        ...    actual=stderr encountered
+        ...    reproduce_hint=${policy_check.cmd}
+        ...    details=${policy_check.stderr}
+    END
+
+    # Read the final JSON file (apim_policy_issues.json)
+    ${issues_json}=    RW.CLI.Run Cli
+    ...    cmd=cat apim_policy_issues.json
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+
+    ${parsed}=    Evaluate    json.loads(r'''${issues_json.stdout}''')    json
+    ${policy_issues}=    Set Variable    ${parsed["issues"]}
+
+    IF    len(@{policy_issues}) > 0
+        FOR    ${issue}    IN    @{policy_issues}
+            RW.Core.Add Issue
+            ...    title=${issue["title"]}
+            ...    severity=${issue["severity"]}
+            ...    next_steps=${issue["next_steps"]}
+            ...    expected=All APIM policies are well configured
+            ...    actual=Potential misconfiguration found
+            ...    reproduce_hint=${policy_check.cmd}
+            ...    details=${issue["details"]}
+        END
+    END
+
+Check APIM SSL Certificates for `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Verify certificate validity, expiration, thumbprint, and domain matches
+    [Tags]    apim    ssl    certificate    access:read-only
+
+    ${cert_check}=    RW.CLI.Run Bash File
+    ...    bash_file=check_apim_ssl_certs.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+
+    RW.Core.Add Pre To Report    ${cert_check.stdout}
+
+    IF    "${cert_check.stderr}" != ''
+        RW.Core.Add Issue
+        ...    title=Errors while checking APIM SSL Certificates
+        ...    severity=3
+        ...    next_steps=Review the debug logs in the Robot report
+        ...    expected=No stderr
+        ...    actual=Errors encountered
+        ...    reproduce_hint=${cert_check.cmd}
+        ...    details=${cert_check.stderr}
+    END
+
+    ${cert_issues_cmd}=    RW.CLI.Run Cli
+    ...    cmd=cat apim_ssl_certificate_issues.json
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+
+    ${parsed}=    Evaluate    json.loads(r'''${cert_issues_cmd.stdout}''')    json
+    ${issues}=    Set Variable    ${parsed["issues"]}
+
+    IF    len(@{issues}) > 0
+        FOR    ${item}    IN    @{issues}
+            RW.Core.Add Issue
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_steps"]}
+            ...    expected=All custom domain certificates are valid
+            ...    actual=Certificate mismatch or near/over expiry
+            ...    reproduce_hint=${cert_check.cmd}
+            ...    details=${item["details"]}
+        END
+    END
+
+Inspect Dependencies and Related Resources for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Runs inspect_apim_dependencies.sh to discover & validate Key Vault, backends, DNS, etc.
+    [Tags]    apim    dependencies    external    keyvault
+
+    ${deps_run}=    RW.CLI.Run Bash File
+    ...    bash_file=inspect_apim_dependencies.sh
+    ...    env=${env}
+    ...    timeout_seconds=300
+    ...    include_in_history=false
+
+    RW.Core.Add Pre To Report    ${deps_run.stdout}
+
+    IF    "${deps_run.stderr}" != ''
+        RW.Core.Add Issue
+        ...    title=Errors inspecting APIM dependencies
+        ...    severity=3
+        ...    next_steps=Review debug logs in the Robot report
+        ...    expected=No stderr output
+        ...    actual=stderr encountered
+        ...    reproduce_hint=${deps_run.cmd}
+        ...    details=${deps_run.stderr}
+    END
+
+    ${deps_json_cmd}=    RW.CLI.Run Cli
+    ...    cmd=cat apim_dependencies.json
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+
+    ${parsed}=    Evaluate    json.loads(r'''${deps_json_cmd.stdout}''')    json
+    ${issue_list}=    Set Variable    ${parsed["issues"]}
+    ${dep_list}=      Set Variable    ${parsed["dependencies"]}
+
+    # Optionally: log the discovered dependencies in the report
+    RW.Core.Add Pre To Report    Found dependencies: ${dep_list}
+
+    IF    len(@{issue_list}) > 0
+        FOR    ${item}    IN    @{issue_list}
+            RW.Core.Add Issue
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_steps"]}
+            ...    expected=Dependencies for APIM are all healthy / reachable
+            ...    actual=Some dependencies are unhealthy or unreachable
+            ...    reproduce_hint=${deps_run.cmd}
+            ...    details=${item["details"]}
+        END
+    END
+
 *** Keywords ***
 Suite Initialization
     ${AZ_RESOURCE_GROUP}=    RW.Core.Import User Variable    AZ_RESOURCE_GROUP
