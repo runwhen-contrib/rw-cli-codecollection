@@ -15,7 +15,7 @@ spec:
     value: SLX_PLACEHOLDER
   owners:
   - {{workspace.owner_email}}
-  statement: The health of Azure Key Vault is measured by ...
+  statement: Measure Azure Key Vault health by checking availability metrics, configuration settings, expiring items (secrets/certificates/keys), log issues, and performance metrics in resource group {{ match_resource.resource_group.name }} in azure subscription {{ custom.subscription_name }}
   additionalContext:
     name: "{{match_resource.resource.name}}"
     tags: "{{match_resource.tags}}"
