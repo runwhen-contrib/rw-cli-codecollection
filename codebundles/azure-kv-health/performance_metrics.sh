@@ -158,7 +158,7 @@ echo "$keyvaults_json" | jq -c '.[]' | while read -r kv_data; do
             --arg title "Excessive Requests Detected in Key Vault \`$kv_name\` in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
             --arg details "$keyvaults_json" \
             --arg severity "$SEVERITY_REQUEST" \
-            --arg nextStep "Review Key Vault access in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+            --arg nextStep "Check Key Vault access in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`\nSet rate limit for Key Vault backend service in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
             --arg name "$kv_name" \
             --arg kv_location "$kv_location" \
             --arg kv_sku "$kv_sku" \
@@ -195,7 +195,7 @@ echo "$keyvaults_json" | jq -c '.[]' | while read -r kv_data; do
             --arg title "High Latency Detected in Key Vault \`$kv_name\` in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
             --arg details "$keyvaults_json" \
             --arg severity "$SEVERITY_LATENCY" \
-            --arg nextStep "Investigate network connectivity and consider implementing caching strategies to reduce latency." \
+            --arg nextStep "Check Key Vault SKU limit in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\'\nUpgrade Key Vault sku in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\" \
             --arg name "$kv_name" \
             --arg kv_location "$kv_location" \
             --arg kv_sku "$kv_sku" \
