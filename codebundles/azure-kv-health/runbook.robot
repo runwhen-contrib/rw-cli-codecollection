@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       Monitors and reports on Azure Key Vault health metrics including availability, authentication failures, certificate/secret/keys expiration and key vaults failed logs 
+Documentation       Check Azure Key Vault health by checking availability metrics, configuration settings, expiring items (secrets/certificates/keys), log issues, and performance metrics
 Metadata            Author    saurabh3460
 Metadata            Display Name    Azure Key Vault Health
 Metadata            Supports    Azure    Key Vault    Health
@@ -15,8 +15,8 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-List Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
-    [Documentation]    List availability metrics for Key Vaults in the resource group
+Check Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    List number of Azure key vault vaults with availability below 100% 
     [Tags]    KeyVault    Azure    Health    Monitoring    access:read-only
     ${availability_output}=    RW.CLI.Run Bash File
     ...    bash_file=availability.sh
@@ -42,7 +42,7 @@ List Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}` in Subsc
             ${percentage}=    Set Variable    ${kv['percentage']}
             IF    '${percentage}' != 'N/A' and float(${percentage}) < 100
                 RW.Core.Add Issue
-                ...    severity=2
+                ...    severity=3
                 ...    expected=Key Vault `${kv_name}` should have 100% availability in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
                 ...    actual=Key Vault `${kv_name}` has ${percentage}% availability in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
                 ...    title=Key Vault `${kv_name}` Availability Below 100% in Resource Group `${AZURE_RESOURCE_GROUP}`
@@ -55,7 +55,7 @@ List Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}` in Subsc
     END
 
 Check Key Vault Configuration in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
-    [Documentation]    List configuration details for Key Vaults in the resource group
+    [Documentation]    List Key Vault miss-configuration
     [Tags]    KeyVault    Azure    Configuration    access:read-only
     ${config_output}=    RW.CLI.Run Bash File
     ...    bash_file=kv_config.sh
@@ -84,7 +84,7 @@ Check Key Vault Configuration in resource group `${AZURE_RESOURCE_GROUP}` in Sub
             
             IF    '${soft_delete}' != 'true'
                 RW.Core.Add Issue
-                ...    severity=2
+                ...    severity=4
                 ...    expected=Key Vault `${kv_name}` should have Soft Delete enabled in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
                 ...    actual=Key Vault `${kv_name}` has Soft Delete set to ${soft_delete} in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
                 ...    title=Key Vault `${kv_name}` Soft Delete Not Enabled in Resource Group `${AZURE_RESOURCE_GROUP}`
@@ -94,7 +94,7 @@ Check Key Vault Configuration in resource group `${AZURE_RESOURCE_GROUP}` in Sub
             
             IF    '${purge_protection}' != 'true'
                 RW.Core.Add Issue
-                ...    severity=1
+                ...    severity=4
                 ...    expected=Key Vault `${kv_name}` should have Purge Protection enabled in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
                 ...    actual=Key Vault `${kv_name}` has Purge Protection set to ${purge_protection} in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
                 ...    title=Key Vault `${kv_name}` Purge Protection Not Enabled in Resource Group `${AZURE_RESOURCE_GROUP}`
@@ -152,13 +152,13 @@ Check Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}` in Su
     ...    cmd=rm -f kv_expiry_issues.json
 
 Check Key Vault Logs for Issues in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
-    [Documentation]    Check Key Vault logs for authentication failures and expired secrets/keys
+    [Documentation]    Check Key Vault log issues
     [Tags]    KeyVault    Azure    Logs    access:read-only
     ${cmd}=    RW.CLI.Run Bash File
     ...    bash_file=log.sh
     ...    env=${env}
     ...    secret__azure_credentials=${azure_credentials}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=180
     ...    include_in_history=false
 
     TRY
@@ -196,7 +196,7 @@ Check Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}` 
     ...    bash_file=performance_metrics.sh
     ...    env=${env}
     ...    secret__azure_credentials=${azure_credentials}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=180
     ...    include_in_history=false
 
     TRY
@@ -227,8 +227,6 @@ Check Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}` 
 
     ${remove_file}=    RW.CLI.Run Cli
     ...    cmd=rm -f azure_keyvault_performance_metrics.json
-
-
 
 *** Keywords ***
 Suite Initialization
@@ -263,7 +261,7 @@ Suite Initialization
     ${LATENCY_THRESHOLD}=    RW.Core.Import User Variable    LATENCY_THRESHOLD
     ...    type=integer
     ...    description=Threshold for high latency (milliseconds)
-    ...    default=1
+    ...    default=500
     ...    example=500
     ${REQUEST_INTERVAL}=    RW.Core.Import User Variable    REQUEST_INTERVAL
     ...    type=string
