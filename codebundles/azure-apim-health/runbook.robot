@@ -286,7 +286,7 @@ Check APIM SSL Certificates for `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_
 
 Inspect Dependencies and Related Resources for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Runs inspect_apim_dependencies.sh to discover & validate Key Vault, backends, DNS, etc.
-    [Tags]    apim    dependencies    external    keyvault
+    [Tags]    apim    dependencies    external    keyvault    access:read-only
 
     ${deps_run}=    RW.CLI.Run Bash File
     ...    bash_file=inspect_apim_dependencies.sh
