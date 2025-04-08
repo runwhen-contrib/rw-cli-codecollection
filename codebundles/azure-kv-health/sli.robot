@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       Monitors and reports on Azure Key Vault health metrics including availability, authentication failures, certificate/secret/keys expiration and key vaults failed logs 
+Documentation       Counts Azure Key Vault health by checking availability metrics, configuration settings, expiring items (secrets/certificates/keys), log issues, and performance metrics
 Metadata            Author    saurabh3460
 Metadata            Display Name    Azure Key Vault Health
 Metadata            Supports    Azure    Key Vault    Health
@@ -14,8 +14,8 @@ Library             RW.platform
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Check Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
-    [Documentation]    List availability metrics for Key Vaults in the resource group
+Count Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Counts number of Azure key vault vaults with availability below 100% 
     [Tags]    KeyVault    Azure    Health    Monitoring    access:read-only
     ${availability_output}=    RW.CLI.Run Bash File
     ...    bash_file=availability.sh
@@ -177,7 +177,7 @@ Suite Initialization
     ${LATENCY_THRESHOLD}=    RW.Core.Import User Variable    LATENCY_THRESHOLD
     ...    type=integer
     ...    description=Threshold for high latency (milliseconds)
-    ...    default=1
+    ...    default=500
     ...    example=500
     ${REQUEST_INTERVAL}=    RW.Core.Import User Variable    REQUEST_INTERVAL
     ...    type=string
