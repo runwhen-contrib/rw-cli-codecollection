@@ -104,23 +104,23 @@ Fetch Key Metrics for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP
     [Documentation]    Gather APIM metrics from Azure Monitor. Raises issues if thresholds are violated.
     [Tags]    apim    metrics    analytics    access:read-only
 
-    ${run_metrics}=    RW.CLI.Run Bash File
+    ${apim_metrics}=    RW.CLI.Run Bash File
     ...    bash_file=apim_metrics.sh
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
 
-    RW.Core.Add Pre To Report    ${run_metrics.stdout}
+    RW.Core.Add Pre To Report    ${apim_metrics.stdout}
 
-    IF    "${run_metrics.stderr}" != ''
+    IF    "${apim_metrics.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Error retrieving APIM metrics
         ...    severity=3
         ...    next_steps=Check debug logs in report
         ...    expected=No stderr output
         ...    actual=Stderr encountered
-        ...    reproduce_hint=${run_metrics.cmd}
-        ...    details=${run_metrics.stderr}
+        ...    reproduce_hint=${apim_metrics.cmd}
+        ...    details=${apim_metrics.stderr}
     END
 
     ${metrics_output}=    RW.CLI.Run Cli
