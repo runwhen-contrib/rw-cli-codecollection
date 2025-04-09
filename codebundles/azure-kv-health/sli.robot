@@ -20,7 +20,7 @@ Count Key Vault Resource Health in resource group `${AZURE_RESOURCE_GROUP}` in S
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=kv_resource_health.sh
     ...    env=${env}
-    ...    timeout_seconds=60
+    ...    timeout_seconds=180
     ...    include_in_history=false
 
     TRY
