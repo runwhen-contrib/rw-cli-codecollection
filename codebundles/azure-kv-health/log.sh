@@ -16,6 +16,7 @@ set -euo pipefail
 : "${AZURE_SUBSCRIPTION_ID:?Must set AZURE_SUBSCRIPTION_ID}"
 : "${AZURE_RESOURCE_GROUP:?Must set AZURE_RESOURCE_GROUP}"
 : "${AZURE_SUBSCRIPTION_NAME:?Must set AZURE_SUBSCRIPTION_NAME}"
+: "${LOG_QUERY_DAYS:=1d}"
 
 OUTPUT_FILE="kv_log_issues.json"
 TEMP_LOG_FILE="kv_log_query_temp.json"
@@ -132,7 +133,7 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
         # Run log query
         if ! log_query=$(az monitor log-analytics query \
             --workspace "$WORKSPACE_GUID" \
-            --analytics-query "AzureDiagnostics | where ResourceProvider == 'MICROSOFT.KEYVAULT' and Resource =~ '$name' | order by TimeGenerated desc" \
+            --analytics-query "AzureDiagnostics | where ResourceProvider == 'MICROSOFT.KEYVAULT' and Resource =~ '$name' and TimeGenerated > ago(${LOG_QUERY_DAYS}) | order by TimeGenerated desc" \
             -o json 2>la_query_err.log); then
             err_msg=$(cat la_query_err.log)
             rm -f la_query_err.log
@@ -206,52 +207,6 @@ EOF
                     "severity": ($severity | tonumber)
                     }]')
             fi
-
-#             # Check for other HTTP failures
-#             other_failures=$(jq -r '.[] | select((.httpStatusCode_d >= "400" and .httpStatusCode_d < "600") and (.httpStatusCode_d != "401" and .httpStatusCode_d != "403"))' "$TEMP_LOG_FILE")
-#             if [[ -n "$other_failures" ]]; then
-#                 # Extract unique entries based on operation name and include additional fields
-#                 details_json=$(echo "$other_failures" | jq -s '
-#                     group_by(.OperationName) | 
-#                     map({
-#                         operation: .[0].OperationName,
-#                         httpStatusCode: .[0].httpStatusCode_d,
-#                         clientInfo: .[0].clientInfo_s,
-#                         id: .[0].id_s,
-#                         ip: .[0].CallerIPAddress,
-#                         timestamp: .[0].TimeGenerated,
-#                         requestUri: .[0].requestUri_s,
-#                         httpMethod: .[0].httpMethod_s,
-#                         resultType: .[0].ResultType,
-#                         resource: .[0].Resource,
-#                         correlationId: .[0].CorrelationId,
-#                         vaultName: .[0].eventGridEventProperties_data_VaultName_s,
-#                         userAgent: .[0].userAgent_s,
-#                         resultDescription: .[0].ResultDescription,
-#                         count: length
-#                     })
-#                 ')
-#                 nextStep=$(cat <<EOF
-# Verify request parameters and payload format for malformed or invalid inputs in resource group \`$AZURE_RESOURCE_GROUP\` in subscription \`$AZURE_SUBSCRIPTION_NAME\`
-# Check for missing or incorrect resource paths and identifiers in resource group \`$AZURE_RESOURCE_GROUP\` in subscription \`$AZURE_SUBSCRIPTION_NAME\`
-# Investigate concurrent operations that may cause resource conflicts in resource group \`$AZURE_RESOURCE_GROUP\` in subscription \`$AZURE_SUBSCRIPTION_NAME\`
-# Review throttling and rate limiting configurations in resource group \`$AZURE_RESOURCE_GROUP\` in subscription \`$AZURE_SUBSCRIPTION_NAME\`
-# Validate service health and maintenance windows in resource group \`$AZURE_RESOURCE_GROUP\` in subscription \`$AZURE_SUBSCRIPTION_NAME\`
-# Check for internal service errors and unexpected failures in resource group \`$AZURE_RESOURCE_GROUP\` in subscription \`$AZURE_SUBSCRIPTION_NAME\`
-# EOF
-# )
-#                 issues_json=$(echo "$issues_json" | jq \
-#                     --arg title "HTTP Failures Detected in Key Vault $name in resource group \`$AZURE_RESOURCE_GROUP\` in subscription \`$AZURE_SUBSCRIPTION_NAME\`" \
-#                     --argjson details "$details_json" \
-#                     --arg severity "2" \
-#                     --arg nextStep "$nextStep" \
-#                     '.issues += [{
-#                     "title": $title,
-#                     "details": $details,
-#                     "next_step": $nextStep,
-#                     "severity": ($severity | tonumber)
-#                     }]')
-#             fi
 
             # Check for expired secrets/keys
             expired_items=$(jq -r '.[] | select((.secretProperties_attributes_exp_d != "None" and .secretProperties_attributes_exp_d < now) or (.keyProperties_attributes_exp_d != "None" and .keyProperties_attributes_exp_d < now))' "$TEMP_LOG_FILE")
