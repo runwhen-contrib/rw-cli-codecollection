@@ -1,0 +1,18 @@
+{
+    "warnings": [
+      "upstream connect error or disconnect/reset before headers. reset reason: connection failure",
+      "error:1408F10B:SSL routines:ssl3_get_record:wrong version number",
+      "istio-proxy fails to start",
+      "502 Bad Gateway",
+      "istio-ingressgateway is running but has no listener on port"
+    ],
+    "errors": [
+      "panic: runtime error",
+      "Failed to create listener",
+      "proxy exited with status",
+      "Pilot push failed",
+      "failed to reconcile state",
+      "Error adding/updating listener"
+    ]
+  }
+  
