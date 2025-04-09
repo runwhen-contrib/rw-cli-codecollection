@@ -14,13 +14,38 @@ Library             RW.platform
 Suite Setup         Suite Initialization
 
 *** Tasks ***
+Count Key Vault Resource Health in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Counts the health status of Key Vaults in the specified resource group
+    [Tags]    KeyVault    Azure    Health    access:read-only
+    ${resource_health}=    RW.CLI.Run Bash File
+    ...    bash_file=kv_resource_health.sh
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+
+    TRY
+        ${issue_list}=    Evaluate    json.loads(open('${CODEBUNDLE_TEMP_DIR}/keyvault_health.json').read())    json
+    EXCEPT
+        Log    Failed to load JSON file, defaulting to empty list.    WARN
+        ${issue_list}=    Create List
+    END
+
+    ${issue_count}=    Set Variable    0
+    FOR    ${kv_health}    IN    @{issue_list}
+        IF    "${kv_health['properties']['title']}" != "Available"
+            ${issue_count}=    Evaluate    ${issue_count} + 1
+        END
+    END
+
+    ${kv_resource_health_score}=    Evaluate    1 if ${issue_count} == 0 else 0
+    Set Global Variable    ${kv_resource_health_score}
+
 Count Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Counts number of Azure key vault vaults with availability below 100% 
     [Tags]    KeyVault    Azure    Health    Monitoring    access:read-only
     ${availability_output}=    RW.CLI.Run Bash File
     ...    bash_file=availability.sh
     ...    env=${env}
-    ...    secret__azure_credentials=${azure_credentials}
     ...    timeout_seconds=180
     ...    include_in_history=false
 
@@ -47,7 +72,6 @@ Count Key Vault configuration in resource group `${AZURE_RESOURCE_GROUP}` in Sub
     ${config_output}=    RW.CLI.Run Bash File
     ...    bash_file=kv_config.sh
     ...    env=${env}
-    ...    secret__azure_credentials=${azure_credentials}
     ...    timeout_seconds=180
     ...    include_in_history=false
 
@@ -76,12 +100,11 @@ Count Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}` in Su
     ${expiry_output}=    RW.CLI.Run Bash File
     ...    bash_file=expiry-checks.sh
     ...    env=${env}
-    ...    secret__azure_credentials=${azure_credentials}
     ...    timeout_seconds=180
     ...    include_in_history=false
 
     TRY
-        ${expiry_data}=    Evaluate    json.load(open('kv_expiry_issues.json'))    json
+        ${expiry_data}=    Evaluate    json.load(open('${CODEBUNDLE_TEMP_DIR}/kv_expiry_issues.json'))    json
     EXCEPT
         Log    Failed to load JSON file, defaulting to empty list.    WARN
         ${expiry_data}=    Create Dictionary    issues=[]
@@ -99,12 +122,11 @@ Count Key Vault Log Issues in resource group `${AZURE_RESOURCE_GROUP}` in Subscr
     ${cmd}=    RW.CLI.Run Bash File
     ...    bash_file=log.sh
     ...    env=${env}
-    ...    secret__azure_credentials=${azure_credentials}
     ...    timeout_seconds=300
     ...    include_in_history=false
 
     TRY
-        ${log_data}=    Evaluate    json.load(open('kv_log_issues.json'))    json
+        ${log_data}=    Evaluate    json.load(open('${CODEBUNDLE_TEMP_DIR}/kv_log_issues.json'))    json
     EXCEPT
         Log    Failed to load JSON file, defaulting to empty list.    WARN
         ${log_data}=    Create Dictionary    issues=[]
@@ -122,12 +144,11 @@ Count Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}` 
     ${cmd}=    RW.CLI.Run Bash File
     ...    bash_file=performance_metrics.sh
     ...    env=${env}
-    ...    secret__azure_credentials=${azure_credentials}
     ...    timeout_seconds=300
     ...    include_in_history=false
 
     TRY
-        ${metrics_data}=    Evaluate    json.load(open('azure_keyvault_performance_metrics.json'))    json
+        ${metrics_data}=    Evaluate    json.load(open('${CODEBUNDLE_TEMP_DIR}/azure_keyvault_performance_metrics.json'))    json
     EXCEPT
         Log    Failed to load JSON file, defaulting to empty list.    WARN
         ${metrics_data}=    Create Dictionary    issues=[]
@@ -194,6 +215,11 @@ Suite Initialization
     ...    description=Time range in hours to look back for metrics
     ...    default=24
     ...    example=24
+    ${LOG_QUERY_DAYS}=    RW.Core.Import User Variable    LOG_QUERY_DAYS
+    ...    type=string
+    ...    description=Time range for log queries (format: 1d, 7d, 30d, etc.)
+    ...    default=1d
+    ...    example=2d
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
@@ -203,6 +229,7 @@ Suite Initialization
     Set Suite Variable    ${REQUEST_INTERVAL}    ${REQUEST_INTERVAL}
     Set Suite Variable    ${LATENCY_INTERVAL}    ${LATENCY_INTERVAL}
     Set Suite Variable    ${TIME_RANGE}    ${TIME_RANGE}
+    Set Suite Variable    ${LOG_QUERY_DAYS}    ${LOG_QUERY_DAYS}
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}", "THRESHOLD_DAYS":"${THRESHOLD_DAYS}", "REQUEST_THRESHOLD":"${REQUEST_THRESHOLD}", "LATENCY_THRESHOLD":"${LATENCY_THRESHOLD}", "REQUEST_INTERVAL":"${REQUEST_INTERVAL}", "LATENCY_INTERVAL":"${LATENCY_INTERVAL}", "TIME_RANGE":"${TIME_RANGE}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}", "THRESHOLD_DAYS":"${THRESHOLD_DAYS}", "REQUEST_THRESHOLD":"${REQUEST_THRESHOLD}", "LATENCY_THRESHOLD":"${LATENCY_THRESHOLD}", "REQUEST_INTERVAL":"${REQUEST_INTERVAL}", "LATENCY_INTERVAL":"${LATENCY_INTERVAL}", "TIME_RANGE":"${TIME_RANGE}", "LOG_QUERY_DAYS":"${LOG_QUERY_DAYS}"}
