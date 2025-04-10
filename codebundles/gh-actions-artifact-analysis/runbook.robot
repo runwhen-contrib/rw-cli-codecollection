@@ -24,11 +24,11 @@ Analyze artifact from GitHub workflow `${WORKFLOW_NAME}` in repository `${GITHUB
     ...    cmd_override=ANALYSIS_COMMAND=${ESCAPED_ANALYSIS_COMMAND} ./gh_actions_artifact_analysis.sh
     ...    secret__GITHUB_TOKEN=${GITHUB_TOKEN}
     ...    env=${env}
-    ${report}=    RW.CLI.Run CLI    cat ${SCRIPT_TMP_DIR}/report.txt
+    ${report}=    RW.CLI.Run CLI    cat report.txt
     RW.Core.Add Pre To Report    Command Stdout:\n${report.stdout}
 
     # Raise an Issue if needed
-    ${issue_details}=    RW.CLI.Run CLI     grep -E '${ISSUE_SEARCH_STRING}' ${SCRIPT_TMP_DIR}/report.txt
+    ${issue_details}=    RW.CLI.Run CLI     grep -E '${ISSUE_SEARCH_STRING}'report.txt
     RW.Core.Add Pre To Report    Searching for the string '${ISSUE_SEARCH_STRING}':\n${issue_details.stdout}
     IF    $issue_details.stdout != ""
         RW.Core.Add Issue
