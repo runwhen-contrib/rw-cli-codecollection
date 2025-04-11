@@ -1,0 +1,15 @@
+{
+    "properties": {
+      "activities": [
+        {
+          "name": "FailStep",
+          "type": "Fail",
+          "typeProperties": {
+            "message": "Simulated failure for monitoring.",
+            "errorCode": 500
+          }
+        }
+      ]
+    }
+}
+  
