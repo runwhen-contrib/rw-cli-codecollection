@@ -170,7 +170,7 @@ for ns in $FILTERED_NAMESPACES; do
                 issue=$(jq -n \
                     --arg ns "$ns" \
                     --arg deployment "$deployment" \
-                    --arg details "Deployment $deployment in namespace $ns should have Istio sidecar (namespace injection enabled) but pods are missing it" \
+                    --arg actual "Deployment $deployment in namespace $ns should have Istio sidecar (namespace injection enabled) but pods are missing it" \
                     --arg reproduce "kubectl get pods -n $ns -l app=$deployment -o jsonpath='{.items[*].spec.containers[*].name}'" \
                     --arg restart_cmd "kubectl rollout restart deployment/$deployment -n $ns" \
                     '{
@@ -179,7 +179,7 @@ for ns in $FILTERED_NAMESPACES; do
                         type: "namespace_enabled_missing_sidecar",
                         severity: 2,
                         title: "Missing Istio Sidecar - Namespace Injection",
-                        details: $details,
+                        actual: $actual,
                         reproduce_hint: $reproduce,
                         next_steps: [
                             "Check if pods were created before Istio installation",
@@ -217,7 +217,7 @@ for ns in $FILTERED_NAMESPACES; do
                     issue=$(jq -n \
                         --arg ns "$ns" \
                         --arg deployment "$deployment" \
-                        --arg details "Deployment $deployment in namespace $ns should have Istio sidecar (explicitly enabled) but it's missing" \
+                        --arg actual "Deployment $deployment in namespace $ns should have Istio sidecar (explicitly enabled) but it's missing" \
                         --arg reproduce "kubectl get pods -n $ns -l app=$deployment -o jsonpath='{.items[*].spec.containers[*].name}'" \
                         --arg restart_cmd "kubectl rollout restart deployment/$deployment -n $ns" \
                         '{
@@ -226,7 +226,7 @@ for ns in $FILTERED_NAMESPACES; do
                             type: "deployment_enabled_missing_sidecar",
                             severity: 2,
                             title: "Missing Istio Sidecar - Deployment Injection",
-                            details: $details,
+                            actual: $actual,
                             reproduce_hint: $reproduce,
                             next_steps: [
                                 "Check if the deployment was created before Istio installation",
@@ -245,7 +245,7 @@ for ns in $FILTERED_NAMESPACES; do
                 issue=$(jq -n \
                     --arg ns "$ns" \
                     --arg deployment "$deployment" \
-                    --arg details "Deployment $deployment in namespace $ns is missing both namespace injection and annotation." \
+                    --arg actual "Deployment $deployment in namespace $ns is missing both namespace injection and annotation." \
                     --arg reproduce "kubectl get namespace $ns -L istio-injection && kubectl get deployment $deployment -n $ns -o jsonpath='{.spec.template.metadata.annotations}'" \
                     --arg patch_cmd "kubectl patch deployment $deployment -n $ns -p '{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"sidecar.istio.io/inject\":\"true\"}}}}}'" \
                     '{
@@ -254,7 +254,7 @@ for ns in $FILTERED_NAMESPACES; do
                         "type": "not_properly_configured",
                         "severity": 3,
                         "title": "Istio Injection Not Configured",
-                        "details": $details,
+                        "actual": $actual,
                         "reproduce_hint": $reproduce,
                         "next_steps": [
                             "Enable namespace-level injection: kubectl label namespace \($ns) istio-injection=enabled",

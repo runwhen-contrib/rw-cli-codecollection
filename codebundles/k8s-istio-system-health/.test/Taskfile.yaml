@@ -2,16 +2,62 @@ version: "3"
 
 tasks:
   default:
-    desc: "Generate workspaceInfo and rebuild/test"
+    desc: "Run/refresh config"
     cmds:
+      - task: check-unpushed-commits
       - task: generate-rwl-config
       - task: run-rwl-discovery
 
   clean:
     desc: "Run cleanup tasks"
     cmds:
+      - task: check-and-cleanup-terraform
+      - task: delete-slxs
       - task: clean-rwl-discovery
 
+  build-infra:
+    desc: "Build test infrastructure"
+    cmds:
+      - task: build-terraform-infra
+
+  check-unpushed-commits:
+    desc: Check if outstanding commits or file updates need to be pushed before testing.
+    vars:
+      # Specify the base directory relative to your Taskfile location
+      BASE_DIR: "../"
+    cmds:
+      - |
+        echo "Checking for uncommitted changes in $BASE_DIR and $BASE_DIR.runwhen, excluding '.test'..."
+        UNCOMMITTED_FILES=$(git diff --name-only HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNCOMMITTED_FILES" ]; then
+          echo "✗"
+          echo "Uncommitted changes found:"
+          echo "$UNCOMMITTED_FILES"
+          echo "Remember to commit & push changes before executing the `run-rwl-discovery` task."
+          echo "------------"
+          exit 1    
+        else
+          echo "√"
+          echo "No uncommitted changes in specified directories."
+          echo "------------"        
+        fi
+      - |
+        echo "Checking for unpushed commits in $BASE_DIR and $BASE_DIR.runwhen, excluding '.test'..."
+        git fetch origin
+        UNPUSHED_FILES=$(git diff --name-only origin/$(git rev-parse --abbrev-ref HEAD) HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNPUSHED_FILES" ]; then
+          echo "✗"
+          echo "Unpushed commits found:"
+          echo "$UNPUSHED_FILES"
+          echo "Remember to push changes before executing the `run-rwl-discovery` task."
+          echo "------------"
+          exit 1        
+        else
+          echo "√"
+          echo "No unpushed commits in specified directories."
+          echo "------------"        
+        fi
+    silent: true
   generate-rwl-config:
     desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
     env:
@@ -186,4 +232,103 @@ tasks:
       - |
         rm -rf output
         rm workspaceInfo.yaml
+    silent: true
+  check-terraform-infra:
+    desc: "Check if Terraform has any deployed infrastructure in the terraform subdirectory"
+    cmds:
+      - |
+        # Source Envs for Auth
+        #source terraform/tf.secret
+        # Set Additional env
+        #export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)
+        #export TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
+        #export TF_VAR_tenant_id=$AZ_TENANT_ID
+        # Navigate to the Terraform directory
+        if [ ! -d "terraform" ]; then
+          echo "Terraform directory not found."
+          exit 1
+        fi
+        cd terraform
+        # Check if Terraform state file exists
+        if [ ! -f "terraform.tfstate" ]; then
+          echo "No Terraform state file found in the terraform directory. No infrastructure is deployed."
+          exit 0
+        fi
+        # List resources in Terraform state
+        resources=$(terraform state list)
+        # Check if any resources are listed in the state file
+        if [ -n "$resources" ]; then
+          echo "Deployed infrastructure detected."
+          echo "$resources"
+          exit 0
+        else
+          echo "No deployed infrastructure found in Terraform state."
+          exit 0
+        fi
+    silent: true
+
+  build-terraform-infra:
+    desc: "Run terraform apply"
+    cmds:
+      - |
+        # Source Envs for Auth
+        #source terraform/tf.secret
+        # Set Additional env
+        #export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)
+        #export TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
+        #export TF_VAR_tenant_id=$AZ_TENANT_ID
+        # Navigate to the Terraform directory
+        if [ -d "terraform" ]; then
+          cd terraform
+        else
+          echo "Terraform directory not found. Terraform apply aborted."
+          exit 1
+        fi
+        task format-and-init-terraform
+        echo "Starting Terraform Build of Terraform infrastructure..."
+        terraform apply -auto-approve || {
+          echo "Failed to clean up Terraform infrastructure."
+          exit 1
+        }
+        echo "Terraform infrastructure build completed."
+    silent: true
+
+  cleanup-terraform-infra:
+    desc: "Cleanup deployed Terraform infrastructure"
+    cmds:
+      - |
+        # Source Envs for Auth
+        #source terraform/tf.secret
+        # Set Additional env
+        #export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)
+        #export TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
+        #export TF_VAR_tenant_id=$AZ_TENANT_ID
+        # Navigate to the Terraform directory
+        if [ -d "terraform" ]; then
+          cd terraform
+        else
+          echo "Terraform directory not found. Cleanup aborted."
+          exit 1
+        fi
+        echo "Starting cleanup of Terraform infrastructure..."
+        terraform destroy -target='module.eks_blueprints_addons.helm_release.this["istio-ingress"]' -auto-approve && terraform destroy -target="module.eks_blueprints_addons" -auto-approve && terraform destroy -target="module.eks" -auto-approve && terraform destroy -auto-approve || {
+          echo "Failed to clean up Terraform infrastructure."
+          exit 1
+        }
+        echo "Terraform infrastructure cleanup completed."
+    silent: true
+
+  check-and-cleanup-terraform:
+    desc: "Check and clean up deployed Terraform infrastructure if it exists"
+    cmds:
+      - |
+        # Capture the output of check-terraform-infra
+        infra_output=$(task check-terraform-infra | tee /dev/tty)
+        # Check if output contains indication of deployed infrastructure
+        if echo "$infra_output" | grep -q "Deployed infrastructure detected"; then
+          echo "Infrastructure detected; proceeding with cleanup."
+          task cleanup-terraform-infra
+        else
+          echo "No deployed infrastructure found; no cleanup required."
+        fi
     silent: true
