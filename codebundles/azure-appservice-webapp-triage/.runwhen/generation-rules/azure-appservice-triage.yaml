@@ -10,6 +10,10 @@ spec:
           pattern: ".+"
           properties: [name]
           mode: substring
+        - type: pattern
+          pattern: "^app(?:,.*)?$""
+          properties: [kind]
+          mode: substring
       slxs:
         - baseName: az-appsvc-triage
           qualifiers: ["resource", "resource_group"]
