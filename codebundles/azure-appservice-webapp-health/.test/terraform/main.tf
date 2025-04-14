@@ -87,14 +87,22 @@ output "resource_group" {
 # --------------------------------------
 resource "azurerm_storage_account" "function_storage" {
   name                     = "rwapsfuncstor"
-  resource_group_name      = azurerm_resource_group.test.name
-  location                 = azurerm_resource_group.test.location
+  resource_group_name      = azurerm_resource_group.function_rg.name
+  location                 = azurerm_resource_group.function_rg.location
   account_tier             = "Standard"
   account_replication_type = "LRS"
   account_kind             = "StorageV2"
 
   tags = var.tags
 }
+
+
+resource "azurerm_resource_group" "function_rg" {
+  name     = "${var.codebundle}-functions-rg"
+  location = var.location
+  tags     = var.tags
+}
+
 
 # --------------------------------------
 # App Service Plan for the Function App
@@ -103,7 +111,7 @@ resource "azurerm_storage_account" "function_storage" {
 resource "azurerm_service_plan" "function_plan" {
   name                = "${var.codebundle}-function-plan"
   location            = azurerm_resource_group.test.location
-  resource_group_name = azurerm_resource_group.test.name
+  resource_group_name = azurerm_resource_group.function_rg.name
   os_type             = "Linux"
   sku_name            = "Y1" # Consumption plan
 }
@@ -114,7 +122,7 @@ resource "azurerm_service_plan" "function_plan" {
 resource "azurerm_linux_function_app" "function_app" {
   name                       = "${var.codebundle}-func"
   location                   = azurerm_resource_group.test.location
-  resource_group_name        = azurerm_resource_group.test.name
+  resource_group_name        = azurerm_resource_group.function_rg.name
   service_plan_id            = azurerm_service_plan.function_plan.id
   storage_account_name       = azurerm_storage_account.function_storage.name
   storage_account_access_key = azurerm_storage_account.function_storage.primary_access_key

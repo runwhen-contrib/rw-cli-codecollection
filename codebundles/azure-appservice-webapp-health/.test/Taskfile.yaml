@@ -74,13 +74,25 @@ tasks:
 
         # Fetch individual cluster details from Terraform state
         pushd terraform > /dev/null
-        resource_group=$(terraform show -json terraform.tfstate | jq -r '
-          .values.root_module.resources[] |
-          select(.type == "azurerm_resource_group") | .values.name')
+        RG1="$(terraform show -json terraform.tfstate \
+          | jq -r '
+              .values.root_module.resources[]
+              | select(.type == "azurerm_resource_group")
+              | .values.name
+            ' \
+          | awk 'NR==1')"
+
+        RG2="$(terraform show -json terraform.tfstate \
+          | jq -r '
+              .values.root_module.resources[]
+              | select(.type == "azurerm_resource_group")
+              | .values.name
+            ' \
+          | awk 'NR==2')"
         popd > /dev/null
 
         # Check if any of the required cluster variables are empty
-        if [ -z "$resource_group" ]; then
+        if [ -z "$RG1" ]; then
           echo "Error: Missing resource group details. Ensure Terraform plan has been applied."
           exit 1
         fi
@@ -98,7 +110,8 @@ tasks:
             clientId: "$AZ_CLIENT_ID"
             clientSecret: "$AZ_CLIENT_SECRET"
             resourceGroupLevelOfDetails:
-              $resource_group: detailed
+              $RG1: detailed
+              $RG2: detailed
         codeCollections:
         - repoURL: "$repo_url"
           branch: "$branch_name"
