@@ -15,12 +15,12 @@ spec:
           properties: [kind]
           mode: substring
       slxs:
-        - baseName: az-appsvc-web-health
+        - baseName: az-appsvc-function-health
           qualifiers: ["resource", "resource_group"]
-          baseTemplateName: azure-appservice-webapp-health
+          baseTemplateName: azure-appservice-function-health
           levelOfDetail: detailed
           outputItems:
             - type: slx
             - type: sli
             - type: runbook
-              templateName: azure-appservice-webapp-health-taskset.yaml
+              templateName: azure-appservice-function-health-taskset.yaml
