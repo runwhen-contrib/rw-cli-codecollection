@@ -23,7 +23,7 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/azure-function-webapp-health/sli.robot
+    pathToRobot: codebundles/azure-appservice-function-health/sli.robot
   intervalStrategy: intermezzo
   intervalSeconds: 600
   configProvided:
