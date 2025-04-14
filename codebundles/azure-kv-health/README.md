@@ -1,9 +1,10 @@
-# Azure Virtual Machine Health
-This codebundle runs a suite of metrics checks for VMs in Azure. It identifies:
-- List Key Vault Availability
+# Azure Key Vault  Health
+This codebundle runs a suite of metrics checks for Key Vault in Azure. It identifies:
+- Check Key Vault Availability
 - Check Key Vault Configuration
 - Check Expiring Key Vault Items (Keys, Secrets and Certificates)
 - Check Key Vault Logs for Issues
+- Check Key Vault Performance Metrics
 
 ## Configuration
 
