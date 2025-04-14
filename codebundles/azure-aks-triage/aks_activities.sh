@@ -34,9 +34,6 @@ az account set --subscription "$subscription" || { echo "Failed to set subscript
 
 tenant_id=$(az account show --query "tenantId" -o tsv)
 
-# Log in to Azure CLI (uncomment if needed)
-# az login --service-principal --username "$AZ_USERNAME" --password "$AZ_SECRET_VALUE" --tenant "$AZ_TENANT" > /dev/null
-# az account set --subscription "$AZ_SUBSCRIPTION"
 
 # Remove previous issues.json file if it exists
 [ -f "issues.json" ] && rm "issues.json"
@@ -44,12 +41,12 @@ tenant_id=$(az account show --query "tenantId" -o tsv)
 
 echo "Azure AKS $AKS_CLUSTER activity logs (recent):"
 # Get the activity logs of the vm scaled set
-resource_id=$(az aks show --name $AKS_CLUSTER --resource-group $AZ_RESOURCE_GROUP --subscription $subscription_id --query "id")
+resource_id=$(az aks show --name $AKS_CLUSTER --resource-group $AZ_RESOURCE_GROUP --subscription $subscription --query "id")
 
 az monitor activity-log list --resource-id $resource_id --start-time "$start_time" --end-time "$end_time" --resource-group $AZ_RESOURCE_GROUP --output table
 
 # Generate the event log URL
-event_log_url="https://portal.azure.com/#@$tenant_id/resource/subscriptions/$subscription_id/resourceGroups/$AZ_RESOURCE_GROUP/providers/Microsoft.ContainerService/managedClusters/$AKS_CLUSTER/eventlogs"
+event_log_url="https://portal.azure.com/#@$tenant_id/resource/subscriptions/$subscription/resourceGroups/$AZ_RESOURCE_GROUP/providers/Microsoft.ContainerService/managedClusters/$AKS_CLUSTER/eventlogs"
 
 # TODO: hook into various activities to create suggestions
 

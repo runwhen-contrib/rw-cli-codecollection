@@ -180,7 +180,7 @@ Scan And Report Issues
             ${contents}=     RW.CLI.Run Cli
             ...    cmd=echo "${item['details']}" > ${SCAN_SCRIPT}_details.log
             ${log_summary}=    RW.CLI.Run Cli
-            ...    cmd=python3 summarize.py < ${SCAN_SCRIPT}_details.log
+            ...    cmd=python3 summarize.py < ${CURDIR}/${SCAN_SCRIPT}_details.log
 
             ${next_steps}=    Catenate    SEPARATOR=\n   @{item["next_steps"]}
 
