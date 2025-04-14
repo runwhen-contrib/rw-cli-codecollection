@@ -25,7 +25,7 @@ Check for Resource Health Issues Affecting Function App `${FUNCTION_APP_NAME}` I
     RW.Core.Add Pre To Report    ${resource_health.stdout}
 
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat app_service_health.json 
+    ...    cmd=cat function_app_health.json
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -53,95 +53,95 @@ Check for Resource Health Issues Affecting Function App `${FUNCTION_APP_NAME}` I
     END
 
 
-Check Function App `${FUNCTION_APP_NAME}` Health in Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Checks the health status of a appservice workload.
-    [Tags]    access:read-only    appservice    health
-    ${health_check_metric}=    RW.CLI.Run Bash File
-    ...    bash_file=appservice_health_metric.sh
-    ...    env=${env}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
-    RW.Core.Add Pre To Report    ${health_check_metric.stdout}
+# Check Function App `${FUNCTION_APP_NAME}` Health in Resource Group `${AZ_RESOURCE_GROUP}`
+#     [Documentation]    Checks the health status of a appservice workload.
+#     [Tags]    access:read-only    appservice    health
+#     ${health_check_metric}=    RW.CLI.Run Bash File
+#     ...    bash_file=appservice_health_metric.sh
+#     ...    env=${env}
+#     ...    timeout_seconds=180
+#     ...    include_in_history=false
+#     RW.Core.Add Pre To Report    ${health_check_metric.stdout}
     
-    ${summary}=    RW.CLI.Run Cli
-    ...    cmd=cat app_service_health_check_summary.txt
-    ...    env=${env}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
-    RW.Core.Add Pre To Report    ${summary.stdout}
+#     ${summary}=    RW.CLI.Run Cli
+#     ...    cmd=cat app_service_health_check_summary.txt
+#     ...    env=${env}
+#     ...    timeout_seconds=180
+#     ...    include_in_history=false
+#     RW.Core.Add Pre To Report    ${summary.stdout}
 
-    ${metrics}=    RW.CLI.Run Cli
-    ...    cmd=cat app_service_health_check_metrics.json
-    ...    env=${env}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
-    RW.Core.Add Pre To Report    ${metrics.stdout}
+#     ${metrics}=    RW.CLI.Run Cli
+#     ...    cmd=cat app_service_health_check_metrics.json
+#     ...    env=${env}
+#     ...    timeout_seconds=180
+#     ...    include_in_history=false
+#     RW.Core.Add Pre To Report    ${metrics.stdout}
 
-    ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat app_service_health_check_issues.json
-    ...    env=${env}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
-    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    IF    len(@{issue_list["issues"]}) > 0
-        FOR    ${item}    IN    @{issue_list["issues"]}
-            RW.Core.Add Issue    
-            ...    title=${item["title"]}
-            ...    severity=${item["severity"]}
-            ...    next_steps=${item["next_step"]}
-            ...    expected=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has is reported healthy
-            ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has health check metric issues
-            ...    reproduce_hint=${health_check_metric.cmd}
-            ...    details=${item["details"]}        
-        END
-    END
-    RW.Core.Add Pre To Report    ${health_check_metric.stdout}
+#     ${issues}=    RW.CLI.Run Cli
+#     ...    cmd=cat app_service_health_check_issues.json
+#     ...    env=${env}
+#     ...    timeout_seconds=180
+#     ...    include_in_history=false
+#     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+#     IF    len(@{issue_list["issues"]}) > 0
+#         FOR    ${item}    IN    @{issue_list["issues"]}
+#             RW.Core.Add Issue    
+#             ...    title=${item["title"]}
+#             ...    severity=${item["severity"]}
+#             ...    next_steps=${item["next_step"]}
+#             ...    expected=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has is reported healthy
+#             ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has health check metric issues
+#             ...    reproduce_hint=${health_check_metric.cmd}
+#             ...    details=${item["details"]}        
+#         END
+#     END
+#     RW.Core.Add Pre To Report    ${health_check_metric.stdout}
 
-Fetch Function App `${FUNCTION_APP_NAME}` Utilization Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Reviews key metrics for the Function App and generates a report
-    [Tags]    access:read-only     appservice    utilization
-    ${metric_health}=    RW.CLI.Run Bash File
-    ...    bash_file=appservice_metric_health.sh
-    ...    env=${env}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
-    RW.Core.Add Pre To Report    ${metric_health.stdout}
-    ${summary}=    RW.CLI.Run Cli
-    ...    cmd=cat app_service_metrics_summary.txt
-    ...    env=${env}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
-    RW.Core.Add Pre To Report    ${summary.stdout}
+# Fetch Function App `${FUNCTION_APP_NAME}` Utilization Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
+#     [Documentation]    Reviews key metrics for the Function App and generates a report
+#     [Tags]    access:read-only     appservice    utilization
+#     ${metric_health}=    RW.CLI.Run Bash File
+#     ...    bash_file=appservice_metric_health.sh
+#     ...    env=${env}
+#     ...    timeout_seconds=180
+#     ...    include_in_history=false
+#     RW.Core.Add Pre To Report    ${metric_health.stdout}
+#     ${summary}=    RW.CLI.Run Cli
+#     ...    cmd=cat app_service_metrics_summary.txt
+#     ...    env=${env}
+#     ...    timeout_seconds=180
+#     ...    include_in_history=false
+#     RW.Core.Add Pre To Report    ${summary.stdout}
 
-    ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat app_service_issues.json
-    ...    env=${env}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
-    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    IF    len(@{issue_list["issues"]}) > 0
-        FOR    ${item}    IN    @{issue_list["issues"]}
-            RW.Core.Add Issue    
-            ...    title=${item["title"]}
-            ...    severity=${item["severity"]}
-            ...    next_steps=${item["next_step"]}
-            ...    expected=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has healthy metrics
-            ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has metric issues
-            ...    reproduce_hint=${metric_health.cmd}
-            ...    details=${item["details"]}        
-        END
-    END
+#     ${issues}=    RW.CLI.Run Cli
+#     ...    cmd=cat app_service_issues.json
+#     ...    env=${env}
+#     ...    timeout_seconds=180
+#     ...    include_in_history=false
+#     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+#     IF    len(@{issue_list["issues"]}) > 0
+#         FOR    ${item}    IN    @{issue_list["issues"]}
+#             RW.Core.Add Issue    
+#             ...    title=${item["title"]}
+#             ...    severity=${item["severity"]}
+#             ...    next_steps=${item["next_step"]}
+#             ...    expected=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has healthy metrics
+#             ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has metric issues
+#             ...    reproduce_hint=${metric_health.cmd}
+#             ...    details=${item["details"]}        
+#         END
+#     END
 
 
-Get Function App `${FUNCTION_APP_NAME}` Logs In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Fetch logs of appservice workload
-    [Tags]    appservice    logs    tail    access:read-only
-    ${logs}=    RW.CLI.Run Bash File
-    ...    bash_file=appservice_logs.sh
-    ...    env=${env}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
-    RW.Core.Add Pre To Report    ${logs.stdout}
+# Get Function App `${FUNCTION_APP_NAME}` Logs In Resource Group `${AZ_RESOURCE_GROUP}`
+#     [Documentation]    Fetch logs of appservice workload
+#     [Tags]    appservice    logs    tail    access:read-only
+#     ${logs}=    RW.CLI.Run Bash File
+#     ...    bash_file=appservice_logs.sh
+#     ...    env=${env}
+#     ...    timeout_seconds=180
+#     ...    include_in_history=false
+#     RW.Core.Add Pre To Report    ${logs.stdout}
 
 Check Configuration Health of Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the configuration health of the Function App
@@ -154,7 +154,7 @@ Check Configuration Health of Function App `${FUNCTION_APP_NAME}` In Resource Gr
     RW.Core.Add Pre To Report    ${config_health.stdout}
 
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat az_app_service_health.json
+    ...    cmd=cat az_function_app_config_health.json
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -172,34 +172,34 @@ Check Configuration Health of Function App `${FUNCTION_APP_NAME}` In Resource Gr
         END
     END
 
-Check Deployment Health of Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Fetch deployment health of the Function App
-    [Tags]    appservice    deployment    access:read-only
-    ${deployment_health}=    RW.CLI.Run Bash File
-    ...    bash_file=appservice_deployment_health.sh
-    ...    env=${env}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
-    RW.Core.Add Pre To Report    ${deployment_health.stdout}
+# Check Deployment Health of Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+#     [Documentation]    Fetch deployment health of the Function App
+#     [Tags]    appservice    deployment    access:read-only
+#     ${deployment_health}=    RW.CLI.Run Bash File
+#     ...    bash_file=appservice_deployment_health.sh
+#     ...    env=${env}
+#     ...    timeout_seconds=180
+#     ...    include_in_history=false
+#     RW.Core.Add Pre To Report    ${deployment_health.stdout}
 
-    ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat deployment_health.json
-    ...    env=${env}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
-    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    IF    len(@{issue_list["issues"]}) > 0
-        FOR    ${item}    IN    @{issue_list["issues"]}
-            RW.Core.Add Issue    
-            ...    title=${item["title"]}
-            ...    severity=${item["severity"]}
-            ...    next_steps=${item["next_step"]}
-            ...    expected=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has a healthy deployments
-            ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has deployment issues
-            ...    reproduce_hint=${deployment_health.cmd}
-            ...    details=${item["details"]}        
-        END
-    END
+#     ${issues}=    RW.CLI.Run Cli
+#     ...    cmd=cat deployment_health.json
+#     ...    env=${env}
+#     ...    timeout_seconds=180
+#     ...    include_in_history=false
+#     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+#     IF    len(@{issue_list["issues"]}) > 0
+#         FOR    ${item}    IN    @{issue_list["issues"]}
+#             RW.Core.Add Issue    
+#             ...    title=${item["title"]}
+#             ...    severity=${item["severity"]}
+#             ...    next_steps=${item["next_step"]}
+#             ...    expected=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has a healthy deployments
+#             ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has deployment issues
+#             ...    reproduce_hint=${deployment_health.cmd}
+#             ...    details=${item["details"]}        
+#         END
+#     END
 
 Fetch Function App `${FUNCTION_APP_NAME}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events of appservice and checks for errors
@@ -212,7 +212,7 @@ Fetch Function App `${FUNCTION_APP_NAME}` Activities In Resource Group `${AZ_RES
     RW.Core.Add Pre To Report    ${activities.stdout}
 
     ${issues}=    RW.CLI.Run Cli    
-    ...    cmd=cat app_service_activities_issues.json
+    ...    cmd=cat function_app_activities_issues.json
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
@@ -226,31 +226,31 @@ Fetch Function App `${FUNCTION_APP_NAME}` Activities In Resource Group `${AZ_RES
             ...    details=${item["details"]}        
         END
     END
-Check Logs for Errors in Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Gets the events of appservice and checks for errors
-    [Tags]    appservice    logs    errors    access:read-only
-    ${log_errors}=    RW.CLI.Run Bash File
-    ...    bash_file=appservice_log_analysis.sh
-    ...    env=${env}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
-    RW.Core.Add Pre To Report    ${log_errors.stdout}
+# Check Logs for Errors in Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+#     [Documentation]    Gets the events of appservice and checks for errors
+#     [Tags]    appservice    logs    errors    access:read-only
+#     ${log_errors}=    RW.CLI.Run Bash File
+#     ...    bash_file=appservice_log_analysis.sh
+#     ...    env=${env}
+#     ...    timeout_seconds=180
+#     ...    include_in_history=false
+#     RW.Core.Add Pre To Report    ${log_errors.stdout}
 
-    ${issues}=    RW.CLI.Run Cli    
-    ...    cmd=cat app_service_log_issues_report.json
-    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    IF    len(@{issue_list["issues"]}) > 0
-        FOR    ${item}    IN    @{issue_list["issues"]}
-            RW.Core.Add Issue    
-            ...    title=${item["title"]}
-            ...    severity=${item["severity"]}
-            ...    next_steps=${item["next_step"]}
-            ...    expected=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no Warning/Error/Critical logs
-            ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has Warning/Error/Critical logs
-            ...    reproduce_hint=${log_errors.cmd}
-            ...    details=${item["details"]}        
-        END
-    END
+#     ${issues}=    RW.CLI.Run Cli    
+#     ...    cmd=cat app_service_log_issues_report.json
+#     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+#     IF    len(@{issue_list["issues"]}) > 0
+#         FOR    ${item}    IN    @{issue_list["issues"]}
+#             RW.Core.Add Issue    
+#             ...    title=${item["title"]}
+#             ...    severity=${item["severity"]}
+#             ...    next_steps=${item["next_step"]}
+#             ...    expected=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no Warning/Error/Critical logs
+#             ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has Warning/Error/Critical logs
+#             ...    reproduce_hint=${log_errors.cmd}
+#             ...    details=${item["details"]}        
+#         END
+#     END
 
 *** Keywords ***
 Suite Initialization

@@ -1,6 +1,12 @@
 #!/bin/bash
 
-# Set subscription ID and resource details
+# Check environment variables
+if [[ -z "$AZ_RESOURCE_GROUP" || -z "$FUNCTION_APP_NAME" ]]; then
+    echo "Error: Please ensure AZ_RESOURCE_GROUP and FUNCTION_APP_NAME environment variables are set."
+    exit 1
+fi
+
+# Retrieve subscription from current Azure CLI context
 subscription=$(az account show --query "id" -o tsv)
 
 # Check if Microsoft.ResourceHealth provider is already registered
@@ -24,7 +30,7 @@ if [[ "$registrationState" != "Registered" ]]; then
         fi
     done
 
-    # Check if the provider is not registered after waiting
+    # Check if the provider is still not registered after waiting
     if [[ "$registrationState" != "Registered" ]]; then
         echo "Error: Microsoft.ResourceHealth provider could not be registered."
         exit 1
@@ -33,16 +39,16 @@ else
     echo "Microsoft.ResourceHealth provider is already registered."
 fi
 
-# Perform the REST API call to get the resource health status
-echo "Retrieving health status for Azure App Service..."
+# Perform the REST API call to get the resource health status for the Function App
+echo "Retrieving health status for Azure Function App '$FUNCTION_APP_NAME'..."
 healthUrl="https://management.azure.com/subscriptions/$subscription/resourceGroups/$AZ_RESOURCE_GROUP/providers/Microsoft.Web/sites/$FUNCTION_APP_NAME/providers/Microsoft.ResourceHealth/availabilityStatuses/current?api-version=2023-07-01-preview"
 
-az rest --method get --url "$healthUrl" > "app_service_health.json"
+az rest --method GET --url "$healthUrl" > "function_app_health.json"
 
 if [[ $? -eq 0 ]]; then
-    echo "Health status retrieved successfully. Output saved to app_service_health.json"
-    cat "app_service_health.json"
+    echo "Health status retrieved successfully. Output saved to function_app_health.json"
+    cat "function_app_health.json"
 else
-    echo "Error: Failed to retrieve health status for Azure App Service."
+    echo "Error: Failed to retrieve health status for Azure Function App."
     exit 1
 fi
