@@ -11,15 +11,16 @@ spec:
           properties: [name]
           mode: substring
         - type: pattern
-          pattern: "^app(?:,.*)?$"
+          pattern: "^functionapp(?:,.*)?$"
           properties: [kind]
           mode: substring
       slxs:
-        - baseName: az-appsvc-webapp-ops
+        - baseName: az-appsvc-web-health
           qualifiers: ["resource", "resource_group"]
-          baseTemplateName: azure-appservice-webapp-ops
-          levelOfDetail: basic
+          baseTemplateName: azure-appservice-webapp-health
+          levelOfDetail: detailed
           outputItems:
             - type: slx
+            - type: sli
             - type: runbook
-              templateName: azure-appservice-webapp-ops-taskset.yaml
+              templateName: azure-appservice-webapp-health-taskset.yaml

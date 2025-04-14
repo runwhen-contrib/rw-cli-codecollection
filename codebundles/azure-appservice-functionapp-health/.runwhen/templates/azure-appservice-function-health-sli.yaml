@@ -1,5 +1,5 @@
 apiVersion: runwhen.com/v1
-kind: Runbook
+kind: ServiceLevelIndicator
 metadata:
   name: {{slx_name}}
   labels:
@@ -7,8 +7,11 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  location: {{default_location}}
-  description: Generates a report for Azure App Service {{match_resource.resource.name}} in resource group {{resource_group.name}}
+  displayUnitsLong: OK
+  displayUnitsShort: ok
+  locations:
+    - {{default_location}}
+  description: Measures the health of Azure Function App {{match_resource.resource.name}} in resource group {{resource_group.name}}
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -20,18 +23,16 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/azure-appservice-webapp-ops/runbook.robot
+    pathToRobot: codebundles/azure-function-webapp-health/sli.robot
+  intervalStrategy: intermezzo
+  intervalSeconds: 600
   configProvided:
     - name: AZ_RESOURCE_GROUP
       value: {{resource_group.name}}
-    - name: APP_SERVICE_NAME
+    - name: FUNCTION_APP_NAME
       value: {{match_resource.resource.name}}
     - name: TIME_PERIOD_MINUTES
       value: "10"
-    - name: SCALE_OUT_FACTOR
-      value: "2"
-    - name: SCALE_IN_FACTOR
-      value: "2"
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}
@@ -39,3 +40,16 @@ spec:
     - name: azure_credentials
       workspaceKey: AUTH DETAILS NOT FOUND
   {% endif %}
+  alerts:
+    warning:
+      operator: <
+      threshold: '1'
+      for: '20m'
+    ticket:
+      operator: <
+      threshold: '1'
+      for: '30m'
+    page:
+      operator: '=='
+      threshold: '0'
+      for: ''

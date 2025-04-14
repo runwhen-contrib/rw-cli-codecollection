@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   location: {{default_location}}
-  description: Generates a report for Azure App Service {{match_resource.resource.name}} in resource group {{resource_group.name}}
+  description: Generates a report for Azure Function App {{match_resource.resource.name}} in resource group {{resource_group.name}}
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -20,18 +20,14 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/azure-appservice-webapp-ops/runbook.robot
+    pathToRobot: codebundles/azure-appservice-function-health/runbook.robot
   configProvided:
     - name: AZ_RESOURCE_GROUP
       value: {{resource_group.name}}
-    - name: APP_SERVICE_NAME
+    - name: FUNCTION_APP_NAME
       value: {{match_resource.resource.name}}
     - name: TIME_PERIOD_MINUTES
       value: "10"
-    - name: SCALE_OUT_FACTOR
-      value: "2"
-    - name: SCALE_IN_FACTOR
-      value: "2"
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}

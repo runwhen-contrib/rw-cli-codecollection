@@ -8,16 +8,16 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/app%20services/10035-icon-service-App-Services.svg
-  alias: Azure App Service Operations for {{match_resource.resource.name}} in resource group {{resource_group.name}}
-  asMeasuredBy: "" 
+  alias: Azure Function App Health for {{match_resource.resource.name}} in resource group {{resource_group.name}}
+  asMeasuredBy: An aggregate score that is evaluated from configuration, metric, event or log issues. 
   configProvided:
   - name: AZ_RESOURCE_GROUP
     value: {{resource_group.name}}
-  - name: APP_SERVICE_NAME
+  - name: FUNCTION_APP_NAME
     value: {{match_resource.resource.name}}
   owners:
   - {{workspace.owner_email}}
-  statement: Perform Ops tasks for App Service {{match_resource.resource.name}} in resource group {{resource_group.name}}
+  statement: Function App {{match_resource.resource.name}} in resource group {{resource_group.name}} be available and healthy. 
   additionalContext:
     name: "{{match_resource.resource.name}}"
     appservice_kind: "{{match_resource.resource.kind}}"
