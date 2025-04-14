@@ -177,8 +177,7 @@ Scan And Report Issues
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list}) > 0
         FOR    ${item}    IN    @{issue_list}
-            ${contents}=     RW.CLI.Run Cli
-            ...    cmd=echo "${item['details']}" > ${SCAN_SCRIPT}_details.log
+            Create File    ${SCAN_SCRIPT}_details.log    "${item['details']}" 
             ${log_summary}=    RW.CLI.Run Cli
             ...    cmd=python3 summarize.py < ${CURDIR}/${SCAN_SCRIPT}_details.log
 
