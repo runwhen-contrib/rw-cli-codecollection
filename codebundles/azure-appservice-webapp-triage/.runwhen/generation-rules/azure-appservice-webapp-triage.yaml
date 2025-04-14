@@ -11,11 +11,11 @@ spec:
           properties: [name]
           mode: substring
         - type: pattern
-          pattern: "^app(?:,.*)?$""
+          pattern: "^app(?:,.*)?$"
           properties: [kind]
           mode: substring
       slxs:
-        - baseName: az-appsvc-triage
+        - baseName: az-appsvc-web-triage
           qualifiers: ["resource", "resource_group"]
           baseTemplateName: azure-appservice-triage
           levelOfDetail: basic
@@ -23,4 +23,4 @@ spec:
             - type: slx
             - type: sli
             - type: runbook
-              templateName: azure-appservice-triage-taskset.yaml
+              templateName: azure-appservice-webapp-triage-taskset.yaml

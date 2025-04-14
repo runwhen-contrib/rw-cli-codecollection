@@ -23,7 +23,7 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/azure-appservice-triage/sli.robot
+    pathToRobot: codebundles/azure-appservice-webapp-triage/sli.robot
   intervalStrategy: intermezzo
   intervalSeconds: 600
   configProvided:
