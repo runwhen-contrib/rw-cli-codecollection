@@ -7,7 +7,7 @@ resource_group="$AZURE_RESOURCE_GROUP"
 # Severity levels
 : "${SEVERITY_CRITICAL:=4}"    # Critical issues (e.g., failed to list Key Vaults)
 : "${SEVERITY_REQUEST:=3}"     # Severity for excessive requests
-: "${SEVERITY_LATENCY:=2}"     # Severity for high latency
+: "${SEVERITY_LATENCY:=3}"     # Severity for high latency
 : "${SEVERITY_LOW:=1}"         # Low severity issues
 
 : "${REQUEST_THRESHOLD:=1}"  # Default threshold for excessive requests (requests/hour)
@@ -165,7 +165,7 @@ echo "$keyvaults_json" | jq -c '.[]' | while read -r kv_data; do
             --arg kv_uri "$kv_uri" \
             --arg resource_url "$resource_url" \
             --arg request_count "$request_count" \
-            --arg request_threshold "$REQUEST_THRESHOLD" \
+            --arg request_threshold "$REQUEST_THRESHOLD-req/hr" \
             --arg expected "Key Vault \`$kv_name\` should have request count below $REQUEST_THRESHOLD requests/hour in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
             --arg actual "Key Vault \`$kv_name\` has $request_count requests/hour (threshold: $REQUEST_THRESHOLD) in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
             --arg reproduceHint "az monitor metrics list --resource \"/subscriptions/$subscription_id/resourceGroups/$resource_group/providers/Microsoft.KeyVault/vaults/$kv_name\" --metric ServiceApiHit --aggregation count --interval \"$REQUEST_INTERVAL\" --query \"value[0].timeseries[0].data[-1].count\" --start-time \"$start_time\" --end-time \"$end_time\" --output tsv" \
@@ -180,8 +180,8 @@ echo "$keyvaults_json" | jq -c '.[]' | while read -r kv_data; do
                "kv_uri": $kv_uri,
                "resource_url": $resource_url,
                "metric": "ServiceApiHit",
-               "value": ($request_count | tonumber),
-               "threshold": ($request_threshold | tonumber),
+               "value": ($request_count | tonumber | . * 100 | round / 100),
+               "threshold": ($request_threshold),
                "expected": $expected,
                "actual": $actual,
                "reproduce_hint": $reproduceHint
@@ -195,16 +195,16 @@ echo "$keyvaults_json" | jq -c '.[]' | while read -r kv_data; do
             --arg title "High Latency Detected in Key Vault \`$kv_name\` in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
             --arg details "$keyvaults_json" \
             --arg severity "$SEVERITY_LATENCY" \
-            --arg nextStep "Check Key Vault SKU limit in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\'\nUpgrade Key Vault sku in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\" \
+            --arg nextStep "Check Key Vault SKU limit in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`\nUpgrade Key Vault sku in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
             --arg name "$kv_name" \
             --arg kv_location "$kv_location" \
             --arg kv_sku "$kv_sku" \
             --arg kv_uri "$kv_uri" \
             --arg resource_url "$resource_url" \
             --arg latency "$latency" \
-            --arg latency_threshold "$LATENCY_THRESHOLD" \
+            --arg latency_threshold "$LATENCY_THRESHOLD-ms" \
             --arg expected "Key Vault \`$kv_name\` should have latency below $LATENCY_THRESHOLD ms in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
-            --arg actual "Key Vault \`$kv_name\` has latency of ${latency}ms (threshold: $LATENCY_THRESHOLD) in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+            --arg actual "Key Vault \`$kv_name\` has latency of $latency ms in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
             --arg reproduceHint "az monitor metrics list --resource \"/subscriptions/$subscription_id/resourceGroups/$resource_group/providers/Microsoft.KeyVault/vaults/$kv_name\" --metric ServiceApiLatency --aggregation average --interval \"$LATENCY_INTERVAL\" --query \"value[0].timeseries[0].data[-1].average\" --start-time \"$start_time\" --end-time \"$end_time\" --output tsv" \
             '.issues += [{
                "title": $title,
@@ -217,8 +217,8 @@ echo "$keyvaults_json" | jq -c '.[]' | while read -r kv_data; do
                "kv_uri": $kv_uri,
                "resource_url": $resource_url,
                "metric": "ServiceApiLatency",
-               "value": ($latency | tonumber),
-               "threshold": ($latency_threshold | tonumber),
+               "value": ($latency | tonumber | . * 100 | round / 100),
+               "threshold": ($latency_threshold),
                "expected": $expected,
                "actual": $actual,
                "reproduce_hint": $reproduceHint
