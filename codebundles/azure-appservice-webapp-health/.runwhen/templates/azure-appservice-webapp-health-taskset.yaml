@@ -20,7 +20,7 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/azure-appservice-webapp-triage/runbook.robot
+    pathToRobot: codebundles/azure-appservice-webapp-health/runbook.robot
   configProvided:
     - name: AZ_RESOURCE_GROUP
       value: {{resource_group.name}}
