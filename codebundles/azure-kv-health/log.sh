@@ -43,7 +43,7 @@ if ! keyvaults=$(az keyvault list -g "$AZURE_RESOURCE_GROUP" --subscription "$AZ
     issues_json=$(echo "$issues_json" | jq \
         --arg title "Failed to List Key Vaults" \
         --arg details "$err_msg" \
-        --arg severity "1" \
+        --arg severity "4" \
         --arg nextStep "Check if the resource group exists and you have the right CLI permissions." \
         '.issues += [{
            "title": $title,
@@ -61,7 +61,7 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
     name=$(echo $row | jq -r '.name')
     resourceGroup=$(echo $row | jq -r '.resourceGroup')
     resource_id=$(echo $row | jq -r '.id')
-    
+    resource_url="https://portal.azure.com/#@/resource${resource_id}"
     echo "Processing Key Vault: $name"
     
     # Get diagnostic settings
@@ -76,11 +76,13 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
             --arg details "No diagnostic settings send logs to Log Analytics. $err_msg" \
             --arg severity "4" \
             --arg nextStep "Configure a diagnostic setting to forward Key Vault \`$name\` logs to Log Analytics in Resource Group \`$AZURE_RESOURCE_GROUP\`" \
+            --arg resource_url "$resource_url" \
             '.issues += [{
                "title": $title,
                "details": $details,
                "next_step": $nextStep,
-               "severity": ($severity | tonumber)
+               "severity": ($severity | tonumber),
+               "resource_url": $resource_url
              }]')
         continue
     fi
@@ -99,11 +101,13 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
                 --arg details "Diagnostic settings exist but no Log Analytics workspace is configured." \
                 --arg severity "1" \
                 --arg nextStep "Configure at least one setting to send logs to Log Analytics for Key Vault \`$name\` in Resource Group \`$AZURE_RESOURCE_GROUP\`" \
+                --arg resource_url "$resource_url" \
                 '.issues += [{
                    "title": $title,
                    "details": $details,
                    "next_step": $nextStep,
-                   "severity": ($severity | tonumber)
+                   "severity": ($severity | tonumber),
+                   "resource_url": $resource_url
                  }]')
             continue
         fi
@@ -120,11 +124,13 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
                 --arg details "$err_msg" \
                 --arg severity "1" \
                 --arg nextStep "Check if you have Reader or higher role on the workspace resource. Also verify it is a valid workspace ID." \
+                --arg resource_url "$resource_url" \
                 '.issues += [{
                    "title": $title,
                    "details": $details,
                    "next_step": $nextStep,
-                   "severity": ($severity | tonumber)
+                   "severity": ($severity | tonumber),
+                   "resource_url": $resource_url
                  }]')
             continue
         fi
@@ -143,11 +149,13 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
                 --arg details "$err_msg" \
                 --arg severity "1" \
                 --arg nextStep "Verify query syntax, aggregator, or ensure the workspace has logs." \
+                --arg resource_url "$resource_url" \
                 '.issues += [{
                    "title": $title,
                    "details": $details,
                    "next_step": $nextStep,
-                   "severity": ($severity | tonumber)
+                   "severity": ($severity | tonumber),
+                   "resource_url": $resource_url
                  }]')
             continue
         fi
@@ -200,11 +208,44 @@ EOF
                     --argjson details "$details_json" \
                     --arg severity "3" \
                     --arg nextStep "$nextStep" \
+                    --arg resource_url "$resource_url" \
                     '.issues += [{
                     "title": $title,
                     "details": $details,
                     "next_step": $nextStep,
-                    "severity": ($severity | tonumber)
+                    "severity": ($severity | tonumber),
+                    "resource_url": $resource_url
+                    }]')
+            fi
+
+            # Check for throttling events (HTTP 429)
+            throttling_events=$(jq -r '.[] | select(.httpStatusCode_d == "429")' "$TEMP_LOG_FILE")
+            if [[ -n "$throttling_events" ]]; then
+                details_json=$(echo "$throttling_events" | jq -s '
+                    group_by(.OperationName) | 
+                    map({
+                        operation: .[0].OperationName,
+                        requestUri: .[0].requestUri_s,
+                        userAgent: .[0].userAgent_s,
+                        clientIP: .[0].CallerIPAddress,
+                        resultDescription: .[0].ResultDescription,
+                        vaultName: .[0].eventGridEventProperties_data_VaultName_s,
+                        count: length
+                    })
+                ')
+
+                issues_json=$(echo "$issues_json" | jq \
+                    --arg title "Key Vault Throttling Detected (HTTP 429) in $name in in resource group \`$AZURE_RESOURCE_GROUP\` in subscription \`$AZURE_SUBSCRIPTION_NAME\`" \
+                    --argjson details "$details_json" \
+                    --arg severity "3" \
+                    --arg nextStep "Review Key vault client retry logic.\n Split workloads across multiple key vaults if needed." \
+                    --arg resource_url "$resource_url" \
+                    '.issues += [{
+                    "title": $title,
+                    "details": $details,
+                    "next_step": $nextStep,
+                    "severity": ($severity | tonumber),
+                    "resource_url": $resource_url
                     }]')
             fi
 
@@ -232,11 +273,13 @@ EOF
                     --argjson details "$details_json" \
                     --arg severity "3" \
                     --arg nextStep "1. Review and rotate expired secrets/keys. 2. Check last access time to determine usage. 3. Verify if keys/secrets are still enabled. 4. Consider implementing automatic rotation. 5. Review operations history to understand usage patterns. 6. Check if associated resources still need these credentials." \
+                    --arg resource_url "$resource_url" \
                     '.issues += [{
                        "title": $title,
                        "details": $details,
                        "next_step": $nextStep,
-                       "severity": ($severity | tonumber)
+                       "severity": ($severity | tonumber),
+                       "resource_url": $resource_url
                      }]')
             fi
         fi
