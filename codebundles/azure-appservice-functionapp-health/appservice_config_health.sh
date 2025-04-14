@@ -13,8 +13,8 @@
 #  - Whether HTTPS-only is enforced
 #  - Which plan SKU is being used
 
-# If you need to select a particular subscription, uncomment:
-# az account set --subscription "$AZ_SUBSCRIPTION"
+# Make sure we’re using the correct subscription
+az account set --subscription "${AZ_SUBSCRIPTION}"
 
 issues_json='{"issues": []}'
 

@@ -7,7 +7,7 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/app%20services/10035-icon-service-App-Services.svg
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/compute/10029-icon-service-Function-Apps.svg
   alias: Azure Function App Health for {{match_resource.resource.name}} in resource group {{resource_group.name}}
   asMeasuredBy: An aggregate score that is evaluated from configuration, metric, event or log issues. 
   configProvided:

@@ -24,7 +24,7 @@ Check for Resource Health Issues Affecting Function App `${FUNCTION_APP_NAME}` I
     ...    show_in_rwl_cheatsheet=true
 
     ${resource_health_output}=    RW.CLI.Run Cli
-    ...    cmd=cat app_service_health.json | tr -d '\n'
+    ...    cmd=cat function_app_health.json | tr -d '\n'
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -47,7 +47,7 @@ Check Function App `${FUNCTION_APP_NAME}` Health Check Metrics In Resource Group
     ...    include_in_history=false
 
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat app_service_health_check_issues.json
+    ...    cmd=cat function_app_health_check_issues.json
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -73,7 +73,7 @@ Check Function App `${FUNCTION_APP_NAME}` Configuration Health In Resource Group
     ...    include_in_history=false
 
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat az_app_service_health.json
+    ...    cmd=cat az_function_app_config_health.json
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -127,7 +127,7 @@ Fetch Function App `${FUNCTION_APP_NAME}` Activities In Resource Group `${AZ_RES
     RW.Core.Add Pre To Report    ${activities.stdout}
 
     ${issues}=    RW.CLI.Run Cli    
-    ...    cmd=cat app_service_activities_issues.json
+    ...    cmd=cat function_app_activities_issues.json
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     Set Global Variable     ${app_service_activities_score}    1
     IF    len(@{issue_list["issues"]}) > 0
@@ -141,8 +141,37 @@ Fetch Function App `${FUNCTION_APP_NAME}` Activities In Resource Group `${AZ_RES
         END
     END
 
+
+Check Logs for Errors in Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Gets the events of appservice and checks for errors
+    [Tags]    appservice    logs    errors    access:read-only
+    ${log_errors}=    RW.CLI.Run Bash File
+    ...    bash_file=appservice_log_analysis.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${log_errors.stdout}
+
+    ${issues}=    RW.CLI.Run Cli    
+    ...    cmd=cat function_app_log_issues_report.json
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+
+    Set Global Variable     ${app_service_log_error_score}    1
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            IF    ${item["severity"]} != 4
+                Set Global Variable    ${app_service_log_error_score}    0
+                Exit For Loop
+            ELSE IF    ${item["severity"]} > 2
+                Set Global Variable    ${app_service_log_error_score}    1
+            END
+        END
+    END
+
+
+
 Generate Function App Health Score for `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}`
-    ${app_service_health_score}=      Evaluate  (${appservice_resource_score} + ${app_service_health_check_score} + ${app_service_config_score} + ${app_service_activities_score} + ${app_service_deployment_score}) / 5
+    ${app_service_health_score}=      Evaluate  (${appservice_resource_score} + ${app_service_health_check_score} + ${app_service_config_score} + ${app_service_activities_score} + ${app_service_deployment_score} + ${app_service_log_error_score}) / 6
     ${health_score}=      Convert to Number    ${app_service_health_score}  2
     RW.Core.Push Metric    ${health_score}
 

@@ -1,23 +1,35 @@
 #!/bin/bash
 
 # ENV:
-# AZ_USERNAME
-# AZ_SECRET_VALUE
-# AZ_SUBSCRIPTION
-# AZ_TENANT
-# APP_SERVICE_NAME
-# AZ_RESOURCE_GROUP
+#   AZ_USERNAME (optional if your Azure CLI is already authenticated)
+#   AZ_SECRET_VALUE (optional)
+#   AZ_SUBSCRIPTION (optional if your Azure CLI context is correct)
+#   AZ_TENANT (optional)
+#   FUNCTION_APP_NAME  - Name of the Azure Function App
+#   AZ_RESOURCE_GROUP  - Resource group containing the Function App
 
-LOG_PATH="_rw_logs_$APP_SERVICE_NAME.zip"
+# Name of the zip file to store logs
+LOG_PATH="_rw_logs_${FUNCTION_APP_NAME}.zip"
+
+# Retrieve the current subscription ID (or use AZ_SUBSCRIPTION if you prefer)
 subscription_id=$(az account show --query "id" -o tsv)
 
-# # Set the subscription
-az account set --subscription $subscription_id
+# If needed, you can explicitly set the subscription (uncomment):
+# az account set --subscription "$AZ_SUBSCRIPTION"
 
-az webapp log download --name $APP_SERVICE_NAME --resource-group $AZ_RESOURCE_GROUP --subscription $subscription_id --log-file $LOG_PATH
-log_contents=$(unzip -qq -c $LOG_PATH)
+echo "Downloading logs for Azure Function App: $FUNCTION_APP_NAME ..."
 
-echo "Azure App Service $APP_SERVICE_NAME logs:"
+# Even though it's a Function App, we can still use 'az webapp log download'
+# because Function Apps and Web Apps share the Microsoft.Web/sites resource type.
+az webapp log download \
+  --name "$FUNCTION_APP_NAME" \
+  --resource-group "$AZ_RESOURCE_GROUP" \
+  --subscription "$subscription_id" \
+  --log-file "$LOG_PATH"
+
+# Unzip and display the contents
+log_contents=$(unzip -qq -c "$LOG_PATH")
+
+echo "Azure Function App '$FUNCTION_APP_NAME' logs:"
 echo ""
-echo ""
-echo -e "$log_contents"
+echo "$log_contents"

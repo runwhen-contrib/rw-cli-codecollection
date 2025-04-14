@@ -19,9 +19,6 @@ end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 # Make sure we’re using the correct subscription
 az account set --subscription "${AZ_SUBSCRIPTION}"
 
-# (Optional) Log in to Azure CLI as SP if needed (uncomment if your environment requires an explicit login step)
-# az login --service-principal --username "$AZ_USERNAME" --password "$AZ_SECRET_VALUE" --tenant "$AZ_TENANT" > /dev/null
-
 # Remove previous issues JSON file if it exists
 [ -f "function_app_activities_issues.json" ] && rm "function_app_activities_issues.json"
 
