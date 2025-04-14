@@ -67,8 +67,8 @@ if [[ -z "$DEPLOYMENTS" || "$DEPLOYMENTS" == "[]" ]]; then
         echo "Production is in state: $PROD_STATE"
         issues_json=$(echo "$issues_json" | jq \
             --arg state "$PROD_STATE" \
-            --arg title "Production Deployment Issue" \
-            --arg nextStep "Investigate the production Function App in the Azure Portal." \
+            --arg title "Production Deployment Issue with Function App \`$FUNCTION_APP_NAME\` " \
+            --arg nextStep "Investigate the production Function App \`$FUNCTION_APP_NAME\` in the Azure Portal." \
             --arg severity "1" \
             --arg config "$DEPLOYMENT_CONFIG" \
             '.issues += [{
@@ -103,8 +103,8 @@ else
             echo "Warning: State missing for slot '$slot'."
             issues_json=$(echo "$issues_json" | jq \
                 --arg slot "$slot" \
-                --arg title "Slot State Missing" \
-                --arg nextStep "Check the slot '$slot' in the Azure Portal." \
+                --arg title "Slot State Missing for Function App \`$FUNCTION_APP_NAME\`" \
+                --arg nextStep "Check the slot \`$slot\` in the Azure Portal." \
                 --arg severity "3" \
                 --arg config "$SLOT_DETAILS" \
                 '.issues += [{
@@ -121,8 +121,8 @@ else
             issues_json=$(echo "$issues_json" | jq \
                 --arg slot "$slot" \
                 --arg state "$SLOT_STATE" \
-                --arg title "Deployment Slot Issue" \
-                --arg nextStep "Investigate the issue with slot '$slot' in the Azure Portal." \
+                --arg title "Deployment Slot Issue with Function App \`$FUNCTION_APP_NAME\`" \
+                --arg nextStep "Investigate the issue with slot \`$slot\` in the Azure Portal." \
                 --arg severity "2" \
                 --arg config "$SLOT_DETAILS" \
                 '.issues += [{

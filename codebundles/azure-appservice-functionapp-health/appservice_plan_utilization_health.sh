@@ -52,8 +52,8 @@ echo ""
 # If function app is not running, note an issue (optional).
 if [[ "$app_state" != "Running" ]]; then
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Function App Not Running" \
-        --arg nextStep "Ensure the Function App is started before analyzing usage." \
+        --arg title "Function App \`$FUNCTION_APP_NAME\` Not Running" \
+        --arg nextStep "Ensure Function App \`$FUNCTION_APP_NAME\` is started before analyzing usage." \
         --arg severity "2" \
         --arg details "State: $app_state" \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
@@ -145,8 +145,8 @@ for metric in "${metrics_list[@]}"; do
         # etc.
         if [[ "$metric" == "CpuPercentage" && $(echo "$val > 80" | bc -l) -eq 1 ]]; then
             issues_json=$(echo "$issues_json" | jq \
-                --arg title "High CPU Usage" \
-                --arg nextStep "Investigate or scale your plan if CPU usage is persistently above 80%." \
+                --arg title "High CPU Usage for Function App \`$FUNCTION_APP_NAME\`" \
+                --arg nextStep "Investigate or scale your plan if CPU usage is persistently above 80% for Function App \`$FUNCTION_APP_NAME\`" \
                 --arg severity "2" \
                 --arg details "CPU: $val%" \
                 '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
@@ -156,8 +156,8 @@ for metric in "${metrics_list[@]}"; do
         if [[ "$metric" == "MemoryWorkingSet" && $(echo "$val > 1073741824" | bc -l) -eq 1 ]]; then
             # 1 GB threshold example
             issues_json=$(echo "$issues_json" | jq \
-                --arg title "High Memory Usage" \
-                --arg nextStep "Investigate or scale out your plan if memory usage is frequently above 1GB." \
+                --arg title "High Memory Usage for Function App \`$FUNCTION_APP_NAME\`" \
+                --arg nextStep "Investigate or scale out your plan if memory usage is frequently above 1GB for Function App \`$FUNCTION_APP_NAME\`" \
                 --arg severity "2" \
                 --arg details "Memory usage: $val bytes" \
                 '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
@@ -167,8 +167,8 @@ for metric in "${metrics_list[@]}"; do
         if [[ "$metric" == "CpuTime" && $(echo "$val > 100" | bc -l) -eq 1 ]]; then
             # Arbitrary CPU time threshold example
             issues_json=$(echo "$issues_json" | jq \
-                --arg title "High CPU Time (Function-level)" \
-                --arg nextStep "Investigate function usage or optimize code if CPUTime is excessively high." \
+                --arg title "High CPU Time (Function-level) for Function App \`$FUNCTION_APP_NAME\`" \
+                --arg nextStep "Investigate function usage or optimize code if CPUTime is excessively high for Function App \`$FUNCTION_APP_NAME\`" \
                 --arg severity "3" \
                 --arg details "CpuTime: $val (seconds?), metric depends on plan." \
                 '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'

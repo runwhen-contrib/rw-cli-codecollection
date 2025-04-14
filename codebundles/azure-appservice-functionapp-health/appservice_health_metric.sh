@@ -38,8 +38,8 @@ function_app_state=$(az functionapp show \
 if [[ "$function_app_state" != "Running" ]]; then
     echo "Function App '$FUNCTION_APP_NAME' is not running. Metrics may be inaccurate."
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Function App Not Running" \
-        --arg nextStep "Ensure the Function App is running before collecting metrics." \
+        --arg title "Function App \`$FUNCTION_APP_NAME\` Not Running" \
+        --arg nextStep "Ensure the Function App \`$FUNCTION_APP_NAME\` is running before collecting metrics" \
         --arg severity "2" \
         --arg details "Current state: $function_app_state" \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
@@ -149,8 +149,8 @@ echo ""
 # If we have 0 executions in the entire time range, might be an issue
 if (( $(echo "$execution_count_total == 0" | bc -l) )); then
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "No Function Executions" \
-        --arg nextStep "Verify that triggers are set up and that the function is invoked." \
+        --arg title "No Function Executions for Funcation App \`$FUNCTION_APP_NAME\`" \
+        --arg nextStep "Verify that triggers are set up for Function App \`$FUNCTION_APP_NAME\` and that the function is invoked" \
         --arg severity "3" \
         --arg details "No executions recorded for '$FUNCTION_APP_NAME' over the last $TIME_PERIOD_MINUTES minute(s)." \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
@@ -160,8 +160,8 @@ fi
 # If there were errors recorded
 if (( $(echo "$errors_total > 0" | bc -l) )); then
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Function Errors Detected" \
-        --arg nextStep "Investigate error logs or Application Insights traces for '$FUNCTION_APP_NAME'." \
+        --arg title "Function Errors Detected for Function App \`$FUNCTION_APP_NAME\`" \
+        --arg nextStep "Investigate error logs or Application Insights traces for '$FUNCTION_APP_NAME'" \
         --arg severity "2" \
         --arg details "Total errors: $errors_total" \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
@@ -171,8 +171,8 @@ fi
 # Optionally, if you want to warn about high execution units (representing cost/usage):
 if (( $(echo "$execution_units_total > 100" | bc -l) )); then
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "High Function Execution Units" \
-        --arg nextStep "Review cost and scaling settings for '$FUNCTION_APP_NAME'." \
+        --arg title "High Function Execution Units for Function App \`$FUNCTION_APP_NAME\`" \
+        --arg nextStep "Review cost and scaling settings for \`$FUNCTION_APP_NAME\`" \
         --arg severity "3" \
         --arg details "Execution units exceeded 100 in the last $TIME_PERIOD_MINUTES minute(s)." \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'

@@ -58,7 +58,7 @@ echo "HTTPS Only: $HTTPS_ONLY"
 if [ "$STATE" != "Running" ]; then
     issues_json=$(echo "$issues_json" | jq \
         --arg title "Function App Not Running" \
-        --arg nextStep "Check the Function App state and troubleshoot in the Azure Portal." \
+        --arg nextStep "Check the Function App \`$FUNCTION_APP_NAME\` state and troubleshoot in the Azure Portal." \
         --arg severity "1" \
         --arg details "State: $STATE" \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
@@ -77,7 +77,7 @@ else
     echo "Diagnostic settings are not enabled."
     issues_json=$(echo "$issues_json" | jq \
         --arg title "Diagnostic Settings Missing" \
-        --arg nextStep "Enable diagnostic settings in the Azure Portal for '$FUNCTION_APP_NAME' in resource group '$AZ_RESOURCE_GROUP'." \
+        --arg nextStep "Enable diagnostic settings in the Azure Portal for \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`." \
         --arg severity "4" \
         --arg details "Diagnostic settings are not configured for this Function App." \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
@@ -89,7 +89,7 @@ if [ "$HTTPS_ONLY" != "true" ]; then
     echo "HTTPS is not enforced."
     issues_json=$(echo "$issues_json" | jq \
         --arg title "HTTPS Enforcement Disabled" \
-        --arg nextStep "Enable the HTTPS-only setting for '$FUNCTION_APP_NAME' in resource group '$AZ_RESOURCE_GROUP'." \
+        --arg nextStep "Enable the HTTPS-only setting for \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`." \
         --arg severity "2" \
         --arg details "HTTPS is not enforced on the Function App." \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
@@ -111,7 +111,7 @@ if [ -n "$APP_SERVICE_PLAN" ] && [[ "$APP_SERVICE_PLAN" != "null" ]]; then
             echo "Free App Service Plan detected."
             issues_json=$(echo "$issues_json" | jq \
                 --arg title "Free App Service Plan in Use" \
-                --arg nextStep "Consider upgrading to a paid App Service Plan for '$FUNCTION_APP_NAME' in resource group '$AZ_RESOURCE_GROUP'." \
+                --arg nextStep "Consider upgrading to a paid App Service Plan for \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`." \
                 --arg severity "3" \
                 --arg details "App Service Plan SKU: $SKUID" \
                 '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'

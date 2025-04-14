@@ -53,10 +53,10 @@ else
                 echo "Errors found in $log_file:"
                 echo "$ERROR_LOGS"
                 issues_json=$(echo "$issues_json" | jq \
-                    --arg funcName "$FUNCTION_APP_NAME" \
+                    --arg funcName "\`$FUNCTION_APP_NAME\`" \
                     --arg logFile "$(basename "$log_file")" \
                     --arg details "$ERROR_LOGS" \
-                    --arg nextStep "Review log file $(basename "$log_file") to address errors." \
+                    --arg nextStep "Review log file $(basename "$log_file") to address errors for Function App \`$FUNCTION_APP_NAME\`" \
                     --arg severity "3" \
                     '.issues += [{
                         "title": "Log File Errors with " + $funcName,

@@ -96,8 +96,8 @@ for level in "${!log_levels[@]}"; do
     # If we found logs for this level, add them as an "issue" in the JSON
     if [[ $(echo "$details" | jq length) -gt 0 ]]; then
         issues_json=$(echo "$issues_json" | jq \
-            --arg title "$level level issues detected for Azure Function App '$FUNCTION_APP_NAME' in Resource Group '$AZ_RESOURCE_GROUP'" \
-            --arg nextStep "Review the $level-level activity logs for Azure Function App '$FUNCTION_APP_NAME'. [Activity log URL]($event_log_url)" \
+            --arg title "$level level issues detected for Azure Function App \`$FUNCTION_APP_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\`" \
+            --arg nextStep "Review the $level-level activity logs for Azure Function App \`$FUNCTION_APP_NAME\`. [Activity log URL]($event_log_url)" \
             --arg severity "${log_levels[$level]}" \
             --argjson logs "$details" \
             '.issues += [{
