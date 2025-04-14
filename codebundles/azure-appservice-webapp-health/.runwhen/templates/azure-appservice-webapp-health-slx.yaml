@@ -20,3 +20,4 @@ spec:
   statement: App Service {{match_resource.resource.name}} in resource group {{resource_group.name}} be available and healthy. 
   additionalContext:
     name: "{{match_resource.resource.name}}"
+    kind: "{{match_resource.kind}}"
