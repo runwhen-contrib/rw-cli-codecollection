@@ -150,10 +150,10 @@ Check Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}` in Su
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
-
+    ${log_file_path}=    Set Variable    "${CODEBUNDLE_TEMP_DIR}/kv_expiry_issues.json"
     # Load issues from generated JSON file
     TRY
-        ${expiry_data}=    Evaluate    json.load(open('${CODEBUNDLE_TEMP_DIR}/kv_expiry_issues.json'))    json
+        ${expiry_data}=    Evaluate    json.load(open(${log_file_path}))    json
     EXCEPT
         Log    Failed to load JSON file, defaulting to empty list.    WARN
         ${expiry_data}=    Create Dictionary    issues=[]
@@ -162,7 +162,7 @@ Check Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}` in Su
     IF    len(${expiry_data['issues']}) > 0
         # Format and display results
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '["Name", "Item", "Resource-URL", "Remaining-Days"], (.issues[] | [ .name, .item, .resource_url, .remaining_days ]) | @tsv' kv_expiry_issues.json | column -t
+        ...    cmd=jq -r '["Name", "Item", "Remaining-Days", "Resource-URL"], (.issues[] | [ .name, .item, .remaining_days, .resource_url]) | @tsv' ${log_file_path} | column -t
         RW.Core.Add Pre To Report    Key Vault Expiry Issues Summary:\n===================================\n${formatted_results.stdout}
 
         # Create issues for each finding
@@ -182,7 +182,7 @@ Check Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}` in Su
 
     # Clean up generated file
     ${remove_file}=    RW.CLI.Run Cli
-    ...    cmd=rm -f kv_expiry_issues.json
+    ...    cmd=rm -f ${log_file_path}
 
 Check Key Vault Logs for Issues in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Check Key Vault log issues
@@ -192,17 +192,19 @@ Check Key Vault Logs for Issues in resource group `${AZURE_RESOURCE_GROUP}` in S
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
-
+    ${log_file_path}=    Set Variable    "${CODEBUNDLE_TEMP_DIR}/kv_log_issues.json"
     TRY
-        ${log_data}=    Evaluate    json.load(open('${CODEBUNDLE_TEMP_DIR}/kv_log_issues.json'))    json
+        ${log_data}=    Evaluate    json.load(open(${log_file_path}))    json
     EXCEPT
         Log    Failed to load JSON file, defaulting to empty list.    WARN
         ${log_data}=    Create Dictionary    issues=[]
     END
 
     IF    len(${log_data['issues']}) > 0
+        ${resource_url}=    Set Variable    ${log_data['issues'][0]['resource_url']}
+        ${json_str}=    Evaluate    json.dumps(${log_data})    json
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '["Operation", "HTTP-Status", "Client-Info", "IP", "ID", "Description"], (.issues[] | .details[] | [(.operation // ""), (.httpStatusCode // ""), (.clientInfo // "" | gsub(" "; "_")), (.ip // ""), (.id // ""), (.resultDescription // "")]) | @tsv' kv_log_issues.json | column -t
+        ...    cmd=jq -r --arg resource_url "${resource_url}" '["Operation", "HTTP-Status", "Client-Info", "IP", "ID", "Description", "Resource-URL"], (.issues[] | .details[] | [(.operation // ""), (.httpStatusCode // ""), (.clientInfo // "" | gsub(" "; "_")), (.ip // ""), (.id // ""), (.resultDescription // ""), ($resource_url // "")]) | @tsv' ${log_file_path} | column -t
         RW.Core.Add Pre To Report    Key Vault Log Issues Summary:\n================================\n${formatted_results.stdout}
 
         FOR    ${issue}    IN    @{log_data['issues']}
@@ -219,7 +221,7 @@ Check Key Vault Logs for Issues in resource group `${AZURE_RESOURCE_GROUP}` in S
         RW.Core.Add Pre To Report    "No issues found in Key Vault logs in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
     END
     ${remove_file}=    RW.CLI.Run Cli
-    ...    cmd=rm -f kv_log_issues.json
+    ...    cmd=rm -f ${log_file_path}
 
 Check Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Check Key Vault performance metrics for excessive requests and high latency
@@ -229,9 +231,9 @@ Check Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}` 
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
-
+    ${log_file_path}=    Set Variable    "${CODEBUNDLE_TEMP_DIR}/azure_keyvault_performance_metrics.json"
     TRY
-        ${metrics_data}=    Evaluate    json.load(open('${CODEBUNDLE_TEMP_DIR}/azure_keyvault_performance_metrics.json'))    json
+        ${metrics_data}=    Evaluate    json.load(open(${log_file_path}))    json
     EXCEPT
         Log    Failed to load JSON file, defaulting to empty list.    WARN
         ${metrics_data}=    Create Dictionary    issues=[]
@@ -239,7 +241,7 @@ Check Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}` 
 
     IF    len(${metrics_data['issues']}) > 0
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '["KeyVault", "Metric", "Value", "Threshold", "Resource URL"], (.issues[] | [.name, .metric, .value, .threshold, .resource_url]) | @tsv' azure_keyvault_performance_metrics.json | column -t
+        ...    cmd=jq -r '["KeyVault", "Metric", "Value", "Threshold", "Resource URL"], (.issues[] | [.name, .metric, .value, .threshold, .resource_url]) | @tsv' ${log_file_path} | column -t
         RW.Core.Add Pre To Report    Key Vault Performance Metrics Issues:\n==========================================\n${formatted_results.stdout}
 
         FOR    ${issue}    IN    @{metrics_data['issues']}
@@ -257,7 +259,7 @@ Check Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}` 
     END
 
     ${remove_file}=    RW.CLI.Run Cli
-    ...    cmd=rm -f azure_keyvault_performance_metrics.json
+    ...    cmd=rm -f ${log_file_path}
 
 *** Keywords ***
 Suite Initialization
