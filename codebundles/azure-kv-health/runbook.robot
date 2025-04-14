@@ -316,6 +316,16 @@ Suite Initialization
     ...    description=Time range for log queries (format: 1d, 7d, 30d, etc.)
     ...    default=1d
     ...    example=2d
+    ${SEVERITY_REQUEST}=    RW.Core.Import User Variable    SEVERITY_REQUEST
+    ...    type=string
+    ...    description=Severity level for excessive request issues (1=Low, 2=Medium, 3=High, 4=Critical)
+    ...    default=3
+    ...    example=3
+    ${SEVERITY_LATENCY}=    RW.Core.Import User Variable    SEVERITY_LATENCY
+    ...    type=string
+    ...    description=Severity level for high latency issues (1=Low, 2=Medium, 3=High, 4=Critical)
+    ...    default=3
+    ...    example=3
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
@@ -326,6 +336,8 @@ Suite Initialization
     Set Suite Variable    ${LATENCY_INTERVAL}    ${LATENCY_INTERVAL}
     Set Suite Variable    ${TIME_RANGE}    ${TIME_RANGE}
     Set Suite Variable    ${LOG_QUERY_DAYS}    ${LOG_QUERY_DAYS}
+    Set Suite Variable    ${SEVERITY_REQUEST}    ${SEVERITY_REQUEST}
+    Set Suite Variable    ${SEVERITY_LATENCY}    ${SEVERITY_LATENCY}
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}", "THRESHOLD_DAYS":"${THRESHOLD_DAYS}", "REQUEST_THRESHOLD":"${REQUEST_THRESHOLD}", "LATENCY_THRESHOLD":"${LATENCY_THRESHOLD}", "REQUEST_INTERVAL":"${REQUEST_INTERVAL}", "LATENCY_INTERVAL":"${LATENCY_INTERVAL}", "TIME_RANGE":"${TIME_RANGE}", "LOG_QUERY_DAYS":"${LOG_QUERY_DAYS}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}", "THRESHOLD_DAYS":"${THRESHOLD_DAYS}", "REQUEST_THRESHOLD":"${REQUEST_THRESHOLD}", "LATENCY_THRESHOLD":"${LATENCY_THRESHOLD}", "REQUEST_INTERVAL":"${REQUEST_INTERVAL}", "LATENCY_INTERVAL":"${LATENCY_INTERVAL}", "TIME_RANGE":"${TIME_RANGE}", "LOG_QUERY_DAYS":"${LOG_QUERY_DAYS}", "SEVERITY_REQUEST":"${SEVERITY_REQUEST}", "SEVERITY_LATENCY":"${SEVERITY_LATENCY}"}
