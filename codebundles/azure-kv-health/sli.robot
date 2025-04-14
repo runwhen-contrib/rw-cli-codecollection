@@ -102,9 +102,9 @@ Count Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}` in Su
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
-
+    ${log_file_path}=    Set Variable    "${CODEBUNDLE_TEMP_DIR}/kv_expiry_issues.json"
     TRY
-        ${expiry_data}=    Evaluate    json.load(open('${CODEBUNDLE_TEMP_DIR}/kv_expiry_issues.json'))    json
+        ${expiry_data}=    Evaluate    json.load(open(${log_file_path}))    json
     EXCEPT
         Log    Failed to load JSON file, defaulting to empty list.    WARN
         ${expiry_data}=    Create Dictionary    issues=[]
@@ -113,7 +113,7 @@ Count Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}` in Su
     ${issue_count}=    Set Variable    len(${expiry_data['issues']})
     ${kv_expiry_score}=    Evaluate    1 if ${issue_count} == 0 else 0
     ${remove_file}=    RW.CLI.Run Cli
-    ...    cmd=rm -f kv_expiry_issues.json
+    ...    cmd=rm -f ${log_file_path}
     Set Global Variable    ${kv_expiry_score}
 
 Count Key Vault Log Issues in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
@@ -124,9 +124,9 @@ Count Key Vault Log Issues in resource group `${AZURE_RESOURCE_GROUP}` in Subscr
     ...    env=${env}
     ...    timeout_seconds=300
     ...    include_in_history=false
-
+    ${log_file_path}=    Set Variable    "${CODEBUNDLE_TEMP_DIR}/kv_log_issues.json"
     TRY
-        ${log_data}=    Evaluate    json.load(open('${CODEBUNDLE_TEMP_DIR}/kv_log_issues.json'))    json
+        ${log_data}=    Evaluate    json.load(open(${log_file_path}))    json
     EXCEPT
         Log    Failed to load JSON file, defaulting to empty list.    WARN
         ${log_data}=    Create Dictionary    issues=[]
@@ -135,7 +135,7 @@ Count Key Vault Log Issues in resource group `${AZURE_RESOURCE_GROUP}` in Subscr
     ${issue_count}=    Set Variable    len(${log_data['issues']})
     ${kv_log_score}=    Evaluate    1 if ${issue_count} == 0 else 0
     ${remove_file}=    RW.CLI.Run Cli
-    ...    cmd=rm -f kv_log_issues.json
+    ...    cmd=rm -f ${log_file_path}
     Set Global Variable    ${kv_log_score}
 
 Count Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
@@ -146,9 +146,9 @@ Count Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}` 
     ...    env=${env}
     ...    timeout_seconds=300
     ...    include_in_history=false
-
+    ${log_file_path}=    Set Variable    "${CODEBUNDLE_TEMP_DIR}/azure_keyvault_performance_metrics.json"
     TRY
-        ${metrics_data}=    Evaluate    json.load(open('${CODEBUNDLE_TEMP_DIR}/azure_keyvault_performance_metrics.json'))    json
+        ${metrics_data}=    Evaluate    json.load(open(${log_file_path}))    json
     EXCEPT
         Log    Failed to load JSON file, defaulting to empty list.    WARN
         ${metrics_data}=    Create Dictionary    issues=[]
@@ -157,11 +157,11 @@ Count Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}` 
     ${issue_count}=    Set Variable    len(${metrics_data['issues']})
     ${kv_perf_score}=    Evaluate    1 if ${issue_count} == 0 else 0
     ${remove_file}=    RW.CLI.Run Cli
-    ...    cmd=rm -f azure_keyvault_performance_metrics.json
+    ...    cmd=rm -f ${log_file_path}
     Set Global Variable    ${kv_perf_score}
 
 Generate Comprehensive Key Vault Health Score
-    ${kv_health_score}=    Evaluate    (${kv_availability_score} + ${kv_config_score} + ${kv_expiry_score} + ${kv_log_score} + ${kv_perf_score}) / 5
+    ${kv_health_score}=    Evaluate    (${kv_resource_health_score} + ${kv_availability_score} + ${kv_config_score} + ${kv_expiry_score} + ${kv_log_score} + ${kv_perf_score}) / 6
     ${health_score}=    Convert to Number    ${kv_health_score}    2
     RW.Core.Push Metric    ${health_score}
 
