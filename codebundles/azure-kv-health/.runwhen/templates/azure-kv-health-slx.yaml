@@ -7,7 +7,7 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://PLACEHOLDER.svf
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/security/10245-icon-service-Key-Vaults.svg
   alias: Azure Key Vault Health in resource group {{ match_resource.resource_group.name }} in azure subscription {{ custom.subscription_name }}
   asMeasuredBy: Composite health score of resources & activities. 
   configProvided:
