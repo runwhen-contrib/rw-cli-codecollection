@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/kubernetes/resources/labeled/deploy.svg
-  alias: Istio sidecar check for cluster {{ cluster.name }}
+  alias: Istio system health checks for cluster {{ cluster.name }}
   asMeasuredBy: ""
   configProvided:
   - name: OBJECT_NAME

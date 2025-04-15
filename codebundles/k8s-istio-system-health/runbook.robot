@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 
-Check Deployments For Istio Sidecar Injection for Cluster {{ cluster.name }}
+Check Deployments For Istio Sidecar Injection for Cluster ${CONTEXT}
     [Documentation]    Checks all deployments in specified namespaces for Istio sidecar injection status
     [Tags]    
     ...    istio
@@ -59,7 +59,7 @@ Check Deployments For Istio Sidecar Injection for Cluster {{ cluster.name }}
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${formatted_report.stdout}
 
-Check Istio Sidecar resources usage for Cluster {{ cluster.name }}
+Check Istio Sidecar resources usage for Cluster ${CONTEXT}
     [Documentation]    Checks all pods in specified namespaces for Istio sidecar resources usage
     [Tags]    
     ...    istio
@@ -96,9 +96,8 @@ Check Istio Sidecar resources usage for Cluster {{ cluster.name }}
 
     RW.Core.Add Pre To Report   ${usage_report.stdout}
 
-#issue and report
 
-Verify Istio Istallation in Cluster {{ cluster.name }}
+Verify Istio Istallation in Cluster ${CONTEXT}
     [Documentation]    Verify Istio Istallation
     [Tags]    
     ...    istio
@@ -134,7 +133,7 @@ Verify Istio Istallation in Cluster {{ cluster.name }}
     RW.Core.Add Pre To Report   ${installation_report.stdout}
 
 
-Check Istio Controlplane logs for errors and warnings in Cluster {{ cluster.name }}
+Check Istio Controlplane logs for errors and warnings in Cluster ${CONTEXT}
     [Documentation]    Check controlplane logs for known erros and warnings
     ...    istio
     ...    logs
@@ -168,7 +167,7 @@ Check Istio Controlplane logs for errors and warnings in Cluster {{ cluster.name
     ...     include_in_history=false
     RW.Core.Add Pre To Report   ${logs_report.stdout}
 
-Check Istio Certificates for the Istio Components in Cluster {{ cluster.name }}
+Check Istio Certificates for the Istio Components in Cluster ${CONTEXT}
     [Documentation]    Check Istio valid Root CA and mTLS Certificates
     ...    istio
     ...    mtls
@@ -201,7 +200,7 @@ Check Istio Certificates for the Istio Components in Cluster {{ cluster.name }}
     ...     include_in_history=false
     RW.Core.Add Pre To Report   ${mtls_report.stdout}
 
-Analyze Istio configurations in Cluster {{ cluster.name }}
+Analyze Istio configurations in Cluster ${CONTEXT}
     [Documentation]    Check Istio configurations
     ...    istio
     ...    config
