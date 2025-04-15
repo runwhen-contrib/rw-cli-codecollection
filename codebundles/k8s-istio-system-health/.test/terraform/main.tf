@@ -39,9 +39,10 @@ module "eks" {
   enable_cluster_creator_admin_permissions = true
 
   cluster_addons = {
-    coredns    = {}
-    kube-proxy = {}
-    vpc-cni    = {}
+    coredns        = {}
+    kube-proxy     = {}
+    vpc-cni        = {}
+    metrics-server = {}
   }
 
   vpc_id     = module.vpc.vpc_id
@@ -81,26 +82,26 @@ module "eks" {
   tags = local.tags
 }
 
-module "eks-metrics-server" {
-  source  = "lablabs/eks-metrics-server/aws"
-  version = "1.0.1"
+# module "eks-metrics-server" {
+#   source  = "lablabs/eks-metrics-server/aws"
+#   version = "1.0.1"
 
-  enabled           = true
-  argo_enabled      = false
-  argo_helm_enabled = false
+#   enabled           = true
+#   argo_enabled      = false
+#   argo_helm_enabled = false
 
-  helm_release_name = "metrics-server"
-  namespace         = "kube-system"
+#   helm_release_name = "metrics-server"
+#   namespace         = "kube-system"
 
-  values = yamlencode({
-    "podLabels" : {
-      "app" : "metrics-server"
-    }
-  })
+#   values = yamlencode({
+#     "podLabels" : {
+#       "app" : "metrics-server"
+#     }
+#   })
 
-  helm_timeout = 240
-  helm_wait    = true
-}
+#   helm_timeout = 240
+#   helm_wait    = true
+# }
 
 ################################################################################
 # EKS Blueprints Addons
