@@ -38,11 +38,24 @@ resource "azurerm_data_factory_linked_service_azure_blob_storage" "blob" {
 }
 
 resource "azapi_resource" "fail_sim_pipeline" {
-  type      = "Microsoft.DataFactory/factories/pipelines@2018-06-01"
-  name      = "fail-sim-pipeline"
-  parent_id = azurerm_data_factory.adf.id
+  type                      = "Microsoft.DataFactory/factories/pipelines@2018-06-01"
+  name                      = "fail-sim-pipeline"
+  parent_id                 = azurerm_data_factory.adf.id
   schema_validation_enabled = false
-  body       = file("${path.module}/fail-sim-pipeline.json")
+  body = {
+    properties : {
+      activities : [
+        {
+          name : "FailStep",
+          type : "Fail",
+          typeProperties : {
+            message : "Simulated failure for monitoring.",
+            errorCode : 500
+          }
+        }
+      ]
+    }
+  }
   depends_on = [azurerm_data_factory.adf]
 }
 
