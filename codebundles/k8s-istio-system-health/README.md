@@ -51,7 +51,7 @@ EOF
 ```
 
 ```
-kubectl apply -f kubeconfig-sa-token.yaml
+kubectl apply -f terraform/kubeconfig-sa-token.yaml
 ```
 
 ```
@@ -64,6 +64,10 @@ kubectl config set-credentials kubeconfig-sa --token=$TOKEN
 
 ```
 kubectl config set-context --current --user=kubeconfig-sa
+```
+
+```
+kubectl config view --minify --raw
 ```
 
 
