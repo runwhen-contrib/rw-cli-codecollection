@@ -172,6 +172,9 @@ resource "azapi_resource" "sql_dataset" {
       }
     }
   }
+  depends_on = [
+    azapi_resource.copy_pipeline
+  ]
 }
 
 resource "azapi_resource" "blob_dataset" {
@@ -196,6 +199,9 @@ resource "azapi_resource" "blob_dataset" {
       }
     }
   }
+  depends_on = [
+    azapi_resource.copy_pipeline
+  ]
 }
 
 resource "azurerm_monitor_diagnostic_setting" "adf_diag" {
