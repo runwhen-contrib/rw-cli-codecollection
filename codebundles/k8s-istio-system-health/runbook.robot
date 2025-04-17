@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 
-Check Deployments For Istio Sidecar Injection for Cluster ${CONTEXT}
+Check Deployments for Istio Sidecar Injection for Cluster ${CLUSTER}
     [Documentation]    Checks all deployments in specified namespaces for Istio sidecar injection status
     [Tags]    
     ...    istio
@@ -59,7 +59,7 @@ Check Deployments For Istio Sidecar Injection for Cluster ${CONTEXT}
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${formatted_report.stdout}
 
-Check Istio Sidecar resources usage for Cluster ${CONTEXT}
+Check Istio Sidecar resources usage for Cluster ${CLUSTER}
     [Documentation]    Checks all pods in specified namespaces for Istio sidecar resources usage
     [Tags]    
     ...    istio
@@ -97,7 +97,7 @@ Check Istio Sidecar resources usage for Cluster ${CONTEXT}
     RW.Core.Add Pre To Report   ${usage_report.stdout}
 
 
-Verify Istio Istallation in Cluster ${CONTEXT}
+Verify Istio Istallation in Cluster ${CLUSTER}
     [Documentation]    Verify Istio Istallation
     [Tags]    
     ...    istio
@@ -133,7 +133,7 @@ Verify Istio Istallation in Cluster ${CONTEXT}
     RW.Core.Add Pre To Report   ${installation_report.stdout}
 
 
-Check Istio Controlplane logs for errors and warnings in Cluster ${CONTEXT}
+Check Istio Controlplane logs for errors and warnings in Cluster ${CLUSTER}
     [Documentation]    Check controlplane logs for known erros and warnings
     ...    istio
     ...    logs
@@ -167,7 +167,7 @@ Check Istio Controlplane logs for errors and warnings in Cluster ${CONTEXT}
     ...     include_in_history=false
     RW.Core.Add Pre To Report   ${logs_report.stdout}
 
-Check Istio Certificates for the Istio Components in Cluster ${CONTEXT}
+Check Istio Certificates for the Istio Components in Cluster ${CLUSTER}
     [Documentation]    Check Istio valid Root CA and mTLS Certificates
     ...    istio
     ...    mtls
@@ -200,7 +200,7 @@ Check Istio Certificates for the Istio Components in Cluster ${CONTEXT}
     ...     include_in_history=false
     RW.Core.Add Pre To Report   ${mtls_report.stdout}
 
-Analyze Istio configurations in Cluster ${CONTEXT}
+Analyze Istio configurations in Cluster ${CLUSTER}
     [Documentation]    Check Istio configurations
     ...    istio
     ...    config
@@ -255,6 +255,11 @@ Suite Initialization
     ...    description=Which Kubernetes context to operate within.
     ...    pattern=\w*
     ...    example=my-main-cluster
+    ${CLUSTER}=    RW.Core.Import User Variable    CLUSTER
+    ...    type=string
+    ...    description=Which Kubernetes cluster to operate within.
+    ...    pattern=\w*
+    ...    example=my-main-cluster
 
     ${EXCLUDED_NAMESPACES}=    RW.Core.Import User Variable    EXCLUDED_NAMESPACES
     ...    type=string
@@ -266,8 +271,9 @@ Suite Initialization
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
+    Set Suite Variable    ${CLUSTER}    ${CLUSTER}
     Set Suite Variable    ${EXCLUDED_NAMESPACES}    ${EXCLUDED_NAMESPACES}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "EXCLUDED_NAMESPACES":"${EXCLUDED_NAMESPACES}", "OUTPUT_DIR":"${OUTPUT_DIR}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "CLUSTER":"${CLUSTER}", "EXCLUDED_NAMESPACES":"${EXCLUDED_NAMESPACES}", "OUTPUT_DIR":"${OUTPUT_DIR}"}
 

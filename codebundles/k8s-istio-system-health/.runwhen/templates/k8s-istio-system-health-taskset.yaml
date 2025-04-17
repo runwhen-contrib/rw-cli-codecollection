@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec: 
   location: {{default_location}}
-  description: istio sidecar check
+  description: istio system health check
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -23,7 +23,9 @@ spec:
     pathToRobot: codebundles/k8s-istio-system-health/runbook.robot
   configProvided:
     - name: CONTEXT
-      value: "{{context}}"
+      value: {{context}}
+    - name: CLUSTER
+      value: {{cluster}}
     - name: KUBERNETES_DISTRIBUTION_BINARY
       value: {{custom.kubernetes_distribution_binary}}
     - name: EXCLUDED_NAMESPACES
