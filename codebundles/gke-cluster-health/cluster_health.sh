@@ -1,337 +1,148 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # gke_cluster_health_nodepool_crashloop_list.sh
-#
-# This script checks each GKE cluster for:
-#   - node readiness
-#   - CPU/memory usage (aggregated by node pool label)
-#   - CrashLoopBackOff pods.
-#
-# For CrashLoop pods, the severity logic is:
-#   - If ANY pod's namespace is in a "critical" list => severity=1
-#   - Else => severity=4
-#
-# Additionally:
-#   - If we cannot fetch credentials for a cluster, we create an issue (severity=4 or as you like).
-#   - The "Suggested Next Steps" for CrashLoop pods now explicitly mentions "Check Namespace Health" for each namespace found.
-
+# Rev‑2.1 — 2025‑04‑18
 set -euo pipefail
 
-if ! command -v gcloud &>/dev/null; then
-  echo "Error: gcloud not found." >&2
-  exit 1
-fi
-if ! command -v kubectl &>/dev/null; then
-  echo "Error: kubectl not found." >&2
-  exit 1
-fi
-
-# Set KUBECONFIG so that gcloud can configure it with the appropriate credentials
-export KUBECONFIG="kubeconfig"
-
-# Comma-separated list of critical namespaces. If any CrashLoop pod is in one of these => severity=1, else 4.
-CRITICAL_NAMESPACES="${CRITICAL_NAMESPACES:-kube-system}"
-
-# Convert to an array for easy checking
-IFS=',' read -r -a CRITICAL_NS_ARRAY <<< "$CRITICAL_NAMESPACES"
-
-PROJECT="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true)}"
-if [ -z "$PROJECT" ]; then
-  echo "Error: No project set. Use PROJECT env or 'gcloud config set project <PROJECT_ID>'." >&2
-  exit 1
-fi
-
-REPORT_FILE="cluster_health_report.txt"
-ISSUES_FILE="cluster_health_issues.json"
-
-{
-  echo "GKE Cluster Health Report"
-  echo "Project: $PROJECT"
-  echo "-------------------------------------"
-} > "$REPORT_FILE"
-
-TEMP_ISSUES="cluster_health_issues_temp.json"
-echo "[" > "$TEMP_ISSUES"
-first_issue=true
-
-#########################
-# 1) List GKE clusters
-#########################
-echo "Fetching GKE clusters in project '$PROJECT'..."
-CLUSTERS_JSON="$(gcloud container clusters list --project="$PROJECT" --format=json || true)"
-if [ -z "$CLUSTERS_JSON" ] || [ "$CLUSTERS_JSON" = "[]" ]; then
-  echo "No GKE clusters found in project '$PROJECT'." | tee -a "$REPORT_FILE"
-  echo "]" >> "$TEMP_ISSUES"
-  mv "$TEMP_ISSUES" "$ISSUES_FILE"
-  exit 0
-fi
-
-NUM_CLUSTERS="$(echo "$CLUSTERS_JSON" | jq length)"
-for i in $(seq 0 $((NUM_CLUSTERS - 1))); do
-  CLUSTER_NAME="$(echo "$CLUSTERS_JSON" | jq -r ".[$i].name")"
-  CLUSTER_LOC="$(echo "$CLUSTERS_JSON" | jq -r ".[$i].location")"
-  if [ -z "$CLUSTER_NAME" ] || [ "$CLUSTER_NAME" = "null" ]; then
-    continue
-  fi
-
-  # Attempt to get credentials. If we fail, create an issue and skip.
-  if ! gcloud container clusters get-credentials "$CLUSTER_NAME" \
-       --zone "$CLUSTER_LOC" \
-       --project "$PROJECT" >/dev/null 2>&1; then
-
-    echo "Error: failed to get credentials for $CLUSTER_NAME. Skipping." | tee -a "$REPORT_FILE"
-
-    # Create a separate issue in the JSON and the report.
-    T="Insufficient Permissions / Error Getting Credentials for GKE Cluster \`$CLUSTER_NAME\`"
-    D="We do not have permission to get cluster credentials (or cluster does not exist)."
-    S=4  # e.g. 'major' or 'informational'; pick your own
-    R="Grant Container/Cluster credentials for GKE Cluster \`$CLUSTER_NAME\`."
-
-    {
-      echo "Issue: $T"
-      echo "Details: $D"
-      echo "Severity: $S"
-      echo "Suggested Next Steps: $R"
-      echo "-------------------------------------"
-    } >> "$REPORT_FILE"
-
-    if [ "$first_issue" = true ]; then
-      first_issue=false
-    else
-      echo "," >> "$TEMP_ISSUES"
-    fi
-
-    jq -n \
-      --arg title "$T" \
-      --arg details "$D" \
-      --arg suggested "$R" \
-      --argjson severity "$S" \
-      '{title: $title, details: $details, severity: $severity, suggested: $suggested}' \
-      >> "$TEMP_ISSUES"
-
-    # Now skip to next cluster
-    continue
-  fi
-
-  #########################
-  # 2) Check node readiness
-  #########################
-  echo "Checking node statuses..." | tee -a "$REPORT_FILE"
-  NODE_STATUSES="$(kubectl get nodes --no-headers 2>/dev/null || true)"
-  if [ -z "$NODE_STATUSES" ]; then
-    echo "No nodes found or error for cluster $CLUSTER_NAME." | tee -a "$REPORT_FILE"
-    continue
-  fi
-  echo "$NODE_STATUSES" >> "$REPORT_FILE"
-
-  NOT_READY="$(echo "$NODE_STATUSES" | grep -v " Ready " || true)"
-  if [ -n "$NOT_READY" ]; then
-    T="Node(s) Not Ready in GKE Cluster \`$CLUSTER_NAME\`"
-    D="The following nodes are not Ready:  $NOT_READY"
-    S=2
-    R="Describe and get events for NotReady nodes in GKE Cluster \`$CLUSTER_NAME\`"
-
-    {
-      echo "Issue: $T"
-      echo "Details: $D"
-      echo "Severity: $S"
-      echo "Suggested Next Steps: $R"
-      echo "-------------------------------------"
-    } >> "$REPORT_FILE"
-
-    if [ "$first_issue" = true ]; then
-      first_issue=false
-    else
-      echo "," >> "$TEMP_ISSUES"
-    fi
-    jq -n \
-      --arg title "$T" \
-      --arg details "$D" \
-      --arg suggested "$R" \
-      --argjson severity "$S" \
-      '{title: $title, details: $details, severity: $severity, suggested: $suggested}' \
-      >> "$TEMP_ISSUES"
-  fi
-
-  #########################################################
-  # 3) Node CPU/Memory usage, aggregated by nodepool label
-  #########################################################
-  echo "Checking node CPU/Memory usage with 'kubectl top nodes'..." | tee -a "$REPORT_FILE"
-  TOP_NODES="$(kubectl top nodes --no-headers 2>/dev/null || true)"
-  if [ -z "$TOP_NODES" ]; then
-    echo "No 'kubectl top' data. Possibly metrics server missing." | tee -a "$REPORT_FILE"
-  else
-    echo "$TOP_NODES" >> "$REPORT_FILE"
-
-    # Build a map from nodeName => nodePool
-    NODEPOOL_MAP="$(kubectl get nodes -o json | jq -r '.items[] | "\(.metadata.name) \(.metadata.labels["cloud.google.com/gke-nodepool"] // "unknown")"')"
-    declare -A NODEPOOL_OF
-    while read -r line; do
-      nodeN="$(echo "$line" | awk '{print $1}')"
-      poolN="$(echo "$line" | awk '{print $2}')"
-      NODEPOOL_OF["$nodeN"]="$poolN"
-    done <<< "$NODEPOOL_MAP"
-
-    # We'll store CPU & mem issues in a map keyed by nodepool.
-    declare -A CPU_ISSUES
-    declare -A MEM_ISSUES
-
-    while IFS= read -r line; do
-      # e.g. "gke-mycluster-mypool-abc 4000m 100% 6132Mi 60%"
-      nodeName="$(echo "$line" | awk '{print $1}')"
-      cpuPctRaw="$(echo "$line" | awk '{print $3}' | tr -d '%')"
-      memPctRaw="$(echo "$line" | awk '{print $5}' | tr -d '%')"
-      poolName="${NODEPOOL_OF[$nodeName]:-unknown}"
-
-      CPU_PCT=0
-      MEM_PCT=0
-      [[ "$cpuPctRaw" =~ ^[0-9]+$ ]] && CPU_PCT="$cpuPctRaw"
-      [[ "$memPctRaw" =~ ^[0-9]+$ ]] && MEM_PCT="$memPctRaw"
-
-      # thresholds: >=90 => severity=1, >=75 => severity=2
-      if [ "$CPU_PCT" -ge 75 ]; then
-        CPU_ISSUES["$poolName"]+="$nodeName=${CPU_PCT}%;"
-      fi
-      if [ "$MEM_PCT" -ge 75 ]; then
-        MEM_ISSUES["$poolName"]+="$nodeName=${MEM_PCT}%;"
-      fi
-    done <<< "$TOP_NODES"
-
-    # produce aggregated issues for CPU
-    for pool in "${!CPU_ISSUES[@]}"; do
-      entries="${CPU_ISSUES[$pool]}"
-      severity=2
-      IFS=';' read -ra arr <<< "$entries"
-      for e in "${arr[@]}"; do
-        pct="$(echo "$e" | grep -oE '[0-9]+%' | tr -d '%')"
-        if [ -n "$pct" ] && [ "$pct" -ge 90 ]; then
-          severity=1
-          break
-        fi
-      done
-      T="High CPU usage in GKE cluster \`$CLUSTER_NAME\`, nodepool \`$pool\`"
-      D="Nodes exceeding 75% CPU:  $(echo "$entries" | sed 's/;/\n/g')"
-      R="Consider scaling or investigating CPU usage on node pool \`$pool\`."
-
-      {
-        echo "Issue: $T"
-        echo "Details: $D"
-        echo "Severity: $severity"
-        echo "Suggested Next Steps: $R"
-        echo "-------------------------------------"
-      } >> "$REPORT_FILE"
-
-      if [ "$first_issue" = true ]; then
-        first_issue=false
-      else
-        echo "," >> "$TEMP_ISSUES"
-      fi
-      jq -n --arg title "$T" --arg details "$D" --arg suggested "$R" --argjson severity "$severity" \
-        '{title: $title, details: $details, severity: $severity, suggested: $suggested}' >> "$TEMP_ISSUES"
-    done
-
-    # produce aggregated issues for memory
-    for pool in "${!MEM_ISSUES[@]}"; do
-      entries="${MEM_ISSUES[$pool]}"
-      severity=2
-      IFS=';' read -ra arr <<< "$entries"
-      for e in "${arr[@]}"; do
-        pct="$(echo "$e" | grep -oE '[0-9]+%' | tr -d '%')"
-        if [ -n "$pct" ] && [ "$pct" -ge 90 ]; then
-          severity=1
-          break
-        fi
-      done
-      T="High memory usage in cluster \`$CLUSTER_NAME\`, nodepool \`$pool\`"
-      D="Nodes exceeding 75% memory:  $(echo "$entries" | sed 's/;/\n/g')"
-      R="Consider investigating memory usage or resizing node pool \`$pool\`."
-
-      {
-        echo "Issue: $T"
-        echo "Details: $D"
-        echo "Severity: $severity"
-        echo "Suggested Next Steps: $R"
-        echo "-------------------------------------"
-      } >> "$REPORT_FILE"
-
-      if [ "$first_issue" = true ]; then
-        first_issue=false
-      else
-        echo "," >> "$TEMP_ISSUES"
-      fi
-      jq -n --arg title "$T" --arg details "$D" --arg suggested "$R" --argjson severity "$severity" \
-        '{title: $title, details: $details, severity: $severity, suggested: $suggested}' >> "$TEMP_ISSUES"
-    done
-  fi
-
-  #############################################
-  # 4) CrashLoopBackOff with "critical" list
-  #############################################
-  echo "Checking for pods in CrashLoopBackOff (using critical namespace list)..." | tee -a "$REPORT_FILE"
-  CRASHLOOP="$(kubectl get pods -A --no-headers 2>/dev/null | awk '$4 ~ /CrashLoopBackOff/')"
-  if [ -n "$CRASHLOOP" ]; then
-    # We gather the unique namespaces so we can mention them specifically
-    declare -A NS_OF_CRASHLOOP=()
-    ANY_CRITICAL_NS=false
-    countCrash="$(echo "$CRASHLOOP" | wc -l)"
-
-    while IFS= read -r line; do
-      ns="$(echo "$line" | awk '{print $1}')"
-      NS_OF_CRASHLOOP["$ns"]=1  # just mark it
-      # check if ns in array
-      for cns in "${CRITICAL_NS_ARRAY[@]}"; do
-        if [ "$ns" = "$cns" ]; then
-          ANY_CRITICAL_NS=true
-          break
-        fi
-      done
-      if $ANY_CRITICAL_NS; then
-        # we can break once we know there's a critical ns
-        break
-      fi
-    done <<< "$CRASHLOOP"
-
-    # We'll build a short list of all the namespaces that have CrashLoop
-    all_crash_ns="$(printf "%s\n" "${!NS_OF_CRASHLOOP[@]}" | sort | paste -sd ', ' -)"
-
-    if $ANY_CRITICAL_NS; then
-      s=1
-    else
-      s=4
-    fi
-
-    T="Pods in CrashLoopBackOff in GKE cluster \`$CLUSTER_NAME\`"
-    D="Found $countCrash crashing pods:  $CRASHLOOP"
-
-    # Build a next-steps message that includes "Check Namespace Health" for each namespace
-    R="Check namespace health \`$all_crash_ns\` in GKE Cluster \`$CLUSTER_NAME\`"
-
-    {
-      echo "Issue: $T"
-      echo "Details: $D"
-      echo "Severity: $s"
-      echo "Suggested Next Steps: $R"
-      echo "-------------------------------------"
-    } >> "$REPORT_FILE"
-
-    if [ "$first_issue" = true ]; then
-      first_issue=false
-    else
-      echo "," >> "$TEMP_ISSUES"
-    fi
-
-    jq -n \
-      --arg title "$T" \
-      --arg details "$D" \
-      --arg suggested "$R" \
-      --argjson severity "$s" \
-      '{title: $title, details: $details, severity: $severity, suggested: $suggested}' \
-      >> "$TEMP_ISSUES"
-  fi
-
+# ───────── prerequisites ─────────
+for bin in gcloud kubectl jq; do
+  command -v "$bin" &>/dev/null || { echo "❌  $bin not found" >&2; exit 1; }
 done
 
-echo "]" >> "$TEMP_ISSUES"
-mv "$TEMP_ISSUES" "$ISSUES_FILE"
+export KUBECONFIG="${KUBECONFIG:-kubeconfig}"
+PROJECT="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true)}"
+[[ -z "$PROJECT" ]] && { echo "❌  No GCP project set" >&2; exit 1; }
 
-echo "Report generated: $REPORT_FILE"
-echo "Issues file generated: $ISSUES_FILE"
+IFS=',' read -r -a CRITICAL_NS_ARRAY <<< "${CRITICAL_NAMESPACES:-kube-system}"
+
+REPORT_FILE="cluster_health_report.txt"
+ISSUES_TMP="$(mktemp)"
+echo -n "[" > "$ISSUES_TMP"
+first_issue=true
+
+log() { printf "%s\n" "$*" >> "$REPORT_FILE"; }
+hr()  { printf -- '─%.0s' {1..80} >> "$REPORT_FILE"; printf "\n" >> "$REPORT_FILE"; }
+
+printf "GKE Cluster Health Report — %s\nProject: %s\n" \
+       "$(date -Iseconds)" "$PROJECT" > "$REPORT_FILE"
+hr
+
+process_cluster() {
+  local CLUSTER_NAME="$1" CLUSTER_LOC="$2"
+
+  if ! gcloud container clusters get-credentials "$CLUSTER_NAME" \
+        --zone "$CLUSTER_LOC" --project "$PROJECT" --quiet >/dev/null 2>&1; then
+    add_issue "No credentials for cluster \`$CLUSTER_NAME\`" \
+              "Unable to fetch kube‑credentials." 4 \
+              "Grant Container Cluster Viewer/Admin for \`$CLUSTER_NAME\`."
+    log "Cluster: $CLUSTER_NAME ($CLUSTER_LOC) — credentials ❌"; hr; return
+  fi
+
+  log "Cluster: $CLUSTER_NAME ($CLUSTER_LOC)"; hr
+
+  # ── 1) Node readiness ────────────────────────────────────────────────
+  local NODE_STATUSES NOT_READY
+  NODE_STATUSES="$(kubectl get nodes --no-headers 2>/dev/null || true)"
+  if [[ -z "$NODE_STATUSES" ]]; then
+    log "No nodes or unable to list nodes"; hr
+  else
+    printf "%-60s %s\n" "NODE" "STATUS" >> "$REPORT_FILE"
+    printf "%-60s %s\n" "----" "------" >> "$REPORT_FILE"
+    echo "$NODE_STATUSES" | awk '{printf "%-60s %s\n",$1,$2}' >> "$REPORT_FILE"; hr
+
+    NOT_READY="$(echo "$NODE_STATUSES" | awk '$2!="Ready"')"
+    [[ -n "$NOT_READY" ]] && \
+      add_issue "Node(s) Not Ready in \`$CLUSTER_NAME\`" \
+                "The following nodes are not Ready:\n$NOT_READY" 2 \
+                "kubectl describe node <name> && kubectl get events --field-selector involvedObject.name=<name>"
+  fi
+
+  # ── 2) CPU / memory by node‑pool ─────────────────────────────────────
+  local TOP_NODES
+  TOP_NODES="$(kubectl top nodes --no-headers 2>/dev/null || true)"
+  if [[ -n "$TOP_NODES" ]]; then
+    printf "%-60s %6s %6s\n" "NODE" "CPU%" "MEM%" >> "$REPORT_FILE"
+    printf "%-60s %6s %6s\n" "----" "----" "----" >> "$REPORT_FILE"
+
+    declare -A NODEPOOL_OF CPU_ISSUES MEM_ISSUES
+    while read -r n p; do NODEPOOL_OF["$n"]="$p"; done < <(
+      kubectl get nodes -o json |
+      jq -r '.items[]|[.metadata.name, (.metadata.labels["cloud.google.com/gke-nodepool"]//"unknown")]|@tsv'
+    )
+
+    # The output of `kubectl top nodes` → five columns.
+    while read -r node _ cpu_pct _ mem_pct; do
+      printf "%-60s %6s %6s\n" "$node" "$cpu_pct" "$mem_pct" >> "$REPORT_FILE"
+
+      cpu_pct_num="${cpu_pct%\%}"; mem_pct_num="${mem_pct%\%}"
+      pool="${NODEPOOL_OF[$node]}"
+
+      [[ $cpu_pct_num =~ ^[0-9]+$ ]] && (( cpu_pct_num >= 75 )) && \
+        CPU_ISSUES["$pool"]+="$node=${cpu_pct_num}%;"
+      [[ $mem_pct_num =~ ^[0-9]+$ ]] && (( mem_pct_num >= 75 )) && \
+        MEM_ISSUES["$pool"]+="$node=${mem_pct_num}%;"
+    done <<< "$TOP_NODES"
+    hr
+
+    report_pool_usage "CPU"   CPU_ISSUES
+    report_pool_usage "memory" MEM_ISSUES
+  else
+    log "kubectl‑top not available (metrics‑server?)"; hr
+  fi
+
+  # ── 3) CrashLoopBackOff pods ────────────────────────────────────────
+  local CRASHLOOP
+  CRASHLOOP="$(kubectl get pods -A --no-headers 2>/dev/null | awk '$4=="CrashLoopBackOff"')"
+  if [[ -n "$CRASHLOOP" ]]; then
+    declare -A NSMAP; local ANY_CRITICAL=false
+    while read -r ns _; do
+      NSMAP["$ns"]=1
+      for c in "${CRITICAL_NS_ARRAY[@]}"; do [[ $ns == "$c" ]] && ANY_CRITICAL=true; done
+    done <<< "$CRASHLOOP"
+
+    local SUGG_NS; SUGG_NS="$(printf "%s\n" "${!NSMAP[@]}" | sort | paste -sd ',')"
+    add_issue "CrashLoopBackOff pods in \`$CLUSTER_NAME\`" \
+              "Crashing pods:\n$CRASHLOOP" \
+              "$([[ $ANY_CRITICAL == true ]] && echo 1 || echo 4)" \
+              "Inspect pods and namespace health: \`$SUGG_NS\`"
+  fi
+}
+
+add_issue() {
+  local TITLE="$1" DETAILS="$2" SEV="$3" NEXT="$4"
+  log "🔸  $TITLE (severity=$SEV)"; [[ -n "$DETAILS" ]] && log "$DETAILS"
+  log "Next‑steps: $NEXT"; hr
+  $first_issue || echo "," >> "$ISSUES_TMP"; first_issue=false
+  jq -n --arg t "$TITLE" --arg d "$DETAILS" --arg n "$NEXT" --argjson s "$SEV" \
+        '{title:$t,details:$d,severity:$s,suggested:$n}' >> "$ISSUES_TMP"
+}
+
+report_pool_usage() {
+  local KIND="$1" ARR_NAME="$2"; declare -n ARR="$ARR_NAME"
+  for pool in "${!ARR[@]}"; do
+    local entries="${ARR[$pool]}" max=0
+    for kv in ${entries//;/ }; do
+      pct="${kv##*=}"; pct="${pct%\%}"
+      [[ $pct =~ ^[0-9]+$ ]] && (( pct > max )) && max=$pct
+    done
+    local sev=2; (( max >= 90 )) && sev=1
+    add_issue "High $KIND usage in \`$CLUSTER_NAME\`, node‑pool \`$pool\`" \
+              "Nodes ≥75% $KIND:\n${entries//;/\n}" \
+              "$sev" \
+              "Scale or optimise workloads on node‑pool \`$pool\`."
+  done
+}
+
+# ───────── main ─────────
+CLUSTERS_JSON="$(gcloud container clusters list --project="$PROJECT" --format=json)"
+[[ "$CLUSTERS_JSON" == "[]" ]] && { echo "No clusters found"; echo "]" >> "$ISSUES_TMP"; jq . "$ISSUES_TMP" > cluster_health_issues.json; exit 0; }
+
+while read -r row; do
+  process_cluster "$(jq -r .name <<<"$row")" "$(jq -r .location <<<"$row")"
+done < <(jq -c '.[]' <<< "$CLUSTERS_JSON")
+
+echo "]" >> "$ISSUES_TMP"
+jq . "$ISSUES_TMP" > cluster_health_issues.json
+rm -f "$ISSUES_TMP"
+
+echo "✔  Report:  $REPORT_FILE"
+echo "✔  Issues:  cluster_health_issues.json"

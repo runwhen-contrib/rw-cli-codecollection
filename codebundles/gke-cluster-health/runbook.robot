@@ -33,11 +33,12 @@ Suite Initialization
     ...    default=kube-system,flux-system,cert-manager
     ...    example=kube-system,flux-system,cert-manager
     ${OS_PATH}=    Get Environment Variable    PATH
+    ${KUBECONFIG}=    Get Environment Variable     KUBECONFIG
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
     Set Suite Variable
     ...    ${env}
-    ...    {"CRITICAL_NAMESPACES":"${CRITICAL_NAMESPACES}","PATH": "$PATH:${OS_PATH}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}", "GCP_PROJECT_ID":"${GCP_PROJECT_ID}"}
+    ...    {"CRITICAL_NAMESPACES":"${CRITICAL_NAMESPACES}","PATH": "$PATH:${OS_PATH}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}", "GCP_PROJECT_ID":"${GCP_PROJECT_ID}", "KUBECONFIG":"${KUBECONFIG}"}
     RW.CLI.Run CLI
     ...    cmd=gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" || true
     ...    env=${env}
@@ -161,4 +162,31 @@ Check for Quota Related GKE Autoscaling Issues in GCP Project `${GCP_PROJECT_ID}
             ...    next_steps=${issue["suggested"]}
         END
     END
+
+Validate GKE Node Sizes for GCP Project `${GCP_PROJECT_ID}`
+    [Documentation]    Analyse live pod requests/limits, node usage,  and propose suitable GKE node machine types.
+    [Tags]    sizing    gke    gcloud    access:read-only    node    autoscale
+
+    ${node_rec}=    RW.CLI.Run Cli
+    ...    cmd=python3 gke_node_size.py
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    timeout_seconds=180
+
+    ${issues}=     RW.CLI.Run Cli
+    ...    cmd=cat node_size_issues.json
     
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list}) > 0
+        FOR    ${issue}    IN    @{issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    expected=GKE Cluster should have available node capacity
+            ...    actual=GKE Clusters are are capacity or need new nodes
+            ...    title= ${issue["title"]}
+            ...    reproduce_hint=${node_rec.cmd}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["next_steps"]}
+        END
+    END
+    RW.Core.Add Pre To Report    Node‑size Recommendation Output:\n${node_rec.stdout}
