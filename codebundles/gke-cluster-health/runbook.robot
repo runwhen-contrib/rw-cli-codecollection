@@ -34,11 +34,23 @@ Suite Initialization
     ...    example=kube-system,flux-system,cert-manager
     ${OS_PATH}=    Get Environment Variable    PATH
     ${KUBECONFIG}=    Get Environment Variable     KUBECONFIG
+    ${MAX_CPU_LIMIT_OVERCOMMIT}=     RW.Core.Import User Variable    MAX_CPU_LIMIT_OVERCOMMIT
+    ...    type=string
+    ...    description=The desired Maximum CPU Limits overcommitment factored into node recommendations.(e.g. 3=300% overcomitted)
+    ...    pattern=\w*
+    ...    default=3
+    ...    example=3
+    ${MAX_MEM_LIMIT_OVERCOMMIT}=    RW.Core.Import User Variable    MAX_MEM_LIMIT_OVERCOMMIT
+    ...    type=string
+    ...    description=The desired Maximum CPU Limits overcommitment factored into node recommendations.(e.g. 2=200% overcomitted)
+    ...    pattern=\w*
+    ...    default=2
+    ...    example=2
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
     Set Suite Variable
     ...    ${env}
-    ...    {"CRITICAL_NAMESPACES":"${CRITICAL_NAMESPACES}","PATH": "$PATH:${OS_PATH}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}", "GCP_PROJECT_ID":"${GCP_PROJECT_ID}", "KUBECONFIG":"${KUBECONFIG}"}
+    ...    {"CRITICAL_NAMESPACES":"${CRITICAL_NAMESPACES}","PATH": "$PATH:${OS_PATH}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}", "GCP_PROJECT_ID":"${GCP_PROJECT_ID}", "KUBECONFIG":"${KUBECONFIG}", "MAX_CPU_LIMIT_OVERCOMMIT":"${MAX_CPU_LIMIT_OVERCOMMIT}", "MAX_MEM_LIMIT_OVERCOMMIT":"${MAX_MEM_LIMIT_OVERCOMMIT}"}
     RW.CLI.Run CLI
     ...    cmd=gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" || true
     ...    env=${env}

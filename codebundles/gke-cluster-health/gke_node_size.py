@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 """
-gke_node_size.py — usage‑aware node‑sizer with inline debug prints
-2025‑04‑18 • grouped “node‑overloaded” issues
+gke_node_size.py — node‑sizer & over‑commit analyser
+2025‑04‑18   •   grouped “node‑overloaded” issues + limit‑overcommit checks
+
+What’s new?
+────────────
+▸ still raises **Node overloaded** when requests exceed allocatable  
+▸ now also raises **Node limits over‑committed** when *limits / allocatable*
+  is above the tunables below  
+▸ sizing logic is driven by the **worst‑case limits** (no extra head‑room)  
 """
 
 from __future__ import annotations
@@ -9,36 +16,36 @@ import json, math, os, re, subprocess, sys, textwrap, time, traceback
 from collections import defaultdict
 from pathlib import Path
 
-HEADROOM_CPU, HEADROOM_MEM, MIN_HEADROOM_NODES = 1.25, 1.10, 3
-EMO = {"OK": "✅", "ERR": "⚠️", "RES": "🔄", "NODE": "🆕"}
+# ── tunables ────────────────────────────────────────────────────────────
+MAX_CPU_LIMIT_OVERCOMMIT = float(os.getenv("MAX_CPU_LIMIT_OVERCOMMIT", "3.0"))  # 300 %
+MAX_MEM_LIMIT_OVERCOMMIT = float(os.getenv("MAX_MEM_LIMIT_OVERCOMMIT", "1.5"))  # 150 %
+MIN_HEADROOM_NODES       = 3          # unchanged – for “can I just reschedule?”
+EMO = {"OK":"✅","ERR":"⚠️","RES":"🔄","NODE":"🆕"}
 
-workdir_path = os.getenv("CODEBUNDLE_TEMP_DIR", ".")  
+workdir_path = os.getenv("CODEBUNDLE_TEMP_DIR", ".")
 issues_file  = os.path.join(workdir_path, "node_size_issues.json")
 
+# ── helpers ─────────────────────────────────────────────────────────────
+def run(cmd:list[str]) -> str: return subprocess.check_output(cmd, text=True)
 
-# ───────────────────────── helpers ──────────────────────────
-def run(cmd): return subprocess.check_output(cmd, text=True)
-
-def retry(cmd, n=3, d=5):
+def retry(cmd:list[str], n=3, d=5):
     for i in range(n):
-        try:
-            return run(cmd)
+        try: return run(cmd)
         except subprocess.CalledProcessError:
-            if i == n - 1: raise
+            if i == n-1: raise
             time.sleep(d); d *= 2
 
-def cpu(v): return int(v[:-1]) if v.endswith("m") else int(float(v) * 1000)
+def cpu(v:str)->int: return int(v[:-1]) if v.endswith("m") else int(float(v)*1000)
 
-_FACT = {"Ki": 1/1024, "Mi": 1, "Gi": 1024, "Ti": 1024**2,
-         "K": 1/(1024/1000), "M": 1000**2/1024**2, "G": 1000**3/1024**2}
-def mem(v):
+_FACT={"Ki":1/1024,"Mi":1,"Gi":1024,"Ti":1024**2,
+       "K":1/(1024/1000),"M":1000**2/1024**2,"G":1000**3/1024**2}
+def mem(v:str)->int:
     for s,f in _FACT.items():
-        if v.endswith(s):
-            return int(float(v[:-len(s)])*f)
+        if v.endswith(s): return int(float(v[:-len(s)])*f)
     return int(int(v)/1_048_576)
 
-# ───────────────────── cluster snapshots ────────────────────
-LIVE = {"Running","Pending","Unknown"}
+# ── cluster snapshots ───────────────────────────────────────────────────
+LIVE={"Running","Pending","Unknown"}
 def gather_pods():
     pod,node={},defaultdict(lambda:{"rc":0,"rm":0,"lc":0,"lm":0,"pods":[]})
     data=json.loads(run(["kubectl","get","pods","-A","-o","json"]))
@@ -49,7 +56,7 @@ def gather_pods():
         rc=rm=lc=lm=0
         for c in it["spec"]["containers"]:
             res=c.get("resources",{}); req=res.get("requests",{}); lim=res.get("limits",{})
-            rc+=cpu(req.get("cpu","0")); rm+=mem(req.get("memory","0"))
+            rc+=cpu(req.get("cpu","0"));          rm+=mem(req.get("memory","0"))
             lc+=cpu(lim.get("cpu",req.get("cpu","0"))); lm+=mem(lim.get("memory",req.get("memory","0")))
         pod[uid]={"node":nd,"rc":rc,"rm":rm,"lc":lc,"lm":lm}
         n=node[nd]; n["rc"]+=rc; n["rm"]+=rm; n["lc"]+=lc; n["lm"]+=lm; n["pods"].append(uid)
@@ -63,8 +70,9 @@ def allocatable():
         t=lbl.get("node.kubernetes.io/instance-type",
                   lbl.get("beta.kubernetes.io/instance-type","unknown"))
         a=n["status"]["allocatable"]
-        out[n["metadata"]["name"]]={"cpu":cpu(a["cpu"]+"m" if "m" not in a["cpu"] else a["cpu"]),
-                                    "mem":mem(a["memory"]),"type":t}
+        out[n["metadata"]["name"]]={
+            "cpu":cpu(a["cpu"]+"m" if "m" not in a["cpu"] else a["cpu"]),
+            "mem":mem(a["memory"]), "type":t}
     return out
 
 def node_usage():
@@ -94,8 +102,8 @@ def note(cl,sev,ttl,det,nxt):
     issues.append({"severity":sev,"title":f"{ttl} in cluster `{cl}`",
                    "details":det,"next_steps":nxt})
 
-# ───────────────── per‑cluster analysis ────────────────────
-def analyse(cl, loc):
+# ── per‑cluster analysis ────────────────────────────────────────────────
+def analyse(cl:str, loc:str):
     flag="--region" if re.fullmatch(r"[a-z0-9-]+[0-9]$",loc) else "--zone"
     retry(["gcloud","container","clusters","get-credentials",cl,flag,loc,"--quiet"])
 
@@ -129,57 +137,54 @@ def analyse(cl, loc):
       Pods     : {len(busy['pods'])}
     """).rstrip())
 
-    # oversized nodes table …
-    over=[]
+    # ── requests‑overloaded table ───────────────────────────────────────
+    overloaded=[]
     for n in valid:
         a=alloc[n]; d=node[n]
-        if d['rc']>a['cpu'] or d['rm']>a['mem'] or d['lc']>a['cpu'] or d['lm']>a['mem']:
-            uc=usage.get(n,{}).get("cpu"); um=usage.get(n,{}).get("mem")
-            over.append((n,d['rc']/a['cpu'],d['rm']/a['mem'],
-                         d['lc']/a['cpu'],d['lm']/a['mem'],
-                         None if uc is None else uc/a['cpu'],
-                         None if um is None else um/a['mem']))
-    if over:
-        w=min(max(len(n) for n,*_ in over)+2,60)
-        print("\nNodes exceeding allocatable:")
-        print("NAME".ljust(w)+"ReqCPU% ReqMEM% LimCPU% LimMEM% UseCPU% UseMEM%")
-        for n,rc,rm,lc,lm,uc,um in over:
-            uc_s="--" if uc is None else f"{uc*100:6.0f}%"
-            um_s="--" if um is None else f"{um*100:6.0f}%"
-            print(f"{n:<{w}} {rc*100:6.0f}% {rm*100:6.0f}% "
-                  f"{lc*100:6.0f}% {lm*100:6.0f}% {uc_s:>6} {um_s:>6}")
-
-        # NEW: single grouped issue entry
-        nodes_list = ", ".join(n for n,*_ in over)
+        if d['rc']>a['cpu'] or d['rm']>a['mem']:
+            overloaded.append(n)
+    if overloaded:
         note(cl,2,"Node overloaded",
-             f"{len(over)} nodes exceed allocatable: {nodes_list}.",
+             f"{len(overloaded)} nodes exceed requests allocatable: {', '.join(overloaded)}.",
              f"Reschedule pods or scale the pool in cluster `{cl}`.")
 
-    # head‑room check
+    # ── limits over‑commit table ────────────────────────────────────────
+    limit_over=[]
+    for n in valid:
+        a=alloc[n]; d=node[n]
+        if (d["lc"]/a["cpu"]>MAX_CPU_LIMIT_OVERCOMMIT or
+            d["lm"]/a["mem"]>MAX_MEM_LIMIT_OVERCOMMIT):
+            limit_over.append(n)
+    if limit_over:
+        note(cl,2,"Node limits over‑committed",
+             (f"{len(limit_over)} nodes beyond limit thresholds "
+              f"(>{MAX_CPU_LIMIT_OVERCOMMIT}× CPU or "
+              f">{MAX_MEM_LIMIT_OVERCOMMIT}× MEM): {', '.join(limit_over)}."),
+             "Lower pod limits, split workload or scale the node‑pool.")
+
+    # can we just reschedule?
     nodes_ok=sum(1 for n,a in alloc.items()
                  if n in usage
-                 and all((a["cpu"]-node[n]["rc"]>=biggest["rc"],
-                          a["mem"]-node[n]["rm"]>=biggest["rm"],
-                          a["cpu"]-usage[n]["cpu"]>=biggest["rc"],
-                          a["mem"]-usage[n]["mem"]>=biggest["rm"])))
+                 and a["cpu"]-usage[n]["cpu"]>=biggest["rc"]
+                 and a["mem"]-usage[n]["mem"]>=biggest["rm"])
     resched_hint=nodes_ok>=MIN_HEADROOM_NODES
 
-    # autoscaling info
+    # ── pool / autoscaler info ──────────────────────────────────────────
     pools=json.loads(run(["gcloud","container","node-pools","list",
                           "--cluster",cl,flag,loc,
                           "--format=json(name,config.machineType,currentNodeCount,initialNodeCount,autoscaling)"]))
     cur_pool=next((p for p in pools if p["config"]["machineType"]==a_b["type"]),pools[0])
     cur_nodes=cur_pool.get("currentNodeCount") or cur_pool["initialNodeCount"]
     max_nodes=cur_pool["autoscaling"]["maxNodeCount"]
-    can_scale=cur_nodes < max_nodes
-
+    can_scale=cur_nodes<max_nodes
     print(f"\n{EMO['RES']}  Pool can scale out ({cur_nodes}/{max_nodes}) — larger node options follow.\n"
           if can_scale else
           f"\n{EMO['RES']}  Pool already at max ({cur_nodes}/{max_nodes}); a larger node is required.\n")
 
-    # sizing section
-    need_cpu=int(max(busy['rc'],biggest['rc'],use_b['cpu'])*HEADROOM_CPU)
-    need_mem=int(max(busy['rm'],biggest['rm'],use_b['mem'])*HEADROOM_MEM)
+    # ── sizing section (driven by *limits*, not head‑room) ──────────────
+    need_cpu = math.ceil(busy['lc'] / MAX_CPU_LIMIT_OVERCOMMIT)
+    need_mem = math.ceil(busy['lm'] / MAX_MEM_LIMIT_OVERCOMMIT)
+
 
     cat=catalogue(region)
     mts=[{"name":n,"cpu":v["cpu"],"mem":v["mem"],"zones":v["zones"]} for n,v in cat.items()]
@@ -187,21 +192,18 @@ def analyse(cl, loc):
          or [m for m in mts if m["cpu"]*1000>=need_cpu and m["mem"]>=need_mem]
 
     try:
-        fits.sort(key=lambda m:(m["cpu"],m["mem"]))
-        best=fits[0]
-
-        zones_n=len(zones)
-        cap_cpu,cap_mem=best["cpu"]*1000, best["mem"]
-        total=max(math.ceil(busy['rc']/cap_cpu), math.ceil(busy['rm']/cap_mem), 3)
-
-        if ctype == "REGIONAL":
-            per_zone = math.ceil(total / zones_n)
-            min_n, max_n = per_zone, per_zone*3
+        fits.sort(key=lambda m:(m["cpu"],m["mem"])); best=fits[0]
+        zones_n=len(zones); cap_cpu,cap_mem=best["cpu"]*1000,best["mem"]
+        total=max(math.ceil(need_cpu/cap_cpu), math.ceil(need_mem/cap_mem), 3)
+        if ctype=="REGIONAL":
+            per_zone=math.ceil(total/zones_n); min_n,max_n=per_zone,per_zone*3
         else:
-            min_n, max_n = total, total*3
+            min_n,max_n=total,total*3
 
-        print(f"{EMO['NODE']}  *** RECOMMENDED NODE: {best['name']} (vCPU {best['cpu']}, Mem {best['mem']}MiB) ***")
-        print(f"Suggested autoscaler {min_n}-{max_n} ({'per zone' if ctype=='REGIONAL' else 'total'})\n")
+        print(f"{EMO['NODE']}  *** RECOMMENDED NODE: {best['name']} "
+              f"(vCPU {best['cpu']}, Mem {best['mem']}MiB) ***")
+        print(f"Suggested autoscaler {min_n}-{max_n}"
+              f" ({'per zone' if ctype=='REGIONAL' else 'total'})\n")
         print("Other machine types that also fit (top 10):")
         for m in fits[:10]:
             mark="← recommended" if m is best else ""
@@ -218,21 +220,18 @@ def analyse(cl, loc):
              f"{type(exc).__name__}: {exc}",
              f"See debug log for cluster `{cl}`.")
 
-# ─────────────────────────  main  ──────────────────────────
+# ── main ────────────────────────────────────────────────────────────────
 if __name__=="__main__":
     proj=os.getenv("CLOUDSDK_CORE_PROJECT") or os.getenv("GCP_PROJECT_ID")
-    if not proj:
-        sys.exit("Set CLOUDSDK_CORE_PROJECT or GCP_PROJECT_ID")
+    if not proj: sys.exit("Set CLOUDSDK_CORE_PROJECT or GCP_PROJECT_ID")
     clusters=json.loads(run(["gcloud","container","clusters","list",
                              "--project",proj,"--format=json(name,location,status)"]))
     for c in clusters:
-        try:
-            analyse(c["name"], c["location"])
+        try: analyse(c["name"], c["location"])
         except Exception as e:
             traceback.print_exc()
             note(c["name"],2,"Analysis failed",
                  f"{type(e).__name__}: {e}",
                  f"Debug cluster `{c['name']}`.")
-    with open(f"{issues_file}","w") as fp:
-        json.dump(issues, fp, indent=2)
+    with open(issues_file,"w") as fp: json.dump(issues, fp, indent=2)
     print(f"\n{EMO['OK']}  issues.json written with {len(issues)} entries\n")
