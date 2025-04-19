@@ -46,11 +46,23 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=2
     ...    example=2
+    ${OPERATIONS_LOOKBACK_HOURS}=    RW.Core.Import User Variable    OPERATIONS_LOOKBACK_HOURS
+    ...    type=string
+    ...    description=The time (in hours) to fetch and analyze cluster operations. 
+    ...    pattern=\w*
+    ...    default=24
+    ...    example=24
+    ${OPERATIONS_STUCK_HOURS}=    RW.Core.Import User Variable    OPERATIONS_STUCK_HOURS
+    ...    type=string
+    ...    description=The amount of time (in hours) to declare an operation as stuck. 
+    ...    pattern=\w*
+    ...    default=2
+    ...    example=2    
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
     Set Suite Variable
     ...    ${env}
-    ...    {"CRITICAL_NAMESPACES":"${CRITICAL_NAMESPACES}","PATH": "$PATH:${OS_PATH}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}", "GCP_PROJECT_ID":"${GCP_PROJECT_ID}", "KUBECONFIG":"${KUBECONFIG}", "MAX_CPU_LIMIT_OVERCOMMIT":"${MAX_CPU_LIMIT_OVERCOMMIT}", "MAX_MEM_LIMIT_OVERCOMMIT":"${MAX_MEM_LIMIT_OVERCOMMIT}"}
+    ...    {"CRITICAL_NAMESPACES":"${CRITICAL_NAMESPACES}","PATH": "$PATH:${OS_PATH}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}", "GCP_PROJECT_ID":"${GCP_PROJECT_ID}", "KUBECONFIG":"${KUBECONFIG}", "MAX_CPU_LIMIT_OVERCOMMIT":"${MAX_CPU_LIMIT_OVERCOMMIT}", "MAX_MEM_LIMIT_OVERCOMMIT":"${MAX_MEM_LIMIT_OVERCOMMIT}","OP_LOOKBACK_HOURS":"${OPERATIONS_LOOKBACK_HOURS}", "STUCK_HOURS":"${OPERATIONS_STUCK_HOURS}"}
     RW.CLI.Run CLI
     ...    cmd=gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" || true
     ...    env=${env}
@@ -183,7 +195,7 @@ Validate GKE Node Sizes for GCP Project `${GCP_PROJECT_ID}`
     ...    cmd=python3 gke_node_size.py
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
-    ...    timeout_seconds=180
+    ...    timeout_seconds=240
 
     ${issues}=     RW.CLI.Run Cli
     ...    cmd=cat node_size_issues.json
@@ -202,3 +214,35 @@ Validate GKE Node Sizes for GCP Project `${GCP_PROJECT_ID}`
         END
     END
     RW.Core.Add Pre To Report    Node‑size Recommendation Output:\n${node_rec.stdout}
+
+Fetch GKE Cluster Operations for GCP Project `${GCP_PROJECT_ID}`
+    [Documentation]    Fetches GKE Operations and identify stuck or failed tasks.
+    [Tags]    sizing    gke    gcloud    access:read-only    cluster    operations
+
+    ${ops_list}=    RW.CLI.Run Bash File
+    ...    bash_file=cluster_operations.sh
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    timeout_seconds=180
+
+    ${ops_report}=     RW.CLI.Run Cli
+    ...    cmd=cat cluster_operations_report.txt
+    RW.Core.Add Pre To Report    Operations:\n${ops_report.stdout}
+
+    ${issues}=     RW.CLI.Run Cli
+    ...    cmd=cat cluster_operations_issues.json
+    
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list}) > 0
+        FOR    ${issue}    IN    @{issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    expected=GKE Cluster operations should not be stuck
+            ...    actual=GKE Clusters operations might be stuck
+            ...    title= ${issue["title"]}
+            ...    reproduce_hint=${ops_list.cmd}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["next_steps"]}
+        END
+    END
+    RW.Core.Add Pre To Report    Operations:\n${ops_list.stdout}
