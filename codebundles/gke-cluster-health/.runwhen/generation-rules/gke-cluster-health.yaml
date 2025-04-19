@@ -20,4 +20,4 @@ spec:
             - type: sli
             - type: runbook
               templateName: gke-cluster-health-taskset.yaml
-            # - type: workflow
+            - type: workflow
