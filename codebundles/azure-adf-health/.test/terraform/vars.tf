@@ -24,7 +24,7 @@ variable "tenant_id" {
 }
 
 # Password for .pfx files (self-signed)
-variable "ssl_cert_password" {
+variable "table_name" {
   type    = string
-  default = "P@ssw0rd123!"
+  default = "dbo.CustomerTransactions"
 }

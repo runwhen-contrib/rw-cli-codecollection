@@ -176,7 +176,7 @@ resource "azapi_resource" "sql_dataset" {
       }
       type = "AzureSqlTable"
       typeProperties = {
-        tableName = "dbo.CustomerTransactions"
+        tableName = var.table_name #  use default value to run this pipeline successfully
       }
     }
   }
