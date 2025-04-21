@@ -3,6 +3,7 @@ Documentation       Performs a health check on Azure Data factories
 Metadata            Author    saurabh3460
 Metadata            Display Name    Azure Data factories Health
 Metadata            Supports    Azure    Data factories
+Force Tags          Azure    Data Factory    Health
 
 Library             BuiltIn
 Library             RW.Core
