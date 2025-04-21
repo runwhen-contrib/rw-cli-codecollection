@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       Performs a health check on Azure Data factories
+Documentation       Performs a health check on Azure Data factories   
 Metadata            Author    saurabh3460
 Metadata            Display Name    Azure Data factories Health
 Metadata            Supports    Azure    Data factories
@@ -28,8 +28,6 @@ Check for Resource Health Issues Affecting Data Factories in resource group `${A
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat ${json_file}
     ...    env=${env}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list}) > 0 
         FOR    ${issue}    IN    @{issue_list}
@@ -66,14 +64,11 @@ Check for Frequent Pipeline Errors in Data Factories in resource group `${AZURE_
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
-    ...    show_in_rwl_cheatsheet=true
 
     TRY
         ${error_data}=    RW.CLI.Run Cli
         ...    cmd=cat ${json_file}
         ...    env=${env}
-        ...    timeout_seconds=180
-        ...    include_in_history=false
         ${error_trends}=    Evaluate    json.loads(r'''${error_data.stdout}''')    json
     EXCEPT
         Log    Failed to load JSON payload, defaulting to empty list.    WARN
@@ -97,6 +92,52 @@ Check for Frequent Pipeline Errors in Data Factories in resource group `${AZURE_
         END
     ELSE
         RW.Core.Add Pre To Report    "No pipeline errors found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+    END
+
+    RW.CLI.Run Cli
+    ...    cmd=rm -f ${json_file}
+
+Check for Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Check for failed pipeline runs in Data Factory pipelines
+    [Tags]    datafactory    pipeline-failures    access:read-only
+    ${json_file}=    Set Variable    "failed_pipelines.json"
+    ${failed_check}=    RW.CLI.Run Bash File
+    ...    bash_file=failed_pipeline.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+
+    ${failed_data}=    RW.CLI.Run Cli
+    ...    cmd=cat ${json_file}
+
+    TRY
+        ${failed_json}=    Evaluate    json.loads(r'''${failed_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${failed_json}=    Create Dictionary    failed_json=[]
+    END
+
+    ${has_failures}=    Evaluate    len($failed_json["failed_pipelines"]) > 0
+
+    IF    ${has_failures}
+        ${formatted_results}=    RW.CLI.Run Cli
+        ...    cmd=jq -r '["Pipeline_Name", "RunId", "Resource_URL"], (.failed_pipelines[] | [ .name, .run_id, .resource_url]) | @tsv' ${json_file} | column -t
+        RW.Core.Add Pre To Report    Failed Pipelines Summary:\n==============================\n${formatted_results.stdout}
+
+        FOR    ${issue}    IN    @{failed_json["failed_pipelines"]}
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    title=${issue["title"]}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["next_step"]}
+            ...    expected=${issue["expected"]}
+            ...    actual=${issue["actual"]}
+            ...    reproduce_hint=${issue["reproduce_hint"]}
+            ...    resource_url=${issue["resource_url"]}
+        END
+    ELSE
+        RW.Core.Add Pre To Report    "No failed pipelines found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
     END
 
     RW.CLI.Run Cli
