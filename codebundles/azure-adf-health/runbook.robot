@@ -3,6 +3,7 @@ Documentation       Performs a health check on Azure Data factories
 Metadata            Author    saurabh3460
 Metadata            Display Name    Azure Data factories Health
 Metadata            Supports    Azure    Data factories
+Force Tags          Azure    Data Factory    Health
 
 Library             BuiltIn
 Library             RW.Core
@@ -53,6 +54,51 @@ Check for Resource Health Issues Affecting Data Factories in resource group `${A
         ...    details=${issue_list}
         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
     END
+    RW.CLI.Run Cli
+    ...    cmd=rm -f ${json_file}
+
+Check for Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Check for frequently occurring errors in Data Factory pipelines
+    [Tags]    datafactory    pipeline-errors    access:read-only
+    ${json_file}=    Set Variable    "error_trend.json"
+    ${error_check}=    RW.CLI.Run Bash File
+    ...    bash_file=error_trend.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+
+    TRY
+        ${error_data}=    RW.CLI.Run Cli
+        ...    cmd=cat ${json_file}
+        ...    env=${env}
+        ...    timeout_seconds=180
+        ...    include_in_history=false
+        ${error_trends}=    Evaluate    json.loads(r'''${error_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${error_trends}=    Create Dictionary    error_trends=[]
+    END
+
+    IF    len(${error_trends['error_trends']}) > 0
+        ${formatted_results}=    RW.CLI.Run Cli
+        ...    cmd=jq -r '["Pipeline_Name", "Last_Seen", "Failure_Count", "RunId", "Resource_URL"], (.error_trends[] | [ .name, (.details | fromjson).LastSeen, (.details | fromjson).FailureCount, .run_id, .resource_url]) | @tsv' ${json_file} | column -t
+        RW.Core.Add Pre To Report    Pipeline Error Trends Summary:\n==============================\n${formatted_results.stdout}
+
+        FOR    ${error}    IN    @{error_trends['error_trends']}
+            RW.Core.Add Issue
+            ...    severity=${error['severity']}
+            ...    expected=${error['expected']}
+            ...    actual=${error['actual']}
+            ...    title=${error['title']}
+            ...    reproduce_hint=${error['reproduce_hint']}
+            ...    details=${error['details']}
+            ...    next_steps=${error['next_step']}
+        END
+    ELSE
+        RW.Core.Add Pre To Report    "No pipeline errors found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+    END
+
     RW.CLI.Run Cli
     ...    cmd=rm -f ${json_file}
 
