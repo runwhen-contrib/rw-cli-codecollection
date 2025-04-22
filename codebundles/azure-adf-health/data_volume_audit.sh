@@ -68,6 +68,7 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
             --arg resource_url "$df_url" \
             --arg reproduce_hint "az monitor diagnostic-settings list --resource \"$df_id\"" \
             --arg actual "Diagnostic settings not enabled" \
+            --arg reproduce_hint "az monitor diagnostic-settings list --resource \"$df_id\"" \
             '.data_volume_alerts += [{
                 "title": $title,
                 "details": $details,
@@ -97,6 +98,7 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
             --arg expected "ActivityRuns logging should be enabled" \
             --arg resource_url "$df_url" \
             --arg actual "ActivityRuns logging is disabled" \
+            --arg reproduce_hint "az monitor diagnostic-settings list --resource \"$df_id\" --subscription \"$subscription_id\" --output json" \
             '.data_volume_alerts += [{
                 "title": $title,
                 "details": $details,
@@ -104,7 +106,8 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
                 "actual": $actual,
                 "expected": $expected,
                 "severity": ($severity | tonumber),
-                "resource_url": $resource_url
+                "resource_url": $resource_url,
+                "reproduce_hint": $reproduce_hint
             }]')
         continue
     fi
@@ -118,6 +121,7 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
             --arg expected "Log Analytics workspace should be configured" \
             --arg resource_url "$df_url" \
             --arg actual "No Log Analytics workspace configured" \
+            --arg reproduce_hint "az monitor log-analytics workspace show --ids \"$workspace_id\" --query customerId -o tsv" \
             '.data_volume_alerts += [{
                 "title": $title,
                 "details": $details,
@@ -125,7 +129,8 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
                 "actual": $actual,
                 "expected": $expected,
                 "severity": ($severity | tonumber),
-                "resource_url": $resource_url
+                "resource_url": $resource_url,
+                "reproduce_hint": $reproduce_hint
             }]')
         continue
     fi
@@ -143,6 +148,7 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
             --arg expected "Should be able to query workspace information" \
             --arg resource_url "$df_url" \
             --arg actual "Failed to get workspace GUID" \
+            --arg reproduce_hint "az monitor log-analytics workspace show --ids \"$workspace_id\" --query customerId -o tsv" \
             '.data_volume_alerts += [{
                 "title": $title,
                 "details": $details,
@@ -150,7 +156,8 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
                 "actual": $actual,
                 "expected": $expected,
                 "severity": ($severity | tonumber),
-                "resource_url": $resource_url
+                "resource_url": $resource_url,
+                "reproduce_hint": $reproduce_hint
             }]')
         continue
     fi
@@ -162,6 +169,7 @@ let threshold = $THRESHOLD_MB;
 AzureDiagnostics
 | where ResourceProvider == "MICROSOFT.DATAFACTORY"
 | where Category == "ActivityRuns"
+| where status_s == "Succeeded"
 | where Resource =~ "$df_name"
 | top 1 by TimeGenerated desc
 | extend isHeavyRead = toint(Output_dataRead_d > threshold), isHeavyWrite = toint(Output_dataWritten_d > threshold)
@@ -186,6 +194,7 @@ EOF
             --arg expected "Log Analytics query should be successful" \
             --arg resource_url "$df_url" \
             --arg actual "Log Analytics query failed" \
+            --arg reproduce_hint "az monitor log-analytics query --workspace \"$workspace_guid\" --analytics-query '$kql_query' --subscription \"$subscription_id\" --output json" \
             '.data_volume_alerts += [{
                 "title": $title,
                 "details": $details,
@@ -193,7 +202,8 @@ EOF
                 "actual": $actual,
                 "expected": $expected,
                 "severity": ($severity | tonumber),
-                "resource_url": $resource_url
+                "resource_url": $resource_url,
+                "reproduce_hint": $reproduce_hint
             }]')
         continue
     fi
@@ -214,15 +224,16 @@ EOF
 
         if [[ "$is_heavy_read" -eq 1 || "$is_heavy_write" -eq 1 ]]; then
             audit_json=$(echo "$audit_json" | jq \
-                --arg title "Heavy Data Operation Detected in Pipeline \`$pipeline_name\` in resource group \`$resource_group\` in subscription \`$subscription_name\`" \
+                --arg title "Large Data Operation Detected in Pipeline \`$pipeline_name\` in resource group \`$resource_group\` in subscription \`$subscription_name\`" \
                 --arg details $activity \
                 --arg severity "4" \
                 --arg nextStep "Review and adjust ADF Integration Runtime configuration in resource group \`$resource_group\` in subscription \`$subscription_name\`" \
                 --arg name "$pipeline_name" \
                 --arg expected "ADF pipeline \`$pipeline_name\` data operations should be below ${THRESHOLD_MB}MB threshold in resource group \`$resource_group\` in subscription \`$subscription_name\`" \
-                --arg actual "ADF pipeline \`$pipeline_name\` has heavy data operations in resource group \`$resource_group\` in subscription \`$subscription_name\`" \
+                --arg actual "ADF pipeline \`$pipeline_name\` has large data operations in resource group \`$resource_group\` in subscription \`$subscription_name\`" \
                 --arg resource_url "$df_url" \
                 --arg run_id "$run_id" \
+                --arg reproduce_hint "az monitor log-analytics query --workspace \"$workspace_guid\" --analytics-query '$kql_query' --subscription \"$subscription_id\" --output json" \
                 '.data_volume_alerts += [{
                     "title": $title,
                     "details": $details,
@@ -232,6 +243,7 @@ EOF
                     "name": $name,
                     "resource_url": $resource_url,
                     "expected": $expected,
+                    "reproduce_hint": $reproduce_hint,
                     "run_id": $run_id
                 }]')
         fi
