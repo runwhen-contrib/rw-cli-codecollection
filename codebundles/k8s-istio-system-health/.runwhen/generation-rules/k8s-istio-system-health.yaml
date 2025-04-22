@@ -16,6 +16,6 @@ spec:
           baseTemplateName: k8s-istio-system-health
           outputItems:
             - type: slx
-            # - type: sli
+            - type: sli
             - type: runbook
               templateName: k8s-istio-system-health-taskset.yaml

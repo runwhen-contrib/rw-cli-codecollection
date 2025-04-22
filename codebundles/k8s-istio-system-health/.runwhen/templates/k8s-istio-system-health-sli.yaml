@@ -1,14 +1,17 @@
 apiVersion: runwhen.com/v1
-kind: Runbook
+kind: ServiceLevelIndicator
 metadata:
   name: {{slx_name}}
   labels:
     {% include "common-labels.yaml" %}
   annotations:
     {% include "common-annotations.yaml" %}
-spec: 
-  location: {{default_location}}
-  description: istio system health check
+spec:
+  displayUnitsLong: OK
+  displayUnitsShort: ok
+  locations:
+    - {{default_location}}
+  description: Measures health of Istio system. 
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -20,7 +23,9 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/k8s-istio-system-health/runbook.robot
+    pathToRobot: codebundles/k8s-istio-system-health/sli.robot
+  intervalStrategy: intermezzo
+  intervalSeconds: 300
   configProvided:
     - name: CONTEXT
       value: {{context}}
@@ -41,3 +46,16 @@ spec:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
   {% endif %}
+  alerts:
+    warning:
+      operator: <
+      threshold: '1'
+      for: '10m'
+    ticket:
+      operator: <
+      threshold: '1'
+      for: '20m'
+    page:
+      operator: '=='
+      threshold: '0'
+      for: '30m'
