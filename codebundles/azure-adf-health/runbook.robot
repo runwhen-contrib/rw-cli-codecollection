@@ -82,13 +82,13 @@ Check for Frequent Pipeline Errors in Data Factories in resource group `${AZURE_
 
         FOR    ${error}    IN    @{error_trends['error_trends']}
             RW.Core.Add Issue
-            ...    severity=${error['severity']}
-            ...    expected=${error['expected']}
-            ...    actual=${error['actual']}
-            ...    title=${error['title']}
-            ...    reproduce_hint=${error['reproduce_hint']}
-            ...    details=${error['details']}
-            ...    next_steps=${error['next_step']}
+            ...    severity=${error.get("severity", 4)}
+            ...    expected=${error.get("expected", "No expected value")}
+            ...    actual=${error.get("actual", "No actual value")}
+            ...    title=${error.get("title", "No title")}
+            ...    reproduce_hint=${error.get("reproduce_hint", "No reproduce hint")}
+            ...    details=${error.get("details", "No details")}
+            ...    next_steps=${error.get("next_step", "No next steps")}
         END
     ELSE
         RW.Core.Add Pre To Report    "No pipeline errors found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
@@ -106,7 +106,6 @@ Check for Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
-    ...    show_in_rwl_cheatsheet=true
 
     ${failed_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${json_file}
@@ -127,17 +126,60 @@ Check for Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE
 
         FOR    ${issue}    IN    @{failed_json["failed_pipelines"]}
             RW.Core.Add Issue
-            ...    severity=${issue["severity"]}
-            ...    title=${issue["title"]}
-            ...    details=${issue["details"]}
-            ...    next_steps=${issue["next_step"]}
-            ...    expected=${issue["expected"]}
-            ...    actual=${issue["actual"]}
-            ...    reproduce_hint=${issue["reproduce_hint"]}
-            ...    resource_url=${issue["resource_url"]}
+            ...    severity=${issue.get("severity", 4)}
+            ...    title=${issue.get("title", "No title")}
+            ...    details=${issue.get("details", "No details")}
+            ...    next_steps=${issue.get("next_step", "No next steps")}
+            ...    expected=${issue.get("expected", "No expected value")}
+            ...    actual=${issue.get("actual", "No actual value")}
+            ...    reproduce_hint=${issue.get("reproduce_hint", "No reproduce hint")}
+            ...    resource_url=${issue.get("resource_url", "No resource url")}
         END
     ELSE
         RW.Core.Add Pre To Report    "No failed pipelines found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+    END
+
+    RW.CLI.Run Cli
+    ...    cmd=rm -f ${json_file}
+
+Check for Large Data Operations in Data Factories in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Check for large data operations in Data Factory pipelines
+    [Tags]    datafactory    data-volume    access:read-only
+    ${json_file}=    Set Variable    "data_volume_audit.json"
+    ${data_volume_check}=    RW.CLI.Run Bash File
+    ...    bash_file=data_volume_audit.sh
+    ...    env=${env}
+    ...    include_in_history=false
+    ${data_volume_data}=    RW.CLI.Run Cli
+    ...    cmd=cat ${json_file}
+
+    TRY
+        ${metrics_data}=    Evaluate    json.loads(r'''${data_volume_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${metrics_data}=    Create Dictionary    metrics_data=[]
+    END
+
+    ${has_heavy_operations}=    Evaluate    len($metrics_data.get("data_volume_alerts", [])) > 0
+
+    IF    ${has_heavy_operations}
+        ${formatted_results}=    RW.CLI.Run Cli
+        ...    cmd=jq -r '["Pipeline_Name", "RunId", "Output_dataRead_d", "Output_dataWritten_d", "Resource_URL"], (.data_volume_alerts[] | [ .name, .run_id, (.details | fromjson).Output_dataRead_d, (.details | fromjson).Output_dataWritten_d, .resource_url]) | @tsv' ${json_file} | column -t
+        RW.Core.Add Pre To Report    Heavy Data Operations Summary:\n==============================\n${formatted_results.stdout}
+
+        FOR    ${issue}    IN    @{metrics_data["data_volume_alerts"]}
+            RW.Core.Add Issue
+            ...    severity=${issue.get("severity", 4)}
+            ...    title=${issue.get("title", "No title")}
+            ...    details=${issue.get("details", "No details")}
+            ...    next_steps=${issue.get("next_step", "No next steps")}
+            ...    expected=${issue.get("expected", "No expected value")}
+            ...    actual=${issue.get("actual", "No aFailed Job Runs Log Parser SLI to run every 120-180 seconds to do a KQL query to find failed job run, fetch detailctual value")}
+            ...    reproduce_hint=${issue.get("reproduce_hint", "No reproduce hint")}
+            ...    resource_url=${issue.get("resource_url", "No resource url")}
+        END
+    ELSE
+        RW.Core.Add Pre To Report    "No heavy data operations detected in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
     END
 
     RW.CLI.Run Cli
