@@ -111,6 +111,9 @@ resource "kubernetes_namespace_v1" "istio_system" {
   metadata {
     name = "istio-system"
   }
+  depends_on = [
+    module.eks
+  ]
 }
 
 module "eks_blueprints_addons" {
@@ -179,6 +182,82 @@ module "eks_blueprints_addons" {
 
   tags = local.tags
 }
+
+# service account and rbac creation 
+
+resource "kubernetes_service_account" "kubeconfig_sa" {
+  metadata {
+    name      = "kubeconfig-sa"
+    namespace = "kube-system"
+  }
+  depends_on = [
+    module.eks_blueprints_addons
+  ]
+}
+
+resource "kubernetes_cluster_role_binding" "view_binding" {
+  metadata {
+    name = "add-on-cluster-admin"
+  }
+
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "ClusterRole"
+    name      = "view"
+  }
+
+  subject {
+    kind      = "ServiceAccount"
+    name      = kubernetes_service_account.kubeconfig_sa.metadata[0].name
+    namespace = kubernetes_service_account.kubeconfig_sa.metadata[0].namespace
+  }
+  depends_on = [
+    module.eks_blueprints_addons
+  ]
+}
+
+resource "kubernetes_secret" "kubeconfig_sa_token" {
+  metadata {
+    name      = "kubeconfig-sa-token"
+    namespace = "kube-system"
+    annotations = {
+      "kubernetes.io/service-account.name" = "kubeconfig-sa"
+    }
+  }
+
+  type = "kubernetes.io/service-account-token"
+  depends_on = [
+    module.eks_blueprints_addons
+  ]
+}
+
+
+# create faulty gateway
+
+resource "kubectl_manifest" "faulty_gateway" {
+  yaml_body = <<YAML
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: faulty-gateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "invalid-host.local"
+YAML
+
+  depends_on = [
+    module.eks_blueprints_addons
+  ]
+}
+
 
 ################################################################################
 # Supporting Resources

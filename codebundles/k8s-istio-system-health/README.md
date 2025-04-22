@@ -27,6 +27,10 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 - To Create Infra use `task build-infra`
 
 ### Post Infra operations
+```
+aws eks --region us-west-2 update-kubeconfig --name istio-cluster
+```
+
 - Create kubeconfig with service account token
 
 ```
