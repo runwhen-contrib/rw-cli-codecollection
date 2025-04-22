@@ -23,9 +23,9 @@ spec:
     pathToRobot: codebundles/k8s-istio-system-health/runbook.robot
   configProvided:
     - name: CONTEXT
-      value: {{context}}
+      value: "{{cluster.context}}"
     - name: CLUSTER
-      value: {{cluster}}
+      value: "{{cluster.name}}"
     - name: KUBERNETES_DISTRIBUTION_BINARY
       value: {{custom.kubernetes_distribution_binary}}
     - name: EXCLUDED_NAMESPACES
@@ -33,7 +33,7 @@ spec:
     - name: CPU_USAGE_THRESHOLD
       value: {{custom.cpu_usage_threshold}}
     - name: MEMORY_USAGE_THRESHOLD
-      value: {{custom.memory_usage_threhold}}
+      value: {{custom.memory_usage_threshold}}
   secretsProvided:
   {% if wb_version %}
     {% include "kubernetes-auth.yaml" ignore missing %}

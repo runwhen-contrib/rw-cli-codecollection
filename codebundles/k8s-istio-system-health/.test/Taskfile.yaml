@@ -84,6 +84,8 @@ tasks:
         custom: 
           kubernetes_distribution_binary: kubectl
           excluded_namespaces: kube-system
+          cpu_usage_threshold: 80
+          memory_usage_threshold: 80
           kubeconfig_secret_name: "kubeconfig"
         EOF
     silent: false
