@@ -35,29 +35,9 @@ Check Deployments for Istio Sidecar Injection for Cluster ${CLUSTER}
     ...    env=${env}
     ...    include_in_history=false
 
-
-    # Process issues if any were found
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
-    IF    len(@{issues}) > 0
-        FOR    ${issue}    IN    @{issues}
-            ${reproduce_cmd}=    Set Variable    kubectl get pods -n ${issue['namespace']} -l app=${issue['deployment']} -o jsonpath='{.items[*].spec.containers[*].name}'
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=Deployment should have Istio sidecar injection configured properly
-            ...    actual=${issue['actual']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${reproduce_cmd}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
-
-
-    # Generate and add the formatted report
-    ${formatted_report}=    RW.CLI.Run Bash File
-    ...    bash_file=istio_sidecar_injection_report.sh
-    ...    env=${env}
-    ...    include_in_history=false
-    RW.Core.Add Pre To Report    ${formatted_report.stdout}
+    ${sidecar_injection_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
+    Set Global Variable    ${sidecar_injection_score}
 
 Check Istio Sidecar resources usage for Cluster ${CLUSTER}
     [Documentation]    Checks all pods in specified namespaces for Istio sidecar resources usage
@@ -77,24 +57,8 @@ Check Istio Sidecar resources usage for Cluster ${CLUSTER}
     ...    include_in_history=false
 
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
-    IF    len(@{issues}) > 0
-        FOR    ${issue}    IN    @{issues}
-            ${reproduce_cmd}=    Set Variable    ${issue['reproduce_hint']}
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=${issue['expected']}
-            ...    actual=${issue['actual']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${reproduce_cmd}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
-    ${usage_report}=    RW.CLI.Run Cli
-    ...     cmd=cat ${OUTPUT_DIR}/istio_sidecar_resource_usage_report.txt
-    ...     env=${env}
-    ...     include_in_history=false
-
-    RW.Core.Add Pre To Report   ${usage_report.stdout}
+    ${sidecar_resources_usage_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
+    Set Global Variable    ${sidecar_resources_usage_score}
 
 
 Verify Istio Istallation in Cluster ${CLUSTER}
@@ -113,24 +77,8 @@ Verify Istio Istallation in Cluster ${CLUSTER}
     ...    include_in_history=false
 
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
-    IF    len(@{issues}) > 0
-        FOR    ${issue}    IN    @{issues}
-            ${reproduce_cmd}=    Set Variable    ${issue['reproduce_hint']}
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=${issue['expected']}
-            ...    actual=${issue['actual']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${reproduce_cmd}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
-    ${installation_report}=    RW.CLI.Run Cli
-    ...     cmd=cat ${OUTPUT_DIR}/istio_installation_report.txt
-    ...     env=${env}
-    ...     include_in_history=false
-
-    RW.Core.Add Pre To Report   ${installation_report.stdout}
+    ${installation_verify_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
+    Set Global Variable    ${installation_verify_score}
 
 
 Check Istio Controlplane logs for errors and warnings in Cluster ${CLUSTER}
@@ -148,24 +96,8 @@ Check Istio Controlplane logs for errors and warnings in Cluster ${CLUSTER}
     ...    include_in_history=false
 
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
-    IF    len(@{issues}) > 0
-        FOR    ${issue}    IN    @{issues}
-            ${reproduce_cmd}=    Set Variable    ${issue['reproduce_hint']}
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=No critical logs in control plane
-            ...    actual=${issue['actual']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${reproduce_cmd}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
-
-    ${logs_report}=    RW.CLI.Run Cli
-    ...     cmd=cat ${OUTPUT_DIR}/istio_controlplane_report.txt
-    ...     env=${env}
-    ...     include_in_history=false
-    RW.Core.Add Pre To Report   ${logs_report.stdout}
+    ${controlplane_logs_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
+    Set Global Variable    ${controlplane_logs_score}
 
 Check Istio Certificates for the Istio Components in Cluster ${CLUSTER}
     [Documentation]    Check Istio valid Root CA and mTLS Certificates
@@ -182,23 +114,8 @@ Check Istio Certificates for the Istio Components in Cluster ${CLUSTER}
     ...    include_in_history=false
 
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
-    IF    len(@{issues}) > 0
-        FOR    ${issue}    IN    @{issues}
-            ${reproduce_cmd}=    Set Variable    ${issue['reproduce_hint']}
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=No critical logs in control plane
-            ...    actual=${issue['actual']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${reproduce_cmd}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
-    ${mtls_report}=    RW.CLI.Run Cli
-    ...     cmd=cat ${OUTPUT_DIR}/istio_mtls_report.txt
-    ...     env=${env}
-    ...     include_in_history=false
-    RW.Core.Add Pre To Report   ${mtls_report.stdout}
+    ${istio_certificate_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
+    Set Global Variable    ${istio_certificate_score}
 
 Analyze Istio configurations in Cluster ${CLUSTER}
     [Documentation]    Check Istio configurations
@@ -215,24 +132,13 @@ Analyze Istio configurations in Cluster ${CLUSTER}
     ...    include_in_history=false
 
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
-    IF    len(@{issues}) > 0
-        FOR    ${issue}    IN    @{issues}
-            ${reproduce_cmd}=    Set Variable    ${issue['reproduce_hint']}
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=No critical logs in control plane
-            ...    actual=${issue['actual']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${reproduce_cmd}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
-    ${analyze_report}=    RW.CLI.Run Cli
-    ...     cmd=cat ${OUTPUT_DIR}/report_istio_analyze.txt
-    ...     env=${env}
-    ...     include_in_history=false
-    RW.Core.Add Pre To Report   ${analyze_report.stdout}
+    ${istio_configuration_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
+    Set Global Variable    ${istio_configuration_score}
 
+Generate Health Score for Cluster ${CLUSTER}
+    ${health_score}=    Evaluate  (${sidecar_injection_score} + ${sidecar_resources_usage_score} + ${installation_verify_score} + ${controlplane_logs_score} + ${istio_certificate_score} + ${istio_configuration_score}) / 6
+    ${health_score}=    Convert to Number    ${health_score}  2
+    RW.Core.Push Metric    ${health_score}
 
 *** Keywords ***
 Suite Initialization
@@ -281,7 +187,7 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=80
     ...    default=80
-    
+
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
