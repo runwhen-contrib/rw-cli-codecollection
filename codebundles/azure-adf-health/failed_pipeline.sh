@@ -6,11 +6,13 @@ set -euo pipefail
 #   AZURE_SUBSCRIPTION_ID
 #   AZURE_RESOURCE_GROUP
 #   AZURE_SUBSCRIPTION_NAME
+#   LOOKBACK_PERIOD
 # -----------------------------------------------------------------------------
 
 : "${AZURE_SUBSCRIPTION_ID:?Must set AZURE_SUBSCRIPTION_ID}"
 : "${AZURE_RESOURCE_GROUP:?Must set AZURE_RESOURCE_GROUP}"
 : "${AZURE_SUBSCRIPTION_NAME:?Must set AZURE_SUBSCRIPTION_NAME}"
+: "${LOOKBACK_PERIOD:?Must set LOOKBACK_PERIOD}"
 
 subscription_id="$AZURE_SUBSCRIPTION_ID"
 resource_group="$AZURE_RESOURCE_GROUP"
@@ -188,6 +190,7 @@ AzureDiagnostics
 | where Category == "PipelineRuns"
 | where status_s == "Failed"
 | where Resource =~ "$df_name"
+| where TimeGenerated > ago($LOOKBACK_PERIOD)
 | summarize by pipelineName_s, Message, runId_g
 EOF
 )
