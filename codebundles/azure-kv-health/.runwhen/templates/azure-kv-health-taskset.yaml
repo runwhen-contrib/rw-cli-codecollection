@@ -24,8 +24,6 @@ spec:
   configProvided:
     - name: AZURE_RESOURCE_GROUP
       value: "{{resource_group.name}}"
-    - name: AZURE_SUBSCRIPTION_NAME
-      value: "{{ custom.subscription_name }}"
     - name: AZURE_SUBSCRIPTION_ID
       value: "{{ match_resource.subscription_id }}"
   secretsProvided:

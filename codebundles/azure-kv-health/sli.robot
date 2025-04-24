@@ -220,6 +220,8 @@ Suite Initialization
     ...    description=Time range for log queries (format: 1d, 7d, 30d, etc.)
     ...    default=1d
     ...    example=2d
+    ${fetch_azure_name}=    RW.CLI.Run Cli
+    ...    cmd= az account list --all --query "[?id=='${AZURE_SUBSCRIPTION_ID}'].name" -o tsv
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
