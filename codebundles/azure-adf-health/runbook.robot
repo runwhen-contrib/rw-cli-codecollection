@@ -206,9 +206,23 @@ Suite Initialization
     ...    type=string
     ...    description=Azure resource group.
     ...    pattern=\w*
+    ${LOOKBACK_PERIOD}=    RW.Core.Import User Variable    LOOKBACK_PERIOD
+    ...    type=string
+    ...    description=The lookback period for querying failed pipelines (e.g., 1d, 7d, 30d).
+    ...    pattern=\w*
+    ...    default=7d
+    ...    example=1d
+    ${THRESHOLD_MB}=    RW.Core.Import User Variable    THRESHOLD_MB
+    ...    type=string
+    ...    description=The threshold for data volume in MB.
+    ...    pattern=\w*
+    ...    default=10
+    ...    example=5000
+    Set Suite Variable    ${THRESHOLD_MB}    ${THRESHOLD_MB}
+    Set Suite Variable    ${LOOKBACK_PERIOD}    ${LOOKBACK_PERIOD}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}", "LOOKBACK_PERIOD":"${LOOKBACK_PERIOD}", "THRESHOLD_MB":"${THRESHOLD_MB}"}
