@@ -9,7 +9,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
-
+Library             Jenkins
 Suite Setup         Suite Initialization
 
 
@@ -123,17 +123,26 @@ Check for Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE
         ${formatted_results}=    RW.CLI.Run Cli
         ...    cmd=jq -r '["Pipeline_Name", "RunId", "Resource_URL"], (.failed_pipelines[] | [ .name, .run_id, .resource_url]) | @tsv' ${json_file} | column -t
         RW.Core.Add Pre To Report    Failed Pipelines Summary:\n==============================\n${formatted_results.stdout}
-
+        
         FOR    ${issue}    IN    @{failed_json["failed_pipelines"]}
+            ${details_json}=    Evaluate    json.loads('''${issue["details"]}''')    json
+            ${next_steps}=    Analyze Logs
+            ...    logs=${details_json["Message"]}
+            ...    error_patterns_file=${CURDIR}/error_patterns.json
+            ${suggestions}=    Set Variable    ${EMPTY}
+            ${logs_details}=    Set Variable    ${EMPTY}
+            FOR    ${step}    IN    @{next_steps}
+                ${suggestions}=    Set Variable    ${suggestions}${step['suggestion']}\n
+                ${logs_details}=    Set Variable    ${logs_details}Log: ${step['log']}\n
+            END
             RW.Core.Add Issue
             ...    severity=${issue.get("severity", 4)}
             ...    title=${issue.get("title", "No title")}
             ...    details=${issue.get("details", "No details")}
-            ...    next_steps=${issue.get("next_step", "No next steps")}
+            ...    next_steps=${suggestions}
             ...    expected=${issue.get("expected", "No expected value")}
             ...    actual=${issue.get("actual", "No actual value")}
             ...    reproduce_hint=${issue.get("reproduce_hint", "No reproduce hint")}
-            ...    resource_url=${issue.get("resource_url", "No resource url")}
         END
     ELSE
         RW.Core.Add Pre To Report    "No failed pipelines found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
