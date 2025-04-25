@@ -1,0 +1,146 @@
+{
+    "ADF_SQL_INVALID_OBJECT_NAME": {
+        "pattern": "ErrorCode=SqlOperationFailed.*Invalid object name",
+        "suggestion": "Verify the database object exists and is accessible:\nCheck table/view name and schema in the query\nEnsure the linked service account has proper permissions\nVerify the correct database is being targeted\nCheck for any recent schema changes"
+    },
+    "ADF_AZUREBLOB_FAILED_TO_CREATE_CONTAINER": {
+        "pattern": "ErrorCode=AzureBlobFailedToCreateContainer.*The remote name could not be resolved",
+        "suggestion": "Storage connectivity troubleshooting:\nVerify storage account name is correct and exists\nCheck network connectivity and DNS resolution\nEnsure firewall rules allow access from ADF IP ranges\nVerify storage account access keys or SAS tokens are valid"
+    },
+    "ADF_JSON_INVALID_DATA_FORMAT": {
+      "pattern": "ErrorCode=JsonInvalidDataFormat",
+      "suggestion": "JSON format validation steps:\nValidate source JSON using a JSON validator tool\nCheck for special characters or encoding issues\nVerify the dataset schema matches the JSON structure\nIf source is an API, check if Content-Type header is application/json"
+    },
+    "ADF_JSON_DESERIALIZATION_ERROR": {
+      "pattern": "Error occurred when deserializing source JSON file",
+      "suggestion": "JSON parsing troubleshooting:\nCheck for malformed JSON structure\nVerify file encoding (UTF-8 recommended)\nEnsure no BOM markers in the file\nValidate array/object nesting levels\nCheck for truncated or incomplete JSON"
+    },
+    "ADF_FUNCTION_RESPONSE_NOT_JSON": {
+      "pattern": "Response Content is not a valid JObject",
+      "suggestion": "Azure Function response fixes:\nEnsure function returns valid JSON with proper Content-Type header\nAdd error handling in function to return formatted JSON responses\nCheck for string escaping in the response\nVerify function output binding configuration"
+    },
+    "ADF_FUNCTION_MISSING_METHOD": {
+      "pattern": "Azure function activity missing Method in JSON",
+      "suggestion": "Ensure that the Azure Function activity definition includes the 'method' property."
+    },
+    "ADF_FUNCTION_MISSING_FUNCTION_NAME": {
+      "pattern": "Azure function activity missing function name",
+      "suggestion": "Ensure that the Azure Function activity definition includes the 'functionName' property."
+    },
+    "ADF_FUNCTION_MISSING_FUNCTION_KEY": {
+      "pattern": "Azure function activity missing function key",
+      "suggestion": "Ensure that the Azure Function activity definition includes the 'functionKey' property."
+    },
+    "ADF_FUNCTION_MISSING_FUNCTION_APP_URL": {
+      "pattern": "Azure function activity missing functionAppUrl",
+      "suggestion": "Ensure that the Azure Function activity definition includes the 'functionAppUrl' property."
+    },
+    "ADF_FUNCTION_CALL_FAILED": {
+      "pattern": "Call to provided Azure function '.*' failed with status-'.*' and message - '.*'",
+      "suggestion": "Verify the Azure Function details in the activity definition, including URL, method, and authentication settings."
+    },
+    "ADF_EXECUTOR_INVALID_JSON": {
+      "pattern": "DF-Executor-SystemInvalidJson",
+      "suggestion": "Check the JSON file's encoding and structure. Ensure it's not multiline if the source expects a single document. Adjust JSON settings accordingly."
+    },
+    "ADF_EXECUTOR_OUT_OF_MEMORY": {
+      "pattern": "DF-Executor-OutOfMemoryError",
+      "suggestion": "Memory optimization steps:\nScale up integration runtime to higher memory SKU\nReduce data preview rows in data flows\nImplement pagination for large datasets\nOptimize data transformations to reduce memory usage\nConsider partitioning data processing"
+    },
+    "ADF_EXECUTOR_UNAUTHORIZED_STORAGE_ACCESS": {
+      "pattern": "DF-Executor-UnauthorizedStorageAccess",
+      "suggestion": "Storage access troubleshooting:\nVerify managed identity is enabled and configured\nCheck RBAC assignments on storage account\nEnsure necessary role assignments (Storage Blob Data Contributor)\nVerify network access rules and private endpoints\nCheck for expired access keys or SAS tokens"
+    },
+    "ADF_EXECUTOR_UNREACHABLE_STORAGE_ACCOUNT": {
+      "pattern": "DF-Executor-UnreachableStorageAccount",
+      "suggestion": "Storage connectivity checks:\nVerify storage account exists and is online\nCheck DNS resolution and network connectivity\nReview firewall rules and network security groups\nVerify VNET and private endpoint configurations\nCheck for any Azure Storage service issues"
+    },
+    "ADF_EXECUTOR_INCORRECT_QUERY": {
+      "pattern": "DF-Executor-IncorrectQuery",
+      "suggestion": "SQL query troubleshooting:\nValidate query syntax in SQL Server Management Studio\nCheck column and table names case sensitivity\nVerify database compatibility level\nTest query with actual credentials used by ADF\nEnsure all referenced objects exist"
+    },
+    "ADF_EXECUTOR_PARAMETER_PARSE_ERROR": {
+      "pattern": "DF-Executor-ParameterParseError",
+      "suggestion": "Parameter validation steps:\nVerify parameter data types match expected values\nCheck for proper JSON formatting in parameter values\nEnsure no special characters in parameter names\nValidate array parameters are properly formatted\nCheck pipeline parameter default values"
+    },
+    "ADF_EXECUTOR_DSL_PARSE_ERROR": {
+      "pattern": "DF-Executor-DSLParseError",
+      "suggestion": "Inspect the data flow script for parsing errors. Look for missing or extra symbols and correct any syntax issues."
+    },
+    "ADF_EXECUTOR_IMPLICIT_CARTESIAN": {
+      "pattern": "DF-Executor-SystemImplicitCartesian",
+      "suggestion": "Avoid implicit cartesian products in joins. Use CROSS JOIN explicitly or ensure join keys create unique combinations."
+    },
+    "ADF_EXECUTOR_INVALID_TYPE": {
+      "pattern": "DF-Executor-InvalidType",
+      "suggestion": "Ensure that the types of parameters match the expected types in the data flow. For instance, avoid passing float parameters if not supported."
+    },
+    "ADF_EXECUTOR_OUT_OF_DISK_SPACE": {
+      "pattern": "DF-Executor-OutOfDiskSpaceError",
+      "suggestion": "The cluster is running out of disk space. Retry the pipeline or consider increasing the disk capacity."
+    },
+    "ADF_MISSING_REQUIRED_PROPERTY": {
+        "pattern": "ErrorCode=2103.*Please provide value for the required property",
+        "suggestion": "Check the activity configuration and provide the missing required property value. Review the activity documentation for mandatory fields."
+    },
+    "ADF_INCORRECT_PROPERTY_TYPE": {
+        "pattern": "ErrorCode=2104.*The type of the property .* is incorrect",
+        "suggestion": "Verify and fix the property type in your activity configuration. Ensure it matches the expected data type as per the documentation."
+    },
+    "ADF_INVALID_JSON_PROPERTY": {
+        "pattern": "ErrorCode=2105.*An invalid json is provided for property",
+        "suggestion": "Check the JSON format of the property value. Ensure it is properly formatted and matches the expected schema."
+    },
+    "ADF_INVALID_STORAGE_CONNECTION": {
+        "pattern": "ErrorCode=2106.*The storage connection string is invalid",
+        "suggestion": "Verify the storage connection string in your linked service. Go to Azure portal, locate your storage account, and copy the correct connection string."
+    },
+    "ADF_UNSUPPORTED_LINKED_SERVICE": {
+        "pattern": "ErrorCode=2110.*The linked service type .* is not supported",
+        "suggestion": "Check if the linked service type is compatible with your activity. Review the activity documentation for supported linked service types."
+    },
+    "ADF_PAYLOAD_TOO_LARGE": {
+        "pattern": "The payload including configurations on activity/dataSet/linked service is too large",
+        "suggestion": "Reduce the size of parameter values being passed between activities. Consider handling large data within activities instead of passing them through pipeline parameters."
+    },
+    "ADF_UNSUPPORTED_COMPRESSION": {
+        "pattern": ".*deflate64.*not supported",
+        "suggestion": "Use the 'deflate' compression algorithm instead of 'deflate64'. For Windows-generated zip files, use third-party tools to specify the compression algorithm or ensure the file size doesn't exceed the threshold that triggers deflate64."
+    },
+    "ADF_ACTIVITY_STUCK": {
+        "pattern": "Activity running longer than expected with no progress",
+        "suggestion": "Check integration runtime status and scale up if needed\nFor copy activities, review source/sink throttling limits\nFor data flows, use memory-optimized compute type\nConsider using a separate IR for parallel activities"
+    },
+    "ADF_FLOW_RUN_SIZE_EXCEEDED": {
+        "pattern": "ErrorCode=FlowRunSizeLimitExceeded",
+        "suggestion": "Pipeline has too many chained activities. Split the pipeline into smaller sub-pipelines and connect them using ExecutePipeline activity."
+    },
+    "ADF_BAD_REQUEST_NULL": {
+        "pattern": ".*code.*:.*BadRequest.*,.*message.*:.*Null",
+        "suggestion": "JSON payload is corrupt. Check for special characters ($), spaces, or invalid user input in your expressions. Use browser developer tools to trace API calls and identify the issue."
+    },
+    "ADF_FOREACH_NOT_PARALLEL": {
+        "pattern": "ForEach activity not running in parallel",
+        "suggestion": "Ensure pipeline is not running in debug mode\nExecute the pipeline in trigger mode for parallel execution\nCheck if batch count is properly configured"
+    },
+    "ADF_DATAFLOW_OPTIMIZATION": {
+        "pattern": ".*internal server error.*|.*concurrency error.*|.*timeout.*",
+        "suggestion": "Use memory-optimized compute for large data transformations\nReduce batch size in ForEach activities\nScale up connected databases/warehouses\nUse separate integration runtimes for parallel activities\nAdjust source/sink partitions"
+    },
+    "ADF_LONG_QUEUE_ERROR": {
+        "pattern": "queue.*timeout|queue.*full|activity.*queued",
+        "suggestion": "For connector issues: Check connector-specific throttling limits\nFor data flows: Review cluster size and memory settings\nFor custom activities: Verify integration runtime capacity\nConsider implementing retry logic with exponential backoff"
+    },
+    "ADF_EXPRESSION_BUILDER_FAIL": {
+        "pattern": "Expression builder.*fail.*load",
+        "suggestion": "Clear browser cache and cookies\nUpdate to latest supported browser version\nTry using a different supported browser\nVerify network connectivity to Azure services"
+    },
+    "ADF_TRIGGER_DEACTIVATION": {
+        "pattern": "Trigger deactivation error",
+        "suggestion": "Check if related storage account is locked\nVerify trigger permissions on resources\nEnsure all referenced resources are accessible\nReview recent changes in collaboration branch"
+    },
+    "ADF_REST_CONTINUATION_TOKEN": {
+        "pattern": ".*token.*:null.*range.*min.*max",
+        "suggestion": "When querying paginated results, ensure you handle the continuation token properly. Pass the complete token string in subsequent API calls, even if the token property is null but range exists."
+    }
+}
