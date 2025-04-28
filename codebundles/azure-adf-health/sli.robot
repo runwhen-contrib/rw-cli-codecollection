@@ -29,14 +29,90 @@ Check for Azure Data Factories Health in resource group `${AZURE_RESOURCE_GROUP}
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    ${availability_score}=    Evaluate    len([issue for issue in ${issue_list} if issue["properties"]["title"] != "Available"]) if len(@{issue_list}) > 0 else 0
+    ${availability_score}=    Evaluate    1 if len([issue for issue in ${issue_list} if issue["properties"]["title"] != "Available"]) > 0 else 0
     Set Global Variable    ${availability_score}
     RW.CLI.Run Cli
     ...    cmd=rm -f ${json_file}
 
+Check for Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Check for frequently occurring errors in Data Factory pipelines
+    [Tags]    datafactory    pipeline-errors    access:read-only
+    ${json_file}=    Set Variable    "error_trend.json"
+    ${error_check}=    RW.CLI.Run Bash File
+    ...    bash_file=error_trend.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+
+    TRY
+        ${error_data}=    RW.CLI.Run Cli
+        ...    cmd=cat ${json_file}
+        ...    env=${env}
+        ${error_trends}=    Evaluate    json.loads(r'''${error_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${error_trends}=    Create Dictionary    error_trends=[]
+    END
+
+    ${pipeline_error_score}=    Evaluate    1 if len(${error_trends['error_trends']}) > 0 else 0
+    Set Global Variable    ${pipeline_error_score}
+
+    RW.CLI.Run Cli
+    ...    cmd=rm -f ${json_file}
+
+Check for Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Check for failed pipeline runs in Data Factory pipelines
+    [Tags]    datafactory    pipeline-failures    access:read-only
+    ${json_file}=    Set Variable    "failed_pipelines.json"
+    ${failed_check}=    RW.CLI.Run Bash File
+    ...    bash_file=failed_pipeline.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+
+    ${failed_data}=    RW.CLI.Run Cli
+    ...    cmd=cat ${json_file}
+
+    TRY
+        ${failed_json}=    Evaluate    json.loads(r'''${failed_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${failed_json}=    Create Dictionary    failed_json=[]
+    END
+
+    ${failed_pipeline_score}=    Evaluate    1 if len(${failed_json["failed_pipelines"]}) > 0 else 0
+    Set Global Variable    ${failed_pipeline_score}
+
+    RW.CLI.Run Cli
+    ...    cmd=rm -f ${json_file}
+
+Check for Large Data Operations in Data Factories in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Check for large data operations in Data Factory pipelines
+    [Tags]    datafactory    data-volume    access:read-only
+    ${json_file}=    Set Variable    "data_volume_audit.json"
+    ${data_volume_check}=    RW.CLI.Run Bash File
+    ...    bash_file=data_volume_audit.sh
+    ...    env=${env}
+    ...    include_in_history=false
+    ${data_volume_data}=    RW.CLI.Run Cli
+    ...    cmd=cat ${json_file}
+
+    TRY
+        ${metrics_data}=    Evaluate    json.loads(r'''${data_volume_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${metrics_data}=    Create Dictionary    metrics_data=[]
+    END
+
+    ${data_volume_score}=    Evaluate    1 if len(${metrics_data.get("data_volume_alerts", [])}) > 0 else 0
+    Set Global Variable    ${data_volume_score}
+
+    RW.CLI.Run Cli
+    ...    cmd=rm -f ${json_file}
+
 Generate Health Score
-    ${ado_health_score}=      Evaluate  (${availability_score} ) / 1
-    ${health_score}=      Convert to Number    ${ado_health_score}  2
+    ${health_score}=      Evaluate  (${availability_score} + ${pipeline_error_score} + ${failed_pipeline_score} + ${data_volume_score}) / 4
+    ${health_score}=      Convert to Number    ${health_score}  2
     RW.Core.Push Metric    ${health_score}
 
 *** Keywords ***
@@ -60,9 +136,23 @@ Suite Initialization
     ...    type=string
     ...    description=Azure resource group.
     ...    pattern=\w*
+    ${LOOKBACK_PERIOD}=    RW.Core.Import User Variable    LOOKBACK_PERIOD
+    ...    type=string
+    ...    description=The lookback period for querying failed pipelines (e.g., 1d, 7d, 30d).
+    ...    pattern=\w*
+    ...    default=7d
+    ...    example=1d
+    ${THRESHOLD_MB}=    RW.Core.Import User Variable    THRESHOLD_MB
+    ...    type=string
+    ...    description=The threshold for data volume in MB.
+    ...    pattern=\w*
+    ...    default=100
+    ...    example=100
+    Set Suite Variable    ${THRESHOLD_MB}    ${THRESHOLD_MB}
+    Set Suite Variable    ${LOOKBACK_PERIOD}    ${LOOKBACK_PERIOD}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}", "LOOKBACK_PERIOD":"${LOOKBACK_PERIOD}", "THRESHOLD_MB":"${THRESHOLD_MB}"}
