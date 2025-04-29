@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       Performs a health check on Azure Data factories   
+Documentation       Azure Data Factories health checks including resource health status, frequent pipeline errors, failed pipeline runs, and large data operations monitoring.
 Metadata            Author    saurabh3460
 Metadata            Display Name    Azure Data factories Health
 Metadata            Supports    Azure    Data factories
