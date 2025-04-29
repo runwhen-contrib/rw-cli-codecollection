@@ -52,7 +52,7 @@ Check Istio Sidecar resources usage for Cluster ${CLUSTER}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    include_in_history=false
     ${issues_list}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/issues_istio_resource_usage.json
+    ...    cmd=cat ${OUTPUT_DIR}/istio_sidecar_resource_usage_issue.json
     ...    env=${env}
     ...    include_in_history=false
 
@@ -197,5 +197,5 @@ Suite Initialization
     Set Suite Variable    ${MEMORY_USAGE_THRESHOLD}    ${MEMORY_USAGE_THRESHOLD}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "CLUSTER":"${CLUSTER}", "EXCLUDED_NAMESPACES":"${EXCLUDED_NAMESPACES}", "CPU_USAGE_THRESHOLD":"${CPU_USAGE_THRESHOLD}", "MEMORY_USAGE_THRESHOLD":"${MEMORY_USAGE_THRESHOLD}", "OUTPUT_DIR":"${OUTPUT_DIR}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "CLUSTER":"${CLUSTER}", "EXCLUDED_NAMESPACES":"${EXCLUDED_NAMESPACES}", "CPU_USAGE_THRESHOLD":"${CPU_USAGE_THRESHOLD}", "MEMORY_USAGE_THRESHOLD":"${MEMORY_USAGE_THRESHOLD}", "OUTPUT_DIR":"${OUTPUT_DIR}", "CURDIR":"${CURDIR}"}
 

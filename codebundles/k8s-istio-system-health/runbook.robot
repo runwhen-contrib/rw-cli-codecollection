@@ -43,7 +43,7 @@ Check Deployments for Istio Sidecar Injection for Cluster ${CLUSTER}
             ${reproduce_cmd}=    Set Variable    kubectl get pods -n ${issue['namespace']} -l app=${issue['deployment']} -o jsonpath='{.items[*].spec.containers[*].name}'
             RW.Core.Add Issue
             ...    severity=${issue['severity']}
-            ...    expected=Deployment should have Istio sidecar injection configured properly
+            ...    expected=${issue['expected']}
             ...    actual=${issue['actual']}
             ...    title=${issue['title']}
             ...    reproduce_hint=${reproduce_cmd}
@@ -72,7 +72,7 @@ Check Istio Sidecar resources usage for Cluster ${CLUSTER}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    include_in_history=false
     ${issues_list}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/issues_istio_resource_usage.json
+    ...    cmd=cat ${OUTPUT_DIR}/istio_sidecar_resource_usage_issue.json
     ...    env=${env}
     ...    include_in_history=false
 
@@ -98,7 +98,7 @@ Check Istio Sidecar resources usage for Cluster ${CLUSTER}
 
 
 Verify Istio Istallation in Cluster ${CLUSTER}
-    [Documentation]    Verify Istio Istallation
+    [Documentation]    Verify Istio Istallation in cluster ${CLUSTER}
     [Tags]    
     ...    istio
     ...    installation
@@ -134,7 +134,7 @@ Verify Istio Istallation in Cluster ${CLUSTER}
 
 
 Check Istio Controlplane logs for errors and warnings in Cluster ${CLUSTER}
-    [Documentation]    Check controlplane logs for known erros and warnings
+    [Documentation]    Check istio controlplane logs for known erros and warnings in cluster ${CLUSTER}
     ...    istio
     ...    logs
     ${results}=    RW.CLI.Run Bash File
@@ -167,8 +167,9 @@ Check Istio Controlplane logs for errors and warnings in Cluster ${CLUSTER}
     ...     include_in_history=false
     RW.Core.Add Pre To Report   ${logs_report.stdout}
 
+
 Check Istio Certificates for the Istio Components in Cluster ${CLUSTER}
-    [Documentation]    Check Istio valid Root CA and mTLS Certificates
+    [Documentation]    Check Istio valid Root CA and mTLS Certificates in cluster ${CLUSTER}
     ...    istio
     ...    mtls
     ${results}=    RW.CLI.Run Bash File
@@ -201,7 +202,7 @@ Check Istio Certificates for the Istio Components in Cluster ${CLUSTER}
     RW.Core.Add Pre To Report   ${mtls_report.stdout}
 
 Analyze Istio configurations in Cluster ${CLUSTER}
-    [Documentation]    Check Istio configurations
+    [Documentation]    Check Istio configurations in cluster ${CLUSTER}
     ...    istio
     ...    config
     ${results}=    RW.CLI.Run Bash File
@@ -291,5 +292,5 @@ Suite Initialization
     Set Suite Variable    ${MEMORY_USAGE_THRESHOLD}    ${MEMORY_USAGE_THRESHOLD}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "CLUSTER":"${CLUSTER}", "EXCLUDED_NAMESPACES":"${EXCLUDED_NAMESPACES}", "CPU_USAGE_THRESHOLD":"${CPU_USAGE_THRESHOLD}", "MEMORY_USAGE_THRESHOLD":"${MEMORY_USAGE_THRESHOLD}", "OUTPUT_DIR":"${OUTPUT_DIR}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "CLUSTER":"${CLUSTER}", "EXCLUDED_NAMESPACES":"${EXCLUDED_NAMESPACES}", "CPU_USAGE_THRESHOLD":"${CPU_USAGE_THRESHOLD}", "MEMORY_USAGE_THRESHOLD":"${MEMORY_USAGE_THRESHOLD}", "OUTPUT_DIR":"${OUTPUT_DIR}", "CURDIR":"${CURDIR}"}
 

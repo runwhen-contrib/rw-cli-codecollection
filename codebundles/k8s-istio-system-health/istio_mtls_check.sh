@@ -50,9 +50,9 @@ ${KUBERNETES_DISTRIBUTION_BINARY} get ns --no-headers -o custom-columns=":metada
         if [[ "$POD_PHASE" != "Running" ]]; then
             ISSUE=$(jq -n \
                 --arg severity "1" \
-                --arg expected "Pod should be in Running state for certificate check" \
-                --arg actual "Pod $POD in namespace $NS is in $POD_PHASE phase" \
-                --arg title "Pod not running, skipping mTLS certificate check" \
+                --arg expected "Pod $POD should be in Running state for certificate check in namepsace $NS" \
+                --arg actual "Pod $POD is in $POD_PHASE phase in namespace $NS" \
+                --arg title "Skipping mTLS certificate check for pod $POD in namespace $NS" \
                 --arg reproduce_hint "${KUBERNETES_DISTRIBUTION_BINARY} get pod $POD -n $NS --context=$CONTEXT" \
                 --arg next_steps "Ensure pod is healthy and running before verifying mTLS certs" \
                 '{severity: $severity, expected: $expected, actual: $actual, title: $title, reproduce_hint: $reproduce_hint, next_steps: $next_steps}')
@@ -84,9 +84,9 @@ sort -u "$ROOT_CA_FILE" | while read -r serial status valid not_after not_before
     if [[ "$valid" != "true" ]]; then
         ISSUE=$(jq -n \
             --arg severity "2" \
-            --arg expected "Root CA certificate should be valid" \
-            --arg actual "Root CA $serial is not valid (valid=$valid)" \
-            --arg title "Invalid Root CA certificate found" \
+            --arg expected "Root CA certificate should be valid for cluster ${CLUSTER}" \
+            --arg actual "Root CA $serial is not valid (valid=$valid) for cluster ${CLUSTER}" \
+            --arg title "Invalid Root CA certificate found for cluster ${CLUSTER}" \
             --arg reproduce_hint "Check with: istioctl proxy-config secret <pod> -n <namespace> --context=$CONTEXT" \
             --arg next_steps "Investigate certificate provisioning and ensure the CA is valid and trusted" \
             '{severity: $severity, expected: $expected, actual: $actual, title: $title, reproduce_hint: $reproduce_hint, next_steps: $next_steps}')
@@ -106,9 +106,9 @@ cat "$MTLS_FILE" | while read -r pod ns serial status valid not_after not_before
     if [[ "$valid" != "true" ]]; then
         ISSUE=$(jq -n \
             --arg severity "2" \
-            --arg expected "mTLS certificate should be valid" \
-            --arg actual "mTLS certificate for pod $pod (serial=$serial) is not valid" \
-            --arg title "Invalid mTLS certificate for pod $pod" \
+            --arg expected "mTLS certificate should be valid for pod $pod in namespace $ns" \
+            --arg actual "mTLS certificate for pod $pod (serial=$serial) is not valid in namespace $ns" \
+            --arg title "Invalid mTLS certificate for pod $pod in namespace $ns" \
             --arg reproduce_hint "istioctl proxy-config secret $pod -n $ns --context=$CONTEXT" \
             --arg next_steps "Restart the pod or investigate certificate provisioning issues" \
             '{severity: $severity, expected: $expected, actual: $actual, title: $title, reproduce_hint: $reproduce_hint, next_steps: $next_steps}')
