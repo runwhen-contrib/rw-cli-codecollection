@@ -7,7 +7,7 @@ declare -A substitutions_list
 declare -A change_details
 declare -A change_summary
 
-
+export HOME=$CODEBUNDLE_TEMP_DIR
 
 ## GitOps Owner Logic
 #########################
