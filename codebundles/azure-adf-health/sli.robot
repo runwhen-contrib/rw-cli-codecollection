@@ -14,7 +14,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check for Azure Data Factories Health in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Count Resource Health Issues Affecting Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Fetch health status for all Data Factories in the resource group
     [Tags]    datafactory    resourcehealth   access:read-only
     ${json_file}=    Set Variable    "datafactory_health.json"
@@ -34,8 +34,8 @@ Check for Azure Data Factories Health in resource group `${AZURE_RESOURCE_GROUP}
     RW.CLI.Run Cli
     ...    cmd=rm -f ${json_file}
 
-Check for Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
-    [Documentation]    Check for frequently occurring errors in Data Factory pipelines
+Count Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Count frequently occurring errors in Data Factory pipelines
     [Tags]    datafactory    pipeline-errors    access:read-only
     ${json_file}=    Set Variable    "error_trend.json"
     ${error_check}=    RW.CLI.Run Bash File
@@ -60,8 +60,8 @@ Check for Frequent Pipeline Errors in Data Factories in resource group `${AZURE_
     RW.CLI.Run Cli
     ...    cmd=rm -f ${json_file}
 
-Check for Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
-    [Documentation]    Check for failed pipeline runs in Data Factory pipelines
+Count Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Count failed pipeline runs in Data Factory pipelines
     [Tags]    datafactory    pipeline-failures    access:read-only
     ${json_file}=    Set Variable    "failed_pipelines.json"
     ${failed_check}=    RW.CLI.Run Bash File
@@ -86,8 +86,8 @@ Check for Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE
     RW.CLI.Run Cli
     ...    cmd=rm -f ${json_file}
 
-Check for Large Data Operations in Data Factories in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
-    [Documentation]    Check for large data operations in Data Factory pipelines
+Count Large Data Operations in Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Count large data operations in Data Factory pipelines
     [Tags]    datafactory    data-volume    access:read-only
     ${json_file}=    Set Variable    "data_volume_audit.json"
     ${data_volume_check}=    RW.CLI.Run Bash File
