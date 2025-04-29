@@ -11,7 +11,7 @@ spec:
   displayUnitsShort: ok
   locations:
     - {{default_location}}
-  description: Performs a health check on Azure Data factories in resource group {{ match_resource.resource_group.name }} in azure subscription {{ custom.subscription_name }}
+  description: Azure Data Factories health checks including resource health status, frequent pipeline errors, failed pipeline runs, and large data operations monitoring in resource group {{ match_resource.resource_group.name }} in azure subscription {{ custom.subscription_name }}
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}

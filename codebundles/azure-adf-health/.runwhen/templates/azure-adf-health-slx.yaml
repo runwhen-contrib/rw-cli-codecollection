@@ -15,7 +15,7 @@ spec:
     value: SLX_PLACEHOLDER
   owners:
   - {{workspace.owner_email}}
-  statement: Measure Azure Data Factory health by checking availability metrics in resource group {{ match_resource.resource_group.name }} in azure subscription {{ custom.subscription_name }}
+  statement: Measure Azure Data Factory health by checking resource health status, frequent pipeline errors, failed pipeline runs, and large data operations in resource group {{ match_resource.resource_group.name }} in azure subscription {{ custom.subscription_name }}
   additionalContext:
     name: "{{match_resource.resource.name}}"
     tags: "{{match_resource.tags}}"
