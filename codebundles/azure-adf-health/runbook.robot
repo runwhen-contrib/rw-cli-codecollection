@@ -81,6 +81,18 @@ Check for Frequent Pipeline Errors in Data Factories in resource group `${AZURE_
         RW.Core.Add Pre To Report    Pipeline Error Trends Summary:\n==============================\n${formatted_results.stdout}
 
         FOR    ${error}    IN    @{error_trends['error_trends']}
+            ${details_json}=    Evaluate    json.loads(r'''${error["details"]}''')    json
+            ${messages}=    Evaluate    json.loads(r'''${details_json["Messages"]}''')
+            LOG    ${messages[0]}
+            ${next_steps}=    Analyze Logs
+            ...    logs=${messages[0]}
+            ...    error_patterns_file=${CURDIR}/error_patterns.json
+            ${suggestions}=    Set Variable    ${EMPTY}
+            ${logs_details}=    Set Variable    ${EMPTY}
+            FOR    ${step}    IN    @{next_steps}
+                ${suggestions}=    Set Variable    ${suggestions}${step['suggestion']}\n
+                ${logs_details}=    Set Variable    ${logs_details}Log: ${step['log']}\n
+            END
             RW.Core.Add Issue
             ...    severity=${error.get("severity", 4)}
             ...    expected=${error.get("expected", "No expected value")}
@@ -88,7 +100,7 @@ Check for Frequent Pipeline Errors in Data Factories in resource group `${AZURE_
             ...    title=${error.get("title", "No title")}
             ...    reproduce_hint=${error.get("reproduce_hint", "No reproduce hint")}
             ...    details=${error.get("details", "No details")}
-            ...    next_steps=${error.get("next_step", "No next steps")}
+            ...    next_steps=${suggestions}
         END
     ELSE
         RW.Core.Add Pre To Report    "No pipeline errors found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
