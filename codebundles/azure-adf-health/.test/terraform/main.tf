@@ -59,7 +59,7 @@ resource "azurerm_mssql_database" "sqldb" {
 resource "null_resource" "create_table_and_insert_data" {
   provisioner "local-exec" {
     on_failure = continue
-    command = <<EOT
+    command    = <<EOT
       sqlcmd -S ${azurerm_mssql_server.sql.fully_qualified_domain_name} -d ${azurerm_mssql_database.sqldb.name} -U ${azurerm_mssql_server.sql.administrator_login} -P ${azurerm_mssql_server.sql.administrator_login_password} -Q "
         CREATE TABLE dbo.CustomerTransactions (
             TransactionID INT PRIMARY KEY,
