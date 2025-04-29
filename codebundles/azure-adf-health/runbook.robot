@@ -14,7 +14,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check for Resource Health Issues Affecting Data Factories in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List Resource Health Issues Affecting Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Fetch health status for all Data Factories in the resource group
     [Tags]    datafactory    resourcehealth   access:read-only
     ${json_file}=    Set Variable    "datafactory_health.json"
@@ -34,8 +34,8 @@ Check for Resource Health Issues Affecting Data Factories in resource group `${A
             IF    "${issue["properties"]["title"]}" != "Available"
                 RW.Core.Add Issue
                 ...    severity=3
-                ...    expected=Azure Data Factory resources should be available in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
-                ...    actual=Azure Data Factory resources are unhealthy in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    expected=Azure Data Factory resources should be available in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    actual=Azure Data Factory resources are unhealthy in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    title=Azure reports an `${issue["properties"]["title"]}` Issue for Data Factory
                 ...    reproduce_hint=${resource_health.cmd}
                 ...    details=${issue}
@@ -45,9 +45,9 @@ Check for Resource Health Issues Affecting Data Factories in resource group `${A
     ELSE
         RW.Core.Add Issue
         ...    severity=4
-        ...    expected=Azure resources health should be enabled for Data Factories in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
-        ...    actual=Azure resource health appears unavailable for Data Factories in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
-        ...    title=Azure resource health is unavailable for Data Factories in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+        ...    expected=Azure resources health should be enabled for Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
+        ...    actual=Azure resource health appears unavailable for Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
+        ...    title=Azure resource health is unavailable for Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
         ...    reproduce_hint=${resource_health.cmd}
         ...    details=${issue_list}
         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
@@ -55,8 +55,8 @@ Check for Resource Health Issues Affecting Data Factories in resource group `${A
     RW.CLI.Run Cli
     ...    cmd=rm -f ${json_file}
 
-Check for Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
-    [Documentation]    Check for frequently occurring errors in Data Factory pipelines
+List Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    List frequently occurring errors in Data Factory pipelines
     [Tags]    datafactory    pipeline-errors    access:read-only
     ${json_file}=    Set Variable    "error_trend.json"
     ${error_check}=    RW.CLI.Run Bash File
@@ -103,14 +103,14 @@ Check for Frequent Pipeline Errors in Data Factories in resource group `${AZURE_
             ...    next_steps=${suggestions}
         END
     ELSE
-        RW.Core.Add Pre To Report    "No pipeline errors found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No pipeline errors found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
     RW.CLI.Run Cli
     ...    cmd=rm -f ${json_file}
 
-Check for Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
-    [Documentation]    Check for failed pipeline runs in Data Factory pipelines
+List Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    List failed pipeline runs in Data Factory pipelines
     [Tags]    datafactory    pipeline-failures    access:read-only
     ${json_file}=    Set Variable    "failed_pipelines.json"
     ${failed_check}=    RW.CLI.Run Bash File
@@ -157,14 +157,14 @@ Check for Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE
             ...    reproduce_hint=${issue.get("reproduce_hint", "No reproduce hint")}
         END
     ELSE
-        RW.Core.Add Pre To Report    "No failed pipelines found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No failed pipelines found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
     RW.CLI.Run Cli
     ...    cmd=rm -f ${json_file}
 
-Check for Large Data Operations in Data Factories in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
-    [Documentation]    Check for large data operations in Data Factory pipelines
+Find Large Data Operations in Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    List large data operations in Data Factory pipelines
     [Tags]    datafactory    data-volume    access:read-only
     ${json_file}=    Set Variable    "data_volume_audit.json"
     ${data_volume_check}=    RW.CLI.Run Bash File
@@ -200,7 +200,7 @@ Check for Large Data Operations in Data Factories in resource group `${AZURE_RES
             ...    resource_url=${issue.get("resource_url", "No resource url")}
         END
     ELSE
-        RW.Core.Add Pre To Report    "No heavy data operations detected in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No heavy data operations detected in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
     RW.CLI.Run Cli
