@@ -72,11 +72,11 @@ for NS in $ALL_NAMESPACES; do
 
             ISSUES+=("{
                 \"severity\": ${severity_code},
-                \"expected\": \"No ${level_lower}s from istioctl analyze\",
+                \"expected\": \"No ${level_lower}s from istioctl analyze for resource ${resource} in namespace ${NS}\",
                 \"actual\": \"${message}\",
                 \"title\": \"Istio ${level} in namespace ${NS}: ${code}\",
                 \"reproduce_hint\": \"istioctl analyze -n ${NS}\",
-                \"next_steps\": \"Review the resource ${resource} in namespace ${NS} for potential misconfiguration.\"
+                \"next_steps\": \"Review the resource ${resource} for potential misconfiguration in namespace ${NS}.\"
             }")
         fi
     done

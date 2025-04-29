@@ -113,7 +113,7 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
 
                     ISSUES+=("$(jq -n \
                         --arg severity "3" \
-                        --arg expected "No warning/error events for Istio control plane pods" \
+                        --arg expected "No warning/error events for Istio controlplane pod $POD in namespace $NS" \
                         --arg actual "$EVENT_DETAILS" \
                         --arg title "Event warnings for pod $POD in namespace $NS" \
                         --arg reproduce_hint "${KUBERNETES_DISTRIBUTION_BINARY} get events -n $NS --field-selector involvedObject.name=$POD,type!=Normal" \
@@ -127,9 +127,9 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
                 STATUS="PARTIALLY RUNNING"
                 ISSUES+=("$(jq -n \
                     --arg severity "1" \
-                    --arg expected "All control plane pods should be running" \
-                    --arg actual "$RUNNING_PODS out of $TOTAL_PODS pods running for $COMPONENT in $NS" \
-                    --arg title "$COMPONENT is not fully running in $NS" \
+                    --arg expected "controlplane component $COMPONENT should be running" \
+                    --arg actual "$RUNNING_PODS out of $TOTAL_PODS pods running for component $COMPONENT in namespace $NS" \
+                    --arg title "Component $COMPONENT is not fully running in namespace $NS" \
                     --arg reproduce_hint "${KUBERNETES_DISTRIBUTION_BINARY} get pods -n $NS -l app=$COMPONENT --context=$CONTEXT" \
                     --arg next_steps "Check the pod status and logs to identify startup issues" \
                     '{severity: $severity, expected: $expected, actual: $actual, title: $title, reproduce_hint: $reproduce_hint, next_steps: $next_steps}')")
@@ -142,10 +142,10 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
     if [[ "$COMPONENT_FOUND" = false ]]; then
         printf "%-25s %-15s %-20s %-15s %-15s %-15s\n" "$COMPONENT" "N/A" "NOT INSTALLED" "0/0" "0" "N/A"
         ISSUES+=("$(jq -n \
-            --arg severity "1" \
-            --arg expected "$COMPONENT should be installed" \
-            --arg actual "$COMPONENT not found in any namespace" \
-            --arg title "$COMPONENT is missing" \
+            --arg severity "2" \
+            --arg expected "Component $COMPONENT should be installed" \
+            --arg actual "Component $COMPONENT not found in any namespace" \
+            --arg title "Component $COMPONENT is missing in cluster ${CLUSTER}" \
             --arg reproduce_hint "${KUBERNETES_DISTRIBUTION_BINARY} get pods --all-namespaces -l app=$COMPONENT" \
             --arg next_steps "Install or verify Istio component installation" \
             '{severity: $severity, expected: $expected, actual: $actual, title: $title, reproduce_hint: $reproduce_hint, next_steps: $next_steps}')")

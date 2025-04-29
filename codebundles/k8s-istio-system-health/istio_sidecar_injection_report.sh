@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -x
 # Function to format section header
 function print_section_header() {
     echo "=== $1 ==="

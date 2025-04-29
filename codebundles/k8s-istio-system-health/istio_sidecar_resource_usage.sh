@@ -1,10 +1,11 @@
 #!/bin/bash
 
-# Threshold
-THRESHOLD=80
+# Thresholds
+CPU_THRESHOLD=${CPU_USAGE_THRESHOLD}
+MEM_THRESHOLD=${MEMORY_USAGE_THRESHOLD}
 
 REPORT_FILE="${OUTPUT_DIR}/istio_sidecar_resource_usage_report.txt"
-ISSUES_FILE="${OUTPUT_DIR}/issues_istio_resource_usage.json"
+ISSUES_FILE="${OUTPUT_DIR}/istio_sidecar_resource_usage_issue.json"
 
 # Prepare files
 echo "" > "$REPORT_FILE"
@@ -46,9 +47,8 @@ check_cluster_connection
 ISSUES=()
 NO_LIMITS_PODS=()
 ZERO_USAGE_PODS=()
-HIGH_USAGE_PODS=()
-
-
+HIGH_CPU_USAGE_PODS=()
+HIGH_MEM_USAGE_PODS=()
 
 # Start the report
 {
@@ -92,7 +92,7 @@ for NS in $NAMESPACES; do
                 NO_LIMITS_PODS+=("$NS $POD")
                 ISSUES+=("{
                     \"severity\": \"1\",
-                    \"expected\": \"All istio-proxy containers should have resource limits defined\",
+                    \"expected\": \"istio-proxy container should have resource limits defined for pod $POD in namespace $NS\",
                     \"actual\": \"Missing resource limits for pod $POD in namespace $NS\",
                     \"title\": \"Missing resource limits for pod $POD in namespace $NS\",
                     \"reproduce_hint\": \"kubectl get pod $POD -n $NS -o jsonpath='{.spec.containers[?(@.name==\"istio-proxy\")].resources}'\",
@@ -105,7 +105,7 @@ for NS in $NAMESPACES; do
                 ZERO_USAGE_PODS+=("$NS $POD")
                 ISSUES+=("{
                     \"severity\": \"2\",
-                    \"expected\": \"istio-proxy should be consuming resources under normal operation\",
+                    \"expected\": \"istio-proxy should be consuming resources under normal operation for pod $POD in namespace $NS\",
                     \"actual\": \"Zero or unavailable usage stats for pod $POD in namespace $NS\",
                     \"title\": \"Zero or Missing Resource Usage for pod $POD in namespace $NS\",
                     \"reproduce_hint\": \"kubectl top pod $POD -n $NS --containers | grep istio-proxy\",
@@ -117,16 +117,27 @@ for NS in $NAMESPACES; do
             CPU_PERCENTAGE=$(awk "BEGIN {printf \"%.2f\", ($CPU_USAGE * 100) / $CPU_LIMITS}")
             MEM_PERCENTAGE=$(awk "BEGIN {printf \"%.2f\", ($MEM_USAGE * 100) / $MEM_LIMITS}")
 
-            # Track high usage
-            if (( $(echo "$CPU_PERCENTAGE > $THRESHOLD" | bc -l) )) || (( $(echo "$MEM_PERCENTAGE > $THRESHOLD" | bc -l) )); then
-                HIGH_USAGE_PODS+=("$NS $POD")
+            if (( $(echo "$CPU_PERCENTAGE > $CPU_THRESHOLD" | bc -l) )); then
+                HIGH_CPU_USAGE_PODS+=("$NS $POD")
                 ISSUES+=("{
                     \"severity\": \"3\",
-                    \"expected\": \"Resource usage should remain below ${THRESHOLD}%%\",
-                    \"actual\": \"Pod $POD in namespace $NS has CPU=${CPU_PERCENTAGE}%%, Memory=${MEM_PERCENTAGE}%%\",
-                    \"title\": \"High istio-proxy resource usage for pod $POD in namespace $NS\",
+                    \"expected\": \"CPU usage should remain below ${CPU_THRESHOLD}% for pod $POD in namespace $NS\",
+                    \"actual\": \"Pod $POD has CPU usage=${CPU_PERCENTAGE}% in namespace $NS\",
+                    \"title\": \"High CPU usage for pod $POD in namespace $NS\",
                     \"reproduce_hint\": \"kubectl top pod $POD -n $NS --containers | grep istio-proxy\",
-                    \"next_steps\": \"Investigate the workload for memory leaks or CPU throttling.\"
+                    \"next_steps\": \"Investigate CPU-intensive workloads or throttling issues.\"
+                }")
+            fi
+
+            if (( $(echo "$MEM_PERCENTAGE > $MEM_THRESHOLD" | bc -l) )); then
+                HIGH_MEM_USAGE_PODS+=("$NS $POD")
+                ISSUES+=("{
+                    \"severity\": \"3\",
+                    \"expected\": \"Memory usage should remain below ${MEM_THRESHOLD}% for pod $POD in namespace $NS\",
+                    \"actual\": \"Pod $POD has Memory usage=${MEM_PERCENTAGE}% in namespace $NS\",
+                    \"title\": \"High Memory usage for pod $POD in namespace $NS\",
+                    \"reproduce_hint\": \"kubectl top pod $POD -n $NS --containers | grep istio-proxy\",
+                    \"next_steps\": \"Investigate for memory leaks or excessive memory usage.\"
                 }")
             fi
 
@@ -163,13 +174,25 @@ done
     fi
 
     echo ""
-    echo "Pods With High Resource Usage (> ${THRESHOLD}%):"
+    echo "Pods With High CPU Usage (> ${CPU_THRESHOLD}%):"
     echo "--------------------------------------------------------------"
-    if [ ${#HIGH_USAGE_PODS[@]} -eq 0 ]; then
-        echo "There are no pods exceeding ${THRESHOLD}% usage."
+    if [ ${#HIGH_CPU_USAGE_PODS[@]} -eq 0 ]; then
+        echo "There are no pods exceeding ${CPU_THRESHOLD}% CPU usage."
     else
         printf "%-15s %-40s\n" "Namespace" "Pod"
-        for ENTRY in "${HIGH_USAGE_PODS[@]}"; do
+        for ENTRY in "${HIGH_CPU_USAGE_PODS[@]}"; do
+            printf "%-15s %-40s\n" $ENTRY
+        done
+    fi
+
+    echo ""
+    echo "Pods With High Memory Usage (> ${MEM_THRESHOLD}%):"
+    echo "--------------------------------------------------------------"
+    if [ ${#HIGH_MEM_USAGE_PODS[@]} -eq 0 ]; then
+        echo "There are no pods exceeding ${MEM_THRESHOLD}% memory usage."
+    else
+        printf "%-15s %-40s\n" "Namespace" "Pod"
+        for ENTRY in "${HIGH_MEM_USAGE_PODS[@]}"; do
             printf "%-15s %-40s\n" $ENTRY
         done
     fi
@@ -178,7 +201,6 @@ done
 # Write JSON issues
 if [ ${#ISSUES[@]} -gt 0 ]; then
     printf "%s\n" "${ISSUES[@]}" | jq -s '.' > "$ISSUES_FILE"
-    #echo "${ISSUES[@]}"
 else
     echo "No issues detected. Skipping issue file creation."
 fi

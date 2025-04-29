@@ -3,8 +3,8 @@
 #set -euo pipefail
 
 # Constants
-ERROR_JSON="controlplane_error_patterns.json"
-ISSUE_FILE="${OUTPUT_DIR}/istio_controlplane_issues.json"
+ERROR_JSON="${CURDIR}/controlplane_error_patterns.json"
+ISSUES_FILE="${OUTPUT_DIR}/istio_controlplane_issues.json"
 REPORT_FILE="${OUTPUT_DIR}/istio_controlplane_report.json"
 LOG_DURATION="1h" # Fetch logs from the last 1 hour
 declare -a ISSUES=()
@@ -81,33 +81,33 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
 
             LOGS=$(${KUBERNETES_DISTRIBUTION_BINARY} logs $POD -n $NS --context="${CONTEXT}" --since=$LOG_DURATION 2>/dev/null)
 
-            for WARNING in "${WARNINGS[@]}"; do
-                if echo "$LOGS" | grep -Fx "$WARNING" &>/dev/null; then
-                    echo "⚠️ Warning found: '$WARNING' in $POD ($NS)"
+            while IFS= read -r WARNING; do
+                if echo "$LOGS" | grep -Fq "$WARNING" &>/dev/null; then
+                    echo "Warning found: '$WARNING' in $POD ($NS)"
                     ISSUES+=("$(jq -n \
-                        --arg severity "medium" \
-                        --arg expected "No critical logs in control plane" \
-                        --arg actual "$WARNING in $POD ($NS)" \
-                        --arg title "Control plane log issue: warning" \
+                        --arg severity "3" \
+                        --arg expected "No warning logs in controlplane pod $POD in namespace $NS" \
+                        --arg actual "Warning \"$WARNING\" for controlplane pod $POD in namespace $NS" \
+                        --arg title "Warning for controlplane pod $POD in namespace $NS" \
                         --arg reproduce_hint "${KUBERNETES_DISTRIBUTION_BINARY} logs $POD -n $NS --context=${CONTEXT} --since=$LOG_DURATION | grep \"$WARNING\"" \
-                        --arg next_steps "Investigate the log entry in pod logs" \
+                        --arg next_steps "Investigate the log entry for pod $POD in namespace $NS" \
                         '{severity: $severity, expected: $expected, actual: $actual, title: $title, reproduce_hint: $reproduce_hint, next_steps: $next_steps}')")
                 fi
-            done
+            done < <(jq -r '.warnings[]' "$ERROR_JSON")
 
-            for ERROR in "${ERRORS[@]}"; do
-                if echo "$LOGS" | grep -Fx "$ERROR" &>/dev/null; then
-                    echo "🚨 Error found: '$ERROR' in $POD ($NS)"
+            while IFS= read -r ERROR; do
+                if echo "$LOGS" | grep -Fq "$ERROR" &>/dev/null; then
+                    echo "Error found: '$ERROR' in $POD ($NS)"
                     ISSUES+=("$(jq -n \
-                        --arg severity "high" \
-                        --arg expected "No critical logs in control plane" \
-                        --arg actual "$ERROR in $POD ($NS)" \
-                        --arg title "Control plane log issue: error" \
+                        --arg severity "2" \
+                        --arg expected "No critical logs in controlplane pod $POD in namespace $NS" \
+                        --arg actual "Error \"$Error\" for controlplane pod $POD in namespace $NS" \
+                        --arg title "Error for controlplane pod $POD in namespace $NS" \
                         --arg reproduce_hint "${KUBERNETES_DISTRIBUTION_BINARY} logs $POD -n $NS --context=${CONTEXT} --since=$LOG_DURATION | grep \"$ERROR\"" \
-                        --arg next_steps "Investigate the log entry in pod logs" \
+                        --arg next_steps "Investigate the log entry for pod $POD in namespace $NS" \
                         '{severity: $severity, expected: $expected, actual: $actual, title: $title, reproduce_hint: $reproduce_hint, next_steps: $next_steps}')")
                 fi
-            done
+            done < <(jq -r '.errors[]' "$ERROR_JSON")
         done
     done
 done
