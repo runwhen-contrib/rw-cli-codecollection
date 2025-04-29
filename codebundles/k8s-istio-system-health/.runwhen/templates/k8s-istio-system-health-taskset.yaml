@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec: 
   location: {{default_location}}
-  description: istio system health check
+  description: List istio proxy sidecar injection status, high memory and cpu usage, warnings and errors in logs, valid certificates, configuration and verify istio installation.
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}

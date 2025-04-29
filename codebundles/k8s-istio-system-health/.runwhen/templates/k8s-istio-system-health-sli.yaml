@@ -11,7 +11,7 @@ spec:
   displayUnitsShort: ok
   locations:
     - {{default_location}}
-  description: Measures health of Istio system. 
+  description: Count istio proxy sidecar injection status, high memory and cpu usage, warnings and errors in logs, valid certificates, configuration and verify istio installation. 
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
