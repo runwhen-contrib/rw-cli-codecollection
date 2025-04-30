@@ -83,27 +83,31 @@ List Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOU
         FOR    ${error}    IN    @{error_trends['error_trends']}
             ${details_json}=    Evaluate    json.loads(r'''${error["details"]}''')    json
             ${messages}=    Evaluate    json.loads(r'''${details_json["Messages"]}''')
-            LOG    ${messages[0]}
-            ${next_steps}=    Analyze Logs
-            ...    logs=${messages[0]}
-            ...    error_patterns_file=${CURDIR}/error_patterns.json
-            ${suggestions}=    Set Variable    ${EMPTY}
-            ${logs_details}=    Set Variable    ${EMPTY}
-            FOR    ${step}    IN    @{next_steps}
-                ${suggestions}=    Set Variable    ${suggestions}${step['suggestion']}\n
-                ${logs_details}=    Set Variable    ${logs_details}Log: ${step['log']}\n
+            ${failure_count}=    Evaluate    int(${details_json["FailureCount"]})
+            IF    ${failure_count} > ${FAILURE_THRESHOLD}
+                ${next_steps}=    Analyze Logs
+                ...    logs=${messages[0]}
+                ...    error_patterns_file=${CURDIR}/error_patterns.json
+                ${suggestions}=    Set Variable    ${EMPTY}
+                ${logs_details}=    Set Variable    ${EMPTY}
+                FOR    ${step}    IN    @{next_steps}
+                    ${suggestions}=    Set Variable    ${suggestions}${step['suggestion']}\n
+                    ${logs_details}=    Set Variable    ${logs_details}Log: ${step['log']}\n
+                END
+                RW.Core.Add Issue
+                ...    severity=${error.get("severity", 4)}
+                ...    expected=${error.get("expected", "No expected value")}
+                ...    actual=${error.get("actual", "No actual value")}
+                ...    title=${error.get("title", "No title")}
+                ...    reproduce_hint=${error.get("reproduce_hint", "No reproduce hint")}
+                ...    details=${error.get("details", "No details")}
+                ...    next_steps=${suggestions}
+            ELSE
+                RW.Core.Add Pre To Report    "No Frequent Pipeline Errors found in resource group `${AZURE_RESOURCE_GROUP}`"
             END
-            RW.Core.Add Issue
-            ...    severity=${error.get("severity", 4)}
-            ...    expected=${error.get("expected", "No expected value")}
-            ...    actual=${error.get("actual", "No actual value")}
-            ...    title=${error.get("title", "No title")}
-            ...    reproduce_hint=${error.get("reproduce_hint", "No reproduce hint")}
-            ...    details=${error.get("details", "No details")}
-            ...    next_steps=${suggestions}
         END
     ELSE
-        RW.Core.Add Pre To Report    "No pipeline errors found in resource group `${AZURE_RESOURCE_GROUP}`"
+        RW.Core.Add Pre To Report    "No Frequent Pipeline Errors found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
     RW.CLI.Run Cli
@@ -237,8 +241,14 @@ Suite Initialization
     ...    type=string
     ...    description=The threshold for data volume in MB.
     ...    pattern=\w*
-    ...    default=10
+    ...    default=1000
     ...    example=5000
+    ${FAILURE_THRESHOLD}=    RW.Core.Import User Variable    FAILURE_THRESHOLD
+    ...    type=string
+    ...    description=The threshold for failure count.
+    ...    pattern=\w*
+    ...    default=1
+    ...    example=5
     Set Suite Variable    ${THRESHOLD_MB}    ${THRESHOLD_MB}
     Set Suite Variable    ${LOOKBACK_PERIOD}    ${LOOKBACK_PERIOD}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
@@ -246,4 +256,4 @@ Suite Initialization
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}", "LOOKBACK_PERIOD":"${LOOKBACK_PERIOD}", "THRESHOLD_MB":"${THRESHOLD_MB}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}", "LOOKBACK_PERIOD":"${LOOKBACK_PERIOD}", "THRESHOLD_MB":"${THRESHOLD_MB}", "FAILURE_THRESHOLD":"${FAILURE_THRESHOLD}"}
