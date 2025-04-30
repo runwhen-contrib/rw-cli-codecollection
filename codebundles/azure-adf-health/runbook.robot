@@ -210,6 +210,46 @@ Find Large Data Operations in Data Factories in resource group `${AZURE_RESOURCE
     RW.CLI.Run Cli
     ...    cmd=rm -f ${json_file}
 
+List Azure Data Factory Details in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    List comprehensive details about Azure Data Factories
+    ${json_file}=    Set Variable    "adf_details.json"
+    
+    ${data_volume_check}=    RW.CLI.Run Bash File
+    ...    bash_file=adf_details.sh
+    ...    env=${env}
+    ...    include_in_history=false
+    ${data_volume_data}=    RW.CLI.Run Cli
+    ...    cmd=cat ${json_file}
+
+    TRY
+        ${metrics_data}=    Evaluate    json.loads(r'''${data_volume_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${metrics_data}=    Create Dictionary    metrics_data=[]
+    END
+
+    ${adf_details}=    Evaluate    len(${metrics_data.get("data_factories", [])}) > 0
+
+    IF    ${adf_details}
+        
+        # Format basic information and component counts
+        # ${basic_info}=    RW.CLI.Run Cli
+        # ...    cmd=jq -r '["Data_Factory", "Location", "Resource_Group", "Pipeline_Count", "Trigger_Count", "Dataset_Count", "LinkedServices_Count"], (.data_factories[] | [ .name, .location, .resource_group, (.components.pipelines|length), (.components.triggers|length), (.components.datasets|length), (.components.linked_services|length)]) | @tsv' ${json_file} | column -t -s $'\t'
+        # RW.Core.Add Pre To Report    Azure Data Factory Overview:\n=========================\n${basic_info.stdout}
+
+        # Format diagnostic settings and linked services
+        ${diag_info}=    RW.CLI.Run Cli
+        ...    cmd=jq -r '["Data_Factory", "Location", "Resource_Group","Diag_Status", "Pipeline_Logging", "Activity_Logging", "Trigger_Logging", "Linked_Services", "ADF_URL"], (.data_factories[] | [ .name, .location, .resource_group, .diagnostics.status, .diagnostics.pipeline_logging_enabled, .diagnostics.activity_logging_enabled, .diagnostics.trigger_logging_enabled, ([.components.linked_services[].name]|join(", ")), .url]) | @tsv' ${json_file} | column -t -s $'\t'
+        RW.Core.Add Pre To Report    \nDiagnostic Settings and Linked Services:\n=====================================\n${diag_info.stdout}
+
+    ELSE
+        RW.Core.Add Pre To Report    No Data Factories found in resource group '${AZURE_RESOURCE_GROUP}' or unable to retrieve data.
+    END
+
+    # Cleanup
+    RW.CLI.Run Cli
+    ...    cmd=rm -f ${json_file}
+
 *** Keywords ***
 Suite Initialization
     ${azure_credentials}=    RW.Core.Import Secret
