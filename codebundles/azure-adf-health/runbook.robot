@@ -250,6 +250,50 @@ List Azure Data Factory Details in resource group `${AZURE_RESOURCE_GROUP}`
     RW.CLI.Run Cli
     ...    cmd=rm -f ${json_file}
 
+List Long Running Pipeline Runs in Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    List long running pipeline runs in Data Factory pipelines
+    [Tags]    datafactory    long-running-pipelines    access:read-only
+    ${json_file}=    Set Variable    "long_pipeline_runs.json"
+    ${long_pipeline_runs_check}=    RW.CLI.Run Bash File
+    ...    bash_file=long_pipeline_runs.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${long_pipeline_runs_data}=    RW.CLI.Run Cli
+    ...    cmd=cat ${json_file}
+
+    TRY
+        ${long_runs}=    Evaluate    json.loads(r'''${long_pipeline_runs_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${long_runs}=    Create Dictionary    long_runs=[]
+    END
+
+    ${has_long_runs}=    Evaluate    len($long_runs.get("long_running_pipelines", [])) > 0
+
+    IF    ${has_long_runs}
+        ${formatted_results}=    RW.CLI.Run Cli
+        ...    cmd=jq -r '["Pipeline_Name", "Run_Id", "Duration_Sec", "Status", "Resource_URL"], (.long_running_pipelines[] | [ .name, .run_id, .duration, .status, .resource_url]) | @tsv' ${json_file} | column -t -s $'\t'
+        RW.Core.Add Pre To Report    Long Running Pipeline Runs Summary:\n==============================\n${formatted_results.stdout}
+
+        FOR    ${issue}    IN    @{long_runs["long_running_pipelines"]}
+           
+            RW.Core.Add Issue
+            ...    severity=${issue.get("severity", 4)}
+            ...    title=${issue.get("title", "No title")}
+            ...    details=${issue}
+            ...    next_steps=${issue.get("next_step", "No next steps")}
+            ...    expected=${issue.get("expected", "No expected value")}
+            ...    actual=${issue.get("actual", "No actual value")}
+            ...    reproduce_hint=${issue.get("reproduce_hint", "No reproduce hint")}
+        END
+    ELSE
+        RW.Core.Add Pre To Report    "No long running pipelines found in resource group `${AZURE_RESOURCE_GROUP}`"
+    END
+
+    RW.CLI.Run Cli
+    ...    cmd=rm -f ${json_file}
+
 *** Keywords ***
 Suite Initialization
     ${azure_credentials}=    RW.Core.Import Secret
@@ -289,6 +333,12 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=1
     ...    example=5
+    ${RUN_TIME_THRESHOLD}=    RW.Core.Import User Variable    RUN_TIME_THRESHOLD
+    ...    type=string
+    ...    description=The threshold for run time of a pipeline.
+    ...    pattern=\w*
+    ...    default=600
+    ...    example=600
     Set Suite Variable    ${THRESHOLD_MB}    ${THRESHOLD_MB}
     Set Suite Variable    ${LOOKBACK_PERIOD}    ${LOOKBACK_PERIOD}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
@@ -296,4 +346,4 @@ Suite Initialization
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}", "LOOKBACK_PERIOD":"${LOOKBACK_PERIOD}", "THRESHOLD_MB":"${THRESHOLD_MB}", "FAILURE_THRESHOLD":"${FAILURE_THRESHOLD}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}", "LOOKBACK_PERIOD":"${LOOKBACK_PERIOD}", "THRESHOLD_MB":"${THRESHOLD_MB}", "FAILURE_THRESHOLD":"${FAILURE_THRESHOLD}", "RUN_TIME_THRESHOLD":"${RUN_TIME_THRESHOLD}"}
