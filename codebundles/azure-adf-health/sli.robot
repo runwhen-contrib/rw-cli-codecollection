@@ -146,8 +146,8 @@ Suite Initialization
     ...    type=string
     ...    description=The threshold for data volume in MB.
     ...    pattern=\w*
-    ...    default=100
-    ...    example=100
+    ...    default=1000
+    ...    example=5000
     Set Suite Variable    ${THRESHOLD_MB}    ${THRESHOLD_MB}
     Set Suite Variable    ${LOOKBACK_PERIOD}    ${LOOKBACK_PERIOD}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
