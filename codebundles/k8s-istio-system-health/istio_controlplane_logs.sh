@@ -1,7 +1,5 @@
 #!/bin/bash
 
-#set -euo pipefail
-
 # Constants
 ERROR_JSON="${CURDIR}/controlplane_error_patterns.json"
 ISSUES_FILE="${OUTPUT_DIR}/istio_controlplane_issues.json"

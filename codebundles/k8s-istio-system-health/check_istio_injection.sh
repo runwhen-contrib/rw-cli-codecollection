@@ -1,5 +1,5 @@
 #!/bin/bash
-set -x
+# set -x
 # Function to check if a command exists
 function check_command_exists() {
     if ! command -v "$1" &> /dev/null; then
@@ -145,9 +145,17 @@ for ns in $FILTERED_NAMESPACES; do
             # If no pods found with app label, try with istio canonical-name
             if [ "$PODS_COUNT" -eq 0 ]; then
                 PODS=$("${KUBERNETES_DISTRIBUTION_BINARY}" get pods -n "$ns" -l "service.istio.io/canonical-name=${deployment}" --context="${CONTEXT}" -o json 2>/dev/null)
-                if [ $? -ne 0 ]; then
-                    echo "Error: Failed to get pods for deployment $deployment. Skipping..."
-                    continue
+                PODS_COUNT=$(echo "$PODS" | jq -r '.items | length')
+                if [ "$PODS_COUNT" -eq 0 ]; then
+                    # checking if multiple versions of the application exists
+                    app=$("${KUBERNETES_DISTRIBUTION_BINARY}" get deployments -n "$ns" ${deployment} --context="${CONTEXT}" -o json | jq -r .spec.template.metadata.labels.app 2>/dev/null)
+                    version=$("${KUBERNETES_DISTRIBUTION_BINARY}" get deployments -n "$ns" ${deployment} --context="${CONTEXT}" -o json | jq -r .spec.template.metadata.labels.version 2>/dev/null)
+                    PODS=$("${KUBERNETES_DISTRIBUTION_BINARY}" get pods -n "$ns" -l "app=${app},version=${version}" --context="${CONTEXT}" -o json 2>/dev/null)
+                    PODS_COUNT=$(echo "$PODS" | jq -r '.items | length')
+                    if [ "$PODS_COUNT" -eq 0 ]; then
+                        echo "Error: Failed to get pods for deployment $deployment. Add app label or canonical-name. Skipping..."
+                        continue
+                    fi
                 fi
             fi
             
