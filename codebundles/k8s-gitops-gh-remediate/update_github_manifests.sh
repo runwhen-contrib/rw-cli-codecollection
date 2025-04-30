@@ -8,6 +8,9 @@ declare -A change_details
 declare -A change_summary
 
 export HOME=$CODEBUNDLE_TEMP_DIR
+export GITHUB_TOKEN=$(cat github_token)
+export TMPDIR="$CODEBUNDLE_TEMP_DIR/tmp"
+mkdir -p "$TMPDIR"
 
 ## GitOps Owner Logic
 #########################
@@ -168,11 +171,9 @@ update_github_manifests () {
     git config --global user.name "RunWhen Runsession Bot" 2>&1
     git config --global pull.rebase false 2>&1
 
-    tempdir=$(mktemp -d "./tempdir.XXXXXX")
-    trap 'rm -rf -- "$tempdir"' EXIT
-    workdir="$tempdir"
-    cd $workdir
-    git clone $git_url 2>&1
+    workdir=$(mktemp -d "$CODEBUNDLE_TEMP_DIR/git.XXXXXX")
+    git_repo=$(basename "${git_url%.git}")
+    git clone "$git_url" "$workdir/$git_repo" 2>&1
     cd $workdir/$git_repo
     git remote set-url origin https://x-access-token:$GITHUB_TOKEN@github.com/$git_owner/$git_repo
     git checkout -b "runwhen/manifest-update-$DATETIME"  2>&1
@@ -187,7 +188,6 @@ update_github_manifests () {
     done
 
     # Test if any git changes are made. If not, bail out and send instruction. If so, commit and PR.  
-    cd $workdir/$git_repo
     if git diff-index --quiet HEAD --; then 
         echo "No git changes detected"
         exit 0
