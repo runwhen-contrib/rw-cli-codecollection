@@ -133,10 +133,11 @@ Verify Istio Istallation in Cluster ${CLUSTER}
     RW.Core.Add Pre To Report   ${installation_report.stdout}
 
 
-Check Istio Controlplane logs for errors and warnings in Cluster ${CLUSTER}
+Check Istio Controlplane logs in Cluster ${CLUSTER}
     [Documentation]    Check istio controlplane logs for known erros and warnings in cluster ${CLUSTER}
+    [Tags]
     ...    istio
-    ...    logs
+    ...    controlplane logs
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=istio_controlplane_logs.sh
     ...    env=${env}
@@ -153,7 +154,7 @@ Check Istio Controlplane logs for errors and warnings in Cluster ${CLUSTER}
             ${reproduce_cmd}=    Set Variable    ${issue['reproduce_hint']}
             RW.Core.Add Issue
             ...    severity=${issue['severity']}
-            ...    expected=No critical logs in control plane
+            ...    expected=${issue['expected']}
             ...    actual=${issue['actual']}
             ...    title=${issue['title']}
             ...    reproduce_hint=${reproduce_cmd}
@@ -162,14 +163,49 @@ Check Istio Controlplane logs for errors and warnings in Cluster ${CLUSTER}
     END
 
     ${logs_report}=    RW.CLI.Run Cli
-    ...     cmd=cat ${OUTPUT_DIR}/istio_controlplane_report.txt
+    ...     cmd=cat ${OUTPUT_DIR}/istio_controlplane_report.json
     ...     env=${env}
     ...     include_in_history=false
     RW.Core.Add Pre To Report   ${logs_report.stdout}
 
+Check Istio Proxy logs in Cluster ${CLUSTER}
+    [Documentation]    Check istio proxy logs for known erros and warnings in cluster ${CLUSTER}
+    [Tags]
+    ...    istio
+    ...    proxy logs
+    ${results}=    RW.CLI.Run Bash File
+    ...    bash_file=istio_proxy_logs.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=false
+    ${issues_list}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/istio_proxy_issues.json
+    ...    env=${env}
+    ...    include_in_history=false
 
-Check Istio Certificates for the Istio Components in Cluster ${CLUSTER}
+    ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
+    IF    len(@{issues}) > 0
+        FOR    ${issue}    IN    @{issues}
+            ${reproduce_cmd}=    Set Variable    ${issue['reproduce_hint']}
+            RW.Core.Add Issue
+            ...    severity=${issue['severity']}
+            ...    expected=${issue['expected']}
+            ...    actual=${issue['actual']}
+            ...    title=${issue['title']}
+            ...    reproduce_hint=${reproduce_cmd}
+            ...    next_steps=${issue['next_steps']}
+        END
+    END
+
+    ${logs_report}=    RW.CLI.Run Cli
+    ...     cmd=cat ${OUTPUT_DIR}/istio_proxy_report.json
+    ...     env=${env}
+    ...     include_in_history=false
+    RW.Core.Add Pre To Report   ${logs_report.stdout}
+
+Check Istio Components Certificates in Cluster ${CLUSTER}
     [Documentation]    Check Istio valid Root CA and mTLS Certificates in cluster ${CLUSTER}
+    [Tags]
     ...    istio
     ...    mtls
     ${results}=    RW.CLI.Run Bash File
@@ -188,7 +224,7 @@ Check Istio Certificates for the Istio Components in Cluster ${CLUSTER}
             ${reproduce_cmd}=    Set Variable    ${issue['reproduce_hint']}
             RW.Core.Add Issue
             ...    severity=${issue['severity']}
-            ...    expected=No critical logs in control plane
+            ...    expected=${issue['expected']}
             ...    actual=${issue['actual']}
             ...    title=${issue['title']}
             ...    reproduce_hint=${reproduce_cmd}
@@ -203,6 +239,7 @@ Check Istio Certificates for the Istio Components in Cluster ${CLUSTER}
 
 Analyze Istio configurations in Cluster ${CLUSTER}
     [Documentation]    Check Istio configurations in cluster ${CLUSTER}
+    [Tags]
     ...    istio
     ...    config
     ${results}=    RW.CLI.Run Bash File
@@ -221,7 +258,7 @@ Analyze Istio configurations in Cluster ${CLUSTER}
             ${reproduce_cmd}=    Set Variable    ${issue['reproduce_hint']}
             RW.Core.Add Issue
             ...    severity=${issue['severity']}
-            ...    expected=No critical logs in control plane
+            ...    expected=${issue['expected']}
             ...    actual=${issue['actual']}
             ...    title=${issue['title']}
             ...    reproduce_hint=${reproduce_cmd}

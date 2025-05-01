@@ -100,6 +100,25 @@ Check Istio Controlplane logs in Cluster ${CLUSTER}
     ${controlplane_logs_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
     Set Global Variable    ${controlplane_logs_score}
 
+Check Istio Proxy logs in Cluster ${CLUSTER}
+    [Documentation]    Check istio proxy logs for known erros and warnings in cluster ${CLUSTER}
+    [Tags]
+    ...    istio
+    ...    proxy logs
+    ${results}=    RW.CLI.Run Bash File
+    ...    bash_file=istio_proxy_logs.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=false
+    ${issues_list}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/istio_proxy_issues.json
+    ...    env=${env}
+    ...    include_in_history=false
+
+    ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
+    ${proxy_logs_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
+    Set Global Variable    ${proxy_logs_score}
+
 Check Istio Components Certificates in Cluster ${CLUSTER}
     [Documentation]    Check Istio valid Root CA and mTLS Certificates in Cluster ${CLUSTER}
     [Tags]
@@ -139,7 +158,7 @@ Analyze Istio configurations in Cluster ${CLUSTER}
     Set Global Variable    ${istio_configuration_score}
 
 Generate Health Score for Cluster ${CLUSTER}
-    ${health_score}=    Evaluate  (${sidecar_injection_score} + ${sidecar_resources_usage_score} + ${installation_verify_score} + ${controlplane_logs_score} + ${istio_certificate_score} + ${istio_configuration_score}) / 6
+    ${health_score}=    Evaluate  (${sidecar_injection_score} + ${sidecar_resources_usage_score} + ${installation_verify_score} + ${controlplane_logs_score} + ${proxy_logs_score} + ${istio_certificate_score} + ${istio_configuration_score}) / 7
     ${health_score}=    Convert to Number    ${health_score}  2
     RW.Core.Push Metric    ${health_score}
 
