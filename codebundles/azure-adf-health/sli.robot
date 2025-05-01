@@ -110,8 +110,34 @@ Count Large Data Operations in Data Factories in resource group `${AZURE_RESOURC
     RW.CLI.Run Cli
     ...    cmd=rm -f ${json_file}
 
+Count Long Running Pipeline Runs in Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Count long running pipeline runs in Data Factory pipelines
+    [Tags]    datafactory    pipeline-long-running    access:read-only
+    ${json_file}=    Set Variable    "long_pipeline_runs.json"
+    ${long_run_check}=    RW.CLI.Run Bash File
+    ...    bash_file=long_pipeline_runs.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+
+    ${long_run_data}=    RW.CLI.Run Cli
+    ...    cmd=cat ${json_file}
+
+    TRY
+        ${long_runs}=    Evaluate    json.loads(r'''${long_run_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${long_runs}=    Create Dictionary    long_runs=[]
+    END
+
+    ${long_pipeline_score}=    Evaluate    1 if len(${long_runs.get("long_running_pipelines", [])}) > 0 else 0
+    Set Global Variable    ${long_pipeline_score}
+
+    RW.CLI.Run Cli
+    ...    cmd=rm -f ${json_file}
+
 Generate Health Score
-    ${health_score}=      Evaluate  (${availability_score} + ${pipeline_error_score} + ${failed_pipeline_score} + ${data_volume_score}) / 4
+    ${health_score}=      Evaluate  (${availability_score} + ${pipeline_error_score} + ${failed_pipeline_score} + ${data_volume_score} + ${long_pipeline_score}) / 5
     ${health_score}=      Convert to Number    ${health_score}  2
     RW.Core.Push Metric    ${health_score}
 
@@ -148,6 +174,18 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=1000
     ...    example=5000
+    ${FAILURE_THRESHOLD}=    RW.Core.Import User Variable    FAILURE_THRESHOLD
+    ...    type=string
+    ...    description=The threshold for failure count.
+    ...    pattern=\w*
+    ...    default=1
+    ...    example=5
+    ${RUN_TIME_THRESHOLD}=    RW.Core.Import User Variable    RUN_TIME_THRESHOLD
+    ...    type=string
+    ...    description=The threshold for run time of a pipeline in seconds.
+    ...    pattern=\w*
+    ...    default=600
+    ...    example=600
     Set Suite Variable    ${THRESHOLD_MB}    ${THRESHOLD_MB}
     Set Suite Variable    ${LOOKBACK_PERIOD}    ${LOOKBACK_PERIOD}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
@@ -155,4 +193,4 @@ Suite Initialization
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}", "LOOKBACK_PERIOD":"${LOOKBACK_PERIOD}", "THRESHOLD_MB":"${THRESHOLD_MB}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}", "LOOKBACK_PERIOD":"${LOOKBACK_PERIOD}", "THRESHOLD_MB":"${THRESHOLD_MB}", "FAILURE_THRESHOLD":"${FAILURE_THRESHOLD}", "RUN_TIME_THRESHOLD":"${RUN_TIME_THRESHOLD}"}
