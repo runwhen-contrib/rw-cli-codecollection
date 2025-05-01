@@ -1,23 +1,23 @@
 {
     "ADF_SQL_INVALID_OBJECT_NAME": {
         "pattern": "ErrorCode=SqlOperationFailed.*Invalid object name",
-        "suggestion": "Verify the database object exists and is accessible:\nCheck table/view name and schema in the query\nEnsure the linked service account has proper permissions\nVerify the correct database is being targeted\nCheck for any recent schema changes"
+        "suggestion": "Verify the database object exists and is accessible\nCheck table/view name and schema in the query\nEnsure the linked service account has proper permissions\nVerify the correct database is being targeted\nCheck for any recent schema changes"
     },
     "ADF_AZUREBLOB_FAILED_TO_CREATE_CONTAINER": {
         "pattern": "ErrorCode=AzureBlobFailedToCreateContainer.*The remote name could not be resolved",
-        "suggestion": "Storage connectivity troubleshooting:\nVerify storage account name is correct and exists\nCheck network connectivity and DNS resolution\nEnsure firewall rules allow access from ADF IP ranges\nVerify storage account access keys or SAS tokens are valid"
+        "suggestion": "Verify storage account name is correct and exists\nCheck network connectivity and DNS resolution\nEnsure firewall rules allow access from ADF IP ranges\nVerify storage account access keys or SAS tokens are valid"
     },
     "ADF_JSON_INVALID_DATA_FORMAT": {
       "pattern": "ErrorCode=JsonInvalidDataFormat",
-      "suggestion": "JSON format validation steps:\nValidate source JSON using a JSON validator tool\nCheck for special characters or encoding issues\nVerify the dataset schema matches the JSON structure\nIf source is an API, check if Content-Type header is application/json"
+      "suggestion": "Validate source JSON using a JSON validator tool\nCheck for special characters or encoding issues\nVerify the dataset schema matches the JSON structure\nIf source is an API, check if Content-Type header is application/json"
     },
     "ADF_JSON_DESERIALIZATION_ERROR": {
       "pattern": "Error occurred when deserializing source JSON file",
-      "suggestion": "JSON parsing troubleshooting:\nCheck for malformed JSON structure\nVerify file encoding (UTF-8 recommended)\nEnsure no BOM markers in the file\nValidate array/object nesting levels\nCheck for truncated or incomplete JSON"
+      "suggestion": "Check for malformed JSON structure\nVerify file encoding (UTF-8 recommended)\nEnsure no BOM markers in the file\nValidate array/object nesting levels\nCheck for truncated or incomplete JSON"
     },
     "ADF_FUNCTION_RESPONSE_NOT_JSON": {
       "pattern": "Response Content is not a valid JObject",
-      "suggestion": "Azure Function response fixes:\nEnsure function returns valid JSON with proper Content-Type header\nAdd error handling in function to return formatted JSON responses\nCheck for string escaping in the response\nVerify function output binding configuration"
+      "suggestion": "Ensure function returns valid JSON with proper Content-Type header\nAdd error handling in function to return formatted JSON responses\nCheck for string escaping in the response\nVerify function output binding configuration"
     },
     "ADF_FUNCTION_MISSING_METHOD": {
       "pattern": "Azure function activity missing Method in JSON",
@@ -45,23 +45,23 @@
     },
     "ADF_EXECUTOR_OUT_OF_MEMORY": {
       "pattern": "DF-Executor-OutOfMemoryError",
-      "suggestion": "Memory optimization steps:\nScale up integration runtime to higher memory SKU\nReduce data preview rows in data flows\nImplement pagination for large datasets\nOptimize data transformations to reduce memory usage\nConsider partitioning data processing"
+      "suggestion": "Scale up integration runtime to higher memory SKU\nReduce data preview rows in data flows\nImplement pagination for large datasets\nOptimize data transformations to reduce memory usage\nConsider partitioning data processing"
     },
     "ADF_EXECUTOR_UNAUTHORIZED_STORAGE_ACCESS": {
       "pattern": "DF-Executor-UnauthorizedStorageAccess",
-      "suggestion": "Storage access troubleshooting:\nVerify managed identity is enabled and configured\nCheck RBAC assignments on storage account\nEnsure necessary role assignments (Storage Blob Data Contributor)\nVerify network access rules and private endpoints\nCheck for expired access keys or SAS tokens"
+      "suggestion": "Verify managed identity is enabled and configured\nCheck RBAC assignments on storage account\nEnsure necessary role assignments (Storage Blob Data Contributor)\nVerify network access rules and private endpoints\nCheck for expired access keys or SAS tokens"
     },
     "ADF_EXECUTOR_UNREACHABLE_STORAGE_ACCOUNT": {
       "pattern": "DF-Executor-UnreachableStorageAccount",
-      "suggestion": "Storage connectivity checks:\nVerify storage account exists and is online\nCheck DNS resolution and network connectivity\nReview firewall rules and network security groups\nVerify VNET and private endpoint configurations\nCheck for any Azure Storage service issues"
+      "suggestion": "Verify storage account exists and is online\nCheck DNS resolution and network connectivity\nReview firewall rules and network security groups\nVerify VNET and private endpoint configurations\nCheck for any Azure Storage service issues"
     },
     "ADF_EXECUTOR_INCORRECT_QUERY": {
       "pattern": "DF-Executor-IncorrectQuery",
-      "suggestion": "SQL query troubleshooting:\nValidate query syntax in SQL Server Management Studio\nCheck column and table names case sensitivity\nVerify database compatibility level\nTest query with actual credentials used by ADF\nEnsure all referenced objects exist"
+      "suggestion": "Validate query syntax in SQL Server Management Studio\nCheck column and table names case sensitivity\nVerify database compatibility level\nTest query with actual credentials used by ADF\nEnsure all referenced objects exist"
     },
     "ADF_EXECUTOR_PARAMETER_PARSE_ERROR": {
       "pattern": "DF-Executor-ParameterParseError",
-      "suggestion": "Parameter validation steps:\nVerify parameter data types match expected values\nCheck for proper JSON formatting in parameter values\nEnsure no special characters in parameter names\nValidate array parameters are properly formatted\nCheck pipeline parameter default values"
+      "suggestion": "Verify parameter data types match expected values\nCheck for proper JSON formatting in parameter values\nEnsure no special characters in parameter names\nValidate array parameters are properly formatted\nCheck pipeline parameter default values"
     },
     "ADF_EXECUTOR_DSL_PARSE_ERROR": {
       "pattern": "DF-Executor-DSLParseError",
