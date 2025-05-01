@@ -50,7 +50,8 @@ module "eks" {
 
   eks_managed_node_groups = {
     initial = {
-      instance_types = ["m5.large"]
+      instance_types = ["t2.medium"]
+      capacity_type  = "SPOT"
 
       min_size     = 1
       max_size     = 5
@@ -231,33 +232,55 @@ resource "kubernetes_secret" "kubeconfig_sa_token" {
   ]
 }
 
-
 # create faulty gateway
+data "kubectl_path_documents" "faulty_gateway_manifest" {
+  pattern = "faulty-gateway.yaml"
+}
 
 resource "kubectl_manifest" "faulty_gateway" {
-  yaml_body = <<YAML
-apiVersion: networking.istio.io/v1beta1
-kind: Gateway
-metadata:
-  name: faulty-gateway
-  namespace: istio-system
-spec:
-  selector:
-    istio: ingressgateway
-  servers:
-  - port:
-      number: 80
-      name: http
-      protocol: HTTP
-    hosts:
-    - "invalid-host.local"
-YAML
+  for_each  = toset(data.kubectl_path_documents.faulty_gateway_manifest.documents)
+  yaml_body = each.value
 
   depends_on = [
     module.eks_blueprints_addons
   ]
 }
 
+# resource "kubectl_manifest" "faulty_gateway" {
+#   yaml_body = <<YAML
+# apiVersion: networking.istio.io/v1beta1
+# kind: Gateway
+# metadata:
+#   name: faulty-gateway
+#   namespace: istio-system
+# spec:
+#   selector:
+#     istio: ingressgateway
+#   servers:
+#   - port:
+#       number: 80
+#       name: http
+#       protocol: HTTP
+#     hosts:
+#     - "invalid-host.local"
+# YAML
+
+#   depends_on = [
+#     module.eks_blueprints_addons
+#   ]
+# }
+
+# bookinfo application and fault injection
+data "kubectl_path_documents" "bookinfo_manifest" {
+  pattern = "./bookinfo/*.yaml"
+}
+
+resource "kubectl_manifest" "bookinfo_app" {
+  for_each  = toset(data.kubectl_path_documents.bookinfo_manifest.documents)
+  yaml_body = each.value
+}
+
+# null resource to execute some requests to generate errors
 
 ################################################################################
 # Supporting Resources
