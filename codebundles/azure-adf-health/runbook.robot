@@ -337,7 +337,7 @@ Suite Initialization
     ...    example=5
     ${RUN_TIME_THRESHOLD}=    RW.Core.Import User Variable    RUN_TIME_THRESHOLD
     ...    type=string
-    ...    description=The threshold for run time of a pipeline.
+    ...    description=The threshold for run time of a pipeline in seconds.
     ...    pattern=\w*
     ...    default=600
     ...    example=600
