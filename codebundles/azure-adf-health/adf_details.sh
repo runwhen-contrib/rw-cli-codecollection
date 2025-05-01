@@ -5,23 +5,19 @@ set -euo pipefail
 # REQUIRED ENV VARS:
 #   AZURE_SUBSCRIPTION_ID
 #   AZURE_RESOURCE_GROUP
-#   AZURE_SUBSCRIPTION_NAME
 # -----------------------------------------------------------------------------
 
 : "${AZURE_SUBSCRIPTION_ID:?Must set AZURE_SUBSCRIPTION_ID}"
 : "${AZURE_RESOURCE_GROUP:?Must set AZURE_RESOURCE_GROUP}"
-: "${AZURE_SUBSCRIPTION_NAME:?Must set AZURE_SUBSCRIPTION_NAME}"
 
 subscription_id="$AZURE_SUBSCRIPTION_ID"
 resource_group="$AZURE_RESOURCE_GROUP"
-subscription_name="$AZURE_SUBSCRIPTION_NAME"
 output_file="adf_details.json"
 adf_details_json='{"data_factories": []}'
 
 echo "Retrieving Azure Data Factory details..."
 echo "Resource Group: $resource_group"
 echo "Subscription ID: $subscription_id"
-echo "Subscription Name: $subscription_name"
 
 # Configure Azure CLI to explicitly allow or disallow preview extensions
 az config set extension.dynamic_install_allow_preview=true

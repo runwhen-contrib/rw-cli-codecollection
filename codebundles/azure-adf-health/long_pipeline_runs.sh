@@ -5,27 +5,23 @@ set -euo pipefail
 # REQUIRED ENV VARS:
 #   AZURE_SUBSCRIPTION_ID
 #   AZURE_RESOURCE_GROUP
-#   AZURE_SUBSCRIPTION_NAME
 #   LOOKBACK_PERIOD (optional, default: 7d)
 #   RUN_TIME_THRESHOLD (optional, default: 3600) - in seconds
 # -----------------------------------------------------------------------------
 
 : "${AZURE_SUBSCRIPTION_ID:?Must set AZURE_SUBSCRIPTION_ID}"
 : "${AZURE_RESOURCE_GROUP:?Must set AZURE_RESOURCE_GROUP}"
-: "${AZURE_SUBSCRIPTION_NAME:?Must set AZURE_SUBSCRIPTION_NAME}"
 : "${LOOKBACK_PERIOD:=7d}"
 : "${RUN_TIME_THRESHOLD:=900}"
 
 subscription_id="$AZURE_SUBSCRIPTION_ID"
 resource_group="$AZURE_RESOURCE_GROUP"
-subscription_name="$AZURE_SUBSCRIPTION_NAME"
 output_file="long_pipeline_runs.json"
 long_runs_json='{"long_running_pipelines": []}'
 
 echo "Checking Data Factories for long-running pipelines..."
 echo "Resource Group: $resource_group"
 echo "Subscription ID: $subscription_id"
-echo "Subscription Name: $subscription_name"
 echo "Runtime Threshold: $RUN_TIME_THRESHOLD seconds"
 
 # Configure Azure CLI to explicitly allow or disallow preview extensions
@@ -65,12 +61,12 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
         rm -f diag_err.log
 
         long_runs_json=$(echo "$long_runs_json" | jq \
-            --arg title "No Diagnostic Settings for Data Factory \`$df_name\` in resource group \`${resource_group}\` in subscription \`${subscription_name}\`" \
+            --arg title "No Diagnostic Settings for Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg details "$err_msg" \
             --arg severity "4" \
-            --arg nextStep "Enable diagnostics and configure Log Analytics for Data Factory \`$df_name\` in resource group \`${resource_group}\` in subscription \`${subscription_name}\`" \
-            --arg expected "Diagnostic settings should be enabled for Data Factory \`$df_name\` in resource group \`${resource_group}\` in subscription \`${subscription_name}\`" \
-            --arg actual "Diagnostic settings not enabled for Data Factory \`$df_name\` in resource group \`${resource_group}\` in subscription \`${subscription_name}\`" \
+            --arg nextStep "Enable diagnostics and configure Log Analytics for Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
+            --arg expected "Diagnostic settings should be enabled for Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
+            --arg actual "Diagnostic settings not enabled for Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg resource_url "$df_url" \
             --arg reproduce_hint "az monitor diagnostic-settings list --resource \"$df_id\"" \
             '.long_running_pipelines += [{
@@ -97,12 +93,12 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
     # If PipelineRuns logging is not enabled, report failure
     if [[ "$enabled_pipeline_runs_count" -eq 0 ]]; then
         long_runs_json=$(echo "$long_runs_json" | jq \
-            --arg title "PipelineRuns Logging Disabled in Data Factory \`$df_name\` in resource group \`${resource_group}\` in subscription \`${subscription_name}\`" \
+            --arg title "PipelineRuns Logging Disabled in Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg details "PipelineRuns logging must be enabled to monitor pipeline execution times." \
             --arg severity "4" \
             --arg nextStep "Enable PipelineRuns logging in diagnostic settings for Data Factory \`$df_name\`" \
-            --arg expected "PipelineRuns logging should be enabled for Data Factory \`$df_name\` in resource group \`${resource_group}\` in subscription \`${subscription_name}\`" \
-            --arg actual "PipelineRuns logging is disabled for Data Factory \`$df_name\` in resource group \`${resource_group}\` in subscription \`${subscription_name}\`" \
+            --arg expected "PipelineRuns logging should be enabled for Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
+            --arg actual "PipelineRuns logging is disabled for Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg resource_url "$df_url" \
             --arg reproduce_hint "az monitor diagnostic-settings list --resource \"$df_id\"" \
             '.long_running_pipelines += [{
@@ -120,12 +116,12 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
 
     if [[ -z "$workspace_id" || "$workspace_id" == "null" ]]; then
         long_runs_json=$(echo "$long_runs_json" | jq \
-            --arg title "No Log Analytics Workspace for Data Factory \`$df_name\` in resource group \`${resource_group}\` in subscription \`${subscription_name}\`" \
+            --arg title "No Log Analytics Workspace for Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg details "Diagnostics are configured but no workspace is defined." \
             --arg severity "4" \
             --arg nextStep "Configure Log Analytics workspace in diagnostic settings for Data Factory \`$df_name\`" \
-            --arg expected "Log Analytics workspace should be configured for Data Factory \`$df_name\` in resource group \`${resource_group}\` in subscription \`${subscription_name}\`" \
-            --arg actual "No Log Analytics workspace configured for Data Factory \`$df_name\` in resource group \`${resource_group}\` in subscription \`${subscription_name}\`" \
+            --arg expected "Log Analytics workspace should be configured for Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
+            --arg actual "No Log Analytics workspace configured for Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg resource_url "$df_url" \
             --arg reproduce_hint "az monitor diagnostic-settings list --resource \"$df_id\"" \
             '.long_running_pipelines += [{
@@ -147,7 +143,7 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
         rm -f guid_err.log
 
         long_runs_json=$(echo "$long_runs_json" | jq \
-            --arg title "Failed to Get Log Analytics Workspace ID for Data Factory \`$df_name\` in resource group \`${resource_group}\` in subscription \`${subscription_name}\`" \
+            --arg title "Failed to Get Log Analytics Workspace ID for Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg details "$err_msg" \
             --arg severity "3" \
             --arg nextStep "Verify Log Analytics workspace permissions and configuration" \
@@ -193,7 +189,7 @@ EOF
         rm -f pipeline_query_err.log
         
         long_runs_json=$(echo "$long_runs_json" | jq \
-            --arg title "Log Analytics Query Failed for Data Factory \`$df_name\` in resource group \`${resource_group}\` in subscription \`${subscription_name}\`" \
+            --arg title "Log Analytics Query Failed for Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg details "$err_msg" \
             --arg severity "4" \
             --arg nextStep "Verify workspace permissions or check if diagnostics have been sending data." \
@@ -229,13 +225,13 @@ EOF
         run_id=$(echo "$pipeline" | jq -r '.runId_g')
         
         long_runs_json=$(echo "$long_runs_json" | jq \
-            --arg title "Long Running Pipeline \`$pipeline_name\` in Data Factory \`$df_name\` in resource group \`${resource_group}\` in subscription \`${subscription_name}\`" \
+            --arg title "Long Running Pipeline \`$pipeline_name\` in Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg details "$pipeline" \
             --arg severity "4" \
-            --arg nextStep "Review pipeline configuration and optimize if possible" \
+            --arg nextStep "Investigate the pipeline to reduce runtime or consider scaling up the Data Factory in resource group \`${resource_group}\`" \
             --arg name "$pipeline_name" \
-            --arg expected "Pipeline runtime should be less than $RUN_TIME_THRESHOLD seconds" \
-            --arg actual "Pipeline runtime was $duration seconds" \
+            --arg expected "Pipeline runtime should be less than $RUN_TIME_THRESHOLD seconds in Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
+            --arg actual "Pipeline \`$pipeline_name\` runtime was $duration seconds in Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg resource_url "$df_url" \
             --arg reproduce_hint "az monitor log-analytics query --workspace \"$workspace_guid\" --analytics-query '$kql_query' --subscription \"$subscription_id\" --output json" \
             --arg run_id "$run_id" \

@@ -5,18 +5,15 @@ set -euo pipefail
 # REQUIRED ENV VARS:
 #   AZURE_SUBSCRIPTION_ID
 #   AZURE_RESOURCE_GROUP
-#   AZURE_SUBSCRIPTION_NAME
 #   THRESHOLD_MB - Threshold in MB for heavy read/write operations
 # -----------------------------------------------------------------------------
 
 : "${AZURE_SUBSCRIPTION_ID:?Must set AZURE_SUBSCRIPTION_ID}"
 : "${AZURE_RESOURCE_GROUP:?Must set AZURE_RESOURCE_GROUP}"
-: "${AZURE_SUBSCRIPTION_NAME:?Must set AZURE_SUBSCRIPTION_NAME}"
 : "${THRESHOLD_MB:?Must set THRESHOLD_MB}"
 
 subscription_id="$AZURE_SUBSCRIPTION_ID"
 resource_group="$AZURE_RESOURCE_GROUP"
-subscription_name="$AZURE_SUBSCRIPTION_NAME"
 output_file="data_volume_audit.json"
 audit_json='{"data_volume_alerts": []}'
 
@@ -141,7 +138,7 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
         rm -f guid_err.log
 
         audit_json=$(echo "$audit_json" | jq \
-            --arg title "Failed to get Log Analytics workspace GUID for $df_name in resource group \`$resource_group\` in subscription \`$subscription_name\`" \
+            --arg title "Failed to get Log Analytics workspace GUID for $df_name in resource group \`$resource_group\`" \
             --arg details "$err_msg" \
             --arg severity "4" \
             --arg nextStep "Verify workspace permissions" \
@@ -224,13 +221,13 @@ EOF
 
         if [[ "$is_heavy_read" -eq 1 || "$is_heavy_write" -eq 1 ]]; then
             audit_json=$(echo "$audit_json" | jq \
-                --arg title "Large Data Operation Detected in Pipeline \`$pipeline_name\` in resource group \`$resource_group\` in subscription \`$subscription_name\`" \
+                --arg title "Large Data Operation Detected in Pipeline \`$pipeline_name\` in resource group \`$resource_group\`" \
                 --arg details $activity \
                 --arg severity "4" \
-                --arg nextStep "Review and adjust ADF Integration Runtime configuration in resource group \`$resource_group\` in subscription \`$subscription_name\`" \
+                --arg nextStep "Review and adjust ADF Integration Runtime configuration in resource group \`$resource_group\`" \
                 --arg name "$pipeline_name" \
-                --arg expected "ADF pipeline \`$pipeline_name\` data operations should be below ${THRESHOLD_MB}MB threshold in resource group \`$resource_group\` in subscription \`$subscription_name\`" \
-                --arg actual "ADF pipeline \`$pipeline_name\` has large data operations in resource group \`$resource_group\` in subscription \`$subscription_name\`" \
+                --arg expected "ADF pipeline \`$pipeline_name\` data operations should be below ${THRESHOLD_MB}MB threshold in resource group \`$resource_group\`" \
+                --arg actual "ADF pipeline \`$pipeline_name\` has large data operations in resource group \`$resource_group\`" \
                 --arg resource_url "$df_url" \
                 --arg run_id "$run_id" \
                 --arg reproduce_hint "az monitor log-analytics query --workspace \"$workspace_guid\" --analytics-query '$kql_query' --subscription \"$subscription_id\" --output json" \

@@ -56,8 +56,8 @@ else
 fi
 
 # Check required environment variables
-if [ -z "$AZURE_RESOURCE_GROUP" ] || [ -z "$AZURE_SUBSCRIPTION_NAME" ]; then
-    echo "Error: AZURE_RESOURCE_GROUP and AZURE_SUBSCRIPTION_NAME environment variables must be set."
+if [ -z "$AZURE_RESOURCE_GROUP" ]; then
+    echo "Error: AZURE_RESOURCE_GROUP environment variables must be set."
     exit 1
 fi
 
