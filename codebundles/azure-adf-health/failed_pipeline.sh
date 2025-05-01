@@ -44,6 +44,11 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
 
     echo "Processing Data Factory: $df_name"
 
+    # Get linked services
+    echo "Getting linked services for $df_name..."
+    linked_services=$(az datafactory linked-service list --factory-name "$df_name" --resource-group "$df_rg" --subscription "$subscription_id" -o json)
+    linked_services=$(echo "$linked_services" | jq -c --arg df_id "$df_id" 'map(. + {url: ("https://adf.azure.com/en/management/datalinkedservices?factory=" + $df_id)})')
+    
     # Get diagnostic settings
     diagnostics=$(az monitor diagnostic-settings list --resource "$df_id" -o json 2>diag_err.log || true)
     
@@ -243,6 +248,7 @@ EOF
             --arg resource_url "$df_url" \
             --arg reproduce_hint "az monitor log-analytics query --workspace \"$workspace_guid\" --analytics-query '$kql_query' --subscription \"$subscription_id\" --output json" \
             --arg run_id "$run_id" \
+            --argjson linked_services "$linked_services" \
             '.failed_pipelines += [{
                 "title": $title,
                 "details": $details,
@@ -253,7 +259,8 @@ EOF
                 "name": $name,
                 "resource_url": $resource_url,
                 "reproduce_hint": $reproduce_hint,
-                "run_id": $run_id
+                "run_id": $run_id,
+                "linked_services": $linked_services
             }]')
     done < <(echo "$failed_pipelines" | jq -c '.[]')
 done
