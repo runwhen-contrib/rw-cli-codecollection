@@ -137,11 +137,13 @@ List Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GROU
 
     IF    ${has_failures}
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '["Pipeline_Name", "RunId", "Resource_URL"], (.failed_pipelines[] | [ .name, .run_id, .resource_url]) | @tsv' ${json_file} | column -t
+        ...    cmd=jq -r '.failed_pipelines[] | "Pipeline_Name: \\(.name)", "RunId: \\(.run_id)", "Resource_URL: \\(.resource_url)", "Linked_Services :", (.linked_services[] | " - \\(.name)\t\\(.properties.type)\t\\(.url)"), "----------------"' ${json_file}
         RW.Core.Add Pre To Report    Failed Pipelines Summary:\n==============================\n${formatted_results.stdout}
-        
+       
         FOR    ${issue}    IN    @{failed_json["failed_pipelines"]}
             ${details_json}=    Evaluate    json.loads('''${issue["details"]}''')    json
+            ${linked_services}=    Set Variable    ${issue.get("linked_services", [])}
+            ${merged}=    Evaluate    dict(${details_json}, linked_services=${linked_services})
             ${next_steps}=    Analyze Logs
             ...    logs=${details_json["Message"]}
             ...    error_patterns_file=${CURDIR}/error_patterns.json
@@ -154,7 +156,7 @@ List Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GROU
             RW.Core.Add Issue
             ...    severity=${issue.get("severity", 4)}
             ...    title=${issue.get("title", "No title")}
-            ...    details=${issue.get("details", "No details")}
+            ...    details=${merged}
             ...    next_steps=${suggestions}
             ...    expected=${issue.get("expected", "No expected value")}
             ...    actual=${issue.get("actual", "No actual value")}
