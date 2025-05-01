@@ -1,8 +1,8 @@
 *** Settings ***
-Documentation       Checks for Istio sidecar injection across deployments in all namespaces.
+Documentation      Checks istio proxy sidecar injection status, high memory and cpu usage, warnings and errors in logs, valid certificates, configuration and verify istio installation.
 Metadata           Author    Nbarola
 Metadata           Display Name    Kubernetes Istio System Health
-Metadata           Supports    Kubernetes,AKS,EKS,GKE,OpenShift
+Metadata           Supports    Kubernetes   AKS EKS GKE OpenShift
 
 Library             BuiltIn
 Library             RW.Core

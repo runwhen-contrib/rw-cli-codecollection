@@ -1,8 +1,8 @@
 *** Settings ***
-Documentation       Checks for Istio sidecar injection across deployments in all namespaces.
+Documentation      Checks istio proxy sidecar injection status, high memory and cpu usage, warnings and errors in logs, valid certificates, configuration and verify istio installation.
 Metadata           Author    Nbarola
 Metadata           Display Name    Kubernetes Istio System Health
-Metadata           Supports    Kubernetes,AKS,EKS,GKE,OpenShift
+Metadata           Supports    Kubernetes   AKS EKS GKE OpenShift
 
 Library             BuiltIn
 Library             RW.Core
@@ -81,8 +81,9 @@ Verify Istio Istallation in Cluster ${CLUSTER}
     Set Global Variable    ${installation_verify_score}
 
 
-Check Istio Controlplane logs for errors and warnings in Cluster ${CLUSTER}
-    [Documentation]    Check controlplane logs for known erros and warnings
+Check Istio Controlplane logs in Cluster ${CLUSTER}
+    [Documentation]    Check controlplane logs for known erros and warnings in Cluster ${CLUSTER}
+    [Tags]
     ...    istio
     ...    logs
     ${results}=    RW.CLI.Run Bash File
@@ -99,8 +100,9 @@ Check Istio Controlplane logs for errors and warnings in Cluster ${CLUSTER}
     ${controlplane_logs_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
     Set Global Variable    ${controlplane_logs_score}
 
-Check Istio Certificates for the Istio Components in Cluster ${CLUSTER}
-    [Documentation]    Check Istio valid Root CA and mTLS Certificates
+Check Istio Components Certificates in Cluster ${CLUSTER}
+    [Documentation]    Check Istio valid Root CA and mTLS Certificates in Cluster ${CLUSTER}
+    [Tags]
     ...    istio
     ...    mtls
     ${results}=    RW.CLI.Run Bash File
@@ -118,7 +120,8 @@ Check Istio Certificates for the Istio Components in Cluster ${CLUSTER}
     Set Global Variable    ${istio_certificate_score}
 
 Analyze Istio configurations in Cluster ${CLUSTER}
-    [Documentation]    Check Istio configurations
+    [Documentation]    Check Istio configurations in Cluster ${CLUSTER}
+    [Tags]
     ...    istio
     ...    config
     ${results}=    RW.CLI.Run Bash File

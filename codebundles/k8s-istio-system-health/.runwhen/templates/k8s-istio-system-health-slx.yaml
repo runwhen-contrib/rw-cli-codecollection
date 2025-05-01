@@ -15,7 +15,7 @@ spec:
     value: {{match_resource.resource.metadata.name}}
   owners:
   - {{workspace.owner_email}}
-  statement: Check for Istio sidecar for deployments
+  statement: Measures health of Istio system by checking istio proxy sidecar injection status, high memory and cpu usage, warnings and errors in logs, valid certificates, configuration and verify istio installation.
   additionalContext:  
     cluster: "{{ cluster.name }}"
     context: "{{ cluster.context }}"
