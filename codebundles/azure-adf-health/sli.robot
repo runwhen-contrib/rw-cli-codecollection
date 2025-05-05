@@ -25,7 +25,12 @@ Count Resource Health Issues Affecting Data Factories in resource group `${AZURE
     ...    show_in_rwl_cheatsheet=true
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat ${json_file}
-    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    TRY
+        ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    EXCEPT
+        Log    Failed to parse JSON from ${json_file}.    WARN
+        ${issue_list}=    Create List
+    END
     ${availability_score}=    Evaluate    1 if len([issue for issue in ${issue_list} if issue["properties"]["title"] != "Available"]) > 0 else 0
     Set Global Variable    ${availability_score}
     RW.CLI.Run Cli
