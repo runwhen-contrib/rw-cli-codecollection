@@ -163,6 +163,72 @@ resource "azapi_resource" "copy_pipeline" {
   ]
 }
 
+
+resource "azapi_resource" "copy_pipeline_v1" {
+  type                      = "Microsoft.DataFactory/factories/pipelines@2018-06-01"
+  name                      = "copy-sql-to-blob-v1"
+  parent_id                 = azurerm_data_factory.adf.id
+  schema_validation_enabled = false
+
+  body = {
+    properties = {
+      activities = [
+        {
+          name      = "Copy data1-v1"
+          type      = "Copy"
+          dependsOn = []
+          policy = {
+            timeout                = "0.12:00:00"
+            retry                  = 0
+            retryIntervalInSeconds = 30
+            secureOutput           = false
+            secureInput            = false
+          }
+          userProperties = [
+            {
+              name  = "Destination"
+              value = "backups/daily_dump.csv"
+            }
+          ]
+          typeProperties = {
+            source = {
+              type            = "AzureSqlSource"
+              queryTimeout    = "02:00:00"
+              isolationLevel  = "ReadCommitted"
+              partitionOption = "None"
+            }
+            sink = {
+              type         = "BlobSink"
+              copyBehavior = "PreserveHierarchy"
+            }
+            enableStaging        = false
+            dataIntegrationUnits = 4
+          }
+          inputs = [
+            {
+              referenceName = "SQLDatasetV1"
+              type          = "DatasetReference"
+            }
+          ]
+          outputs = [
+            {
+              referenceName = "BlobDataset"
+              type          = "DatasetReference"
+            }
+          ]
+        }
+      ]
+    }
+  }
+  depends_on = [
+    azurerm_data_factory_linked_service_azure_sql_database.sql,
+    azurerm_data_factory_linked_service_azure_blob_storage.blob,
+    azapi_resource.sql_dataset_v1,
+    azapi_resource.blob_dataset
+
+  ]
+}
+
 resource "azapi_resource" "sql_dataset" {
   type                      = "Microsoft.DataFactory/factories/datasets@2018-06-01"
   name                      = "SQLDataset"
@@ -178,6 +244,26 @@ resource "azapi_resource" "sql_dataset" {
       type = "AzureSqlTable"
       typeProperties = {
         tableName = var.table_name #  use default value to run this pipeline successfully
+      }
+    }
+  }
+}
+
+resource "azapi_resource" "sql_dataset_v1" {
+  type                      = "Microsoft.DataFactory/factories/datasets@2018-06-01"
+  name                      = "SQLDatasetV1"
+  parent_id                 = azurerm_data_factory.adf.id
+  schema_validation_enabled = false
+
+  body = {
+    properties = {
+      linkedServiceName = {
+        referenceName = azurerm_data_factory_linked_service_azure_sql_database.sql.name
+        type          = "LinkedServiceReference"
+      }
+      type = "AzureSqlTable"
+      typeProperties = {
+        tableName = "dbo.CustomerTransactions" #  use default value to run this pipeline successfully
       }
     }
   }
@@ -241,6 +327,25 @@ resource "null_resource" "trigger_pipeline" {
         --resource-group ${azurerm_resource_group.rg.name} \
         --factory-name ${azurerm_data_factory.adf.name} \
         --name ${azapi_resource.copy_pipeline.name}
+    EOT
+  }
+}
+
+resource "null_resource" "trigger_pipeline_v1" {
+  depends_on = [
+    azapi_resource.copy_pipeline_v1,
+    azapi_resource.sql_dataset_v1,
+    azapi_resource.blob_dataset,
+    azurerm_data_factory_linked_service_azure_sql_database.sql,
+    azurerm_data_factory_linked_service_azure_blob_storage.blob
+  ]
+
+  provisioner "local-exec" {
+    command = <<EOT
+      az datafactory pipeline create-run \
+        --resource-group ${azurerm_resource_group.rg.name} \
+        --factory-name ${azurerm_data_factory.adf.name} \
+        --name ${azapi_resource.copy_pipeline_v1.name}
     EOT
   }
 }
