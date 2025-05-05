@@ -25,9 +25,6 @@ Count Resource Health Issues Affecting Data Factories in resource group `${AZURE
     ...    show_in_rwl_cheatsheet=true
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat ${json_file}
-    ...    env=${env}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     ${availability_score}=    Evaluate    1 if len([issue for issue in ${issue_list} if issue["properties"]["title"] != "Available"]) > 0 else 0
     Set Global Variable    ${availability_score}
@@ -47,7 +44,6 @@ Count Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESO
     TRY
         ${error_data}=    RW.CLI.Run Cli
         ...    cmd=cat ${json_file}
-        ...    env=${env}
         ${error_trends}=    Evaluate    json.loads(r'''${error_data.stdout}''')    json
     EXCEPT
         Log    Failed to load JSON payload, defaulting to empty list.    WARN
@@ -93,6 +89,7 @@ Count Large Data Operations in Data Factories in resource group `${AZURE_RESOURC
     ${data_volume_check}=    RW.CLI.Run Bash File
     ...    bash_file=data_volume_audit.sh
     ...    env=${env}
+    ...    timeout_seconds=180
     ...    include_in_history=false
     ${data_volume_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${json_file}
