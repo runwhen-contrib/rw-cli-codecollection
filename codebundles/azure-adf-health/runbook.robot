@@ -20,16 +20,20 @@ List Resource Health Issues Affecting Data Factories in resource group `${AZURE_
     ${json_file}=    Set Variable    "datafactory_health.json"
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=resource_health.sh
+    ...    timeout_seconds=180
     ...    env=${env}
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
-    RW.Core.Add Pre To Report    ${resource_health.stdout}
-
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat ${json_file}
-    ...    env=${env}
-    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    IF    len(@{issue_list}) > 0 
+    TRY
+        ${issue_list}=    Evaluate    json.loads(r'''${issues}''')    json
+    EXCEPT
+        Log    Failed to parse JSON from ${json_file}.    WARN
+        ${issue_list}=    Create List
+    END
+    ${found}=    Set Variable    ${False}
+    IF    len(${issue_list}) > 0
         FOR    ${issue}    IN    @{issue_list}
             IF    "${issue["properties"]["title"]}" != "Available"
                 RW.Core.Add Issue
@@ -40,7 +44,11 @@ List Resource Health Issues Affecting Data Factories in resource group `${AZURE_
                 ...    reproduce_hint=${resource_health.cmd}
                 ...    details=${issue}
                 ...    next_steps=Please escalate to the Azure service owner or check back later.
+                ${found}=    Set Variable    ${True}
             END
+        END
+        IF    not ${found}
+            RW.Core.Add Pre To Report    All Data Factories are healthy in resource group `${AZURE_RESOURCE_GROUP}`.
         END
     ELSE
         RW.Core.Add Issue
@@ -68,7 +76,6 @@ List Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOU
     TRY
         ${error_data}=    RW.CLI.Run Cli
         ...    cmd=cat ${json_file}
-        ...    env=${env}
         ${error_trends}=    Evaluate    json.loads(r'''${error_data.stdout}''')    json
     EXCEPT
         Log    Failed to load JSON payload, defaulting to empty list.    WARN
@@ -175,6 +182,7 @@ Find Large Data Operations in Data Factories in resource group `${AZURE_RESOURCE
     ${json_file}=    Set Variable    "data_volume_audit.json"
     ${data_volume_check}=    RW.CLI.Run Bash File
     ...    bash_file=data_volume_audit.sh
+    ...    timeout_seconds=180
     ...    env=${env}
     ...    include_in_history=false
     ${data_volume_data}=    RW.CLI.Run Cli
@@ -203,7 +211,6 @@ Find Large Data Operations in Data Factories in resource group `${AZURE_RESOURCE
             ...    expected=${issue.get("expected", "No expected value")}
             ...    actual=${issue.get("actual", "No aFailed Job Runs Log Parser SLI to run every 120-180 seconds to do a KQL query to find failed job run, fetch detailctual value")}
             ...    reproduce_hint=${issue.get("reproduce_hint", "No reproduce hint")}
-            ...    resource_url=${issue.get("resource_url", "No resource url")}
         END
     ELSE
         RW.Core.Add Pre To Report    "No heavy data operations detected in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -218,6 +225,7 @@ List Azure Data Factory Details in resource group `${AZURE_RESOURCE_GROUP}`
     
     ${data_volume_check}=    RW.CLI.Run Bash File
     ...    bash_file=adf_details.sh
+    ...    timeout_seconds=180
     ...    env=${env}
     ...    include_in_history=false
     ${data_volume_data}=    RW.CLI.Run Cli
@@ -233,13 +241,6 @@ List Azure Data Factory Details in resource group `${AZURE_RESOURCE_GROUP}`
     ${adf_details}=    Evaluate    len(${metrics_data.get("data_factories", [])}) > 0
 
     IF    ${adf_details}
-        
-        # Format basic information and component counts
-        # ${basic_info}=    RW.CLI.Run Cli
-        # ...    cmd=jq -r '["Data_Factory", "Location", "Resource_Group", "Pipeline_Count", "Trigger_Count", "Dataset_Count", "LinkedServices_Count"], (.data_factories[] | [ .name, .location, .resource_group, (.components.pipelines|length), (.components.triggers|length), (.components.datasets|length), (.components.linked_services|length)]) | @tsv' ${json_file} | column -t -s $'\t'
-        # RW.Core.Add Pre To Report    Azure Data Factory Overview:\n=========================\n${basic_info.stdout}
-
-        # Format diagnostic settings and linked services
         ${diag_info}=    RW.CLI.Run Cli
         ...    cmd=jq -r '["Data_Factory", "Location", "Resource_Group","Diag_Status", "Pipeline_Logging", "Activity_Logging", "Trigger_Logging", "Linked_Services", "ADF_URL"], (.data_factories[] | [ .name, .location, .resource_group, .diagnostics.status, .diagnostics.pipeline_logging_enabled, .diagnostics.activity_logging_enabled, .diagnostics.trigger_logging_enabled, ([.components.linked_services[].name]|join(", ")), .url]) | @tsv' ${json_file} | column -t -s $'\t'
         RW.Core.Add Pre To Report    \nDiagnostic Settings and Linked Services:\n=====================================\n${diag_info.stdout}
