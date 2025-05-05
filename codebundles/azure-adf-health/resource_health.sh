@@ -1,10 +1,11 @@
 #!/bin/bash
+set -euo pipefail
 
 # Configure Azure CLI to explicitly allow or disallow preview extensions
 az config set extension.dynamic_install_allow_preview=true
 # Check and install datafactory extension if needed
 echo "Checking for datafactory extension..."
-if ! az extension show --name datafactory > /dev/null; then
+if ! az extension show --name datafactory &>/dev/null; then
     echo "Installing datafactory extension..."
     az extension add --name datafactory || { echo "Failed to install datafactory extension."; exit 1; }
 fi
@@ -20,10 +21,6 @@ else
     subscription="$AZURE_SUBSCRIPTION_ID"
     echo "Using specified subscription ID: $subscription"
 fi
-
-# Set the subscription ID
-echo "Switching to subscription ID: $subscription"
-az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
 
 # Check if Microsoft.ResourceHealth provider is registered
 echo "Checking registration status of Microsoft.ResourceHealth provider..."
