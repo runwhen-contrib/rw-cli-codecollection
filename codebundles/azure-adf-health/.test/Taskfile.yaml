@@ -4,6 +4,7 @@ tasks:
   default:
     desc: "Run/refresh config"
     cmds:
+      - task: check-sqlcmd
       - task: check-unpushed-commits
       - task: generate-rwl-config
       - task: run-rwl-discovery
@@ -18,7 +19,17 @@ tasks:
   build-infra:
     desc: "Build test infrastructure"
     cmds:
+      - task: check-sqlcmd
       - task: build-terraform-infra
+
+  check-sqlcmd:
+    desc: "Check if sqlcmd is installed"
+    cmds:
+      - |
+        if ! command -v sqlcmd &> /dev/null; then
+          echo "Warning: sqlcmd is required to initialize the database tables.\nEnsure it is installed so that the pipeline can run successfully."
+        fi
+    silent: true
 
   check-unpushed-commits:
     desc: Check if outstanding commits or file updates need to be pushed before testing.
