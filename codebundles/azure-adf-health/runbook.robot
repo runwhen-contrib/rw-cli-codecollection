@@ -27,7 +27,7 @@ List Resource Health Issues Affecting Data Factories in resource group `${AZURE_
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat ${json_file}
     TRY
-        ${issue_list}=    Evaluate    json.loads(r'''${issues}''')    json
+        ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     EXCEPT
         Log    Failed to parse JSON from ${json_file}.    WARN
         ${issue_list}=    Create List
