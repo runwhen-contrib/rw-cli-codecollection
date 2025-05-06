@@ -3,9 +3,9 @@
 #set -euo pipefail
 
 # Constants
-ERROR_JSON="${CURDIR}/proxy_error_patterns.json"
-ISSUES_FILE="${OUTPUT_DIR}/istio_proxy_issues.json"
-REPORT_FILE="${OUTPUT_DIR}/istio_proxy_report.json"
+ERROR_JSON="proxy_error_patterns.json"
+ISSUES_FILE="istio_proxy_issues.json"
+REPORT_FILE="istio_proxy_report.json"
 LOG_DURATION="1h" # Fetch logs from the last 1 hour
 declare -a ISSUES=()
 

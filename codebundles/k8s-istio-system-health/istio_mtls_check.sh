@@ -4,8 +4,8 @@ echo "🔍 Checking Istio mTLS Certificates for all Istio-injected pods in conte
 echo "Using Kubernetes CLI: ${KUBERNETES_DISTRIBUTION_BINARY}"
 
 # Output files
-REPORT_FILE="${OUTPUT_DIR}/istio_mtls_cert_report.txt"
-ISSUES_FILE="${OUTPUT_DIR}/istio_mtls_issues.json"
+REPORT_FILE="istio_mtls_cert_report.txt"
+ISSUES_FILE="istio_mtls_issues.json"
 
 # Temporary files
 ROOT_CA_FILE="/tmp/root_ca_tmp"

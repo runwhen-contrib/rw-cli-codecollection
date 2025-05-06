@@ -1,7 +1,7 @@
 #!/bin/bash
 
-REPORT_FILE="${OUTPUT_DIR}/report_istio_analyze.txt"
-ISSUES_FILE="${OUTPUT_DIR}/issues_istio_analyze.json"
+REPORT_FILE="report_istio_analyze.txt"
+ISSUES_FILE="issues_istio_analyze.json"
 
 # Prepare output files
 echo "" > "$REPORT_FILE"
@@ -55,6 +55,8 @@ for NS in $ALL_NAMESPACES; do
         raw_message=$(echo "$OUTPUT" | jq -r ".[$i].message")
         message=$(printf '%s' "$raw_message" | sed 's/"/\\"/g')
         resource=$(echo "$OUTPUT" | jq -r ".[$i].resource.name // \"unknown\"")
+        resource_name=$(echo "$OUTPUT" | jq -r ".[$i].resource.name // \"unknown\"")
+        resource_ns=$(echo  "$OUTPUT" | jq -r ".[$i].resource.namespace // \"$NS\"")
 
         if [[ "$level" == "Info" ]]; then
             line="[$level] $code - $raw_message"
@@ -71,12 +73,14 @@ for NS in $ALL_NAMESPACES; do
             fi
 
             ISSUES+=("{
-                \"severity\": ${severity_code},
-                \"expected\": \"No ${level_lower}s from istioctl analyze for resource ${resource} in namespace ${NS}\",
-                \"actual\": \"${message}\",
-                \"title\": \"Istio ${level} in namespace ${NS}: ${code}\",
-                \"reproduce_hint\": \"istioctl analyze -n ${NS}\",
-                \"next_steps\": \"Review the resource ${resource} for potential misconfiguration in namespace ${NS}.\"
+            \"severity\": ${severity_code},
+            \"namespace\": \"${resource_ns}\",
+            \"resource\": \"${resource_name}\",
+            \"expected\": \"No ${level_lower}s from istioctl analyze for resource ${resource_name}\",
+            \"actual\": \"${message}\",
+            \"title\": \"Istio ${level} in namespace ${resource_ns}: ${code}\",
+            \"reproduce_hint\": \"istioctl analyze -n ${resource_ns}\",
+            \"next_steps\": \"Review ${resource_name} in ${resource_ns} for mis-configuration.\"
             }")
         fi
     done

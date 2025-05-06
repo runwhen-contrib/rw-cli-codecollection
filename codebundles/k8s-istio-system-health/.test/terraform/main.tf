@@ -336,3 +336,63 @@ module "vpc" {
 
   tags = local.tags
 }
+
+
+###############################################################################
+# 1. read the secret (unchanged)
+###############################################################################
+data "kubernetes_secret" "sa_token" {
+  metadata {
+    name      = kubernetes_secret.kubeconfig_sa_token.metadata[0].name
+    namespace = kubernetes_secret.kubeconfig_sa_token.metadata[0].namespace
+  }
+  depends_on = [kubernetes_secret.kubeconfig_sa_token]
+}
+
+###############################################################################
+# 2. locals – raw JWT, base-64-encode the PEM cert
+###############################################################################
+locals {
+  sa_token = nonsensitive(data.kubernetes_secret.sa_token.data.token)          # JWT
+  ca_b64   = base64encode(
+               nonsensitive(data.kubernetes_secret.sa_token.data["ca.crt"])
+             )                                                                 # <- encode
+}
+
+###############################################################################
+# 3. write kubeconfig.secret
+###############################################################################
+resource "local_file" "sa_kubeconfig" {
+  filename        = "${path.module}/kubeconfig.secret"
+  file_permission = "0600"
+
+  content = yamlencode({
+    apiVersion = "v1"
+    kind       = "Config"
+
+    clusters = [{
+      name    = module.eks.cluster_name
+      cluster = {
+        server                     = module.eks.cluster_endpoint
+        certificate-authority-data = local.ca_b64        # <- encoded cert
+      }
+    }]
+
+    contexts = [{
+      name    = module.eks.cluster_name
+      context = {
+        cluster = module.eks.cluster_name
+        user    = "sa"
+      }
+    }]
+
+    current-context = module.eks.cluster_name
+
+    users = [{
+      name = "sa"
+      user = {
+        token = local.sa_token                           # raw JWT
+      }
+    }]
+  })
+}

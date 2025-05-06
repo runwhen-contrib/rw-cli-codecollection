@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Constants
-ERROR_JSON="${CURDIR}/controlplane_error_patterns.json"
-ISSUES_FILE="${OUTPUT_DIR}/istio_controlplane_issues.json"
-REPORT_FILE="${OUTPUT_DIR}/istio_controlplane_report.json"
+ERROR_JSON="controlplane_error_patterns.json"
+ISSUES_FILE="istio_controlplane_issues.json"
+REPORT_FILE="istio_controlplane_report.json"
 LOG_DURATION="1h" # Fetch logs from the last 1 hour
 declare -a ISSUES=()
 

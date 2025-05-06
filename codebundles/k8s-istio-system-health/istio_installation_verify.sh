@@ -1,7 +1,7 @@
 #!/bin/bash
 
-REPORT_FILE="${OUTPUT_DIR}/istio_installation_report.txt"
-ISSUES_FILE="${OUTPUT_DIR}/istio_installation_issues.json"
+REPORT_FILE="istio_installation_report.txt"
+ISSUES_FILE="istio_installation_issues.json"
 LOG_TAIL_COUNT=50  # ⬅️ Set the number of log lines to tail here
 
 # Prepare files

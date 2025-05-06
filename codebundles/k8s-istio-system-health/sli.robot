@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 
-Check Deployments for Istio Sidecar Injection for Cluster ${CLUSTER}
+Check Deployments for Istio Sidecar Injection for Cluster ${CONTEXT}
     [Documentation]    Checks all deployments in specified namespaces for Istio sidecar injection status
     [Tags]    
     ...    istio
@@ -39,7 +39,7 @@ Check Deployments for Istio Sidecar Injection for Cluster ${CLUSTER}
     ${sidecar_injection_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
     Set Global Variable    ${sidecar_injection_score}
 
-Check Istio Sidecar resources usage for Cluster ${CLUSTER}
+Check Istio Sidecar resources usage for Cluster ${CONTEXT}
     [Documentation]    Checks all pods in specified namespaces for Istio sidecar resources usage
     [Tags]    
     ...    istio
@@ -61,7 +61,7 @@ Check Istio Sidecar resources usage for Cluster ${CLUSTER}
     Set Global Variable    ${sidecar_resources_usage_score}
 
 
-Verify Istio Istallation in Cluster ${CLUSTER}
+Verify Istio Istallation in Cluster ${CONTEXT}
     [Documentation]    Verify Istio Istallation
     [Tags]    
     ...    istio
@@ -81,8 +81,8 @@ Verify Istio Istallation in Cluster ${CLUSTER}
     Set Global Variable    ${installation_verify_score}
 
 
-Check Istio Controlplane logs in Cluster ${CLUSTER}
-    [Documentation]    Check controlplane logs for known erros and warnings in Cluster ${CLUSTER}
+Check Istio Controlplane logs in Cluster ${CONTEXT}
+    [Documentation]    Check controlplane logs for known erros and warnings in Cluster ${CONTEXT}
     [Tags]
     ...    istio
     ...    logs
@@ -100,8 +100,8 @@ Check Istio Controlplane logs in Cluster ${CLUSTER}
     ${controlplane_logs_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
     Set Global Variable    ${controlplane_logs_score}
 
-Check Istio Proxy logs in Cluster ${CLUSTER}
-    [Documentation]    Check istio proxy logs for known erros and warnings in cluster ${CLUSTER}
+Check Istio Proxy logs in Cluster ${CONTEXT}
+    [Documentation]    Check istio proxy logs for known erros and warnings in cluster ${CONTEXT}
     [Tags]
     ...    istio
     ...    proxy logs
@@ -119,8 +119,8 @@ Check Istio Proxy logs in Cluster ${CLUSTER}
     ${proxy_logs_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
     Set Global Variable    ${proxy_logs_score}
 
-Check Istio Components Certificates in Cluster ${CLUSTER}
-    [Documentation]    Check Istio valid Root CA and mTLS Certificates in Cluster ${CLUSTER}
+Check Istio Components Certificates in Cluster ${CONTEXT}
+    [Documentation]    Check Istio valid Root CA and mTLS Certificates in Cluster ${CONTEXT}
     [Tags]
     ...    istio
     ...    mtls
@@ -138,8 +138,8 @@ Check Istio Components Certificates in Cluster ${CLUSTER}
     ${istio_certificate_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
     Set Global Variable    ${istio_certificate_score}
 
-Analyze Istio configurations in Cluster ${CLUSTER}
-    [Documentation]    Check Istio configurations in Cluster ${CLUSTER}
+Analyze Istio configurations in Cluster ${CONTEXT}
+    [Documentation]    Check Istio configurations in Cluster ${CONTEXT}
     [Tags]
     ...    istio
     ...    config
@@ -157,7 +157,7 @@ Analyze Istio configurations in Cluster ${CLUSTER}
     ${istio_configuration_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
     Set Global Variable    ${istio_configuration_score}
 
-Generate Health Score for Cluster ${CLUSTER}
+Generate Health Score for Cluster ${CONTEXT}
     ${health_score}=    Evaluate  (${sidecar_injection_score} + ${sidecar_resources_usage_score} + ${installation_verify_score} + ${controlplane_logs_score} + ${proxy_logs_score} + ${istio_certificate_score} + ${istio_configuration_score}) / 7
     ${health_score}=    Convert to Number    ${health_score}  2
     RW.Core.Push Metric    ${health_score}
@@ -181,11 +181,6 @@ Suite Initialization
     ${CONTEXT}=    RW.Core.Import User Variable    CONTEXT
     ...    type=string
     ...    description=Which Kubernetes context to operate within.
-    ...    pattern=\w*
-    ...    example=my-main-cluster
-    ${CLUSTER}=    RW.Core.Import User Variable    CLUSTER
-    ...    type=string
-    ...    description=Which Kubernetes cluster to operate within.
     ...    pattern=\w*
     ...    example=my-main-cluster
 
@@ -213,11 +208,10 @@ Suite Initialization
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
-    Set Suite Variable    ${CLUSTER}    ${CLUSTER}
     Set Suite Variable    ${EXCLUDED_NAMESPACES}    ${EXCLUDED_NAMESPACES}
     Set Suite Variable    ${CPU_USAGE_THRESHOLD}    ${CPU_USAGE_THRESHOLD}
     Set Suite Variable    ${MEMORY_USAGE_THRESHOLD}    ${MEMORY_USAGE_THRESHOLD}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "CLUSTER":"${CLUSTER}", "EXCLUDED_NAMESPACES":"${EXCLUDED_NAMESPACES}", "CPU_USAGE_THRESHOLD":"${CPU_USAGE_THRESHOLD}", "MEMORY_USAGE_THRESHOLD":"${MEMORY_USAGE_THRESHOLD}", "OUTPUT_DIR":"${OUTPUT_DIR}", "CURDIR":"${CURDIR}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "EXCLUDED_NAMESPACES":"${EXCLUDED_NAMESPACES}", "CPU_USAGE_THRESHOLD":"${CPU_USAGE_THRESHOLD}", "MEMORY_USAGE_THRESHOLD":"${MEMORY_USAGE_THRESHOLD}"}
 

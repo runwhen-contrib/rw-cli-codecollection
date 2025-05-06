@@ -20,7 +20,7 @@ function format_command_output() {
 print_section_header "Istio Sidecar Injection Status Check"
 
 # Set the report file path
-REPORT_FILE="${OUTPUT_DIR}/report.txt"
+REPORT_FILE="report.txt"
 
 # Process each namespace's results
 if [ -f $REPORT_FILE ]; then

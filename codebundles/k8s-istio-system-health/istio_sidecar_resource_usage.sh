@@ -4,8 +4,8 @@
 CPU_THRESHOLD=${CPU_USAGE_THRESHOLD}
 MEM_THRESHOLD=${MEMORY_USAGE_THRESHOLD}
 
-REPORT_FILE="${OUTPUT_DIR}/istio_sidecar_resource_usage_report.txt"
-ISSUES_FILE="${OUTPUT_DIR}/istio_sidecar_resource_usage_issue.json"
+REPORT_FILE="istio_sidecar_resource_usage_report.txt"
+ISSUES_FILE="istio_sidecar_resource_usage_issue.json"
 
 # Prepare files
 echo "" > "$REPORT_FILE"

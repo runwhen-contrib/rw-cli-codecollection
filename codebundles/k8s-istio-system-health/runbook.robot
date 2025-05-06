@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 
-Check Deployments for Istio Sidecar Injection for Cluster ${CLUSTER}
+Check Deployments for Istio Sidecar Injection for Cluster ${CONTEXT}
     [Documentation]    Checks all deployments in specified namespaces for Istio sidecar injection status
     [Tags]    
     ...    istio
@@ -31,7 +31,7 @@ Check Deployments for Istio Sidecar Injection for Cluster ${CLUSTER}
     
  
     ${issues_list}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/issues.json
+    ...    cmd=cat issues.json
     ...    env=${env}
     ...    include_in_history=false
 
@@ -40,13 +40,12 @@ Check Deployments for Istio Sidecar Injection for Cluster ${CLUSTER}
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
     IF    len(@{issues}) > 0
         FOR    ${issue}    IN    @{issues}
-            ${reproduce_cmd}=    Set Variable    kubectl get pods -n ${issue['namespace']} -l app=${issue['deployment']} -o jsonpath='{.items[*].spec.containers[*].name}'
             RW.Core.Add Issue
             ...    severity=${issue['severity']}
             ...    expected=${issue['expected']}
             ...    actual=${issue['actual']}
             ...    title=${issue['title']}
-            ...    reproduce_hint=${reproduce_cmd}
+            ...    reproduce_hint=${results.cmd}
             ...    next_steps=${issue['next_steps']}
         END
     END
@@ -59,7 +58,7 @@ Check Deployments for Istio Sidecar Injection for Cluster ${CLUSTER}
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${formatted_report.stdout}
 
-Check Istio Sidecar resources usage for Cluster ${CLUSTER}
+Check Istio Sidecar resources usage for Cluster ${CONTEXT}
     [Documentation]    Checks all pods in specified namespaces for Istio sidecar resources usage
     [Tags]    
     ...    istio
@@ -97,8 +96,8 @@ Check Istio Sidecar resources usage for Cluster ${CLUSTER}
     RW.Core.Add Pre To Report   ${usage_report.stdout}
 
 
-Verify Istio Istallation in Cluster ${CLUSTER}
-    [Documentation]    Verify Istio Istallation in cluster ${CLUSTER}
+Verify Istio Istallation in Cluster ${CONTEXT}
+    [Documentation]    Verify Istio Istallation in cluster ${CONTEXT}
     [Tags]    
     ...    istio
     ...    installation
@@ -133,8 +132,8 @@ Verify Istio Istallation in Cluster ${CLUSTER}
     RW.Core.Add Pre To Report   ${installation_report.stdout}
 
 
-Check Istio Controlplane logs in Cluster ${CLUSTER}
-    [Documentation]    Check istio controlplane logs for known erros and warnings in cluster ${CLUSTER}
+Check Istio Controlplane logs in Cluster ${CONTEXT}
+    [Documentation]    Check istio controlplane logs for known erros and warnings in cluster ${CONTEXT}
     [Tags]
     ...    istio
     ...    controlplane logs
@@ -168,8 +167,8 @@ Check Istio Controlplane logs in Cluster ${CLUSTER}
     ...     include_in_history=false
     RW.Core.Add Pre To Report   ${logs_report.stdout}
 
-Check Istio Proxy logs in Cluster ${CLUSTER}
-    [Documentation]    Check istio proxy logs for known erros and warnings in cluster ${CLUSTER}
+Check Istio Proxy logs in Cluster ${CONTEXT}
+    [Documentation]    Check istio proxy logs for known erros and warnings in cluster ${CONTEXT}
     [Tags]
     ...    istio
     ...    proxy logs
@@ -203,8 +202,8 @@ Check Istio Proxy logs in Cluster ${CLUSTER}
     ...     include_in_history=false
     RW.Core.Add Pre To Report   ${logs_report.stdout}
 
-Check Istio Components Certificates in Cluster ${CLUSTER}
-    [Documentation]    Check Istio valid Root CA and mTLS Certificates in cluster ${CLUSTER}
+Check Istio Components Certificates in Cluster ${CONTEXT}
+    [Documentation]    Check Istio valid Root CA and mTLS Certificates in cluster ${CONTEXT}
     [Tags]
     ...    istio
     ...    mtls
@@ -237,8 +236,8 @@ Check Istio Components Certificates in Cluster ${CLUSTER}
     ...     include_in_history=false
     RW.Core.Add Pre To Report   ${mtls_report.stdout}
 
-Analyze Istio configurations in Cluster ${CLUSTER}
-    [Documentation]    Check Istio configurations in cluster ${CLUSTER}
+Analyze Istio configurations in Cluster ${CONTEXT}
+    [Documentation]    Check Istio configurations in cluster ${CONTEXT}
     [Tags]
     ...    istio
     ...    config
@@ -293,11 +292,6 @@ Suite Initialization
     ...    description=Which Kubernetes context to operate within.
     ...    pattern=\w*
     ...    example=my-main-cluster
-    ${CLUSTER}=    RW.Core.Import User Variable    CLUSTER
-    ...    type=string
-    ...    description=Which Kubernetes cluster to operate within.
-    ...    pattern=\w*
-    ...    example=my-main-cluster
 
     ${EXCLUDED_NAMESPACES}=    RW.Core.Import User Variable    EXCLUDED_NAMESPACES
     ...    type=string
@@ -323,11 +317,10 @@ Suite Initialization
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
-    Set Suite Variable    ${CLUSTER}    ${CLUSTER}
     Set Suite Variable    ${EXCLUDED_NAMESPACES}    ${EXCLUDED_NAMESPACES}
     Set Suite Variable    ${CPU_USAGE_THRESHOLD}    ${CPU_USAGE_THRESHOLD}
     Set Suite Variable    ${MEMORY_USAGE_THRESHOLD}    ${MEMORY_USAGE_THRESHOLD}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "CLUSTER":"${CLUSTER}", "EXCLUDED_NAMESPACES":"${EXCLUDED_NAMESPACES}", "CPU_USAGE_THRESHOLD":"${CPU_USAGE_THRESHOLD}", "MEMORY_USAGE_THRESHOLD":"${MEMORY_USAGE_THRESHOLD}", "OUTPUT_DIR":"${OUTPUT_DIR}", "CURDIR":"${CURDIR}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "EXCLUDED_NAMESPACES":"${EXCLUDED_NAMESPACES}", "CPU_USAGE_THRESHOLD":"${CPU_USAGE_THRESHOLD}", "MEMORY_USAGE_THRESHOLD":"${MEMORY_USAGE_THRESHOLD}"}
 

@@ -49,8 +49,8 @@ check_command_exists jq
 check_cluster_connection
 
 # Set file paths
-REPORT_FILE="${OUTPUT_DIR}/report.txt"
-ISSUES_FILE="${OUTPUT_DIR}/issues.json"
+REPORT_FILE="report.txt"
+ISSUES_FILE="issues.json"
 
 
 # Prepare files
