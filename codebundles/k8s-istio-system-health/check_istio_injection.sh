@@ -179,14 +179,16 @@ for ns in $FILTERED_NAMESPACES; do
                     --arg title "Missing Istio Sidecar (Namespace Injection) for deployment \`$deployment\` in namespace \`$ns\`" \
                     --arg reproduce "kubectl get pods -n $ns -l app=$deployment -o jsonpath='{.items[*].spec.containers[*].name}'" \
                     --arg restart_cmd "kubectl rollout restart deployment/$deployment -n $ns" \
-                    --arg next_steps "Restart Pods for Deployment \`$deployment\` in \`$ns\`\nVerify the Istio injection webhook is working"
+                    --arg next_steps "Restart Pods for Deployment \`$deployment\` in \`$ns\`\nVerify the Istio injection webhook is working" \
+                    --arg details ""Restart pods to trigger injection:"$restart_cmd" \
                     '{
                         "severity": 2,
                         "title": $title,
                         "expected": $expected,
                         "actual": $actual,
                         "reproduce_hint": $reproduce,
-                        "next_steps": $next_steps
+                        "next_steps": $next_steps,
+                        "details": $details
                     }')
                 all_issues+=("$issue")
                 deployments_missing_sidecar+=("$deployment")
@@ -222,13 +224,15 @@ for ns in $FILTERED_NAMESPACES; do
                         --arg reproduce "kubectl get pods -n $ns -l app=$deployment -o jsonpath='{.items[*].spec.containers[*].name}'" \
                         --arg restart_cmd "kubectl rollout restart deployment/$deployment -n $ns" \
                         --arg next_steps "Check if the deployment was created before Istio installation\nVerify the sidecar.istio.io/inject annotation is set correctly for deployment \`$deployment\` in namespace \`$ns\`" \
+                        --arg details "Once annotations are set, perform a restart:$restart_cmd" \
                         '{
                             "severity": 2,
                             "title": $title,
                             "expected": $expected,
                             "actual": $actual,
                             "reproduce_hint": $reproduce,
-                            "next_steps": $next_steps
+                            "next_steps": $next_steps,
+                            "details": $details
                         }')
                     all_issues+=("$issue")
                 else
@@ -245,13 +249,15 @@ for ns in $FILTERED_NAMESPACES; do
                     --arg reproduce "kubectl get namespace $ns -L istio-injection && kubectl get deployment $deployment -n $ns -o jsonpath='{.spec.template.metadata.annotations}'" \
                     --arg patch_cmd "kubectl patch deployment $deployment -n $ns -p '{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"sidecar.istio.io/inject\":\"true\"}}}}}'" \
                     --arg next_steps "Enable namespace-level Istio injection in namespace \`$ns\`" \
+                    --arg details "Annotate the namespace or patch with: $patch_cmd" \
                     '{
                         "severity": 3,
                         "title": $title,
                         "expected": $expected,
                         "actual": $actual,
                         "reproduce_hint": $reproduce,
-                        "next_steps": $next_steps
+                        "next_steps": $next_steps,
+                        "details": $details
                     }')
 
                 all_issues+=("$issue")
