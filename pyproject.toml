@@ -1,0 +1,33 @@
+[build-system]
+requires = [
+    "setuptools>=61.2",
+    "wheel"
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rw-cli-keywords"
+description = "A set of RunWhen published CLI keywords and python libraries for interacting with APIs using CLIs"
+readme = "README.md"
+license = { text = "Apache License 2.0" }
+authors = [
+    { name = "RunWhen", email = "info@runwhen.com" }
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License"
+]
+# We declare these fields as dynamic because they come from external files
+dynamic = ["version", "dependencies"]
+
+[tool.setuptools.packages.find]
+where = ["libraries"] 
+
+# Dynamically read the version from the VERSION file
+# and the dependencies from requirements.txt.
+[tool.setuptools.dynamic]
+version = { file = "VERSION" }
+dependencies = { file = "requirements.txt" }
+
+[project.urls]
+homepage = "https://github.com/runwhen-contrib/rw-cli-codecollection"

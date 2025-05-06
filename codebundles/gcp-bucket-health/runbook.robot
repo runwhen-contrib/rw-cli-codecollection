@@ -24,7 +24,7 @@ Fetch GCP Bucket Storage Utilization for `${PROJECT_IDS}`
     ...    show_in_rwl_cheatsheet=true
     ...    timeout_seconds=240
     ${bucket_output}=    RW.CLI.Run Cli
-    ...    cmd=cat $HOME/bucket_report.json | jq .
+    ...    cmd=cat bucket_report.json | jq .
     ...    env=${env}
     ${bucket_list}=    Evaluate    json.loads(r'''${bucket_output.stdout}''')    json
     FOR    ${item}    IN    @{bucket_list}
@@ -65,10 +65,10 @@ Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
     RW.Core.Add Pre To Report    Commands Used:\n${bucket_security_configuration.cmd}
 
     ${bucket_security_output}=    RW.CLI.Run Cli
-    ...    cmd=cat $HOME/bucket_security_issues.json | jq .
+    ...    cmd=cat bucket_security_issues.json | jq .
     ...    env=${env}
     ${total_public_access_buckets}=    RW.CLI.Run Cli
-    ...    cmd=cat $HOME/bucket_security_issues.json | jq '[.[] | select(.issue_type == "public_access")]'
+    ...    cmd=cat bucket_security_issues.json | jq '[.[] | select(.issue_type == "public_access")]'
     ...    env=${env}
     ${total_public_access_buckets_list}=    Evaluate
     ...    json.loads(r'''${total_public_access_buckets.stdout}''')
@@ -96,7 +96,7 @@ Fetch GCP Bucket Storage Operations Rate for `${PROJECT_IDS}`
     ...    show_in_rwl_cheatsheet=true
     ...    timeout_seconds=240
     ${bucket_ops_output}=    RW.CLI.Run Cli
-    ...    cmd=cat $HOME/bucket_ops_report.json | jq .
+    ...    cmd=cat bucket_ops_report.json | jq .
     ...    env=${env}
     ${bucket_list}=    Evaluate    json.loads(r'''${bucket_ops_output.stdout}''')    json
     FOR    ${item}    IN    @{bucket_list}
@@ -144,7 +144,6 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=1
     ...    default=0
-    ${HOME}=    Get Environment Variable    HOME
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${USAGE_THRESHOLD}    ${USAGE_THRESHOLD}
     Set Suite Variable    ${OPS_RATE_THRESHOLD}    ${OPS_RATE_THRESHOLD}
@@ -153,4 +152,4 @@ Suite Initialization
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
     Set Suite Variable
     ...    ${env}
-    ...    {"GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}","PATH":"$PATH:${OS_PATH}", "PROJECT_IDS":"${PROJECT_IDS}", "HOME":"${HOME}"}
+    ...    {"GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}","PATH":"$PATH:${OS_PATH}", "PROJECT_IDS":"${PROJECT_IDS}"}

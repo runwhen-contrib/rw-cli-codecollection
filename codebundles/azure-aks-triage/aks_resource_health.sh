@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "[]" > ${OUTPUT_DIR}/az_resource_health.json
+echo "[]" > az_resource_health.json
 
 # Check if AZURE_RESOURCE_SUBSCRIPTION_ID is set, otherwise get the current subscription ID
 if [ -z "$AZURE_RESOURCE_SUBSCRIPTION_ID" ]; then
@@ -48,6 +48,6 @@ fi
 
 # Perform the REST API call to get the resource health status
 echo "Retrieving health status for AKS cluster..."
-az rest --method get --url "https://management.azure.com/subscriptions/$subscription/resourceGroups/$AZ_RESOURCE_GROUP/providers/Microsoft.ContainerService/managedClusters/$AKS_CLUSTER/providers/Microsoft.ResourceHealth/availabilityStatuses/current?api-version=2023-07-01-preview" > ${OUTPUT_DIR}/az_resource_health.json
+az rest --method get --url "https://management.azure.com/subscriptions/$subscription/resourceGroups/$AZ_RESOURCE_GROUP/providers/Microsoft.ContainerService/managedClusters/$AKS_CLUSTER/providers/Microsoft.ResourceHealth/availabilityStatuses/current?api-version=2023-07-01-preview" > az_resource_health.json
 
-cat ${OUTPUT_DIR}/az_resource_health.json
+cat az_resource_health.json

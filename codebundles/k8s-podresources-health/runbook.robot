@@ -128,7 +128,7 @@ Identify Overutilized Pods in Namespace `${NAMESPACE}`
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    ${pod_usage_analysis.stdout}
     ${overutilized_pods}=    RW.CLI.Run Cli
-    ...    cmd=cat $HOME/overutilized_pods.json | jq .
+    ...    cmd=cat overutilized_pods.json | jq .
     ...    env=${env}
     ${overutilized_pods_list}=    Evaluate
     ...    json.loads(r'''${overutilized_pods.stdout}''')
@@ -214,11 +214,6 @@ Suite Initialization
     ...    enum=[kubectl,oc]
     ...    example=kubectl
     ...    default=kubectl
-    ${HOME}=    RW.Core.Import User Variable    HOME
-    ...    type=string
-    ...    description=Home directory to execute scripts from
-    ...    example=/home
-    ...    default=/home/runwhen
    ${UTILIZATION_THRESHOLD}=    RW.Core.Import User Variable    UTILIZATION_THRESHOLD
     ...    type=string
     ...    description=The resource usage threshold at which to identify issues. 
@@ -240,14 +235,13 @@ Suite Initialization
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
-    Set Suite Variable    ${HOME}    ${HOME}
     Set Suite Variable    ${DEFAULT_INCREASE}    ${DEFAULT_INCREASE}
     Set Suite Variable    ${UTILIZATION_THRESHOLD}    ${UTILIZATION_THRESHOLD}
     Set Suite Variable    ${RESTART_AGE}    ${RESTART_AGE}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    
     ...    ${env}    
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}","DEFAULT_INCREASE":"${DEFAULT_INCREASE}","UTILIZATION_THRESHOLD":"${UTILIZATION_THRESHOLD}", "HOME":"${HOME}", "RESTART_AGE": "${RESTART_AGE}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}","DEFAULT_INCREASE":"${DEFAULT_INCREASE}","UTILIZATION_THRESHOLD":"${UTILIZATION_THRESHOLD}", "RESTART_AGE": "${RESTART_AGE}"}
     IF    "${LABELS}" != ""
         ${LABELS}=    Set Variable    -l ${LABELS}
     END

@@ -20,12 +20,10 @@ if [[ -z "${APP_SERVICE_NAME:-}" ]]; then
   exit 1
 fi
 
-OUTPUT_DIR="${OUTPUT_DIR:-./output}"
-mkdir -p "${OUTPUT_DIR}"
 
 TIMESTAMP="$(date +%Y%m%d%H%M%S)"
-LOG_FILE="${OUTPUT_DIR}/${APP_SERVICE_NAME}_logs_${TIMESTAMP}.zip"
-UNZIP_DIR="${OUTPUT_DIR}/${APP_SERVICE_NAME}_logs_${TIMESTAMP}"
+LOG_FILE="${APP_SERVICE_NAME}_logs_${TIMESTAMP}.zip"
+UNZIP_DIR="${APP_SERVICE_NAME}_logs_${TIMESTAMP}"
 
 ##############################################################################
 # 2) Download Logs

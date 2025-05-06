@@ -3,9 +3,7 @@
 # Variables
 subscription=$(az account show --query "id" -o tsv)
 issues_json='{"issues": []}'
-OUTPUT_DIR="${OUTPUT_DIR:-./output}"
-mkdir -p "$OUTPUT_DIR"
-HEALTH_OUTPUT="${OUTPUT_DIR}/app_gateway_config_health.json"
+HEALTH_OUTPUT="app_gateway_config_health.json"
 rm -rf "$HEALTH_OUTPUT" || true
 newline=$'\n'
 

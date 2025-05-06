@@ -116,7 +116,7 @@ done
 json_output=$(printf '%s\n' "${overutilized_pods[@]}" | jq -s '.')
 
 # Write the JSON output to a file
-output_file="$HOME/overutilized_pods.json"
+output_file="overutilized_pods.json"
 if [[ ${#overutilized_pods[@]} -eq 0 ]]; then
   echo "[]" > "$output_file"
 else

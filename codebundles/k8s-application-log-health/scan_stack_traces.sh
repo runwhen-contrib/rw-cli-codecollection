@@ -25,8 +25,7 @@ ERROR_JSON="error_patterns.json"
 # Number of lines to capture *before* the start of a stack trace
 PRECEDING_LINES=${PRECEDING_LINES:-25}
 
-SHARED_TEMP_DIR="${SHARED_TEMP_DIR:-/tmp}"
-ISSUES_OUTPUT="${SHARED_TEMP_DIR}/scan_stacktrace_issues.json"
+ISSUES_OUTPUT="scan_stacktrace_issues.json"
 
 # Start with an empty JSON structure
 ISSUES_JSON='{"issues": []}'
@@ -34,7 +33,7 @@ ISSUES_JSON='{"issues": []}'
 echo "Scanning logs for stack traces in '${WORKLOAD_TYPE}/${WORKLOAD_NAME}' in namespace '${NAMESPACE}' (context: '${CONTEXT}')..."
 
 # 1) Get list of pods from local JSON (adjust path as needed)
-PODS=($(jq -r '.[].metadata.name' "${SHARED_TEMP_DIR}/application_logs_pods.json"))
+PODS=($(jq -r '.[].metadata.name' "application_logs_pods.json"))
 
 # 2) Iterate over each pod
 for POD in "${PODS[@]}"; do
@@ -45,14 +44,14 @@ for POD in "${PODS[@]}"; do
       .[]
       | select(.metadata.name == $POD)
       | .spec.containers[].name
-    ' "${SHARED_TEMP_DIR}/application_logs_pods.json")
+    ' "application_logs_pods.json")
 
     # 2b) For each container, read the local logs
     for CONTAINER in ${CONTAINERS}; do
         echo "  Processing Container ${CONTAINER}"
 
-        LOG_FILE="${SHARED_TEMP_DIR}/${WORKLOAD_TYPE}_${WORKLOAD_NAME}_logs/${POD}_${CONTAINER}_logs.txt"
-        TRACE_FILE="${SHARED_TEMP_DIR}/${POD}_${CONTAINER}_trace.txt"
+        LOG_FILE="${WORKLOAD_TYPE}_${WORKLOAD_NAME}_logs/${POD}_${CONTAINER}_logs.txt"
+        TRACE_FILE="${POD}_${CONTAINER}_trace.txt"
         : > "${TRACE_FILE}"  # Clear/overwrite existing contents
 
         if [[ ! -f "$LOG_FILE" ]]; then

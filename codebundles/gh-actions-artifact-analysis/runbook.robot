@@ -119,12 +119,6 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=Review the log output or escalate to the service owner. 
     ...    example=Remediate security issues with container images and update Helm Chart image versions 
-    ${HOME}=    RW.Core.Import User Variable    HOME
-    ...    type=string
-    ...    description=The home path of the runner
-    ...    pattern=\w*
-    ...    example=/home/runwhen
-    ...    default=/home/runwhen
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${GITHUB_REPO}    ${GITHUB_REPO}
     Set Suite Variable    ${WORKFLOW_NAME}    ${WORKFLOW_NAME}
@@ -138,12 +132,7 @@ Suite Initialization
     Set Suite Variable    ${ISSUE_TITLE}    ${ISSUE_TITLE}
     Set Suite Variable    ${ISSUE_NEXT_STEPS}    ${ISSUE_NEXT_STEPS}
 
-    Set Suite Variable    ${HOME}    ${HOME}
-    ${temp_dir}=    RW.CLI.Run Cli    cmd=mktemp -d ${HOME}/gh-actions-artifact-analysis-XXXXXXXXXX | tr -d '\n'
-    Set Suite Variable    ${SCRIPT_TMP_DIR}    ${temp_dir.stdout}
     Set Suite Variable
     ...    ${env}
-    ...    {"RESULT_FILE":"${RESULT_FILE}","ARTIFACT_NAME":"${ARTIFACT_NAME}","WORKFLOW_NAME":"${WORKFLOW_NAME}","GITHUB_REPO":"${GITHUB_REPO}","PERIOD_HOURS":"${PERIOD_HOURS}", "SCRIPT_TMP_DIR":"${SCRIPT_TMP_DIR}", "PATH":"$PATH:${OS_PATH}"}
+    ...    {"RESULT_FILE":"${RESULT_FILE}","ARTIFACT_NAME":"${ARTIFACT_NAME}","WORKFLOW_NAME":"${WORKFLOW_NAME}","GITHUB_REPO":"${GITHUB_REPO}","PERIOD_HOURS":"${PERIOD_HOURS}", "PATH":"$PATH:${OS_PATH}"}
 
-Suite Teardown
-    RW.CLI.Run Cli    cmd=rm -rf ${SCRIPT_TMP_DIR}

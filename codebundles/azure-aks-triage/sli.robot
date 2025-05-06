@@ -22,7 +22,7 @@ Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resou
     ...    show_in_rwl_cheatsheet=true
 
     ${resource_health_output}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/az_resource_health.json | tr -d '\n'
+    ...    cmd=cat az_resource_health.json | tr -d '\n'
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -44,7 +44,8 @@ Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOUR
     ...    timeout_seconds=180
     ...    include_in_history=false
 
-    ${issues}=    RW.CLI.Run Cli    cmd=cat ${OUTPUT DIR}/aks_activities_issues.json
+    ${issues}=    RW.CLI.Run Cli    
+    ...    cmd=cat aks_activities_issues.json
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     Set Global Variable     ${aks_activities_score}    1
     IF    len(@{issue_list["issues"]}) > 0
@@ -69,7 +70,7 @@ Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${
     ...    show_in_rwl_cheatsheet=true
 
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/az_cluster_health.json | jq '{issues: [.issues[] | select(.severity < 4)]}'
+    ...    cmd=cat az_cluster_health.json | jq '{issues: [.issues[] | select(.severity < 4)]}'
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -112,4 +113,4 @@ Suite Initialization
     Set Suite Variable    ${TIME_PERIOD_MINUTES}    ${TIME_PERIOD_MINUTES}
     Set Suite Variable
     ...    ${env}
-    ...    {"AKS_CLUSTER":"${AKS_CLUSTER}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "OUTPUT_DIR":"${OUTPUT DIR}", "TIME_PERIOD_MINUTES": "${TIME_PERIOD_MINUTES}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}
+    ...    {"AKS_CLUSTER":"${AKS_CLUSTER}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "TIME_PERIOD_MINUTES": "${TIME_PERIOD_MINUTES}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}

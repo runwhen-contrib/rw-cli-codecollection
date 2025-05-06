@@ -1,8 +1,7 @@
 #!/bin/bash
 
 # Variables
-OUTPUT_DIR="${OUTPUT_DIR:-"./output"}"
-LOG_DIR="${LOG_DIR:-"$OUTPUT_DIR/app_service_logs"}"
+LOG_DIR="${LOG_DIR:-"app_service_logs"}"
 
 # Ensure required variables are set
 if [[ -z "$APP_SERVICE_NAME" || -z "$AZ_RESOURCE_GROUP" ]]; then
@@ -10,8 +9,6 @@ if [[ -z "$APP_SERVICE_NAME" || -z "$AZ_RESOURCE_GROUP" ]]; then
     exit 1
 fi
 
-# Ensure directories exist
-mkdir -p "$LOG_DIR" "$OUTPUT_DIR"
 
 # Step 1: Download logs
 LOG_FILE="$LOG_DIR/app_logs.zip"
@@ -64,5 +61,5 @@ else
 fi
 
 # Step 3: Output issues report
-echo "$issues_json" | jq '.' > "$OUTPUT_DIR/app_service_log_issues_report.json"
-echo "Log analysis completed. Results saved to $OUTPUT_DIR/app_service_log_issues_report.json"
+echo "$issues_json" | jq '.' > "app_service_log_issues_report.json"
+echo "Log analysis completed. Results saved to app_service_log_issues_report.json"

@@ -6,8 +6,6 @@ set -euo pipefail
 #   APP_GATEWAY_NAME:   Name of the Application Gateway
 #   AZ_RESOURCE_GROUP:  Name of the Resource Group containing the App Gateway
 #
-# OPTIONAL:
-#   OUTPUT_DIR:         Directory to store the resulting JSON (default: ./output)
 #
 # This script:
 #  1) Retrieves the App Gateway's Resource ID
@@ -39,9 +37,7 @@ set -euo pipefail
 : "${APP_GATEWAY_NAME:?Must set APP_GATEWAY_NAME}"
 : "${AZ_RESOURCE_GROUP:?Must set AZ_RESOURCE_GROUP}"
 
-OUTPUT_DIR="${OUTPUT_DIR:-./output}"
-mkdir -p "$OUTPUT_DIR"
-OUTPUT_FILE="${OUTPUT_DIR}/app_gateway_log_metrics.json"
+OUTPUT_FILE="app_gateway_log_metrics.json"
 
 echo "Fetching Application Gateway resource ID..."
 

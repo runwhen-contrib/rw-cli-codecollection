@@ -6,8 +6,6 @@ set -euo pipefail
 #   APP_GATEWAY_NAME
 #   AZ_RESOURCE_GROUP
 #
-# OPTIONAL:
-#   OUTPUT_DIR (default: ./output)
 #
 # This script:
 #   1) Fetches the App Gateway configuration -> finds references
@@ -26,9 +24,7 @@ set -euo pipefail
 : "${APP_GATEWAY_NAME:?Must set APP_GATEWAY_NAME}"
 : "${AZ_RESOURCE_GROUP:?Must set AZ_RESOURCE_GROUP}"
 
-OUTPUT_DIR="${OUTPUT_DIR:-./output}"
-mkdir -p "$OUTPUT_DIR"
-OUTPUT_FILE="${OUTPUT_DIR}/appgw_resource_discovery.json"
+OUTPUT_FILE="appgw_resource_discovery.json"
 
 echo "Finding related Azure resources for App Gateway ‘$APP_GATEWAY_NAME’ (RG: ‘$AZ_RESOURCE_GROUP’)..."
 echo "Output file: $OUTPUT_FILE"
@@ -113,10 +109,10 @@ echo "Retrieving App Gateway config..."
 if ! appgw_json=$(az network application-gateway show \
       --name "$APP_GATEWAY_NAME" \
       --resource-group "$AZ_RESOURCE_GROUP" \
-      -o json 2>$OUTPUT_DIR/appgw_show_err.log); then
+      -o json 2>appgw_show_err.log); then
   echo "ERROR: Could not retrieve App Gateway JSON."
-  error_txt=$(cat "$OUTPUT_DIR/appgw_show_err.log")
-  rm -f "$OUTPUT_DIR/appgw_show_err.log"
+  error_txt=$(cat "appgw_show_err.log")
+  rm -f "appgw_show_err.log"
 
   discoveries=$(echo "$discoveries" | jq \
     --arg msg "Failed to fetch App Gateway config: $error_txt" \
@@ -124,7 +120,7 @@ if ! appgw_json=$(az network application-gateway show \
   echo "$discoveries" > "$OUTPUT_FILE"
   exit 1
 fi
-rm -f "$OUTPUT_DIR/appgw_show_err.log"
+rm -f "appgw_show_err.log"
 
 # 2) Collect references from the App Gateway
 echo "Collecting direct references from the App Gateway..."

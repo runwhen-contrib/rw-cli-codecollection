@@ -115,8 +115,8 @@ done
 
 # Outputting recommendations as JSON
 if [ -n "$recommendations" ]; then
-    echo "[$recommendations]" > $OUTPUT_DIR/pvc_issues.json
-    cat $OUTPUT_DIR/pvc_issues.json
+    echo "[$recommendations]" > pvc_issues.json
+    cat pvc_issues.json
 else
-    echo "[]" > $OUTPUT_DIR/pvc_issues.json
+    echo "[]" > pvc_issues.json
 fi

@@ -7,10 +7,7 @@
 # AZ_TENANT
 # APP_SERVICE_NAME
 # AZ_RESOURCE_GROUP
-# OUTPUT_DIR
 
-# Ensure OUTPUT_DIR is set
-: "${OUTPUT_DIR:?OUTPUT_DIR variable is not set}"
 
 # Get the resource ID of the App Service
 resource_id=$(az webapp show --name "$APP_SERVICE_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "id" -o tsv)
@@ -33,14 +30,14 @@ if [[ "$app_service_state" != "Running" ]]; then
         --arg details "App Service state: $app_service_state" \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
     )
-    summary_file="$OUTPUT_DIR/health_check_summary.txt"
+    summary_file="health_check_summary.txt"
     echo "Health Check Summary for App Service: $APP_SERVICE_NAME" > "$summary_file"
     echo "====================================================" >> "$summary_file"
     echo "App Service State: $app_service_state" >> "$summary_file"
     echo "Issues Detected: 1" >> "$summary_file"
     echo "$issues_json" | jq -r '.issues[] | "Title: \(.title)\nSeverity: \(.severity)\nDetails: \(.details)\nNext Steps: \(.next_step)\n"' >> "$summary_file"
-    echo "Issues JSON saved at: $OUTPUT_DIR/issues.json"
-    echo "$issues_json" > "$OUTPUT_DIR/issues.json"
+    echo "Issues JSON saved at: issues.json"
+    echo "$issues_json" > "issues.json"
     exit 0
 fi
 
@@ -147,7 +144,7 @@ if [[ -n "$health_check_path" && "$health_check_path" != "null" ]]; then
 fi
 
 # Generate the health check summary
-summary_file="$OUTPUT_DIR/app_service_health_check_summary.txt"
+summary_file="app_service_health_check_summary.txt"
 echo "Health Check Summary for App Service: $APP_SERVICE_NAME" > "$summary_file"
 echo "====================================================" >> "$summary_file"
 echo "App Service State: $app_service_state" >> "$summary_file"
@@ -172,8 +169,8 @@ echo "====================================================" >> "$summary_file"
 echo "$issues_json" | jq -r '.issues[] | "Title: \(.title)\nSeverity: \(.severity)\nDetails: \(.details)\nNext Steps: \(.next_step)\n"' >> "$summary_file"
 
 # Save JSON outputs
-issues_file="$OUTPUT_DIR/app_service_health_check_issues.json"
-metrics_file="$OUTPUT_DIR/app_service_health_check_metrics.json"
+issues_file="app_service_health_check_issues.json"
+metrics_file="app_service_health_check_metrics.json"
 
 echo "$issues_json" > "$issues_file"
 echo "$health_check_data" > "$metrics_file"

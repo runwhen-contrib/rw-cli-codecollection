@@ -23,7 +23,7 @@ Fetch GCP Bucket Storage Utilization for `${PROJECT_IDS}`
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    timeout_seconds=240
     ${buckets_over_threshold}=    RW.CLI.Run Cli
-    ...    cmd=cat $HOME/bucket_report.json | jq '[.[] | select(.size_tb | tonumber > ${USAGE_THRESHOLD})] | length'
+    ...    cmd=cat bucket_report.json | jq '[.[] | select(.size_tb | tonumber > ${USAGE_THRESHOLD})] | length'
     ...    env=${env}
     ${buckets_over_utilization}=    Evaluate    1 if int(${buckets_over_threshold.stdout}) == 0 else 0
     Set Global Variable    ${buckets_over_utilization}
@@ -36,10 +36,10 @@ Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ${bucket_security_output}=    RW.CLI.Run Cli
-    ...    cmd=cat $HOME/bucket_security_issues.json | jq . 
+    ...    cmd=cat bucket_security_issues.json | jq . 
     ...    env=${env}
     ${total_public_access_buckets}=    RW.CLI.Run Cli
-    ...    cmd=cat $HOME/bucket_security_issues.json | jq '[.[] | select(.issue_type == "public_access")] | length' 
+    ...    cmd=cat bucket_security_issues.json | jq '[.[] | select(.issue_type == "public_access")] | length' 
     ...    env=${env}
     ${public_bucket_score}=    Evaluate    1 if int(${total_public_access_buckets.stdout}) <= ${PUBLIC_ACCESS_BUCKET_THRESHOLD} else 0
     Set Global Variable    ${public_bucket_score}
@@ -55,7 +55,7 @@ Fetch GCP Bucket Storage Operations Rate for `${PROJECT_IDS}`
     ...    show_in_rwl_cheatsheet=true
     ...    timeout_seconds=240
     ${buckets_over_ops_threshold}=    RW.CLI.Run Cli
-    ...    cmd=cat $HOME/bucket_ops_report.json | jq '[.[] | select(.total_ops | tonumber > ${OPS_RATE_THRESHOLD})] | length'
+    ...    cmd=cat bucket_ops_report.json | jq '[.[] | select(.total_ops | tonumber > ${OPS_RATE_THRESHOLD})] | length'
     ...    env=${env}
     ${bucket_ops_rate_score}=    Evaluate    1 if int(${buckets_over_ops_threshold.stdout}) == 0 else 0
     Set Global Variable    ${bucket_ops_rate_score}
@@ -95,7 +95,6 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=10
     ...    default=10
-    ${HOME}=    Get Environment Variable    HOME
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${OPS_RATE_THRESHOLD}    ${OPS_RATE_THRESHOLD}
     Set Suite Variable      ${USAGE_THRESHOLD}    ${USAGE_THRESHOLD}
@@ -104,4 +103,4 @@ Suite Initialization
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
     Set Suite Variable
     ...    ${env}
-    ...    {"GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}","PATH":"$PATH:${OS_PATH}", "PROJECT_IDS":"${PROJECT_IDS}", "HOME":"${HOME}"}
+    ...    {"GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}","PATH":"$PATH:${OS_PATH}", "PROJECT_IDS":"${PROJECT_IDS}"}

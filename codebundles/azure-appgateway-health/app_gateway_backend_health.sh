@@ -2,9 +2,7 @@
 set -o pipefail
 
 # Variables
-OUTPUT_DIR="${OUTPUT_DIR:-./output}"
-mkdir -p "$OUTPUT_DIR"
-HEALTH_OUTPUT="${OUTPUT_DIR}/backend_pool_members_health.json"
+HEALTH_OUTPUT="backend_pool_members_health.json"
 rm -rf "$HEALTH_OUTPUT" || true
 newline=$'\n'
 
@@ -33,10 +31,10 @@ echo "Checking backend pool members health for Application Gateway '$APP_GATEWAY
 
 # Try fetching backend health from Application Gateway
 AZ_CMD="az network application-gateway show-backend-health --name \"$APP_GATEWAY_NAME\" --resource-group \"$AZ_RESOURCE_GROUP\" -o json"
-if ! BACKEND_HEALTH=$(eval "$AZ_CMD" 2>/$OUTPUT_DIR/app_gateway_backend_health_error.log); then
+if ! BACKEND_HEALTH=$(eval "$AZ_CMD" 2>app_gateway_backend_health_error.log); then
     # CLI returned a non-zero exit code: possibly auth failure, perms issue, etc.
     echo "Error: Failed to retrieve backend health from Azure CLI command."
-    error_details=$(cat /$OUTPUT_DIR/app_gateway_backend_health_error.log)
+    error_details=$(cat app_gateway_backend_health_error.log)
     
     issues_json=$(echo "$issues_json" | jq \
         --arg title "Unable to Fetch Application Gateway Backend Health" \
@@ -50,11 +48,11 @@ if ! BACKEND_HEALTH=$(eval "$AZ_CMD" 2>/$OUTPUT_DIR/app_gateway_backend_health_e
             "severity": ($severity | tonumber)
         }]')
     
-    rm -f /$OUTPUT_DIR/app_gateway_backend_health_error.log
+    rm -f app_gateway_backend_health_error.log
     echo "$issues_json" > "$HEALTH_OUTPUT"
     exit 1
 fi
-rm -f /$OUTPUT_DIR/app_gateway_backend_health_error.log  # Cleanup
+rm -f app_gateway_backend_health_error.log  # Cleanup
 
 # Check if output is valid JSON
 if ! echo "$BACKEND_HEALTH" | jq '.' >/dev/null 2>&1; then
