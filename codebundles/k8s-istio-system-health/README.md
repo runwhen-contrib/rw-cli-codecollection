@@ -1,6 +1,6 @@
 # Kubernetes Deployment Triage
 
-This codebundle provides a task aimed at finding issues related to a Istio sidecar being available for the applications.
+This codebundle provides a task aimed at finding issues related to a Istio being available for the applications in a Cluster.
 
 ## Tasks
 `Check Deployments for Istio Sidecar Injection`
@@ -19,6 +19,8 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 - `CONTEXT`: The Kubernetes context to operate within.
 - `CLUSTER`: The Kubernetes cluster to operate within.
 - `EXCLUDED_NAMESPACE`: The name of the namespaces to exclude in search. Leave it blank to search in all namespaces.
+- `CPU_USAGE_THRESHOLD`: The Threshold for CPU usage for istio sidecars.
+- `MEMORY_USAGE_THRESHOLD`: The Threshold for MEMORY usage for istio sidecars.
 
 ## Requirements
 - A kubeconfig with appropriate RBAC permissions to perform the desired command.
@@ -75,4 +77,13 @@ kubectl config view --minify --raw
 ```
 
 
+### To send request to the app and generate errors 
+
+```
+kubectl port-forward svc/productpage 9080:9080
+```
+
+```
+curl http://localhost:9080/productpage?u=normal
+```
 
