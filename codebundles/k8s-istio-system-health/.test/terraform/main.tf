@@ -1,3 +1,6 @@
+data "aws_caller_identity" "current" {}
+
+
 data "aws_availability_zones" "available" {
   # Do not include local zones
   filter {
@@ -83,6 +86,24 @@ module "eks" {
   tags = local.tags
 }
 
+resource "kubernetes_cluster_role_binding" "eks_admins" {
+  metadata { name = "eks-admins-binding" }
+
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "ClusterRole"
+    name      = "cluster-admin"
+  }
+
+  subject {
+    kind = "Group"
+    name = "eks-admins"
+  }
+
+  depends_on = [module.eks]   # wait until cluster is ready
+}
+
+
 # module "eks-metrics-server" {
 #   source  = "lablabs/eks-metrics-server/aws"
 #   version = "1.0.1"
@@ -136,6 +157,8 @@ module "eks_blueprints_addons" {
       repository    = local.istio_chart_url
       name          = "istio-base"
       namespace     = kubernetes_namespace_v1.istio_system.metadata[0].name
+      wait     = true     
+      timeout  = 600 
     }
 
     istiod = {
@@ -278,6 +301,9 @@ data "kubectl_path_documents" "bookinfo_manifest" {
 resource "kubectl_manifest" "bookinfo_app" {
   for_each  = toset(data.kubectl_path_documents.bookinfo_manifest.documents)
   yaml_body = each.value
+
+  depends_on = [module.eks_blueprints_addons]
+
 }
 
 # null resource to execute some requests to generate errors
