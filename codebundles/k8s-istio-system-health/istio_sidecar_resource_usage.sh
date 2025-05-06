@@ -94,7 +94,7 @@ for NS in $NAMESPACES; do
                     \"severity\": \"1\",
                     \"expected\": \"istio-proxy container should have resource limits defined for pod $POD in namespace $NS\",
                     \"actual\": \"Missing resource limits for pod $POD in namespace $NS\",
-                    \"title\": \"Missing resource limits for pod $POD in namespace $NS\",
+                    \"title\": \"Missing resource limits for pod \`$POD\` in namespace \`$NS\`\",
                     \"reproduce_hint\": \"kubectl get pod $POD -n $NS -o jsonpath='{.spec.containers[?(@.name==\"istio-proxy\")].resources}'\",
                     \"next_steps\": \"Update deployment spec to include resource limits for the istio-proxy container\"
                 }")
@@ -107,7 +107,7 @@ for NS in $NAMESPACES; do
                     \"severity\": \"2\",
                     \"expected\": \"istio-proxy should be consuming resources under normal operation for pod $POD in namespace $NS\",
                     \"actual\": \"Zero or unavailable usage stats for pod $POD in namespace $NS\",
-                    \"title\": \"Zero or Missing Resource Usage for pod $POD in namespace $NS\",
+                    \"title\": \"Zero or Missing Resource Usage for pod \`$POD\` in namespace \`$NS\`\",
                     \"reproduce_hint\": \"kubectl top pod $POD -n $NS --containers | grep istio-proxy\",
                     \"next_steps\": \"Check pod status and connectivity. It may be crashing, pending, or unscheduled.\"
                 }")
@@ -123,7 +123,7 @@ for NS in $NAMESPACES; do
                     \"severity\": \"3\",
                     \"expected\": \"CPU usage should remain below ${CPU_THRESHOLD}% for pod $POD in namespace $NS\",
                     \"actual\": \"Pod $POD has CPU usage=${CPU_PERCENTAGE}% in namespace $NS\",
-                    \"title\": \"High CPU usage for pod $POD in namespace $NS\",
+                    \"title\": \"High CPU usage for pod \`$POD\` in namespace \`$NS\`\",
                     \"reproduce_hint\": \"kubectl top pod $POD -n $NS --containers | grep istio-proxy\",
                     \"next_steps\": \"Investigate CPU-intensive workloads or throttling issues.\"
                 }")
@@ -135,7 +135,7 @@ for NS in $NAMESPACES; do
                     \"severity\": \"3\",
                     \"expected\": \"Memory usage should remain below ${MEM_THRESHOLD}% for pod $POD in namespace $NS\",
                     \"actual\": \"Pod $POD has Memory usage=${MEM_PERCENTAGE}% in namespace $NS\",
-                    \"title\": \"High Memory usage for pod $POD in namespace $NS\",
+                    \"title\": \"High Memory usage for pod \`$POD\` in namespace \`$NS\`\",
                     \"reproduce_hint\": \"kubectl top pod $POD -n $NS --containers | grep istio-proxy\",
                     \"next_steps\": \"Investigate for memory leaks or excessive memory usage.\"
                 }")

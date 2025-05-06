@@ -107,7 +107,7 @@ for NS in $FILTERED_NAMESPACES; do
                         --arg severity "3" \
                         --arg expected "No warnings in istio-proxy logs for pod $POD in namespace $NS" \
                         --arg actual "Warning \"$WARNING\" for pod $POD in namespace $NS" \
-                        --arg title "istio-proxy has a warning for pod $POD in namespace $NS" \
+                        --arg title "istio-proxy has a warning for pod \`$POD\` in namespace \`$NS\`" \
                         --arg reproduce_hint "${KUBERNETES_DISTRIBUTION_BINARY} logs $POD -c istio-proxy -n $NS --context=${CONTEXT} --since=$LOG_DURATION | grep \"$WARNING\"" \
                         --arg next_steps "Check mesh configuration and app behavior" \
                         '{severity: $severity, expected: $expected, actual: $actual, title: $title, reproduce_hint: $reproduce_hint, next_steps: $next_steps}')")
@@ -121,7 +121,7 @@ for NS in $FILTERED_NAMESPACES; do
                         --arg severity "2" \
                         --arg expected "No errors in istio-proxy logs for pod $POD in namespace $NS" \
                         --arg actual "Error \"$ERROR\" for pod $POD in namespace ($NS)" \
-                        --arg title "istio-proxy has a error for pod $POD in namespace $NS" \
+                        --arg title "istio-proxy has a error for pod \`$POD\` in namespace \`$NS\`" \
                         --arg reproduce_hint "${KUBERNETES_DISTRIBUTION_BINARY} logs $POD -c istio-proxy -n $NS --context=${CONTEXT} --since=$LOG_DURATION | grep \"$ERROR\"" \
                         --arg next_steps "Check for misconfigurations, service availability, or mTLS issues" \
                         '{severity: $severity, expected: $expected, actual: $actual, title: $title, reproduce_hint: $reproduce_hint, next_steps: $next_steps}')")

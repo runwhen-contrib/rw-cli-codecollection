@@ -78,9 +78,9 @@ for NS in $ALL_NAMESPACES; do
             \"resource\": \"${resource_name}\",
             \"expected\": \"No ${level_lower}s from istioctl analyze for resource ${resource_name}\",
             \"actual\": \"${message}\",
-            \"title\": \"Istio ${level} in namespace ${resource_ns}: ${code}\",
+            \"title\": \"Istio \`${level}\` in namespace \`${resource_ns}\`: \`${code}\`\",
             \"reproduce_hint\": \"istioctl analyze -n ${resource_ns}\",
-            \"next_steps\": \"Review ${resource_name} in ${resource_ns} for mis-configuration.\"
+            \"next_steps\": \"Review \`${resource_name}\` in namespace \`${resource_ns}\` for Istio mis-configuration.\"
             }")
         fi
     done

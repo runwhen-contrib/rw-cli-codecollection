@@ -86,9 +86,9 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
                         --arg severity "3" \
                         --arg expected "No warning logs in controlplane pod $POD in namespace $NS" \
                         --arg actual "Warning \"$WARNING\" for controlplane pod $POD in namespace $NS" \
-                        --arg title "Warning for controlplane pod $POD in namespace $NS" \
+                        --arg title "Warning for istio controlplane pod \`$POD\` in namespace \`$NS\`" \
                         --arg reproduce_hint "${KUBERNETES_DISTRIBUTION_BINARY} logs $POD -n $NS --context=${CONTEXT} --since=$LOG_DURATION | grep \"$WARNING\"" \
-                        --arg next_steps "Investigate the log entry for pod $POD in namespace $NS" \
+                        --arg next_steps "Investigate the log entry for pod \`$POD\` in namespace \`$NS\`" \
                         '{severity: $severity, expected: $expected, actual: $actual, title: $title, reproduce_hint: $reproduce_hint, next_steps: $next_steps}')")
                 fi
             done < <(jq -r '.warnings[]' "$ERROR_JSON")
@@ -100,9 +100,9 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
                         --arg severity "2" \
                         --arg expected "No critical logs in controlplane pod $POD in namespace $NS" \
                         --arg actual "Error \"$Error\" for controlplane pod $POD in namespace $NS" \
-                        --arg title "Error for controlplane pod $POD in namespace $NS" \
+                        --arg title "Error for istio controlplane pod \`$POD\` in namespace \`$NS\`" \
                         --arg reproduce_hint "${KUBERNETES_DISTRIBUTION_BINARY} logs $POD -n $NS --context=${CONTEXT} --since=$LOG_DURATION | grep \"$ERROR\"" \
-                        --arg next_steps "Investigate the log entry for pod $POD in namespace $NS" \
+                        --arg next_steps "Investigate the log entry for pod \`$POD\` in namespace \`$NS\`" \
                         '{severity: $severity, expected: $expected, actual: $actual, title: $title, reproduce_hint: $reproduce_hint, next_steps: $next_steps}')")
                 fi
             done < <(jq -r '.errors[]' "$ERROR_JSON")
