@@ -19,3 +19,4 @@ spec:
   additionalContext:  
     cluster: "{{ cluster.name }}"
     context: "{{ cluster.context }}"
+    resource: {{ match_resource }}
