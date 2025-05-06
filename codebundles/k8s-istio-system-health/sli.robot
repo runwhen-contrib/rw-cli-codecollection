@@ -31,7 +31,7 @@ Verify Istio Sidecar Injection for Cluster `${CONTEXT}`
     
  
     ${issues_list}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/issues.json
+    ...    cmd=cat issues.json
     ...    env=${env}
     ...    include_in_history=false
 
@@ -52,7 +52,7 @@ Check Istio Sidecar Resource Usage for Cluster `${CONTEXT}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    include_in_history=false
     ${issues_list}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/istio_sidecar_resource_usage_issue.json
+    ...    cmd=cat istio_sidecar_resource_usage_issue.json
     ...    env=${env}
     ...    include_in_history=false
 
@@ -72,7 +72,7 @@ Validate Istio Installation in Cluster `${CONTEXT}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    include_in_history=false
     ${issues_list}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/istio_installation_issues.json
+    ...    cmd=cat istio_installation_issues.json
     ...    env=${env}
     ...    include_in_history=false
 
@@ -92,7 +92,7 @@ Check Istio Controlplane Logs For Errors in Cluster `${CONTEXT}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    include_in_history=false
     ${issues_list}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/istio_controlplane_issues.json
+    ...    cmd=cat istio_controlplane_issues.json
     ...    env=${env}
     ...    include_in_history=false
 
@@ -111,7 +111,7 @@ Fetch Istio Proxy Logs in Cluster `${CONTEXT}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    include_in_history=false
     ${issues_list}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/istio_proxy_issues.json
+    ...    cmd=cat istio_proxy_issues.json
     ...    env=${env}
     ...    include_in_history=false
 
@@ -130,7 +130,7 @@ Verify Istio SSL Certificates in Cluster `${CONTEXT}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    include_in_history=false
     ${issues_list}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/istio_mtls_issues.json
+    ...    cmd=cat istio_mtls_issues.json
     ...    env=${env}
     ...    include_in_history=false
 
@@ -149,7 +149,7 @@ Check Istio Configuration Health in Cluster `${CONTEXT}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    include_in_history=false
     ${issues_list}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/issues_istio_analyze.json
+    ...    cmd=cat issues_istio_analyze.json
     ...    env=${env}
     ...    include_in_history=false
 

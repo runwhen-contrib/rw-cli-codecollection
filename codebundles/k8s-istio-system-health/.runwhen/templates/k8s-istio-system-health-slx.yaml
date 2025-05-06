@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/Istio.svg
-  alias: Istio system health checks for cluster "{{ cluster.name }}"
+  alias: {{ cluster.name }} Istio System Health
   asMeasuredBy: ""
   configProvided:
   - name: OBJECT_NAME
