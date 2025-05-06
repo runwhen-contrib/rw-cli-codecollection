@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 
-Check Deployments for Istio Sidecar Injection for Cluster ${CONTEXT}
+Verify Istio Sidecar Injection for Cluster `${CONTEXT}`
     [Documentation]    Checks all deployments in specified namespaces for Istio sidecar injection status
     [Tags]    
     ...    istio
@@ -39,7 +39,7 @@ Check Deployments for Istio Sidecar Injection for Cluster ${CONTEXT}
     ${sidecar_injection_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
     Set Global Variable    ${sidecar_injection_score}
 
-Check Istio Sidecar resources usage for Cluster ${CONTEXT}
+Check Istio Sidecar Resource Usage for Cluster `${CONTEXT}`
     [Documentation]    Checks all pods in specified namespaces for Istio sidecar resources usage
     [Tags]    
     ...    istio
@@ -61,7 +61,7 @@ Check Istio Sidecar resources usage for Cluster ${CONTEXT}
     Set Global Variable    ${sidecar_resources_usage_score}
 
 
-Verify Istio Istallation in Cluster ${CONTEXT}
+Validate Istio Installation in Cluster `${CONTEXT}`
     [Documentation]    Verify Istio Istallation
     [Tags]    
     ...    istio
@@ -81,8 +81,8 @@ Verify Istio Istallation in Cluster ${CONTEXT}
     Set Global Variable    ${installation_verify_score}
 
 
-Check Istio Controlplane logs in Cluster ${CONTEXT}
-    [Documentation]    Check controlplane logs for known erros and warnings in Cluster ${CONTEXT}
+Check Istio Controlplane Logs For Errors in Cluster `${CONTEXT}`
+    [Documentation]    Check controlplane logs for known errors and warnings in Cluster
     [Tags]
     ...    istio
     ...    logs
@@ -100,8 +100,8 @@ Check Istio Controlplane logs in Cluster ${CONTEXT}
     ${controlplane_logs_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
     Set Global Variable    ${controlplane_logs_score}
 
-Check Istio Proxy logs in Cluster ${CONTEXT}
-    [Documentation]    Check istio proxy logs for known erros and warnings in cluster ${CONTEXT}
+Fetch Istio Proxy Logs in Cluster `${CONTEXT}`
+    [Documentation]    Check istio proxy logs for known errors and warnings in cluster
     [Tags]
     ...    istio
     ...    proxy logs
@@ -119,8 +119,8 @@ Check Istio Proxy logs in Cluster ${CONTEXT}
     ${proxy_logs_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
     Set Global Variable    ${proxy_logs_score}
 
-Check Istio Components Certificates in Cluster ${CONTEXT}
-    [Documentation]    Check Istio valid Root CA and mTLS Certificates in Cluster ${CONTEXT}
+Verify Istio SSL Certificates in Cluster `${CONTEXT}`
+    [Documentation]    Check Istio valid Root CA and mTLS Certificates in Cluster
     [Tags]
     ...    istio
     ...    mtls
@@ -138,8 +138,8 @@ Check Istio Components Certificates in Cluster ${CONTEXT}
     ${istio_certificate_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
     Set Global Variable    ${istio_certificate_score}
 
-Analyze Istio configurations in Cluster ${CONTEXT}
-    [Documentation]    Check Istio configurations in Cluster ${CONTEXT}
+Check Istio Configuration Health in Cluster `${CONTEXT}`
+    [Documentation]    Check Istio configurations in Cluster
     [Tags]
     ...    istio
     ...    config

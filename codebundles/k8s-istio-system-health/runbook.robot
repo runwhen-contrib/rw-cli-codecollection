@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 
-Check Deployments for Istio Sidecar Injection for Cluster ${CONTEXT}
+Verify Istio Sidecar Injection for Cluster `${CONTEXT}`
     [Documentation]    Checks all deployments in specified namespaces for Istio sidecar injection status
     [Tags]    
     ...    istio
@@ -58,7 +58,7 @@ Check Deployments for Istio Sidecar Injection for Cluster ${CONTEXT}
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${formatted_report.stdout}
 
-Check Istio Sidecar resources usage for Cluster ${CONTEXT}
+Check Istio Sidecar Resource Usage for Cluster `${CONTEXT}`
     [Documentation]    Checks all pods in specified namespaces for Istio sidecar resources usage
     [Tags]    
     ...    istio
@@ -96,11 +96,13 @@ Check Istio Sidecar resources usage for Cluster ${CONTEXT}
     RW.Core.Add Pre To Report   ${usage_report.stdout}
 
 
-Verify Istio Istallation in Cluster ${CONTEXT}
-    [Documentation]    Verify Istio Istallation in cluster ${CONTEXT}
+Validate Istio Installation in Cluster `${CONTEXT}`
+    [Documentation]    Verify Istio Istallation in cluster
     [Tags]    
     ...    istio
     ...    installation
+    ...    kubernetes
+    ...    servicemesh
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=istio_installation_verify.sh
     ...    env=${env}
@@ -132,8 +134,8 @@ Verify Istio Istallation in Cluster ${CONTEXT}
     RW.Core.Add Pre To Report   ${installation_report.stdout}
 
 
-Check Istio Controlplane logs in Cluster ${CONTEXT}
-    [Documentation]    Check istio controlplane logs for known erros and warnings in cluster ${CONTEXT}
+Check Istio Controlplane Logs For Errors in Cluster `${CONTEXT}`
+    [Documentation]    Check istio controlplane logs for known errors and warnings in cluster ${CONTEXT}
     [Tags]
     ...    istio
     ...    controlplane logs
@@ -167,8 +169,8 @@ Check Istio Controlplane logs in Cluster ${CONTEXT}
     ...     include_in_history=false
     RW.Core.Add Pre To Report   ${logs_report.stdout}
 
-Check Istio Proxy logs in Cluster ${CONTEXT}
-    [Documentation]    Check istio proxy logs for known erros and warnings in cluster ${CONTEXT}
+Fetch Istio Proxy Logs in Cluster `${CONTEXT}`
+    [Documentation]    Check istio proxy logs for known errors and warnings in cluster
     [Tags]
     ...    istio
     ...    proxy logs
@@ -202,11 +204,13 @@ Check Istio Proxy logs in Cluster ${CONTEXT}
     ...     include_in_history=false
     RW.Core.Add Pre To Report   ${logs_report.stdout}
 
-Check Istio Components Certificates in Cluster ${CONTEXT}
-    [Documentation]    Check Istio valid Root CA and mTLS Certificates in cluster ${CONTEXT}
+Verify Istio SSL Certificates in Cluster `${CONTEXT}`
+    [Documentation]    Check Istio valid Root CA and mTLS Certificates in cluster
     [Tags]
     ...    istio
     ...    mtls
+    ...    servicemesh
+    ...    kubernetes
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=istio_mtls_check.sh
     ...    env=${env}
@@ -236,11 +240,13 @@ Check Istio Components Certificates in Cluster ${CONTEXT}
     ...     include_in_history=false
     RW.Core.Add Pre To Report   ${mtls_report.stdout}
 
-Analyze Istio configurations in Cluster ${CONTEXT}
-    [Documentation]    Check Istio configurations in cluster ${CONTEXT}
+Check Istio Configuration Health in Cluster `${CONTEXT}`
+    [Documentation]    Check Istio configurations in cluster
     [Tags]
     ...    istio
     ...    config
+    ...    servicemesh
+    ...    kubernetes
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=analyze_istio_configurations.sh
     ...    env=${env}

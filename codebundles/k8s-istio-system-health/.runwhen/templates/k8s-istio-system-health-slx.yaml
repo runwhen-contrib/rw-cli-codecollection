@@ -20,4 +20,3 @@ spec:
     cluster: "{{ cluster.name }}"
     context: "{{ cluster.context }}"
     resource: {{ match_resource.resource }}
-    resource_parent: {{ cluster.resource }}
