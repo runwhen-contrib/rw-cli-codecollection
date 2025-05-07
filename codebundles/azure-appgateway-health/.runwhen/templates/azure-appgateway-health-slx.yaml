@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/networking/10076-icon-service-Application-Gateways.svg
-  alias: Azure Application Gateway {{match_resource.resource.name}}
+  alias: {{match_resource.resource.name}} App Gateway Health
   asMeasuredBy: Availability of Application Gateway {{match_resource.resource.name}} and its backend pools.
   configProvided:
   - name: SLX_PLACEHOLDER
@@ -22,3 +22,10 @@ spec:
     qualified_name: "{{ match_resource.qualified_name }}"
     resource_group: "{{ match_resource.resource_group.name }}"
     subscription_id: "{{ match_resource.subscription_id }}"
+  tags: 
+    - name: cloud
+      value: azure
+    - name: service
+      value: app_gateway
+    - name: access
+      value: read-only

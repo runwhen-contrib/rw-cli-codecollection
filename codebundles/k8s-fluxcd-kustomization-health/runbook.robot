@@ -13,8 +13,8 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-List all available FluxCD Kustomization objects in Namespace `${NAMESPACE}`    
-    [Documentation]    List all FluxCD kustomization objects found in ${NAMESPACE}
+List All FluxCD Kustomization objects in Namespace `${NAMESPACE}` in Cluster `${CONTEXT}`
+    [Documentation]    List all FluxCD kustomization objects. 
     [Tags]            access:read-only  FluxCD     Kustomization     Available    List    ${NAMESPACE}
     ${kustomizations}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}
@@ -26,8 +26,34 @@ List all available FluxCD Kustomization objects in Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    Kustomizations available: \n ${kustomizations.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
-List Unready FluxCD Kustomizations in Namespace `${NAMESPACE}`  
-    [Documentation]    List all Kustomizations that are not found in a ready state in namespace ${NAMESPACE}  
+List Suspended FluxCD Kustomization objects in Namespace `${NAMESPACE}` in Cluster `${CONTEXT}`  
+    [Documentation]    List Suspended FluxCD kustomization objects.
+    [Tags]            access:read-only  FluxCD     Kustomization     Suspended    List
+    ${suspended_kustomizations}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n "${NAMESPACE}" --context "${CONTEXT}" -o json | jq --arg now "$(date -u +%s)" '[.items[] | select(.spec.suspend == true) | {KustomizationName: .metadata.name, SuspendedSince: (.status.conditions[] | select(.type=="Ready") | .lastTransitionTime), SuspendedDurationHours: (( ($now|tonumber) - ((.status.conditions[] | select(.type=="Ready") | .lastTransitionTime) | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime)) / 3600 * 100 | round / 100 )}]'
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${KUBECONFIG}
+    ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
+    ${history}=    RW.CLI.Pop Shell History
+    ${suspended_kustomization_list}=    Evaluate    json.loads(r'''${suspended_kustomizations.stdout}''')    json
+    IF    len(@{suspended_kustomization_list}) > 0
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=Kustomizations should not be suspended.    
+        ...    actual=Kustomizations are suspended.
+        ...    title=GitOps Resources are Suspended in Namespace \`${NAMESPACE}\`
+        ...    reproduce_hint=${suspended_kustomizations.cmd}
+        ...    details=Suspended Kustomizations:\n${suspended_kustomizations.stdout}
+        ...    next_steps=Resume suspended Kustomizations in namespace \`${NAMESPACE}\` in Cluster \`${CONTEXT}\`  
+    END
+
+    RW.Core.Add Pre To Report    Suspended Kustomizations:\n${suspended_kustomizations.stdout}
+    RW.Core.Add Pre To Report    Commands Used:\n${history}
+
+
+List Unready FluxCD Kustomizations in Namespace `${NAMESPACE}` in Cluster `${CONTEXT}` 
+    [Documentation]    List all Kustomizations that are not found in a ready state in namespace.
     [Tags]        access:read-only  FluxCD     Kustomization    Versions    ${NAMESPACE}
     ${kustomizations_not_ready}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json | jq '[.items[] | select(.status.conditions[] | select(.type == "Ready" and .status == "False")) | {KustomizationName: .metadata.name, ReadyStatus: {ready: (.status.conditions[] | select(.type == "Ready").status), message: (.status.conditions[] | select(.type == "Ready").message), reason: (.status.conditions[] | select(.type == "Ready").reason), last_transition_time: (.status.conditions[] | select(.type == "Ready").lastTransitionTime)}, ReconcileStatus: {reconciling: (.status.conditions[] | select(.type == "Reconciling").status), message: (.status.conditions[] | select(.type == "Reconciling").message)}}]'

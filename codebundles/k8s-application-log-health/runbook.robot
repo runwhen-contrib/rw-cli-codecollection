@@ -179,7 +179,7 @@ Scan And Report Issues
         FOR    ${item}    IN    @{issue_list}
             Create File    ${SCAN_SCRIPT}_details.log    "${item['details']}" 
             ${log_summary}=    RW.CLI.Run Cli
-            ...    cmd=python3 summarize.py < ${SCAN_SCRIPT}_details.log
+            ...    cmd=python3 summarize.py < ${CURDIR}/${SCAN_SCRIPT}_details.log
 
             ${next_steps}=    Catenate    SEPARATOR=\n   @{item["next_steps"]}
 
