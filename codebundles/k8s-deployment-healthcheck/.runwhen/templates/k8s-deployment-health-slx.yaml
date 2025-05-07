@@ -21,3 +21,27 @@ spec:
     labelMap: "{{match_resource.resource.metadata.labels}}"
     cluster: "{{ cluster.name }}"
     context: "{{ cluster.context }}"
+    hierarchy: ["cluster", "namespace", "deployment"]
+  tags: 
+    - name: access
+      value: read-only
+    - name: platform
+      value: kubernetes
+    - name: cluster
+      value: {{ cluster.name }}
+    - name: context
+      value: {{ cluster.context }}
+    - name: namespace
+      namespace: "{{match_resource.resource.metadata.namespace}}"
+    - name: deployment
+      namespace: "{{match_resource.resource.metadata.name}}"
+    - name: cluster_type
+      value: {{ cluster.cluster_type }}
+  {% if cluster.cluster_type == "aks" %}
+    - name: "resource_group"
+      value: "{{ cluster.resource_group }}"
+  {% endif %}
+  {% for k, v in match_resource.resource.metadata.labels.items() %}
+    - name: "[k8s]{{ k }}"
+      value: "{{ v }}"
+  {% endfor %}
