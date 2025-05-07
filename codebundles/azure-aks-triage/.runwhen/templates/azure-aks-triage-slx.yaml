@@ -17,7 +17,6 @@ spec:
     - {{ workspace.owner_email }}
   statement: AKS Clusters should be in a healthy state. 
   additionalContext:
-    tags: "{{match_resource.tags}}"
     qualified_name: "{{ match_resource.qualified_name }}"
     # The resource heirachy as it relates to tag names
     hierarchy: ["subscription_id", "resource_group", "resource_name"]
