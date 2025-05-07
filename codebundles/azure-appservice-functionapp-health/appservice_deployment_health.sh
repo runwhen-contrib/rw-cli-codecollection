@@ -73,7 +73,7 @@ if [[ -z "$DEPLOYMENTS" || "$DEPLOYMENTS" == "[]" ]]; then
             --arg config "$DEPLOYMENT_CONFIG" \
             '.issues += [{
                 "title": $title, 
-                "details": "Production state: " + $state, 
+                "details": ("Slot state: \($state)"),
                 "deployment_configuration": $config, 
                 "next_step": $nextStep, 
                 "severity": ($severity | tonumber)
@@ -127,7 +127,7 @@ else
                 --arg config "$SLOT_DETAILS" \
                 '.issues += [{
                     "title": $title, 
-                    "details": "Slot state: " + $state, 
+                    "details": ("Production state: \($state)"), 
                     "slot": $slot, 
                     "deployment_configuration": $config, 
                     "next_step": $nextStep, 

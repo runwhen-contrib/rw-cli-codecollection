@@ -55,4 +55,4 @@ build
 **.pfx
 **gcp_credentials_json
 **bashfile-**
-**/db.sqlite3
+**db.sqlite3**

@@ -1,0 +1,28 @@
+{
+    "warnings": [
+      "JWT validation failed",
+      "upstream connect error or disconnect/reset before headers",
+      "TLS handshake error",
+      "No healthy upstream",
+      "Error adding/updating cluster",
+      "Downstream connection terminated",
+      "Stream removed with error",
+      "connection terminated with error",
+      "503 UH no_healthy_upstream",
+      "503 UC upstream connect error",
+      "504 DC downstream connection termination",
+      "FI fault_filter_abort",
+      "DNS resolution failed"
+    ],
+    "errors": [
+      "Envoy proxy is NOT ready",
+      "Unable to establish connection",
+      "upstream connect error",
+      "bad certificate",
+      "remote error: tls",
+      "no route configured",
+      "Listener filter chain match failed",
+      "Failed to bind listener"
+    ]
+}
+  

@@ -154,11 +154,6 @@ Suite Initialization
     ...    description=Which Kubernetes context to operate within.
     ...    pattern=\w*
     ...    example=my-main-cluster
-    ${LABELS}=    RW.Core.Import User Variable    LABELS
-    ...    type=string
-    ...    description=A Kubernetes label selector string used to filter/find relevant resources for troubleshooting.
-    ...    pattern=\w*
-    ...    example=Could not render example.
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
@@ -171,7 +166,3 @@ Suite Initialization
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${DAEMONSET_NAME}    ${DAEMONSET_NAME}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
-    IF    "${LABELS}" != ""
-        ${LABELS}=    Set Variable    -l ${LABELS}
-    END
-    Set Suite Variable    ${LABELS}    ${LABELS}

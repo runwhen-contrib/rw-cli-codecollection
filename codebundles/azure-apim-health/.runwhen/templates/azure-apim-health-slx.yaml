@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/devops/10042-icon-service-API-Management-Services.svg
-  alias: Azure API Management Instance {{match_resource.resource.name}}
+  alias: {{match_resource.resource.name}} APIM Health
   asMeasuredBy: Availability of API Management Instance {{match_resource.resource.name}} and its related services.
   configProvided:
   - name: SLX_PLACEHOLDER
@@ -22,3 +22,10 @@ spec:
     qualified_name: "{{ match_resource.qualified_name }}"
     resource_group: "{{ match_resource.resource_group.name }}"
     subscription_id: "{{ match_resource.subscription_id }}"
+  tags: 
+    - name: cloud
+      value: azure
+    - name: service
+      value: apim
+    - name: access
+      value: read-only

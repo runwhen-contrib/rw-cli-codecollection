@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/containers/10023-icon-service-Kubernetes-Services.svg
-  alias: "AKS Cluster {{match_resource.resource.name}} Health"
+  alias: {{match_resource.resource.name}} AKS Health
   asMeasuredBy: "As scored by upstream Azure resource health, critical or error activities, and configuration health. 1=Health, 0=Unhealthy"
   configProvided:
     - name: SLX_PLACEHOLDER
@@ -21,3 +21,10 @@ spec:
     qualified_name: "{{ match_resource.qualified_name }}"
     resource_group: "{{ match_resource.resource_group.name }}"
     subscription_id: "{{ match_resource.subscription_id }}"
+  tags: 
+    - name: cloud
+      value: azure
+    - name: service
+      value: aks
+    - name: access
+      value: read-only
