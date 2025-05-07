@@ -51,6 +51,7 @@ Analyze artifact from GitHub workflow `${WORKFLOW_NAME}` in repository `${GITHUB
         ...    details=${last_run_health_issue_details.stdout}
         ...    next_steps=Inspect Logs for GitHub workflow `${WORKFLOW_NAME}` in repository `${GITHUB_REPO}` 
     END
+    RW.CLI.Run CLI    cmd=rm report.txt
 
 *** Keywords ***
 Suite Initialization
