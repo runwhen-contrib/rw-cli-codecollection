@@ -147,6 +147,8 @@ Check Istio Controlplane Logs For Errors in Cluster `${CONTEXT}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    include_in_history=false
+    RW.Core.Add Pre To Report   ${results.stdout}
+    
     ${issues_list}=    RW.CLI.Run Cli
     ...    cmd=cat istio_controlplane_issues.json
     ...    env=${env}
