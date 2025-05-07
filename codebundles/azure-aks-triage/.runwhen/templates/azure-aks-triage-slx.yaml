@@ -34,7 +34,7 @@ spec:
       value: {{ match_resource.resource_group.name }}
     - name: resource_name
       value: {{match_resource.resource.name}}
-{% for k, v in match_resource.tags.items() -%}
-    - name:  "[azure]{{ k }}"
+  {% for k, v in match_resource.tags.items() %}
+    - name: "[azure]{{ k }}"
       value: "{{ v }}"
-{%- endfor %}
+  {% endfor %}
