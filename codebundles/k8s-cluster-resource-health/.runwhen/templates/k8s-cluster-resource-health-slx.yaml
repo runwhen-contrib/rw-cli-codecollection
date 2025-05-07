@@ -20,8 +20,7 @@ spec:
     cluster: "{{ cluster.name }}"
     context: "{{ cluster.context }}"
     hierarchy: ["cluster"]
-    resource: |
-      "{{match_resource.resource}}"
+    resource: {{ match_resource.resource }}
   tags: 
     - name: access
       value: read-only
