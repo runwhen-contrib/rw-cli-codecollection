@@ -113,7 +113,8 @@ tasks:
         codeCollections:
         - repoURL: "$repo_url"
           branch: "$branch_name"
-          codeBundles: ["$codebundle"]
+          # codeBundles: ["$codebundle"]
+          codeBundles: ["$codebundle", "k8s-cluster-resource-health"]
         EOF
     silent: true
 
