@@ -22,7 +22,8 @@ spec:
     qualified_name: "{{ match_resource.qualified_name }}"
     resource_group: "{{ match_resource.resource_group.name }}"
     subscription_id: "{{ match_resource.subscription_id }}"
-    resource: {{ match_resource.resource }}
+    resource: |
+      {{ match_resource.resource }}
   tags:
     - name: cloud
       value: azure
