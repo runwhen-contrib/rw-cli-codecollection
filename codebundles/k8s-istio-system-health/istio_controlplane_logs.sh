@@ -51,8 +51,8 @@ ISTIO_COMPONENTS=("istiod" "istio-ingressgateway" "istio-egressgateway")
 
 [[ ! -f "$ERROR_JSON" ]] && { echo "❌  JSON file '$ERROR_JSON' not found"; exit 1; }
 
-WARNINGS=($(jq -r '.warnings[]' "$ERROR_JSON"))
-ERRORS=($(jq -r '.errors[]'   "$ERROR_JSON"))
+mapfile -t WARNINGS < <(jq -r '.warnings[]' "$ERROR_JSON")
+mapfile -t ERRORS   < <(jq -r '.errors[]'   "$ERROR_JSON")
 
 echo "🔍  Checking Istio Control-Plane logs for exact matches"
 echo "------------------------------------------------------"
@@ -69,6 +69,7 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
 
       # ---------- warnings ----------
       for WARNING in "${WARNINGS[@]}"; do
+        echo "Searching for: $WARNING"
         if grep -Fq "$WARNING" <<< "$LOGS"; then
           echo "  ⚠️  Warning found: '$WARNING'"
           ISSUES+=("$(jq -n \
@@ -91,6 +92,7 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
 
       # ---------- errors ----------
       for ERR in "${ERRORS[@]}"; do
+        echo "Searching for: $ERR"
         if grep -Fq "$ERR" <<< "$LOGS"; then
           echo "  ❌  Error found: '$ERR'"
           ISSUES+=("$(jq -n \

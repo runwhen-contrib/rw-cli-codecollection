@@ -7,8 +7,8 @@ echo "Using Kubernetes CLI: ${KUBERNETES_DISTRIBUTION_BINARY}"
 # Output & temp files
 REPORT_FILE="istio_mtls_cert_report.txt"
 ISSUES_FILE="istio_mtls_issues.json"
-ROOT_CA_FILE="/tmp/root_ca_tmp"
-MTLS_FILE="/tmp/mtls_tmp"
+ROOT_CA_FILE="root_ca_tmp"
+MTLS_FILE="mtls_tmp"
 
 > "$ROOT_CA_FILE"; > "$MTLS_FILE"
 echo ""  >"$REPORT_FILE"
