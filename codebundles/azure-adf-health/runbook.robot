@@ -14,7 +14,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-List Resource Health Issues Affecting Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
+Check for Resource Health Issues Affecting Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Fetch health status for all Data Factories in the resource group
     [Tags]    datafactory    resourcehealth   access:read-only
     ${json_file}=    Set Variable    "datafactory_health.json"
@@ -60,8 +60,6 @@ List Resource Health Issues Affecting Data Factories in resource group `${AZURE_
         ...    details=${issue_list}
         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
     END
-    RW.CLI.Run Cli
-    ...    cmd=rm -f ${json_file}
 
 List Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    List frequently occurring errors in Data Factory pipelines
@@ -94,7 +92,7 @@ List Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOU
             IF    ${failure_count} > ${FAILURE_THRESHOLD}
                 ${next_steps}=    Analyze Logs
                 ...    logs=${messages[0]}
-                ...    error_patterns_file=${CURDIR}/error_patterns.json
+                ...    error_patterns_file=error_patterns.json
                 ${suggestions}=    Set Variable    ${EMPTY}
                 ${logs_details}=    Set Variable    ${EMPTY}
                 FOR    ${step}    IN    @{next_steps}
@@ -117,8 +115,6 @@ List Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOU
         RW.Core.Add Pre To Report    "No Frequent Pipeline Errors found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
-    RW.CLI.Run Cli
-    ...    cmd=rm -f ${json_file}
 
 List Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    List failed pipeline runs in Data Factory pipelines
@@ -153,7 +149,7 @@ List Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GROU
             ${merged}=    Evaluate    dict(${details_json}, linked_services=${linked_services})
             ${next_steps}=    Analyze Logs
             ...    logs=${details_json["Message"]}
-            ...    error_patterns_file=${CURDIR}/error_patterns.json
+            ...    error_patterns_file=error_patterns.json
             ${suggestions}=    Set Variable    ${EMPTY}
             ${logs_details}=    Set Variable    ${EMPTY}
             FOR    ${step}    IN    @{next_steps}
@@ -173,8 +169,6 @@ List Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GROU
         RW.Core.Add Pre To Report    "No failed pipelines found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
-    RW.CLI.Run Cli
-    ...    cmd=rm -f ${json_file}
 
 Find Large Data Operations in Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    List large data operations in Data Factory pipelines
@@ -216,10 +210,9 @@ Find Large Data Operations in Data Factories in resource group `${AZURE_RESOURCE
         RW.Core.Add Pre To Report    "No heavy data operations detected in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
-    RW.CLI.Run Cli
-    ...    cmd=rm -f ${json_file}
 
-List Azure Data Factory Details in resource group `${AZURE_RESOURCE_GROUP}`
+
+Fetch Azure Data Factory Details in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    List comprehensive details about Azure Data Factories
     ${json_file}=    Set Variable    "adf_details.json"
     
@@ -249,9 +242,6 @@ List Azure Data Factory Details in resource group `${AZURE_RESOURCE_GROUP}`
         RW.Core.Add Pre To Report    No Data Factories found in resource group '${AZURE_RESOURCE_GROUP}' or unable to retrieve data.
     END
 
-    # Cleanup
-    RW.CLI.Run Cli
-    ...    cmd=rm -f ${json_file}
 
 List Long Running Pipeline Runs in Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    List long running pipeline runs in Data Factory pipelines
@@ -294,8 +284,6 @@ List Long Running Pipeline Runs in Data Factories in resource group `${AZURE_RES
         RW.Core.Add Pre To Report    "No long running pipelines found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
-    RW.CLI.Run Cli
-    ...    cmd=rm -f ${json_file}
 
 *** Keywords ***
 Suite Initialization

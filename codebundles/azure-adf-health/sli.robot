@@ -14,7 +14,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Count Resource Health Issues Affecting Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
+Identify Health Issues Affecting Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Fetch health status for all Data Factories in the resource group
     [Tags]    datafactory    resourcehealth   access:read-only
     ${json_file}=    Set Variable    "datafactory_health.json"
