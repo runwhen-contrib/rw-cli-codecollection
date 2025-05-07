@@ -17,10 +17,7 @@ spec:
   - {{workspace.owner_email}}
   statement: Overall health for {{namespace.name}} should be 1, 99% of the time. 
   additionalContext:  
-    namespace: "{{match_resource.resource.metadata.namespace}}"
-    labelMap: "{{match_resource.resource.metadata.labels}}"
-    cluster: "{{ cluster.name }}"
-    context: "{{ cluster.context }}"
+    qualified_name: "{{ match_resource.qualified_name }}"
     hierarchy: ["cluster", "namespace"]
   tags: 
     - name: access

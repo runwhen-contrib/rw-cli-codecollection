@@ -114,7 +114,7 @@ tasks:
         - repoURL: "$repo_url"
           branch: "$branch_name"
           # codeBundles: ["$codebundle"]
-          codeBundles: ["$codebundle", "k8s-cluster-resource-health", "k8s-deployment-healthcheck"]
+          codeBundles: ["$codebundle", "k8s-cluster-resource-health", "k8s-deployment-healthcheck", "k8s-namespace-healthcheck"]
         EOF
     silent: true
 
