@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://PLACEHOLDER.svf
-  alias: {{ match_resource.resource_group.name }} Azure Data Factory Health in resource group
+  alias: {{ match_resource.resource_group.name }} Azure Data Factory Health
   asMeasuredBy: Composite health score of resources & activities. 
   configProvided:
   - name: SLX_PLACEHOLDER
@@ -22,6 +22,7 @@ spec:
     qualified_name: "{{ match_resource.qualified_name }}"
     resource_group: "{{ match_resource.resource_group.name }}"
     subscription_id: "{{ match_resource.subscription_id }}"
+    resource: {{ match_resource.resource }}
   tags:
     - name: cloud
       value: azure
