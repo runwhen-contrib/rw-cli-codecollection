@@ -23,6 +23,7 @@ Verify Istio Sidecar Injection for Cluster `${CONTEXT}`
     ...    sidecar
     ...    injection
     ...    deployment
+    ...    access:read-only
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=check_istio_injection.sh
     ...    env=${env}
@@ -66,6 +67,7 @@ Check Istio Sidecar Resource Usage for Cluster `${CONTEXT}`
     ...    sidecar
     ...    resources 
     ...    usage
+    ...    access:read-only
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=istio_sidecar_resource_usage.sh
     ...    env=${env}
@@ -105,6 +107,7 @@ Validate Istio Installation in Cluster `${CONTEXT}`
     ...    installation
     ...    kubernetes
     ...    servicemesh
+    ...    access:read-only
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=istio_installation_verify.sh
     ...    env=${env}
@@ -141,7 +144,10 @@ Check Istio Controlplane Logs For Errors in Cluster `${CONTEXT}`
     [Documentation]    Check istio controlplane logs for known errors and warnings in cluster ${CONTEXT}
     [Tags]
     ...    istio
-    ...    controlplane logs
+    ...    controlplane 
+    ...    logs
+    ...    access:read-only
+
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=istio_controlplane_logs.sh
     ...    env=${env}
@@ -179,7 +185,10 @@ Fetch Istio Proxy Logs in Cluster `${CONTEXT}`
     [Documentation]    Check istio proxy logs for known errors and warnings in cluster
     [Tags]
     ...    istio
-    ...    proxy logs
+    ...    proxy
+    ...    logs
+    ...    access:read-only
+
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=istio_proxy_logs.sh
     ...    env=${env}
@@ -218,6 +227,8 @@ Verify Istio SSL Certificates in Cluster `${CONTEXT}`
     ...    mtls
     ...    servicemesh
     ...    kubernetes
+    ...    access:read-only
+
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=istio_mtls_check.sh
     ...    env=${env}
@@ -255,6 +266,8 @@ Check Istio Configuration Health in Cluster `${CONTEXT}`
     ...    config
     ...    servicemesh
     ...    kubernetes
+    ...    access:read-only
+
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=analyze_istio_configurations.sh
     ...    env=${env}
