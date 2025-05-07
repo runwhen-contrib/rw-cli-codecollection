@@ -31,8 +31,8 @@ spec:
     - name: context
       value: {{ cluster.context }}
     - name: cluster_type
-      value: {{ cluster.type }}
-  {% if cluster.type == "aks" %}
+      value: {{ cluster.cluster_type }}
+  {% if cluster.cluster_type == "aks" %}
     - name: "resource_group"
       value: "{{ cluster.resource_group }}"
   {% endif %}
