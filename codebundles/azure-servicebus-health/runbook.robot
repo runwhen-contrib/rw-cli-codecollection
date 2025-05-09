@@ -62,6 +62,47 @@ Check for Resource Health Issues Service Bus `${SB_NAMESPACE_NAME}` In Resource 
         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
     END
 
+Check Configuration Health for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Fetch the details and health of the service bus configuration
+    [Tags]    servicebus    logs    config    access:read-only
+    ${config_health}=    RW.CLI.Run Bash File
+    ...    bash_file=service_bus_config_health.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${config_health.stdout}
+    IF    "${config_health.stderr}" != ''
+        RW.Core.Add Issue
+        ...    title=Warnings/Errors running task.
+        ...    severity=3
+        ...    next_steps=Check debug logs in Report
+        ...    expected=No stderr output
+        ...    actual=stderr encountered
+        ...    reproduce_hint=${config_health.cmd}
+        ...    details=${config_health.stderrt}
+    END
+    ${report}=    RW.CLI.Run Cli
+    ...    cmd=cat service_bus_namespace.txt
+    RW.Core.Add Pre To Report    ${report.stdout} 
+      
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat service_bus_config_health.json
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            RW.Core.Add Issue    
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_step"]}
+            ...    expected=Service Bus `${SB_NAMESPACE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has a healthy configuration
+            ...    actual=Service Bus `${SB_NAMESPACE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has configuration recommendations
+            ...    reproduce_hint=${config_health.cmd}
+            ...    details=${item["details"]}        
+        END
+    END
 
 *** Keywords ***
 Suite Initialization
