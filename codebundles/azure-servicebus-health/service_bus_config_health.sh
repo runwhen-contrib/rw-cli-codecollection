@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ---------------------------------------------------------------------------
 #  service_bus_config_health.sh
-#  • service_bus_namespace.txt   – plain-text summary for human report
-#  • service_bus_config_health.json – machine-readable issues list
+#  • service_bus_namespace.txt   – plain-text summary for report
+#  • service_bus_config_health.json – issues array for automation
 # ---------------------------------------------------------------------------
 
 set -euo pipefail
@@ -14,7 +14,7 @@ OUT_ISSUES="service_bus_config_health.json"
 : "${AZ_RESOURCE_GROUP:?Must set AZ_RESOURCE_GROUP}"
 
 ##############################################################################
-# 1) Fetch namespace JSON once
+# 1) Pull namespace properties
 ##############################################################################
 ns_json=$(az servicebus namespace show \
             --name "$SB_NAMESPACE_NAME" \
@@ -22,16 +22,16 @@ ns_json=$(az servicebus namespace show \
             -o json)
 
 ##############################################################################
-# 2) Plain-text summary for the report
+# 2) Human-readable snapshot (plain text)
 ##############################################################################
-name=$(jq -r '.name' <<<"$ns_json")
-loc=$(jq -r '.location' <<<"$ns_json")
-sku=$(jq -r '.sku.name' <<<"$ns_json")
-cap=$(jq -r '.sku.capacity' <<<"$ns_json")
-tls=$(jq -r '.minimumTlsVersion' <<<"$ns_json")
+name=$(jq -r '.name'               <<<"$ns_json")
+loc=$(jq -r '.location'            <<<"$ns_json")
+sku=$(jq -r '.sku.name'            <<<"$ns_json")
+cap=$(jq -r '.sku.capacity // "-"' <<<"$ns_json")
+tls=$(jq -r '.minimumTlsVersion'   <<<"$ns_json")
 pna=$(jq -r '.publicNetworkAccess' <<<"$ns_json")
 identity=$(jq -r '.identity.type // "None"' <<<"$ns_json")
-zone=$(jq -r '.zoneRedundant // false' <<<"$ns_json")
+zone=$(jq -r '.zoneRedundant // false'      <<<"$ns_json")
 
 cat > "$OUT_TXT" <<EOF
 Service Bus Namespace Configuration
@@ -46,10 +46,10 @@ Public Network:       $pna
 Managed Identity:     $identity
 Zone Redundant:       $zone
 EOF
-echo "📝  Wrote human summary -> $OUT_TXT"
+echo "📝  Wrote summary -> $OUT_TXT"
 
 ##############################################################################
-# 3) Build issues array for automation
+# 3) Build issues list
 ##############################################################################
 issues='[]'
 add_issue() {
@@ -60,42 +60,41 @@ add_issue() {
                 <<<"$issues")
 }
 
-ns_backtick="\`$SB_NAMESPACE_NAME\`"
+ns_bt="\`$SB_NAMESPACE_NAME\`"   # back-ticked
 
-# TLS version
-if [[ "$tls" != 1.2 && "$tls" != 1.3 ]]; then
-  add_issue 3 \
-    "TLS minimum version for Service Bus $ns_backtick is $tls (should be ≥1.2)" \
-    "Run: \`az servicebus namespace update -g $AZ_RESOURCE_GROUP -n $SB_NAMESPACE_NAME --minimum-tls-version 1.2\`" \
-    "minimumTlsVersion=$tls"
-fi
+# --- Rules that apply to ALL SKUs --------------------------------------------------
+[[ "$tls" != 1.2 && "$tls" != 1.3 ]] && add_issue 3 \
+  "TLS minimum version for $ns_bt is $tls (≥1.2 recommended)" \
+  "az servicebus namespace update -g $AZ_RESOURCE_GROUP -n $SB_NAMESPACE_NAME --minimum-tls-version 1.2" \
+  "minimumTlsVersion=$tls"
 
-# Public network access
-if [[ "$pna" == "Enabled" ]]; then
-  add_issue 2 \
-    "Public network access enabled on $ns_backtick" \
-    "Disable public access or restrict via firewall / Private Link for $ns_backtick" \
-    "publicNetworkAccess=Enabled"
-fi
+[[ "$pna" == "Enabled" ]] && add_issue 2 \
+  "Public network access enabled on $ns_bt" \
+  "Disable or restrict public access via firewall / Private Link" \
+  "publicNetworkAccess=Enabled"
 
-# Managed identity
-if [[ "$identity" == "None" ]]; then
-  add_issue 2 \
-    "No managed identity assigned to $ns_backtick" \
-    "Assign a system identity: \`az servicebus namespace update -g $AZ_RESOURCE_GROUP -n $SB_NAMESPACE_NAME --assign-identity\`" \
-    "identity.type=None"
-fi
+[[ "$identity" == "None" ]] && add_issue 2 \
+  "No managed identity assigned to $ns_bt" \
+  "az servicebus namespace update -g $AZ_RESOURCE_GROUP -n $SB_NAMESPACE_NAME --assign-identity" \
+  "identity.type=None"
 
-# Zone redundancy (Premium only)
-if [[ "$sku" == "Premium" && "$zone" != "true" ]]; then
-  add_issue 1 \
-    "Zone redundancy disabled on Premium Service Bus $ns_backtick" \
-    "Enable zone redundancy: \`az servicebus namespace update -g $AZ_RESOURCE_GROUP -n $SB_NAMESPACE_NAME --zone-redundant true\`" \
+# --- Premium-only features ----------------------------------------------------------
+if [[ "$sku" == "Premium" ]]; then
+  # Zone redundancy check (real warning)
+  [[ "$zone" != "true" ]] && add_issue 1 \
+    "Zone redundancy disabled on Premium $ns_bt" \
+    "az servicebus namespace update -g $AZ_RESOURCE_GROUP -n $SB_NAMESPACE_NAME --zone-redundant true" \
     "zoneRedundant=$zone"
+else
+  # Informational note for Standard/Basic
+  add_issue 4 \
+    "Zone redundancy not available on $sku SKU ($ns_bt)" \
+    "Upgrade to Premium if multi-AZ availability is required" \
+    "zoneRedundant property ignored on $sku tier"
 fi
 
 ##############################################################################
-# 4) Emit issues JSON
+# 4) Emit machine-readable issues JSON
 ##############################################################################
 jq -n --arg ns "$SB_NAMESPACE_NAME" --argjson issues "$issues" \
       '{namespace:$ns,issues:$issues}' > "$OUT_ISSUES"

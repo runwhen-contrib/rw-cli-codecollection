@@ -16,14 +16,14 @@ resource "azurerm_log_analytics_workspace" "law" {
 }
 
 ###############################################################################
-# SERVICE BUS  – single Premium namespace (no private link)
+# SERVICE BUS  – single Standard namespace (no private link)
 ###############################################################################
 
 resource "azurerm_servicebus_namespace" "primary" {
   name                         = "sb-demo-primary"
   location                     = azurerm_resource_group.sb_rg.location
   resource_group_name          = azurerm_resource_group.sb_rg.name
-  sku                          = "Premium" # keep Premium to test features
+  sku                          = "Standard" # keep Premium to test features
   capacity                     = 1
   premium_messaging_partitions = 1
   minimum_tls_version          = "1.2"
