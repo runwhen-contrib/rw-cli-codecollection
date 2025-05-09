@@ -1,0 +1,1 @@
+export SB_NAMESPACE_NAME=sb-demo-primary

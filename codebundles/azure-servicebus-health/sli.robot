@@ -22,46 +22,24 @@ Check for Resource Health Issues Service Bus `${SB_NAMESPACE_NAME}` In Resource 
     ...    timeout_seconds=60
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
-    RW.Core.Add Pre To Report    ${resource_health.stdout}
-    IF    "${resource_health.stderr}" != ''
-        RW.Core.Add Issue
-        ...    title=Warnings/Errors running task.
-        ...    severity=3
-        ...    next_steps=Check debug logs in Report
-        ...    expected=No stderr output
-        ...    actual=stderr encountered
-        ...    reproduce_hint=${resource_health.cmd}
-        ...    details=${resource_health.stderrt}
-    END
-
-    ${issues}=    RW.CLI.Run Cli
+    ${sb_health_output}=    RW.CLI.Run Cli
     ...    cmd=cat service_bus_health.json
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
-    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    IF    len(@{issue_list}) > 0 
-        IF    "${issue_list["properties"]["title"]}" != "Available"
-            RW.Core.Add Issue
-            ...    severity=2
-            ...    expected=Azure resources should be available for Service Bus `${SB_NAMESPACE_NAME}` in `${AZ_RESOURCE_GROUP}`
-            ...    actual=Azure resources are unhealthy for Service Bus `${SB_NAMESPACE_NAME}` in `${AZ_RESOURCE_GROUP}`
-            ...    title=Azure reports an `${issue_list["properties"]["title"]}` Issue for Service Bus `${SB_NAMESPACE_NAME}` in `${AZ_RESOURCE_GROUP}`
-            ...    reproduce_hint=${resource_health.cmd}
-            ...    details=${issue_list}
-            ...    next_steps=Please escalate to the Azure service owner or check back later.
-        END
+    ${sb_health_output_list}=    Evaluate    json.loads(r'''${sb_health_output.stdout}''')    json
+    IF    len(@{sb_health_output_list}) > 0 
+        ${sb_resource_score}=    Evaluate    1 if "${sb_health_output_list["properties"]["title"]}" == "Available" else 0
     ELSE
-        RW.Core.Add Issue
-        ...    severity=4
-        ...    expected=Azure resources health should be enabled for Service Bus `${SB_NAMESPACE_NAME}` in `${AZ_RESOURCE_GROUP}`
-        ...    actual=Azure resource health appears unavailable for Service Bus `${SB_NAMESPACE_NAME}` in `${AZ_RESOURCE_GROUP}`
-        ...    title=Azure resource health is unavailable for Service Bus `${SB_NAMESPACE_NAME}` in `${AZ_RESOURCE_GROUP}`
-        ...    reproduce_hint=${resource_health.cmd}
-        ...    details=${issue_list}
-        ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
+        ${sb_resource_score}=    Set Variable    0
     END
+    Set Global Variable    ${sb_resource_score}
 
+
+Generate Service Bus Health Score
+    ${sb_health_score}=      Evaluate  (${sb_resource_score} + ${sb_resource_score} ) / 2
+    ${health_score}=      Convert to Number    ${sb_health_score}  2
+    RW.Core.Push Metric    ${sb_health_score}
 
 *** Keywords ***
 Suite Initialization
