@@ -25,7 +25,7 @@ spec:
     {% endif %}
     pathToRobot: codebundles/k8s-certmanager-healthcheck/sli.robot
   intervalStrategy: intermezzo
-  intervalSeconds: 30
+  intervalSeconds: 300
   configProvided:
     - name: DISTRIBUTION
       value: {{custom.kubernetes_distribution}}
@@ -42,3 +42,12 @@ spec:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
   {% endif %}
+  alerts:
+    warning:
+      operator: >
+      threshold: '0'
+      for: '10m'
+    ticket:
+      operator: >
+      threshold: '1'
+      for: '15m'
