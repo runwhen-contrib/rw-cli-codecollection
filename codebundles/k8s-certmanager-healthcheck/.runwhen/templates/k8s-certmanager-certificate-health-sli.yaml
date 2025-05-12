@@ -44,10 +44,10 @@ spec:
   {% endif %}
   alerts:
     warning:
-      operator: >
+      operator: '>'
       threshold: '0'
       for: '10m'
     ticket:
-      operator: >
-      threshold: '1'
+      operator: '>'
+      threshold: '0'
       for: '15m'
