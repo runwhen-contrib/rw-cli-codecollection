@@ -448,13 +448,13 @@ Suite Initialization
     ...    description=The error pattern to use when grep-ing logs.
     ...    pattern=\w*
     ...    example=(Error: 13|Error: 14)
-    ...    default=("")
+    ...    default="error|ERROR"
     ${LOGS_EXCLUDE_PATTERN}=    RW.Core.Import User Variable    LOGS_EXCLUDE_PATTERN
     ...    type=string
     ...    description=Pattern used to exclude entries from log results when searching in log results.
     ...    pattern=\w*
     ...    example=(node_modules|opentelemetry)
-    ...    default=("")
+    ...    default="info"
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
@@ -464,7 +464,7 @@ Suite Initialization
     ${LOG_LINES}=    RW.Core.Import User Variable    LOG_LINES
     ...    type=string
     ...    description=The number of lines to fetch when adding logs to the report
-    ...    pattern=\w*
+    ...    pattern=\d+
     ...    example=100
     ...    default=100
     Set Suite Variable    ${LOG_LINES}    ${LOG_LINES}   

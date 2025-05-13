@@ -29,14 +29,6 @@ spec:
       value: {{custom.kubernetes_distribution_binary}}
     - name: DEPLOYMENT_NAME
       value: {{match_resource.resource.metadata.name}}
-    - name: EXPECTED_AVAILABILITY
-      value: "1"
-    - name: ANOMALY_THRESHOLD
-      value: "0.2"
-    - name: LOGS_ERROR_PATTERN
-      value: ""
-    - name: LOGS_EXCLUDE_PATTERN
-      value: "info"
   secretsProvided:
   {% if wb_version %}
     {% include "kubernetes-auth.yaml" ignore missing %}
