@@ -433,7 +433,7 @@ Suite Initialization
     ${EXPECTED_AVAILABILITY}=    RW.Core.Import User Variable    EXPECTED_AVAILABILITY
     ...    type=string
     ...    description=The minimum numbers of replicas allowed considered healthy.
-    ...    pattern=\d+
+    ...    pattern=^\d+$
     ...    example=3
     ...    default=3
     ${ANOMALY_THRESHOLD}=    RW.Core.Import User Variable
@@ -464,7 +464,7 @@ Suite Initialization
     ${LOG_LINES}=    RW.Core.Import User Variable    LOG_LINES
     ...    type=string
     ...    description=The number of lines to fetch when adding logs to the report
-    ...    pattern=\d+
+    ...    pattern=^\d+$
     ...    example=100
     ...    default=100
     Set Suite Variable    ${LOG_LINES}    ${LOG_LINES}   
