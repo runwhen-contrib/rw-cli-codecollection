@@ -27,14 +27,6 @@ spec:
       value: {{match_resource.resource.metadata.name}}
     - name: CONTEXT
       value: {{context}}
-    - name: LABELS
-      value: ''
-    - name: UTILIZATION_THRESHOLD
-      value: "95"
-    - name: DEFAULT_INCREASE
-      value: "25"
-    - name: RESTART_AGE
-      value: "10"
   secretsProvided:
   {% if wb_version %}
     {% include "kubernetes-auth.yaml" ignore missing %}
