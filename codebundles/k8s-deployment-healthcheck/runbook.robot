@@ -14,7 +14,6 @@ Library             OperatingSystem
 Library             String
 
 Suite Setup         Suite Initialization
-Suite Teardown      Suite Teardown
 
 
 *** Tasks ***
