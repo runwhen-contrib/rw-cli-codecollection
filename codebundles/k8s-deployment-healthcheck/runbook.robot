@@ -447,13 +447,13 @@ Suite Initialization
     ...    description=The error pattern to use when grep-ing logs.
     ...    pattern=\w*
     ...    example=(Error: 13|Error: 14)
-    ...    default="error|ERROR"
+    ...    default=error|ERROR
     ${LOGS_EXCLUDE_PATTERN}=    RW.Core.Import User Variable    LOGS_EXCLUDE_PATTERN
     ...    type=string
     ...    description=Pattern used to exclude entries from log results when searching in log results.
     ...    pattern=\w*
     ...    example=(node_modules|opentelemetry)
-    ...    default="info"
+    ...    default=info
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
