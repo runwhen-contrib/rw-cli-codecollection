@@ -18,7 +18,6 @@ spec:
   statement: API Management Instance {{match_resource.resource.name}} should be healthy and serving traffic. 
   additionalContext:
     name: "{{match_resource.resource.name}}"
-    tags: "{{match_resource.tags}}"
     qualified_name: "{{ match_resource.qualified_name }}"
     resource_group: "{{ match_resource.resource_group.name }}"
     subscription_id: "{{ match_resource.subscription_id }}"

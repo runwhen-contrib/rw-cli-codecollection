@@ -22,12 +22,6 @@ spec:
     performance metrics in resource group {{ match_resource.resource_group.name }}.
   additionalContext:
     name: "{{ match_resource.resource.name }}"
-{% if match_resource.tags %}
-    tags:
-{%   for k, v in match_resource.tags.items() %}
-      {{ k }}: "{{ v | replace('\"', '\\\"') }}"
-{%   endfor %}
-{% endif %}
     qualified_name: "{{ match_resource.qualified_name }}"
     resource_group: "{{ match_resource.resource_group.name }}"
     subscription_id: "{{ match_resource.subscription_id }}"
