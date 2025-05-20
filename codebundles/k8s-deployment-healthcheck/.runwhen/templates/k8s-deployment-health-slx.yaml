@@ -19,4 +19,3 @@ spec:
   additionalContext:  
     qualified_name: "{{ match_resource.qualified_name }}"
   tags: 
-    {% include "kubernetes-tags.yaml" ignore missing %}
