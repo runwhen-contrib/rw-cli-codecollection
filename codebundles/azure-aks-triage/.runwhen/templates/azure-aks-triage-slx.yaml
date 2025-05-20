@@ -17,8 +17,10 @@ spec:
     - {{ workspace.owner_email }}
   statement: AKS Clusters should be in a healthy state. 
   additionalContext:
+    {% include "azure-hierarchy.yaml" %}
     qualified_name: "{{ match_resource.qualified_name }}"
   tags: 
+    {% include "azure-tags.yaml" %}
     - name: cloud
       value: azure
     - name: service

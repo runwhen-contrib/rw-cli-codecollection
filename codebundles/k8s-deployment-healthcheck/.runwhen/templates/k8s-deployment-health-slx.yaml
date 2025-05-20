@@ -17,7 +17,7 @@ spec:
   - {{workspace.owner_email}}
   statement: Pods for {{match_resource.resource.metadata.name}} deployments should be in a ready state. There should be Zero unready pods. 
   additionalContext:  
-    {% include "kubernetes-heirarchy.yaml" %}
+    {% include "kubernetes-hierarchy.yaml" %}
     qualified_name: "{{ match_resource.qualified_name }}"
   tags: 
     {% include "kubernetes-tags.yaml" %}
