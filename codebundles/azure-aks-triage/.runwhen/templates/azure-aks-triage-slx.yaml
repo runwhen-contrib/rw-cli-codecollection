@@ -17,10 +17,8 @@ spec:
     - {{ workspace.owner_email }}
   statement: AKS Clusters should be in a healthy state. 
   additionalContext:
-    tags: "{{match_resource.tags}}"
+    {% include "azure-hierarchy.yaml" %}
     qualified_name: "{{ match_resource.qualified_name }}"
-    resource_group: "{{ match_resource.resource_group.name }}"
-    subscription_id: "{{ match_resource.subscription_id }}"
   tags: 
     - name: cloud
       value: azure
@@ -28,3 +26,4 @@ spec:
       value: aks
     - name: access
       value: read-only
+    {% include "azure-tags.yaml" %}
