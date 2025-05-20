@@ -26,4 +26,3 @@ spec:
       value: aks
     - name: access
       value: read-only
-      {% include "azure-tags.yaml" ignore missing %}
