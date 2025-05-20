@@ -17,7 +17,28 @@ spec:
   - {{workspace.owner_email}}
   statement: Pods for {{match_resource.resource.metadata.name}} deployments should be in a ready state. There should be Zero unready pods. 
   additionalContext:  
-    namespace: "{{match_resource.resource.metadata.namespace}}"
-    labelMap: "{{match_resource.resource.metadata.labels}}"
-    cluster: "{{ cluster.name }}"
-    context: "{{ cluster.context }}"
+    qualified_name: "{{ match_resource.qualified_name }}"
+    hierarchy: ["cluster", "namespace", "deployment"]
+  tags: 
+    - name: access
+      value: read-only
+    - name: platform
+      value: kubernetes
+    - name: cluster
+      value: {{ cluster.name }}
+    - name: context
+      value: {{ cluster.context }}
+    - name: namespace
+      value: "{{match_resource.resource.metadata.namespace}}"
+    - name: deployment
+      value: "{{match_resource.resource.metadata.name}}"
+    - name: cluster_type
+      value: {{ cluster.cluster_type }}
+  {% if cluster.cluster_type == "aks" %}
+    - name: "resource_group"
+      value: "{{ cluster.resource_group }}"
+  {% endif %}
+  {% for k, v in match_resource.resource.metadata.labels.items() %}
+    - name: "[k8s]{{ k }}"
+      value: "{{ v }}"
+  {% endfor %}
