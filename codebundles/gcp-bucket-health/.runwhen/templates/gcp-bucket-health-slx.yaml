@@ -14,10 +14,10 @@ spec:
   - {{workspace.owner_email}}
   statement: GCP Buckets should be secure and of a reasonable size.    
   additionalContext:
-    {% include "gcp-hierarchy.yaml" %}
+    {% include "gcp-hierarchy.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"
   tags: 
-    {% include "gcp-tags.yaml" %}
+    {% include "gcp-tags.yaml" ignore missing %}
     - name: service
       value: gcs
     - name: category
