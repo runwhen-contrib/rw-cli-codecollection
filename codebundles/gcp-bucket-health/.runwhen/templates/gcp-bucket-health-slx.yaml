@@ -18,8 +18,6 @@ spec:
     project: "{{match_resource.resource.project_id}}"
   tags: 
     {% include "gcp-tags.yaml" %}
-    - name: platform
-      value: gcp
     - name: service
       value: gcs
     - name: category
