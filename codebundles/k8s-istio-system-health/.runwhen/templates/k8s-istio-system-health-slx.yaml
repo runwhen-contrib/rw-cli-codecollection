@@ -17,6 +17,9 @@ spec:
   - {{workspace.owner_email}}
   statement: Measures health of Istio system by checking istio proxy sidecar injection status, high memory and cpu usage, warnings and errors in logs, valid certificates, configuration and verify istio installation.
   additionalContext:  
-    cluster: "{{ cluster.name }}"
-    context: "{{ cluster.context }}"
-    resource: {{ match_resource.resource }}
+    {% include "kubernetes-hierarchy.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name }}"
+  tags: 
+    {% include "kubernetes-tags.yaml" ignore missing %}
+    - name: access
+      value: read-only
