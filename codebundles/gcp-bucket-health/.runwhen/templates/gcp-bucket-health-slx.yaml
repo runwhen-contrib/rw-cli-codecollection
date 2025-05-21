@@ -15,7 +15,7 @@ spec:
   statement: GCP Buckets should be secure and of a reasonable size.    
   additionalContext:
     {% include "gcp-hierarchy.yaml" %}
-    project: "{{match_resource.resource.project_id}}"
+    qualified_name: "{{ match_resource.qualified_name }}"
   tags: 
     {% include "gcp-tags.yaml" %}
     - name: service
