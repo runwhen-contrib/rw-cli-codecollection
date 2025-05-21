@@ -19,6 +19,7 @@ spec:
   additionalContext:  
     {% include "kubernetes-hierarchy.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"
-  tags: 
+  tags:  
+    {% include "kubernetes-tags.yaml" ignore missing %}
     - name: access
       value: read-only
