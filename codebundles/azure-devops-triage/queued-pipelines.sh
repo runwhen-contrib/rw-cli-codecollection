@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
+set -x
 # -----------------------------------------------------------------------------
 # REQUIRED ENV VARS:
 #   AZURE_DEVOPS_ORG
 #   AZURE_DEVOPS_PROJECT
 #
 # OPTIONAL ENV VARS:
-#   QUEUE_THRESHOLD - Threshold in minutes or hours (e.g., "10m" or "1h") for queued pipelines (default: "10m")
 #
 # This script:
 #   1) Lists all pipelines in the specified Azure DevOps project
@@ -17,7 +16,7 @@ set -euo pipefail
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
 : "${AZURE_DEVOPS_PROJECT:?Must set AZURE_DEVOPS_PROJECT}"
-: "${QUEUE_THRESHOLD:=10m}"
+: "${QUEUE_THRESHOLD:=1m}"
 
 OUTPUT_FILE="queued_pipelines.json"
 issues_json='[]'
@@ -81,10 +80,19 @@ if ! pipelines=$(az pipelines list --output json 2>pipelines_err.log); then
 fi
 rm -f pipelines_err.log
 
-# Process each pipeline
-for row in $(echo "${pipelines}" | jq -c '.[]'); do
-    pipeline_id=$(echo $row | jq -r '.id')
-    pipeline_name=$(echo $row | jq -r '.name')
+# Save pipelines to a file to avoid subshell issues
+echo "$pipelines" > pipelines.json
+
+# Get the number of pipelines
+pipeline_count=$(jq '. | length' pipelines.json)
+
+# Process each pipeline using a for loop instead of pipe to while
+for ((i=0; i<pipeline_count; i++)); do
+    pipeline_json=$(jq -c ".[${i}]" pipelines.json)
+    
+    # Extract values from JSON using jq
+    pipeline_id=$(echo "$pipeline_json" | jq -r '.id')
+    pipeline_name=$(echo "$pipeline_json" | jq -r '.name')
     
     echo "Processing Pipeline: $pipeline_name (ID: $pipeline_id)"
     
@@ -108,13 +116,27 @@ for row in $(echo "${pipelines}" | jq -c '.[]'); do
     fi
     rm -f runs_err.log
     
+    # Save runs to a file to avoid subshell issues
+    echo "$runs" > runs.json
+    
+    # Get the number of runs
+    run_count=$(jq '. | length' runs.json)
+    
     # Check for queued runs
-    for run in $(echo "${runs}" | jq -c '.[] | select(.state == "notStarted")'); do
-        run_id=$(echo $run | jq -r '.id')
-        run_name=$(echo $run | jq -r '.name // "Run #\(.id)"')
-        web_url=$(echo $run | jq -r '.url')
-        branch=$(echo $run | jq -r '.sourceBranch // "unknown"' | sed 's|refs/heads/||')
-        created_date=$(echo $run | jq -r '.createdDate')
+    for ((j=0; j<run_count; j++)); do
+        run_json=$(jq -c ".[${j}]" runs.json)
+        
+        # Check if run is queued (notStarted)
+        run_state=$(echo "$run_json" | jq -r '.status')
+        if [[ "$run_state" != "notStarted" ]]; then
+            continue
+        fi
+        
+        run_id=$(echo "$run_json" | jq -r '.id')
+        run_name=$(echo "$run_json" | jq -r '.name // "Run #\(.id)"')
+        web_url=$(echo "$run_json" | jq -r '.url')
+        branch=$(echo "$run_json" | jq -r '.sourceBranch // "unknown"' | sed 's|refs/heads/||')
+        created_date=$(echo "$run_json" | jq -r '.queueTime')
         
         # Calculate queue time in minutes
         created_timestamp=$(date -d "$created_date" +%s)
@@ -145,17 +167,23 @@ for row in $(echo "${pipelines}" | jq -c '.[]'); do
             if ! run_details=$(az pipelines runs show --id "$run_id" --output json 2>/dev/null); then
                 queue_reason="Could not retrieve detailed information"
             else
+                # Save run details to a file
+                echo "$run_details" > run_details.json
+                
                 # Extract queue position if available
-                queue_position=$(echo "$run_details" | jq -r '.queuePosition // "Unknown"')
+                queue_position=$(jq -r '.queuePosition // "Unknown"' run_details.json)
                 if [ "$queue_position" != "null" ] && [ "$queue_position" != "Unknown" ]; then
                     queue_reason="Queue position: $queue_position"
                 fi
                 
                 # Try to extract any waiting reason
-                waiting_reason=$(echo "$run_details" | jq -r '.reason // "Unknown"')
+                waiting_reason=$(jq -r '.reason // "Unknown"' run_details.json)
                 if [ "$waiting_reason" != "null" ] && [ "$waiting_reason" != "Unknown" ]; then
                     queue_reason="$queue_reason, Reason: $waiting_reason"
                 fi
+                
+                # Clean up run details file
+                rm -f run_details.json
             fi
             
             issues_json=$(echo "$issues_json" | jq \
@@ -185,49 +213,13 @@ for row in $(echo "${pipelines}" | jq -c '.[]'); do
                  }]')
         fi
     done
+    
+    # Clean up runs file
+    rm -f runs.json
 done
 
-# Get agent pools to check for capacity issues
-echo "Checking agent pools for capacity issues..."
-if ! pools=$(az pipelines pool list --output json 2>/dev/null); then
-    echo "WARNING: Could not list agent pools to check capacity."
-else
-    # Process each pool to check capacity
-    for pool in $(echo "${pools}" | jq -c '.[]'); do
-        pool_id=$(echo $pool | jq -r '.id')
-        pool_name=$(echo $pool | jq -r '.name')
-        
-        # Skip Microsoft-hosted pools as we can't manage their capacity
-        is_hosted=$(echo $pool | jq -r '.isHosted // false')
-        if [ "$is_hosted" = "true" ]; then
-            continue
-        }
-        
-        # Get agents in the pool
-        if ! agents=$(az pipelines agent list --pool-id "$pool_id" --output json 2>/dev/null); then
-            continue
-        fi
-        
-        # Count total and busy agents
-        total_agents=$(echo "$agents" | jq 'length')
-        busy_agents=$(echo "$agents" | jq '[.[] | select(.status == "online" and .enabled == true and .assignedRequest != null)] | length')
-        
-        # If all agents are busy, report capacity issue
-        if [ "$total_agents" -gt 0 ] && [ "$busy_agents" -eq "$total_agents" ]; then
-            issues_json=$(echo "$issues_json" | jq \
-                --arg title "Agent Pool \`$pool_name\` at Full Capacity" \
-                --arg details "All $total_agents agents in pool are currently busy. This may be causing pipeline queuing." \
-                --arg severity "3" \
-                --arg nextStep "Consider adding more agents to pool \`$pool_name\` to reduce queue times." \
-                '. += [{
-                   "title": $title,
-                   "details": $details,
-                   "next_step": $nextStep,
-                   "severity": ($severity | tonumber)
-                 }]')
-        fi
-    done
-fi
+# Clean up pipelines file
+rm -f pipelines.json
 
 # Write final JSON
 echo "$issues_json" > "$OUTPUT_FILE"

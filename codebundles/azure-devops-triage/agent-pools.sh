@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-set -x
-env
+
 # -----------------------------------------------------------------------------
 # REQUIRED ENV VARS:
 #   AZURE_DEVOPS_ORG

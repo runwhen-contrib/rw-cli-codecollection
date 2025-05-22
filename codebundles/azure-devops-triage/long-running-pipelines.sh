@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
+set -x
 # -----------------------------------------------------------------------------
 # REQUIRED ENV VARS:
 #   AZURE_DEVOPS_ORG
 #   AZURE_DEVOPS_PROJECT
 #
 # OPTIONAL ENV VARS:
-#   DAYS_TO_LOOK_BACK - Number of days to look back for pipeline runs (default: 7)
 #   DURATION_THRESHOLD - Threshold in minutes or hours (e.g., "60m" or "2h") for long-running pipelines (default: "60m")
 #
 # This script:
@@ -18,8 +17,7 @@ set -euo pipefail
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
 : "${AZURE_DEVOPS_PROJECT:?Must set AZURE_DEVOPS_PROJECT}"
-: "${DAYS_TO_LOOK_BACK:=7}"
-: "${DURATION_THRESHOLD:=60m}"
+: "${DURATION_THRESHOLD:=1m}"
 
 OUTPUT_FILE="long_running_pipelines.json"
 issues_json='[]'
@@ -49,7 +47,6 @@ THRESHOLD_MINUTES=$(convert_to_minutes "$DURATION_THRESHOLD")
 echo "Analyzing Azure DevOps Pipeline Durations..."
 echo "Organization: $AZURE_DEVOPS_ORG"
 echo "Project:      $AZURE_DEVOPS_PROJECT"
-echo "Look Back:    $DAYS_TO_LOOK_BACK days"
 echo "Threshold:    $THRESHOLD_MINUTES minutes"
 
 # Ensure Azure CLI is logged in and DevOps extension is installed
@@ -84,18 +81,27 @@ if ! pipelines=$(az pipelines list --output json 2>pipelines_err.log); then
 fi
 rm -f pipelines_err.log
 
-# Process each pipeline
-for row in $(echo "${pipelines}" | jq -c '.[]'); do
-    pipeline_id=$(echo $row | jq -r '.id')
-    pipeline_name=$(echo $row | jq -r '.name')
+# Save pipelines to a file to avoid subshell issues
+echo "$pipelines" > pipelines.json
+
+# Get the number of pipelines
+pipeline_count=$(jq '. | length' pipelines.json)
+
+# Process each pipeline using a for loop instead of pipe to while
+for ((i=0; i<pipeline_count; i++)); do
+    pipeline_json=$(jq -c ".[${i}]" pipelines.json)
+    
+    # Extract values from JSON using jq
+    pipeline_id=$(echo "$pipeline_json" | jq -r '.id')
+    pipeline_name=$(echo "$pipeline_json" | jq -r '.name')
     
     echo "Processing Pipeline: $pipeline_name (ID: $pipeline_id)"
     
-    # Calculate date for filtering runs (in ISO format)
-    from_date=$(date -d "$DAYS_TO_LOOK_BACK days ago" -u +"%Y-%m-%dT%H:%M:%SZ")
+    # # Calculate date for filtering runs (in ISO format)
+    # from_date=$(date -d "$DAYS_TO_LOOK_BACK days ago" -u +"%Y-%m-%dT%H:%M:%SZ")
     
     # Get recent pipeline runs
-    if ! runs=$(az pipelines runs list --pipeline-id "$pipeline_id" --min-created-time "$from_date" --output json 2>runs_err.log); then
+    if ! runs=$(az pipelines runs list --pipeline-id "$pipeline_id" --output json 2>runs_err.log); then
         err_msg=$(cat runs_err.log)
         rm -f runs_err.log
         
@@ -114,13 +120,27 @@ for row in $(echo "${pipelines}" | jq -c '.[]'); do
     fi
     rm -f runs_err.log
     
+    # Save runs to a file to avoid subshell issues
+    echo "$runs" > runs.json
+    
+    # Get the number of runs
+    run_count=$(jq '. | length' runs.json)
+    
     # Check for currently running pipelines
-    for run in $(echo "${runs}" | jq -c '.[] | select(.state == "inProgress")'); do
-        run_id=$(echo $run | jq -r '.id')
-        run_name=$(echo $run | jq -r '.name // "Run #\(.id)"')
-        web_url=$(echo $run | jq -r '.url')
-        branch=$(echo $run | jq -r '.sourceBranch // "unknown"' | sed 's|refs/heads/||')
-        created_date=$(echo $run | jq -r '.createdDate')
+    for ((j=0; j<run_count; j++)); do
+        run_json=$(jq -c ".[${j}]" runs.json)
+        
+        # Check if run is in progress
+        run_state=$(echo "$run_json" | jq -r '.status')
+        if [[ "$run_state" != "inProgress" ]]; then
+            continue
+        fi
+        
+        run_id=$(echo "$run_json" | jq -r '.id')
+        run_name=$(echo "$run_json" | jq -r '.name // "Run #\(.id)"')
+        web_url=$(echo "$run_json" | jq -r '.url')
+        branch=$(echo "$run_json" | jq -r '.sourceBranch // "unknown"' | sed 's|refs/heads/||')
+        created_date=$(echo "$run_json" | jq -r '.startTime')
         
         # Calculate run duration in minutes
         created_timestamp=$(date -d "$created_date" +%s)
@@ -173,16 +193,40 @@ for row in $(echo "${pipelines}" | jq -c '.[]'); do
     done
     
     # Also check for completed runs that took longer than the threshold
-    for run in $(echo "${runs}" | jq -c '.[] | select(.state == "completed")'); do
-        run_id=$(echo $run | jq -r '.id')
-        run_name=$(echo $run | jq -r '.name // "Run #\(.id)"')
-        web_url=$(echo $run | jq -r '.url')
-        branch=$(echo $run | jq -r '.sourceBranch // "unknown"' | sed 's|refs/heads/||')
+    for ((j=0; j<run_count; j++)); do
+        run_json=$(jq -c ".[${j}]" runs.json)
         
-        # Get duration in seconds and convert to minutes
-        duration_seconds=$(echo $run | jq -r '.finishedDate | fromdateiso8601 - (.startTime | fromdateiso8601)' 2>/dev/null || echo 0)
-        if [ "$duration_seconds" = "null" ] || [ -z "$duration_seconds" ]; then
+        # Check if run is completed
+        run_state=$(echo "$run_json" | jq -r '.status')
+        if [[ "$run_state" != "completed" ]]; then
             continue
+        fi
+        
+        run_id=$(echo "$run_json" | jq -r '.id')
+        run_name=$(echo "$run_json" | jq -r '.name // "Run #\(.id)"')
+        web_url=$(echo "$run_json" | jq -r '.url')
+        branch=$(echo "$run_json" | jq -r '.sourceBranch // "unknown"' | sed 's|refs/heads/||')
+        
+        # Get start and finish times
+        start_time=$(echo "$run_json" | jq -r '.startTime')
+        finish_time=$(echo "$run_json" | jq -r '.finishTime')
+        
+        # Check if both times are valid
+        if [ "$start_time" != "null" ] && [ -n "$start_time" ] && [ "$finish_time" != "null" ] && [ -n "$finish_time" ]; then
+            # Convert ISO timestamps to Unix timestamps using date
+            start_timestamp=$(date -d "$start_time" +%s 2>/dev/null || echo 0)
+            finish_timestamp=$(date -d "$finish_time" +%s 2>/dev/null || echo 0)
+            
+            # Calculate duration in seconds
+            if [ "$start_timestamp" -gt 0 ] && [ "$finish_timestamp" -gt 0 ]; then
+                duration_seconds=$((finish_timestamp - start_timestamp))
+            else
+                duration_seconds=0
+                echo "  Warning: Could not parse timestamps for run $run_id"
+            fi
+        else
+            duration_seconds=0
+            echo "  Warning: Missing start or finish time for run $run_id"
         fi
         
         duration_minutes=$((duration_seconds / 60))
@@ -230,7 +274,13 @@ for row in $(echo "${pipelines}" | jq -c '.[]'); do
                  }]')
         fi
     done
+    
+    # Clean up runs file
+    rm -f runs.json
 done
+
+# Clean up pipelines file
+rm -f pipelines.json
 
 # Write final JSON
 echo "$issues_json" > "$OUTPUT_FILE"
