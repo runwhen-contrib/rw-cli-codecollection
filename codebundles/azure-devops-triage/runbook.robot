@@ -79,7 +79,7 @@ Check for Failed Pipelines in project `${AZURE_DEVOPS_PROJECT}` in organisation 
         END
     END
 
-Check for Long Running Pipelines in project `${AZURE_DEVOPS_PROJECT}` in organisation `${AZURE_DEVOPS_ORG}`
+Check for Long Running Pipelines in project `${AZURE_DEVOPS_PROJECT}` in organisation `${AZURE_DEVOPS_ORG}` (Threshold: ${DURATION_THRESHOLD})
     [Documentation]    Identify pipelines that are running longer than expected
     [Tags]    DevOps    Azure    Pipelines    Performance    access:read-only
     ${long_running}=    RW.CLI.Run Bash File
@@ -105,7 +105,7 @@ Check for Long Running Pipelines in project `${AZURE_DEVOPS_PROJECT}` in organis
         FOR    ${issue}    IN    @{issue_list}
             RW.Core.Add Issue
             ...    severity=${issue['severity']}
-            ...    expected=Pipeline should complete within the expected time frame
+            ...    expected=Pipeline should complete within the expected time frame (${DURATION_THRESHOLD})
             ...    actual=Pipeline is running longer than expected (${issue['duration']})
             ...    title=${issue['title']}
             ...    reproduce_hint=${long_running.cmd}
@@ -115,7 +115,7 @@ Check for Long Running Pipelines in project `${AZURE_DEVOPS_PROJECT}` in organis
         END
     END
 
-Check for Queued Pipelines in project `${AZURE_DEVOPS_PROJECT}` in organisation `${AZURE_DEVOPS_ORG}`
+Check for Queued Pipelines in project `${AZURE_DEVOPS_PROJECT}` in organisation `${AZURE_DEVOPS_ORG}` (Threshold: ${QUEUE_THRESHOLD})
     [Documentation]    Identify pipelines that are queued for longer than expected
     [Tags]    DevOps    Azure    Pipelines    Queue    access:read-only
     ${queued_pipelines}=    RW.CLI.Run Bash File
@@ -141,7 +141,7 @@ Check for Queued Pipelines in project `${AZURE_DEVOPS_PROJECT}` in organisation 
         FOR    ${issue}    IN    @{issue_list}
             RW.Core.Add Issue
             ...    severity=${issue['severity']}
-            ...    expected=Pipeline should start execution promptly
+            ...    expected=Pipeline should start execution promptly (within ${QUEUE_THRESHOLD})
             ...    actual=Pipeline has been queued for ${issue['queue_time']}
             ...    title=${issue['title']}
             ...    reproduce_hint=${queued_pipelines.cmd}
@@ -252,27 +252,12 @@ Suite Initialization
     ...    type=string
     ...    description=Threshold for queued pipelines (format: 10m, 1h)
     ...    default=10m
-    ${SEVERITY_FAILED}=    RW.Core.Import User Variable    SEVERITY_FAILED
-    ...    type=string
-    ...    description=Severity level for failed pipeline issues (1=Low, 2=Medium, 3=High, 4=Critical)
-    ...    default=3
-    ${SEVERITY_LONG_RUNNING}=    RW.Core.Import User Variable    SEVERITY_LONG_RUNNING
-    ...    type=string
-    ...    description=Severity level for long-running pipeline issues (1=Low, 2=Medium, 3=High, 4=Critical)
-    ...    default=2
-    ${SEVERITY_QUEUED}=    RW.Core.Import User Variable    SEVERITY_QUEUED
-    ...    type=string
-    ...    description=Severity level for queued pipeline issues (1=Low, 2=Medium, 3=High, 4=Critical)
-    ...    default=2
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${AZURE_DEVOPS_ORG}    ${AZURE_DEVOPS_ORG}
     Set Suite Variable    ${AZURE_DEVOPS_PROJECT}    ${AZURE_DEVOPS_PROJECT}
     Set Suite Variable    ${DAYS_TO_LOOK_BACK}    ${DAYS_TO_LOOK_BACK}
     Set Suite Variable    ${DURATION_THRESHOLD}    ${DURATION_THRESHOLD}
     Set Suite Variable    ${QUEUE_THRESHOLD}    ${QUEUE_THRESHOLD}
-    Set Suite Variable    ${SEVERITY_FAILED}    ${SEVERITY_FAILED}
-    Set Suite Variable    ${SEVERITY_LONG_RUNNING}    ${SEVERITY_LONG_RUNNING}
-    Set Suite Variable    ${SEVERITY_QUEUED}    ${SEVERITY_QUEUED}
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_DEVOPS_ORG":"${AZURE_DEVOPS_ORG}", "AZURE_DEVOPS_PROJECT":"${AZURE_DEVOPS_PROJECT}", "DAYS_TO_LOOK_BACK":"${DAYS_TO_LOOK_BACK}", "DURATION_THRESHOLD":"${DURATION_THRESHOLD}", "QUEUE_THRESHOLD":"${QUEUE_THRESHOLD}", "SEVERITY_FAILED":"${SEVERITY_FAILED}", "SEVERITY_LONG_RUNNING":"${SEVERITY_LONG_RUNNING}", "SEVERITY_QUEUED":"${SEVERITY_QUEUED}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_DEVOPS_ORG":"${AZURE_DEVOPS_ORG}", "AZURE_DEVOPS_PROJECT":"${AZURE_DEVOPS_PROJECT}", "DAYS_TO_LOOK_BACK":"${DAYS_TO_LOOK_BACK}", "DURATION_THRESHOLD":"${DURATION_THRESHOLD}", "QUEUE_THRESHOLD":"${QUEUE_THRESHOLD}"}
