@@ -31,6 +31,29 @@ The `.test` directory contains infrastructure test code using Terraform to set u
 4. Azure CLI installed and configured
 5. Terraform installed (v1.0.0+)
 
+### Azure DevOps Organization Setup (Before Running Terraform)
+
+Before running Terraform, you need to configure your Azure DevOps organization with the necessary permissions:
+
+#### 1. Organization Settings Configuration
+
+1. Navigate to your Azure DevOps organization settings
+2. Add the user who will be running Terraform to the organization
+3. Add the service principal as user that will be used by Terraform
+
+#### 2. Agent Pool Permissions
+
+1. Go to Organization Settings > Agent Pools > Security
+2. Add your user (service principal) account with Administrator permissions
+
+#### 3. Organization-Level Security Permissions
+
+1. Go to Organization Settings > Security > Permissions
+2. Find your user (service principal)
+3. Ensure they have "Create new projects" permission set to "Allow"
+
+These permissions are required for Terraform to successfully create and configure resources in your Azure DevOps organization.
+
 ### Test Environment Setup
 
 The test environment creates:
