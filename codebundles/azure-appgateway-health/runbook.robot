@@ -63,7 +63,7 @@ Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NA
     END
 Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the details and health of the application gateway configuration
-    [Tags]    appgateway    logs    tail    access:read-only
+    [Tags]    appgateway    config    health    access:read-only
     ${config_health}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_config_health.sh
     ...    env=${env}

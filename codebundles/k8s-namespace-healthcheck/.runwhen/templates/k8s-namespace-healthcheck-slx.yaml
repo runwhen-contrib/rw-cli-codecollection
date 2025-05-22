@@ -17,8 +17,9 @@ spec:
   - {{workspace.owner_email}}
   statement: Overall health for {{namespace.name}} should be 1, 99% of the time. 
   additionalContext:  
-    namespace: "{{match_resource.resource.metadata.name}}"
-    labelMap: "{{match_resource.resource.metadata.labels}}"
-    cluster: "{{ cluster.name }}"
-    context: "{{ cluster.context }}"
-    subscription_id: "{{ cluster.subscription_id }}"
+    {% include "kubernetes-hierarchy.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name }}"
+  tags: 
+    {% include "kubernetes-tags.yaml" ignore missing %}
+    - name: access
+      value: read-only

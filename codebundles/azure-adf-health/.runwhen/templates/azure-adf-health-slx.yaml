@@ -17,15 +17,10 @@ spec:
   - {{workspace.owner_email}}
   statement: Measure Azure Data Factory health by checking resource health status, frequent pipeline errors, failed pipeline runs, and large data operations in resource group {{ match_resource.resource_group.name }}
   additionalContext:
-    name: "{{match_resource.resource.name}}"
+    {% include "azure-hierarchy.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"
-    resource_group: "{{ match_resource.resource_group.name }}"
-    subscription_id: "{{ match_resource.subscription_id }}"
-    resource: |
-      {{ match_resource.resource }}
   tags:
-    - name: cloud
-      value: azure
+    {% include "azure-tags.yaml" ignore missing %}
     - name: service
       value: datafactory
     - name: access

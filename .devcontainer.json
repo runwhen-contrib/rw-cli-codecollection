@@ -17,8 +17,12 @@
     ],
     "workspaceFolder": "/home/runwhen/codecollection/",
     "features": {
-        "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+        "ghcr.io/devcontainers/features/sshd:1": {
+            "version": "latest"
+        }
     },
+    "remoteUser": "runwhen",
     // Configure tool-specific properties.
     "customizations": {
         // Configure properties specific to VS Code.

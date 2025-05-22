@@ -10,18 +10,15 @@ spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/containers/10023-icon-service-Kubernetes-Services.svg
   alias: {{match_resource.resource.name}} AKS Health
   asMeasuredBy: "As scored by upstream Azure resource health, critical or error activities, and configuration health. 1=Health, 0=Unhealthy"
-  configProvided:
-    - name: SLX_PLACEHOLDER
-      value: SLX_PLACEHOLDER
   owners:
     - {{ workspace.owner_email }}
   statement: AKS Clusters should be in a healthy state. 
   additionalContext:
+    {% include "azure-hierarchy.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"
-    resource_group: "{{ match_resource.resource_group.name }}"
-    subscription_id: "{{ match_resource.subscription_id }}"
   tags: 
-    - name: cloud
+    {% include "azure-tags.yaml" ignore missing %}
+    - name: platform
       value: azure
     - name: service
       value: aks

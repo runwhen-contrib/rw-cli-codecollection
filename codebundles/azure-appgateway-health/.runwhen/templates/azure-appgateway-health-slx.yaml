@@ -17,13 +17,10 @@ spec:
   - {{workspace.owner_email}}
   statement: Application Gateway {{match_resource.resource.name}} should be healthy and serving traffic. 
   additionalContext:
-    name: "{{match_resource.resource.name}}"
+    {% include "azure-hierarchy.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"
-    resource_group: "{{ match_resource.resource_group.name }}"
-    subscription_id: "{{ match_resource.subscription_id }}"
   tags: 
-    - name: cloud
-      value: azure
+    {% include "azure-tags.yaml" ignore missing %}
     - name: service
       value: app_gateway
     - name: access

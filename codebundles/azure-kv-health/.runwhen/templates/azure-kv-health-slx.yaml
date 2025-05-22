@@ -21,13 +21,10 @@ spec:
     settings, expiring items (secrets/certificates/keys), log issues, and
     performance metrics in resource group {{ match_resource.resource_group.name }}.
   additionalContext:
-    name: "{{ match_resource.resource.name }}"
+    {% include "azure-hierarchy.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"
-    resource_group: "{{ match_resource.resource_group.name }}"
-    subscription_id: "{{ match_resource.subscription_id }}"
   tags:
-    - name: cloud
-      value: azure
+    {% include "azure-tags.yaml" ignore missing %}
     - name: service
       value: keyvault
     - name: access
