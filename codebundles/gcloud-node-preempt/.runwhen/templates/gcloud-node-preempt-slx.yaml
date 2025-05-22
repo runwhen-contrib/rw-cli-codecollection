@@ -17,4 +17,13 @@ spec:
   - {{workspace.owner_email}}
   statement: Nodes in an active preempt event should trigger RunWhen workflows.    
   additionalContext:
-    project: "{{match_resource.resource.project_id}}"
+    {% include "gcp-hierarchy.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name }}"
+  tags: 
+    {% include "gcp-tags.yaml" ignore missing %}
+    - name: service
+      value: gke
+    - name: category
+      value: compute
+    - name: access
+      value: read-only
