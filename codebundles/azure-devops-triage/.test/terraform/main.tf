@@ -80,7 +80,7 @@ output "agent_pool_setup_instructions" {
        c. Extract: tar zxvf vsts-agent-linux-x64-2.214.1.tar.gz
        d. Configure: ./config.sh
           - Server URL: https://dev.azure.com/${var.azure_devops_org}
-          - PAT: (your PAT)
+          - PAT: (your PAT) #generate PAT from the your azure devops org
           - Agent pool: ${azuredevops_agent_pool.test_pool.name}
        e. Run as a service: ./svc.sh install && ./svc.sh start
   EOT

@@ -94,6 +94,16 @@ After Terraform creates the agent pool, you need to manually set up at least one
 3. Follow the instructions to download and configure the agent on your machine
 4. Start the agent and verify it's online
 
+Or follow these steps:
+    a. Create a folder on your machine (e.g., mkdir ~/azagent && cd ~/azagent)
+    b. Download the agent: curl -O https://vstsagentpackage.azureedge.net/agent/2.214.1/vsts-agent-linux-x64-2.214.1.tar.gz
+    c. Extract: tar zxvf vsts-agent-linux-x64-2.214.1.tar.gz
+    d. Configure: ./config.sh
+        - Server URL: https://dev.azure.com/${var.azure_devops_org}
+        - PAT: (your PAT) #generate PAT from the your azure devops org
+        - Agent pool: ${azuredevops_agent_pool.test_pool.name}
+    e. Run as a service: ./svc.sh install && ./svc.sh start
+
 #### Step 4: Trigger Test Pipelines (Manual Step)
 
 The test environment includes several pipeline definitions:
