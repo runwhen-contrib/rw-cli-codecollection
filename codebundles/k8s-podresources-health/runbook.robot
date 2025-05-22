@@ -194,18 +194,18 @@ Suite Initialization
     ...    NAMESPACE
     ...    type=string
     ...    description=The name of the Kubernetes namespace to scope actions and searching to. Supports csv list of namespaces.
-    ...    pattern=\w*
+    ...    pattern=^$|[A-Za-z0-9._-]+$
     ...    example=my-namespace
     ${CONTEXT}=    RW.Core.Import User Variable    CONTEXT
     ...    type=string
     ...    description=Which Kubernetes context to operate within.
-    ...    pattern=\w*
+    ...    pattern=^$|[A-Za-z0-9._-]+$
     ...    example=my-main-cluster
     ...    default=''
     ${LABELS}=    RW.Core.Import User Variable    LABELS
     ...    type=string
     ...    description=The metadata labels to use when selecting the objects to measure as running.
-    ...    pattern=\w*
+    ...    pattern=^(\s*|[A-Za-z0-9_.-]+=.+?(,[A-Za-z0-9_.-]+=.+?)*)$
     ...    example=app=myapp
     ...    default=''
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
@@ -217,19 +217,19 @@ Suite Initialization
    ${UTILIZATION_THRESHOLD}=    RW.Core.Import User Variable    UTILIZATION_THRESHOLD
     ...    type=string
     ...    description=The resource usage threshold at which to identify issues. 
-    ...    pattern=\w*
+    ...    pattern=^\d+$
     ...    example=95
     ...    default=95
    ${DEFAULT_INCREASE}=    RW.Core.Import User Variable    DEFAULT_INCREASE
     ...    type=string
     ...    description=The percentage increase for resource recommendations.  
-    ...    pattern=\w*
+    ...    pattern=^\d+$
     ...    example=25
     ...    default=25
    ${RESTART_AGE}=    RW.Core.Import User Variable    RESTART_AGE
     ...    type=string
     ...    description=The age (in minutes) to consider when looking for container restarts.
-    ...    pattern=\w*
+    ...    pattern=^\d+$
     ...    example=10
     ...    default=10
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}

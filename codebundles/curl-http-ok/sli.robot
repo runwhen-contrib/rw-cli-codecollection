@@ -37,7 +37,7 @@ Validate HTTP URL Availability and Timeliness for ${URL}
     [Documentation]    Use cURL to validate the http response  
     [Tags]    cURL    HTTP    Ingress    Latency    Errors
     ${curl_rsp}=    RW.CLI.Run Cli
-    ...    cmd=curl -o /dev/null -w '{"http_code": \%{http_code}, "time_total": \%{time_total}}' -s ${URL}
+    ...    cmd=curl --connect-timeout 5 --max-time 15 -o /dev/null -w '{"http_code": \%{http_code}, "time_total": \%{time_total}}' -s ${URL}
     ${json}=    evaluate  json.loads($curl_rsp.stdout)
     ${latency}=    Set Variable    ${json['time_total']}
     ${latency_within_target}=    Evaluate    1 if ${latency} <= ${TARGET_LATENCY} else 0

@@ -17,7 +17,7 @@ Check HTTP URL Availability and Timeliness for `${URL}`
     [Documentation]    Use cURL to validate the http response
     [Tags]    curl    http    ingress    latency    errors    access:read-only
     ${curl_rsp}=    RW.CLI.Run Cli
-    ...    cmd=curl -o /dev/null -w '{"http_code": \%{http_code}, "time_total": \%{time_total}}' -s ${URL}
+    ...    cmd=curl --connect-timeout 5 --max-time 15 -o /dev/null -w '{"http_code": \%{http_code}, "time_total": \%{time_total}}' -s ${URL}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
     ${owner_kind}=    RW.CLI.Run Cli

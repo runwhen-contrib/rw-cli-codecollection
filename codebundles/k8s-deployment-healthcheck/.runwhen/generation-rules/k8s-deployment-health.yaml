@@ -16,6 +16,5 @@ spec:
           baseTemplateName: k8s-deployment-health
           outputItems:
             - type: slx
-            # - type: sli
             - type: runbook
               templateName: k8s-deployment-health-taskset.yaml
