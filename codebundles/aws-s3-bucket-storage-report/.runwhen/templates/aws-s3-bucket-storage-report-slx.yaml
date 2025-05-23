@@ -17,4 +17,11 @@ spec:
   - {{workspace.owner_email}}
   statement: S3 buckets in {{match_resource.resource.region}} should be available.
   additionalContext:
-    region: "{{match_resource.resource.region}}"
+    {% include "aws.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name }}"
+  tags: 
+    {% include "aws-tags.yaml" ignore missing %}
+    - name: category
+      value: storage
+    - name: access
+      value: read-only
