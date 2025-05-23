@@ -17,5 +17,13 @@ spec:
   - {{workspace.owner_email}}
   statement: EKS Nodes {{match_resource.resource.region}} should be available.
   additionalContext:
-    region: "{{match_resource.resource.region}}"
-    name: "{{match_resource.resource.cluster_name}}"
+    {% include "aws.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name }}"
+  tags: 
+    {% include "aws-tags.yaml" ignore missing %}
+    - name: service
+      value: eks
+    - name: category
+      value: kubernetes
+    - name: access
+      value: read-only

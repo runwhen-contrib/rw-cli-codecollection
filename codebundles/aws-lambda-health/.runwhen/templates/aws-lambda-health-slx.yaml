@@ -17,4 +17,11 @@ spec:
   - {{workspace.owner_email}}
   statement: The total count of failing Lambdas should be 0.   
   additionalContext:
-    region: "{{match_resource.resource.region}}"
+    {% include "aws.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name }}"
+  tags: 
+    {% include "aws-tags.yaml" ignore missing %}
+    - name: service
+      value: lamda
+    - name: access
+      value: read-only
