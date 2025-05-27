@@ -1,24 +1,3 @@
-# Azure DevOps Triage
-
-This codebundle runs a suite of health checks for Azure DevOps. It identifies:
-
-- Agent Pool Availability
-- Failed Pipeline Runs
-- Long-Running Pipelines
-- Queued Pipelines
-- Repository Policies
-- Service Connection Health
-
-## Configuration
-
-The runbook requires initialization to import necessary secrets and user variables. The following variables should be set:
-
-- `AZURE_RESOURCE_GROUP`: The Azure resource group where DevOps resources are deployed
-- `AZURE_DEVOPS_ORG`: Your Azure DevOps organization name
-- `AZURE_DEVOPS_PROJECT`: Your Azure DevOps project name
-- `DURATION_THRESHOLD`: Threshold for long-running pipelines (format: 60m, 2h) (default: 60m)
-- `QUEUE_THRESHOLD`: Threshold for queued pipelines (format: 10m, 1h) (default: 30m)
-
 ## Testing
 
 The `.test` directory contains infrastructure test code using Terraform to set up a test environment.
