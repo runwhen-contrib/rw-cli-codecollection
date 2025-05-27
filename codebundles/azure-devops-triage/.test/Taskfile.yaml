@@ -60,34 +60,56 @@ tasks:
     silent: true
   generate-rwl-config:
     desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
-    env:
-      ARM_SUBSCRIPTION_ID: "{{.ARM_SUBSCRIPTION_ID}}"
-      AZ_TENANT_ID: "{{.AZ_TENANT_ID}}"
-      AZ_CLIENT_SECRET: "{{.AZ_CLIENT_SECRET}}"
-      AZ_CLIENT_ID: "{{.AZ_CLIENT_ID}}"
-      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+    # env:
+    #   ARM_SUBSCRIPTION_ID: "{{.ARM_SUBSCRIPTION_ID}}"
+    #   AZ_TENANT_ID: "{{.AZ_TENANT_ID}}"
+    #   AZ_CLIENT_SECRET: "{{.AZ_CLIENT_SECRET}}"
+    #   AZ_CLIENT_ID: "{{.AZ_CLIENT_ID}}"
+    #   RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
     cmds:
       - |
         source terraform/tf.secret
         repo_url=$(git config --get remote.origin.url)
         branch_name=$(git rev-parse --abbrev-ref HEAD)
         codebundle=$(basename "$(dirname "$PWD")")
-        AZURE_SUBSCRIPTION_ID=$ARM_SUBSCRIPTION_ID
-        subscription_name=$(az account show --subscription ${AZURE_SUBSCRIPTION_ID} --query name -o tsv)
+        #AZURE_SUBSCRIPTION_ID=$ARM_SUBSCRIPTION_ID
+        #subscription_name=$(az account show --subscription ${AZURE_SUBSCRIPTION_ID} --query name -o tsv)
         # Fetch individual cluster details from Terraform state
         pushd terraform > /dev/null
         resource_group=$(terraform show -json terraform.tfstate | jq -r '
           .values.root_module.resources[] | 
           select(.type == "azurerm_resource_group") | .values.name')
+        
+        # Get Azure DevOps organization and project from Terraform state
+        devops_org=$(terraform show -json terraform.tfstate | jq -r '
+          .values.root_module.resources[] | 
+          select(.type == "azuredevops_project") | 
+          .values.name' | head -n 1 | xargs -I{} echo "azure-devops-test-org")
+        
+        devops_project=$(terraform show -json terraform.tfstate | jq -r '
+          .values.root_module.resources[] | 
+          select(.type == "azuredevops_project") | 
+          .values.name' | head -n 1)
         popd > /dev/null
 
-        # Check if any of the required cluster variables are empty
+        # Check if any of the required variables are empty
         if [ -z "$resource_group" ]; then
           echo "Error: Missing resource_group details. Ensure Terraform plan has been applied."
           exit 1
         fi
+        
+        if [ -z "$devops_org" ]; then
+          echo "Error: Missing resource_group details. Ensure Terraform plan has been applied."
+          exit 1
+        fi
+        
+        if [ -z "$devops_project" ]; then
+          echo "Error: Missing resource_group details. Ensure Terraform plan has been applied."
+          exit 1
+        fi
+        
         source terraform/tf.secret
-        # Generate workspaceInfo.yaml with fetched resource_group details
+        # Generate workspaceInfo.yaml with fetched details
         cat <<EOF > workspaceInfo.yaml
         workspaceName: "$RW_WORKSPACE"
         workspaceOwnerEmail: authors@runwhen.com
@@ -107,6 +129,10 @@ tasks:
           codeBundles: ["$codebundle"]
         custom:
           subscription_name: $subscription_name
+          devops_org: $devops_org
+          devops_project: $devops_project
+          duration_threshold: "60m"
+          queue_threshold: "10m"
         EOF
     silent: true
 
@@ -354,6 +380,23 @@ tasks:
           exit 1
         }
         echo "Terraform infrastructure build completed."
+        
+        # Extract and display Azure DevOps project details
+        echo "Azure DevOps Project Details:"
+        project_name=$(terraform output -json | jq -r '.project_name.value')
+        org_service_url=$(terraform output -json | jq -r '.org_service_url.value')
+        echo "Organization URL: $org_service_url"
+        echo "Project Name: $project_name"
+        
+        # Extract and display agent pool details
+        echo "Agent Pool Details:"
+        agent_pool_name=$(terraform output -json | jq -r '.agent_pool_name.value')
+        echo "Agent Pool Name: $agent_pool_name"
+        
+        echo "Next Steps:"
+        echo "1. Set up a self-hosted agent in the '$agent_pool_name' pool"
+        echo "2. Configure the agent according to the README instructions"
+        echo "3. Run the test pipelines to generate data for the triage codebundle"
     silent: true
 
   cleanup-terraform-infra:

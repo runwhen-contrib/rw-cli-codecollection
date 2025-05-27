@@ -240,10 +240,6 @@ Suite Initialization
     ...    type=string
     ...    description=Azure DevOps project.
     ...    pattern=\w*
-    ${DAYS_TO_LOOK_BACK}=    RW.Core.Import User Variable    DAYS_TO_LOOK_BACK
-    ...    type=integer
-    ...    description=Number of days to look back for pipeline runs
-    ...    default=7
     ${DURATION_THRESHOLD}=    RW.Core.Import User Variable    DURATION_THRESHOLD
     ...    type=string
     ...    description=Threshold for long-running pipelines (format: 60m, 2h)
@@ -255,9 +251,8 @@ Suite Initialization
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${AZURE_DEVOPS_ORG}    ${AZURE_DEVOPS_ORG}
     Set Suite Variable    ${AZURE_DEVOPS_PROJECT}    ${AZURE_DEVOPS_PROJECT}
-    Set Suite Variable    ${DAYS_TO_LOOK_BACK}    ${DAYS_TO_LOOK_BACK}
     Set Suite Variable    ${DURATION_THRESHOLD}    ${DURATION_THRESHOLD}
     Set Suite Variable    ${QUEUE_THRESHOLD}    ${QUEUE_THRESHOLD}
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_DEVOPS_ORG":"${AZURE_DEVOPS_ORG}", "AZURE_DEVOPS_PROJECT":"${AZURE_DEVOPS_PROJECT}", "DAYS_TO_LOOK_BACK":"${DAYS_TO_LOOK_BACK}", "DURATION_THRESHOLD":"${DURATION_THRESHOLD}", "QUEUE_THRESHOLD":"${QUEUE_THRESHOLD}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_DEVOPS_ORG":"${AZURE_DEVOPS_ORG}", "AZURE_DEVOPS_PROJECT":"${AZURE_DEVOPS_PROJECT}", "DURATION_THRESHOLD":"${DURATION_THRESHOLD}", "QUEUE_THRESHOLD":"${QUEUE_THRESHOLD}"}

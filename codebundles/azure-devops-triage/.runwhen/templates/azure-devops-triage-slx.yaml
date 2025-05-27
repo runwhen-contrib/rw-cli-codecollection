@@ -18,12 +18,6 @@ spec:
       value: "{{ custom.devops_org }}"
     - name: AZURE_DEVOPS_PROJECT
       value: "{{ custom.devops_project }}"
-    - name: DAYS_TO_LOOK_BACK
-      value: "7"
-    - name: DURATION_THRESHOLD
-      value: "60m"
-    - name: QUEUE_THRESHOLD
-      value: "10m"
   owners:
     - {{ workspace.owner_email }}
   statement: >-
