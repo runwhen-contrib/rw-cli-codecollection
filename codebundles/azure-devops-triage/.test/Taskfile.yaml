@@ -60,12 +60,12 @@ tasks:
     silent: true
   generate-rwl-config:
     desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
-    # env:
-    #   ARM_SUBSCRIPTION_ID: "{{.ARM_SUBSCRIPTION_ID}}"
-    #   AZ_TENANT_ID: "{{.AZ_TENANT_ID}}"
-    #   AZ_CLIENT_SECRET: "{{.AZ_CLIENT_SECRET}}"
-    #   AZ_CLIENT_ID: "{{.AZ_CLIENT_ID}}"
-    #   RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+    env:
+      ARM_SUBSCRIPTION_ID: "{{.ARM_SUBSCRIPTION_ID}}"
+      AZ_TENANT_ID: "{{.AZ_TENANT_ID}}"
+      AZ_CLIENT_SECRET: "{{.AZ_CLIENT_SECRET}}"
+      AZ_CLIENT_ID: "{{.AZ_CLIENT_ID}}"
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
     cmds:
       - |
         source terraform/tf.secret
@@ -128,11 +128,8 @@ tasks:
           branch: "$branch_name"
           codeBundles: ["$codebundle"]
         custom:
-          subscription_name: $subscription_name
           devops_org: $devops_org
           devops_project: $devops_project
-          duration_threshold: "60m"
-          queue_threshold: "10m"
         EOF
     silent: true
 
