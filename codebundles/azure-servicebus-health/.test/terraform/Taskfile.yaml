@@ -31,6 +31,24 @@ tasks:
     - |
       terraform fmt
       terraform init
+
+  build-terraform-infra:
+    desc: Build the Azure Service Bus test infrastructure
+    cmds:
+      - task: format-and-init-terraform
+      - |
+        echo "Building Azure Service Bus test infrastructure..."
+        terraform apply -auto-approve
+        echo "✅ Test infrastructure built successfully"
+
+  destroy-terraform-infra:
+    desc: Destroy the Azure Service Bus test infrastructure
+    cmds:
+      - |
+        echo "Destroying Azure Service Bus test infrastructure..."
+        terraform destroy -auto-approve
+        echo "✅ Test infrastructure destroyed successfully"
+
   test-terraform:
     desc: Run tests for all terraform directories.
     silent: true
