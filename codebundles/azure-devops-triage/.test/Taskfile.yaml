@@ -72,7 +72,7 @@ tasks:
         repo_url=$(git config --get remote.origin.url)
         branch_name=$(git rev-parse --abbrev-ref HEAD)
         codebundle=$(basename "$(dirname "$PWD")")
-        #AZURE_SUBSCRIPTION_ID=$ARM_SUBSCRIPTION_ID
+        AZURE_SUBSCRIPTION_ID=$ARM_SUBSCRIPTION_ID
         #subscription_name=$(az account show --subscription ${AZURE_SUBSCRIPTION_ID} --query name -o tsv)
         # Fetch individual cluster details from Terraform state
         pushd terraform > /dev/null
