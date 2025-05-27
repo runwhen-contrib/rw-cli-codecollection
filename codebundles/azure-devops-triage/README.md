@@ -31,6 +31,13 @@ The `.test` directory contains infrastructure test code using Terraform to set u
 4. Azure CLI installed and configured
 5. Terraform installed (v1.0.0+)
 
+## tf.secret file
+
+export RW_PAT=""
+export RW_WORKSPACE="ifc-sre-stack"
+export RW_API_URL="papi.beta.runwhen.com"
+
+
 ### Azure DevOps Organization Setup (Before Running Terraform)
 
 Before running Terraform, you need to configure your Azure DevOps organization with the necessary permissions:
