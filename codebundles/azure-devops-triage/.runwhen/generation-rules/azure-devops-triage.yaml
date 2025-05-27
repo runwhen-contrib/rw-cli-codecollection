@@ -4,7 +4,7 @@ spec:
   platform: azure
   generationRules:
     - resourceTypes:
-        - azure_devops_organization
+        - azure_resources_resource_groups
       matchRules:
         - type: pattern
           pattern: ".+"
