@@ -4,7 +4,7 @@ spec:
   platform: azure
   generationRules:
     - resourceTypes:
-        - azure_resources_resource_groups
+        - azure_devops_pipeline_template_definitions
       matchRules:
         - type: pattern
           pattern: ".+"
@@ -12,7 +12,7 @@ spec:
           mode: substring
       slxs:
         - baseName: az-devops-triage
-          qualifiers: ["resource_group"]
+          qualifiers: ["*"]
           baseTemplateName: azure-devops-triage
           levelOfDetail: basic
           outputItems:
