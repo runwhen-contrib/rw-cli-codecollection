@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   location: {{default_location}}
-  description: Check Azure Key Vault health by checking availability metrics, configuration settings, expiring items (secrets/certificates/keys), log issues, and performance metrics in resource group {{ match_resource.resource_group.name }} in azure subscription {{ custom.subscription_name }}
+  description: Check Azure Key Vault health by checking availability metrics, configuration settings, expiring items (secrets/certificates/keys), log issues, and performance metrics in resource group {{ match_resource.resource_group.name }} in azure subscription {{ match_resource.subscription_name }}
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
