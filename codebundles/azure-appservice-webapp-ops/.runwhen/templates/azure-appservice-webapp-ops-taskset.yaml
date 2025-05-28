@@ -32,6 +32,8 @@ spec:
       value: "2"
     - name: SCALE_IN_FACTOR
       value: "2"
+    - name: AZURE_SUBSCRIPTION_NAME
+      value: "{{ match_resource.subscription_name }}"
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}
