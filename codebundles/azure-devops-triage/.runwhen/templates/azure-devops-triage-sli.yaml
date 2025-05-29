@@ -28,7 +28,7 @@ spec:
   intervalSeconds: 600
   configProvided:
     - name: AZURE_RESOURCE_GROUP
-      value: "{{ match_resource.resource_group.name }}"
+      value: "{{ match_resource.resource.name }}"
     - name: AZURE_DEVOPS_ORG
       value: "{{ custom.devops_org }}"
     - name: AZURE_DEVOPS_PROJECT

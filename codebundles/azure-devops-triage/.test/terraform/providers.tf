@@ -22,9 +22,9 @@ provider "azurerm" {
 
 provider "azuredevops" {
   org_service_url = var.azure_devops_org_url != null ? var.azure_devops_org_url : "https://dev.azure.com/${var.azure_devops_org}"
-  client_id       = var.service_principal_id
+  client_id       = var.client_id
   tenant_id       = var.tenant_id
-  client_secret   = var.service_principal_key
+  client_secret   = var.client_secret
 }
 
 # provider "azapi" {

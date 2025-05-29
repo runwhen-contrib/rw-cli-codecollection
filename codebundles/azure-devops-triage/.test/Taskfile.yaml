@@ -72,44 +72,78 @@ tasks:
         repo_url=$(git config --get remote.origin.url)
         branch_name=$(git rev-parse --abbrev-ref HEAD)
         codebundle=$(basename "$(dirname "$PWD")")
-        AZURE_SUBSCRIPTION_ID=$ARM_SUBSCRIPTION_ID
-        #subscription_name=$(az account show --subscription ${AZURE_SUBSCRIPTION_ID} --query name -o tsv)
-        # Fetch individual cluster details from Terraform state
+        
+        # Check if terraform state exists
+        if [ ! -f "terraform/terraform.tfstate" ]; then
+          echo "❌ ERROR: Terraform state file not found."
+          echo "Required infrastructure is missing. Please run 'task build-infra' first."
+          exit 1
+        fi
+        
+        # Check if terraform state is valid JSON
+        if ! jq empty terraform/terraform.tfstate 2>/dev/null; then
+          echo "❌ ERROR: Terraform state file is not valid JSON."
+          echo "Please run 'task build-infra' to create proper infrastructure."
+          exit 1
+        fi
+        
+        # Check if required resources exist in terraform state
         pushd terraform > /dev/null
-        resource_group=$(terraform show -json terraform.tfstate | jq -r '
-          .values.root_module.resources[] | 
-          select(.type == "azurerm_resource_group") | .values.name')
         
-        # Get Azure DevOps organization and project from Terraform state
-        devops_org=$(terraform show -json terraform.tfstate | jq -r '
-          .values.root_module.resources[] | 
-          select(.type == "azuredevops_project") | 
-          .values.name' | head -n 1 | xargs -I{} echo "azure-devops-test-org")
+        # Check for resource group
+        if ! jq '.resources' terraform.tfstate | grep -q "azurerm_resource_group"; then
+          echo "❌ ERROR: No Azure Resource Group found in Terraform state."
+          echo "Please run 'task build-infra' to create required infrastructure."
+          exit 1
+        fi
         
-        devops_project=$(terraform show -json terraform.tfstate | jq -r '
-          .values.root_module.resources[] | 
-          select(.type == "azuredevops_project") | 
-          .values.name' | head -n 1)
-        popd > /dev/null
-
-        # Check if any of the required variables are empty
+        # Check for Azure DevOps project
+        if ! jq '.resources' terraform.tfstate | grep -q "azuredevops_project"; then
+          echo "❌ ERROR: No Azure DevOps Project found in Terraform state."
+          echo "Please run 'task build-infra' to create required infrastructure."
+          exit 1
+        fi
+        
+        # Extract resource values from terraform state
+        resource_group=$(terraform show -json terraform.tfstate | jq -r '.values.root_module.resources[] | select(.type == "azurerm_resource_group") | .values.name')
         if [ -z "$resource_group" ]; then
-          echo "Error: Missing resource_group details. Ensure Terraform plan has been applied."
+          echo "❌ ERROR: Failed to extract Resource Group name from Terraform state."
+          echo "Please run 'task build-infra' to recreate the infrastructure."
           exit 1
         fi
         
-        if [ -z "$devops_org" ]; then
-          echo "Error: Missing resource_group details. Ensure Terraform plan has been applied."
-          exit 1
-        fi
-        
+        # Extract DevOps project name
+        devops_project=$(terraform show -json terraform.tfstate | jq -r '.values.root_module.resources[] | select(.type == "azuredevops_project") | .values.name' | head -n 1)
         if [ -z "$devops_project" ]; then
-          echo "Error: Missing resource_group details. Ensure Terraform plan has been applied."
+          echo "❌ ERROR: Failed to extract Azure DevOps Project name from Terraform state."
+          echo "Please run 'task build-infra' to recreate the infrastructure."
           exit 1
         fi
         
-        source terraform/tf.secret
-        # Generate workspaceInfo.yaml with fetched details
+        # For DevOps org, we need to extract from the service URL
+        org_service_url=$(terraform show -json terraform.tfstate | jq -r ' 
+          .values.outputs["project_url"].value' | head -n 1)
+        if [ -z "$org_service_url" ]; then
+          echo "❌ ERROR: Failed to extract Azure DevOps Organization URL from Terraform state."
+          echo "Please run 'task build-infra' to recreate the infrastructure."
+          exit 1
+        fi
+        
+        # Extract org name from URL
+        devops_org=$(echo "$org_service_url" | sed -n 's/.*dev\.azure\.com\/\([^\/]*\).*/\1/p')
+        if [ -z "$devops_org" ]; then
+          echo "❌ ERROR: Failed to extract Azure DevOps Organization name from URL."
+          echo "Please run 'task build-infra' to recreate the infrastructure."
+          exit 1
+        fi
+        popd > /dev/null
+        
+        echo "Using the following values:"
+        echo "Resource Group: $resource_group"
+        echo "DevOps Organization: $devops_org"
+        echo "DevOps Project: $devops_project"
+        
+        # Generate workspaceInfo.yaml with fetched or default details
         cat <<EOF > workspaceInfo.yaml
         workspaceName: "$RW_WORKSPACE"
         workspaceOwnerEmail: authors@runwhen.com
@@ -131,6 +165,8 @@ tasks:
           devops_org: $devops_org
           devops_project: $devops_project
         EOF
+        
+        echo "Generated workspaceInfo.yaml with configuration for RunWhen Local."
     silent: true
 
   run-rwl-discovery:

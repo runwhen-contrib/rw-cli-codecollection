@@ -15,8 +15,19 @@ variable "service_principal_id" {
   sensitive   = true
 }
 
-variable "service_principal_key" {
-  description = "Service Principal Key for Azure DevOps service connection"
+# variable "service_principal_key" {
+#   description = "Service Principal Key for Azure DevOps service connection"
+#   type        = string
+#   sensitive   = true
+# }
+variable "client_id" {
+  description = "Client ID for Azure DevOps service connection"
+  type        = string
+  sensitive   = true
+}
+
+variable "client_secret" {
+  description = "Client Secret for Azure DevOps service connection"
   type        = string
   sensitive   = true
 }

@@ -95,8 +95,8 @@ resource "azuredevops_serviceendpoint_azurerm" "test_endpoint" {
   azurerm_subscription_id   = data.azurerm_client_config.current.subscription_id
   azurerm_subscription_name = "Test Subscription"
   credentials {
-    serviceprincipalid  = var.service_principal_id
-    serviceprincipalkey = var.service_principal_key
+    serviceprincipalid  = var.client_id
+    serviceprincipalkey = var.client_secret
   }
 }
 

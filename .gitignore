@@ -24,9 +24,6 @@ build
 **/.terraform/
 **/.terraform.lock.hcl
 
-# Ignore terraform tfvars
-**/*.tfvars
-
 # Ignore crash logs
 **/crash.log
 
