@@ -12,12 +12,8 @@ spec:
     {{ match_resource.resource_group.name }} Azure DevOps Health
   asMeasuredBy: Composite health score of Azure DevOps resources & activities.
   configProvided:
-    - name: AZURE_RESOURCE_GROUP
-      value: "{{ match_resource.resource_group.name }}"
-    - name: AZURE_DEVOPS_ORG
-      value: "{{ custom.devops_org }}"
-    - name: AZURE_DEVOPS_PROJECT
-      value: "{{ custom.devops_project }}"
+    - name: SLX_PLACEHOLDER
+      value: SLX_PLACEHOLDER
   owners:
     - {{ workspace.owner_email }}
   statement: >-
