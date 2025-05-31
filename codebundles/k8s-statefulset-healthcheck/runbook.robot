@@ -1,249 +1,156 @@
 *** Settings ***
-Documentation       Triages issues related to a StatefulSet and its replicas.
-Metadata            Author    jon-funk
+Documentation       Triages issues related to a StatefulSet and its pods.
+Metadata            Author    stewartshea
 Metadata            Display Name    Kubernetes StatefulSet Triage
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 
 Library             BuiltIn
-Library             String
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             RW.NextSteps
+Library             RW.K8sHelper
+Library             RW.K8sLog
 Library             OperatingSystem
+Library             String
 
 Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check Readiness Probe Configuration for StatefulSet `${STATEFULSET_NAME}`
-    [Documentation]    Validates if a readiness probe has possible misconfigurations
+Analyze Application Log Patterns for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
+    [Documentation]    Fetches and analyzes logs from the StatefulSet pods for errors, stack traces, connection issues, and other patterns that indicate application health problems.
     [Tags]
-    ...    readiness
-    ...    probe
-    ...    workloads
+    ...    logs
+    ...    application
     ...    errors
-    ...    failure
-    ...    restart
-    ...    get
+    ...    patterns
+    ...    health
     ...    statefulset
-    ...    ${statefulset_name}
+    ...    ${STATEFULSET_NAME}
     ...    access:read-only
-    ${readiness_probe_health}=    RW.CLI.Run Bash File
-    ...    bash_file=validate_probes.sh
-    ...    cmd_overide=./validate_probes.sh readinessProbe
-    ...    env=${env}
-    ...    include_in_history=False
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=echo '${readiness_probe_health.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
-    ...    env=${env}
-    ...    include_in_history=false
-    IF    len($recommendations.stdout) > 0
-        RW.Core.Add Issue
-        ...    severity=2
-        ...    expected=Readiness probes should be configured and functional for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
-        ...    actual=Issues found with readiness probe configuration for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
-        ...    title=Readiness Probe Configuration Issues with StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
-        ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=${readiness_probe_health.stdout}
-        ...    next_steps=${recommendations.stdout}
-    END
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${readiness_probe_health.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
-
-Check Liveness Probe Configuration for StatefulSet `${STATEFULSET_NAME}`
-    [Documentation]    Validates if a Liveliness probe has possible misconfigurations
-    [Tags]
-    ...    liveliness
-    ...    probe
-    ...    workloads
-    ...    errors
-    ...    failure
-    ...    restart
-    ...    get
+    ${log_dir}=    RW.K8sLog.Fetch Workload Logs
     ...    statefulset
-    ...    ${statefulset_name}
-    ...    access:read-only
-    ${liveness_probe_health}=    RW.CLI.Run Bash File
-    ...    bash_file=validate_probes.sh
-    ...    cmd_overide=./validate_probes.sh livenessProbe
-    ...    env=${env}
-    ...    include_in_history=False
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=echo '${liveness_probe_health.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
-    ...    env=${env}
-    ...    include_in_history=false
-    IF    len($recommendations.stdout) > 0
-        RW.Core.Add Issue
-        ...    severity=2
-        ...    expected=Liveness probes should be configured and functional for statefulset `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
-        ...    actual=Issues found with liveness probe configuration for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
-        ...    title=Liveness Probe Configuration Issues with StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
-        ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=${liveness_probe_health.stdout}
-        ...    next_steps=${recommendations.stdout}
-    END
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Liveness probe testing results:\n\n${liveness_probe_health.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
-
-Troubleshoot StatefulSet Warning Events for `${STATEFULSET_NAME}`
-    [Documentation]    Fetches warning events related to the statefulset workload in the namespace and triages any issues found in the events.
-    [Tags]    access:read-only  events    workloads    errors    warnings    get    statefulset    ${statefulset_name}
-    ${events}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '(now - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind == "StatefulSet" or .involvedObject.kind == "Pod") and (.involvedObject.name | tostring | contains("${STATEFULSET_NAME}")) and (.lastTimestamp | fromdateiso8601) >= $time_limit) | {kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp} ] | group_by([.kind, .name]) | map({kind: .[0].kind, name: .[0].name, count: length, reasons: map(.reason) | unique, messages: map(.message) | unique, firstTimestamp: map(.firstTimestamp | fromdateiso8601) | sort | .[0] | todateiso8601, lastTimestamp: map(.lastTimestamp | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
-    ${object_list}=    Evaluate    json.loads(r'''${events.stdout}''')    json
-    IF    len(@{object_list}) > 0
-        FOR    ${item}    IN    @{object_list}
-            ${message_string}=    Catenate    SEPARATOR;    @{item["messages"]}
-            ${messages}=    Replace String    ${message_string}    "    ${EMPTY}
-            ${item_next_steps}=    RW.CLI.Run Bash File
-            ...    bash_file=workload_next_steps.sh
-            ...    cmd_overide=./workload_next_steps.sh "${messages}" "StatefulSet" "${STATEFULSET_NAME}"
-            ...    env=${env}
-            ...    include_in_history=False
-            RW.Core.Add Issue
-            ...    severity=4
-            ...    expected=Warning events should not be present in namespace `${NAMESPACE}` for StatefulSet `${STATEFULSET_NAME}`
-            ...    actual=Warning events are found in namespace `${NAMESPACE}` for StatefulSet `${STATEFULSET_NAME}` which indicate potential issues.
-            ...    title= StatefulSet `${STATEFULSET_NAME}` generated warning events for ${item["kind"]} `${item["name"]}`.
-            ...    reproduce_hint=View Commands Used in Report Output
-            ...    details=${item["kind"]} `${item["name"]}` generated the following warning details:\n`${item}`
-            ...    next_steps=${item_next_steps.stdout}
-        END
-    END
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    ${events.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
-
-Check StatefulSet Event Anomalies for `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
-    [Documentation]    Parses all events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
-    [Tags]    access:read-only  statefulset    events    info    state    anomolies    count    occurences    ${statefulset_name}
-    ${recent_anomalies}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '(now - (60*60)) as $time_limit | [ .items[] | select(.type != "Warning" and (.involvedObject.kind == "StatefulSet" or .involvedObject.kind == "Pod") and (.involvedObject.name | tostring | contains("${STATEFULSET_NAME}"))) | {kind: .involvedObject.kind, count: .count, name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, duration: (if (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp | fromdateiso8601)) == 0) then 1 else (((.lastTimestamp | fromdateiso8601) - (.firstTimestamp | fromdateiso8601))/60) end) } ] | group_by([.kind, .name]) | map({kind: .[0].kind, name: .[0].name, count: (map(.count) | add), reasons: map(.reason) | unique, messages: map(.message) | unique, average_events_per_minute: (if .[0].duration == 1 then 1 else ((map(.count) | add)/.[0].duration ) end),firstTimestamp: map(.firstTimestamp | fromdateiso8601) | sort | .[0] | todateiso8601, lastTimestamp: map(.lastTimestamp | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
-    ${anomaly_list}=    Evaluate    json.loads(r'''${recent_anomalies.stdout}''')    json
-    IF    len($anomaly_list) > 0
-        FOR    ${item}    IN    @{anomaly_list}
-            IF    $item["average_events_per_minute"] > ${ANOMALY_THRESHOLD}
-                ${messages}=    Replace String    ${item["messages"][0]}    "    ${EMPTY}
-                ${item_next_steps}=    RW.CLI.Run Bash File
-                ...    bash_file=workload_next_steps.sh
-                ...    cmd_overide=./workload_next_steps.sh "${messages}" "StatefulSet" "${STATEFULSET_NAME}"
-                ...    env=${env}
-                ...    include_in_history=False
-                RW.Core.Add Issue
-                ...    severity=3
-                ...    expected=Deployment `${STATEFULSET_NAME}` in namespace `${NAMESPACE}` has generated an average events per minute above the threshold of ${ANOMALY_THRESHOLD}.
-                ...    actual=Deployment `${STATEFULSET_NAME}` in namespace `${NAMESPACE}` should have less than ${ANOMALY_THRESHOLD} events per minute related to a specific object.
-                ...    title= ${item["kind"]} `${item["name"]}` has an average of ${item["average_events_per_minute"]} events per minute (above the threshold of ${ANOMALY_THRESHOLD})
-                ...    reproduce_hint=View Commands Used in Report Output
-                ...    details=${item["kind"]} `${item["name"]}` has ${item["count"]} normal events that should be reviewed:\n`${item}`
-                ...    next_steps=${item_next_steps.stdout}
-            END
-        END
-        ${anomalies_report_output}=    Set Variable    ${recent_anomalies.stdout}
-    ELSE
-        ${anomalies_report_output}=    Set Variable    No anomalies were detected!
-    END
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add To Report    Summary Of Anomalies Detected:\n
-    RW.Core.Add To Report    ${anomalies_report_output}\n
-    RW.Core.Add Pre To Report    Commands Used:\n${history}
-
-Fetch StatefulSet Logs for `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}` and Add to Report
-    [Documentation]    Fetches the last 100 lines of logs for the given statefulset in the namespace.
-    [Tags]    access:read-only  fetch    log    pod    container    errors    inspect    trace    info    ${STATEFULSET_NAME}    statefulset
-    ${logs}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs --tail=100 statefulset/${STATEFULSET_NAME} --context ${CONTEXT} -n ${NAMESPACE}
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    ${logs.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
-
-Get Related StatefulSet `${STATEFULSET_NAME}` Events
-    [Documentation]    Fetches events related to the StatefulSet workload in the namespace.
-    [Tags]    events    workloads    errors    warnings    get    statefulset
-    ${events}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} | grep -i "${STATEFULSET_NAME}" || true
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    ${events.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
-
-Fetch Manifest Details for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
-    [Documentation]    Fetches the current state of the statefulset manifest for inspection.
-    [Tags]    access:read-only  statefulset    details    manifest    info    ${STATEFULSET_NAME}
-    ${statefulset}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${LABELS} --context=${CONTEXT} -n ${NAMESPACE} -o yaml
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    ${statefulset.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
-
-List Unhealthy Replica Counts for StatefulSets in Namespace `${NAMESPACE}`
-    [Documentation]    Pulls the replica information for a given StatefulSet and checks if it's highly available
-    ...    , if the replica counts are the expected / healthy values, and if not, what they should be.
-    [Tags]
-    ...    statefulset
-    ...    replicas
-    ...    desired
-    ...    actual
-    ...    available
-    ...    ready
-    ...    unhealthy
-    ...    rollout
-    ...    stuck
-    ...    pods
+    ...    ${STATEFULSET_NAME}
     ...    ${NAMESPACE}
+    ...    ${CONTEXT}
+    ...    ${kubeconfig.content}
+    ...    ${LOG_AGE}
+    
+    ${scan_results}=    RW.K8sLog.Scan Logs For Issues
+    ...    ${log_dir}
+    ...    statefulset
+    ...    ${STATEFULSET_NAME}
+    ...    ${NAMESPACE}
+    ...    @{LOG_PATTERN_CATEGORIES}
+    
+    ${log_health_score}=    RW.K8sLog.Calculate Log Health Score    ${scan_results}
+    
+    # Process each issue found in the logs
+    ${issues}=    Evaluate    $scan_results.get('issues', [])
+    IF    len($issues) > 0
+        FOR    ${issue}    IN    @{issues}
+            ${summarized_details}=    RW.K8sLog.Summarize Log Issues    ${issue["details"]}
+            ${next_steps_text}=    Catenate    SEPARATOR=\n    @{issue["next_steps"]}
+            
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    expected=No application errors should be present in StatefulSet `${STATEFULSET_NAME}` logs in namespace `${NAMESPACE}`
+            ...    actual=Application errors detected in StatefulSet `${STATEFULSET_NAME}` logs in namespace `${NAMESPACE}`
+            ...    title=${issue["title"]}
+            ...    reproduce_hint=Use RW.K8sLog.Fetch Workload Logs and RW.K8sLog.Scan Logs For Issues keywords to reproduce this analysis
+            ...    details=${summarized_details}
+            ...    next_steps=${next_steps_text}
+        END
+    END
+    
+    # Add summary to report
+    ${summary_text}=    Catenate    SEPARATOR=\n    @{scan_results["summary"]}
+    RW.Core.Add Pre To Report    Application Log Analysis Summary for StatefulSet ${STATEFULSET_NAME}:\n${summary_text}
+    RW.Core.Add Pre To Report    Log Health Score: ${log_health_score} (1.0 = healthy, 0.0 = unhealthy)
+    
+    RW.K8sLog.Cleanup Temp Files
+
+Detect Log Anomalies for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
+    [Documentation]    Analyzes logs for repeating patterns, anomalous behavior, and unusual log volume that may indicate underlying issues.
+    [Tags]
+    ...    logs
+    ...    anomalies
+    ...    patterns
+    ...    volume
+    ...    statefulset
+    ...    ${STATEFULSET_NAME}
     ...    access:read-only
-    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset -n ${NAMESPACE} -o json --context ${CONTEXT} | jq -r '.items[] | select(.status.availableReplicas < .status.replicas) | "---\\nStatefulSet Name: " + (.metadata.name|tostring) + "\\nDesired Replicas: " + (.status.replicas|tostring) + "\\nAvailable Replicas: " + (.status.availableReplicas|tostring)'
+    ${log_dir}=    RW.K8sLog.Fetch Workload Logs
+    ...    statefulset
+    ...    ${STATEFULSET_NAME}
+    ...    ${NAMESPACE}
+    ...    ${CONTEXT}
+    ...    ${kubeconfig.content}
+    ...    ${LOG_AGE}
+    
+    ${anomaly_results}=    RW.K8sLog.Analyze Log Anomalies
+    ...    ${log_dir}
+    ...    statefulset
+    ...    ${STATEFULSET_NAME}
+    ...    ${NAMESPACE}
+    
+    # Process anomaly issues
+    ${anomaly_issues}=    Evaluate    $anomaly_results.get('issues', [])
+    IF    len($anomaly_issues) > 0
+        FOR    ${issue}    IN    @{anomaly_issues}
+            ${summarized_details}=    RW.K8sLog.Summarize Log Issues    ${issue["details"]}
+            ${next_steps_text}=    Catenate    SEPARATOR=\n    @{issue["next_steps"]}
+            
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    expected=No log anomalies should be present in StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+            ...    actual=Log anomalies detected in StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+            ...    title=${issue["title"]}
+            ...    reproduce_hint=Use RW.K8sLog.Analyze Log Anomalies keyword to reproduce this analysis
+            ...    details=${summarized_details}
+            ...    next_steps=${next_steps_text}
+        END
+    END
+    
+    # Add summary to report
+    ${anomaly_summary}=    Catenate    SEPARATOR=\n    @{anomaly_results["summary"]}
+    RW.Core.Add Pre To Report    Log Anomaly Analysis for StatefulSet ${STATEFULSET_NAME}:\n${anomaly_summary}
+    
+    RW.K8sLog.Cleanup Temp Files
+
+Check StatefulSet Status for `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
+    [Documentation]    Checks the status of the StatefulSet and identifies any issues with pod readiness or availability.
+    [Tags]
+    ...    statefulset
+    ...    status
+    ...    availability
+    ...    replicas
+    ...    ${STATEFULSET_NAME}
+    ...    access:read-only
+    ${ss_status}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${STATEFULSET_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
-    ${statefulset}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${LABELS} --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r 'if (.items | length) > 0 then .items[0] else {} end'
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ${available_replicas}=    RW.CLI.Parse Cli Json Output
-    ...    rsp=${statefulset}
-    ...    extract_path_to_var__available_replicas=status.availableReplicas || `0`
-    ...    available_replicas__raise_issue_if_lt=1
-    ...    set_issue_title=No Available Replicas for Statefulset In Namespace ${NAMESPACE}
-    ...    set_issue_details=No ready/available statefulset pods found for the statefulset with labels ${LABELS} in namespace ${NAMESPACE}, check events, namespace events, helm charts or kustomization objects.
-    ...    set_issue_next_steps=Troubleshoot Events In Namespace `${NAMESPACE}`\nCheck for Available Helm Chart Updates\nFetch HelmRelease Error Messages\nCheck Readiness and Liveness Probe Status for pods under the `${LABELS}` labels
-    ...    assign_stdout_from_var=available_replicas
-    ${desired_replicas}=    RW.CLI.Parse Cli Json Output
-    ...    rsp=${statefulset}
-    ...    extract_path_to_var__desired_replicas=status.replicas || `0`
-    ...    desired_replicas__raise_issue_if_lt=1
-    ...    set_issue_title=No Desired Replicas For Statefulset In Namespace ${NAMESPACE}
-    ...    set_issue_details=No desired replicas for statefulset under labels ${LABELS} in namespace ${NAMESPACE}
-    ...    set_issue_next_steps=Troubleshoot Events In Namespace `${NAMESPACE}`\nCheck Recent Scaling Changes\nCheck for Available Helm Chart Updates\nFetch HelmRelease Error Messages\nCheck Readiness and Liveness Probe Status for pods under the `${LABELS}` labels
-    ...    assign_stdout_from_var=desired_replicas
-    ${desired_replicas}=    Convert To Number    ${desired_replicas.stdout}
-    ${available_replicas}=    Convert To Number    ${available_replicas.stdout}
-    RW.Core.Add Pre To Report    StatefulSet State:\n${StatefulSet}
+    
+    ${status_data}=    Evaluate    json.loads(r'''${ss_status.stdout}''')    json
+    ${desired_replicas}=    Set Variable    ${status_data["spec"]["replicas"]}
+    ${ready_replicas}=    Set Variable    ${status_data["status"].get("readyReplicas", 0)}
+    ${current_replicas}=    Set Variable    ${status_data["status"].get("currentReplicas", 0)}
+    
+    IF    ${ready_replicas} < ${desired_replicas}
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=StatefulSet `${STATEFULSET_NAME}` should have ${desired_replicas} ready replicas in namespace `${NAMESPACE}`
+        ...    actual=StatefulSet `${STATEFULSET_NAME}` has ${ready_replicas} ready replicas in namespace `${NAMESPACE}`
+        ...    title=StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}` has unhealthy replicas
+        ...    reproduce_hint=${ss_status.cmd}
+        ...    details=StatefulSet ${STATEFULSET_NAME} has ${ready_replicas}/${desired_replicas} ready replicas
+        ...    next_steps=Check pod status and events for StatefulSet pods\nInvestigate container restarts\nCheck persistent volume claims if applicable
+    END
+    
+    RW.Core.Add Pre To Report    StatefulSet Status:\n${ss_status.stdout}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
@@ -258,9 +165,9 @@ Suite Initialization
     ...    example=For examples, start here https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
     ${STATEFULSET_NAME}=    RW.Core.Import User Variable    STATEFULSET_NAME
     ...    type=string
-    ...    description=Used to target the resource for queries and filtering events.
+    ...    description=Used to target the StatefulSet resource for queries and filtering events.
     ...    pattern=\w*
-    ...    example=my-database
+    ...    example=mysql-primary
     ${NAMESPACE}=    RW.Core.Import User Variable    NAMESPACE
     ...    type=string
     ...    description=The name of the Kubernetes namespace to scope actions and searching to.
@@ -271,36 +178,34 @@ Suite Initialization
     ...    description=Which Kubernetes context to operate within.
     ...    pattern=\w*
     ...    example=my-main-cluster
-    ${LABELS}=    RW.Core.Import User Variable    LABELS
-    ...    type=string
-    ...    description=The Kubernetes labels used to fetch the first matching statefulset.
-    ...    pattern=\w*
-    ...    example=Could not render example.
-    ...    default=
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
-    ...    description=Which binary to use for CLI commands
+    ...    description=Which binary to use for Kubernetes CLI commands.
     ...    enum=[kubectl,oc]
     ...    example=kubectl
     ...    default=kubectl
-    ${ANOMALY_THRESHOLD}=    RW.Core.Import User Variable
-    ...    ANOMALY_THRESHOLD
+    ${LOG_AGE}=    RW.Core.Import User Variable    LOG_AGE
     ...    type=string
-    ...    description=The rate of occurence per minute at which an Event becomes classified as an anomaly, even if Kubernetes considers it informational.
-    ...    pattern=\d+(\.\d+)?
-    ...    example=5.0
-    ...    default=5.0
+    ...    description=How far back to analyze logs (e.g., 10m, 1h, 2h)
+    ...    pattern=\w*
+    ...    example=30m
+    ...    default=10m
+    ${LOG_PATTERN_CATEGORIES}=    RW.Core.Import User Variable    LOG_PATTERN_CATEGORIES
+    ...    type=string
+    ...    description=Comma-separated list of log pattern categories to analyze
+    ...    pattern=\w*
+    ...    example=GenericError,StackTrace,Connection,Timeout
+    ...    default=GenericError,AppFailure,StackTrace,Connection,Timeout,Auth,Exceptions,Resource
+    # Convert comma-separated string to list
+    @{category_list}=    Split String    ${LOG_PATTERN_CATEGORIES}    ,
+    @{category_list}=    Evaluate    [cat.strip() for cat in $category_list]
+    Set Suite Variable    ${LOG_AGE}    ${LOG_AGE}
+    Set Suite Variable    @{LOG_PATTERN_CATEGORIES}    @{category_list}
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
-    Set Suite Variable    ${CONTEXT}    ${CONTEXT}
-    Set Suite Variable    ${ANOMALY_THRESHOLD}    ${ANOMALY_THRESHOLD}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
+    Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${STATEFULSET_NAME}    ${STATEFULSET_NAME}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "ANOMALY_THRESHOLD":"${ANOMALY_THRESHOLD}", "STATEFULSET_NAME": "${STATEFULSET_NAME}"}
-
-    IF    "${LABELS}" != ""
-        ${LABELS}=    Set Variable    -l ${LABELS}
-    END
-    Set Suite Variable    ${LABELS}    ${LABELS}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "STATEFULSET_NAME": "${STATEFULSET_NAME}"}

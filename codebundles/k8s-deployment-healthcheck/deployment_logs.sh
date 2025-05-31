@@ -165,6 +165,96 @@ for FILE in "${LOG_FILES[@]}"; do
     ERROR_FUZZY_STRING+=$(echo "$ERROR_SUMMARY" | head -n 3 | tr -d '":' | tr ' ' '\n' | awk '{ for (i=1; i<=NF; i++) if (i != 2) print $i }')
 done
 ERROR_FUZZY_STRING=$(echo "$ERROR_FUZZY_STRING" | sort | uniq)
+
+# Additional lnav queries for enhanced analysis
+echo "---"
+echo "Query for API response time analysis"
+for FILE in "${LOG_FILES[@]}"; do
+    echo "$FILE"
+    # Analyze slow API responses (>1000ms)
+    SLOW_RESPONSES=$(lnav -n -c ';SELECT "http.req.path", AVG("http.resp.took.ms") as avg_duration, COUNT(*) as count FROM http_logrus_custom WHERE "http.resp.took.ms" > 1000 GROUP BY "http.req.path" ORDER BY avg_duration DESC LIMIT 5;' $FILE)
+    if [[ -n "$SLOW_RESPONSES" && $(echo "$SLOW_RESPONSES" | wc -l) -gt 1 ]]; then
+        echo "Slow API endpoints detected:"
+        echo "$SLOW_RESPONSES"
+        issue_descriptions+=("Slow API responses detected in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}")
+        recommendations+=("Investigate performance bottlenecks for slow API endpoints in ${WORKLOAD_TYPE} ${WORKLOAD_NAME}")
+    fi
+done
+
+echo "---"
+echo "Query for database connection issues"
+for FILE in "${LOG_FILES[@]}"; do
+    echo "$FILE"
+    # Look for database-related patterns
+    DB_ISSUES=$(lnav -n -c ';SELECT log_line, COUNT(*) as count FROM logline WHERE log_line MATCH "(?i)(database|mysql|postgres|sql|connection pool|deadlock|timeout)" AND log_line MATCH "(?i)(error|fail|timeout)" GROUP BY log_line ORDER BY count DESC LIMIT 5;' $FILE)
+    if [[ -n "$DB_ISSUES" && $(echo "$DB_ISSUES" | wc -l) -gt 1 ]]; then
+        echo "Database issues detected:"
+        echo "$DB_ISSUES"
+        issue_descriptions+=("Database connectivity or performance issues detected")
+        recommendations+=("Review database connection pool settings and query performance for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}")
+    fi
+done
+
+echo "---"
+echo "Query for authentication and authorization failures"
+for FILE in "${LOG_FILES[@]}"; do
+    echo "$FILE"
+    # Security-related log analysis
+    AUTH_FAILURES=$(lnav -n -c ';SELECT log_line, COUNT(*) as count FROM logline WHERE log_line MATCH "(?i)(unauthorized|forbidden|invalid.*token|authentication.*failed|permission.*denied|access.*denied)" GROUP BY log_line ORDER BY count DESC LIMIT 5;' $FILE)
+    if [[ -n "$AUTH_FAILURES" && $(echo "$AUTH_FAILURES" | wc -l) -gt 1 ]]; then
+        echo "Authentication/Authorization failures detected:"
+        echo "$AUTH_FAILURES"
+        issue_descriptions+=("Authentication or authorization failures detected")
+        recommendations+=("Review RBAC policies and authentication configuration for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}")
+        recommendations+=("Check service account permissions and token validity")
+    fi
+done
+
+echo "---"
+echo "Query for memory and resource pressure"
+for FILE in "${LOG_FILES[@]}"; do
+    echo "$FILE"
+    # Resource constraint analysis
+    RESOURCE_ISSUES=$(lnav -n -c ';SELECT log_line, COUNT(*) as count FROM logline WHERE log_line MATCH "(?i)(out of memory|oom|memory.*limit|cpu.*throttl|resource.*exhausted|disk.*full)" GROUP BY log_line ORDER BY count DESC LIMIT 5;' $FILE)
+    if [[ -n "$RESOURCE_ISSUES" && $(echo "$RESOURCE_ISSUES" | wc -l) -gt 1 ]]; then
+        echo "Resource constraint issues detected:"
+        echo "$RESOURCE_ISSUES"
+        issue_descriptions+=("Resource constraints detected (memory, CPU, or disk)")
+        recommendations+=("Review resource limits and requests for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}")
+        recommendations+=("Check pod resource utilization and node capacity")
+    fi
+done
+
+echo "---"
+echo "Query for application startup and lifecycle issues"
+for FILE in "${LOG_FILES[@]}"; do
+    echo "$FILE"
+    # Application lifecycle analysis
+    LIFECYCLE_ISSUES=$(lnav -n -c ';SELECT log_line, COUNT(*) as count FROM logline WHERE log_line MATCH "(?i)(startup.*failed|initialization.*error|shutdown.*error|graceful.*shutdown|sigterm|sigkill)" GROUP BY log_line ORDER BY count DESC LIMIT 5;' $FILE)
+    if [[ -n "$LIFECYCLE_ISSUES" && $(echo "$LIFECYCLE_ISSUES" | wc -l) -gt 1 ]]; then
+        echo "Application lifecycle issues detected:"
+        echo "$LIFECYCLE_ISSUES"
+        issue_descriptions+=("Application startup or shutdown issues detected")
+        recommendations+=("Review application initialization sequence and graceful shutdown handling")
+        recommendations+=("Check readiness and liveness probe configuration for ${WORKLOAD_TYPE} ${WORKLOAD_NAME}")
+    fi
+done
+
+echo "---"
+echo "Query for external service integration failures"
+for FILE in "${LOG_FILES[@]}"; do
+    echo "$FILE"
+    # External service dependency analysis
+    EXTERNAL_FAILURES=$(lnav -n -c ';SELECT log_line, COUNT(*) as count FROM logline WHERE log_line MATCH "(?i)(external.*service|upstream.*error|third.*party|api.*call.*failed|webhook.*failed|integration.*error)" GROUP BY log_line ORDER BY count DESC LIMIT 5;' $FILE)
+    if [[ -n "$EXTERNAL_FAILURES" && $(echo "$EXTERNAL_FAILURES" | wc -l) -gt 1 ]]; then
+        echo "External service integration failures detected:"
+        echo "$EXTERNAL_FAILURES"
+        issue_descriptions+=("External service integration failures detected")
+        recommendations+=("Verify external service availability and network connectivity")
+        recommendations+=("Review API endpoint configurations and retry policies")
+    fi
+done
+
 ##### End query #####
 
 # If neither above work, query with grep
