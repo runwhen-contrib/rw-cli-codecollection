@@ -113,9 +113,8 @@ Suite Initialization
     Set Suite Variable    ${ANOMALY_THRESHOLD}
     Set Suite Variable    ${LOGS_ERROR_PATTERN}
     Set Suite Variable    ${LOGS_EXCLUDE_PATTERN}
-    Set Suite Variable
-    ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "LOGS_ERROR_PATTERN":"${LOGS_ERROR_PATTERN}", "LOGS_EXCLUDE_PATTERN":"${LOGS_EXCLUDE_PATTERN}", "ANOMALY_THRESHOLD":"${ANOMALY_THRESHOLD}", "DEPLOYMENT_NAME": "${DEPLOYMENT_NAME}"}
+    ${env}=    Evaluate    {"KUBECONFIG":"${kubeconfig.key}","KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}","CONTEXT":"${CONTEXT}","NAMESPACE":"${NAMESPACE}","LOGS_ERROR_PATTERN":"${LOGS_ERROR_PATTERN}","LOGS_EXCLUDE_PATTERN":"${LOGS_EXCLUDE_PATTERN}","ANOMALY_THRESHOLD":"${ANOMALY_THRESHOLD}","DEPLOYMENT_NAME":"${DEPLOYMENT_NAME}"}
+    Set Suite Variable    ${env}
 
 
 *** Tasks ***
@@ -429,23 +428,39 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
-    ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' "liveness_probe_output"
-    ...    env=${env}
-    ...    include_in_history=false
-    IF    len($recommendations.stdout) > 0
+    
+    # Check for command failure and create generic issue if needed
+    IF    ${liveness_probe_health.returncode} != 0
         RW.Core.Add Issue
         ...    severity=2
-        ...    expected=Liveness probes should be configured and functional for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-        ...    actual=Issues found with liveness probe configuration for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-        ...    title=Configuration Issues with Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-        ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=Liveness Probe Configuration Issues with Deployment ${DEPLOYMENT_NAME}\n${liveness_probe_health.stdout}
-        ...    next_steps=${recommendations.stdout}
+        ...    expected=Liveness probe validation should complete for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+        ...    actual=Failed to validate liveness probe for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+        ...    title=Unable to Validate Liveness Probe for Deployment `${DEPLOYMENT_NAME}`
+        ...    reproduce_hint=${liveness_probe_health.cmd}
+        ...    details=Validation script failed with exit code ${liveness_probe_health.returncode}:\n\nSTDOUT:\n${liveness_probe_health.stdout}\n\nSTDERR:\n${liveness_probe_health.stderr}
+        ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
+        ${history}=    RW.CLI.Pop Shell History
+        RW.Core.Add Pre To Report    Failed to validate liveness probe:\n\n${liveness_probe_health.stderr}
+        RW.Core.Add Pre To Report    Commands Used: ${liveness_probe_health.cmd}
+    ELSE
+        ${recommendations}=    RW.CLI.Run Cli
+        ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' "liveness_probe_output"
+        ...    env=${env}
+        ...    include_in_history=false
+        IF    len($recommendations.stdout) > 0
+            RW.Core.Add Issue
+            ...    severity=2
+            ...    expected=Liveness probes should be configured and functional for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    actual=Issues found with liveness probe configuration for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    title=Configuration Issues with Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    reproduce_hint=View Commands Used in Report Output
+            ...    details=Liveness Probe Configuration Issues with Deployment ${DEPLOYMENT_NAME}\n${liveness_probe_health.stdout}
+            ...    next_steps=${recommendations.stdout}
+        END
+        ${history}=    RW.CLI.Pop Shell History
+        RW.Core.Add Pre To Report    Liveness probe testing results:\n\n${liveness_probe_health.stdout}
+        RW.Core.Add Pre To Report    Commands Used: ${liveness_probe_health.cmd}
     END
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Liveness probe testing results:\n\n${liveness_probe_health.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${liveness_probe_health.cmd}
 
 Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Validates if a readiness probe has possible misconfigurations
@@ -467,23 +482,39 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}` in Names
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
-    ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' "readiness_probe_output"
-    ...    env=${env}
-    ...    include_in_history=false
-    IF    len($recommendations.stdout) > 0
+    
+    # Check for command failure and create generic issue if needed
+    IF    ${readiness_probe_health.returncode} != 0
         RW.Core.Add Issue
         ...    severity=2
-        ...    expected=Readiness probes should be configured and functional for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-        ...    actual=Issues found with readiness probe configuration for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-        ...    title=Configuration Issues with Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-        ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=Readiness Probe Issues with Deployment ${DEPLOYMENT_NAME}\n${readiness_probe_health.stdout}
-        ...    next_steps=${recommendations.stdout}
+        ...    expected=Readiness probe validation should complete for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+        ...    actual=Failed to validate readiness probe for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+        ...    title=Unable to Validate Readiness Probe for Deployment `${DEPLOYMENT_NAME}`
+        ...    reproduce_hint=${readiness_probe_health.cmd}
+        ...    details=Validation script failed with exit code ${readiness_probe_health.returncode}:\n\nSTDOUT:\n${readiness_probe_health.stdout}\n\nSTDERR:\n${readiness_probe_health.stderr}
+        ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
+        ${history}=    RW.CLI.Pop Shell History
+        RW.Core.Add Pre To Report    Failed to validate readiness probe:\n\n${readiness_probe_health.stderr}
+        RW.Core.Add Pre To Report    Commands Used: ${readiness_probe_health.cmd}
+    ELSE
+        ${recommendations}=    RW.CLI.Run Cli
+        ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' "readiness_probe_output"
+        ...    env=${env}
+        ...    include_in_history=false
+        IF    len($recommendations.stdout) > 0
+            RW.Core.Add Issue
+            ...    severity=2
+            ...    expected=Readiness probes should be configured and functional for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    actual=Issues found with readiness probe configuration for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    title=Configuration Issues with Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    reproduce_hint=View Commands Used in Report Output
+            ...    details=Readiness Probe Issues with Deployment ${DEPLOYMENT_NAME}\n${readiness_probe_health.stdout}
+            ...    next_steps=${recommendations.stdout}
+        END
+        ${history}=    RW.CLI.Pop Shell History
+        RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${readiness_probe_health.stdout}
+        RW.Core.Add Pre To Report    Commands Used: ${readiness_probe_health.cmd}
     END
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${readiness_probe_health.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${readiness_probe_health.cmd}
 
 Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches pods that have container restarts and provides a report of the restart issues.
@@ -542,142 +573,174 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
-   ${k8s_deployment_details}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ${related_resource_recommendations}=    RW.K8sHelper.Get Related Resource Recommendations
-    ...    k8s_object=${k8s_deployment_details.stdout}
     
-    # Simple JSON parsing with fallback
-    TRY
-        ${object_list}=    Evaluate    json.loads(r'''${events.stdout}''')    json
-    EXCEPT
-        Log    Warning: Failed to parse events JSON, creating generic warning issue
-        ${object_list}=    Create List
-        # Create generic issue if we have events but can't parse them
-        IF    "Warning" in $events.stdout
+    # Check for command failure and create generic issue if needed
+    IF    ${events.returncode} != 0
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=Deployment warning events should be retrievable for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+        ...    actual=Failed to retrieve deployment warning events for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+        ...    title=Unable to Fetch Warning Events for Deployment `${DEPLOYMENT_NAME}`
+        ...    reproduce_hint=${events.cmd}
+        ...    details=Command failed with exit code ${events.returncode}:\n\nSTDOUT:\n${events.stdout}\n\nSTDERR:\n${events.stderr}
+        ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
+        ${history}=    RW.CLI.Pop Shell History
+        RW.Core.Add Pre To Report    Failed to retrieve events:\n\n${events.stderr}
+        RW.Core.Add Pre To Report    Commands Used: ${history}
+    ELSE
+        ${k8s_deployment_details}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json
+        ...    env=${env}
+        ...    secret_file__kubeconfig=${kubeconfig}
+        
+        # Check for deployment details command failure
+        IF    ${k8s_deployment_details.returncode} != 0
             RW.Core.Add Issue
-            ...    severity=3
-            ...    expected=No warning events should be present for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    actual=Warning events detected for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    title=Warning Events Detected for Deployment `${DEPLOYMENT_NAME}` (Parse Failed)
-            ...    reproduce_hint=${events.cmd}
-            ...    details=Warning events detected but JSON parsing failed. Raw output:\n${events.stdout}
-            ...    next_steps=Manually review events output and investigate warning conditions\n${related_resource_recommendations}
-        END
-    END
-    
-    # Consolidate issues by type to avoid duplicates
-    ${pod_issues}=    Create List
-    ${deployment_issues}=    Create List
-    ${unique_issue_types}=    Create Dictionary
-    
-    IF    len(@{object_list}) > 0
-        FOR    ${item}    IN    @{object_list}
-            ${message_string}=    Catenate    SEPARATOR;    @{item["messages"]}
-            ${messages}=    RW.K8sHelper.Sanitize Messages    ${message_string}
-            ${issues}=    RW.CLI.Run Bash File
-            ...    bash_file=workload_issues.sh
-            ...    cmd_override=./workload_issues.sh "${messages}" "Deployment" "${DEPLOYMENT_NAME}"
-            ...    env=${env}
-            ...    include_in_history=False
+            ...    severity=2
+            ...    expected=Deployment details should be retrievable for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    actual=Failed to retrieve deployment details for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    title=Unable to Fetch Deployment Details for `${DEPLOYMENT_NAME}`
+            ...    reproduce_hint=${k8s_deployment_details.cmd}
+            ...    details=Command failed with exit code ${k8s_deployment_details.returncode}:\n\nSTDOUT:\n${k8s_deployment_details.stdout}\n\nSTDERR:\n${k8s_deployment_details.stderr}
+            ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
+            ${history}=    RW.CLI.Pop Shell History
+            RW.Core.Add Pre To Report    Failed to retrieve deployment details:\n\n${k8s_deployment_details.stderr}
+            RW.Core.Add Pre To Report    Commands Used: ${history}
+        ELSE
+            ${related_resource_recommendations}=    RW.K8sHelper.Get Related Resource Recommendations
+            ...    k8s_object=${k8s_deployment_details.stdout}
             
             # Simple JSON parsing with fallback
             TRY
-                ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+                ${object_list}=    Evaluate    json.loads(r'''${events.stdout}''')    json
             EXCEPT
-                Log    Warning: Failed to parse workload issues JSON, creating generic issue
-                ${issue_list}=    Create List
-                # Create generic issue if we have content but can't parse it
-                IF    len($messages) > 0
-                    ${generic_issue}=    Create Dictionary    
-                    ...    severity=3    
-                    ...    title=Event Issues for ${item["kind"]} ${item["name"]}    
-                    ...    next_steps=Investigate event messages: ${messages}    
-                    ...    details=Event detected but issue parsing failed: ${messages}
-                    Append To List    ${issue_list}    ${generic_issue}
+                Log    Warning: Failed to parse events JSON, creating generic warning issue
+                ${object_list}=    Create List
+                # Create generic issue if we have events but can't parse them
+                IF    "Warning" in $events.stdout
+                    RW.Core.Add Issue
+                    ...    severity=3
+                    ...    expected=No warning events should be present for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                    ...    actual=Warning events detected for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                    ...    title=Warning Events Detected for Deployment `${DEPLOYMENT_NAME}` (Parse Failed)
+                    ...    reproduce_hint=${events.cmd}
+                    ...    details=Warning events detected but JSON parsing failed. Raw output:\n${events.stdout}
+                    ...    next_steps=Manually review events output and investigate warning conditions\n${related_resource_recommendations}
                 END
             END
             
-            # Process issues normally
-            FOR    ${issue}    IN    @{issue_list}
-                ${issue_key}=    Set Variable    ${issue["title"]}
-                ${current_count}=    Evaluate    $unique_issue_types.get("${issue_key}", 0)
-                ${new_count}=    Evaluate    ${current_count} + 1
-                ${updated_dict}=    Evaluate    {**$unique_issue_types, "${issue_key}": ${new_count}}
-                Set Test Variable    ${unique_issue_types}    ${updated_dict}
+            # Consolidate issues by type to avoid duplicates
+            ${pod_issues}=    Create List
+            ${deployment_issues}=    Create List
+            ${unique_issue_types}=    Create Dictionary
+            
+            IF    len(@{object_list}) > 0
+                FOR    ${item}    IN    @{object_list}
+                    ${message_string}=    Catenate    SEPARATOR;    @{item["messages"]}
+                    ${messages}=    RW.K8sHelper.Sanitize Messages    ${message_string}
+                    ${issues}=    RW.CLI.Run Bash File
+                    ...    bash_file=workload_issues.sh
+                    ...    cmd_override=./workload_issues.sh "${messages}" "Deployment" "${DEPLOYMENT_NAME}"
+                    ...    env=${env}
+                    ...    include_in_history=False
+                    
+                    # Simple JSON parsing with fallback
+                    TRY
+                        ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+                    EXCEPT
+                        Log    Warning: Failed to parse workload issues JSON, creating generic issue
+                        ${issue_list}=    Create List
+                        # Create generic issue if we have content but can't parse it
+                        IF    len($messages) > 0
+                            ${generic_issue}=    Create Dictionary    
+                            ...    severity=3    
+                            ...    title=Event Issues for ${item["kind"]} ${item["name"]}    
+                            ...    next_steps=Investigate event messages: ${messages}    
+                            ...    details=Event detected but issue parsing failed: ${messages}
+                            Append To List    ${issue_list}    ${generic_issue}
+                        END
+                    END
+                    
+                    # Process issues normally
+                    FOR    ${issue}    IN    @{issue_list}
+                        ${issue_key}=    Set Variable    ${issue["title"]}
+                        ${current_count}=    Evaluate    $unique_issue_types.get("${issue_key}", 0)
+                        ${new_count}=    Evaluate    ${current_count} + 1
+                        ${updated_dict}=    Evaluate    {**$unique_issue_types, "${issue_key}": ${new_count}}
+                        Set Test Variable    ${unique_issue_types}    ${updated_dict}
+                        
+                        IF    '${item["kind"]}' == 'Pod'
+                            Append To List    ${pod_issues}    ${issue}
+                        ELSE
+                            Append To List    ${deployment_issues}    ${issue}
+                        END
+                    END
+                    
+                    # If no structured issues but we have event content, create generic issue
+                    IF    len(@{issue_list}) == 0 and len($messages) > 0
+                        ${generic_issue}=    Create Dictionary    
+                        ...    severity=3    
+                        ...    title=Event Issues for ${item["kind"]} ${item["name"]}    
+                        ...    next_steps=Investigate event messages: ${messages}    
+                        ...    details=Event detected but issue parsing failed: ${messages}
+                        
+                        IF    '${item["kind"]}' == 'Pod'
+                            Append To List    ${pod_issues}    ${generic_issue}
+                        ELSE
+                            Append To List    ${deployment_issues}    ${generic_issue}
+                        END
+                    END
+                END
                 
-                IF    '${item["kind"]}' == 'Pod'
-                    Append To List    ${pod_issues}    ${issue}
-                ELSE
-                    Append To List    ${deployment_issues}    ${issue}
+                # Create consolidated issues
+                IF    len($pod_issues) > 0
+                    # Group pod issues by type and create single consolidated issue
+                    ${pod_count}=    Evaluate    len([item for item in $object_list if item['kind'] == 'Pod'])
+                    ${sample_pod_issue}=    Set Variable    ${pod_issues[0]}
+                    ${all_pod_messages}=    Create List
+                    FOR    ${item}    IN    @{object_list}
+                        IF    '${item["kind"]}' == 'Pod'
+                            ${pod_msg}=    Catenate    **Pod ${item["name"]}**: ${item["messages"][0]}
+                            Append To List    ${all_pod_messages}    ${pod_msg}
+                        END
+                    END
+                    ${consolidated_pod_details}=    Catenate    SEPARATOR=\n    @{all_pod_messages}
+                    
+                    RW.Core.Add Issue
+                    ...    severity=${sample_pod_issue["severity"]}
+                    ...    expected=Pod readiness and health should be maintained for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                    ...    actual=${pod_count} pods are experiencing issues for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                    ...    title=Multiple Pod Issues for Deployment `${DEPLOYMENT_NAME}` (${pod_count} pods affected)
+                    ...    reproduce_hint=${events.cmd}
+                    ...    details=**Affected Pods:** ${pod_count}\n\n${consolidated_pod_details}
+                    ...    next_steps=${sample_pod_issue["next_steps"]}\n${related_resource_recommendations}
                 END
-            END
-            
-            # If no structured issues but we have event content, create generic issue
-            IF    len(@{issue_list}) == 0 and len($messages) > 0
-                ${generic_issue}=    Create Dictionary    
-                ...    severity=3    
-                ...    title=Event Issues for ${item["kind"]} ${item["name"]}    
-                ...    next_steps=Investigate event messages: ${messages}    
-                ...    details=Event detected but issue parsing failed: ${messages}
                 
-                IF    '${item["kind"]}' == 'Pod'
-                    Append To List    ${pod_issues}    ${generic_issue}
-                ELSE
-                    Append To List    ${deployment_issues}    ${generic_issue}
+                # Create issues for deployment/replicaset level problems (should be fewer)
+                ${processed_deployment_titles}=    Create Dictionary
+                FOR    ${issue}    IN    @{deployment_issues}
+                    ${title_key}=    Set Variable    ${issue["title"]}
+                    ${is_duplicate}=    Evaluate    $processed_deployment_titles.get("${title_key}", False)
+                    IF    not ${is_duplicate}
+                        ${updated_titles}=    Evaluate    {**$processed_deployment_titles, "${title_key}": True}
+                        Set Test Variable    ${processed_deployment_titles}    ${updated_titles}
+                        RW.Core.Add Issue
+                        ...    severity=${issue["severity"]}
+                        ...    expected=No deployment-level warning events should be present for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                        ...    actual=Deployment-level warning events found for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                        ...    title=${issue["title"]}
+                        ...    reproduce_hint=${events.cmd}
+                        ...    details=${issue["details"]}
+                        ...    next_steps=${issue["next_steps"]}\n${related_resource_recommendations}
+                    END
                 END
             END
-        END
-        
-        # Create consolidated issues
-        IF    len($pod_issues) > 0
-            # Group pod issues by type and create single consolidated issue
-            ${pod_count}=    Evaluate    len([item for item in $object_list if item['kind'] == 'Pod'])
-            ${sample_pod_issue}=    Set Variable    ${pod_issues[0]}
-            ${all_pod_messages}=    Create List
-            FOR    ${item}    IN    @{object_list}
-                IF    '${item["kind"]}' == 'Pod'
-                    ${pod_msg}=    Catenate    **Pod ${item["name"]}**: ${item["messages"][0]}
-                    Append To List    ${all_pod_messages}    ${pod_msg}
-                END
-            END
-            ${consolidated_pod_details}=    Catenate    SEPARATOR=\n    @{all_pod_messages}
             
-            RW.Core.Add Issue
-            ...    severity=${sample_pod_issue["severity"]}
-            ...    expected=Pod readiness and health should be maintained for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    actual=${pod_count} pods are experiencing issues for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    title=Multiple Pod Issues for Deployment `${DEPLOYMENT_NAME}` (${pod_count} pods affected)
-            ...    reproduce_hint=${events.cmd}
-            ...    details=**Affected Pods:** ${pod_count}\n\n${consolidated_pod_details}
-            ...    next_steps=${sample_pod_issue["next_steps"]}\n${related_resource_recommendations}
-        END
-        
-        # Create issues for deployment/replicaset level problems (should be fewer)
-        ${processed_deployment_titles}=    Create Dictionary
-        FOR    ${issue}    IN    @{deployment_issues}
-            ${title_key}=    Set Variable    ${issue["title"]}
-            ${is_duplicate}=    Evaluate    $processed_deployment_titles.get("${title_key}", False)
-            IF    not ${is_duplicate}
-                ${updated_titles}=    Evaluate    {**$processed_deployment_titles, "${title_key}": True}
-                Set Test Variable    ${processed_deployment_titles}    ${updated_titles}
-                RW.Core.Add Issue
-                ...    severity=${issue["severity"]}
-                ...    expected=No deployment-level warning events should be present for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                ...    actual=Deployment-level warning events found for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                ...    title=${issue["title"]}
-                ...    reproduce_hint=${events.cmd}
-                ...    details=${issue["details"]}
-                ...    next_steps=${issue["next_steps"]}\n${related_resource_recommendations}
-            END
+            ${history}=    RW.CLI.Pop Shell History
+            RW.Core.Add Pre To Report    ${events.stdout}
+            RW.Core.Add Pre To Report    Commands Used: ${history}
         END
     END
-    
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    ${events.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Fetch Deployment Workload Details For `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches the current state of the deployment for future review in the report.
@@ -688,9 +751,25 @@ Fetch Deployment Workload Details For `${DEPLOYMENT_NAME}` in Namespace `${NAMES
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Snapshot of deployment state:\n\n${deployment.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
+    
+    # Check for command failure and create generic issue if needed
+    IF    ${deployment.returncode} != 0
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=Deployment manifest should be retrievable for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+        ...    actual=Failed to retrieve deployment manifest for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+        ...    title=Unable to Fetch Deployment Manifest for `${DEPLOYMENT_NAME}`
+        ...    reproduce_hint=${deployment.cmd}
+        ...    details=Command failed with exit code ${deployment.returncode}:\n\nSTDOUT:\n${deployment.stdout}\n\nSTDERR:\n${deployment.stderr}
+        ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
+        ${history}=    RW.CLI.Pop Shell History
+        RW.Core.Add Pre To Report    Failed to retrieve deployment manifest:\n\n${deployment.stderr}
+        RW.Core.Add Pre To Report    Commands Used: ${history}
+    ELSE
+        ${history}=    RW.CLI.Pop Shell History
+        RW.Core.Add Pre To Report    Snapshot of deployment state:\n\n${deployment.stdout}
+        RW.Core.Add Pre To Report    Commands Used: ${history}
+    END
 
 Inspect Deployment Replicas for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
     [Documentation]    Pulls the replica information for a given deployment and checks if it's highly available
@@ -715,41 +794,61 @@ Inspect Deployment Replicas for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
     ...    env=${env}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
-    TRY
-        ${deployment_status}=    Evaluate    json.loads(r'''${deployment_replicas.stdout}''') if r'''${deployment_replicas.stdout}'''.strip() else {}    json
-    EXCEPT
-        Log    Warning: Failed to parse deployment status JSON, using empty status
-        ${deployment_status}=    Create Dictionary
-    END
     
-    # Set safe defaults for missing keys
-    ${available_condition}=    Evaluate    $deployment_status.get('available_condition', {'status': 'Unknown', 'message': 'Status unavailable'})
-    ${ready_replicas}=    Evaluate    $deployment_status.get('ready_replicas', 0)
-    ${desired_replicas}=    Evaluate    $deployment_status.get('desired_replicas', 0)
-    ${unavailable_replicas}=    Evaluate    $deployment_status.get('unavailable_replicas', 0)
-    ${progressing_condition}=    Evaluate    $deployment_status.get('progressing_condition', {'status': 'Unknown'})
-    
-    IF    "${available_condition['status']}" == "False" or ${ready_replicas} == 0
-        ${item_next_steps}=    RW.CLI.Run Bash File
-        ...    bash_file=workload_next_steps.sh
-        ...    cmd_override=./workload_next_steps.sh "${available_condition['message']}" "Deployment" "${DEPLOYMENT_NAME}"
-        ...    env=${env}
-        ...    include_in_history=False
+    # Check for command failure and create generic issue if needed
+    IF    ${deployment_replicas.returncode} != 0
         RW.Core.Add Issue
-        ...    severity=1
-        ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should have minimum availability / pod.
-        ...    actual=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` does not have minimum availability / pods.
-        ...    title=Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` is unavailable
-        ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=Deployment `${DEPLOYMENT_NAME}` has ${ready_replicas} ready pods and needs ${desired_replicas}
-        ...    next_steps=${item_next_steps.stdout}
-    ELSE IF    ${unavailable_replicas} > 0 and "${available_condition['status']}" == "True" and "${progressing_condition['status']}" == "False"
-        RW.Core.Add Issue
-        ...    severity=3
-        ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should have ${desired_replicas} pods.
-        ...    actual=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` has ${ready_replicas} pods.
-        ...    title=Deployment `${DEPLOYMENT_NAME}` has Missing Replicas in Namespace `${NAMESPACE}`
-        ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=Deployment `${DEPLOYMENT_NAME}` has ${ready_replicas} ready pods but needs ${desired_replicas}
-        ...    next_steps=Check pod status and investigate why replicas are not ready
+        ...    severity=2
+        ...    expected=Deployment replica status should be retrievable for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+        ...    actual=Failed to retrieve deployment replica status for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+        ...    title=Unable to Inspect Deployment Replicas for `${DEPLOYMENT_NAME}`
+        ...    reproduce_hint=${deployment_replicas.cmd}
+        ...    details=Command failed with exit code ${deployment_replicas.returncode}:\n\nSTDOUT:\n${deployment_replicas.stdout}\n\nSTDERR:\n${deployment_replicas.stderr}
+        ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
+        ${history}=    RW.CLI.Pop Shell History
+        RW.Core.Add Pre To Report    Failed to retrieve deployment replica status:\n\n${deployment_replicas.stderr}
+        RW.Core.Add Pre To Report    Commands Used: ${history}
+    ELSE
+        TRY
+            ${deployment_status}=    Evaluate    json.loads(r'''${deployment_replicas.stdout}''') if r'''${deployment_replicas.stdout}'''.strip() else {}    json
+        EXCEPT
+            Log    Warning: Failed to parse deployment status JSON, using empty status
+            ${deployment_status}=    Create Dictionary
+        END
+        
+        # Set safe defaults for missing keys
+        ${available_condition}=    Evaluate    $deployment_status.get('available_condition', {'status': 'Unknown', 'message': 'Status unavailable'})
+        ${ready_replicas}=    Evaluate    $deployment_status.get('ready_replicas', 0)
+        ${desired_replicas}=    Evaluate    $deployment_status.get('desired_replicas', 0)
+        ${unavailable_replicas}=    Evaluate    $deployment_status.get('unavailable_replicas', 0)
+        ${progressing_condition}=    Evaluate    $deployment_status.get('progressing_condition', {'status': 'Unknown'})
+        
+        IF    "${available_condition['status']}" == "False" or ${ready_replicas} == 0
+            ${item_next_steps}=    RW.CLI.Run Bash File
+            ...    bash_file=workload_next_steps.sh
+            ...    cmd_override=./workload_next_steps.sh "${available_condition['message']}" "Deployment" "${DEPLOYMENT_NAME}"
+            ...    env=${env}
+            ...    include_in_history=False
+            RW.Core.Add Issue
+            ...    severity=1
+            ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should have minimum availability / pod.
+            ...    actual=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` does not have minimum availability / pods.
+            ...    title=Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` is unavailable
+            ...    reproduce_hint=View Commands Used in Report Output
+            ...    details=Deployment `${DEPLOYMENT_NAME}` has ${ready_replicas} ready pods and needs ${desired_replicas}
+            ...    next_steps=${item_next_steps.stdout}
+        ELSE IF    ${unavailable_replicas} > 0 and "${available_condition['status']}" == "True" and "${progressing_condition['status']}" == "False"
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should have ${desired_replicas} pods.
+            ...    actual=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` has ${ready_replicas} pods.
+            ...    title=Deployment `${DEPLOYMENT_NAME}` has Missing Replicas in Namespace `${NAMESPACE}`
+            ...    reproduce_hint=View Commands Used in Report Output
+            ...    details=Deployment `${DEPLOYMENT_NAME}` has ${ready_replicas} ready pods but needs ${desired_replicas}
+            ...    next_steps=Check pod status and investigate why replicas are not ready
+        END
+        
+        ${history}=    RW.CLI.Pop Shell History
+        RW.Core.Add Pre To Report    Deployment Replica Status: Ready=${ready_replicas}/${desired_replicas}, Unavailable=${unavailable_replicas}
+        RW.Core.Add Pre To Report    Commands Used: ${history}
     END
