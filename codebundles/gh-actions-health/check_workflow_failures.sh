@@ -178,14 +178,15 @@ while IFS= read -r repo_name; do
                     # Get failure details
                     failure_details=$(get_failure_details "$repo_name" "$run_id" "$workflow_name")
                     
-                    # Update the failure object with details
+                    # Update the failure object with details (safely handle newlines and special chars)
                     enhanced_failure=$(echo "$failure" | jq --arg details "$failure_details" '.failure_details = $details')
-                    enhanced_failures=$(echo "$enhanced_failures" | jq --argjson item "$enhanced_failure" '. + [$item]')
+                    # Safely add to array by combining arrays
+                    enhanced_failures=$(echo "$enhanced_failures [$enhanced_failure]" | jq -s '.[0] + .[1]')
                     
                     failure_count=$((failure_count + 1))
                 else
                     # Add without enhanced details to avoid too many API calls
-                    enhanced_failures=$(echo "$enhanced_failures" | jq --argjson item "$failure" '. + [$item]')
+                    enhanced_failures=$(echo "$enhanced_failures [$failure]" | jq -s '.[0] + .[1]')
                 fi
             done <<< $(echo "$repo_failures" | jq -c '.[]')
             

@@ -388,10 +388,10 @@ Suite Initialization
     ...    default=70
     ${FAILURE_LOOKBACK_DAYS}=    RW.Core.Import User Variable    FAILURE_LOOKBACK_DAYS
     ...    type=string
-    ...    description=Number of days to look back for workflow failures
+    ...    description=Number of days to look back for workflow failures. Accepts partial numbers (e.g. 0.04 = 1h)
     ...    pattern=^\d+$
-    ...    example=7
-    ...    default=7
+    ...    example=1
+    ...    default=1
     ${MAX_REPOS_TO_ANALYZE}=    RW.Core.Import User Variable    MAX_REPOS_TO_ANALYZE
     ...    type=string
     ...    description=Maximum number of repositories to analyze when GITHUB_REPOS is 'ALL' (0 for unlimited)
@@ -405,7 +405,6 @@ Suite Initialization
     ...    example=25
     ...    default=0
     
-    ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${GITHUB_TOKEN}    ${GITHUB_TOKEN}
     Set Suite Variable    ${GITHUB_REPOS}    ${GITHUB_REPOS}
     Set Suite Variable    ${GITHUB_ORGS}    ${GITHUB_ORGS}
@@ -419,7 +418,7 @@ Suite Initialization
     Set Suite Variable    ${MAX_REPOS_PER_ORG}    ${MAX_REPOS_PER_ORG}
     Set Suite Variable
     ...    ${env}
-    ...    {"GITHUB_REPOS":"${GITHUB_REPOS}", "GITHUB_ORGS":"${GITHUB_ORGS}", "MAX_WORKFLOW_DURATION_MINUTES":"${MAX_WORKFLOW_DURATION_MINUTES}", "REPO_FAILURE_THRESHOLD":"${REPO_FAILURE_THRESHOLD}", "HIGH_RUNNER_UTILIZATION_THRESHOLD":"${HIGH_RUNNER_UTILIZATION_THRESHOLD}", "HIGH_USAGE_THRESHOLD":"${HIGH_USAGE_THRESHOLD}", "RATE_LIMIT_WARNING_THRESHOLD":"${RATE_LIMIT_WARNING_THRESHOLD}", "FAILURE_LOOKBACK_DAYS":"${FAILURE_LOOKBACK_DAYS}", "MAX_REPOS_TO_ANALYZE":"${MAX_REPOS_TO_ANALYZE}", "MAX_REPOS_PER_ORG":"${MAX_REPOS_PER_ORG}", "PATH":"$PATH:${OS_PATH}"} 
+    ...    {"GITHUB_REPOS":"${GITHUB_REPOS}", "GITHUB_ORGS":"${GITHUB_ORGS}", "MAX_WORKFLOW_DURATION_MINUTES":"${MAX_WORKFLOW_DURATION_MINUTES}", "REPO_FAILURE_THRESHOLD":"${REPO_FAILURE_THRESHOLD}", "HIGH_RUNNER_UTILIZATION_THRESHOLD":"${HIGH_RUNNER_UTILIZATION_THRESHOLD}", "HIGH_USAGE_THRESHOLD":"${HIGH_USAGE_THRESHOLD}", "RATE_LIMIT_WARNING_THRESHOLD":"${RATE_LIMIT_WARNING_THRESHOLD}", "FAILURE_LOOKBACK_DAYS":"${FAILURE_LOOKBACK_DAYS}", "MAX_REPOS_TO_ANALYZE":"${MAX_REPOS_TO_ANALYZE}", "MAX_REPOS_PER_ORG":"${MAX_REPOS_PER_ORG}"}
     
     # Validate GitHub API authentication
     ${auth_test}=    RW.CLI.Run Cli
