@@ -1,7 +1,19 @@
 #!/bin/bash
 
+# Get or set subscription ID
+if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
+    subscription=$(az account show --query "id" -o tsv)
+    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
+else
+    subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
+    echo "Using specified subscription ID: $subscription"
+fi
+
+# Set the subscription to the determined ID
+echo "Switching to subscription ID: $subscription"
+az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
+
 # Input variables for subscription ID, App Service name, and resource group
-subscription=$(az account show --query "id" -o tsv)
 issues_json='{"issues": []}'
 
 

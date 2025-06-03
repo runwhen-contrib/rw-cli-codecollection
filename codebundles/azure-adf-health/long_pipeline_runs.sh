@@ -3,21 +3,34 @@ set -euo pipefail
 
 # -----------------------------------------------------------------------------
 # REQUIRED ENV VARS:
-#   AZURE_SUBSCRIPTION_ID
 #   AZURE_RESOURCE_GROUP
+#   AZURE_RESOURCE_SUBSCRIPTION_ID
 #   LOOKBACK_PERIOD (optional, default: 7d)
 #   RUN_TIME_THRESHOLD (optional, default: 3600) - in seconds
 # -----------------------------------------------------------------------------
 
-: "${AZURE_SUBSCRIPTION_ID:?Must set AZURE_SUBSCRIPTION_ID}"
 : "${AZURE_RESOURCE_GROUP:?Must set AZURE_RESOURCE_GROUP}"
+: "${AZURE_RESOURCE_SUBSCRIPTION_ID:?Must set AZURE_RESOURCE_SUBSCRIPTION_ID}"
 : "${LOOKBACK_PERIOD:=7d}"
 : "${RUN_TIME_THRESHOLD:=900}"
 
-subscription_id="$AZURE_SUBSCRIPTION_ID"
+subscription_id="$AZURE_RESOURCE_SUBSCRIPTION_ID"
 resource_group="$AZURE_RESOURCE_GROUP"
 output_file="long_pipeline_runs.json"
 long_runs_json='{"long_running_pipelines": []}'
+
+# Get or set subscription ID
+if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
+    subscription=$(az account show --query "id" -o tsv)
+    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
+else
+    subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
+    echo "Using specified subscription ID: $subscription"
+fi
+
+# Set the subscription to the determined ID
+echo "Switching to subscription ID: $subscription"
+az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
 
 echo "Checking Data Factories for long-running pipelines..."
 echo "Resource Group: $resource_group"

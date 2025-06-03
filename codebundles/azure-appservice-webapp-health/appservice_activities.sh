@@ -7,6 +7,7 @@
 # AZ_TENANT
 # APP_SERVICE_NAME
 # AZ_RESOURCE_GROUP
+# AZURE_RESOURCE_SUBSCRIPTION_ID (Optional, defaults to current subscription)
 # TIME_PERIOD_MINUTES (Optional, default is 60)
 
 
@@ -17,12 +18,23 @@ TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-60}"
 start_time=$(date -u -d "$TIME_PERIOD_MINUTES minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
 end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
+# Get or set subscription ID
+if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
+    subscription_id=$(az account show --query "id" -o tsv)
+    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription_id"
+else
+    subscription_id="$AZURE_RESOURCE_SUBSCRIPTION_ID"
+    echo "Using specified subscription ID: $subscription_id"
+fi
+
+# Set the subscription to the determined ID
+echo "Switching to subscription ID: $subscription_id"
+az account set --subscription "$subscription_id" || { echo "Failed to set subscription."; exit 1; }
+
 tenant_id=$(az account show --query "tenantId" -o tsv)
-subscription_id=$(az account show --query "id" -o tsv)
 
 # Log in to Azure CLI (uncomment if needed)
 # az login --service-principal --username "$AZ_USERNAME" --password "$AZ_SECRET_VALUE" --tenant "$AZ_TENANT" > /dev/null
-az account set --subscription "$subscription_id"
 
 # Remove previous issues.json file if it exists
 [ -f "issues.json" ] && rm "issues.json"

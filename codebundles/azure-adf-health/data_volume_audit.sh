@@ -3,19 +3,32 @@ set -euo pipefail
 
 # -----------------------------------------------------------------------------
 # REQUIRED ENV VARS:
-#   AZURE_SUBSCRIPTION_ID
 #   AZURE_RESOURCE_GROUP
+#   AZURE_RESOURCE_SUBSCRIPTION_ID
 #   THRESHOLD_MB - Threshold in MB for heavy read/write operations
 # -----------------------------------------------------------------------------
 
-: "${AZURE_SUBSCRIPTION_ID:?Must set AZURE_SUBSCRIPTION_ID}"
 : "${AZURE_RESOURCE_GROUP:?Must set AZURE_RESOURCE_GROUP}"
+: "${AZURE_RESOURCE_SUBSCRIPTION_ID:?Must set AZURE_RESOURCE_SUBSCRIPTION_ID}"
 : "${THRESHOLD_MB:?Must set THRESHOLD_MB}"
 
-subscription_id="$AZURE_SUBSCRIPTION_ID"
+subscription_id="$AZURE_RESOURCE_SUBSCRIPTION_ID"
 resource_group="$AZURE_RESOURCE_GROUP"
 output_file="data_volume_audit.json"
 audit_json='{"data_volume_alerts": []}'
+
+# Get or set subscription ID
+if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
+    subscription=$(az account show --query "id" -o tsv)
+    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
+else
+    subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
+    echo "Using specified subscription ID: $subscription"
+fi
+
+# Set the subscription to the determined ID
+echo "Switching to subscription ID: $subscription"
+az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
 
 echo "Checking Data Factories for heavy data operations..."
 echo "Resource Group: $resource_group"

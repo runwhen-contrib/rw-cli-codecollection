@@ -3,14 +3,14 @@ set -euo pipefail
 
 # -----------------------------------------------------------------------------
 # REQUIRED ENV VARS:
-#   AZURE_SUBSCRIPTION_ID
 #   AZURE_RESOURCE_GROUP
+#   AZURE_RESOURCE_SUBSCRIPTION_ID
 # -----------------------------------------------------------------------------
 
-: "${AZURE_SUBSCRIPTION_ID:?Must set AZURE_SUBSCRIPTION_ID}"
 : "${AZURE_RESOURCE_GROUP:?Must set AZURE_RESOURCE_GROUP}"
+: "${AZURE_RESOURCE_SUBSCRIPTION_ID:?Must set AZURE_RESOURCE_SUBSCRIPTION_ID}"
 
-subscription_id="$AZURE_SUBSCRIPTION_ID"
+subscription_id="$AZURE_RESOURCE_SUBSCRIPTION_ID"
 resource_group="$AZURE_RESOURCE_GROUP"
 output_file="adf_details.json"
 adf_details_json='{"data_factories": []}'
@@ -18,6 +18,19 @@ adf_details_json='{"data_factories": []}'
 echo "Retrieving Azure Data Factory details..."
 echo "Resource Group: $resource_group"
 echo "Subscription ID: $subscription_id"
+
+# Get or set subscription ID
+if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
+    subscription=$(az account show --query "id" -o tsv)
+    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
+else
+    subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
+    echo "Using specified subscription ID: $subscription"
+fi
+
+# Set the subscription to the determined ID
+echo "Switching to subscription ID: $subscription"
+az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
 
 # Configure Azure CLI to explicitly allow or disallow preview extensions
 az config set extension.dynamic_install_allow_preview=true

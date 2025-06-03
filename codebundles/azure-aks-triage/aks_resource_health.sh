@@ -2,8 +2,8 @@
 
 echo "[]" > az_resource_health.json
 
-# Check if AZURE_RESOURCE_SUBSCRIPTION_ID is set, otherwise get the current subscription ID
-if [ -z "$AZURE_RESOURCE_SUBSCRIPTION_ID" ]; then
+# Get or set subscription ID
+if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
     subscription=$(az account show --query "id" -o tsv)
     echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
 else

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 #
 # Collect APIM Resource Information & Potential Issues
 # For APIM ${APIM_NAME} in Resource Group ${AZ_RESOURCE_GROUP}
@@ -21,14 +21,17 @@ set -euo pipefail
 
 ###############################################################################
 # Get or set subscription ID
-if [ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]; then
+if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
     subscription=$(az account show --query "id" -o tsv)
     echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
 else
     subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
     echo "Using specified subscription ID: $subscription"
 fi
-az account set --subscription "$subscription"
+
+# Set the subscription to the determined ID
+echo "Switching to subscription ID: $subscription"
+az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
 ###############################################################################
 
 # Ensure required environment variables

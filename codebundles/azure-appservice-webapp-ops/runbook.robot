@@ -209,6 +209,11 @@ Suite Initialization
     ...    type=string
     ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
     ...    pattern=\w*
+    ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_RESOURCE_SUBSCRIPTION_ID
+    ...    type=string
+    ...    description=The Azure Subscription ID for the resource.
+    ...    pattern=\w*
+    ...    default=""
     ${TIME_PERIOD_MINUTES}=    RW.Core.Import User Variable    TIME_PERIOD_MINUTES
     ...    type=string
     ...    description=The time period, in minutes, to look back for activites/events. 
@@ -240,4 +245,4 @@ Suite Initialization
     # Populate env dictionary for uniform usage in tasks, matching your existing pattern
     Set Suite Variable
     ...    ${env}
-    ...    {"AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}","APP_SERVICE_NAME":"${APP_SERVICE_NAME}", "SCALE_IN_FACTOR":"${SCALE_IN_FACTOR}"}
+    ...    {"AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}","APP_SERVICE_NAME":"${APP_SERVICE_NAME}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "SCALE_IN_FACTOR":"${SCALE_IN_FACTOR}"}

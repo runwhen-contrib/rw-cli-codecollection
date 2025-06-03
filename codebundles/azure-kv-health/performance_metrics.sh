@@ -1,6 +1,18 @@
 #!/bin/bash
 
-subscription_id="$AZURE_SUBSCRIPTION_ID"
+# Environment variables expected:
+# AZURE_RESOURCE_GROUP - The resource group containing Key Vaults
+# AZURE_RESOURCE_SUBSCRIPTION_ID - The Azure subscription ID
+# AZURE_SUBSCRIPTION_NAME - The Azure subscription name (optional)
+# REQUEST_THRESHOLD - Threshold for excessive requests (requests/hour, default: 1000)
+# LATENCY_THRESHOLD - Threshold for high latency (milliseconds, default: 500)
+# REQUEST_INTERVAL - Interval for request metrics (default: PT1H)
+# LATENCY_INTERVAL - Interval for latency metrics (default: PT1H)
+# TIME_RANGE - Time range in hours to look back (default: 24)
+# SEVERITY_REQUEST - Severity for request issues (default: 3)
+# SEVERITY_LATENCY - Severity for latency issues (default: 3)
+
+subscription_id="$AZURE_RESOURCE_SUBSCRIPTION_ID"
 resource_group="$AZURE_RESOURCE_GROUP"
 : "${AZURE_SUBSCRIPTION_NAME:?Must set AZURE_SUBSCRIPTION_NAME}"
 
@@ -37,7 +49,7 @@ json_output='{
 echo "$json_output" | jq '.' > "$output_file"
 
 echo "Checking Key Vault performance metrics..."
-echo "Subscription ID: $AZURE_SUBSCRIPTION_ID"
+echo "Subscription ID: $AZURE_RESOURCE_SUBSCRIPTION_ID"
 echo "Resource Group:  $AZURE_RESOURCE_GROUP"
 echo "Request Threshold: $REQUEST_THRESHOLD requests/hour"
 echo "Latency Threshold: $LATENCY_THRESHOLD ms"

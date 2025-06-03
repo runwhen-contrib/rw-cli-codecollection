@@ -4,22 +4,31 @@
 #   FUNCTION_APP_NAME     - Azure Function App name
 #   AZ_RESOURCE_GROUP     - Resource group for the Function App
 #   TIME_PERIOD_MINUTES   - (Optional) How many minutes to look back for metrics (default: 60)
-#   (Optional) AZ_SUBSCRIPTION, AZ_USERNAME, AZ_SECRET_VALUE, AZ_TENANT for auth/sub selection
+#   AZURE_RESOURCE_SUBSCRIPTION_ID - (Optional) Subscription ID (defaults to current subscription)
 
 # USAGE:
-#   1. Make sure you’re logged into Azure CLI or uncomment the login commands below if using a service principal.
+#   1. Make sure you're logged into Azure CLI
 #   2. Run the script; it will check if there's a valid plan ID. If so, it queries plan-level metrics like CPU%/Memory.
 #      Otherwise, it falls back to function-level metrics (CpuTime / MemoryWorkingSet on the site itself).
 
 set -e
 
+# Get or set subscription ID
+if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
+    subscription=$(az account show --query "id" -o tsv)
+    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
+else
+    subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
+    echo "Using specified subscription ID: $subscription"
+fi
+
+# Set the subscription to the determined ID
+echo "Switching to subscription ID: $subscription"
+az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
+
 TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-60}"
 start_time=$(date -u -d "$TIME_PERIOD_MINUTES minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
 end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-
-# OPTIONAL: If needed, do service principal login or subscription set:
-# az login --service-principal --username "$AZ_USERNAME" --password "$AZ_SECRET_VALUE" --tenant "$AZ_TENANT"
-# az account set --subscription "$AZ_SUBSCRIPTION"
 
 echo "Analyzing plan usage for Function App: $FUNCTION_APP_NAME"
 echo "Resource Group: $AZ_RESOURCE_GROUP"
@@ -63,7 +72,7 @@ fi
 ########################################
 # 2. Decide where to get metrics from
 ########################################
-# If plan_id is non-empty, we assume it’s a standard or premium plan resource.
+# If plan_id is non-empty, we assume it's a standard or premium plan resource.
 # Otherwise, we fall back to function-level metrics on the site itself.
 
 resource_to_query="$plan_id"
@@ -84,7 +93,7 @@ echo ""
 # For dedicated/premium plan-level queries, typical metrics:
 #   - "CpuPercentage", "MemoryWorkingSet"
 #
-# If we’re falling back to the function app resource, we can try:
+# If we're falling back to the function app resource, we can try:
 #   - "CpuTime", "MemoryWorkingSet"
 #   (some function apps will show these, others might not)
 #

@@ -1,13 +1,10 @@
 #!/bin/bash
 
 # ENV:
-# AZ_USERNAME
-# AZ_SECRET_VALUE
-# AZ_SUBSCRIPTION
-# AZ_TENANT
 # FUNCTION_APP_NAME
 # AZ_RESOURCE_GROUP
 # TIME_PERIOD_MINUTES (Optional, default is 60)
+# AZURE_RESOURCE_SUBSCRIPTION_ID (Optional, defaults to current subscription)
 
 # Set the default time period to 60 minutes if not provided
 TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-60}"
@@ -16,8 +13,18 @@ TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-60}"
 start_time=$(date -u -d "$TIME_PERIOD_MINUTES minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
 end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
-# Make sure we’re using the correct subscription
-az account set --subscription "${AZ_SUBSCRIPTION}"
+# Get or set subscription ID
+if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
+    subscription=$(az account show --query "id" -o tsv)
+    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
+else
+    subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
+    echo "Using specified subscription ID: $subscription"
+fi
+
+# Set the subscription to the determined ID
+echo "Switching to subscription ID: $subscription"
+az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
 
 # Remove previous issues JSON file if it exists
 [ -f "function_app_activities_issues.json" ] && rm "function_app_activities_issues.json"

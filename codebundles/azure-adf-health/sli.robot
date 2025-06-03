@@ -150,9 +150,9 @@ Suite Initialization
     ...    type=string
     ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
     ...    pattern=\w*
-    ${AZURE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_ID
+    ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_RESOURCE_SUBSCRIPTION_ID
     ...    type=string
-    ...    description=The Azure Subscription ID for the resource.  
+    ...    description=The Azure Subscription ID for the resource.
     ...    pattern=\w*
     ...    default=""
     ${AZURE_RESOURCE_GROUP}=    RW.Core.Import User Variable    AZURE_RESOURCE_GROUP
@@ -185,8 +185,8 @@ Suite Initialization
     ...    example=600
     Set Suite Variable    ${THRESHOLD_MB}    ${THRESHOLD_MB}
     Set Suite Variable    ${LOOKBACK_PERIOD}    ${LOOKBACK_PERIOD}
-    Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
+    Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "LOOKBACK_PERIOD":"${LOOKBACK_PERIOD}", "THRESHOLD_MB":"${THRESHOLD_MB}", "FAILURE_THRESHOLD":"${FAILURE_THRESHOLD}", "RUN_TIME_THRESHOLD":"${RUN_TIME_THRESHOLD}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "LOOKBACK_PERIOD":"${LOOKBACK_PERIOD}", "THRESHOLD_MB":"${THRESHOLD_MB}", "FAILURE_THRESHOLD":"${FAILURE_THRESHOLD}", "RUN_TIME_THRESHOLD":"${RUN_TIME_THRESHOLD}"}
