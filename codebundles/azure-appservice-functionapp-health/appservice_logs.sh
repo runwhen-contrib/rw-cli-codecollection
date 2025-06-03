@@ -1,21 +1,25 @@
 #!/bin/bash
 
 # ENV:
-#   AZ_USERNAME (optional if your Azure CLI is already authenticated)
-#   AZ_SECRET_VALUE (optional)
-#   AZ_SUBSCRIPTION (optional if your Azure CLI context is correct)
-#   AZ_TENANT (optional)
 #   FUNCTION_APP_NAME  - Name of the Azure Function App
 #   AZ_RESOURCE_GROUP  - Resource group containing the Function App
+#   AZURE_RESOURCE_SUBSCRIPTION_ID - (Optional) Subscription ID (defaults to current subscription)
+
+# Get or set subscription ID
+if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
+    subscription_id=$(az account show --query "id" -o tsv)
+    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription_id"
+else
+    subscription_id="$AZURE_RESOURCE_SUBSCRIPTION_ID"
+    echo "Using specified subscription ID: $subscription_id"
+fi
+
+# Set the subscription to the determined ID
+echo "Switching to subscription ID: $subscription_id"
+az account set --subscription "$subscription_id" || { echo "Failed to set subscription."; exit 1; }
 
 # Name of the zip file to store logs
 LOG_PATH="_rw_logs_${FUNCTION_APP_NAME}.zip"
-
-# Retrieve the current subscription ID (or use AZ_SUBSCRIPTION if you prefer)
-subscription_id=$(az account show --query "id" -o tsv)
-
-# If needed, you can explicitly set the subscription (uncomment):
-# az account set --subscription "$AZ_SUBSCRIPTION"
 
 echo "Downloading logs for Azure Function App: $FUNCTION_APP_NAME ..."
 

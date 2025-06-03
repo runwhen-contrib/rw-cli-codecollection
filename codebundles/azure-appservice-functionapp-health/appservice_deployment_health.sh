@@ -3,16 +3,25 @@
 # ENVIRONMENT VARIABLES:
 #   FUNCTION_APP_NAME  - The name of the Azure Function App
 #   AZ_RESOURCE_GROUP  - The name of the resource group containing the Function App
-#   CHECK_PERIOD       - (Optional) Period in hours to consider “recent.” Default: 24
-#   AZ_SUBSCRIPTION    - (Optional) If you want to set a specific subscription
+#   CHECK_PERIOD       - (Optional) Period in hours to consider "recent." Default: 24
+#   AZURE_RESOURCE_SUBSCRIPTION_ID - (Optional) Subscription ID (defaults to current subscription)
 #   (Optional) AZ_USERNAME, AZ_SECRET_VALUE, AZ_TENANT (for service principal login, if needed)
 
 # PERIOD in hours to check for recent deployments (if you track them)
 CHECK_PERIOD="${CHECK_PERIOD:-24}"
 
-# If needed, log in as an SP or switch subscriptions:
-# az login --service-principal --username "$AZ_USERNAME" --password "$AZ_SECRET_VALUE" --tenant "$AZ_TENANT" > /dev/null
-[ -n "$AZ_SUBSCRIPTION" ] && az account set --subscription "$AZ_SUBSCRIPTION"
+# Get or set subscription ID
+if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
+    subscription=$(az account show --query "id" -o tsv)
+    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
+else
+    subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
+    echo "Using specified subscription ID: $subscription"
+fi
+
+# Set the subscription to the determined ID
+echo "Switching to subscription ID: $subscription"
+az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
 
 # Ensure required variables
 if [[ -z "$FUNCTION_APP_NAME" || -z "$AZ_RESOURCE_GROUP" ]]; then
@@ -36,7 +45,7 @@ DEPLOYMENTS=$(az functionapp deployment slot list \
 if [[ -z "$DEPLOYMENTS" || "$DEPLOYMENTS" == "[]" ]]; then
     echo "No deployment slots found. Checking production configuration..."
 
-    # Retrieve the production function’s info
+    # Retrieve the production function's info
     DEPLOYMENT_CONFIG=$(az functionapp show \
       --name "$FUNCTION_APP_NAME" \
       --resource-group "$AZ_RESOURCE_GROUP" \
@@ -139,7 +148,7 @@ else
 fi
 
 #-----------------------------------------------------------------------------
-# 2. Check for “recent failed or stuck deployments”
+# 2. Check for "recent failed or stuck deployments"
 #    NOTE: Unlike Web Apps, there's no `az functionapp log deployment show`.
 #    If you rely on Kudu or other logs, integrate them below.
 #-----------------------------------------------------------------------------

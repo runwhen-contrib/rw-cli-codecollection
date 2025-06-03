@@ -3,7 +3,7 @@
 # ENV VARS expected:
 #   AZ_RESOURCE_GROUP      - name of the resource group
 #   FUNCTION_APP_NAME      - name of the Azure Function App
-#   AZ_SUBSCRIPTION        - subscription ID (optional if your CLI context is already correct)
+#   AZURE_RESOURCE_SUBSCRIPTION_ID - (Optional) Subscription ID (defaults to current subscription)
 #   AZ_USERNAME, AZ_SECRET_VALUE, AZ_TENANT (optional - only if you need to do an SP login)
 #
 # This script collects configuration information and identifies potential issues
@@ -13,8 +13,18 @@
 #  - Whether HTTPS-only is enforced
 #  - Which plan SKU is being used
 
-# Make sure we’re using the correct subscription
-az account set --subscription "${AZ_SUBSCRIPTION}"
+# Get or set subscription ID
+if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
+    subscription=$(az account show --query "id" -o tsv)
+    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
+else
+    subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
+    echo "Using specified subscription ID: $subscription"
+fi
+
+# Set the subscription to the determined ID
+echo "Switching to subscription ID: $subscription"
+az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
 
 issues_json='{"issues": []}'
 
