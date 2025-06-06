@@ -1,0 +1,21 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+  - resourceTypes:
+    - microsoft.compute/virtualmachines
+    matchRules:
+    - type: pattern
+      pattern: "."
+      properties: [name]
+      mode: substring
+    slxs:
+    - baseName: vm-disk-health
+      levelOfDetail: detailed
+      qualifiers: ["resource", "resourcegroup", "subscription"]
+      baseTemplateName: azure-vm-disk-health
+      outputItems:
+        - type: slx
+        - type: sli
+        - type: runbook
+          templateName: azure-vm-disk-health-taskset.yaml
