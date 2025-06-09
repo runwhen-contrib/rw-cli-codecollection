@@ -15,7 +15,8 @@ PROJECT="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true
 IFS=',' read -r -a CRITICAL_NS_ARRAY <<< "${CRITICAL_NAMESPACES:-kube-system}"
 
 REPORT_FILE="cluster_health_report.txt"
-ISSUES_TMP="$(mktemp)"
+TEMP_DIR="${CODEBUNDLE_TEMP_DIR:-.}"
+ISSUES_TMP="$TEMP_DIR/cluster_health_issues_$$.json"
 echo -n "[" > "$ISSUES_TMP"
 first_issue=true
 
