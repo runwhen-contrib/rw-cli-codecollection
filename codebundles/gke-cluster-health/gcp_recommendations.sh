@@ -26,7 +26,8 @@ fi
 
 REPORT_FILE="recommendations_report.txt"
 ISSUES_FILE="recommendations_issues.json"
-TEMP_ISSUES="recommendations_issues_temp.json"
+TEMP_DIR="${CODEBUNDLE_TEMP_DIR:-.}"
+TEMP_ISSUES="$TEMP_DIR/recommendations_issues_temp_$$.json"
 
 # Safely remove old files if they exist
 rm -f "$REPORT_FILE" "$ISSUES_FILE" "$TEMP_ISSUES"
