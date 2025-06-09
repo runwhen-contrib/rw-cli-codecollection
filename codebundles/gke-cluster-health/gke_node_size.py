@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
 gke_node_size.py — node‑sizer & over‑commit analyser
-2025‑04‑18   •   grouped “node‑overloaded” issues + limit‑overcommit checks
+2025‑04‑18   •   grouped "node‑overloaded" issues + limit‑overcommit checks
 
-What’s new?
+What's new?
 ────────────
-▸ still raises **Node overloaded** when requests exceed allocatable  
-▸ now also raises **Node limits over‑committed** when *limits / allocatable*
+▸ still raises **Node overloaded** when requests exceed allocatable  
+▸ now also raises **Node limits over‑committed** when *limits / allocatable*
   is above the tunables below  
 ▸ sizing logic is driven by the **worst‑case limits** (no extra head‑room)  
 """
@@ -17,9 +17,9 @@ from collections import defaultdict
 from pathlib import Path
 
 # ── tunables ────────────────────────────────────────────────────────────
-MAX_CPU_LIMIT_OVERCOMMIT = float(os.getenv("MAX_CPU_LIMIT_OVERCOMMIT", "3.0"))  # 300 %
-MAX_MEM_LIMIT_OVERCOMMIT = float(os.getenv("MAX_MEM_LIMIT_OVERCOMMIT", "1.5"))  # 150 %
-MIN_HEADROOM_NODES       = 3          # unchanged – for “can I just reschedule?”
+MAX_CPU_LIMIT_OVERCOMMIT = float(os.getenv("MAX_CPU_LIMIT_OVERCOMMIT", "3.0"))  # 300 %
+MAX_MEM_LIMIT_OVERCOMMIT = float(os.getenv("MAX_MEM_LIMIT_OVERCOMMIT", "1.5"))  # 150 %
+MIN_HEADROOM_NODES       = 3          # unchanged – for "can I just reschedule?"
 EMO = {"OK":"✅","ERR":"⚠️","RES":"🔄","NODE":"🆕"}
 
 workdir_path = os.getenv("CODEBUNDLE_TEMP_DIR", ".")
@@ -48,7 +48,12 @@ def mem(v:str)->int:
 LIVE={"Running","Pending","Unknown"}
 def gather_pods():
     pod,node={},defaultdict(lambda:{"rc":0,"rm":0,"lc":0,"lm":0,"pods":[]})
-    data=json.loads(run(["kubectl","get","pods","-A","-o","json"]))
+    try:
+        data=json.loads(run(["kubectl","get","pods","-A","-o","json"]))
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: Failed to get pods - {e}")
+        return pod, node
+    
     for it in data["items"]:
         if it["status"].get("phase") not in LIVE or it["metadata"].get("deletionTimestamp"):
             continue
@@ -60,19 +65,51 @@ def gather_pods():
             lc+=cpu(lim.get("cpu",req.get("cpu","0"))); lm+=mem(lim.get("memory",req.get("memory","0")))
         pod[uid]={"node":nd,"rc":rc,"rm":rm,"lc":lc,"lm":lm}
         n=node[nd]; n["rc"]+=rc; n["rm"]+=rm; n["lc"]+=lc; n["lm"]+=lm; n["pods"].append(uid)
+    
+    print(f"Gathered {len(pod)} pods across {len([n for n in node if n != 'UNSCHED'])} nodes")
+    if "UNSCHED" in node and len(node["UNSCHED"]["pods"]) > 0:
+        print(f"Warning: {len(node['UNSCHED']['pods'])} unscheduled pods found")
+    
     return pod,node
 
 def allocatable():
-    data=json.loads(run(["kubectl","get","nodes","-o","json"]))
+    try:
+        data=json.loads(run(["kubectl","get","nodes","-o","json"]))
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: Failed to get nodes - {e}")
+        return {}
+    
     out={}
     for n in data["items"]:
+        node_name = n["metadata"]["name"]
+        
+        # Check node conditions for readiness
+        conditions = n.get("status", {}).get("conditions", [])
+        ready_condition = next((c for c in conditions if c["type"] == "Ready"), None)
+        if ready_condition and ready_condition["status"] != "True":
+            print(f"Warning: Node {node_name} is not ready - {ready_condition.get('reason', 'Unknown')}")
+        
         lbl=n["metadata"]["labels"]
         t=lbl.get("node.kubernetes.io/instance-type",
                   lbl.get("beta.kubernetes.io/instance-type","unknown"))
+        
+        # Get node taints that might affect scheduling
+        taints = n.get("spec", {}).get("taints", [])
+        if taints:
+            taint_effects = [taint.get("effect", "Unknown") for taint in taints]
+            if "NoSchedule" in taint_effects or "NoExecute" in taint_effects:
+                print(f"Warning: Node {node_name} has scheduling taints: {taint_effects}")
+        
         a=n["status"]["allocatable"]
-        out[n["metadata"]["name"]]={
+        out[node_name]={
             "cpu":cpu(a["cpu"]+"m" if "m" not in a["cpu"] else a["cpu"]),
-            "mem":mem(a["memory"]), "type":t}
+            "mem":mem(a["memory"]), "type":t,
+            "ready": ready_condition["status"] == "True" if ready_condition else False}
+    
+    print(f"Found {len(out)} total nodes")
+    ready_nodes = sum(1 for node_data in out.values() if node_data.get("ready", False))
+    print(f"{ready_nodes}/{len(out)} nodes are ready")
+    
     return out
 
 def node_usage():
@@ -114,14 +151,58 @@ def analyse(cl:str, loc:str):
     zones=set(meta.get("locations",[loc])); ctype=meta.get("locationType") or ("REGIONAL" if len(zones)>1 else "ZONAL")
     region=loc[:-2] if flag=="--zone" else loc
 
-    valid=[n for n in node if n in alloc]
+    # Cross-validate nodes from different sources
+    kubectl_nodes = set(alloc.keys())
+    scheduled_nodes = set(n for n in node if n != "UNSCHED" and n in alloc)
+    
+    # Check for discrepancies
+    if len(kubectl_nodes) != len(scheduled_nodes):
+        print(f"Warning: Node count mismatch - kubectl found {len(kubectl_nodes)} nodes, "
+              f"but only {len(scheduled_nodes)} have scheduled pods")
+        missing_nodes = kubectl_nodes - scheduled_nodes
+        if missing_nodes:
+            print(f"Nodes without scheduled pods: {missing_nodes}")
+    
+    # Validate against expected node pools
+    try:
+        pools_info = json.loads(run(["gcloud","container","node-pools","list",
+                                    "--cluster",cl,flag,loc,
+                                    "--format=json(name,currentNodeCount,initialNodeCount)"]))
+        expected_total_nodes = sum(p.get("currentNodeCount", p.get("initialNodeCount", 0)) for p in pools_info)
+        print(f"Expected nodes from node pools: {expected_total_nodes}, Found: {len(kubectl_nodes)}")
+        if expected_total_nodes != len(kubectl_nodes):
+            note(cl,2,"Node count mismatch",
+                 f"Expected {expected_total_nodes} nodes from node pools but found {len(kubectl_nodes)} nodes. "
+                 f"This may indicate nodes failed to join the cluster or are stuck in provisioning.",
+                 f"Check GCP Console for node pool status and instance health in cluster `{cl}`.")
+    except subprocess.CalledProcessError:
+        print("Warning: Could not verify node pool information")
+
+    valid=[n for n in node if n in alloc and alloc[n].get("ready", True)]
+    unready_nodes = [n for n in alloc if not alloc[n].get("ready", True)]
+    
+    if unready_nodes:
+        note(cl,2,"Unready nodes detected",
+             f"{len(unready_nodes)} nodes are not ready: {', '.join(unready_nodes)}. "
+             f"This reduces available cluster capacity.",
+             f"Investigate node health and readiness issues in cluster `{cl}`.")
+    
     if not valid:
         note(cl,2,"Analysis failed","No schedulable nodes found.",
              f"Check control plane for `{cl}`."); return
 
     busiest=max(valid,key=lambda n:(node[n]['rc'],node[n]['rm']))
     a_b=alloc[busiest]; busy=node[busiest]; use_b=usage.get(busiest,{"cpu":0,"mem":0})
-    biggest=max(pod.values(), key=lambda p:(p["rc"],p["rm"]))
+    
+    # Ensure we have pod data to analyze
+    all_pods = list(pod.values())
+    if not all_pods:
+        note(cl,3,"No pods found",
+             f"No pods found in cluster `{cl}`. Cannot perform sizing analysis.",
+             f"Deploy workloads to cluster `{cl}` for meaningful analysis.")
+        return
+    
+    biggest=max(all_pods, key=lambda p:(p["rc"],p["rm"]))
 
     pr=lambda v:f"{v:6.1f}%"
     print(textwrap.dedent(f"""
@@ -175,7 +256,7 @@ def analyse(cl:str, loc:str):
                           "--format=json(name,config.machineType,currentNodeCount,initialNodeCount,autoscaling)"]))
     cur_pool=next((p for p in pools if p["config"]["machineType"]==a_b["type"]),pools[0])
     cur_nodes=cur_pool.get("currentNodeCount") or cur_pool["initialNodeCount"]
-    max_nodes=cur_pool["autoscaling"]["maxNodeCount"]
+    max_nodes=cur_pool.get("autoscaling", {}).get("maxNodeCount", cur_nodes)
     can_scale=cur_nodes<max_nodes
     print(f"\n{EMO['RES']}  Pool can scale out ({cur_nodes}/{max_nodes}) — larger node options follow.\n"
           if can_scale else

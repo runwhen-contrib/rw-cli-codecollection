@@ -33,7 +33,8 @@ PD_METRIC="SSD_TOTAL_GB"        # or DISKS_TOTAL_GB, etc.
 
 REPORT_FILE="region_quota_report.txt"
 ISSUES_FILE="region_quota_issues.json"
-TMP_ISSUES="tmp_region_issues.json"
+TEMP_DIR="${CODEBUNDLE_TEMP_DIR:-.}"
+TMP_ISSUES="$TEMP_DIR/tmp_region_issues_$$.json"
 
 # Safely remove old output files (no error if they don't exist):
 rm -f "$REPORT_FILE" "$ISSUES_FILE" "$TMP_ISSUES"
@@ -176,9 +177,23 @@ for (( i=0; i<"$numClusters"; i++ )); do
     continue
   fi
 
+  # Get cluster details to determine zone count for regional clusters
+  CLUSTER_DETAILS="$(gcloud container clusters describe "$cName" --zone="$cLoc" \
+    --project="$PROJECT" --format="json(locations,locationType)" 2>/dev/null || echo '{}')"
+  
+  CLUSTER_LOC_TYPE="$(echo "$CLUSTER_DETAILS" | jq -r '.locationType // "ZONAL"')"
+  CLUSTER_ZONES="$(echo "$CLUSTER_DETAILS" | jq -r '.locations[]?' | wc -l)"
+  
+  # Default to 1 zone if we can't determine
+  [[ "$CLUSTER_ZONES" =~ ^[0-9]+$ ]] && [ "$CLUSTER_ZONES" -gt 0 ] || CLUSTER_ZONES=1
+  
+  echo "  Cluster type: $CLUSTER_LOC_TYPE across $CLUSTER_ZONES zones" >> "$REPORT_FILE"
+
   # Summation of potential usage
   totalCPUs=0
   totalNodes=0
+  totalMinCPUs=0
+  totalMinNodes=0
   npCount="$(echo "$NP_JSON" | jq length)"
   declare -a nodepoolNames=()
 
@@ -187,29 +202,47 @@ for (( i=0; i<"$numClusters"; i++ )); do
     nodepoolNames+=("$npName")
 
     autoScale="$(echo "$NP_JSON" | jq -r ".[$p].autoscaling.enabled")"
+    cMin=0
     cMax=0
     if [ "$autoScale" = "true" ]; then
+      cMin="$(echo "$NP_JSON" | jq -r ".[$p].autoscaling.minNodeCount")"
       cMax="$(echo "$NP_JSON" | jq -r ".[$p].autoscaling.maxNodeCount")"
     else
-      cMax="$(echo "$NP_JSON" | jq -r ".[$p].initialNodeCount")"
+      # For non-autoscaling pools, min and max are the same (initialNodeCount)
+      cMin="$(echo "$NP_JSON" | jq -r ".[$p].initialNodeCount")"
+      cMax="$cMin"
     fi
+    [[ "$cMin" =~ ^[0-9]+$ ]] || cMin=0
     [[ "$cMax" =~ ^[0-9]+$ ]] || cMax=0
 
     mType="$(echo "$NP_JSON" | jq -r ".[$p].config.machineType")"
-    # naive parse
+    # naive parse - extract CPU count from machine type
     cVal=4
     if [[ "$mType" =~ ([0-9]+)$ ]]; then
       cVal="${BASH_REMATCH[1]}"
     fi
 
+    totalMinCPUs=$(( totalMinCPUs + (cMin * cVal) ))
+    totalMinNodes=$(( totalMinNodes + cMin ))
     totalCPUs=$(( totalCPUs + (cMax * cVal) ))
     totalNodes=$(( totalNodes + cMax ))
+    
+    # Add note about zone distribution for multi-zone clusters
+    if [ "$CLUSTER_ZONES" -gt 1 ]; then
+      zoneNote=" (distributed across $CLUSTER_ZONES zones)"
+    else
+      zoneNote=""
+    fi
+    
+    echo "  Pool $npName: $cMin-$cMax nodes total ($mType, ${cVal}vCPU each)$zoneNote" >> "$REPORT_FILE"
   done
 
   nodePoolsCSV="$(IFS=,; echo "${nodepoolNames[*]}")"
 
-  echo " => Potential total nodes: $totalNodes" >> "$REPORT_FILE"
-  echo " => Potential total vCPUs: $totalCPUs" >> "$REPORT_FILE"
+  echo " => Minimum total nodes: $totalMinNodes (baseline always running)" >> "$REPORT_FILE"
+  echo " => Maximum total nodes: $totalNodes (if fully scaled out)" >> "$REPORT_FILE"
+  echo " => Minimum total vCPUs: $totalMinCPUs" >> "$REPORT_FILE"
+  echo " => Maximum total vCPUs: $totalCPUs" >> "$REPORT_FILE"
 
   # Derive region
   realRegion="$(deriveRegion "$cLoc" "$locType")"
@@ -230,19 +263,28 @@ for (( i=0; i<"$numClusters"; i++ )); do
     freeCPUs="$(awk -v used="$cpuUsage" -v lim="$cpuLimit" 'BEGIN { printf "%.0f", lim - used }')"
     echo " => CPU $CPU_METRIC: limit=$cpuLimit usage=$cpuUsage free=$freeCPUs" >> "$REPORT_FILE"
 
-    if [ "$totalCPUs" -gt "$freeCPUs" ]; then
+    # Check if minimum required CPUs exceed available quota
+    if [ "$totalMinCPUs" -gt "$freeCPUs" ]; then
       postIssue \
-        "CPU Quota breach for GKE Cluster \`$cName\`" \
-        "Project=$PROJECT region=$realRegion, cluster=$cName, nodePools=$nodePoolsCSV => Potential usage=$totalCPUs, free=$freeCPUs" \
+        "CPU Quota breach for GKE Cluster \`$cName\` (minimum requirements)" \
+        "Project=$PROJECT region=$realRegion, cluster=$cName, nodePools=$nodePoolsCSV => Minimum required CPUs=$totalMinCPUs exceeds free=$freeCPUs" \
+        1 \
+        "Immediately request CPU quota increase in GCP Project \`$PROJECT\` for GKE Cluster \`$cName\` (NodePool \`$nodePoolsCSV\`) Region $realRegion. Cluster cannot maintain minimum node count."
+    # Check if maximum CPUs could exceed quota (capacity planning)
+    elif [ "$totalCPUs" -gt "$freeCPUs" ]; then
+      postIssue \
+        "CPU Quota insufficient for full scale-out of GKE Cluster \`$cName\`" \
+        "Project=$PROJECT region=$realRegion, cluster=$cName, nodePools=$nodePoolsCSV => Maximum CPUs=$totalCPUs exceeds free=$freeCPUs (minimum=$totalMinCPUs is OK)" \
         2 \
-        "Request CPU quota increase or reduce autoscaling in GCP Project \`$PROJECT\` for GKE Cluster \`$cName\` (NodePool \`$nodePoolsCSV\`) Region $realRegion."
+        "Request CPU quota increase or reduce autoscaling maximums in GCP Project \`$PROJECT\` for GKE Cluster \`$cName\` (NodePool \`$nodePoolsCSV\`) Region $realRegion."
     else
+      # Check if we're approaching limits based on maximum usage
       ratioCPU="$(awk -v pot="$totalCPUs" -v fr="$freeCPUs" 'BEGIN{ if(fr<=0){print 999}else{print pot/fr}}')"
       check80="$(awk -v r="$ratioCPU" 'BEGIN{ if(r>=0.8)print 1;else print 0;}')"
       if [ "$check80" -eq 1 ]; then
         postIssue \
-          "CPU usage approaching for GKE Cluster \`$cName\`" \
-          "Project=$PROJECT region=$realRegion, cluster=$cName, nodePools=$nodePoolsCSV => potential usage=$totalCPUs ~80% of free=$freeCPUs" \
+          "CPU usage approaching limit for GKE Cluster \`$cName\`" \
+          "Project=$PROJECT region=$realRegion, cluster=$cName, nodePools=$nodePoolsCSV => Maximum CPUs=$totalCPUs is ~80% of free=$freeCPUs" \
           3 \
           "Monitor CPU usage or request more CPU quota in GCP Project \`$PROJECT\` for GKE Cluster \`$cName\` (NodePool \`$nodePoolsCSV\`) Region $realRegion."
       fi
@@ -259,19 +301,27 @@ for (( i=0; i<"$numClusters"; i++ )); do
     ipFree="$(awk -v u="$ipUsage" -v l="$ipLimit" 'BEGIN{ printf "%.0f", l-u }')"
     echo " => IP $IP_METRIC: limit=$ipLimit usage=$ipUsage free=$ipFree" >> "$REPORT_FILE"
 
-    if [ "$totalNodes" -gt "$ipFree" ]; then
+    # Check if minimum required IPs exceed available quota
+    if [ "$totalMinNodes" -gt "$ipFree" ]; then
       postIssue \
-        "IP Quota breach for GKE Cluster \`$cName\`" \
-        "Project=$PROJECT region=$realRegion, cluster=$cName, nodePools=$nodePoolsCSV => potential node count=$totalNodes, freeIPs=$ipFree" \
+        "IP Quota breach for GKE Cluster \`$cName\` (minimum requirements)" \
+        "Project=$PROJECT region=$realRegion, cluster=$cName, nodePools=$nodePoolsCSV => Minimum required nodes=$totalMinNodes exceeds free IPs=$ipFree" \
+        1 \
+        "Immediately request IP quota increase in GCP Project \`$PROJECT\` for GKE Cluster \`$cName\` (NodePool \`$nodePoolsCSV\`) Region $realRegion. Cluster cannot maintain minimum node count."
+    # Check if maximum nodes could exceed quota
+    elif [ "$totalNodes" -gt "$ipFree" ]; then
+      postIssue \
+        "IP Quota insufficient for full scale-out of GKE Cluster \`$cName\`" \
+        "Project=$PROJECT region=$realRegion, cluster=$cName, nodePools=$nodePoolsCSV => Maximum nodes=$totalNodes exceeds free IPs=$ipFree (minimum=$totalMinNodes is OK)" \
         2 \
-        "Request IP quota or reduce nodepool size for GCP Project \`$PROJECT\` for GKE Cluster \`$cName\` (NodePool \`$nodePoolsCSV\`) Region $realRegion."
+        "Request IP quota increase or reduce nodepool maximums in GCP Project \`$PROJECT\` for GKE Cluster \`$cName\` (NodePool \`$nodePoolsCSV\`) Region $realRegion."
     else
       ratioIP="$(awk -v n="$totalNodes" -v f="$ipFree" 'BEGIN{ if(f<=0){print 999}else{print n/f} }')"
       checkIP80="$(awk -v x="$ratioIP" 'BEGIN{ if(x>=0.8)print 1;else print 0;}')"
       if [ "$checkIP80" -eq 1 ]; then
         postIssue \
-          "IP usage ~80% for GKE Cluster \`$cName\`" \
-          "Project=$PROJECT region=$realRegion, cluster=$cName, nodePools=$nodePoolsCSV => nodes=$totalNodes vs freeIPs=$ipFree" \
+          "IP usage approaching limit for GKE Cluster \`$cName\`" \
+          "Project=$PROJECT region=$realRegion, cluster=$cName, nodePools=$nodePoolsCSV => Maximum nodes=$totalNodes is ~80% of free IPs=$ipFree" \
           3 \
           "Check IP usage or request more addresses for GCP Project \`$PROJECT\` for GKE Cluster \`$cName\` (NodePool \`$nodePoolsCSV\`) Region $realRegion."
       fi
