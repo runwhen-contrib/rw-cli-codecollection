@@ -5,6 +5,7 @@ on:
     branches: [ main ]
     paths:
       - 'libraries/**'
+      - '.github/workflows/docs.yaml'
   workflow_dispatch:
     inputs:
       doc_type:
