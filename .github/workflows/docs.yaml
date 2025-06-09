@@ -23,7 +23,6 @@ on:
         default: 'libraries'
         type: string
 
-
 jobs:
   generate-docs:
     runs-on: ubuntu-latest
