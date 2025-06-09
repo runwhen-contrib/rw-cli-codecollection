@@ -48,4 +48,7 @@ jobs:
           
           # Git commit settings
           commit_changes: 'true'
-          commit_message: ${{ github.event_name == 'pull_request' && 'docs: update keyword documentation [skip ci]' || 'docs: manual update of keyword documentation [skip ci]' }} 
+          commit_message: >-
+            ${{ github.event_name == 'pull_request' && 
+            'docs: update keyword documentation [skip ci]' || 
+            'docs: manual update of keyword documentation [skip ci]' }} 
