@@ -66,12 +66,6 @@ Example usage:
 - `jenkins_token`
 - `history_limit`
 
-**Robot Framework Example:**
-
-```robotframework
-${jenkins_build_logs_analytics_result}=    Jenkins.build_logs_analytics    https://example.com    example-name    ${jenkins_token}    ...
-```
-
 ---
 
 #### build_logs_analytics
@@ -99,12 +93,6 @@ Example usage:
 - `jenkins_token`
 - `history_limit`
 
-**Robot Framework Example:**
-
-```robotframework
-${build_logs_analytics_result}=    build_logs_analytics    https://example.com    example-name    ${jenkins_token}    ...
-```
-
 ---
 
 ### k8s_applications Library
@@ -116,12 +104,6 @@ ${build_logs_analytics_result}=    build_logs_analytics    https://example.com  
 - `stacktraces`
 - `max_report_stacktraces`
 
-**Robot Framework Example:**
-
-```robotframework
-${stacktrace_report_data_result}=    stacktrace_report_data    ${stacktraces}    ${max_report_stacktraces}
-```
-
 ---
 
 #### stacktrace_report
@@ -129,12 +111,6 @@ ${stacktrace_report_data_result}=    stacktrace_report_data    ${stacktraces}   
 **Arguments:**
 
 - `stacktraces`
-
-**Robot Framework Example:**
-
-```robotframework
-${stacktrace_report_result}=    stacktrace_report    ${stacktraces}
-```
 
 ---
 
@@ -146,23 +122,11 @@ ${stacktrace_report_result}=    stacktrace_report    ${stacktraces}
 - `content`
 - `app_name`
 
-**Robot Framework Example:**
-
-```robotframework
-${create_github_issue_result}=    create_github_issue    ${repo}    ${content}    example-name
-```
-
 ---
 
 ### _test_parsers Library
 
 #### test_golang_report
-
-**Robot Framework Example:**
-
-```robotframework
-${test_golang_report_result}=    test_golang_report
-```
 
 ---
 
@@ -173,12 +137,6 @@ ${test_golang_report_result}=    test_golang_report
 **Arguments:**
 
 - `state`
-
-**Robot Framework Example:**
-
-```robotframework
-${repository_list_issues_result}=    Repository.list_issues    ${state}
-```
 
 ---
 
@@ -191,12 +149,6 @@ ${repository_list_issues_result}=    Repository.list_issues    ${state}
 - `labels`
 - `assignees`
 
-**Robot Framework Example:**
-
-```robotframework
-${repository_create_issue_result}=    Repository.create_issue    ${title}    ${body}    ${labels}    ...
-```
-
 ---
 
 #### list_issues
@@ -204,12 +156,6 @@ ${repository_create_issue_result}=    Repository.create_issue    ${title}    ${b
 **Arguments:**
 
 - `state`
-
-**Robot Framework Example:**
-
-```robotframework
-${list_issues_result}=    list_issues    ${state}
-```
 
 ---
 
@@ -221,12 +167,6 @@ ${list_issues_result}=    list_issues    ${state}
 - `body`
 - `labels`
 - `assignees`
-
-**Robot Framework Example:**
-
-```robotframework
-${create_issue_result}=    create_issue    ${title}    ${body}    ${labels}    ...
-```
 
 ---
 
@@ -247,12 +187,6 @@ Args:
 
 - Health score between 0.0 (unhealthy) and 1.0 (healthy)
 
-**Robot Framework Example:**
-
-```robotframework
-${calculate_log_health_score_result}=    calculate_log_health_score    ${scan_results}
-```
-
 ---
 
 ### k8s_helper Library
@@ -271,12 +205,6 @@ Args:
 **Returns:**
 
 - - The sanitized string.
-
-**Robot Framework Example:**
-
-```robotframework
-${sanitize_messages_result}=    sanitize_messages    ${input_string}
-```
 
 ---
 
@@ -309,12 +237,6 @@ Args:
 
 - Path to the directory containing fetched logs
 
-**Robot Framework Example:**
-
-```robotframework
-${k8slog_fetch_workload_logs_result}=    K8sLog.fetch_workload_logs    ${workload_type}    example-name    example-name    ...
-```
-
 ---
 
 #### K8sLog.scan_logs_for_issues
@@ -340,12 +262,6 @@ Args:
 
 - Dictionary containing scan results with issues and summary
 
-**Robot Framework Example:**
-
-```robotframework
-${k8slog_scan_logs_for_issues_result}=    K8sLog.scan_logs_for_issues    ${log_dir}    ${workload_type}    example-name    ...
-```
-
 ---
 
 #### K8sLog.analyze_log_anomalies
@@ -369,12 +285,6 @@ Args:
 
 - Dictionary containing anomaly analysis results
 
-**Robot Framework Example:**
-
-```robotframework
-${k8slog_analyze_log_anomalies_result}=    K8sLog.analyze_log_anomalies    ${log_dir}    ${workload_type}    example-name    ...
-```
-
 ---
 
 #### K8sLog.summarize_log_issues
@@ -391,12 +301,6 @@ Args:
 **Returns:**
 
 - Summarized and formatted issue details
-
-**Robot Framework Example:**
-
-```robotframework
-${k8slog_summarize_log_issues_result}=    K8sLog.summarize_log_issues    ${issue_details}
-```
 
 ---
 
@@ -415,23 +319,11 @@ Args:
 
 - Health score between 0.0 (unhealthy) and 1.0 (healthy)
 
-**Robot Framework Example:**
-
-```robotframework
-${k8slog_calculate_log_health_score_result}=    K8sLog.calculate_log_health_score    ${scan_results}
-```
-
 ---
 
 #### K8sLog.cleanup_temp_files
 
 Clean up temporary files created during log analysis.
-
-**Robot Framework Example:**
-
-```robotframework
-${k8slog_cleanup_temp_files_result}=    K8sLog.cleanup_temp_files
-```
 
 ---
 
@@ -460,12 +352,6 @@ Args:
 
 - Path to the directory containing fetched logs
 
-**Robot Framework Example:**
-
-```robotframework
-${fetch_workload_logs_result}=    fetch_workload_logs    ${workload_type}    example-name    example-name    ...
-```
-
 ---
 
 #### scan_logs_for_issues
@@ -491,12 +377,6 @@ Args:
 
 - Dictionary containing scan results with issues and summary
 
-**Robot Framework Example:**
-
-```robotframework
-${scan_logs_for_issues_result}=    scan_logs_for_issues    ${log_dir}    ${workload_type}    example-name    ...
-```
-
 ---
 
 #### analyze_log_anomalies
@@ -519,12 +399,6 @@ Args:
 **Returns:**
 
 - Dictionary containing anomaly analysis results
-
-**Robot Framework Example:**
-
-```robotframework
-${analyze_log_anomalies_result}=    analyze_log_anomalies    ${log_dir}    ${workload_type}    example-name    ...
-```
 
 ---
 
@@ -551,12 +425,6 @@ Raises:
 - `expected_rsp_returncodes`
 - `contains_stderr_ok`
 
-**Robot Framework Example:**
-
-```robotframework
-${verify_rsp_result}=    verify_rsp    ${rsp}    ${expected_rsp_statuscodes}    ${expected_rsp_returncodes}    ...
-```
-
 ---
 
 #### escape_str_for_exec
@@ -573,12 +441,6 @@ Args:
 **Returns:**
 
 - str: string with triple escaped quotes for passthrough
-
-**Robot Framework Example:**
-
-```robotframework
-${escape_str_for_exec_result}=    escape_str_for_exec    ${string}    ${escapes}
-```
 
 ---
 
@@ -631,12 +493,6 @@ Args:
 
 - platform.ShellServiceResponse: the unchanged response object that was parsed, for subsequent parses.
 
-**Robot Framework Example:**
-
-```robotframework
-${parse_cli_json_output_result}=    parse_cli_json_output    ${rsp}    ${set_severity_level}    ${set_issue_expected}    ...
-```
-
 ---
 
 ### postgres_helper Library
@@ -657,12 +513,6 @@ ${parse_cli_json_output_result}=    parse_cli_json_output    ${rsp}    ${set_sev
 - `database_name`
 - `opt_flags`
 
-**Robot Framework Example:**
-
-```robotframework
-${k8s_postgres_query_result}=    k8s_postgres_query    ${query}    ${context}    example-name    ...
-```
-
 ---
 
 ### CLI Library
@@ -681,12 +531,6 @@ Otherwise, run it via 'platform.execute_shell_command'.
 - `files`
 - `timeout_seconds`
 - `cwd`
-
-**Robot Framework Example:**
-
-```robotframework
-${execute_command_result}=    execute_command    ${cmd}    ${service}    ${request_secrets}    ...
-```
 
 ---
 
@@ -712,12 +556,6 @@ automatically in `execute_command()`.
 - `include_in_history`
 - `cmd_override`
 - `timeout_seconds`
-
-**Robot Framework Example:**
-
-```robotframework
-${run_bash_file_result}=    run_bash_file    /path/to/file    ${target_service}    ${env}    ...
-```
 
 ---
 
@@ -745,12 +583,6 @@ Executes a string of shell commands either locally or remotely (if target_servic
 - `include_in_history`
 - `timeout_seconds`
 - `debug`
-
-**Robot Framework Example:**
-
-```robotframework
-${run_cli_result}=    run_cli    ${cmd}    ${target_service}    ${env}    ...
-```
 
 ---
 
@@ -820,12 +652,6 @@ Args:
 
 - platform.ShellServiceResponse: The response object used. Typically unchanged but the stdout can be
 
-**Robot Framework Example:**
-
-```robotframework
-${parse_cli_output_by_line_result}=    parse_cli_output_by_line    ${rsp}    ${lines_like_regexp}    ${issue_if_no_capture_groups}    ...
-```
-
 ---
 
 ### k8s_helper Library
@@ -845,12 +671,6 @@ obj_json (dict): The Kubernetes object JSON.
 
 - str: Recommendations based on the object's annotations or labels.
 
-**Robot Framework Example:**
-
-```robotframework
-${get_related_resource_recommendations_result}=    get_related_resource_recommendations    ${k8s_object}
-```
-
 ---
 
 ## File Operations
@@ -864,23 +684,11 @@ ${get_related_resource_recommendations_result}=    get_related_resource_recommen
 - `filename`
 - `st`
 
-**Robot Framework Example:**
-
-```robotframework
-${get_file_contents_peek_result}=    get_file_contents_peek    /path/to/file    ${st}
-```
-
 ---
 
 ### repository Library
 
 #### GitCommit.changed_files
-
-**Robot Framework Example:**
-
-```robotframework
-${gitcommit_changed_files_result}=    GitCommit.changed_files
-```
 
 ---
 
@@ -889,12 +697,6 @@ ${gitcommit_changed_files_result}=    GitCommit.changed_files
 **Arguments:**
 
 - `search_term`
-
-**Robot Framework Example:**
-
-```robotframework
-${repositoryfile_search_result}=    RepositoryFile.search    ${search_term}
-```
 
 ---
 
@@ -906,31 +708,13 @@ ${repositoryfile_search_result}=    RepositoryFile.search    ${search_term}
 - `before`
 - `after`
 
-**Robot Framework Example:**
-
-```robotframework
-${repositoryfile_content_peek_result}=    RepositoryFile.content_peek    ${line_num}    ${before}    ${after}
-```
-
 ---
 
 #### RepositoryFile.git_add
 
-**Robot Framework Example:**
-
-```robotframework
-${repositoryfile_git_add_result}=    RepositoryFile.git_add
-```
-
 ---
 
 #### RepositoryFile.write_content
-
-**Robot Framework Example:**
-
-```robotframework
-${repositoryfile_write_content_result}=    RepositoryFile.write_content
-```
 
 ---
 
@@ -940,41 +724,17 @@ ${repositoryfile_write_content_result}=    RepositoryFile.write_content
 
 - `src_file`
 
-**Robot Framework Example:**
-
-```robotframework
-${repositoryfiles_add_source_file_result}=    RepositoryFiles.add_source_file    /path/to/file
-```
-
 ---
 
 #### RepositoryFiles.file_paths
-
-**Robot Framework Example:**
-
-```robotframework
-${repositoryfiles_file_paths_result}=    RepositoryFiles.file_paths
-```
 
 ---
 
 #### RepositoryFiles.all_files
 
-**Robot Framework Example:**
-
-```robotframework
-${repositoryfiles_all_files_result}=    RepositoryFiles.all_files
-```
-
 ---
 
 #### RepositoryFiles.all_basenames
-
-**Robot Framework Example:**
-
-```robotframework
-${repositoryfiles_all_basenames_result}=    RepositoryFiles.all_basenames
-```
 
 ---
 
@@ -984,12 +744,6 @@ ${repositoryfiles_all_basenames_result}=    RepositoryFiles.all_basenames
 
 - `filename`
 
-**Robot Framework Example:**
-
-```robotframework
-${repository_find_file_result}=    Repository.find_file    /path/to/file
-```
-
 ---
 
 #### Repository.is_text_file
@@ -998,21 +752,9 @@ ${repository_find_file_result}=    Repository.find_file    /path/to/file
 
 - `file_path`
 
-**Robot Framework Example:**
-
-```robotframework
-${repository_is_text_file_result}=    Repository.is_text_file    /path/to/file
-```
-
 ---
 
 #### Repository.create_file_list
-
-**Robot Framework Example:**
-
-```robotframework
-${repository_create_file_list_result}=    Repository.create_file_list
-```
 
 ---
 
@@ -1022,31 +764,13 @@ ${repository_create_file_list_result}=    Repository.create_file_list
 
 - `filename`
 
-**Robot Framework Example:**
-
-```robotframework
-${repository_get_commits_that_changed_file_result}=    Repository.get_commits_that_changed_file    /path/to/file
-```
-
 ---
 
 #### changed_files
 
-**Robot Framework Example:**
-
-```robotframework
-${changed_files_result}=    changed_files
-```
-
 ---
 
 #### write_content
-
-**Robot Framework Example:**
-
-```robotframework
-${write_content_result}=    write_content
-```
 
 ---
 
@@ -1056,31 +780,13 @@ ${write_content_result}=    write_content
 
 - `src_file`
 
-**Robot Framework Example:**
-
-```robotframework
-${add_source_file_result}=    add_source_file    /path/to/file
-```
-
 ---
 
 #### file_paths
 
-**Robot Framework Example:**
-
-```robotframework
-${file_paths_result}=    file_paths
-```
-
 ---
 
 #### all_files
-
-**Robot Framework Example:**
-
-```robotframework
-${all_files_result}=    all_files
-```
 
 ---
 
@@ -1090,12 +796,6 @@ ${all_files_result}=    all_files
 
 - `filename`
 
-**Robot Framework Example:**
-
-```robotframework
-${find_file_result}=    find_file    /path/to/file
-```
-
 ---
 
 #### is_text_file
@@ -1104,21 +804,9 @@ ${find_file_result}=    find_file    /path/to/file
 
 - `file_path`
 
-**Robot Framework Example:**
-
-```robotframework
-${is_text_file_result}=    is_text_file    /path/to/file
-```
-
 ---
 
 #### create_file_list
-
-**Robot Framework Example:**
-
-```robotframework
-${create_file_list_result}=    create_file_list
-```
 
 ---
 
@@ -1128,33 +816,15 @@ ${create_file_list_result}=    create_file_list
 
 - `filename`
 
-**Robot Framework Example:**
-
-```robotframework
-${get_commits_that_changed_file_result}=    get_commits_that_changed_file    /path/to/file
-```
-
 ---
 
 ### parsers Library
 
 #### StackTraceData.first_file
 
-**Robot Framework Example:**
-
-```robotframework
-${stacktracedata_first_file_result}=    StackTraceData.first_file
-```
-
 ---
 
 #### StackTraceData.get_first_file_line_nums_as_str
-
-**Robot Framework Example:**
-
-```robotframework
-${stacktracedata_get_first_file_line_nums_as_str_result}=    StackTraceData.get_first_file_line_nums_as_str
-```
 
 ---
 
@@ -1166,12 +836,6 @@ ${stacktracedata_get_first_file_line_nums_as_str_result}=    StackTraceData.get_
 - `show_debug`
 - `exclude_paths`
 
-**Robot Framework Example:**
-
-```robotframework
-${basestacktraceparse_extract_files_result}=    BaseStackTraceParse.extract_files    ${text}    ${show_debug}    /path/to/file
-```
-
 ---
 
 #### PythonStackTraceParse.extract_files
@@ -1181,12 +845,6 @@ ${basestacktraceparse_extract_files_result}=    BaseStackTraceParse.extract_file
 - `text`
 - `show_debug`
 - `exclude_paths`
-
-**Robot Framework Example:**
-
-```robotframework
-${pythonstacktraceparse_extract_files_result}=    PythonStackTraceParse.extract_files    ${text}    ${show_debug}    /path/to/file
-```
 
 ---
 
@@ -1198,31 +856,23 @@ ${pythonstacktraceparse_extract_files_result}=    PythonStackTraceParse.extract_
 - `show_debug`
 - `exclude_paths`
 
-**Robot Framework Example:**
-
-```robotframework
-${golangstacktraceparse_extract_files_result}=    GoLangStackTraceParse.extract_files    ${text}    ${show_debug}    /path/to/file
-```
-
 ---
 
 #### first_file
-
-**Robot Framework Example:**
-
-```robotframework
-${first_file_result}=    first_file
-```
 
 ---
 
 #### get_first_file_line_nums_as_str
 
-**Robot Framework Example:**
+---
 
-```robotframework
-${get_first_file_line_nums_as_str_result}=    get_first_file_line_nums_as_str
-```
+#### extract_files
+
+**Arguments:**
+
+- `text`
+- `show_debug`
+- `exclude_paths`
 
 ---
 
@@ -1234,12 +884,6 @@ ${get_first_file_line_nums_as_str_result}=    get_first_file_line_nums_as_str
 - `show_debug`
 - `exclude_paths`
 
-**Robot Framework Example:**
-
-```robotframework
-${extract_files_result}=    extract_files    ${text}    ${show_debug}    /path/to/file
-```
-
 ---
 
 #### extract_files
@@ -1249,28 +893,6 @@ ${extract_files_result}=    extract_files    ${text}    ${show_debug}    /path/t
 - `text`
 - `show_debug`
 - `exclude_paths`
-
-**Robot Framework Example:**
-
-```robotframework
-${extract_files_result}=    extract_files    ${text}    ${show_debug}    /path/to/file
-```
-
----
-
-#### extract_files
-
-**Arguments:**
-
-- `text`
-- `show_debug`
-- `exclude_paths`
-
-**Robot Framework Example:**
-
-```robotframework
-${extract_files_result}=    extract_files    ${text}    ${show_debug}    /path/to/file
-```
 
 ---
 
@@ -1291,23 +913,11 @@ Args:
 
 - Summarized and formatted issue details
 
-**Robot Framework Example:**
-
-```robotframework
-${summarize_log_issues_result}=    summarize_log_issues    ${issue_details}
-```
-
 ---
 
 #### cleanup_temp_files
 
 Clean up temporary files created during log analysis.
-
-**Robot Framework Example:**
-
-```robotframework
-${cleanup_temp_files_result}=    cleanup_temp_files
-```
 
 ---
 
@@ -1317,21 +927,9 @@ ${cleanup_temp_files_result}=    cleanup_temp_files
 
 Helper function to check if a file exists in the given paths.
 
-**Robot Framework Example:**
-
-```robotframework
-${find_file_result}=    find_file
-```
-
 ---
 
 #### resolve_path_to_robot
-
-**Robot Framework Example:**
-
-```robotframework
-${resolve_path_to_robot_result}=    resolve_path_to_robot
-```
 
 ---
 
@@ -1342,12 +940,6 @@ Helper to convert readable duration strings (eg: 1d2m36s) to a datetime.
 **Arguments:**
 
 - `duration_str`
-
-**Robot Framework Example:**
-
-```robotframework
-${string_to_datetime_result}=    string_to_datetime    ${duration_str}
-```
 
 ---
 
@@ -1363,12 +955,6 @@ ${string_to_datetime_result}=    string_to_datetime    ${duration_str}
 - `show_debug`
 - `exclude_paths`
 
-**Robot Framework Example:**
-
-```robotframework
-${basestacktraceparse_extract_endpoints_result}=    BaseStackTraceParse.extract_endpoints    ${text}    ${show_debug}    /path/to/file
-```
-
 ---
 
 #### GoLangStackTraceParse.extract_endpoints
@@ -1379,12 +965,6 @@ ${basestacktraceparse_extract_endpoints_result}=    BaseStackTraceParse.extract_
 - `show_debug`
 - `exclude_paths`
 
-**Robot Framework Example:**
-
-```robotframework
-${golangstacktraceparse_extract_endpoints_result}=    GoLangStackTraceParse.extract_endpoints    ${text}    ${show_debug}    /path/to/file
-```
-
 ---
 
 #### extract_endpoints
@@ -1395,12 +975,6 @@ ${golangstacktraceparse_extract_endpoints_result}=    GoLangStackTraceParse.extr
 - `show_debug`
 - `exclude_paths`
 
-**Robot Framework Example:**
-
-```robotframework
-${extract_endpoints_result}=    extract_endpoints    ${text}    ${show_debug}    /path/to/file
-```
-
 ---
 
 #### extract_endpoints
@@ -1410,12 +984,6 @@ ${extract_endpoints_result}=    extract_endpoints    ${text}    ${show_debug}   
 - `text`
 - `show_debug`
 - `exclude_paths`
-
-**Robot Framework Example:**
-
-```robotframework
-${extract_endpoints_result}=    extract_endpoints    ${text}    ${show_debug}    /path/to/file
-```
 
 ---
 
@@ -1447,12 +1015,6 @@ Args:
 
 - platform.ShellServiceResponse
 
-**Robot Framework Example:**
-
-```robotframework
-${execute_local_command_result}=    execute_local_command    ${cmd}    ${request_secrets}    ${env}    ...
-```
-
 ---
 
 ## Utilities
@@ -1474,12 +1036,6 @@ Example usage:
 - `jenkins_username`
 - `jenkins_token`
 
-**Robot Framework Example:**
-
-```robotframework
-${jenkins_parse_atom_feed_result}=    Jenkins.parse_atom_feed    https://example.com    example-name    ${jenkins_token}
-```
-
 ---
 
 #### parse_atom_feed
@@ -1497,12 +1053,6 @@ Example usage:
 - `jenkins_username`
 - `jenkins_token`
 
-**Robot Framework Example:**
-
-```robotframework
-${parse_atom_feed_result}=    parse_atom_feed    https://example.com    example-name    ${jenkins_token}
-```
-
 ---
 
 ### k8s_applications Library
@@ -1513,12 +1063,6 @@ ${parse_atom_feed_result}=    parse_atom_feed    https://example.com    example-
 
 - `proc_list`
 
-**Robot Framework Example:**
-
-```robotframework
-${format_process_list_result}=    format_process_list    ${proc_list}
-```
-
 ---
 
 #### parse_django_stacktraces
@@ -1526,12 +1070,6 @@ ${format_process_list_result}=    format_process_list    ${proc_list}
 **Arguments:**
 
 - `logs`
-
-**Robot Framework Example:**
-
-```robotframework
-${parse_django_stacktraces_result}=    parse_django_stacktraces    ${logs}
-```
 
 ---
 
@@ -1542,12 +1080,6 @@ ${parse_django_stacktraces_result}=    parse_django_stacktraces    ${logs}
 - `logs`
 - `show_debug`
 
-**Robot Framework Example:**
-
-```robotframework
-${parse_django_json_stacktraces_result}=    parse_django_json_stacktraces    ${logs}    ${show_debug}
-```
-
 ---
 
 #### parse_golang_json_stacktraces
@@ -1556,12 +1088,6 @@ ${parse_django_json_stacktraces_result}=    parse_django_json_stacktraces    ${l
 
 - `logs`
 - `show_debug`
-
-**Robot Framework Example:**
-
-```robotframework
-${parse_golang_json_stacktraces_result}=    parse_golang_json_stacktraces    ${logs}    ${show_debug}
-```
 
 ---
 
@@ -1588,12 +1114,6 @@ Args:
 
 - list[StackTraceData]: Returns a list of StackTraceData objects that contain the parsed stacktrace data to be leveraged by other functions
 
-**Robot Framework Example:**
-
-```robotframework
-${dynamic_parse_stacktraces_result}=    dynamic_parse_stacktraces    ${logs}    example-name    ${parse_mode}    ...
-```
-
 ---
 
 #### determine_parser
@@ -1601,12 +1121,6 @@ ${dynamic_parse_stacktraces_result}=    dynamic_parse_stacktraces    ${logs}    
 **Arguments:**
 
 - `first_line`
-
-**Robot Framework Example:**
-
-```robotframework
-${determine_parser_result}=    determine_parser    ${first_line}
-```
 
 ---
 
@@ -1619,53 +1133,23 @@ ${determine_parser_result}=    determine_parser    ${first_line}
 - `parser_override`
 - `show_debug`
 
-**Robot Framework Example:**
-
-```robotframework
-${parse_stacktraces_result}=    parse_stacktraces    ${logs}    ${parse_mode}    ${parser_override}    ...
-```
-
 ---
 
 ### _test_parsers Library
 
 #### test_python_parser
 
-**Robot Framework Example:**
-
-```robotframework
-${test_python_parser_result}=    test_python_parser
-```
-
 ---
 
 #### test_google_drf_parser
-
-**Robot Framework Example:**
-
-```robotframework
-${test_google_drf_parser_result}=    test_google_drf_parser
-```
 
 ---
 
 #### test_golang_parser
 
-**Robot Framework Example:**
-
-```robotframework
-${test_golang_parser_result}=    test_golang_parser
-```
-
 ---
 
 #### test_golangjson_parse
-
-**Robot Framework Example:**
-
-```robotframework
-${test_golangjson_parse_result}=    test_golangjson_parse
-```
 
 ---
 
@@ -1677,12 +1161,6 @@ ${test_golangjson_parse_result}=    test_golangjson_parse
 
 - `data`
 
-**Robot Framework Example:**
-
-```robotframework
-${basestacktraceparse_is_json_result}=    BaseStackTraceParse.is_json    ${data}
-```
-
 ---
 
 #### BaseStackTraceParse.parse_log
@@ -1691,12 +1169,6 @@ ${basestacktraceparse_is_json_result}=    BaseStackTraceParse.is_json    ${data}
 
 - `log`
 - `show_debug`
-
-**Robot Framework Example:**
-
-```robotframework
-${basestacktraceparse_parse_log_result}=    BaseStackTraceParse.parse_log    ${log}    ${show_debug}
-```
 
 ---
 
@@ -1708,12 +1180,6 @@ ${basestacktraceparse_parse_log_result}=    BaseStackTraceParse.parse_log    ${l
 - `show_debug`
 - `exclude_paths`
 
-**Robot Framework Example:**
-
-```robotframework
-${basestacktraceparse_extract_line_nums_result}=    BaseStackTraceParse.extract_line_nums    ${text}    ${show_debug}    /path/to/file
-```
-
 ---
 
 #### BaseStackTraceParse.extract_urls
@@ -1722,12 +1188,6 @@ ${basestacktraceparse_extract_line_nums_result}=    BaseStackTraceParse.extract_
 
 - `text`
 - `show_debug`
-
-**Robot Framework Example:**
-
-```robotframework
-${basestacktraceparse_extract_urls_result}=    BaseStackTraceParse.extract_urls    ${text}    ${show_debug}
-```
 
 ---
 
@@ -1738,12 +1198,6 @@ ${basestacktraceparse_extract_urls_result}=    BaseStackTraceParse.extract_urls 
 - `text`
 - `show_debug`
 
-**Robot Framework Example:**
-
-```robotframework
-${basestacktraceparse_extract_sentences_result}=    BaseStackTraceParse.extract_sentences    ${text}    ${show_debug}
-```
-
 ---
 
 #### CSharpStackTraceParse.parse_log
@@ -1753,12 +1207,6 @@ ${basestacktraceparse_extract_sentences_result}=    BaseStackTraceParse.extract_
 - `log`
 - `show_debug`
 
-**Robot Framework Example:**
-
-```robotframework
-${csharpstacktraceparse_parse_log_result}=    CSharpStackTraceParse.parse_log    ${log}    ${show_debug}
-```
-
 ---
 
 #### PythonStackTraceParse.extract_sentences
@@ -1767,12 +1215,6 @@ ${csharpstacktraceparse_parse_log_result}=    CSharpStackTraceParse.parse_log   
 
 - `text`
 - `show_debug`
-
-**Robot Framework Example:**
-
-```robotframework
-${pythonstacktraceparse_extract_sentences_result}=    PythonStackTraceParse.extract_sentences    ${text}    ${show_debug}
-```
 
 ---
 
@@ -1784,12 +1226,6 @@ ${pythonstacktraceparse_extract_sentences_result}=    PythonStackTraceParse.extr
 - `show_debug`
 - `exclude_paths`
 
-**Robot Framework Example:**
-
-```robotframework
-${pythonstacktraceparse_extract_line_nums_result}=    PythonStackTraceParse.extract_line_nums    ${text}    ${show_debug}    /path/to/file
-```
-
 ---
 
 #### PythonStackTraceParse.parse_log
@@ -1798,12 +1234,6 @@ ${pythonstacktraceparse_extract_line_nums_result}=    PythonStackTraceParse.extr
 
 - `log`
 - `show_debug`
-
-**Robot Framework Example:**
-
-```robotframework
-${pythonstacktraceparse_parse_log_result}=    PythonStackTraceParse.parse_log    ${log}    ${show_debug}
-```
 
 ---
 
@@ -1814,12 +1244,6 @@ ${pythonstacktraceparse_parse_log_result}=    PythonStackTraceParse.parse_log   
 - `log`
 - `show_debug`
 
-**Robot Framework Example:**
-
-```robotframework
-${drfstacktraceparse_parse_log_result}=    DRFStackTraceParse.parse_log    ${log}    ${show_debug}
-```
-
 ---
 
 #### GoogleDRFStackTraceParse.parse_log
@@ -1828,12 +1252,6 @@ ${drfstacktraceparse_parse_log_result}=    DRFStackTraceParse.parse_log    ${log
 
 - `log`
 - `show_debug`
-
-**Robot Framework Example:**
-
-```robotframework
-${googledrfstacktraceparse_parse_log_result}=    GoogleDRFStackTraceParse.parse_log    ${log}    ${show_debug}
-```
 
 ---
 
@@ -1844,12 +1262,6 @@ ${googledrfstacktraceparse_parse_log_result}=    GoogleDRFStackTraceParse.parse_
 - `log`
 - `show_debug`
 
-**Robot Framework Example:**
-
-```robotframework
-${golangstacktraceparse_parse_log_result}=    GoLangStackTraceParse.parse_log    ${log}    ${show_debug}
-```
-
 ---
 
 #### GoLangStackTraceParse.extract_sentences
@@ -1858,12 +1270,6 @@ ${golangstacktraceparse_parse_log_result}=    GoLangStackTraceParse.parse_log   
 
 - `text`
 - `show_debug`
-
-**Robot Framework Example:**
-
-```robotframework
-${golangstacktraceparse_extract_sentences_result}=    GoLangStackTraceParse.extract_sentences    ${text}    ${show_debug}
-```
 
 ---
 
@@ -1875,12 +1281,6 @@ ${golangstacktraceparse_extract_sentences_result}=    GoLangStackTraceParse.extr
 - `show_debug`
 - `exclude_paths`
 
-**Robot Framework Example:**
-
-```robotframework
-${golangstacktraceparse_extract_line_nums_result}=    GoLangStackTraceParse.extract_line_nums    ${text}    ${show_debug}    /path/to/file
-```
-
 ---
 
 #### GoLangJsonStackTraceParse.parse_log
@@ -1890,11 +1290,14 @@ ${golangstacktraceparse_extract_line_nums_result}=    GoLangStackTraceParse.extr
 - `log`
 - `show_debug`
 
-**Robot Framework Example:**
+---
 
-```robotframework
-${golangjsonstacktraceparse_parse_log_result}=    GoLangJsonStackTraceParse.parse_log    ${log}    ${show_debug}
-```
+#### parse_log
+
+**Arguments:**
+
+- `log`
+- `show_debug`
 
 ---
 
@@ -1905,11 +1308,14 @@ ${golangjsonstacktraceparse_parse_log_result}=    GoLangJsonStackTraceParse.pars
 - `log`
 - `show_debug`
 
-**Robot Framework Example:**
+---
 
-```robotframework
-${parse_log_result}=    parse_log    ${log}    ${show_debug}
-```
+#### parse_log
+
+**Arguments:**
+
+- `log`
+- `show_debug`
 
 ---
 
@@ -1920,11 +1326,14 @@ ${parse_log_result}=    parse_log    ${log}    ${show_debug}
 - `log`
 - `show_debug`
 
-**Robot Framework Example:**
+---
 
-```robotframework
-${parse_log_result}=    parse_log    ${log}    ${show_debug}
-```
+#### parse_log
+
+**Arguments:**
+
+- `log`
+- `show_debug`
 
 ---
 
@@ -1935,12 +1344,6 @@ ${parse_log_result}=    parse_log    ${log}    ${show_debug}
 - `log`
 - `show_debug`
 
-**Robot Framework Example:**
-
-```robotframework
-${parse_log_result}=    parse_log    ${log}    ${show_debug}
-```
-
 ---
 
 #### parse_log
@@ -1949,57 +1352,6 @@ ${parse_log_result}=    parse_log    ${log}    ${show_debug}
 
 - `log`
 - `show_debug`
-
-**Robot Framework Example:**
-
-```robotframework
-${parse_log_result}=    parse_log    ${log}    ${show_debug}
-```
-
----
-
-#### parse_log
-
-**Arguments:**
-
-- `log`
-- `show_debug`
-
-**Robot Framework Example:**
-
-```robotframework
-${parse_log_result}=    parse_log    ${log}    ${show_debug}
-```
-
----
-
-#### parse_log
-
-**Arguments:**
-
-- `log`
-- `show_debug`
-
-**Robot Framework Example:**
-
-```robotframework
-${parse_log_result}=    parse_log    ${log}    ${show_debug}
-```
-
----
-
-#### parse_log
-
-**Arguments:**
-
-- `log`
-- `show_debug`
-
-**Robot Framework Example:**
-
-```robotframework
-${parse_log_result}=    parse_log    ${log}    ${show_debug}
-```
 
 ---
 
@@ -2027,12 +1379,6 @@ Args:
 
 - _type_: _description_
 
-**Robot Framework Example:**
-
-```robotframework
-${filter_by_time_result}=    filter_by_time    ${list_data}    example-name    ${operand}    ...
-```
-
 ---
 
 ### Suggest Library
@@ -2043,12 +1389,6 @@ ${filter_by_time_result}=    filter_by_time    ${list_data}    example-name    $
 
 - `suggestions`
 - `expand_arrays`
-
-**Robot Framework Example:**
-
-```robotframework
-${format_result}=    format    ${suggestions}    ${expand_arrays}
-```
 
 ---
 
@@ -2064,12 +1404,6 @@ Normalize logs to improve pattern matching.
 
 - `log`
 
-**Robot Framework Example:**
-
-```robotframework
-${normalize_log_result}=    normalize_log    ${log}
-```
-
 ---
 
 #### Jenkins.get_failed_tests
@@ -2082,15 +1416,9 @@ Returns a list of pipelines in the 'UNSTABLE' state along with their failed test
 - `jenkins_username`
 - `jenkins_token`
 
-**Robot Framework Example:**
+**Examples:**
 
-```robotframework
-${jenkins_get_failed_tests_result}=    Jenkins.get_failed_tests    https://example.com    example-name    ${jenkins_token}
 ```
-
-**Additional Examples:**
-
-```python
 | ${failed_tests}=    Get Failed Tests    ${JENKINS_URL}    ${JENKINS_USERNAME}    ${JENKINS_TOKEN} |
 | FOR  ${pipeline}  IN  @{failed_tests} |
 |    Log  Pipeline name: ${pipeline['pipeline_details']['pipeline_name']} |
@@ -2119,12 +1447,6 @@ Example usage in Robot:
 - `jenkins_token`
 - `wait_threshold`
 
-**Robot Framework Example:**
-
-```robotframework
-${jenkins_get_queued_builds_result}=    Jenkins.get_queued_builds    https://example.com    example-name    ${jenkins_token}    ...
-```
-
 ---
 
 #### Jenkins.get_executor_utilization
@@ -2142,12 +1464,6 @@ Returns a list with executor utilization info for each Jenkins node.
 - `jenkins_username`
 - `jenkins_token`
 
-**Robot Framework Example:**
-
-```robotframework
-${jenkins_get_executor_utilization_result}=    Jenkins.get_executor_utilization    https://example.com    example-name    ${jenkins_token}
-```
-
 ---
 
 #### Jenkins.analyze_logs
@@ -2158,12 +1474,6 @@ Analyzes logs for common errors, prioritizing lines with ERROR, and suggests nex
 
 - `logs`
 - `error_patterns_file`
-
-**Robot Framework Example:**
-
-```robotframework
-${jenkins_analyze_logs_result}=    Jenkins.analyze_logs    ${logs}    /path/to/file
-```
 
 ---
 
@@ -2177,15 +1487,9 @@ Returns a list of pipelines in the 'UNSTABLE' state along with their failed test
 - `jenkins_username`
 - `jenkins_token`
 
-**Robot Framework Example:**
+**Examples:**
 
-```robotframework
-${get_failed_tests_result}=    get_failed_tests    https://example.com    example-name    ${jenkins_token}
 ```
-
-**Additional Examples:**
-
-```python
 | ${failed_tests}=    Get Failed Tests    ${JENKINS_URL}    ${JENKINS_USERNAME}    ${JENKINS_TOKEN} |
 | FOR  ${pipeline}  IN  @{failed_tests} |
 |    Log  Pipeline name: ${pipeline['pipeline_details']['pipeline_name']} |
@@ -2214,12 +1518,6 @@ Example usage in Robot:
 - `jenkins_token`
 - `wait_threshold`
 
-**Robot Framework Example:**
-
-```robotframework
-${get_queued_builds_result}=    get_queued_builds    https://example.com    example-name    ${jenkins_token}    ...
-```
-
 ---
 
 #### get_executor_utilization
@@ -2237,12 +1535,6 @@ Returns a list with executor utilization info for each Jenkins node.
 - `jenkins_username`
 - `jenkins_token`
 
-**Robot Framework Example:**
-
-```robotframework
-${get_executor_utilization_result}=    get_executor_utilization    https://example.com    example-name    ${jenkins_token}
-```
-
 ---
 
 #### analyze_logs
@@ -2254,12 +1546,6 @@ Analyzes logs for common errors, prioritizing lines with ERROR, and suggests nex
 - `logs`
 - `error_patterns_file`
 
-**Robot Framework Example:**
-
-```robotframework
-${analyze_logs_result}=    analyze_logs    ${logs}    /path/to/file
-```
-
 ---
 
 ### k8s_applications Library
@@ -2270,12 +1556,6 @@ ${analyze_logs_result}=    analyze_logs    ${logs}    /path/to/file
 
 - `printenv`
 
-**Robot Framework Example:**
-
-```robotframework
-${serialize_env_result}=    serialize_env    ${printenv}
-```
-
 ---
 
 #### test_search
@@ -2285,21 +1565,9 @@ ${serialize_env_result}=    serialize_env    ${printenv}
 - `repo`
 - `exceptions`
 
-**Robot Framework Example:**
-
-```robotframework
-${test_search_result}=    test_search    ${repo}    ${exceptions}
-```
-
 ---
 
 #### get_test_data
-
-**Robot Framework Example:**
-
-```robotframework
-${get_test_data_result}=    get_test_data
-```
 
 ---
 
@@ -2310,12 +1578,6 @@ ${get_test_data_result}=    get_test_data
 - `git_uri`
 - `git_token`
 - `number_of_commits_history`
-
-**Robot Framework Example:**
-
-```robotframework
-${clone_repo_result}=    clone_repo    ${git_uri}    ${git_token}    ${number_of_commits_history}
-```
 
 ---
 
@@ -2329,12 +1591,6 @@ ${clone_repo_result}=    clone_repo    ${git_uri}    ${git_token}    ${number_of
 - `process_list`
 - `app_name`
 
-**Robot Framework Example:**
-
-```robotframework
-${troubleshoot_application_result}=    troubleshoot_application    ${repos}    ${exceptions}    ${env}    ...
-```
-
 ---
 
 #### scale_up_hpa
@@ -2347,33 +1603,15 @@ ${troubleshoot_application_result}=    troubleshoot_application    ${repos}    $
 - `set_value`
 - `max_allowed_replicas`
 
-**Robot Framework Example:**
-
-```robotframework
-${scale_up_hpa_result}=    scale_up_hpa    ${infra_repo}    /path/to/file    ${increase_value}    ...
-```
-
 ---
 
 ### _test_parsers Library
 
 #### test_no_results
 
-**Robot Framework Example:**
-
-```robotframework
-${test_no_results_result}=    test_no_results
-```
-
 ---
 
 #### test_dynamic
-
-**Robot Framework Example:**
-
-```robotframework
-${test_dynamic_result}=    test_dynamic
-```
 
 ---
 
@@ -2381,31 +1619,13 @@ ${test_dynamic_result}=    test_dynamic
 
 #### GitCommit.diff
 
-**Robot Framework Example:**
-
-```robotframework
-${gitcommit_diff_result}=    GitCommit.diff
-```
-
 ---
 
 #### GitCommit.diff_additions
 
-**Robot Framework Example:**
-
-```robotframework
-${gitcommit_diff_additions_result}=    GitCommit.diff_additions
-```
-
 ---
 
 #### GitCommit.diff_deletions
-
-**Robot Framework Example:**
-
-```robotframework
-${gitcommit_diff_deletions_result}=    GitCommit.diff_deletions
-```
 
 ---
 
@@ -2416,12 +1636,6 @@ ${gitcommit_diff_deletions_result}=    GitCommit.diff_deletions
 - `num_commits_history`
 - `cache`
 
-**Robot Framework Example:**
-
-```robotframework
-${repository_clone_repo_result}=    Repository.clone_repo    ${num_commits_history}    ${cache}
-```
-
 ---
 
 #### Repository.git_commit
@@ -2431,12 +1645,6 @@ ${repository_clone_repo_result}=    Repository.clone_repo    ${num_commits_histo
 - `branch_name`
 - `comment`
 
-**Robot Framework Example:**
-
-```robotframework
-${repository_git_commit_result}=    Repository.git_commit    example-name    ${comment}
-```
-
 ---
 
 #### Repository.git_push_branch
@@ -2445,12 +1653,6 @@ ${repository_git_commit_result}=    Repository.git_commit    example-name    ${c
 
 - `branch`
 - `remote`
-
-**Robot Framework Example:**
-
-```robotframework
-${repository_git_push_branch_result}=    Repository.git_push_branch    ${branch}    ${remote}
-```
 
 ---
 
@@ -2463,21 +1665,9 @@ ${repository_git_push_branch_result}=    Repository.git_push_branch    ${branch}
 - `body`
 - `check_open`
 
-**Robot Framework Example:**
-
-```robotframework
-${repository_git_pr_result}=    Repository.git_pr    ${title}    ${branch}    ${body}    ...
-```
-
 ---
 
 #### Repository.get_repo_base_url
-
-**Robot Framework Example:**
-
-```robotframework
-${repository_get_repo_base_url_result}=    Repository.get_repo_base_url
-```
 
 ---
 
@@ -2488,12 +1678,6 @@ ${repository_get_repo_base_url_result}=    Repository.get_repo_base_url
 - `search_words`
 - `search_files`
 
-**Robot Framework Example:**
-
-```robotframework
-${repository_search_result}=    Repository.search    ${search_words}    /path/to/file
-```
-
 ---
 
 #### Repository.serialize_git_commits
@@ -2501,12 +1685,6 @@ ${repository_search_result}=    Repository.search    ${search_words}    /path/to
 **Arguments:**
 
 - `commit_list`
-
-**Robot Framework Example:**
-
-```robotframework
-${repository_serialize_git_commits_result}=    Repository.serialize_git_commits    ${commit_list}
-```
 
 ---
 
@@ -2516,41 +1694,17 @@ ${repository_serialize_git_commits_result}=    Repository.serialize_git_commits 
 
 - `num_commits`
 
-**Robot Framework Example:**
-
-```robotframework
-${repository_get_git_log_result}=    Repository.get_git_log    ${num_commits}
-```
-
 ---
 
 #### diff
-
-**Robot Framework Example:**
-
-```robotframework
-${diff_result}=    diff
-```
 
 ---
 
 #### diff_additions
 
-**Robot Framework Example:**
-
-```robotframework
-${diff_additions_result}=    diff_additions
-```
-
 ---
 
 #### diff_deletions
-
-**Robot Framework Example:**
-
-```robotframework
-${diff_deletions_result}=    diff_deletions
-```
 
 ---
 
@@ -2559,12 +1713,6 @@ ${diff_deletions_result}=    diff_deletions
 **Arguments:**
 
 - `search_term`
-
-**Robot Framework Example:**
-
-```robotframework
-${search_result}=    search    ${search_term}
-```
 
 ---
 
@@ -2576,31 +1724,13 @@ ${search_result}=    search    ${search_term}
 - `before`
 - `after`
 
-**Robot Framework Example:**
-
-```robotframework
-${content_peek_result}=    content_peek    ${line_num}    ${before}    ${after}
-```
-
 ---
 
 #### git_add
 
-**Robot Framework Example:**
-
-```robotframework
-${git_add_result}=    git_add
-```
-
 ---
 
 #### all_basenames
-
-**Robot Framework Example:**
-
-```robotframework
-${all_basenames_result}=    all_basenames
-```
 
 ---
 
@@ -2611,12 +1741,6 @@ ${all_basenames_result}=    all_basenames
 - `num_commits_history`
 - `cache`
 
-**Robot Framework Example:**
-
-```robotframework
-${clone_repo_result}=    clone_repo    ${num_commits_history}    ${cache}
-```
-
 ---
 
 #### git_commit
@@ -2626,12 +1750,6 @@ ${clone_repo_result}=    clone_repo    ${num_commits_history}    ${cache}
 - `branch_name`
 - `comment`
 
-**Robot Framework Example:**
-
-```robotframework
-${git_commit_result}=    git_commit    example-name    ${comment}
-```
-
 ---
 
 #### git_push_branch
@@ -2640,12 +1758,6 @@ ${git_commit_result}=    git_commit    example-name    ${comment}
 
 - `branch`
 - `remote`
-
-**Robot Framework Example:**
-
-```robotframework
-${git_push_branch_result}=    git_push_branch    ${branch}    ${remote}
-```
 
 ---
 
@@ -2658,21 +1770,9 @@ ${git_push_branch_result}=    git_push_branch    ${branch}    ${remote}
 - `body`
 - `check_open`
 
-**Robot Framework Example:**
-
-```robotframework
-${git_pr_result}=    git_pr    ${title}    ${branch}    ${body}    ...
-```
-
 ---
 
 #### get_repo_base_url
-
-**Robot Framework Example:**
-
-```robotframework
-${get_repo_base_url_result}=    get_repo_base_url
-```
 
 ---
 
@@ -2683,12 +1783,6 @@ ${get_repo_base_url_result}=    get_repo_base_url
 - `search_words`
 - `search_files`
 
-**Robot Framework Example:**
-
-```robotframework
-${search_result}=    search    ${search_words}    /path/to/file
-```
-
 ---
 
 #### serialize_git_commits
@@ -2696,12 +1790,6 @@ ${search_result}=    search    ${search_words}    /path/to/file
 **Arguments:**
 
 - `commit_list`
-
-**Robot Framework Example:**
-
-```robotframework
-${serialize_git_commits_result}=    serialize_git_commits    ${commit_list}
-```
 
 ---
 
@@ -2711,73 +1799,31 @@ ${serialize_git_commits_result}=    serialize_git_commits    ${commit_list}
 
 - `num_commits`
 
-**Robot Framework Example:**
-
-```robotframework
-${get_git_log_result}=    get_git_log    ${num_commits}
-```
-
 ---
 
 ### parsers Library
 
 #### StackTraceData.has_results
 
-**Robot Framework Example:**
-
-```robotframework
-${stacktracedata_has_results_result}=    StackTraceData.has_results
-```
-
 ---
 
 #### StackTraceData.errors_summary
-
-**Robot Framework Example:**
-
-```robotframework
-${stacktracedata_errors_summary_result}=    StackTraceData.errors_summary
-```
 
 ---
 
 #### StackTraceData.first_line_nums
 
-**Robot Framework Example:**
-
-```robotframework
-${stacktracedata_first_line_nums_result}=    StackTraceData.first_line_nums
-```
-
 ---
 
 #### has_results
-
-**Robot Framework Example:**
-
-```robotframework
-${has_results_result}=    has_results
-```
 
 ---
 
 #### errors_summary
 
-**Robot Framework Example:**
-
-```robotframework
-${errors_summary_result}=    errors_summary
-```
-
 ---
 
 #### first_line_nums
-
-**Robot Framework Example:**
-
-```robotframework
-${first_line_nums_result}=    first_line_nums
-```
 
 ---
 
@@ -2786,12 +1832,6 @@ ${first_line_nums_result}=    first_line_nums
 **Arguments:**
 
 - `data`
-
-**Robot Framework Example:**
-
-```robotframework
-${is_json_result}=    is_json    ${data}
-```
 
 ---
 
@@ -2802,12 +1842,6 @@ ${is_json_result}=    is_json    ${data}
 - `text`
 - `show_debug`
 - `exclude_paths`
-
-**Robot Framework Example:**
-
-```robotframework
-${extract_line_nums_result}=    extract_line_nums    ${text}    ${show_debug}    /path/to/file
-```
 
 ---
 
@@ -2818,12 +1852,6 @@ ${extract_line_nums_result}=    extract_line_nums    ${text}    ${show_debug}   
 - `text`
 - `show_debug`
 
-**Robot Framework Example:**
-
-```robotframework
-${extract_urls_result}=    extract_urls    ${text}    ${show_debug}
-```
-
 ---
 
 #### extract_sentences
@@ -2833,12 +1861,6 @@ ${extract_urls_result}=    extract_urls    ${text}    ${show_debug}
 - `text`
 - `show_debug`
 
-**Robot Framework Example:**
-
-```robotframework
-${extract_sentences_result}=    extract_sentences    ${text}    ${show_debug}
-```
-
 ---
 
 #### extract_sentences
@@ -2847,12 +1869,6 @@ ${extract_sentences_result}=    extract_sentences    ${text}    ${show_debug}
 
 - `text`
 - `show_debug`
-
-**Robot Framework Example:**
-
-```robotframework
-${extract_sentences_result}=    extract_sentences    ${text}    ${show_debug}
-```
 
 ---
 
@@ -2864,12 +1880,6 @@ ${extract_sentences_result}=    extract_sentences    ${text}    ${show_debug}
 - `show_debug`
 - `exclude_paths`
 
-**Robot Framework Example:**
-
-```robotframework
-${extract_line_nums_result}=    extract_line_nums    ${text}    ${show_debug}    /path/to/file
-```
-
 ---
 
 #### extract_sentences
@@ -2878,12 +1888,6 @@ ${extract_line_nums_result}=    extract_line_nums    ${text}    ${show_debug}   
 
 - `text`
 - `show_debug`
-
-**Robot Framework Example:**
-
-```robotframework
-${extract_sentences_result}=    extract_sentences    ${text}    ${show_debug}
-```
 
 ---
 
@@ -2894,12 +1898,6 @@ ${extract_sentences_result}=    extract_sentences    ${text}    ${show_debug}
 - `text`
 - `show_debug`
 - `exclude_paths`
-
-**Robot Framework Example:**
-
-```robotframework
-${extract_line_nums_result}=    extract_line_nums    ${text}    ${show_debug}    /path/to/file
-```
 
 ---
 
@@ -2920,12 +1918,6 @@ Args:
 
 - any: the loaded json object
 
-**Robot Framework Example:**
-
-```robotframework
-${from_json_result}=    from_json    ${json_str}
-```
-
 ---
 
 #### to_json
@@ -2943,12 +1935,6 @@ Args:
 
 - str: the str representation of the json blob
 
-**Robot Framework Example:**
-
-```robotframework
-${to_json_result}=    to_json    ${json_data}
-```
-
 ---
 
 ### postgres_helper Library
@@ -2965,12 +1951,6 @@ ${to_json_result}=    to_json    ${json_data}
 - `workload_name`
 - `container_name`
 
-**Robot Framework Example:**
-
-```robotframework
-${get_password_result}=    get_password    ${context}    example-name    ${kubeconfig}    ...
-```
-
 ---
 
 #### get_user
@@ -2984,12 +1964,6 @@ ${get_password_result}=    get_password    ${context}    example-name    ${kubec
 - `labels`
 - `workload_name`
 - `container_name`
-
-**Robot Framework Example:**
-
-```robotframework
-${get_user_result}=    get_user    ${context}    example-name    ${kubeconfig}    ...
-```
 
 ---
 
@@ -3005,12 +1979,6 @@ ${get_user_result}=    get_user    ${context}    example-name    ${kubeconfig}  
 - `workload_name`
 - `container_name`
 
-**Robot Framework Example:**
-
-```robotframework
-${get_database_result}=    get_database    ${context}    example-name    ${kubeconfig}    ...
-```
-
 ---
 
 ### CLI Library
@@ -3020,12 +1988,6 @@ ${get_database_result}=    get_database    ${context}    example-name    ${kubec
 **Arguments:**
 
 - `string`
-
-**Robot Framework Example:**
-
-```robotframework
-${escape_string_result}=    escape_string    ${string}
-```
 
 ---
 
@@ -3037,12 +1999,6 @@ Escapes a command for safe execution in bash.
 
 - `command`
 
-**Robot Framework Example:**
-
-```robotframework
-${escape_bash_command_result}=    escape_bash_command    ${command}
-```
-
 ---
 
 #### pop_shell_history
@@ -3052,12 +2008,6 @@ Deletes the shell history up to this point and returns it as a string for displa
 **Returns:**
 
 - str: the string of shell command history
-
-**Robot Framework Example:**
-
-```robotframework
-${pop_shell_history_result}=    pop_shell_history
-```
 
 ---
 
@@ -3073,12 +2023,6 @@ ${pop_shell_history_result}=    pop_shell_history
 - `include_object_hints`
 - `k_nearest`
 - `minimum_match_score`
-
-**Robot Framework Example:**
-
-```robotframework
-${suggest_result}=    suggest    ${search}    ${platform}    ${pretty_answer}    ...
-```
 
 ---
 
