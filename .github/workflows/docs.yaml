@@ -34,7 +34,7 @@ jobs:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
       
       - name: Generate Keyword Documentation
-        uses: runwhen-contrib/github-actions/runwhen-keyword-docs-generator@keyword-doc-generator@keyword-doc-generator
+        uses: runwhen-contrib/github-actions/runwhen-keyword-docs-generator@keyword-doc-generator
         with:
           # Use workflow dispatch inputs if available, otherwise defaults
           doc_type: ${{ github.event.inputs.doc_type || 'markdown' }}
