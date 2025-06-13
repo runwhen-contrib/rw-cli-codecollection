@@ -4,12 +4,12 @@ spec:
   platform: azure
   generationRules:
     - resourceTypes:
-        - azure_resources_resource_groups
+        - resource_groups
       matchRules:
-        - type: pattern
-          pattern: ".+"
-          properties: [name]
-          mode: substring
+      - type: custom-variable
+        path: custom.devops_org
+        pattern: ".*"
+        mode: substring 
       slxs:
         - baseName: az-devops-triage
           qualifiers: ["resource_group"]

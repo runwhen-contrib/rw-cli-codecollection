@@ -3,6 +3,7 @@ variable "azure_devops_org" {
   type        = string
 }
 
+
 variable "azure_devops_org_url" {
   description = "Azure DevOps organization URL"
   type        = string

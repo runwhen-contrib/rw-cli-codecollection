@@ -1,0 +1,14 @@
+trigger:
+- master
+
+pool:
+  name: Test-Agent-Pool  # Use self-hosted agent pool
+
+steps:
+- script: |
+    echo "Running successful pipeline"
+    echo "This pipeline will succeed"
+    echo "Using resource group: $(RESOURCE_GROUP)"
+    echo "Agent name: $(Agent.Name)"
+    echo "Agent machine name: $(Agent.MachineName)"
+  displayName: 'Run successful script'

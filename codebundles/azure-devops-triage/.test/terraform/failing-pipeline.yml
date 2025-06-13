@@ -1,0 +1,15 @@
+trigger:
+- master
+
+pool:
+  name: Test-Agent-Pool  # Use self-hosted agent pool
+
+steps:
+- script: |
+    echo "Running failing pipeline"
+    echo "This pipeline will fail"
+    echo "Using resource group: $(RESOURCE_GROUP)"
+    echo "Agent name: $(Agent.Name)"
+    echo "Agent machine name: $(Agent.MachineName)"
+    exit 1
+  displayName: 'Run failing script'
