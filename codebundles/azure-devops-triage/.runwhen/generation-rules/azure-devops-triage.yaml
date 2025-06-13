@@ -22,7 +22,7 @@ spec:
           qualifiers: ["resource"]
           baseTemplateName: azure-devops-triage
           levelOfDetail: basic
-          outputItems: []
+          outputItems:
             - type: slx
             # #- type: sli
             # - type: runbook
