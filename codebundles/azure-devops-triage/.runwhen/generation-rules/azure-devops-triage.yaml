@@ -6,8 +6,9 @@ spec:
     - resourceTypes:
         - resource_groups
       matchRules:
-      - type: custom-variable
-        path: custom.devops_org
+      - type: pattern
+        resourceType: variables
+        properties: ["custom.devops_org"]
         pattern: ".*"
         mode: substring 
       slxs:
