@@ -22,8 +22,8 @@ spec:
           qualifiers: ["resource_group"]
           baseTemplateName: azure-devops-triage
           levelOfDetail: basic
-          outputItems:
-            - type: slx
-            #- type: sli
-            - type: runbook
-              templateName: azure-devops-triage-taskset.yaml
+          outputItems: []
+            # - type: slx
+            # #- type: sli
+            # - type: runbook
+            #   templateName: azure-devops-triage-taskset.yaml
