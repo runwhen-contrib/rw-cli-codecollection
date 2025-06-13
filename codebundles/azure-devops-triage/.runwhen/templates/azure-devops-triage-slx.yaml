@@ -17,10 +17,8 @@ spec:
     - {{ workspace.owner_email }}
   statement: Measure Azure DevOps health by checking agent pools, pipeline status, repository policies, and service connections for organization. 
   additionalContext:
-    {% include "azure-hierarchy.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"
   tags:
-    {% include "azure-tags.yaml" ignore missing %}
     - name: cloud
       value: azure
     - name: service
