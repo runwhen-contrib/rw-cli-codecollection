@@ -8,14 +8,14 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/security/10245-icon-service-Key-Vaults.svg
-  alias: {{ match_resource.organization }} Azure DevOps Health
+  # alias: {{ match_resource.organization }} Azure DevOps Health
   asMeasuredBy: Composite health score of Azure DevOps resources & activities.
   configProvided:
     - name: SLX_PLACEHOLDER
       value: SLX_PLACEHOLDER
   owners:
     - {{ workspace.owner_email }}
-  statement: Measure Azure DevOps health by checking agent pools, pipeline status, repository policies, and service connections for organization {{ custom.devops_org }}.
+  statement: Measure Azure DevOps health by checking agent pools, pipeline status, repository policies, and service connections for organization. 
   additionalContext:
     # {% include "azure-hierarchy.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"
