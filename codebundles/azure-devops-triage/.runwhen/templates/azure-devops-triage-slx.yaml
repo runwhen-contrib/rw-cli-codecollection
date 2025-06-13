@@ -20,7 +20,7 @@ spec:
     # {% include "azure-hierarchy.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"
   tags:
-    {% include "azure-tags.yaml" ignore missing %}
+    # {% include "azure-tags.yaml" ignore missing %}
     - name: cloud
       value: azure
     - name: service
