@@ -6,11 +6,17 @@ spec:
     - resourceTypes:
         - resource_groups
       matchRules:
-      - type: pattern
-        resourceType: variables
-        properties: ["custom.devops_org"]
-        pattern: ".*"
-        mode: substring 
+      - type: and 
+        matches: 
+        - type: pattern
+          resourceType: variables
+          properties: [custom/devops_org]
+          pattern: ".+"
+          mode: substring
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
       slxs:
         - baseName: az-devops-triage
           qualifiers: ["resource_group"]
