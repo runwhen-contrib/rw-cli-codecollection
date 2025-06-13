@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/security/10245-icon-service-Key-Vaults.svg
-  alias: {{ custom.devops_org }} Azure DevOps Health
+  alias: {{ match_resource.organization }} Azure DevOps Health
   asMeasuredBy: Composite health score of Azure DevOps resources & activities.
   configProvided:
     - name: SLX_PLACEHOLDER
