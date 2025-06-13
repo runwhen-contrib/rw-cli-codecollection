@@ -4,7 +4,7 @@ spec:
   platform: azure
   generationRules:
     - resourceTypes:
-        - resource_groups
+        - resource_group
       matchRules:
       - type: and 
         matches: 
