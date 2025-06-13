@@ -1,21 +1,15 @@
 apiVersion: runwhen.com/v1
 kind: GenerationRules
 spec:
-  platform: azure
+  platform: azure_devops
   generationRules:
+    # Example 1: Generate SLXs for all production projects
     - resourceTypes:
-        - resource_group
+        - project
       matchRules:
-      - type: and 
-        matches: 
-        - type: pattern
-          resourceType: variables
-          properties: [custom/devops_org]
-          pattern: ".+"
-          mode: substring
         - type: pattern
           pattern: ".+"
-          properties: [name]
+          properties: ["name"]
           mode: substring
       slxs:
         - baseName: az-devops-triage
