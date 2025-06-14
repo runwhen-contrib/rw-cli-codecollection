@@ -298,6 +298,7 @@ def run_bash_file(
 
             # Actually write the file physically to staging_dir
             staged_path = os.path.join(staging_dir, fname)
+            logger.info(f"Staging file '{fname}' to '{staged_path}'")
             with open(staged_path, "w", encoding="utf-8") as out_f:
                 out_f.write(content)
 
