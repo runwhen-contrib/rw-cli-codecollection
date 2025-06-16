@@ -437,6 +437,30 @@ def run_cli(
     # 3) We look for CODEBUNDLE_TEMP_DIR
     codebundle_temp_dir = os.getenv("CODEBUNDLE_TEMP_DIR", None)
 
+    # 4) Look for rw_path_to_robot
+    # Might return something like "/path/to/.../sli.robot"
+    rw_path_to_robot = resolve_path_to_robot()
+
+    # If CODEBUNDLE_TEMP_DIR is set, stage files from the current working directory
+    if codebundle_temp_dir and rw_path_to_robot:
+        final_dir = os.path.dirname(rw_path_to_robot)
+        staging_dir = codebundle_temp_dir
+        os.makedirs(staging_dir, exist_ok=True)
+        logger.info(f"Staging files from '{final_dir}' to '{staging_dir}'")
+
+        for fname in os.listdir(final_dir):
+            full_path = os.path.join(final_dir, fname)
+            if os.path.isfile(full_path):
+                try:
+                    with open(full_path, "r", encoding="utf-8") as fh:
+                        content = fh.read()
+                    staged_path = os.path.join(staging_dir, fname)
+                    logger.info(f"Staging file '{fname}' to '{staged_path}'")
+                    with open(staged_path, "w", encoding="utf-8") as out_f:
+                        out_f.write(content)
+                except Exception as e:
+                    logger.warning(f"Could not stage file '{full_path}': {e}")
+
     # 4) If loop_with_items is given, run the command multiple times with item-based formatting
     if loop_with_items and len(loop_with_items) > 0:
         for item in loop_with_items:
@@ -498,3 +522,4 @@ def string_to_datetime(duration_str: str) -> datetime:
     Helper to convert readable duration strings (eg: 1d2m36s) to a datetime.
     """
     return _string_to_datetime(duration_str)
+
