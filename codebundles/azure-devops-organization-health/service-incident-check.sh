@@ -4,6 +4,8 @@ set -x
 # -----------------------------------------------------------------------------
 # REQUIRED ENV VARS:
 #   AZURE_DEVOPS_ORG
+#   AUTH_TYPE (optional, default: service_principal)
+#   AZURE_DEVOPS_PAT (required if AUTH_TYPE=pat)
 #
 # This script:
 #   1) Checks for Azure DevOps service incidents
@@ -13,12 +15,29 @@ set -x
 # -----------------------------------------------------------------------------
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
+: "${AUTH_TYPE:=service_principal}"
 
 OUTPUT_FILE="service_incident_check.json"
 incident_json='[]'
 
 echo "Checking for Azure DevOps Service Incidents..."
 echo "Organization: $AZURE_DEVOPS_ORG"
+
+# Setup authentication (if needed for Azure CLI commands later)
+if [ "$AUTH_TYPE" = "service_principal" ]; then
+    echo "Using service principal authentication..."
+    # Service principal authentication is handled by Azure CLI login
+elif [ "$AUTH_TYPE" = "pat" ]; then
+    if [ -z "${AZURE_DEVOPS_PAT:-}" ]; then
+        echo "ERROR: AZURE_DEVOPS_PAT must be set when AUTH_TYPE=pat"
+        exit 1
+    fi
+    echo "Using PAT authentication..."
+    # We'll setup PAT auth later if needed for specific commands
+else
+    echo "ERROR: Invalid AUTH_TYPE. Must be 'service_principal' or 'pat'"
+    exit 1
+fi
 
 # Check Azure DevOps service status (using public status page approach)
 echo "Checking Azure DevOps service status..."
@@ -87,23 +106,30 @@ if status_response=$(curl -s -w "%{http_code}" -o status_page.html "$status_url"
     if [ "$status_code" = "200" ]; then
         echo "Status page accessible"
         
-        # Look for incident indicators in the status page (basic text search)
-        if grep -qi "incident\|outage\|degraded\|maintenance" status_page.html 2>/dev/null; then
-            incident_keywords=$(grep -i "incident\|outage\|degraded\|maintenance" status_page.html | head -3 | tr '\n' ' ' || echo "")
+        # Parse actual service status from JSON data instead of keyword search
+        if service_status=$(grep -o '"serviceStatus":{[^}]*"health":[0-9]*[^}]*}' status_page.html 2>/dev/null); then
+            # Extract health status (1=healthy, 2=advisory, 3=degraded, 4=unhealthy)
+            health_status=$(echo "$service_status" | grep -o '"health":[0-9]*' | cut -d':' -f2)
+            service_message=$(echo "$service_status" | grep -o '"message":"[^"]*"' | cut -d'"' -f4)
             
-            incident_json=$(echo "$incident_json" | jq \
-                --arg title "Potential Azure DevOps Service Issues" \
-                --arg details "Status page contains incident-related keywords: $incident_keywords" \
-                --arg severity "3" \
-                --arg next_steps "Check Azure DevOps status page for current incidents and service advisories" \
-                '. += [{
-                   "title": $title,
-                   "details": $details,
-                   "severity": ($severity | tonumber),
-                   "next_steps": $next_steps
-                 }]')
+            if [ "$health_status" -le 2 ]; then
+                # Health status 1-2 indicates degraded or unhealthy services
+                incident_json=$(echo "$incident_json" | jq \
+                    --arg title "Azure DevOps Service Degradation Detected" \
+                    --arg details "Service health status: $health_status. Message: $service_message" \
+                    --arg severity "3" \
+                    --arg next_steps "Check Azure DevOps status page for current incidents and service advisories" \
+                    '. += [{
+                       "title": $title,
+                       "details": $details,
+                       "severity": ($severity | tonumber),
+                       "next_steps": $next_steps
+                     }]')
+            else
+                echo "Azure DevOps services report healthy status (health: $health_status)"
+            fi
         else
-            echo "No obvious incident indicators found on status page"
+            echo "Could not parse service status from status page"
         fi
     else
         echo "Status page returned HTTP $status_code"
@@ -168,8 +194,8 @@ for endpoint in "${api_endpoints[@]}"; do
         
         echo "    Response: HTTP $api_code, ${api_time}s"
         
-        # 401 is expected without authentication, but other errors might indicate service issues
-        if [ "$api_code" != "401" ] && [ "$api_code" != "200" ] && [ "$api_code" != "203" ]; then
+        # 401 is expected without authentication, 302 is normal redirect, 200/203 are success
+        if [ "$api_code" != "401" ] && [ "$api_code" != "200" ] && [ "$api_code" != "302" ] && [ "$api_code" != "203" ]; then
             incident_json=$(echo "$incident_json" | jq \
                 --arg title "Azure DevOps API Endpoint Issue" \
                 --arg details "API endpoint $endpoint_name returned HTTP $api_code" \
@@ -211,24 +237,23 @@ for endpoint in "${api_endpoints[@]}"; do
     fi
 done
 
-# Check for regional issues by testing different Azure regions (if applicable)
-echo "Checking for regional connectivity issues..."
-# This is a simplified check - in practice, you might test different regional endpoints
-ping_targets=("8.8.8.8" "1.1.1.1")
-failed_pings=0
+# Check Azure DevOps specific connectivity instead of generic internet
+echo "Checking Azure DevOps specific connectivity..."
+azure_targets=("dev.azure.com" "status.dev.azure.com")
+failed_azure_connections=0
 
-for target in "${ping_targets[@]}"; do
-    if ! ping -c 1 -W 5 "$target" >/dev/null 2>&1; then
-        failed_pings=$((failed_pings + 1))
+for target in "${azure_targets[@]}"; do
+    if ! curl -s --connect-timeout 10 "https://$target" >/dev/null 2>&1; then
+        failed_azure_connections=$((failed_azure_connections + 1))
     fi
 done
 
-if [ "$failed_pings" -eq ${#ping_targets[@]} ]; then
+if [ "$failed_azure_connections" -gt 0 ]; then
     incident_json=$(echo "$incident_json" | jq \
-        --arg title "Network Connectivity Issues" \
-        --arg details "Cannot reach external network targets - may indicate local network issues" \
-        --arg severity "3" \
-        --arg next_steps "Check local network connectivity and firewall settings" \
+        --arg title "Azure DevOps Connectivity Issues" \
+        --arg details "Cannot reach $failed_azure_connections Azure DevOps endpoints - may indicate service or network issues" \
+        --arg severity "4" \
+        --arg next_steps "Check Azure DevOps service status and local network connectivity to Azure endpoints" \
         '. += [{
            "title": $title,
            "details": $details,
@@ -255,19 +280,9 @@ if command -v timedatectl >/dev/null 2>&1; then
     fi
 fi
 
-# If no incidents detected, add a healthy status
+# Only report if there are actual incidents - don't create issues for healthy status
 if [ "$(echo "$incident_json" | jq '. | length')" -eq 0 ]; then
-    incident_json=$(echo "$incident_json" | jq \
-        --arg title "No Service Incidents Detected" \
-        --arg details "Azure DevOps services appear to be operating normally with no detected incidents" \
-        --arg severity "1" \
-        --arg next_steps "Continue monitoring. Issues may be organization-specific rather than service-wide." \
-        '. += [{
-           "title": $title,
-           "details": $details,
-           "severity": ($severity | tonumber),
-           "next_steps": $next_steps
-         }]')
+    echo "No service incidents detected - Azure DevOps services appear healthy"
 fi
 
 # Write final JSON

@@ -1,12 +1,13 @@
 *** Settings ***
 Documentation       Comprehensive Azure DevOps organization health monitoring focusing on platform-wide issues and shared resources
-Metadata            Author    runwhen
+Metadata            Author    stewartshea
 Metadata            Display Name    Azure DevOps Organization Health
-Metadata            Supports    Azure    DevOps    Organization    Platform    Health
-Force Tags          Azure    DevOps    Organization    Platform    Health
+Metadata            Supports    AzureDevOps,CICD
+Force Tags          AzureDevOps    CICD
 
 Library    String
 Library             BuiltIn
+Library             OperatingSystem
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
@@ -16,7 +17,7 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 Check Service Health Status for Azure DevOps Organization `${AZURE_DEVOPS_ORG}`
-    [Documentation]    Check the overall health status of Azure DevOps services for the organization
+    [Documentation]    Tests connectivity and access to core Azure DevOps APIs and services. Identifies service issues vs permission limitations.
     [Tags]    Organization    Service    Health    Platform    access:read-only
     
     ${service_health}=    RW.CLI.Run Bash File
@@ -53,7 +54,7 @@ Check Service Health Status for Azure DevOps Organization `${AZURE_DEVOPS_ORG}`
     RW.Core.Add Pre To Report    ${service_health.stdout}
 
 Check Agent Pool Capacity and Utilization for Organization `${AZURE_DEVOPS_ORG}`
-    [Documentation]    Analyze agent pool capacity, utilization, and distribution across the organization
+    [Documentation]    Analyzes self-hosted agent pools for capacity issues including offline agents, utilization thresholds, and configuration problems.
     [Tags]    Organization    AgentPools    Capacity    Distribution    access:read-only
     
     ${agent_capacity}=    RW.CLI.Run Bash File
@@ -90,7 +91,7 @@ Check Agent Pool Capacity and Utilization for Organization `${AZURE_DEVOPS_ORG}`
     RW.Core.Add Pre To Report    ${agent_capacity.stdout}
 
 Validate Organization Policies and Security Settings for `${AZURE_DEVOPS_ORG}`
-    [Documentation]    Verify organization-level policies, security settings, and compliance status
+    [Documentation]    Examines organization security groups, user access levels, and policy configurations. Requires elevated permissions for full analysis.
     [Tags]    Organization    Policies    Compliance    Security    access:read-only
     
     ${org_policies}=    RW.CLI.Run Bash File
@@ -127,7 +128,7 @@ Validate Organization Policies and Security Settings for `${AZURE_DEVOPS_ORG}`
     RW.Core.Add Pre To Report    ${org_policies.stdout}
 
 Check License Utilization and Capacity for Organization `${AZURE_DEVOPS_ORG}`
-    [Documentation]    Check license usage, capacity, and identify potential licensing issues
+    [Documentation]    Analyzes user license assignments for cost optimization opportunities and identifies inactive users or licensing inefficiencies.
     [Tags]    Organization    Licenses    Capacity    Utilization    access:read-only
     
     ${license_analysis}=    RW.CLI.Run Bash File
@@ -164,7 +165,7 @@ Check License Utilization and Capacity for Organization `${AZURE_DEVOPS_ORG}`
     RW.Core.Add Pre To Report    ${license_analysis.stdout}
 
 Investigate Platform-wide Service Incidents for Organization `${AZURE_DEVOPS_ORG}`
-    [Documentation]    Check for platform-wide service incidents that might be affecting the organization
+    [Documentation]    Monitors Azure DevOps platform status and detects service-wide incidents by checking official status pages and API performance.
     [Tags]    Organization    Incidents    Platform    Service    access:read-only
     
     ${service_incidents}=    RW.CLI.Run Bash File
@@ -201,7 +202,7 @@ Investigate Platform-wide Service Incidents for Organization `${AZURE_DEVOPS_ORG
     RW.Core.Add Pre To Report    ${service_incidents.stdout}
 
 Analyze Cross-Project Dependencies for Organization `${AZURE_DEVOPS_ORG}`
-    [Documentation]    Identify and analyze dependencies between projects that might impact overall organization health
+    [Documentation]    Identifies shared resources between projects including agent pools, service connections, and potential naming conflicts.
     [Tags]    Organization    Dependencies    Projects    Integration    access:read-only
     
     ${cross_deps}=    RW.CLI.Run Bash File
@@ -238,7 +239,7 @@ Analyze Cross-Project Dependencies for Organization `${AZURE_DEVOPS_ORG}`
     RW.Core.Add Pre To Report    ${cross_deps.stdout}
 
 Investigate Platform Issues for Organization `${AZURE_DEVOPS_ORG}`
-    [Documentation]    Deep dive investigation for platform-wide issues affecting organization performance
+    [Documentation]    Performs detailed investigation of agent pool issues and analyzes recent pipeline failures across all projects.
     [Tags]    Organization    Investigation    Platform    Performance    access:read-only
     
     ${platform_investigation}=    RW.CLI.Run Bash File
@@ -249,7 +250,7 @@ Investigate Platform Issues for Organization `${AZURE_DEVOPS_ORG}`
     ...    show_in_rwl_cheatsheet=true
     
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat platform_issues.json
+    ...    cmd=cat platform_issue_investigation.json
     
     TRY
         ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
@@ -285,6 +286,7 @@ Suite Initialization
         ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
         ...    pattern=\w*
         Set Suite Variable    ${AUTH_TYPE}    service_principal
+        Set Suite Variable    ${AZURE_DEVOPS_PAT}    ${EMPTY}
     EXCEPT
         Log    Azure credentials not found, trying Azure DevOps PAT...    INFO
         TRY
@@ -294,9 +296,11 @@ Suite Initialization
             ...    description=Azure DevOps Personal Access Token
             ...    pattern=\w*
             Set Suite Variable    ${AUTH_TYPE}    pat
+            Set Suite Variable    ${AZURE_DEVOPS_PAT}    ${azure_devops_pat}
         EXCEPT
             Log    No authentication method found, defaulting to service principal...    WARN
             Set Suite Variable    ${AUTH_TYPE}    service_principal
+            Set Suite Variable    ${AZURE_DEVOPS_PAT}    ${EMPTY}
         END
     END
     
@@ -318,6 +322,12 @@ Suite Initialization
     Set Suite Variable    ${AZURE_DEVOPS_ORG}    ${AZURE_DEVOPS_ORG}
     Set Suite Variable    ${AGENT_UTILIZATION_THRESHOLD}    ${AGENT_UTILIZATION_THRESHOLD}
     Set Suite Variable    ${LICENSE_UTILIZATION_THRESHOLD}    ${LICENSE_UTILIZATION_THRESHOLD}
+    # Get Azure service principal credentials from environment if available
+    ${AZURE_CLIENT_ID}=    Get Environment Variable    AZURE_CLIENT_ID    ${EMPTY}
+    ${AZURE_CLIENT_SECRET}=    Get Environment Variable    AZURE_CLIENT_SECRET    ${EMPTY}
+    ${AZURE_TENANT_ID}=    Get Environment Variable    AZURE_TENANT_ID    ${EMPTY}
+    ${AZURE_SUBSCRIPTION_ID}=    Get Environment Variable    AZURE_SUBSCRIPTION_ID    ${EMPTY}
+    
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_DEVOPS_ORG":"${AZURE_DEVOPS_ORG}", "AGENT_UTILIZATION_THRESHOLD":"${AGENT_UTILIZATION_THRESHOLD}", "LICENSE_UTILIZATION_THRESHOLD":"${LICENSE_UTILIZATION_THRESHOLD}", "AUTH_TYPE":"${AUTH_TYPE}"} 
+    ...    {"AZURE_DEVOPS_ORG":"${AZURE_DEVOPS_ORG}", "AGENT_UTILIZATION_THRESHOLD":"${AGENT_UTILIZATION_THRESHOLD}", "LICENSE_UTILIZATION_THRESHOLD":"${LICENSE_UTILIZATION_THRESHOLD}", "AUTH_TYPE":"${AUTH_TYPE}", "AZURE_DEVOPS_PAT":"${AZURE_DEVOPS_PAT}", "AZURE_CLIENT_ID":"${AZURE_CLIENT_ID}", "AZURE_CLIENT_SECRET":"${AZURE_CLIENT_SECRET}", "AZURE_TENANT_ID":"${AZURE_TENANT_ID}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}"} 

@@ -5,6 +5,8 @@ set -x
 # REQUIRED ENV VARS:
 #   AZURE_DEVOPS_ORG
 #   LICENSE_UTILIZATION_THRESHOLD (optional, default: 90)
+#   AUTH_TYPE (optional, default: service_principal)
+#   AZURE_DEVOPS_PAT (required if AUTH_TYPE=pat)
 #
 # This script:
 #   1) Analyzes license usage across the organization
@@ -15,6 +17,7 @@ set -x
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
 : "${LICENSE_UTILIZATION_THRESHOLD:=90}"
+: "${AUTH_TYPE:=service_principal}"
 
 OUTPUT_FILE="license_utilization.json"
 license_json='[]'
@@ -31,6 +34,36 @@ fi
 
 # Configure Azure DevOps CLI defaults
 az devops configure --defaults organization="https://dev.azure.com/$AZURE_DEVOPS_ORG" --output none
+
+# Setup authentication
+if [ "$AUTH_TYPE" = "service_principal" ]; then
+    echo "Using service principal authentication..."
+    # Service principal authentication is handled by Azure CLI login
+    # Verify authentication is working before proceeding
+    echo "Verifying Azure DevOps authentication..."
+    for i in {1..3}; do
+        if az devops project list --output none &>/dev/null; then
+            echo "Authentication verified successfully"
+            break
+        else
+            echo "Authentication not ready, waiting... (attempt $i/3)"
+            sleep 2
+        fi
+        if [ $i -eq 3 ]; then
+            echo "WARNING: Authentication verification failed, proceeding anyway..."
+        fi
+    done
+elif [ "$AUTH_TYPE" = "pat" ]; then
+    if [ -z "${AZURE_DEVOPS_PAT:-}" ]; then
+        echo "ERROR: AZURE_DEVOPS_PAT must be set when AUTH_TYPE=pat"
+        exit 1
+    fi
+    echo "Using PAT authentication..."
+    echo "$AZURE_DEVOPS_PAT" | az devops login --organization "https://dev.azure.com/$AZURE_DEVOPS_ORG"
+else
+    echo "ERROR: Invalid AUTH_TYPE. Must be 'service_principal' or 'pat'"
+    exit 1
+fi
 
 # Get organization users and their license information
 echo "Getting user license information..."
@@ -56,7 +89,7 @@ fi
 rm -f users_err.log
 
 echo "$users" > users.json
-user_count=$(jq '. | length' users.json)
+user_count=$(jq '.items | length' users.json)
 
 if [ "$user_count" -eq 0 ]; then
     echo "No users found."
@@ -68,11 +101,11 @@ fi
 echo "Found $user_count users. Analyzing license distribution..."
 
 # Analyze license types and usage
-basic_users=$(jq '[.[] | select(.accessLevel == "basic")] | length' users.json)
-stakeholder_users=$(jq '[.[] | select(.accessLevel == "stakeholder")] | length' users.json)
-visual_studio_users=$(jq '[.[] | select(.accessLevel == "visualStudioSubscriber")] | length' users.json)
-express_users=$(jq '[.[] | select(.accessLevel == "express")] | length' users.json)
-advanced_users=$(jq '[.[] | select(.accessLevel == "advanced")] | length' users.json)
+basic_users=$(jq '[.items[] | select(.accessLevel.accountLicenseType == "basic")] | length' users.json)
+stakeholder_users=$(jq '[.items[] | select(.accessLevel.accountLicenseType == "stakeholder")] | length' users.json)
+visual_studio_users=$(jq '[.items[] | select(.accessLevel.accountLicenseType == "msdn")] | length' users.json)
+express_users=$(jq '[.items[] | select(.accessLevel.accountLicenseType == "express")] | length' users.json)
+advanced_users=$(jq '[.items[] | select(.accessLevel.accountLicenseType == "advanced")] | length' users.json)
 
 echo "License Distribution:"
 echo "  Basic: $basic_users"
@@ -111,7 +144,7 @@ inactive_users=0
 users_with_access_info=0
 
 for ((i=0; i<user_count; i++)); do
-    user_json=$(jq -c ".[${i}]" users.json)
+    user_json=$(jq -c ".items[${i}]" users.json)
     last_accessed=$(echo "$user_json" | jq -r '.lastAccessedDate // null')
     
     if [ "$last_accessed" != "null" ] && [ -n "$last_accessed" ]; then
@@ -172,42 +205,41 @@ if [ "$total_cost_users" -gt 0 ]; then
     echo "Average cost per paid user: \$${cost_per_total_user}/month"
 fi
 
-# Build license analysis summary
-if [ ${#license_issues[@]} -eq 0 ]; then
-    issues_summary="License utilization appears optimal"
-    title="License Utilization: Optimal"
-else
+# Build license analysis summary - only create issues if there are actual problems
+if [ ${#license_issues[@]} -gt 0 ]; then
     issues_summary=$(IFS='; '; echo "${license_issues[*]}")
     title="License Utilization: Optimization Opportunities"
+    
+    license_json=$(echo "$license_json" | jq \
+        --arg title "$title" \
+        --arg total_users "$user_count" \
+        --arg basic_users "$basic_users" \
+        --arg stakeholder_users "$stakeholder_users" \
+        --arg visual_studio_users "$visual_studio_users" \
+        --arg express_users "$express_users" \
+        --arg advanced_users "$advanced_users" \
+        --arg inactive_users "$inactive_users" \
+        --arg estimated_monthly_cost "$estimated_monthly_cost" \
+        --arg issues_summary "$issues_summary" \
+        --arg severity "$severity" \
+        '. += [{
+           "title": $title,
+           "total_users": ($total_users | tonumber),
+           "basic_users": ($basic_users | tonumber),
+           "stakeholder_users": ($stakeholder_users | tonumber),
+           "visual_studio_users": ($visual_studio_users | tonumber),
+           "express_users": ($express_users | tonumber),
+           "advanced_users": ($advanced_users | tonumber),
+           "inactive_users": ($inactive_users | tonumber),
+           "estimated_monthly_cost_usd": ($estimated_monthly_cost | tonumber),
+           "issues_summary": $issues_summary,
+           "severity": ($severity | tonumber),
+           "details": "Organization has \($total_users) users: \($basic_users) Basic, \($stakeholder_users) Stakeholder, \($visual_studio_users) VS Subscriber. Estimated cost: $\($estimated_monthly_cost)/month. Issues: \($issues_summary)",
+           "next_steps": "Review license allocation and consider optimizing user access levels. Remove inactive users and ensure appropriate license types are assigned."
+         }]')
+else
+    echo "License utilization appears optimal - no issues detected"
 fi
-
-license_json=$(echo "$license_json" | jq \
-    --arg title "$title" \
-    --arg total_users "$user_count" \
-    --arg basic_users "$basic_users" \
-    --arg stakeholder_users "$stakeholder_users" \
-    --arg visual_studio_users "$visual_studio_users" \
-    --arg express_users "$express_users" \
-    --arg advanced_users "$advanced_users" \
-    --arg inactive_users "$inactive_users" \
-    --arg estimated_monthly_cost "$estimated_monthly_cost" \
-    --arg issues_summary "$issues_summary" \
-    --arg severity "$severity" \
-    '. += [{
-       "title": $title,
-       "total_users": ($total_users | tonumber),
-       "basic_users": ($basic_users | tonumber),
-       "stakeholder_users": ($stakeholder_users | tonumber),
-       "visual_studio_users": ($visual_studio_users | tonumber),
-       "express_users": ($express_users | tonumber),
-       "advanced_users": ($advanced_users | tonumber),
-       "inactive_users": ($inactive_users | tonumber),
-       "estimated_monthly_cost_usd": ($estimated_monthly_cost | tonumber),
-       "issues_summary": $issues_summary,
-       "severity": ($severity | tonumber),
-       "details": "Organization has \($total_users) users: \($basic_users) Basic, \($stakeholder_users) Stakeholder, \($visual_studio_users) VS Subscriber. Estimated cost: $\($estimated_monthly_cost)/month. Issues: \($issues_summary)",
-       "next_steps": "Review license allocation and consider optimizing user access levels. Remove inactive users and ensure appropriate license types are assigned."
-     }]')
 
 # Add specific recommendations based on findings
 if [ "$inactive_users" -gt 0 ]; then

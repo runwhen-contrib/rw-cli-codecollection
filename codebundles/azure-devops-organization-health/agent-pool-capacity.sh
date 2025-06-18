@@ -5,6 +5,8 @@ set -x
 # REQUIRED ENV VARS:
 #   AZURE_DEVOPS_ORG
 #   AGENT_UTILIZATION_THRESHOLD (optional, default: 80)
+#   AUTH_TYPE (optional, default: service_principal)
+#   AZURE_DEVOPS_PAT (required if AUTH_TYPE=pat)
 #
 # This script:
 #   1) Analyzes all agent pools in the organization
@@ -15,6 +17,7 @@ set -x
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
 : "${AGENT_UTILIZATION_THRESHOLD:=80}"
+: "${AUTH_TYPE:=service_principal}"
 
 OUTPUT_FILE="agent_pool_capacity.json"
 capacity_json='[]'
@@ -32,9 +35,25 @@ fi
 # Configure Azure DevOps CLI defaults
 az devops configure --defaults organization="https://dev.azure.com/$AZURE_DEVOPS_ORG" --output none
 
+# Setup authentication
+if [ "$AUTH_TYPE" = "service_principal" ]; then
+    echo "Using service principal authentication..."
+    # Service principal authentication is handled by Azure CLI login
+elif [ "$AUTH_TYPE" = "pat" ]; then
+    if [ -z "${AZURE_DEVOPS_PAT:-}" ]; then
+        echo "ERROR: AZURE_DEVOPS_PAT must be set when AUTH_TYPE=pat"
+        exit 1
+    fi
+    echo "Using PAT authentication..."
+    echo "$AZURE_DEVOPS_PAT" | az devops login --organization "https://dev.azure.com/$AZURE_DEVOPS_ORG"
+else
+    echo "ERROR: Invalid AUTH_TYPE. Must be 'service_principal' or 'pat'"
+    exit 1
+fi
+
 # Get list of agent pools
 echo "Getting agent pools..."
-if ! agent_pools=$(az pipelines agent pool list --output json 2>pools_err.log); then
+if ! agent_pools=$(az pipelines pool list --output json 2>pools_err.log); then
     err_msg=$(cat pools_err.log)
     rm -f pools_err.log
     
@@ -173,42 +192,41 @@ for ((i=0; i<pool_count; i++)); do
         fi
     fi
     
-    # Add pool analysis to results
+    # Add pool analysis to results - only create issues for pools with actual problems
     if [ ${#pool_issues[@]} -gt 0 ]; then
         issues_summary=$(IFS='; '; echo "${pool_issues[*]}")
         title="Agent Pool Capacity Issue: $pool_name"
+        
+        capacity_json=$(echo "$capacity_json" | jq \
+            --arg title "$title" \
+            --arg pool_name "$pool_name" \
+            --arg pool_id "$pool_id" \
+            --arg pool_type "$pool_type" \
+            --arg agent_count "$agent_count" \
+            --arg online_count "$online_count" \
+            --arg offline_count "$offline_count" \
+            --arg busy_count "$busy_count" \
+            --arg utilization "$utilization" \
+            --arg issues_summary "$issues_summary" \
+            --arg severity "$severity" \
+            '. += [{
+               "title": $title,
+               "pool_name": $pool_name,
+               "pool_id": $pool_id,
+               "pool_type": $pool_type,
+               "total_agents": ($agent_count | tonumber),
+               "online_agents": ($online_count | tonumber),
+               "offline_agents": ($offline_count | tonumber),
+               "busy_agents": ($busy_count | tonumber),
+               "utilization_percent": $utilization,
+               "issues_summary": $issues_summary,
+               "severity": ($severity | tonumber),
+               "details": "Pool \($pool_name): \($agent_count) agents (\($online_count) online, \($busy_count) busy). Utilization: \($utilization)%. Issues: \($issues_summary)",
+               "next_steps": "Review agent pool \($pool_name) capacity and consider adding more agents or investigating offline agents"
+             }]')
     else
-        issues_summary="Pool capacity appears normal"
-        title="Agent Pool Capacity: $pool_name - Normal"
+        echo "  Pool $pool_name capacity appears normal"
     fi
-    
-    capacity_json=$(echo "$capacity_json" | jq \
-        --arg title "$title" \
-        --arg pool_name "$pool_name" \
-        --arg pool_id "$pool_id" \
-        --arg pool_type "$pool_type" \
-        --arg agent_count "$agent_count" \
-        --arg online_count "$online_count" \
-        --arg offline_count "$offline_count" \
-        --arg busy_count "$busy_count" \
-        --arg utilization "$utilization" \
-        --arg issues_summary "$issues_summary" \
-        --arg severity "$severity" \
-        '. += [{
-           "title": $title,
-           "pool_name": $pool_name,
-           "pool_id": $pool_id,
-           "pool_type": $pool_type,
-           "total_agents": ($agent_count | tonumber),
-           "online_agents": ($online_count | tonumber),
-           "offline_agents": ($offline_count | tonumber),
-           "busy_agents": ($busy_count | tonumber),
-           "utilization_percent": $utilization,
-           "issues_summary": $issues_summary,
-           "severity": ($severity | tonumber),
-           "details": "Pool \($pool_name): \($agent_count) agents (\($online_count) online, \($busy_count) busy). Utilization: \($utilization)%. Issues: \($issues_summary)",
-           "next_steps": "Review agent pool \($pool_name) capacity and consider adding more agents or investigating offline agents"
-         }]')
 done
 
 # Calculate overall organization capacity metrics
@@ -218,38 +236,36 @@ else
     overall_utilization="0"
 fi
 
-# Add organization-wide capacity summary
+# Add organization-wide capacity summary - only if there are issues
 if [ "$pools_with_issues" -gt 0 ] || (( $(echo "$overall_utilization >= $AGENT_UTILIZATION_THRESHOLD" | bc -l) )); then
     org_severity=2
     org_title="Organization Agent Capacity Issues Detected"
     org_details="$pools_with_issues pools have capacity issues. Overall utilization: ${overall_utilization}%"
+    
+    capacity_json=$(echo "$capacity_json" | jq \
+        --arg title "$org_title" \
+        --arg total_agents "$total_agents" \
+        --arg total_online "$total_online" \
+        --arg total_busy "$total_busy" \
+        --arg overall_utilization "$overall_utilization" \
+        --arg pools_with_issues "$pools_with_issues" \
+        --arg org_details "$org_details" \
+        --arg severity "$org_severity" \
+        '. += [{
+           "title": $title,
+           "organization_summary": true,
+           "total_agents": ($total_agents | tonumber),
+           "total_online": ($total_online | tonumber),
+           "total_busy": ($total_busy | tonumber),
+           "overall_utilization_percent": $overall_utilization,
+           "pools_with_issues": ($pools_with_issues | tonumber),
+           "details": $org_details,
+           "severity": ($severity | tonumber),
+           "next_steps": "Monitor agent capacity trends and plan for additional capacity if utilization remains high"
+         }]')
 else
-    org_severity=1
-    org_title="Organization Agent Capacity: Healthy"
-    org_details="Agent capacity appears adequate across all pools. Overall utilization: ${overall_utilization}%"
+    echo "Organization agent capacity appears healthy across all pools"
 fi
-
-capacity_json=$(echo "$capacity_json" | jq \
-    --arg title "$org_title" \
-    --arg total_agents "$total_agents" \
-    --arg total_online "$total_online" \
-    --arg total_busy "$total_busy" \
-    --arg overall_utilization "$overall_utilization" \
-    --arg pools_with_issues "$pools_with_issues" \
-    --arg org_details "$org_details" \
-    --arg severity "$org_severity" \
-    '. += [{
-       "title": $title,
-       "organization_summary": true,
-       "total_agents": ($total_agents | tonumber),
-       "total_online": ($total_online | tonumber),
-       "total_busy": ($total_busy | tonumber),
-       "overall_utilization_percent": $overall_utilization,
-       "pools_with_issues": ($pools_with_issues | tonumber),
-       "details": $org_details,
-       "severity": ($severity | tonumber),
-       "next_steps": "Monitor agent capacity trends and plan for additional capacity if utilization remains high"
-     }]')
 
 # Clean up temporary files
 rm -f agent_pools.json

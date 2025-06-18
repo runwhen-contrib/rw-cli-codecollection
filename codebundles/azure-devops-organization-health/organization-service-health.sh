@@ -4,6 +4,8 @@ set -x
 # -----------------------------------------------------------------------------
 # REQUIRED ENV VARS:
 #   AZURE_DEVOPS_ORG
+#   AUTH_TYPE (optional, default: service_principal)
+#   AZURE_DEVOPS_PAT (required if AUTH_TYPE=pat)
 #
 # This script:
 #   1) Checks Azure DevOps service health status
@@ -13,6 +15,7 @@ set -x
 # -----------------------------------------------------------------------------
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
+: "${AUTH_TYPE:=service_principal}"
 
 OUTPUT_FILE="organization_service_health.json"
 health_json='[]'
@@ -28,6 +31,22 @@ fi
 
 # Configure Azure DevOps CLI defaults
 az devops configure --defaults organization="https://dev.azure.com/$AZURE_DEVOPS_ORG" --output none
+
+# Setup authentication
+if [ "$AUTH_TYPE" = "service_principal" ]; then
+    echo "Using service principal authentication..."
+    # Service principal authentication is handled by Azure CLI login
+elif [ "$AUTH_TYPE" = "pat" ]; then
+    if [ -z "${AZURE_DEVOPS_PAT:-}" ]; then
+        echo "ERROR: AZURE_DEVOPS_PAT must be set when AUTH_TYPE=pat"
+        exit 1
+    fi
+    echo "Using PAT authentication..."
+    echo "$AZURE_DEVOPS_PAT" | az devops login --organization "https://dev.azure.com/$AZURE_DEVOPS_ORG"
+else
+    echo "ERROR: Invalid AUTH_TYPE. Must be 'service_principal' or 'pat'"
+    exit 1
+fi
 
 # Test basic organization connectivity
 echo "Testing organization connectivity..."
@@ -54,7 +73,7 @@ rm -f org_err.log
 echo "Organization connectivity: OK"
 
 # Check if we can list projects (basic functionality test)
-project_count=$(echo "$org_info" | jq '. | length')
+project_count=$(echo "$org_info" | jq '.value | length')
 echo "Found $project_count projects in organization"
 
 if [ "$project_count" -eq 0 ]; then
@@ -73,7 +92,7 @@ fi
 
 # Test agent pools API (organization-level resource)
 echo "Testing agent pools API..."
-if ! agent_pools=$(az pipelines agent pool list --output json 2>agent_err.log); then
+if ! agent_pools=$(az pipelines pool list --output json 2>agent_err.log); then
     err_msg=$(cat agent_err.log)
     rm -f agent_err.log
     
@@ -96,7 +115,7 @@ rm -f agent_err.log
 
 # Test service connections API (requires project context, so test with first available project)
 if [ "$project_count" -gt 0 ]; then
-    first_project=$(echo "$org_info" | jq -r '.[0].name')
+    first_project=$(echo "$org_info" | jq -r '.value[0].name')
     echo "Testing service connections API with project: $first_project"
     
     if ! service_connections=$(az devops service-endpoint list --project "$first_project" --output json 2>service_err.log); then
@@ -156,36 +175,17 @@ if ! org_settings=$(az devops security group list --output json 2>settings_err.l
     err_msg=$(cat settings_err.log)
     rm -f settings_err.log
     
-    # This is often a permissions issue, not necessarily a service health issue
-    health_json=$(echo "$health_json" | jq \
-        --arg title "Limited Organization Access" \
-        --arg details "Cannot access organization settings: $err_msg" \
-        --arg severity "1" \
-        --arg next_steps "This may indicate limited permissions rather than a service issue. Consider granting additional organization-level permissions if needed." \
-        '. += [{
-           "title": $title,
-           "details": $details,
-           "severity": ($severity | tonumber),
-           "next_steps": $next_steps
-         }]')
+    # This is expected with limited permissions - don't create an issue for this
+    echo "Organization settings access: Limited (permissions may be insufficient for organization-level access)"
+    echo "Note: $err_msg"
 else
     echo "Organization settings access: OK"
 fi
 rm -f settings_err.log
 
-# If no issues found, add a healthy status
+# Only report if there are actual service health issues - don't create issues for healthy status
 if [ "$(echo "$health_json" | jq '. | length')" -eq 0 ]; then
-    health_json=$(echo "$health_json" | jq \
-        --arg title "Organization Service Health: Healthy" \
-        --arg details "All Azure DevOps services are accessible and responding normally for organization $AZURE_DEVOPS_ORG" \
-        --arg severity "1" \
-        --arg next_steps "Continue monitoring. No action required." \
-        '. += [{
-           "title": $title,
-           "details": $details,
-           "severity": ($severity | tonumber),
-           "next_steps": $next_steps
-         }]')
+    echo "All Azure DevOps services are accessible and responding normally for organization $AZURE_DEVOPS_ORG"
 fi
 
 # Write final JSON

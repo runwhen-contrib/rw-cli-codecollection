@@ -4,6 +4,8 @@ set -x
 # -----------------------------------------------------------------------------
 # REQUIRED ENV VARS:
 #   AZURE_DEVOPS_ORG
+#   AUTH_TYPE (optional, default: service_principal)
+#   AZURE_DEVOPS_PAT (required if AUTH_TYPE=pat)
 #
 # This script:
 #   1) Analyzes cross-project dependencies
@@ -13,6 +15,7 @@ set -x
 # -----------------------------------------------------------------------------
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
+: "${AUTH_TYPE:=service_principal}"
 
 OUTPUT_FILE="cross_project_dependencies.json"
 dependencies_json='[]'
@@ -28,6 +31,36 @@ fi
 
 # Configure Azure DevOps CLI defaults
 az devops configure --defaults organization="https://dev.azure.com/$AZURE_DEVOPS_ORG" --output none
+
+# Setup authentication
+if [ "$AUTH_TYPE" = "service_principal" ]; then
+    echo "Using service principal authentication..."
+    # Service principal authentication is handled by Azure CLI login
+    # Verify authentication is working before proceeding
+    echo "Verifying Azure DevOps authentication..."
+    for i in {1..3}; do
+        if az devops project list --output none &>/dev/null; then
+            echo "Authentication verified successfully"
+            break
+        else
+            echo "Authentication not ready, waiting... (attempt $i/3)"
+            sleep 2
+        fi
+        if [ $i -eq 3 ]; then
+            echo "WARNING: Authentication verification failed, proceeding anyway..."
+        fi
+    done
+elif [ "$AUTH_TYPE" = "pat" ]; then
+    if [ -z "${AZURE_DEVOPS_PAT:-}" ]; then
+        echo "ERROR: AZURE_DEVOPS_PAT must be set when AUTH_TYPE=pat"
+        exit 1
+    fi
+    echo "Using PAT authentication..."
+    echo "$AZURE_DEVOPS_PAT" | az devops login --organization "https://dev.azure.com/$AZURE_DEVOPS_ORG"
+else
+    echo "ERROR: Invalid AUTH_TYPE. Must be 'service_principal' or 'pat'"
+    exit 1
+fi
 
 # Get list of projects
 echo "Getting projects..."
@@ -53,7 +86,7 @@ fi
 rm -f projects_err.log
 
 echo "$projects" > projects.json
-project_count=$(jq '. | length' projects.json)
+project_count=$(jq '.value | length' projects.json)
 
 if [ "$project_count" -eq 0 ]; then
     echo "No projects found."
@@ -66,7 +99,7 @@ echo "Found $project_count projects. Analyzing dependencies..."
 
 # Analyze shared agent pools usage
 echo "Analyzing shared agent pool usage..."
-if agent_pools=$(az pipelines agent pool list --output json 2>/dev/null); then
+if agent_pools=$(az pipelines pool list --output json 2>/dev/null); then
     shared_pools=()
     
     # Check each agent pool for usage across projects
@@ -89,7 +122,7 @@ if agent_pools=$(az pipelines agent pool list --output json 2>/dev/null); then
         projects_using_pool=0
         
         for ((j=0; j<project_count; j++)); do
-            project_json=$(jq -c ".[${j}]" projects.json)
+            project_json=$(jq -c ".value[${j}]" projects.json)
             project_name=$(echo "$project_json" | jq -r '.name')
             
             # Check if project has pipelines using this pool
@@ -109,18 +142,22 @@ if agent_pools=$(az pipelines agent pool list --output json 2>/dev/null); then
     
     if [ ${#shared_pools[@]} -gt 0 ]; then
         shared_pools_summary=$(IFS=', '; echo "${shared_pools[*]}")
+        echo "  Found ${#shared_pools[@]} shared agent pools: $shared_pools_summary"
         
-        dependencies_json=$(echo "$dependencies_json" | jq \
-            --arg title "Shared Agent Pools Detected" \
-            --arg details "Agent pools shared across projects: $shared_pools_summary" \
-            --arg severity "1" \
-            --arg next_steps "Monitor shared agent pool capacity to ensure adequate resources for all dependent projects" \
-            '. += [{
-               "title": $title,
-               "details": $details,
-               "severity": ($severity | tonumber),
-               "next_steps": $next_steps
-             }]')
+        # Only flag as an issue if there are excessive shared pools (might indicate poor organization)
+        if [ ${#shared_pools[@]} -gt 10 ]; then
+            dependencies_json=$(echo "$dependencies_json" | jq \
+                --arg title "Excessive Shared Agent Pools" \
+                --arg details "Large number of agent pools (${#shared_pools[@]}) shared across projects: $shared_pools_summary" \
+                --arg severity "3" \
+                --arg next_steps "Review agent pool organization and consider consolidating or restructuring pools for better management" \
+                '. += [{
+                   "title": $title,
+                   "details": $details,
+                   "severity": ($severity | tonumber),
+                   "next_steps": $next_steps
+                 }]')
+        fi
     fi
 else
     echo "  Could not analyze agent pool usage"
@@ -132,7 +169,7 @@ service_connections_by_name=()
 declare -A connection_projects
 
 for ((i=0; i<project_count; i++)); do
-    project_json=$(jq -c ".[${i}]" projects.json)
+    project_json=$(jq -c ".value[${i}]" projects.json)
     project_name=$(echo "$project_json" | jq -r '.name')
     
     echo "  Checking service connections in: $project_name"
@@ -190,7 +227,7 @@ echo "Analyzing repository dependencies..."
 cross_repo_refs=0
 
 for ((i=0; i<project_count; i++)); do
-    project_json=$(jq -c ".[${i}]" projects.json)
+    project_json=$(jq -c ".value[${i}]" projects.json)
     project_name=$(echo "$project_json" | jq -r '.name')
     
     echo "  Checking repositories in: $project_name"
@@ -232,12 +269,12 @@ echo "Analyzing project naming patterns..."
 similar_projects=()
 
 for ((i=0; i<project_count; i++)); do
-    project_json=$(jq -c ".[${i}]" projects.json)
+    project_json=$(jq -c ".value[${i}]" projects.json)
     project_name=$(echo "$project_json" | jq -r '.name')
     
     # Look for projects with similar prefixes
     for ((j=i+1; j<project_count; j++)); do
-        other_project_json=$(jq -c ".[${j}]" projects.json)
+        other_project_json=$(jq -c ".value[${j}]" projects.json)
         other_project_name=$(echo "$other_project_json" | jq -r '.name')
         
         # Simple similarity check - same first 3 characters
@@ -268,19 +305,9 @@ if [ ${#similar_projects[@]} -gt 0 ]; then
          }]')
 fi
 
-# If no dependency issues found, add a healthy status
+# Only report if there are actual dependency issues - don't create issues for well-organized dependencies
 if [ "$(echo "$dependencies_json" | jq '. | length')" -eq 0 ]; then
-    dependencies_json=$(echo "$dependencies_json" | jq \
-        --arg title "Cross-Project Dependencies: Well Organized" \
-        --arg details "No significant cross-project dependency issues detected across $project_count projects" \
-        --arg severity "1" \
-        --arg next_steps "Continue monitoring cross-project dependencies as the organization grows" \
-        '. += [{
-           "title": $title,
-           "details": $details,
-           "severity": ($severity | tonumber),
-           "next_steps": $next_steps
-         }]')
+    echo "No significant cross-project dependency issues detected across $project_count projects"
 fi
 
 # Clean up temporary files
