@@ -1,0 +1,60 @@
+{
+  "critical_patterns": {
+    "GenericError": {
+      "description": "Generic error patterns that indicate application failures",
+      "patterns": [
+        "error|ERROR",
+        "exception|Exception|EXCEPTION",
+        "fatal|Fatal|FATAL",
+        "panic|Panic|PANIC",
+        "crash|Crash|CRASH",
+        "failed|Failed|FAILED",
+        "failure|Failure|FAILURE"
+      ],
+      "severity": 1
+    },
+    "AppFailure": {
+      "description": "Application-specific failure patterns",
+      "patterns": [
+        "application.*failed",
+        "service.*unavailable",
+        "connection.*refused",
+        "timeout.*error",
+        "out.*of.*memory",
+        "disk.*full",
+        "permission.*denied",
+        "authentication.*failed",
+        "authorization.*failed"
+      ],
+      "severity": 1
+    },
+    "StackTrace": {
+      "description": "Stack trace patterns indicating application crashes",
+      "patterns": [
+        "stack.*trace",
+        "at\\s+\\w+\\.\\w+",
+        "Exception.*in thread",
+        "java\\.lang\\.",
+        "python.*traceback",
+        "goroutine.*panic",
+        "panic:",
+        "fatal.*error"
+      ],
+      "severity": 1
+    }
+  },
+  "exclude_patterns": [
+    "info|INFO",
+    "debug|DEBUG",
+    "trace|TRACE",
+    "health.*check",
+    "heartbeat",
+    "metrics",
+    "monitoring"
+  ],
+  "config": {
+    "max_matches_per_pattern": 10,
+    "case_sensitive": false,
+    "timeout_seconds": 30
+  }
+} 
