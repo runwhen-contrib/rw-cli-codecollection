@@ -7,8 +7,8 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/devops/10308-icon-service-Azure-DevOps.svg
-  alias: {{ match_resource.organization }} Azure DevOps Organization Health
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/devops/10261-icon-service-Azure-DevOps.svg
+  alias: {{ match_resurce.organization }} Azure DevOps Organization Health
   asMeasuredBy: Comprehensive organization-level health score including agent pools, licensing, policies, and platform availability.
   configProvided:
     - name: SLX_PLACEHOLDER
