@@ -27,12 +27,10 @@ spec:
   intervalStrategy: intermezzo
   intervalSeconds: 600
   configProvided:
-    - name: AZURE_RESOURCE_GROUP
-      value: "{{ match_resource.resource.name }}"
     - name: AZURE_DEVOPS_ORG
-      value: "{{ custom.devops_org }}"
+      value: "{{ organization }}"
     - name: AZURE_DEVOPS_PROJECT
-      value: "{{ custom.devops_project }}"
+      value: ""
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}
