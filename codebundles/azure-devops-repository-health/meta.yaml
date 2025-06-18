@@ -1,0 +1,135 @@
+apiVersion: runwhen.com/v1
+kind: CodeBundle
+metadata:
+  name: azure-devops-repository-health
+  title: "Azure DevOps Repository Health"
+  description: "Repository-level health monitoring for Azure DevOps focusing on security, code quality, and configuration issues"
+  author: "RunWhen"
+  documentationURL: "https://docs.runwhen.com/public/v/codebundles/azure-devops-repository-health"
+  tags:
+    - azure
+    - devops
+    - repository
+    - security
+    - code-quality
+    - branch-management
+    - collaboration
+    - sli
+    - monitoring
+spec:
+  platform: linux
+  requires:
+    - curl
+    - jq
+    - bc
+  supportedLocations:
+    - azure
+    - kubernetes
+    - local
+  codeBundle:
+    repoURL: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    ref: main
+    pathToRobot: codebundles/azure-devops-repository-health/runbook.robot
+  parameters:
+    - name: AZURE_DEVOPS_ORG
+      description: "Azure DevOps organization name"
+      required: true
+      example: "myorganization"
+    - name: AZURE_DEVOPS_PROJECT
+      description: "Azure DevOps project name"
+      required: true
+      example: "MyProject"
+    - name: AZURE_DEVOPS_REPO
+      description: "Repository name to analyze"
+      required: true
+      example: "my-application"
+    - name: AZURE_RESOURCE_GROUP  
+      description: "Azure resource group"
+      required: true
+      example: "rg-devops-prod"
+    - name: REPO_SIZE_THRESHOLD_MB
+      description: "Repository size threshold in MB above which performance issues are flagged"
+      required: false
+      default: "500"
+      example: "1000"
+    - name: STALE_BRANCH_DAYS
+      description: "Number of days after which branches are considered stale"
+      required: false
+      default: "90"
+      example: "60"
+    - name: MIN_CODE_COVERAGE
+      description: "Minimum code coverage percentage threshold"
+      required: false
+      default: "80"
+      example: "85"
+  secrets:
+    - name: azure_credentials
+      description: "Azure service principal credentials for authentication"
+      required: true
+      keys:
+        - AZURE_CLIENT_ID
+        - AZURE_TENANT_ID
+        - AZURE_CLIENT_SECRET
+        - AZURE_SUBSCRIPTION_ID
+  sli:
+    enabled: true
+    type: "availability"
+    objective: 0.95
+    description: "Repository health score should be above 70/100"
+    query: |
+      # Repository health is considered healthy when:
+      # - Security policies are properly configured
+      # - Code quality meets standards
+      # - Branch management follows best practices
+      # - Collaboration patterns are healthy
+      # Health score >= 70 indicates good repository health
+    errorQuery: |
+      # Repository health issues include:
+      # - Missing or weak branch protection
+      # - Security misconfigurations
+      # - Code quality problems
+      # - Poor collaboration patterns
+      # - Performance issues
+  troubleshooting:
+    - name: "Fix Branch Protection Issues"
+      description: "Address missing or weak branch protection policies"
+      steps:
+        - "Enable required reviewers policy for default branch"
+        - "Configure build validation requirements"
+        - "Prevent authors from approving their own changes"
+        - "Reset approvals when source branch is updated"
+    - name: "Improve Code Quality"
+      description: "Address code quality and technical debt issues"
+      steps:
+        - "Implement automated testing in build pipeline"
+        - "Add code coverage requirements"
+        - "Set up code quality gates"
+        - "Review and refactor high-complexity code"
+    - name: "Optimize Branch Management"
+      description: "Clean up branch structure and improve workflow"
+      steps:
+        - "Delete stale and abandoned branches"
+        - "Establish branch naming conventions"
+        - "Implement Git workflow standards"
+        - "Set up automated branch cleanup policies"
+    - name: "Enhance Collaboration Practices"
+      description: "Improve team collaboration and code review"
+      steps:
+        - "Establish code review guidelines"
+        - "Distribute review responsibilities across team"
+        - "Reduce long-lived pull requests"
+        - "Implement pull request templates"
+    - name: "Address Performance Issues"
+      description: "Optimize repository performance and storage"
+      steps:
+        - "Implement Git LFS for large files"
+        - "Clean up repository history if needed"
+        - "Remove unnecessary files and dependencies"
+        - "Consider repository splitting for large codebases"
+    - name: "Investigate Security Issues"
+      description: "Address security misconfigurations and incidents"
+      steps:
+        - "Review and audit repository permissions"
+        - "Scan for exposed secrets or credentials"
+        - "Implement security scanning in CI/CD"
+        - "Strengthen access controls and policies" 

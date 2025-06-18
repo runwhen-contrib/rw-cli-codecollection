@@ -1,0 +1,354 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Run complete organization health test suite"
+    cmds:
+      - task: check-unpushed-commits
+      - task: generate-rwl-config
+      - task: test-all-scenarios
+
+  clean:
+    desc: "Run cleanup tasks"
+    cmds:
+      - task: check-and-cleanup-terraform
+      - task: delete-slxs
+      - task: clean-rwl-discovery
+
+  build-infra:
+    desc: "Build test infrastructure with multiple organization scenarios"
+    cmds:
+      - task: build-terraform-infra
+
+  test-all-scenarios:
+    desc: "Run all organization health test scenarios"
+    cmds:
+      - task: test-agent-scenarios
+      - task: test-license-scenarios
+      - task: test-security-scenarios
+      - task: test-service-scenarios
+      - task: validate-results
+
+  test-agent-scenarios:
+    desc: "Test agent pool capacity related scenarios"
+    cmds:
+      - task: test-overutilized-pools
+      - task: test-offline-agents
+      - task: test-undersized-pools
+
+  test-license-scenarios:
+    desc: "Test license utilization scenarios"
+    cmds:
+      - task: test-high-license-usage
+      - task: test-inactive-users
+      - task: test-misaligned-access
+
+  test-security-scenarios:
+    desc: "Test security policy scenarios"
+    cmds:
+      - task: test-weak-policies
+      - task: test-over-permissions
+      - task: test-unsecured-connections
+
+  test-service-scenarios:
+    desc: "Test platform service health scenarios"
+    cmds:
+      - task: test-connectivity-issues
+      - task: test-performance-degradation
+      - task: test-cross-project-dependencies
+
+  check-unpushed-commits:
+    desc: Check if outstanding commits or file updates need to be pushed before testing.
+    vars:
+      BASE_DIR: "../"
+    cmds:
+      - |
+        echo "Checking for uncommitted changes in $BASE_DIR and $BASE_DIR.runwhen, excluding '.test'..."
+        UNCOMMITTED_FILES=$(git diff --name-only HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNCOMMITTED_FILES" ]; then
+          echo "✗"
+          echo "Uncommitted changes found:"
+          echo "$UNCOMMITTED_FILES"
+          echo "Remember to commit & push changes before executing tests."
+          echo "------------"
+          exit 1    
+        else
+          echo "√"
+          echo "No uncommitted changes in specified directories."
+          echo "------------"        
+        fi
+      - |
+        echo "Checking for unpushed commits in $BASE_DIR and $BASE_DIR.runwhen, excluding '.test'..."
+        git fetch origin
+        UNPUSHED_FILES=$(git diff --name-only origin/$(git rev-parse --abbrev-ref HEAD) HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNPUSHED_FILES" ]; then
+          echo "✗"
+          echo "Unpushed commits found:"
+          echo "$UNPUSHED_FILES"
+          echo "Remember to push changes before executing tests."
+          echo "------------"
+          exit 1        
+        else
+          echo "√"
+          echo "No unpushed commits in specified directories."
+          echo "------------"        
+        fi
+    silent: true
+
+  generate-rwl-config:
+    desc: "Generate RunWhen Local configuration for organization health testing"
+    env:
+      ARM_SUBSCRIPTION_ID: "{{.ARM_SUBSCRIPTION_ID}}"
+      AZ_TENANT_ID: "{{.AZ_TENANT_ID}}"
+      AZ_CLIENT_SECRET: "{{.AZ_CLIENT_SECRET}}"
+      AZ_CLIENT_ID: "{{.AZ_CLIENT_ID}}"
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "org-health-test-workspace"}}'
+    cmds:
+      - |
+        source terraform/tf.secret
+        repo_url=$(git config --get remote.origin.url)
+        branch_name=$(git rev-parse --abbrev-ref HEAD)
+        codebundle=$(basename "$(dirname "$PWD")")
+        
+        # Check if terraform state exists
+        if [ ! -f "terraform/terraform.tfstate" ]; then
+          echo "❌ ERROR: Terraform state file not found."
+          echo "Required infrastructure is missing. Please run 'task build-infra' first."
+          exit 1
+        fi
+        
+        # Extract resource values from terraform state
+        pushd terraform > /dev/null
+        
+        resource_group=$(terraform show -json terraform.tfstate | jq -r '.values.root_module.resources[] | select(.type == "azurerm_resource_group") | .values.name')
+        org_service_url=$(terraform show -json terraform.tfstate | jq -r '.values.outputs["org_url"].value')
+        devops_org=$(echo "$org_service_url" | sed -n 's/.*dev\.azure\.com\/\([^\/]*\).*/\1/p')
+        
+        popd > /dev/null
+        
+        echo "Using the following values:"
+        echo "Resource Group: $resource_group"
+        echo "DevOps Organization: $devops_org"
+        
+        # Generate workspaceInfo.yaml for organization health testing
+        cat <<EOF > workspaceInfo.yaml
+        workspaceName: "$RW_WORKSPACE"
+        workspaceOwnerEmail: authors@runwhen.com
+        defaultLocation: location-01-us-west1
+        defaultLOD: detailed
+        cloudConfig:
+          azure:
+            subscriptionId: "$ARM_SUBSCRIPTION_ID"
+            tenantId: "$AZ_TENANT_ID"
+            clientId: "$AZ_CLIENT_ID"
+            clientSecret: "$AZ_CLIENT_SECRET"
+            resourceGroupLevelOfDetails:
+              $resource_group: detailed
+            devops:
+              organizationUrl: "https://dev.azure.com/$devops_org"
+        codeCollections:
+        - repoURL: "$repo_url"
+          branch: "$branch_name"
+          codeBundles: ["$codebundle"]
+        custom:
+          devops_org: $devops_org
+          agent_utilization_threshold: 80
+          license_utilization_threshold: 90
+          test_scenarios:
+            - overutilized_pools
+            - offline_agents  
+            - high_license_usage
+            - inactive_users
+            - weak_policies
+            - connectivity_issues
+        EOF
+        
+        echo "Generated workspaceInfo.yaml for organization health testing."
+    silent: true
+
+  test-overutilized-pools:
+    desc: "Test agent pools with high utilization (should trigger capacity warnings)"
+    env:
+      AGENT_UTILIZATION_THRESHOLD: "80"
+    cmds:
+      - |
+        echo "=== Testing Overutilized Agent Pools ==="
+        echo "Threshold: $AGENT_UTILIZATION_THRESHOLD%"
+        echo "Expected: Agent capacity warnings, health score impact"
+        echo ""
+        
+        # Run the organization health runbook
+        cd ../..
+        robot -v AGENT_UTILIZATION_THRESHOLD:$AGENT_UTILIZATION_THRESHOLD \
+              -v AZURE_DEVOPS_ORG:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw devops_org) \
+              -v AZURE_RESOURCE_GROUP:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw resource_group_name) \
+              -d .test/output/overutilized-pools \
+              runbook.robot
+        
+        echo "=== Overutilized Pools Test Complete ==="
+        echo "Check .test/output/overutilized-pools for results"
+        echo ""
+
+  test-high-license-usage:
+    desc: "Test license utilization above threshold"
+    env:
+      LICENSE_UTILIZATION_THRESHOLD: "90"
+    cmds:
+      - |
+        echo "=== Testing High License Usage ==="
+        echo "Threshold: $LICENSE_UTILIZATION_THRESHOLD%"
+        echo "Expected: License utilization warnings, optimization recommendations"
+        echo ""
+        
+        # Run the organization health runbook
+        cd ../..
+        robot -v LICENSE_UTILIZATION_THRESHOLD:$LICENSE_UTILIZATION_THRESHOLD \
+              -v AZURE_DEVOPS_ORG:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw devops_org) \
+              -v AZURE_RESOURCE_GROUP:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw resource_group_name) \
+              -d .test/output/high-license-usage \
+              runbook.robot
+        
+        echo "=== High License Usage Test Complete ==="
+        echo "Check .test/output/high-license-usage for results"
+        echo ""
+
+  test-weak-policies:
+    desc: "Test organization with weak security policies"
+    cmds:
+      - |
+        echo "=== Testing Weak Security Policies ==="
+        echo "Expected: Security policy violations, compliance issues"
+        echo ""
+        
+        # Run the organization health runbook
+        cd ../..
+        robot -v SECURITY_POLICY_CHECK:enabled \
+              -v AZURE_DEVOPS_ORG:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw devops_org) \
+              -v AZURE_RESOURCE_GROUP:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw resource_group_name) \
+              -d .test/output/weak-policies \
+              runbook.robot
+        
+        echo "=== Weak Security Policies Test Complete ==="
+        echo "Check .test/output/weak-policies for results"
+        echo ""
+
+  test-connectivity-issues:
+    desc: "Test service connectivity and platform health"
+    cmds:
+      - |
+        echo "=== Testing Service Connectivity ==="
+        echo "Expected: Connectivity monitoring, API health checks"
+        echo ""
+        
+        # Run the organization health runbook
+        cd ../..
+        robot -v SERVICE_HEALTH_CHECK:enabled \
+              -v AZURE_DEVOPS_ORG:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw devops_org) \
+              -v AZURE_RESOURCE_GROUP:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw resource_group_name) \
+              -d .test/output/connectivity-issues \
+              runbook.robot
+        
+        echo "=== Service Connectivity Test Complete ==="
+        echo "Check .test/output/connectivity-issues for results"
+        echo ""
+
+  validate-results:
+    desc: "Validate all test results and generate summary"
+    cmds:
+      - |
+        echo "=== Validating Test Results ==="
+        
+        # Check if all test outputs exist
+        test_dirs=("overutilized-pools" "high-license-usage" "weak-policies" "connectivity-issues")
+        
+        for dir in "${test_dirs[@]}"; do
+          if [ -d ".test/output/$dir" ]; then
+            echo "✓ $dir test completed"
+            
+            # Check for expected issues in robot output
+            if grep -q "PASS" ".test/output/$dir/output.xml" 2>/dev/null; then
+              echo "  ✓ Robot tests passed"
+            else
+              echo "  ⚠ Robot tests may have issues"
+            fi
+          else
+            echo "✗ $dir test not found"
+          fi
+        done
+        
+        echo ""
+        echo "=== Test Summary ==="
+        echo "Review individual test outputs in .test/output/ for detailed results"
+        echo "Expected issues should be detected in each scenario"
+        echo ""
+
+  build-terraform-infra:
+    desc: "Build test infrastructure using Terraform"
+    cmds:
+      - |
+        echo "Building Azure DevOps organization health test infrastructure..."
+        
+        # Check if terraform directory exists
+        if [ ! -d "terraform" ]; then
+          echo "❌ ERROR: terraform directory not found"
+          exit 1
+        fi
+        
+        cd terraform
+        
+        # Check if tf.secret exists
+        if [ ! -f "tf.secret" ]; then
+          echo "❌ ERROR: tf.secret file not found"
+          echo "Please create tf.secret with required environment variables"
+          exit 1
+        fi
+        
+        # Source the secrets
+        source tf.secret
+        
+        # Initialize and apply terraform
+        terraform init
+        terraform plan
+        terraform apply -auto-approve
+        
+        echo "✓ Infrastructure built successfully"
+        echo "Organization health test environment is ready"
+
+  check-and-cleanup-terraform:
+    desc: "Check and cleanup Terraform resources"
+    cmds:
+      - |
+        if [ -f "terraform/terraform.tfstate" ]; then
+          echo "Terraform state found, cleaning up resources..."
+          cd terraform
+          source tf.secret
+          terraform destroy -auto-approve
+          echo "✓ Resources cleaned up"
+        else
+          echo "No Terraform state found, nothing to cleanup"
+        fi
+
+  delete-slxs:
+    desc: "Delete generated SLX resources"
+    cmds:
+      - |
+        echo "Cleaning up generated SLX resources..."
+        if [ -f "workspaceInfo.yaml" ]; then
+          rm workspaceInfo.yaml
+          echo "✓ workspaceInfo.yaml removed"
+        fi
+        if [ -d ".test/output" ]; then
+          rm -rf .test/output
+          echo "✓ Test output directory removed"
+        fi
+
+  clean-rwl-discovery:
+    desc: "Clean RunWhen Local discovery files"
+    cmds:
+      - |
+        echo "Cleaning RunWhen Local discovery files..."
+        rm -f *.discovery.yaml
+        rm -f *.slx.yaml
+        rm -f *.sli.yaml
+        rm -f *.taskset.yaml
+        echo "✓ Discovery files cleaned" 

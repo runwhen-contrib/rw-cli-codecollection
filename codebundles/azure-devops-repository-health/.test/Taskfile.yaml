@@ -1,0 +1,531 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Run complete repository health test suite"
+    cmds:
+      - task: check-unpushed-commits
+      - task: generate-rwl-config
+      - task: test-all-scenarios
+
+  clean:
+    desc: "Run cleanup tasks"
+    cmds:
+      - task: check-and-cleanup-terraform
+      - task: delete-slxs
+      - task: clean-rwl-discovery
+
+  build-infra:
+    desc: "Build test infrastructure with multiple repository scenarios"
+    cmds:
+      - task: build-terraform-infra
+
+  test-all-scenarios:
+    desc: "Run all repository health test scenarios"
+    cmds:
+      - task: test-security-scenarios
+      - task: test-quality-scenarios
+      - task: test-collaboration-scenarios
+      - task: test-performance-scenarios
+      - task: validate-results
+
+  test-security-scenarios:
+    desc: "Test security-related repository health scenarios"
+    cmds:
+      - task: test-unprotected-repo
+      - task: test-weak-security
+      - task: test-overpermissioned-repo
+
+  test-quality-scenarios:
+    desc: "Test code quality repository health scenarios"
+    cmds:
+      - task: test-no-builds
+      - task: test-failing-builds
+      - task: test-poor-structure
+
+  test-collaboration-scenarios:
+    desc: "Test collaboration repository health scenarios"
+    cmds:
+      - task: test-abandoned-prs
+      - task: test-single-reviewer
+      - task: test-quick-merges
+
+  test-performance-scenarios:
+    desc: "Test performance repository health scenarios"
+    cmds:
+      - task: test-large-repo
+      - task: test-excessive-branches
+      - task: test-frequent-pushes
+
+  check-unpushed-commits:
+    desc: Check if outstanding commits or file updates need to be pushed before testing.
+    vars:
+      BASE_DIR: "../"
+    cmds:
+      - |
+        echo "Checking for uncommitted changes in $BASE_DIR and $BASE_DIR.runwhen, excluding '.test'..."
+        UNCOMMITTED_FILES=$(git diff --name-only HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNCOMMITTED_FILES" ]; then
+          echo "✗"
+          echo "Uncommitted changes found:"
+          echo "$UNCOMMITTED_FILES"
+          echo "Remember to commit & push changes before executing tests."
+          echo "------------"
+          exit 1    
+        else
+          echo "√"
+          echo "No uncommitted changes in specified directories."
+          echo "------------"        
+        fi
+      - |
+        echo "Checking for unpushed commits in $BASE_DIR and $BASE_DIR.runwhen, excluding '.test'..."
+        git fetch origin
+        UNPUSHED_FILES=$(git diff --name-only origin/$(git rev-parse --abbrev-ref HEAD) HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNPUSHED_FILES" ]; then
+          echo "✗"
+          echo "Unpushed commits found:"
+          echo "$UNPUSHED_FILES"
+          echo "Remember to push changes before executing tests."
+          echo "------------"
+          exit 1        
+        else
+          echo "√"
+          echo "No unpushed commits in specified directories."
+          echo "------------"        
+        fi
+    silent: true
+
+  generate-rwl-config:
+    desc: "Generate RunWhen Local configuration for repository health testing"
+    env:
+      ARM_SUBSCRIPTION_ID: "{{.ARM_SUBSCRIPTION_ID}}"
+      AZ_TENANT_ID: "{{.AZ_TENANT_ID}}"
+      AZ_CLIENT_SECRET: "{{.AZ_CLIENT_SECRET}}"
+      AZ_CLIENT_ID: "{{.AZ_CLIENT_ID}}"
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "repo-health-test-workspace"}}'
+    cmds:
+      - |
+        source terraform/tf.secret
+        repo_url=$(git config --get remote.origin.url)
+        branch_name=$(git rev-parse --abbrev-ref HEAD)
+        codebundle=$(basename "$(dirname "$PWD")")
+        
+        # Check if terraform state exists
+        if [ ! -f "terraform/terraform.tfstate" ]; then
+          echo "❌ ERROR: Terraform state file not found."
+          echo "Required infrastructure is missing. Please run 'task build-infra' first."
+          exit 1
+        fi
+        
+        # Extract resource values from terraform state
+        pushd terraform > /dev/null
+        
+        resource_group=$(terraform show -json terraform.tfstate | jq -r '.values.root_module.resources[] | select(.type == "azurerm_resource_group") | .values.name')
+        devops_project=$(terraform show -json terraform.tfstate | jq -r '.values.root_module.resources[] | select(.type == "azuredevops_project") | .values.name' | head -n 1)
+        org_service_url=$(terraform show -json terraform.tfstate | jq -r '.values.outputs["project_url"].value' | head -n 1)
+        devops_org=$(echo "$org_service_url" | sed -n 's/.*dev\.azure\.com\/\([^\/]*\).*/\1/p')
+        
+        popd > /dev/null
+        
+        echo "Using the following values:"
+        echo "Resource Group: $resource_group"
+        echo "DevOps Organization: $devops_org"
+        echo "DevOps Project: $devops_project"
+        
+        # Generate workspaceInfo.yaml for repository health testing
+        cat <<EOF > workspaceInfo.yaml
+        workspaceName: "$RW_WORKSPACE"
+        workspaceOwnerEmail: authors@runwhen.com
+        defaultLocation: location-01-us-west1
+        defaultLOD: detailed
+        cloudConfig:
+          azure:
+            subscriptionId: "$ARM_SUBSCRIPTION_ID"
+            tenantId: "$AZ_TENANT_ID"
+            clientId: "$AZ_CLIENT_ID"
+            clientSecret: "$AZ_CLIENT_SECRET"
+            resourceGroupLevelOfDetails:
+              $resource_group: detailed
+        codeCollections:
+        - repoURL: "$repo_url"
+          branch: "$branch_name"
+          codeBundles: ["$codebundle"]
+        custom:
+          devops_org: $devops_org
+          devops_project: $devops_project
+          test_scenarios:
+            - unprotected_repo
+            - weak_security_repo
+            - overpermissioned_repo
+            - no_builds_repo
+            - failing_builds_repo
+            - large_repo
+            - collaboration_issues_repo
+        EOF
+        
+        echo "Generated workspaceInfo.yaml for repository health testing."
+    silent: true
+
+  test-unprotected-repo:
+    desc: "Test repository with no branch protection (should trigger critical issues)"
+    env:
+      AZURE_DEVOPS_REPO: "test-unprotected-repo"
+    cmds:
+      - |
+        echo "=== Testing Unprotected Repository ==="
+        echo "Repository: $AZURE_DEVOPS_REPO"
+        echo "Expected: Critical security issues, health score <50"
+        echo ""
+        
+        # Run the repository health runbook
+        cd ../..
+        robot -v AZURE_DEVOPS_REPO:$AZURE_DEVOPS_REPO \
+              -v AZURE_DEVOPS_PROJECT:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw project_name) \
+              -v AZURE_DEVOPS_ORG:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw devops_org) \
+              -v AZURE_RESOURCE_GROUP:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw resource_group_name) \
+              -d .test/output/unprotected-repo \
+              runbook.robot
+        
+        echo "=== Unprotected Repository Test Complete ==="
+        echo "Check .test/output/unprotected-repo for results"
+        echo ""
+
+  test-weak-security:
+    desc: "Test repository with weak security configuration"
+    env:
+      AZURE_DEVOPS_REPO: "test-weak-security-repo"
+    cmds:
+      - |
+        echo "=== Testing Weak Security Repository ==="
+        echo "Repository: $AZURE_DEVOPS_REPO"
+        echo "Expected: Security configuration issues, health score 50-69"
+        echo ""
+        
+        cd ../..
+        robot -v AZURE_DEVOPS_REPO:$AZURE_DEVOPS_REPO \
+              -v AZURE_DEVOPS_PROJECT:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw project_name) \
+              -v AZURE_DEVOPS_ORG:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw devops_org) \
+              -v AZURE_RESOURCE_GROUP:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw resource_group_name) \
+              -d .test/output/weak-security \
+              runbook.robot
+        
+        echo "=== Weak Security Test Complete ==="
+
+  test-overpermissioned-repo:
+    desc: "Test repository with excessive permissions"
+    env:
+      AZURE_DEVOPS_REPO: "test-overpermissioned-repo"
+    cmds:
+      - |
+        echo "=== Testing Over-Permissioned Repository ==="
+        echo "Repository: $AZURE_DEVOPS_REPO"
+        echo "Expected: Permission-related security issues"
+        echo ""
+        
+        cd ../..
+        robot -v AZURE_DEVOPS_REPO:$AZURE_DEVOPS_REPO \
+              -v AZURE_DEVOPS_PROJECT:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw project_name) \
+              -v AZURE_DEVOPS_ORG:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw devops_org) \
+              -v AZURE_RESOURCE_GROUP:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw resource_group_name) \
+              -d .test/output/overpermissioned \
+              runbook.robot
+        
+        echo "=== Over-Permissioned Repository Test Complete ==="
+
+  test-no-builds:
+    desc: "Test repository with no build pipelines"
+    env:
+      AZURE_DEVOPS_REPO: "test-no-builds-repo"
+    cmds:
+      - |
+        echo "=== Testing Repository Without Builds ==="
+        echo "Repository: $AZURE_DEVOPS_REPO"
+        echo "Expected: Code quality issues, missing build validation"
+        echo ""
+        
+        cd ../..
+        robot -v AZURE_DEVOPS_REPO:$AZURE_DEVOPS_REPO \
+              -v AZURE_DEVOPS_PROJECT:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw project_name) \
+              -v AZURE_DEVOPS_ORG:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw devops_org) \
+              -v AZURE_RESOURCE_GROUP:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw resource_group_name) \
+              -d .test/output/no-builds \
+              runbook.robot
+        
+        echo "=== No Builds Test Complete ==="
+
+  test-failing-builds:
+    desc: "Test repository with high build failure rate"
+    env:
+      AZURE_DEVOPS_REPO: "test-failing-builds-repo"
+    cmds:
+      - |
+        echo "=== Testing Repository With Failing Builds ==="
+        echo "Repository: $AZURE_DEVOPS_REPO"
+        echo "Expected: High build failure rate issues"
+        echo ""
+        
+        cd ../..
+        robot -v AZURE_DEVOPS_REPO:$AZURE_DEVOPS_REPO \
+              -v AZURE_DEVOPS_PROJECT:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw project_name) \
+              -v AZURE_DEVOPS_ORG:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw devops_org) \
+              -v AZURE_RESOURCE_GROUP:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw resource_group_name) \
+              -d .test/output/failing-builds \
+              runbook.robot
+        
+        echo "=== Failing Builds Test Complete ==="
+
+  test-poor-structure:
+    desc: "Test repository with poor structure and naming"
+    env:
+      AZURE_DEVOPS_REPO: "test-poor-structure-repo"
+    cmds:
+      - |
+        echo "=== Testing Repository With Poor Structure ==="
+        echo "Repository: $AZURE_DEVOPS_REPO"
+        echo "Expected: Structure and naming convention issues"
+        echo ""
+        
+        cd ../..
+        robot -v AZURE_DEVOPS_REPO:$AZURE_DEVOPS_REPO \
+              -v AZURE_DEVOPS_PROJECT:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw project_name) \
+              -v AZURE_DEVOPS_ORG:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw devops_org) \
+              -v AZURE_RESOURCE_GROUP:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw resource_group_name) \
+              -d .test/output/poor-structure \
+              runbook.robot
+        
+        echo "=== Poor Structure Test Complete ==="
+
+  test-abandoned-prs:
+    desc: "Test repository with abandoned pull requests"
+    env:
+      AZURE_DEVOPS_REPO: "test-abandoned-prs-repo"
+    cmds:
+      - |
+        echo "=== Testing Repository With Abandoned PRs ==="
+        echo "Repository: $AZURE_DEVOPS_REPO"
+        echo "Expected: High PR abandonment rate issues"
+        echo ""
+        
+        cd ../..
+        robot -v AZURE_DEVOPS_REPO:$AZURE_DEVOPS_REPO \
+              -v AZURE_DEVOPS_PROJECT:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw project_name) \
+              -v AZURE_DEVOPS_ORG:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw devops_org) \
+              -v AZURE_RESOURCE_GROUP:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw resource_group_name) \
+              -d .test/output/abandoned-prs \
+              runbook.robot
+        
+        echo "=== Abandoned PRs Test Complete ==="
+
+  test-single-reviewer:
+    desc: "Test repository with single reviewer bottleneck"
+    env:
+      AZURE_DEVOPS_REPO: "test-single-reviewer-repo"
+    cmds:
+      - |
+        echo "=== Testing Repository With Single Reviewer ==="
+        echo "Repository: $AZURE_DEVOPS_REPO"
+        echo "Expected: Reviewer bottleneck issues"
+        echo ""
+        
+        cd ../..
+        robot -v AZURE_DEVOPS_REPO:$AZURE_DEVOPS_REPO \
+              -v AZURE_DEVOPS_PROJECT:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw project_name) \
+              -v AZURE_DEVOPS_ORG:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw devops_org) \
+              -v AZURE_RESOURCE_GROUP:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw resource_group_name) \
+              -d .test/output/single-reviewer \
+              runbook.robot
+        
+        echo "=== Single Reviewer Test Complete ==="
+
+  test-quick-merges:
+    desc: "Test repository with quick merge patterns"
+    env:
+      AZURE_DEVOPS_REPO: "test-quick-merges-repo"
+    cmds:
+      - |
+        echo "=== Testing Repository With Quick Merges ==="
+        echo "Repository: $AZURE_DEVOPS_REPO"
+        echo "Expected: Quick merge pattern issues"
+        echo ""
+        
+        cd ../..
+        robot -v AZURE_DEVOPS_REPO:$AZURE_DEVOPS_REPO \
+              -v AZURE_DEVOPS_PROJECT:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw project_name) \
+              -v AZURE_DEVOPS_ORG:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw devops_org) \
+              -v AZURE_RESOURCE_GROUP:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw resource_group_name) \
+              -d .test/output/quick-merges \
+              runbook.robot
+        
+        echo "=== Quick Merges Test Complete ==="
+
+  test-large-repo:
+    desc: "Test repository with size and performance issues"
+    env:
+      AZURE_DEVOPS_REPO: "test-large-repo"
+      REPO_SIZE_THRESHOLD_MB: "100"  # Lower threshold for testing
+    cmds:
+      - |
+        echo "=== Testing Large Repository ==="
+        echo "Repository: $AZURE_DEVOPS_REPO"
+        echo "Expected: Performance and size issues"
+        echo ""
+        
+        cd ../..
+        robot -v AZURE_DEVOPS_REPO:$AZURE_DEVOPS_REPO \
+              -v AZURE_DEVOPS_PROJECT:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw project_name) \
+              -v AZURE_DEVOPS_ORG:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw devops_org) \
+              -v AZURE_RESOURCE_GROUP:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw resource_group_name) \
+              -v REPO_SIZE_THRESHOLD_MB:$REPO_SIZE_THRESHOLD_MB \
+              -d .test/output/large-repo \
+              runbook.robot
+        
+        echo "=== Large Repository Test Complete ==="
+
+  test-excessive-branches:
+    desc: "Test repository with too many branches"
+    env:
+      AZURE_DEVOPS_REPO: "test-excessive-branches-repo"
+    cmds:
+      - |
+        echo "=== Testing Repository With Excessive Branches ==="
+        echo "Repository: $AZURE_DEVOPS_REPO"
+        echo "Expected: Branch management issues"
+        echo ""
+        
+        cd ../..
+        robot -v AZURE_DEVOPS_REPO:$AZURE_DEVOPS_REPO \
+              -v AZURE_DEVOPS_PROJECT:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw project_name) \
+              -v AZURE_DEVOPS_ORG:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw devops_org) \
+              -v AZURE_RESOURCE_GROUP:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw resource_group_name) \
+              -d .test/output/excessive-branches \
+              runbook.robot
+        
+        echo "=== Excessive Branches Test Complete ==="
+
+  test-frequent-pushes:
+    desc: "Test repository with frequent small pushes"
+    env:
+      AZURE_DEVOPS_REPO: "test-frequent-pushes-repo"
+    cmds:
+      - |
+        echo "=== Testing Repository With Frequent Pushes ==="
+        echo "Repository: $AZURE_DEVOPS_REPO"
+        echo "Expected: Workflow efficiency issues"
+        echo ""
+        
+        cd ../..
+        robot -v AZURE_DEVOPS_REPO:$AZURE_DEVOPS_REPO \
+              -v AZURE_DEVOPS_PROJECT:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw project_name) \
+              -v AZURE_DEVOPS_ORG:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw devops_org) \
+              -v AZURE_RESOURCE_GROUP:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw resource_group_name) \
+              -d .test/output/frequent-pushes \
+              runbook.robot
+        
+        echo "=== Frequent Pushes Test Complete ==="
+
+  validate-results:
+    desc: "Validate test results against expected outcomes"
+    cmds:
+      - |
+        echo "=== Validating Test Results ==="
+        echo ""
+        
+        # Check if output directories exist
+        if [ ! -d "output" ]; then
+          echo "❌ No test output found. Run tests first."
+          exit 1
+        fi
+        
+        # Validate each test scenario
+        echo "Checking test results..."
+        
+        # Unprotected repo should have critical issues
+        if [ -d "output/unprotected-repo" ]; then
+          echo "✓ Unprotected repository test completed"
+          # Check for expected issues in the output
+          if grep -q "Missing Required Reviewers Policy" output/unprotected-repo/log.html 2>/dev/null; then
+            echo "  ✓ Detected missing reviewers policy"
+          else
+            echo "  ⚠ Missing reviewers policy not detected"
+          fi
+        fi
+        
+        # Weak security should have configuration issues
+        if [ -d "output/weak-security" ]; then
+          echo "✓ Weak security test completed"
+        fi
+        
+        # Large repo should have performance issues
+        if [ -d "output/large-repo" ]; then
+          echo "✓ Large repository test completed"
+        fi
+        
+        echo ""
+        echo "=== Test Validation Complete ==="
+        echo "Review individual test outputs in .test/output/ directories"
+
+  build-terraform-infra:
+    desc: "Build Terraform infrastructure for repository health testing"
+    dir: terraform
+    cmds:
+      - |
+        echo "Building repository health test infrastructure..."
+        
+        # Check if tf.secret exists
+        if [ ! -f "tf.secret" ]; then
+          echo "❌ ERROR: tf.secret file not found."
+          echo "Please create tf.secret with required environment variables:"
+          echo "export ARM_SUBSCRIPTION_ID=\"your-subscription-id\""
+          echo "export AZ_TENANT_ID=\"your-tenant-id\""
+          echo "export AZ_CLIENT_ID=\"your-client-id\""
+          echo "export AZ_CLIENT_SECRET=\"your-client-secret\""
+          echo "export AZDO_PERSONAL_ACCESS_TOKEN=\"your-devops-pat\""
+          echo "export AZDO_ORG_SERVICE_URL=\"https://dev.azure.com/your-org\""
+          exit 1
+        fi
+        
+        source tf.secret
+        
+        # Initialize Terraform
+        terraform init
+        
+        # Plan and apply
+        terraform plan -out=tfplan
+        terraform apply tfplan
+        
+        echo "✓ Infrastructure created successfully"
+        echo ""
+        echo "Test repositories created:"
+        terraform output -json repository_urls | jq -r 'to_entries[] | "  - \(.key): \(.value)"'
+
+  check-and-cleanup-terraform:
+    desc: "Check and cleanup Terraform resources"
+    dir: terraform
+    cmds:
+      - |
+        if [ -f "terraform.tfstate" ]; then
+          echo "Cleaning up Terraform infrastructure..."
+          source tf.secret
+          terraform destroy -auto-approve
+          echo "✓ Infrastructure cleaned up"
+        else
+          echo "No Terraform state found, nothing to clean up"
+        fi
+
+  delete-slxs:
+    desc: "Delete any generated SLXs from testing"
+    cmds:
+      - |
+        echo "Cleaning up generated SLXs..."
+        rm -rf output/
+        echo "✓ SLXs cleaned up"
+
+  clean-rwl-discovery:
+    desc: "Clean up RunWhen Local discovery artifacts"
+    cmds:
+      - |
+        echo "Cleaning up RunWhen Local artifacts..."
+        rm -f workspaceInfo.yaml
+        docker stop RunWhenLocal 2>/dev/null || true
+        docker rm RunWhenLocal 2>/dev/null || true
+        echo "✓ RunWhen Local artifacts cleaned up" 
