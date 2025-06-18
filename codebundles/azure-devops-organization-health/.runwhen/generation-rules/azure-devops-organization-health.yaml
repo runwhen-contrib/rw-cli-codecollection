@@ -17,6 +17,5 @@ spec:
           levelOfDetail: basic
           outputItems:
             - type: slx
-            - type: sli
             - type: runbook
               templateName: azure-devops-organization-health-taskset.yaml 

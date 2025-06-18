@@ -6,7 +6,6 @@ tasks:
     cmds:
       - task: check-unpushed-commits
       - task: generate-rwl-config
-      - task: test-all-scenarios
 
   clean:
     desc: "Run cleanup tasks"
@@ -29,33 +28,6 @@ tasks:
       - task: test-service-scenarios
       - task: validate-results
 
-  test-agent-scenarios:
-    desc: "Test agent pool capacity related scenarios"
-    cmds:
-      - task: test-overutilized-pools
-      - task: test-offline-agents
-      - task: test-undersized-pools
-
-  test-license-scenarios:
-    desc: "Test license utilization scenarios"
-    cmds:
-      - task: test-high-license-usage
-      - task: test-inactive-users
-      - task: test-misaligned-access
-
-  test-security-scenarios:
-    desc: "Test security policy scenarios"
-    cmds:
-      - task: test-weak-policies
-      - task: test-over-permissions
-      - task: test-unsecured-connections
-
-  test-service-scenarios:
-    desc: "Test platform service health scenarios"
-    cmds:
-      - task: test-connectivity-issues
-      - task: test-performance-degradation
-      - task: test-cross-project-dependencies
 
   check-unpushed-commits:
     desc: Check if outstanding commits or file updates need to be pushed before testing.
@@ -166,122 +138,39 @@ tasks:
         echo "Generated workspaceInfo.yaml for organization health testing."
     silent: true
 
-  test-overutilized-pools:
-    desc: "Test agent pools with high utilization (should trigger capacity warnings)"
-    env:
-      AGENT_UTILIZATION_THRESHOLD: "80"
+  run-rwl-discovery:
+    desc: "Run RunWhen Local Discovery on test infrastructure"
     cmds:
       - |
-        echo "=== Testing Overutilized Agent Pools ==="
-        echo "Threshold: $AGENT_UTILIZATION_THRESHOLD%"
-        echo "Expected: Agent capacity warnings, health score impact"
-        echo ""
-        
-        # Run the organization health runbook
-        cd ../..
-        robot -v AGENT_UTILIZATION_THRESHOLD:$AGENT_UTILIZATION_THRESHOLD \
-              -v AZURE_DEVOPS_ORG:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw devops_org) \
-              -v AZURE_RESOURCE_GROUP:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw resource_group_name) \
-              -d .test/output/overutilized-pools \
-              runbook.robot
-        
-        echo "=== Overutilized Pools Test Complete ==="
-        echo "Check .test/output/overutilized-pools for results"
-        echo ""
+        CONTAINER_NAME="RunWhenLocal"
+        if docker ps -q --filter "name=$CONTAINER_NAME" | grep -q .; then
+          echo "Stopping and removing existing container $CONTAINER_NAME..."
+          docker stop $CONTAINER_NAME && docker rm $CONTAINER_NAME
+        elif docker ps -a -q --filter "name=$CONTAINER_NAME" | grep -q .; then
+          echo "Removing existing stopped container $CONTAINER_NAME..."
+          docker rm $CONTAINER_NAME
+        else
+          echo "No existing container named $CONTAINER_NAME found."
+        fi
 
-  test-high-license-usage:
-    desc: "Test license utilization above threshold"
-    env:
-      LICENSE_UTILIZATION_THRESHOLD: "90"
-    cmds:
-      - |
-        echo "=== Testing High License Usage ==="
-        echo "Threshold: $LICENSE_UTILIZATION_THRESHOLD%"
-        echo "Expected: License utilization warnings, optimization recommendations"
-        echo ""
-        
-        # Run the organization health runbook
-        cd ../..
-        robot -v LICENSE_UTILIZATION_THRESHOLD:$LICENSE_UTILIZATION_THRESHOLD \
-              -v AZURE_DEVOPS_ORG:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw devops_org) \
-              -v AZURE_RESOURCE_GROUP:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw resource_group_name) \
-              -d .test/output/high-license-usage \
-              runbook.robot
-        
-        echo "=== High License Usage Test Complete ==="
-        echo "Check .test/output/high-license-usage for results"
-        echo ""
+        echo "Cleaning up output directory..."
+        sudo rm -rf output || { echo "Failed to remove output directory"; exit 1; }
+        mkdir output && chmod 777 output || { echo "Failed to set permissions"; exit 1; }
 
-  test-weak-policies:
-    desc: "Test organization with weak security policies"
-    cmds:
-      - |
-        echo "=== Testing Weak Security Policies ==="
-        echo "Expected: Security policy violations, compliance issues"
-        echo ""
-        
-        # Run the organization health runbook
-        cd ../..
-        robot -v SECURITY_POLICY_CHECK:enabled \
-              -v AZURE_DEVOPS_ORG:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw devops_org) \
-              -v AZURE_RESOURCE_GROUP:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw resource_group_name) \
-              -d .test/output/weak-policies \
-              runbook.robot
-        
-        echo "=== Weak Security Policies Test Complete ==="
-        echo "Check .test/output/weak-policies for results"
-        echo ""
+        echo "Starting new container $CONTAINER_NAME..."
 
-  test-connectivity-issues:
-    desc: "Test service connectivity and platform health"
-    cmds:
-      - |
-        echo "=== Testing Service Connectivity ==="
-        echo "Expected: Connectivity monitoring, API health checks"
-        echo ""
-        
-        # Run the organization health runbook
-        cd ../..
-        robot -v SERVICE_HEALTH_CHECK:enabled \
-              -v AZURE_DEVOPS_ORG:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw devops_org) \
-              -v AZURE_RESOURCE_GROUP:$(cd .test && source terraform/tf.secret && cd terraform && terraform output -raw resource_group_name) \
-              -d .test/output/connectivity-issues \
-              runbook.robot
-        
-        echo "=== Service Connectivity Test Complete ==="
-        echo "Check .test/output/connectivity-issues for results"
-        echo ""
+        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d ghcr.io/runwhen-contrib/runwhen-local:latest || {
+          echo "Failed to start container"; exit 1;
+        }
 
-  validate-results:
-    desc: "Validate all test results and generate summary"
-    cmds:
-      - |
-        echo "=== Validating Test Results ==="
-        
-        # Check if all test outputs exist
-        test_dirs=("overutilized-pools" "high-license-usage" "weak-policies" "connectivity-issues")
-        
-        for dir in "${test_dirs[@]}"; do
-          if [ -d ".test/output/$dir" ]; then
-            echo "✓ $dir test completed"
-            
-            # Check for expected issues in robot output
-            if grep -q "PASS" ".test/output/$dir/output.xml" 2>/dev/null; then
-              echo "  ✓ Robot tests passed"
-            else
-              echo "  ⚠ Robot tests may have issues"
-            fi
-          else
-            echo "✗ $dir test not found"
-          fi
-        done
-        
-        echo ""
-        echo "=== Test Summary ==="
-        echo "Review individual test outputs in .test/output/ for detailed results"
-        echo "Expected issues should be detected in each scenario"
-        echo ""
+        echo "Running workspace builder script in container..."
+        docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh $1 --verbose || {
+          echo "Error executing script in container"; exit 1;
+        }
 
+        echo "Review generated config files under output/workspaces/"
+    silent: true
+ 
   build-terraform-infra:
     desc: "Build test infrastructure using Terraform"
     cmds:

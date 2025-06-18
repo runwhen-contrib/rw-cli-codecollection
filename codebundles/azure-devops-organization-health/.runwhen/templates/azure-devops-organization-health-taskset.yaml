@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   location: {{default_location}}
-  description: Comprehensive organization health check for Azure DevOps including agent pool capacity, license utilization, security policies, service connectivity, and platform incidents in organization {{ custom.devops_org }}
+  description: Comprehensive organization health check for Azure DevOps including agent pool capacity, license utilization, security policies, service connectivity, and platform incidents in organization {{ organization }}
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -22,14 +22,12 @@ spec:
     {% endif %}
     pathToRobot: codebundles/azure-devops-organization-health/runbook.robot
   configProvided:
-    - name: AZURE_RESOURCE_GROUP
-      value: "{{ match_resource.resource_group.name }}"
     - name: AZURE_DEVOPS_ORG
-      value: "{{ custom.devops_org }}"
+      value: "{{ organization }}"
     - name: AGENT_UTILIZATION_THRESHOLD
-      value: "{{ custom.agent_utilization_threshold | default('80') }}"
+      value: "80"
     - name: LICENSE_UTILIZATION_THRESHOLD
-      value: "{{ custom.license_utilization_threshold | default('90') }}"
+      value: "90"
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}

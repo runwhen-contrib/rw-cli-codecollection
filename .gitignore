@@ -53,6 +53,7 @@ build
 **.secret**
 **.pem
 **.pfx
+**.azure-devops
 **gcp_credentials_json
 **bashfile-**
 **db.sqlite3**
