@@ -11,7 +11,7 @@ set -x
 #   1) Checks organization-level security policies
 #   2) Verifies compliance settings
 #   3) Reviews user access and permissions
-#   4) Identifies security configuration issues
+#   4) Identifies security configuration issues with clustered reporting
 # -----------------------------------------------------------------------------
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
@@ -19,6 +19,12 @@ set -x
 
 OUTPUT_FILE="organization_policies.json"
 policies_json='[]'
+
+# Clustered issue tracking
+public_projects=()
+projects_without_policies=()
+insecure_service_connections=()
+access_denied_areas=()
 
 echo "Analyzing Organization Policies and Compliance..."
 echo "Organization: $AZURE_DEVOPS_ORG"
@@ -54,18 +60,7 @@ if ! security_groups=$(az devops security group list --output json 2>security_er
     err_msg=$(cat security_err.log)
     rm -f security_err.log
     
-    # This might be a permissions issue rather than a policy problem
-    policies_json=$(echo "$policies_json" | jq \
-        --arg title "Cannot Access Security Groups" \
-        --arg details "Unable to access organization security groups: $err_msg" \
-        --arg severity "2" \
-        --arg next_steps "Verify that the service principal has permissions to read organization security settings" \
-        '. += [{
-           "title": $title,
-           "details": $details,
-           "severity": ($severity | tonumber),
-           "next_steps": $next_steps
-         }]')
+    access_denied_areas+=("Security Groups: $err_msg")
 else
     group_count=$(echo "$security_groups" | jq '. | length')
     echo "Found $group_count security groups"
@@ -79,7 +74,7 @@ else
     
     if [ "$admin_groups" -eq 0 ]; then
         policies_json=$(echo "$policies_json" | jq \
-            --arg title "No Administrator Groups Found" \
+            --arg title "No Administrator Groups Found in Organization \`${AZURE_DEVOPS_ORG}\`" \
             --arg details "No administrator security groups found in organization" \
             --arg severity "3" \
             --arg next_steps "Verify that proper administrator groups exist and are configured" \
@@ -99,17 +94,7 @@ if ! users=$(az devops user list --output json 2>users_err.log); then
     err_msg=$(cat users_err.log)
     rm -f users_err.log
     
-    policies_json=$(echo "$policies_json" | jq \
-        --arg title "Cannot Access User Information" \
-        --arg details "Unable to access organization users: $err_msg" \
-        --arg severity "2" \
-        --arg next_steps "Verify permissions to read user information" \
-        '. += [{
-           "title": $title,
-           "details": $details,
-           "severity": ($severity | tonumber),
-           "next_steps": $next_steps
-         }]')
+    access_denied_areas+=("User Information: $err_msg")
 else
     user_count=$(echo "$users" | jq '. | length')
     echo "Found $user_count users"
@@ -128,7 +113,7 @@ else
     
     if [ "$user_count" -gt 100 ]; then
         policies_json=$(echo "$policies_json" | jq \
-            --arg title "Large User Base" \
+            --arg title "Large User Base in Organization \`${AZURE_DEVOPS_ORG}\`" \
             --arg details "Organization has $user_count users - consider reviewing access management" \
             --arg severity "1" \
             --arg next_steps "Regularly review user access and remove inactive users to optimize licensing" \
@@ -148,45 +133,27 @@ if ! projects=$(az devops project list --output json 2>projects_err.log); then
     err_msg=$(cat projects_err.log)
     rm -f projects_err.log
     
-    policies_json=$(echo "$policies_json" | jq \
-        --arg title "Cannot Access Projects" \
-        --arg details "Unable to access organization projects: $err_msg" \
-        --arg severity "3" \
-        --arg next_steps "Verify permissions to read project information" \
-        '. += [{
-           "title": $title,
-           "details": $details,
-           "severity": ($severity | tonumber),
-           "next_steps": $next_steps
-         }]')
+    access_denied_areas+=("Projects: $err_msg")
 else
     project_count=$(echo "$projects" | jq '. | length')
     echo "Found $project_count projects"
     
     # Check project visibility settings
-    public_projects=$(echo "$projects" | jq '[.[] | select(.visibility == "public")] | length')
+    public_project_names=$(echo "$projects" | jq -r '.[] | select(.visibility == "public") | .name')
     private_projects=$(echo "$projects" | jq '[.[] | select(.visibility == "private")] | length')
     
-    echo "  Public projects: $public_projects"
+    echo "  Public projects: $(echo "$public_project_names" | wc -l | tr -d ' ')"
     echo "  Private projects: $private_projects"
     
-    if [ "$public_projects" -gt 0 ]; then
-        policies_json=$(echo "$policies_json" | jq \
-            --arg title "Public Projects Found" \
-            --arg details "$public_projects projects are set to public visibility" \
-            --arg severity "2" \
-            --arg next_steps "Review public projects to ensure they should be publicly accessible" \
-            '. += [{
-               "title": $title,
-               "details": $details,
-               "severity": ($severity | tonumber),
-               "next_steps": $next_steps
-             }]')
-    fi
+    # Store public project names for clustering
+    while IFS= read -r project_name; do
+        if [[ -n "$project_name" ]]; then
+            public_projects+=("$project_name")
+        fi
+    done <<< "$public_project_names"
     
     # Sample a few projects to check for repository policies
     projects_to_check=$(echo "$projects" | jq -r '.[0:3][].name')
-    projects_without_policies=0
     
     for project in $projects_to_check; do
         echo "  Checking policies for project: $project"
@@ -204,7 +171,7 @@ else
                     enabled_policies=$(echo "$policies" | jq '[.[] | select(.isEnabled == true)] | length')
                     
                     if [ "$enabled_policies" -eq 0 ]; then
-                        projects_without_policies=$((projects_without_policies + 1))
+                        projects_without_policies+=("$project")
                     fi
                     
                     echo "    Repository policies: $enabled_policies enabled out of $policy_count total"
@@ -212,27 +179,12 @@ else
             fi
         fi
     done
-    
-    if [ "$projects_without_policies" -gt 0 ]; then
-        policies_json=$(echo "$policies_json" | jq \
-            --arg title "Projects Without Branch Protection" \
-            --arg details "$projects_without_policies out of sampled projects have no enabled branch protection policies" \
-            --arg severity "2" \
-            --arg next_steps "Review and implement branch protection policies across all projects" \
-            '. += [{
-               "title": $title,
-               "details": $details,
-               "severity": ($severity | tonumber),
-               "next_steps": $next_steps
-             }]')
-    fi
 fi
 rm -f projects_err.log
 
 # Check service connections at organization level (sample across projects)
 echo "Checking service connections security..."
 service_connections_checked=0
-insecure_connections=0
 
 if [ "$project_count" -gt 0 ]; then
     # Check service connections in first few projects
@@ -246,40 +198,103 @@ if [ "$project_count" -gt 0 ]; then
             service_connections_checked=$((service_connections_checked + conn_count))
             
             # Check for connections without proper authorization
-            unauth_conns=$(echo "$service_conns" | jq '[.[] | select(.authorization.scheme == null or .authorization.scheme == "")] | length')
-            insecure_connections=$((insecure_connections + unauth_conns))
+            unauth_conn_names=$(echo "$service_conns" | jq -r '.[] | select(.authorization.scheme == null or .authorization.scheme == "") | "\(.name) (\(.type))"')
             
-            echo "    Service connections: $conn_count total, $unauth_conns potentially insecure"
+            while IFS= read -r conn_name; do
+                if [[ -n "$conn_name" ]]; then
+                    insecure_service_connections+=("$project/$conn_name")
+                fi
+            done <<< "$unauth_conn_names"
+            
+            echo "    Service connections: $conn_count total"
         fi
     done
-    
-    if [ "$insecure_connections" -gt 0 ]; then
-        policies_json=$(echo "$policies_json" | jq \
-            --arg title "Insecure Service Connections" \
-            --arg details "$insecure_connections out of $service_connections_checked service connections may have security issues" \
-            --arg severity "3" \
-            --arg next_steps "Review service connection security settings and ensure proper authorization is configured" \
-            '. += [{
-               "title": $title,
-               "details": $details,
-               "severity": ($severity | tonumber),
-               "next_steps": $next_steps
-             }]')
-    fi
 fi
 
 # Check for organization-level settings (this requires specific permissions)
 echo "Checking organization settings..."
 if ! org_settings=$(az devops configure --list 2>/dev/null); then
     echo "  Cannot access detailed organization settings (may require additional permissions)"
+    access_denied_areas+=("Organization Settings: Limited permissions")
 else
     echo "  Organization settings accessible"
+fi
+
+# Generate clustered issues
+if [ ${#access_denied_areas[@]} -gt 0 ]; then
+    area_list=$(printf '%s\n' "${access_denied_areas[@]}")
+    
+    policies_json=$(echo "$policies_json" | jq \
+        --arg title "Limited Access to Organization Security Areas in \`${AZURE_DEVOPS_ORG}\`" \
+        --arg details "Cannot access the following security areas (may require elevated permissions):\n$area_list" \
+        --arg severity "2" \
+        --arg next_steps "Verify that the service principal has permissions to read organization security settings" \
+        '. += [{
+           "title": $title,
+           "details": $details,
+           "severity": ($severity | tonumber),
+           "next_steps": $next_steps
+         }]')
+fi
+
+if [ ${#public_projects[@]} -gt 0 ]; then
+    project_list=$(printf '%s\n' "${public_projects[@]}" | head -10)
+    if [ ${#public_projects[@]} -gt 10 ]; then
+        project_list="${project_list}... and $((${#public_projects[@]} - 10)) more"
+    fi
+    
+    policies_json=$(echo "$policies_json" | jq \
+        --arg title "Public Projects Found in Organization \`${AZURE_DEVOPS_ORG}\`" \
+        --arg details "${#public_projects[@]} projects are set to public visibility (best practice review):\n$project_list" \
+        --arg severity "4" \
+        --arg next_steps "Review public projects to ensure they should be publicly accessible" \
+        '. += [{
+           "title": $title,
+           "details": $details,
+           "severity": ($severity | tonumber),
+           "next_steps": $next_steps
+         }]')
+fi
+
+if [ ${#projects_without_policies[@]} -gt 0 ]; then
+    project_list=$(printf '%s\n' "${projects_without_policies[@]}")
+    
+    policies_json=$(echo "$policies_json" | jq \
+        --arg title "Projects Without Branch Protection in Organization \`${AZURE_DEVOPS_ORG}\`" \
+        --arg details "${#projects_without_policies[@]} sampled projects have no enabled branch protection policies (best practice):\n$project_list" \
+        --arg severity "4" \
+        --arg next_steps "Review and implement branch protection policies across all projects" \
+        '. += [{
+           "title": $title,
+           "details": $details,
+           "severity": ($severity | tonumber),
+           "next_steps": $next_steps
+         }]')
+fi
+
+if [ ${#insecure_service_connections[@]} -gt 0 ]; then
+    conn_list=$(printf '%s\n' "${insecure_service_connections[@]}" | head -10)
+    if [ ${#insecure_service_connections[@]} -gt 10 ]; then
+        conn_list="${conn_list}... and $((${#insecure_service_connections[@]} - 10)) more"
+    fi
+    
+    policies_json=$(echo "$policies_json" | jq \
+        --arg title "Insecure Service Connections in Organization \`${AZURE_DEVOPS_ORG}\`" \
+        --arg details "${#insecure_service_connections[@]} service connections may have security issues:\n$conn_list" \
+        --arg severity "3" \
+        --arg next_steps "Review service connection security settings and ensure proper authorization is configured" \
+        '. += [{
+           "title": $title,
+           "details": $details,
+           "severity": ($severity | tonumber),
+           "next_steps": $next_steps
+         }]')
 fi
 
 # If no policy issues found, add a healthy status
 if [ "$(echo "$policies_json" | jq '. | length')" -eq 0 ]; then
     policies_json=$(echo "$policies_json" | jq \
-        --arg title "Organization Policies: Compliant" \
+        --arg title "Organization Policies: Compliant (\`${AZURE_DEVOPS_ORG}\`)" \
         --arg details "Organization policies and security settings appear to be properly configured" \
         --arg severity "1" \
         --arg next_steps "Continue regular policy reviews and maintain current security standards" \

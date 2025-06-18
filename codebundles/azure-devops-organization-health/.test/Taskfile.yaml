@@ -71,9 +71,9 @@ tasks:
     desc: "Generate RunWhen Local configuration for organization health testing"
     env:
       ARM_SUBSCRIPTION_ID: "{{.ARM_SUBSCRIPTION_ID}}"
-      AZ_TENANT_ID: "{{.AZ_TENANT_ID}}"
-      AZ_CLIENT_SECRET: "{{.AZ_CLIENT_SECRET}}"
-      AZ_CLIENT_ID: "{{.AZ_CLIENT_ID}}"
+      AZURE_TENANT_ID: "{{.AZURE_TENANT_ID}}"
+      AZURE_CLIENT_SECRET: "{{.AZURE_CLIENT_SECRET}}"
+      AZURE_CLIENT_ID: "{{.AZURE_CLIENT_ID}}"
       RW_WORKSPACE: '{{.RW_WORKSPACE | default "org-health-test-workspace"}}'
     cmds:
       - |
@@ -111,9 +111,9 @@ tasks:
         cloudConfig:
           azure:
             subscriptionId: "$ARM_SUBSCRIPTION_ID"
-            tenantId: "$AZ_TENANT_ID"
-            clientId: "$AZ_CLIENT_ID"
-            clientSecret: "$AZ_CLIENT_SECRET"
+            tenantId: "$AZURE_TENANT_ID"
+            clientId: "$AZURE_CLIENT_ID"
+            clientSecret: "$AZURE_CLIENT_SECRET"
             resourceGroupLevelOfDetails:
               $resource_group: detailed
             devops:

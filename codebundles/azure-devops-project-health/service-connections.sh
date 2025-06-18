@@ -14,6 +14,7 @@ set -euo pipefail
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
 : "${AZURE_DEVOPS_PROJECT:?Must set AZURE_DEVOPS_PROJECT}"
+: "${AUTH_TYPE:=service_principal}"
 
 OUTPUT_FILE="service_connections_issues.json"
 issues_json='[]'
@@ -31,6 +32,22 @@ fi
 # Configure Azure DevOps CLI defaults
 az devops configure --defaults organization="https://dev.azure.com/$AZURE_DEVOPS_ORG" project="$AZURE_DEVOPS_PROJECT" --output none
 
+# Setup authentication
+if [ "$AUTH_TYPE" = "service_principal" ]; then
+    echo "Using service principal authentication..."
+    # Service principal authentication is handled by Azure CLI login
+elif [ "$AUTH_TYPE" = "pat" ]; then
+    if [ -z "${AZURE_DEVOPS_PAT:-}" ]; then
+        echo "ERROR: AZURE_DEVOPS_PAT must be set when AUTH_TYPE=pat"
+        exit 1
+    fi
+    echo "Using PAT authentication..."
+    echo "$AZURE_DEVOPS_PAT" | az devops login --organization "https://dev.azure.com/$AZURE_DEVOPS_ORG"
+else
+    echo "ERROR: Invalid AUTH_TYPE. Must be 'service_principal' or 'pat'"
+    exit 1
+fi
+
 # Get list of service connections
 echo "Retrieving service connections in project..."
 if ! connections=$(az devops service-endpoint list --output json 2>connections_err.log); then
@@ -41,7 +58,7 @@ if ! connections=$(az devops service-endpoint list --output json 2>connections_e
     issues_json=$(echo "$issues_json" | jq \
         --arg title "Failed to List Service Connections" \
         --arg details "$err_msg" \
-        --arg severity "4" \
+        --arg severity "3" \
         --arg nextStep "Check if you have sufficient permissions to view service connections." \
         '. += [{
            "title": $title,

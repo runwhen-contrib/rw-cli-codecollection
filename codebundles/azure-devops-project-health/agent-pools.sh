@@ -16,6 +16,7 @@
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
 : "${HIGH_UTILIZATION_THRESHOLD:=80}"  # Default to 80% if not specified
+: "${AUTH_TYPE:=service_principal}"
 
 OUTPUT_FILE="agent_pools_issues.json"
 issues_json='[]'
@@ -34,6 +35,22 @@ fi
 # Configure Azure DevOps CLI defaults
 az devops configure --defaults organization="$ORG_URL" --output none
 
+# Setup authentication
+if [ "$AUTH_TYPE" = "service_principal" ]; then
+    echo "Using service principal authentication..."
+    # Service principal authentication is handled by Azure CLI login
+elif [ "$AUTH_TYPE" = "pat" ]; then
+    if [ -z "${AZURE_DEVOPS_PAT:-}" ]; then
+        echo "ERROR: AZURE_DEVOPS_PAT must be set when AUTH_TYPE=pat"
+        exit 1
+    fi
+    echo "Using PAT authentication..."
+    echo "$AZURE_DEVOPS_PAT" | az devops login --organization "$ORG_URL"
+else
+    echo "ERROR: Invalid AUTH_TYPE. Must be 'service_principal' or 'pat'"
+    exit 1
+fi
+
 # Get list of agent pools
 echo "Retrieving agent pools in organization..."
 if ! pools=$(az pipelines pool list --org "$ORG_URL" --output json 2>pools_err.log); then
@@ -44,7 +61,7 @@ if ! pools=$(az pipelines pool list --org "$ORG_URL" --output json 2>pools_err.l
     issues_json=$(echo "$issues_json" | jq \
         --arg title "Failed to List Agent Pools" \
         --arg details "$err_msg" \
-        --arg severity "4" \
+        --arg severity "3" \
         --arg nextStep "Check if you have sufficient permissions to view agent pools." \
         '. += [{
            "title": $title,
@@ -105,17 +122,7 @@ for ((i=0; i<pool_count; i++)); do
     # Check if pool has no agents
     agent_count=$(echo "$agents" | jq '. | length')
     if [[ "$agent_count" -eq 0 ]]; then
-        issues_json=$(echo "$issues_json" | jq \
-            --arg title "No Agents Found in Pool \`$pool_name\`" \
-            --arg details "Agent pool $pool_name (ID: $pool_id) has no registered agents." \
-            --arg severity "3" \
-            --arg nextStep "Add agents to this pool or remove the pool if it's no longer needed." \
-            '. += [{
-               "title": $title,
-               "details": $details,
-               "next_step": $nextStep,
-               "severity": ($severity | tonumber)
-             }]')
+        echo "  Pool $pool_name has no agents (this may be intentional)"
         continue
     fi
     
@@ -139,18 +146,18 @@ for ((i=0; i<pool_count; i++)); do
              }]')
     fi
     
-    # Check for disabled agents
-    disabled_agents=$(echo "$agents" | jq '[.[] | select(.enabled == false)]')
-    disabled_count=$(echo "$disabled_agents" | jq '. | length')
+    # Check for disabled agents - only report if they're offline AND disabled (likely problematic)
+    disabled_offline_agents=$(echo "$agents" | jq '[.[] | select(.enabled == false and .status != "online")]')
+    disabled_offline_count=$(echo "$disabled_offline_agents" | jq '. | length')
     
-    if [[ "$disabled_count" -gt 0 ]]; then
-        disabled_details=$(echo "$disabled_agents" | jq -c '[.[] | {name: .name, status: .status, enabled: .enabled, version: .version}]')
+    if [[ "$disabled_offline_count" -gt 0 ]]; then
+        disabled_details=$(echo "$disabled_offline_agents" | jq -c '[.[] | {name: .name, status: .status, enabled: .enabled, version: .version}]')
         
         issues_json=$(echo "$issues_json" | jq \
-            --arg title "Disabled Agents Found in Pool \`$pool_name\`" \
+            --arg title "Disabled and Offline Agents in Pool \`$pool_name\`" \
             --arg details "$disabled_details" \
-            --arg severity "2" \
-            --arg nextStep "Enable these agents if they should be available for builds, or remove them if they're no longer needed." \
+            --arg severity "4" \
+            --arg nextStep "These agents are both disabled and offline. Enable and restart them if they should be available, or remove them if no longer needed." \
             '. += [{
                "title": $title,
                "details": $details,

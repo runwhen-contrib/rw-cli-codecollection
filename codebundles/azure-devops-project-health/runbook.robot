@@ -7,6 +7,7 @@ Force Tags          Azure    DevOps    Projects    Health
 
 Library    String
 Library             BuiltIn
+Library             Collections
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
@@ -16,8 +17,12 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 Check Agent Pool Availability for Organization `${AZURE_DEVOPS_ORG}`
-    [Documentation]    Check the health status of Agent Pools in the specified organization
+    [Documentation]    Check agent pool health and capacity issues
     [Tags]    DevOps    Azure    Health    access:read-only
+    
+    ${project_count}=    Get Length    ${PROJECT_LIST}
+    Log    Starting agent pool check for ${project_count} projects: ${PROJECT_LIST}    INFO
+    
     ${agent_pool}=    RW.CLI.Run Bash File
     ...    bash_file=agent-pools.sh
     ...    env=${env}
@@ -52,10 +57,21 @@ Check Agent Pool Availability for Organization `${AZURE_DEVOPS_ORG}`
     RW.Core.Add Pre To Report    ${agent_pool.stdout}
 
 Check for Failed Pipelines Across Projects in Organization `${AZURE_DEVOPS_ORG}`
-    [Documentation]    Identify failed pipeline runs across specified projects
+    [Documentation]    Identify failed pipeline runs with detailed logs
     [Tags]    DevOps    Azure    Pipelines    Failures    access:read-only
+    
+    ${project_count}=    Get Length    ${PROJECT_LIST}
+    Log    Checking failed pipelines across ${project_count} projects: ${PROJECT_LIST}    INFO
+    
     FOR    ${project}    IN    @{PROJECT_LIST}
-        Log    Checking failed pipelines for project: ${project}
+        Log    Checking failed pipelines for project: ${project}    INFO
+        
+        # Validate project name is not empty
+        IF    "${project.strip()}" == ""
+            Log    Skipping empty project name    WARN
+            CONTINUE
+        END
+        
         ${failed_pipelines}=    RW.CLI.Run Bash File
         ...    bash_file=pipeline-logs.sh
         ...    env=${env}
@@ -93,7 +109,7 @@ Check for Failed Pipelines Across Projects in Organization `${AZURE_DEVOPS_ORG}`
     END
 
 Check for Long-Running Pipelines in Organization `${AZURE_DEVOPS_ORG}` (Threshold: ${DURATION_THRESHOLD})
-    [Documentation]    Identify pipelines that are running longer than expected across specified projects
+    [Documentation]    Identify pipelines exceeding duration thresholds
     [Tags]    DevOps    Azure    Pipelines    Performance    access:read-only
     FOR    ${project}    IN    @{PROJECT_LIST}
         Log    Checking long running pipelines for project: ${project}
@@ -134,7 +150,7 @@ Check for Long-Running Pipelines in Organization `${AZURE_DEVOPS_ORG}` (Threshol
     END
 
 Check for Queued Pipelines in Organization `${AZURE_DEVOPS_ORG}` (Threshold: ${QUEUE_THRESHOLD})
-    [Documentation]    Identify pipelines that are queued for longer than expected across specified projects
+    [Documentation]    Identify pipelines queued beyond threshold limits
     [Tags]    DevOps    Azure    Pipelines    Queue    access:read-only
     FOR    ${project}    IN    @{PROJECT_LIST}
         Log    Checking queued pipelines for project: ${project}
@@ -175,23 +191,23 @@ Check for Queued Pipelines in Organization `${AZURE_DEVOPS_ORG}` (Threshold: ${Q
     END
 
 Check Repository Branch Policies Across Projects in Organization `${AZURE_DEVOPS_ORG}`
-    [Documentation]    Verify repository branch policies against best practices across specified projects
+    [Documentation]    Verify repository branch policies compliance
     [Tags]    DevOps    Azure    Repository    Policies    access:read-only
     FOR    ${project}    IN    @{PROJECT_LIST}
         Log    Checking repository policies for project: ${project}
         ${repo_policies}=    RW.CLI.Run Bash File
-        ...    bash_file=repository-policies.sh
+        ...    bash_file=repo-policies.sh
         ...    env=${env}
         ...    timeout_seconds=180
         ...    include_in_history=false
         ...    show_in_rwl_cheatsheet=true
-        ...    cmd_override=AZURE_DEVOPS_PROJECT="${project}" ./repository-policies.sh
+        ...    cmd_override=AZURE_DEVOPS_PROJECT="${project}" ./repo-policies.sh
         
         RW.Core.Add Pre To Report    Repository Policies for Project ${project}:
         RW.Core.Add Pre To Report    ${repo_policies.stdout}
         
         ${issues}=    RW.CLI.Run Cli
-        ...    cmd=cat repository_policies_issues.json
+        ...    cmd=cat repo_policies_issues.json
         
         TRY
             ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
@@ -215,7 +231,7 @@ Check Repository Branch Policies Across Projects in Organization `${AZURE_DEVOPS
     END
 
 Check Service Connection Health Across Projects in Organization `${AZURE_DEVOPS_ORG}`
-    [Documentation]    Verify the health of service connections used by pipelines across specified projects
+    [Documentation]    Verify service connection availability and readiness
     [Tags]    DevOps    Azure    ServiceConnections    access:read-only
     FOR    ${project}    IN    @{PROJECT_LIST}
         Log    Checking service connections for project: ${project}
@@ -255,7 +271,7 @@ Check Service Connection Health Across Projects in Organization `${AZURE_DEVOPS_
     END
 
 Investigate Pipeline Performance Issues for Organization `${AZURE_DEVOPS_ORG}`
-    [Documentation]    Identify performance degradation and bottlenecks across projects
+    [Documentation]    Analyze pipeline performance trends and bottlenecks
     [Tags]    Investigation    Performance    Trends    Bottlenecks    access:read-only
     
     FOR    ${project}    IN    @{PROJECT_LIST}
@@ -296,52 +312,15 @@ Investigate Pipeline Performance Issues for Organization `${AZURE_DEVOPS_ORG}`
         RW.Core.Add Pre To Report    ${performance_analysis.stdout}
     END
 
-Investigate Critical Issues Across Projects in Organization `${AZURE_DEVOPS_ORG}`
-    [Documentation]    Deep dive investigation for critical project health issues that require immediate attention
-    [Tags]    Investigation    Critical    Issues    Projects    access:read-only
-    
-    FOR    ${project}    IN    @{PROJECT_LIST}
-        Log    Investigating critical issues for project: ${project}
-        
-        ${critical_investigation}=    RW.CLI.Run Bash File
-        ...    bash_file=critical-project-investigation.sh
-        ...    env=${env}
-        ...    timeout_seconds=300
-        ...    include_in_history=false
-        ...    show_in_rwl_cheatsheet=true
-        ...    cmd_override=AZURE_DEVOPS_PROJECT="${project}" ./critical-project-investigation.sh
-        
-        ${issues}=    RW.CLI.Run Cli
-        ...    cmd=cat critical_project_issues.json
-        
-        TRY
-            ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-        EXCEPT
-            Log    Failed to load JSON payload for project ${project}, defaulting to empty list.    WARN
-            ${issue_list}=    Create List
-        END
-        
-        IF    len(@{issue_list}) > 0
-            FOR    ${issue}    IN    @{issue_list}
-                RW.Core.Add Issue
-                ...    severity=${issue['severity']}
-                ...    expected=Project should operate without critical issues in `${project}`
-                ...    actual=Critical project issues detected in `${project}`
-                ...    title=${issue['title']} (Project: ${project})
-                ...    reproduce_hint=${critical_investigation.cmd}
-                ...    details=${issue['details']}
-                ...    next_steps=${issue['next_steps']}
-            END
-        END
-        
-        RW.Core.Add Pre To Report    Critical Issue Investigation for Project ${project}:
-        RW.Core.Add Pre To Report    ${critical_investigation.stdout}
-    END
+
 
 
 *** Keywords ***
 Suite Initialization
+    Log    Starting Suite Initialization...    INFO
+    
     # Support both Azure Service Principal and Azure DevOps PAT authentication
+    Log    Setting up authentication...    INFO
     TRY
         ${azure_credentials}=    RW.Core.Import Secret
         ...    azure_credentials
@@ -349,6 +328,7 @@ Suite Initialization
         ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
         ...    pattern=\w*
         Set Suite Variable    ${AUTH_TYPE}    service_principal
+        Log    Using service principal authentication    INFO
     EXCEPT
         Log    Azure credentials not found, trying Azure DevOps PAT...    INFO
         TRY
@@ -358,20 +338,31 @@ Suite Initialization
             ...    description=Azure DevOps Personal Access Token
             ...    pattern=\w*
             Set Suite Variable    ${AUTH_TYPE}    pat
+            Log    Using PAT authentication    INFO
         EXCEPT
             Log    No authentication method found, defaulting to service principal...    WARN
             Set Suite Variable    ${AUTH_TYPE}    service_principal
         END
     END
     
+    Log    Importing user variables...    INFO
     ${AZURE_DEVOPS_ORG}=    RW.Core.Import User Variable    AZURE_DEVOPS_ORG
     ...    type=string
     ...    description=Azure DevOps organization name.
     ...    pattern=\w*
-    ${AZURE_DEVOPS_PROJECTS}=    RW.Core.Import User Variable    AZURE_DEVOPS_PROJECTS
-    ...    type=string
-    ...    description=Comma-separated list of Azure DevOps projects to monitor (e.g., "project1,project2,project3"). For single project, just provide the project name.
-    ...    pattern=\w*
+    
+    TRY
+        ${AZURE_DEVOPS_PROJECTS}=    RW.Core.Import User Variable    AZURE_DEVOPS_PROJECTS
+        ...    type=string
+        ...    description=Comma-separated list of Azure DevOps projects to monitor (e.g., "project1,project2,project3"). Leave empty to auto-discover all projects.
+        ...    pattern=.*
+        ...    default=
+        Log    AZURE_DEVOPS_PROJECTS: ${AZURE_DEVOPS_PROJECTS}    INFO
+    EXCEPT
+        Log    AZURE_DEVOPS_PROJECTS not provided, will auto-discover projects...    INFO
+        ${AZURE_DEVOPS_PROJECTS}=    Set Variable    
+    END
+    
     ${DURATION_THRESHOLD}=    RW.Core.Import User Variable    DURATION_THRESHOLD
     ...    type=string
     ...    description=Threshold for long-running pipelines (format: 60m, 2h)
@@ -383,14 +374,89 @@ Suite Initialization
     ...    default=30m
     ...    pattern=\w*
     
-    # Convert comma-separated projects to list
-    ${PROJECT_LIST}=    Split String    ${AZURE_DEVOPS_PROJECTS}    ,
-    ${PROJECT_LIST}=    Evaluate    [project.strip() for project in $PROJECT_LIST]
+    Log    Processing project list...    INFO
+    # Handle project list - either from user input or auto-discovery
+    ${projects_empty}=    Evaluate    "${AZURE_DEVOPS_PROJECTS}" == "" or "${AZURE_DEVOPS_PROJECTS}".strip() == ""
+    IF    ${projects_empty}
+        Log    No projects specified, auto-discovering all projects in organization...    INFO
+        ${PROJECT_LIST}=    Discover All Projects
+    ELSE
+        Log    Processing provided project list: ${AZURE_DEVOPS_PROJECTS}    INFO
+        # Convert comma-separated projects to list and clean up
+        ${PROJECT_LIST}=    Split String    ${AZURE_DEVOPS_PROJECTS}    ,
+        ${cleaned_projects}=    Create List
+        FOR    ${project}    IN    @{PROJECT_LIST}
+            ${project_trimmed}=    Strip String    ${project}
+            IF    "${project_trimmed}" != ""
+                Append To List    ${cleaned_projects}    ${project_trimmed}
+            END
+        END
+        ${PROJECT_LIST}=    Set Variable    ${cleaned_projects}
+        
+        # Validate that we have at least one project after cleanup
+        ${project_count}=    Get Length    ${PROJECT_LIST}
+        IF    ${project_count} == 0
+            Log    Project list is empty after cleanup, auto-discovering all projects...    WARN
+            ${PROJECT_LIST}=    Discover All Projects
+        END
+    END
     
+    # Final validation
+    ${project_count}=    Get Length    ${PROJECT_LIST}
+    IF    ${project_count} == 0
+        Fail    No projects found or accessible. Check organization name and permissions.
+    END
+    
+    Log    Will monitor ${project_count} projects: ${PROJECT_LIST}    INFO
+    
+    Log    Setting suite variables...    INFO
     Set Suite Variable    ${AZURE_DEVOPS_ORG}    ${AZURE_DEVOPS_ORG}
     Set Suite Variable    ${PROJECT_LIST}    ${PROJECT_LIST}
     Set Suite Variable    ${DURATION_THRESHOLD}    ${DURATION_THRESHOLD}
     Set Suite Variable    ${QUEUE_THRESHOLD}    ${QUEUE_THRESHOLD}
-    Set Suite Variable
-    ...    ${env}
-    ...    {"AZURE_DEVOPS_ORG":"${AZURE_DEVOPS_ORG}", "DURATION_THRESHOLD":"${DURATION_THRESHOLD}", "QUEUE_THRESHOLD":"${QUEUE_THRESHOLD}", "AUTH_TYPE":"${AUTH_TYPE}"}
+    
+    # Create the env dictionary for bash scripts
+    ${env_dict}=    Create Dictionary
+    ...    AZURE_DEVOPS_ORG=${AZURE_DEVOPS_ORG}
+    ...    DURATION_THRESHOLD=${DURATION_THRESHOLD}
+    ...    QUEUE_THRESHOLD=${QUEUE_THRESHOLD}
+    ...    AUTH_TYPE=${AUTH_TYPE}
+    Set Suite Variable    ${env}    ${env_dict}
+    
+    Log    Suite Initialization completed successfully!    INFO
+
+
+Discover All Projects
+    [Documentation]    Auto-discover all projects in the Azure DevOps organization
+    
+    # Create a temporary env dictionary for this discovery call
+    ${temp_env}=    Create Dictionary
+    ...    AZURE_DEVOPS_ORG=${AZURE_DEVOPS_ORG}
+    ...    AUTH_TYPE=${AUTH_TYPE}
+    
+    ${discover_projects}=    RW.CLI.Run Bash File
+    ...    bash_file=discover-projects.sh
+    ...    env=${temp_env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+    
+    ${projects_result}=    RW.CLI.Run Cli
+    ...    cmd=cat discovered_projects.json
+    
+    TRY
+        ${projects_data}=    Evaluate    json.loads(r'''${projects_result.stdout}''')    json
+        ${project_names}=    Evaluate    [project['name'] for project in ${projects_data}]
+        RETURN    ${project_names}
+    EXCEPT
+        Log    Failed to discover projects, using fallback method...    WARN
+        # Fallback: try to extract from stdout
+        ${project_lines}=    Split To Lines    ${discover_projects.stdout}
+        ${project_names}=    Create List
+        FOR    ${line}    IN    @{project_lines}
+            ${line}=    Strip String    ${line}
+            IF    "${line}" != "" and not "${line}".startswith("#") and not "${line}".startswith("Analyzing")
+                Append To List    ${project_names}    ${line}
+            END
+        END
+        RETURN    ${project_names}
+    END

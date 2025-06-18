@@ -2,11 +2,10 @@ version: "3"
 
 tasks:
   default:
-    desc: "Run/refresh config"
+    desc: "Run complete organization health test suite"
     cmds:
       - task: check-unpushed-commits
       - task: generate-rwl-config
-      - task: run-rwl-discovery
 
   clean:
     desc: "Run cleanup tasks"
@@ -16,14 +15,23 @@ tasks:
       - task: clean-rwl-discovery
 
   build-infra:
-    desc: "Build test infrastructure"
+    desc: "Build test infrastructure with multiple organization scenarios"
     cmds:
       - task: build-terraform-infra
+
+  test-all-scenarios:
+    desc: "Run all organization health test scenarios"
+    cmds:
+      - task: test-agent-scenarios
+      - task: test-license-scenarios
+      - task: test-security-scenarios
+      - task: test-service-scenarios
+      - task: validate-results
+
 
   check-unpushed-commits:
     desc: Check if outstanding commits or file updates need to be pushed before testing.
     vars:
-      # Specify the base directory relative to your Taskfile location
       BASE_DIR: "../"
     cmds:
       - |
@@ -33,7 +41,7 @@ tasks:
           echo "✗"
           echo "Uncommitted changes found:"
           echo "$UNCOMMITTED_FILES"
-          echo "Remember to commit & push changes before executing the `run-rwl-discovery` task."
+          echo "Remember to commit & push changes before executing tests."
           echo "------------"
           exit 1    
         else
@@ -49,7 +57,7 @@ tasks:
           echo "✗"
           echo "Unpushed commits found:"
           echo "$UNPUSHED_FILES"
-          echo "Remember to push changes before executing the `run-rwl-discovery` task."
+          echo "Remember to push changes before executing tests."
           echo "------------"
           exit 1        
         else
@@ -58,14 +66,17 @@ tasks:
           echo "------------"        
         fi
     silent: true
+
   generate-rwl-config:
-    desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
+    desc: "Generate RunWhen Local configuration for organization health testing"
     env:
       ARM_SUBSCRIPTION_ID: "{{.ARM_SUBSCRIPTION_ID}}"
-      AZ_TENANT_ID: "{{.AZ_TENANT_ID}}"
-      AZ_CLIENT_SECRET: "{{.AZ_CLIENT_SECRET}}"
-      AZ_CLIENT_ID: "{{.AZ_CLIENT_ID}}"
-      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+      AZURE_TENANT_ID: "{{.AZURE_TENANT_ID}}"
+      AZURE_CLIENT_SECRET: "{{.AZURE_CLIENT_SECRET}}"
+      AZURE_CLIENT_ID: "{{.AZURE_CLIENT_ID}}"
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "org-health-test-workspace"}}'
+      AZURE_DEVOPS_ORG: "{{.AZURE_DEVOPS_ORG}}"
+
     cmds:
       - |
         source terraform/tf.secret
@@ -74,76 +85,27 @@ tasks:
         codebundle=$(basename "$(dirname "$PWD")")
         
         # Check if terraform state exists
-        if [ ! -f "terraform/terraform.tfstate" ]; then
-          echo "❌ ERROR: Terraform state file not found."
-          echo "Required infrastructure is missing. Please run 'task build-infra' first."
-          exit 1
-        fi
-        
-        # Check if terraform state is valid JSON
-        if ! jq empty terraform/terraform.tfstate 2>/dev/null; then
-          echo "❌ ERROR: Terraform state file is not valid JSON."
-          echo "Please run 'task build-infra' to create proper infrastructure."
-          exit 1
-        fi
-        
-        # Check if required resources exist in terraform state
-        pushd terraform > /dev/null
-        
-        # Check for resource group
-        if ! jq '.resources' terraform.tfstate | grep -q "azurerm_resource_group"; then
-          echo "❌ ERROR: No Azure Resource Group found in Terraform state."
-          echo "Please run 'task build-infra' to create required infrastructure."
-          exit 1
-        fi
-        
-        # Check for Azure DevOps project
-        if ! jq '.resources' terraform.tfstate | grep -q "azuredevops_project"; then
-          echo "❌ ERROR: No Azure DevOps Project found in Terraform state."
-          echo "Please run 'task build-infra' to create required infrastructure."
-          exit 1
-        fi
+        #if [ ! -f "terraform/terraform.tfstate" ]; then
+        #  echo "❌ ERROR: Terraform state file not found."
+        #  echo "Required infrastructure is missing. Please run 'task build-infra' first."
+        #  exit 1
+        #fi
         
         # Extract resource values from terraform state
-        resource_group=$(terraform show -json terraform.tfstate | jq -r '.values.root_module.resources[] | select(.type == "azurerm_resource_group") | .values.name')
-        if [ -z "$resource_group" ]; then
-          echo "❌ ERROR: Failed to extract Resource Group name from Terraform state."
-          echo "Please run 'task build-infra' to recreate the infrastructure."
-          exit 1
-        fi
+        #pushd terraform > /dev/null
         
-        # Extract DevOps project name
-        devops_project=$(terraform show -json terraform.tfstate | jq -r '.values.root_module.resources[] | select(.type == "azuredevops_project") | .values.name' | head -n 1)
-        if [ -z "$devops_project" ]; then
-          echo "❌ ERROR: Failed to extract Azure DevOps Project name from Terraform state."
-          echo "Please run 'task build-infra' to recreate the infrastructure."
-          exit 1
-        fi
+        #resource_group=$(terraform show -json terraform.tfstate | jq -r '.values.root_module.resources[] | select(.type == "azurerm_resource_group") | .values.name')
         
-        # For DevOps org, we need to extract from the service URL
-        org_service_url=$(terraform show -json terraform.tfstate | jq -r ' 
-          .values.outputs["project_url"].value' | head -n 1)
-        if [ -z "$org_service_url" ]; then
-          echo "❌ ERROR: Failed to extract Azure DevOps Organization URL from Terraform state."
-          echo "Please run 'task build-infra' to recreate the infrastructure."
-          exit 1
-        fi
+        #org_service_url=$(terraform show -json terraform.tfstate | jq -r '.values.outputs["org_url"].value')
+        devops_org=$AZURE_DEVOPS_ORG
         
-        # Extract org name from URL
-        devops_org=$(echo "$org_service_url" | sed -n 's/.*dev\.azure\.com\/\([^\/]*\).*/\1/p')
-        if [ -z "$devops_org" ]; then
-          echo "❌ ERROR: Failed to extract Azure DevOps Organization name from URL."
-          echo "Please run 'task build-infra' to recreate the infrastructure."
-          exit 1
-        fi
-        popd > /dev/null
+        #popd > /dev/null
         
         echo "Using the following values:"
         echo "Resource Group: $resource_group"
         echo "DevOps Organization: $devops_org"
-        echo "DevOps Project: $devops_project"
         
-        # Generate workspaceInfo.yaml with fetched or default details
+        # Generate workspaceInfo.yaml for organization health testing
         cat <<EOF > workspaceInfo.yaml
         workspaceName: "$RW_WORKSPACE"
         workspaceOwnerEmail: authors@runwhen.com
@@ -152,28 +114,23 @@ tasks:
         cloudConfig:
           azure:
             subscriptionId: "$ARM_SUBSCRIPTION_ID"
-            tenantId: "$AZ_TENANT_ID"
-            clientId: "$AZ_CLIENT_ID"
-            clientSecret: "$AZ_CLIENT_SECRET"
-            resourceGroupLevelOfDetails:
-              $resource_group: detailed
+            tenantId: "$AZURE_TENANT_ID"
+            clientId: "$AZURE_CLIENT_ID"
+            clientSecret: "$AZURE_CLIENT_SECRET"
+            devops:
+              organizationUrl: "https://dev.azure.com/$devops_org"
         codeCollections:
         - repoURL: "$repo_url"
           branch: "$branch_name"
           codeBundles: ["$codebundle"]
-        custom:
-          devops_org: $devops_org
-          devops_project: $devops_project
         EOF
-        
-        echo "Generated workspaceInfo.yaml with configuration for RunWhen Local."
+        echo "Generated workspaceInfo.yaml for organization health testing."
     silent: true
 
   run-rwl-discovery:
     desc: "Run RunWhen Local Discovery on test infrastructure"
     cmds:
       - |
-        source terraform/tf.secret
         CONTAINER_NAME="RunWhenLocal"
         if docker ps -q --filter "name=$CONTAINER_NAME" | grep -q .; then
           echo "Stopping and removing existing container $CONTAINER_NAME..."
@@ -202,31 +159,52 @@ tasks:
 
         echo "Review generated config files under output/workspaces/"
     silent: true
-
-  validate-generation-rules:
-    desc: "Validate YAML files in .runwhen/generation-rules"
+ 
+  build-terraform-infra:
+    desc: "Build test infrastructure using Terraform"
     cmds:
       - |
-        for cmd in curl yq ajv; do
-          if ! command -v $cmd &> /dev/null; then
-            echo "Error: $cmd is required but not installed."
-            exit 1
-          fi
-        done
+        echo "Building Azure DevOps organization health test infrastructure..."
+        
+        # Check if terraform directory exists
+        if [ ! -d "terraform" ]; then
+          echo "❌ ERROR: terraform directory not found"
+          exit 1
+        fi
+        
+        cd terraform
+        
+        # Check if tf.secret exists
+        if [ ! -f "tf.secret" ]; then
+          echo "❌ ERROR: tf.secret file not found"
+          echo "Please create tf.secret with required environment variables"
+          exit 1
+        fi
+        
+        # Source the secrets
+        source tf.secret
+        
+        # Initialize and apply terraform
+        terraform init
+        terraform plan
+        terraform apply -auto-approve
+        
+        echo "✓ Infrastructure built successfully"
+        echo "Organization health test environment is ready"
 
-        temp_dir=$(mktemp -d)
-        curl -s -o "$temp_dir/generation-rule-schema.json" https://raw.githubusercontent.com/runwhen-contrib/runwhen-local/refs/heads/main/src/generation-rule-schema.json
-
-        for yaml_file in ../.runwhen/generation-rules/*.yaml; do
-          echo "Validating $yaml_file"
-          json_file="$temp_dir/$(basename "${yaml_file%.*}.json")"
-          yq -o=json "$yaml_file" > "$json_file"
-          ajv validate -s "$temp_dir/generation-rule-schema.json" -d "$json_file" --spec=draft2020 --strict=false \
-          && echo "$yaml_file is valid." || echo "$yaml_file is invalid."
-        done
-
-        rm -rf "$temp_dir"
-    silent: true
+  check-and-cleanup-terraform:
+    desc: "Check and cleanup Terraform resources"
+    cmds:
+      - |
+        if [ -f "terraform/terraform.tfstate" ]; then
+          echo "Terraform state found, cleaning up resources..."
+          cd terraform
+          source tf.secret
+          terraform destroy -auto-approve
+          echo "✓ Resources cleaned up"
+        else
+          echo "No Terraform state found, nothing to cleanup"
+        fi
 
   check-rwp-config:
     desc: Check if env vars are set for RunWhen Platform
@@ -262,28 +240,11 @@ tasks:
     cmds:
       - task: check-rwp-config
       - |
-        source terraform/tf.secret
         BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
         if [ ! -d "$BASE_DIR" ]; then
           echo "Directory $BASE_DIR does not exist. Upload aborted."
           exit 1
         fi
-
-        # Create Secrets
-        URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/secrets"
-        PAYLOAD="{\"secrets\": {\"az_subscriptionId\": \"${ARM_SUBSCRIPTION_ID}\", \"az_clientId\": \"${AZ_CLIENT_ID}\", \"az_tenantId\": \"${AZ_TENANT_ID}\", \"az_clientSecret\": \"${AZ_CLIENT_SECRET}\"}}"
-        echo "Uploading secrets to $URL"
-        response_code=$(curl -X POST "$URL" \
-          -H "Authorization: Bearer $RW_PAT" \
-          -H "Content-Type: application/json" \
-          -d "$PAYLOAD" \
-          -w "%{http_code}" -o /dev/null -s)
-        if [[ "$response_code" == "200" || "$response_code" == "201" ]]; then
-          echo "Successfully uploaded secrets to $URL"
-        else
-          echo "Failed to upload secrets: $SLX_NAME to $URL. Unexpected response code: $response_code"
-        fi
-
 
         for dir in "$BASE_DIR"/*; do
           if [ -d "$dir" ]; then
@@ -298,7 +259,6 @@ tasks:
 
             URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/${SLX_NAME}"
             echo "Uploading SLX: $SLX_NAME to $URL"
-            
             response=$(curl -v -X POST "$URL" \
               -H "Authorization: Bearer $RW_PAT" \
               -H "Content-Type: application/json" \
@@ -314,172 +274,26 @@ tasks:
         done
     silent: true
   delete-slxs:
-    desc: "Delete SLX objects from the appropriate URL"
-    env:
-      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
-      RW_API_URL: "{{.RW_API}}"
-      RW_PAT: "{{.RW_PAT}}"
-    cmds:
-      - task: check-rwp-config
-      - |
-        source terraform/tf.secret
-        BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
-        if [ ! -d "$BASE_DIR" ]; then
-          echo "Directory $BASE_DIR does not exist. Deletion aborted."
-          exit 1
-        fi
-
-        for dir in "$BASE_DIR"/*; do
-          if [ -d "$dir" ]; then
-            SLX_NAME=$(basename "$dir")
-            URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/${SLX_NAME}"
-            echo "Deleting SLX: $SLX_NAME from $URL"
-            response=$(curl -v -X DELETE "$URL" \
-              -H "Authorization: Bearer $RW_PAT" \
-              -H "Content-Type: application/json" -w "%{http_code}" -o /dev/null -s 2>&1)
-
-            if [[ "$response" =~ 200|204 ]]; then
-              echo "Successfully deleted SLX: $SLX_NAME from $URL"
-            else
-              echo "Failed to delete SLX: $SLX_NAME from $URL. Response:"
-              echo "$response"
-            fi
-          fi
-        done
-    silent: true
-
-  check-terraform-infra:
-    desc: "Check if Terraform has any deployed infrastructure in the terraform subdirectory"
+    desc: "Delete generated SLX resources"
     cmds:
       - |
-        # Source Envs for Auth
-        source terraform/tf.secret
-
-        # Set Additional env
-        # export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)
-        # export TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
-        # export TF_VAR_tenant_id=$AZ_TENANT_ID
-
-        # Navigate to the Terraform directory
-        if [ ! -d "terraform" ]; then
-          echo "Terraform directory not found."
-          exit 1
+        echo "Cleaning up generated SLX resources..."
+        if [ -f "workspaceInfo.yaml" ]; then
+          rm workspaceInfo.yaml
+          echo "✓ workspaceInfo.yaml removed"
         fi
-        cd terraform
-
-        # Check if Terraform state file exists
-        if [ ! -f "terraform.tfstate" ]; then
-          echo "No Terraform state file found in the terraform directory. No infrastructure is deployed."
-          exit 0
+        if [ -d ".test/output" ]; then
+          rm -rf .test/output
+          echo "✓ Test output directory removed"
         fi
-
-        # List resources in Terraform state
-        resources=$(terraform state list)
-
-        # Check if any resources are listed in the state file
-        if [ -n "$resources" ]; then
-          echo "Deployed infrastructure detected."
-          echo "$resources"
-          exit 0
-        else
-          echo "No deployed infrastructure found in Terraform state."
-          exit 0
-        fi
-    silent: true
-
-  build-terraform-infra:
-    desc: "Run terraform apply"
-    cmds:
-      - |
-        # Source Envs for Auth
-        source terraform/tf.secret
-
-        # Set Additional env
-        # export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)
-        # export TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
-        # export TF_VAR_tenant_id=$AZ_TENANT_ID
-
-        # Navigate to the Terraform directory
-        if [ -d "terraform" ]; then
-          cd terraform
-        else
-          echo "Terraform directory not found. Terraform apply aborted."
-          exit 1
-        fi
-        task format-and-init-terraform
-        echo "Starting Terraform Build of Terraform infrastructure..."
-        terraform apply -auto-approve || {
-          echo "Failed to clean up Terraform infrastructure."
-          exit 1
-        }
-        echo "Terraform infrastructure build completed."
-        
-        # Extract and display Azure DevOps project details
-        echo "Azure DevOps Project Details:"
-        project_name=$(terraform output -json | jq -r '.project_name.value')
-        org_service_url=$(terraform output -json | jq -r '.org_service_url.value')
-        echo "Organization URL: $org_service_url"
-        echo "Project Name: $project_name"
-        
-        # Extract and display agent pool details
-        echo "Agent Pool Details:"
-        agent_pool_name=$(terraform output -json | jq -r '.agent_pool_name.value')
-        echo "Agent Pool Name: $agent_pool_name"
-        
-        echo "Next Steps:"
-        echo "1. Set up a self-hosted agent in the '$agent_pool_name' pool"
-        echo "2. Configure the agent according to the README instructions"
-        echo "3. Run the test pipelines to generate data for the triage codebundle"
-    silent: true
-
-  cleanup-terraform-infra:
-    desc: "Cleanup deployed Terraform infrastructure"
-    cmds:
-      - |
-        # Source Envs for Auth
-        source terraform/tf.secret
-
-        # Set Additional env
-        # export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)
-        # export TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
-        # export TF_VAR_tenant_id=$AZ_TENANT_ID
-
-        # Navigate to the Terraform directory
-        if [ -d "terraform" ]; then
-          cd terraform
-        else
-          echo "Terraform directory not found. Cleanup aborted."
-          exit 1
-        fi
-
-        echo "Starting cleanup of Terraform infrastructure..."
-        terraform destroy -auto-approve || {
-          echo "Failed to clean up Terraform infrastructure."
-          exit 1
-        }
-        echo "Terraform infrastructure cleanup completed."
-    silent: true
-
-  check-and-cleanup-terraform:
-    desc: "Check and clean up deployed Terraform infrastructure if it exists"
-    cmds:
-      - |
-        # Capture the output of check-terraform-infra
-        infra_output=$(task check-terraform-infra | tee /dev/tty)
-
-        # Check if output contains indication of deployed infrastructure
-        if echo "$infra_output" | grep -q "Deployed infrastructure detected"; then
-          echo "Infrastructure detected; proceeding with cleanup."
-          task cleanup-terraform-infra
-        else
-          echo "No deployed infrastructure found; no cleanup required."
-        fi
-    silent: true
 
   clean-rwl-discovery:
-    desc: "Check and clean up RunWhen Local discovery output"
+    desc: "Clean RunWhen Local discovery files"
     cmds:
       - |
-        sudo rm -rf output
-        rm workspaceInfo.yaml
-    silent: true
+        echo "Cleaning RunWhen Local discovery files..."
+        rm -f *.discovery.yaml
+        rm -f *.slx.yaml
+        rm -f *.sli.yaml
+        rm -f *.taskset.yaml
+        echo "✓ Discovery files cleaned" 

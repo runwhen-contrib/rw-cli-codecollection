@@ -17,6 +17,6 @@ spec:
           levelOfDetail: basic
           outputItems:
             - type: slx
-            # #- type: sli
-            # - type: runbook
-            #   templateName: azure-devops-triage-taskset.yaml
+            # - type: sli
+            - type: runbook
+              templateName: azure-devops-triage-taskset.yaml
