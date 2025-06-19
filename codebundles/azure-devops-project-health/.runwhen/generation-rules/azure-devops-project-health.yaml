@@ -11,12 +11,12 @@ spec:
           properties: ["name"]
           mode: substring
       slxs:
-        - baseName: az-devops-triage
+        - baseName: az-devops-project-health
           qualifiers: ["organization"]
-          baseTemplateName: azure-devops-triage
+          baseTemplateName: azure-devops-project-health
           levelOfDetail: basic
           outputItems:
             - type: slx
             # - type: sli
             - type: runbook
-              templateName: azure-devops-triage-taskset.yaml
+              templateName: azure-devops-project-health-taskset.yaml
