@@ -12,6 +12,7 @@
 #  OPTIONAL ENV VAR
 #    AZURE_RESOURCE_SUBSCRIPTION_ID  Subscription to target (defaults to az login context)
 #    QUERY_TIMESPAN                  Time span for log queries (default: P1D - last 24 hours)
+#    LOG_ANALYTICS_WORKSPACE         Log Analytics workspace name (optional, will try to auto-detect)
 # ---------------------------------------------------------------------------
 
 set -euo pipefail
@@ -42,7 +43,7 @@ az account set --subscription "$subscription"
 : "${AZ_RESOURCE_GROUP:?Must set AZ_RESOURCE_GROUP}"
 
 # ---------------------------------------------------------------------------
-# 3) Get Service Bus resource ID
+# 3) Get Service Bus resource ID and find Log Analytics workspace
 # ---------------------------------------------------------------------------
 echo "Getting resource ID for Service Bus namespace: $SB_NAMESPACE_NAME"
 
@@ -53,48 +54,84 @@ resource_id=$(az servicebus namespace show \
 
 echo "Resource ID: $resource_id"
 
+# Try to find Log Analytics workspace
+workspace_id=""
+if [[ -n "${LOG_ANALYTICS_WORKSPACE:-}" ]]; then
+  echo "Using specified Log Analytics workspace: $LOG_ANALYTICS_WORKSPACE"
+  workspace_id=$(az monitor log-analytics workspace show \
+    --workspace-name "$LOG_ANALYTICS_WORKSPACE" \
+    --query "id" -o tsv 2>/dev/null || echo "")
+else
+  echo "Auto-detecting Log Analytics workspace..."
+  # Try to find workspace in the same resource group first
+  workspace_id=$(az monitor log-analytics workspace list \
+    --resource-group "$AZ_RESOURCE_GROUP" \
+    --query "[0].id" -o tsv 2>/dev/null || echo "")
+  
+  # If not found in same RG, try to find any workspace in the subscription
+  if [[ -z "$workspace_id" ]]; then
+    workspace_id=$(az monitor log-analytics workspace list \
+      --query "[0].id" -o tsv 2>/dev/null || echo "")
+  fi
+fi
+
+if [[ -z "$workspace_id" ]]; then
+  echo "⚠️  No Log Analytics workspace found. Skipping log queries."
+  # Create a minimal output indicating no workspace
+  jq -n '{operationLogs: [], requestLogs: [], errorLogs: []}' > "$LOG_OUTPUT"
+  jq -n --arg ns "$SB_NAMESPACE_NAME" \
+    '{namespace:$ns,issues:[{severity:3,title:"No Log Analytics workspace found",next_step:"Configure diagnostic settings to send logs to Log Analytics",details:"No Log Analytics workspace detected"}]}' > "$ISSUES_OUTPUT"
+  echo "✅ Analysis complete (no workspace found). Issues written to $ISSUES_OUTPUT"
+  exit 0
+fi
+
+echo "Using Log Analytics workspace: $workspace_id"
+
 # ---------------------------------------------------------------------------
 # 4) Query Log Analytics for Service Bus logs
 # ---------------------------------------------------------------------------
 echo "Querying logs for Service Bus namespace: $SB_NAMESPACE_NAME (timespan: $QUERY_TIMESPAN)"
 
-# Define Log Analytics queries
+# Define Log Analytics queries with shorter timeouts
 operation_logs_query="AzureDiagnostics 
 | where ResourceId == '$resource_id' 
 | where Category == 'OperationalLogs'
 | project TimeGenerated, OperationName, Category, Resource, ResourceGroup, status_s, error_s
-| order by TimeGenerated desc"
+| order by TimeGenerated desc
+| take 100"
 
 request_logs_query="AzureDiagnostics 
 | where ResourceId == '$resource_id' 
 | where Category == 'RootServiceTracking'
 | project TimeGenerated, OperationName, Category, Resource, ResultDescription, ResultType
-| order by TimeGenerated desc"
+| order by TimeGenerated desc
+| take 100"
 
 error_logs_query="AzureDiagnostics 
 | where ResourceId == '$resource_id' 
 | where Level == 'Error' or ResultType has 'Failed' or status_s has 'Failed' or error_s != ''
 | project TimeGenerated, OperationName, Category, Resource, ResultDescription, ResultType, error_s, status_s
-| order by TimeGenerated desc"
+| order by TimeGenerated desc
+| take 50"
 
-# Run queries
+# Run queries with timeout
 echo "Querying operational logs..."
-operation_logs=$(az monitor log-analytics query \
-  --workspace "$resource_id" \
+operation_logs=$(timeout 30 az monitor log-analytics query \
+  --workspace "$workspace_id" \
   --analytics-query "$operation_logs_query" \
   --timespan "$QUERY_TIMESPAN" \
   -o json 2>/dev/null || echo "[]")
 
 echo "Querying request logs..."
-request_logs=$(az monitor log-analytics query \
-  --workspace "$resource_id" \
+request_logs=$(timeout 30 az monitor log-analytics query \
+  --workspace "$workspace_id" \
   --analytics-query "$request_logs_query" \
   --timespan "$QUERY_TIMESPAN" \
   -o json 2>/dev/null || echo "[]")
 
 echo "Querying error logs..."
-error_logs=$(az monitor log-analytics query \
-  --workspace "$resource_id" \
+error_logs=$(timeout 30 az monitor log-analytics query \
+  --workspace "$workspace_id" \
   --analytics-query "$error_logs_query" \
   --timespan "$QUERY_TIMESPAN" \
   -o json 2>/dev/null || echo "[]")
@@ -136,8 +173,7 @@ if [[ "$error_count" -gt 0 ]]; then
 fi
 
 # Check for failed operations
-failed_ops=$(jq '.operationLogs[] | select(.status_s == "Failed")' <<< "$logs_data")
-failed_ops_count=$(jq '.operationLogs[] | select(.status_s == "Failed") | length' <<< "$logs_data")
+failed_ops_count=$(jq '.operationLogs[] | select(.status_s == "Failed") | length' <<< "$logs_data" 2>/dev/null || echo "0")
 
 if [[ "$failed_ops_count" -gt 0 ]]; then
   # Get the most recent failed operations (up to 5)

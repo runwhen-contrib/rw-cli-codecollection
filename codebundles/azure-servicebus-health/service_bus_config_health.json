@@ -1,0 +1,17 @@
+{
+  "namespace": "sb-demo-primary",
+  "issues": [
+    {
+      "severity": 2,
+      "title": "Public network access enabled on `sb-demo-primary`",
+      "next_step": "Disable or restrict public access via firewall / Private Link",
+      "details": "publicNetworkAccess=Enabled"
+    },
+    {
+      "severity": 4,
+      "title": "Zone redundancy not available on Standard SKU (`sb-demo-primary`)",
+      "next_step": "Upgrade to Premium if multi-AZ availability is required",
+      "details": "zoneRedundant property ignored on Standard tier"
+    }
+  ]
+}
