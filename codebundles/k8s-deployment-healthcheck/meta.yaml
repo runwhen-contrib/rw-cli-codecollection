@@ -339,207 +339,6 @@ commands:
     to regularly review warning events within a specified timeframe, identifying patterns
     or trends that require further investigation and remediation to ensure the overall
     health of the Kubernetes environment.'
-- command: 'kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq ''(now
-    - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind
-    == "Deployment" or .involvedObject.kind == "ReplicaSet" or .involvedObject.kind
-    == "Pod") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}"))
-    and (.lastTimestamp | fromdateiso8601) >= $time_limit) | {kind: .involvedObject.kind,
-    name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp:
-    .firstTimestamp, lastTimestamp: .lastTimestamp} ] | group_by([.kind, .name]) |
-    map({kind: .[0].kind, name: .[0].name, count: length, reasons: map(.reason) |
-    unique, messages: map(.message) | unique, firstTimestamp: map(.firstTimestamp
-    | fromdateiso8601) | sort | .[0] | todateiso8601, lastTimestamp: map(.lastTimestamp
-    | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'''
-  doc_links: '
-
-    - [Kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
-
-    - [Kubectl Get Command Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
-
-    - [Kubectl JSONPath Guide](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}'
-  explanation: This command is using kubectl to get events from a specific context
-    and namespace in JSON format, then filtering the results to show only warnings
-    related to Deployments, ReplicaSets, or Pods with a specific name within the last
-    hour. The output is grouped by kind and name, showing the count, unique reasons,
-    unique messages, first and last timestamps of the warning events.
-  multi_line_details: "\n# Get events from a Kubernetes cluster in a specific context\
-    \ and namespace in JSON format\nkubectl get events --context ${CONTEXT} -n ${NAMESPACE}\
-    \ -o json | \\\n\n# Use jq to filter and format the data\njq '\n# Define a time\
-    \ limit based on 1 hour ago\n(now - (60*60)) as $time_limit |\n\n# Filter and\
-    \ map items based on certain conditions\n[ .items[] | \n\n# Select only Warning\
-    \ events related to Deployment, ReplicaSet, or Pod\nselect(.type == \"Warning\"\
-    \ and \n       (.involvedObject.kind == \"Deployment\" or\n        .involvedObject.kind\
-    \ == \"ReplicaSet\" or\n        .involvedObject.kind == \"Pod\") and\n\n# Make\
-    \ sure the name contains the given deployment name\n        (.involvedObject.name\
-    \ | tostring | contains(\"${DEPLOYMENT_NAME}\")) and\n\n# Check if lastTimestamp\
-    \ is more recent than the time limit\n        (.lastTimestamp | fromdateiso8601)\
-    \ >= $time_limit) | \n\n# Create a new object with selected properties\n{kind:\
-    \ .involvedObject.kind, \n name: .involvedObject.name, \n reason: .reason, \n\
-    \ message: .message, \n firstTimestamp: .firstTimestamp, \n lastTimestamp: .lastTimestamp}\
-    \ ] |\n\n# Group the objects by kind and name\ngroup_by([.kind, .name]) | \n\n\
-    # Map the grouped objects into a desired format\nmap({kind: .[0].kind, \n    \
-    \ name: .[0].name, \n     count: length, \n     reasons: map(.reason) | unique,\
-    \ \n     messages: map(.message) | unique, \n     firstTimestamp: map(.firstTimestamp\
-    \ | fromdateiso8601) | sort | .[0] | todateiso8601, \n     lastTimestamp: map(.lastTimestamp\
-    \ | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'\n"
-  name: inspect_deployment_warning_events_for_deployment_name_in_namespace_namespace
-  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes applications: A
-    DevOps or Site Reliability Engineer might use this command to quickly identify
-    and address warning events related to Deployments, ReplicaSets, or Pods within
-    a specific timeframe, in order to ensure the stability and performance of the
-    application.
-
-
-    2. Investigating performance issues: In the event of performance degradation or
-    intermittent errors within a Kubernetes cluster, a DevOps or Site Reliability
-    Engineer may use this command to pinpoint warning events related to specific resources
-    and assess the impact on overall performance.
-
-
-    3. Debugging CrashLoopBackoff events: When dealing with recurring CrashLoopBackoff
-    events in Kubernetes, a DevOps or Site Reliability Engineer could utilize this
-    command to gather and analyze warning events associated with Pods, identifying
-    potential issues that are causing the continuous restarts.
-
-
-    4. Incident response and resolution: During incident response activities, such
-    as service outages or disruptions, a DevOps or Site Reliability Engineer may employ
-    this command to swiftly isolate warning events impacting critical resources and
-    take corrective actions to mitigate the impact on the system.
-
-
-    5. Proactive maintenance and optimization: As part of routine maintenance and
-    optimization efforts, a DevOps or Site Reliability Engineer might use this command
-    to regularly review warning events within a specified timeframe, identifying patterns
-    or trends that require further investigation and remediation to ensure the overall
-    health of the Kubernetes environment.'
-- command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
-    -o yaml
-  doc_links: '
-
-    '
-  explanation: This command is used to retrieve the YAML configuration for a specific
-    deployment in a Kubernetes cluster, specified by the deployment name, context,
-    and namespace. It's a way to view the detailed configuration settings for that
-    deployment.
-  multi_line_details: "\n# The following command is used to retrieve the configuration\
-    \ details of a specific deployment in a YAML format\n\n# Use kubectl to get the\
-    \ deployment with the specified name\nkubectl get deployment/${DEPLOYMENT_NAME}\
-    \ \n\n# Specify the context for the cluster where the deployment resides \n--context\
-    \ ${CONTEXT}\n\n# Specify the namespace where the deployment is located\n-n ${NAMESPACE}\
-    \ \n\n# Output the details in YAML format for easier reading and manipulation\n\
-    -o yaml\n"
-  name: fetch_deployment_workload_details_for_deployment_name_in_namespace_namespace
-  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: When
-    a deployment is continuously crashing and restarting, a DevOps or SRE might use
-    this command to retrieve the YAML configuration in order to review the settings
-    and find any misconfigurations that could be causing the issue.
-
-
-    2. Investigating performance issues: If there are performance issues with a specific
-    deployment, a DevOps or SRE might use this command to view the detailed configuration
-    and identify any potential bottlenecks or inefficiencies.
-
-
-    3. Auditing and documentation: In order to keep track of the configurations for
-    different deployments, a DevOps or SRE might use this command to retrieve the
-    YAML configuration and document it for future reference or auditing purposes.
-
-
-    4. Comparing configurations: When comparing the settings of different deployments
-    or versions of a deployment, a DevOps or SRE might use this command to retrieve
-    the YAML configuration and compare them side by side.
-
-
-    5. Making changes to the deployment: Before making any changes to the deployment
-    configuration, a DevOps or SRE might use this command to retrieve the current
-    configuration as a reference point for the updates.'
-- command: kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
-    -o yaml
-  doc_links: '
-
-    '
-  explanation: This command is used to retrieve the YAML configuration for a specific
-    deployment in a Kubernetes cluster, specified by the deployment name, context,
-    and namespace. It's a way to view the detailed configuration settings for that
-    deployment.
-  multi_line_details: "\n# The following command is used to retrieve the configuration\
-    \ details of a specific deployment in a YAML format\n\n# Use kubectl to get the\
-    \ deployment with the specified name\nkubectl get deployment/${DEPLOYMENT_NAME}\
-    \ \n\n# Specify the context for the cluster where the deployment resides \n--context\
-    \ ${CONTEXT}\n\n# Specify the namespace where the deployment is located\n-n ${NAMESPACE}\
-    \ \n\n# Output the details in YAML format for easier reading and manipulation\n\
-    -o yaml\n"
-  name: fetch_deployment_workload_details_for_deployment_name_in_namespace_namespace
-  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: When
-    a deployment is continuously crashing and restarting, a DevOps or SRE might use
-    this command to retrieve the YAML configuration in order to review the settings
-    and find any misconfigurations that could be causing the issue.
-
-
-    2. Investigating performance issues: If there are performance issues with a specific
-    deployment, a DevOps or SRE might use this command to view the detailed configuration
-    and identify any potential bottlenecks or inefficiencies.
-
-
-    3. Auditing and documentation: In order to keep track of the configurations for
-    different deployments, a DevOps or SRE might use this command to retrieve the
-    YAML configuration and document it for future reference or auditing purposes.
-
-
-    4. Comparing configurations: When comparing the settings of different deployments
-    or versions of a deployment, a DevOps or SRE might use this command to retrieve
-    the YAML configuration and compare them side by side.
-
-
-    5. Making changes to the deployment: Before making any changes to the deployment
-    configuration, a DevOps or SRE might use this command to retrieve the current
-    configuration as a reference point for the updates.'
-- command: 'kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
-    -o json | jq ''.status | {desired_replicas: .replicas, ready_replicas: (.readyReplicas
-    // 0), missing_replicas: ((.replicas // 0) - (.readyReplicas // 0)), unavailable_replicas:
-    (.unavailableReplicas // 0), available_condition: (if any(.conditions[]; .type
-    == "Available") then (.conditions[] | select(.type == "Available")) else "Condition
-    not available" end), progressing_condition: (if any(.conditions[]; .type == "Progressing")
-    then (.conditions[] | select(.type == "Progressing")) else "Condition not available"
-    end)}'''
-  doc_links: '
-
-    '
-  explanation: This command retrieves information about a specific deployment from
-    the Kubernetes cluster, including the number of desired, ready, missing, and unavailable
-    replicas, as well as the available and progressing conditions. It uses jq to filter
-    and format the information in JSON output.
-  multi_line_details: "\n# Set variables for the deployment name, context, and namespace\n\
-    DEPLOYMENT_NAME=my-deployment\nCONTEXT=my-context\nNAMESPACE=my-namespace\n\n\
-    # Retrieve details about the specified deployment in JSON format, use 'jq' to\
-    \ parse the information\nkubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT}\
-    \ -n ${NAMESPACE} -o json | \\\n    jq '.status | {\n        desired_replicas:\
-    \ .replicas,\n        ready_replicas: (.readyReplicas // 0),\n        missing_replicas:\
-    \ ((.replicas // 0) - (.readyReplicas // 0)),\n        unavailable_replicas: (.unavailableReplicas\
-    \ // 0),\n        available_condition: (if any(.conditions[]; .type == \"Available\"\
-    ) then \n                                (.conditions[] | select(.type == \"Available\"\
-    )) \n                              else \"Condition not available\" end),\n  \
-    \      progressing_condition: (if any(.conditions[]; .type == \"Progressing\"\
-    ) then \n                                  (.conditions[] | select(.type == \"\
-    Progressing\")) \n                                else \"Condition not available\"\
-    \ end)\n    }'\n"
-  name: inspect_deployment_replicas_for_deployment_name_in_namespace_namespace
-  when_is_it_useful: '1. Monitoring the health and status of a specific deployment
-    in a Kubernetes cluster to ensure that it is functioning as expected.
-
-    2. Debugging issues related to the availability and readiness of replicas within
-    a deployment, such as pods continuously restarting or not being able to start.
-
-    3. Investigating and troubleshooting CrashLoopBackoff events that may be occurring
-    within a deployment.
-
-    4. Analyzing and diagnosing problems with progressing conditions for a deployment,
-    such as delays or failures in updating and rolling out new versions of an application.
-
-    5. Gathering detailed information about the current state of a deployment in order
-    to make informed decisions and take appropriate actions, such as scaling or modifying
-    its configuration.'
 - command: 'kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
     -o json | jq ''.status | {desired_replicas: .replicas, ready_replicas: (.readyReplicas
     // 0), missing_replicas: ((.replicas // 0) - (.readyReplicas // 0)), unavailable_replicas:
@@ -797,3 +596,62 @@ commands:
     5. As part of a proactive monitoring and alerting strategy, the engineer may schedule
     regular executions of this script to continuously monitor and ensure the stability
     and proper functioning of ReplicaSets in the Kubernetes environment.'
+
+user_variables:
+  - name: CONTAINER_RESTART_AGE
+    default: "1h"
+    description: "The time window (in (h) hours or (m) minutes) to search for container restarts. Only containers that restarted within this time period will be reported."
+    type: string
+    required: false
+    examples:
+      - "30m"
+      - "2h"
+      - "1h"
+  
+  - name: CONTAINER_RESTART_THRESHOLD
+    default: "1"
+    description: "The minimum number of restarts required to trigger an issue. Containers with restart counts below this threshold will be ignored."
+    type: integer
+    required: false
+    examples:
+      - "1"
+      - "3"
+      - "5"
+      
+  - name: LOG_AGE
+    default: "10m"
+    description: "The time window to fetch logs for analysis in the SLI. Optimized for 5-minute interval monitoring."
+    type: string
+    required: false
+    examples:
+      - "5m"
+      - "10m"
+      - "15m"
+      
+  - name: EVENT_AGE
+    default: "10m"
+    description: "The time window to check for recent warning events in the SLI. Optimized for 5-minute interval monitoring."
+    type: string
+    required: false
+    examples:
+      - "5m"
+      - "10m"
+      - "15m"
+  - name: EVENT_THRESHOLD
+    default: "2"
+    description: "The maximum number of critical warning events allowed before scoring is reduced. Higher values reduce alert sensitivity."
+    type: integer
+    required: false
+    examples:
+      - "1"
+      - "2"
+      - "3"
+  - name: CHECK_SERVICE_ENDPOINTS
+    default: "true"
+    description: "Whether to check service endpoint health. Set to 'false' if deployment doesn't have associated services."
+    type: string
+    required: false
+    enum: ["true", "false"]
+    examples:
+      - "true"
+      - "false"

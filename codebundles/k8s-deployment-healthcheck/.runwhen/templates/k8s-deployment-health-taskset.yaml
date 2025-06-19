@@ -29,6 +29,12 @@ spec:
       value: {{custom.kubernetes_distribution_binary}}
     - name: DEPLOYMENT_NAME
       value: {{match_resource.resource.metadata.name}}
+    - name: CONTAINER_RESTART_AGE
+      value: "10m"
+    - name: CONTAINER_RESTART_THRESHOLD
+      value: "1"
+    - name: LOG_AGE
+      value: "10m"
   secretsProvided:
   {% if wb_version %}
     {% include "kubernetes-auth.yaml" ignore missing %}
