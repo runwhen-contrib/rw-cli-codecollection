@@ -8,8 +8,8 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/devops/10261-icon-service-Azure-DevOps.svg
-  alias: {{ match_resource.organization }} Azure DevOps Health
-  asMeasuredBy: Composite health score of Azure DevOps resources & activities.
+  alias: {{ match_resource.organization }} Azure DevOps Project Health
+  asMeasuredBy: Composite health score of Azure DevOps project resources & activities.
   configProvided:
     - name: AZURE_DEVOPS_ORG
       value: "{{ organization }}"
@@ -21,7 +21,7 @@ spec:
       value: "30m"
   owners:
     - {{ workspace.owner_email }}
-  statement: Measure Azure DevOps health by checking agent pools, pipeline status, repository policies, and service connections for organization. 
+  statement: Measure Azure DevOps health by checking agent pools, pipeline status, repository policies, and service connections for projects.
   additionalContext:
     {% include "azure-hierarchy.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"
