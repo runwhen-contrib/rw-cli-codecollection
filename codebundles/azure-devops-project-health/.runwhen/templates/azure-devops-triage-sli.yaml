@@ -23,7 +23,7 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/azure-devops-triage/sli.robot
+    pathToRobot: codebundles/azure-devops-project-health/sli.robot
   intervalStrategy: intermezzo
   intervalSeconds: 600
   configProvided:

@@ -20,7 +20,7 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/azure-devops-triage/runbook.robot
+    pathToRobot: codebundles/azure-devops-project-health/runbook.robot
   configProvided:
     - name: AZURE_DEVOPS_ORG
       value: "{{ organization }}"
