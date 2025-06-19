@@ -11,8 +11,14 @@ spec:
   alias: {{ match_resource.organization }} Azure DevOps Health
   asMeasuredBy: Composite health score of Azure DevOps resources & activities.
   configProvided:
-    - name: SLX_PLACEHOLDER
-      value: SLX_PLACEHOLDER
+    - name: AZURE_DEVOPS_ORG
+      value: "{{ organization }}"
+    - name: AZURE_DEVOPS_PROJECTS
+      value: "All"
+    - name: DURATION_THRESHOLD
+      value: "60m"
+    - name: QUEUE_THRESHOLD
+      value: "30m"
   owners:
     - {{ workspace.owner_email }}
   statement: Measure Azure DevOps health by checking agent pools, pipeline status, repository policies, and service connections for organization. 
