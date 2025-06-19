@@ -1,6 +1,8 @@
 #!/bin/bash
 
-# Exit immediately if a command exits with a non-zero status
+# Enhanced Workflow Failures Check with Log Extraction
+# This version fetches actual log content around the failure points
+
 set -e
 
 # Function to handle error messages and exit
@@ -13,6 +15,10 @@ function error_exit {
 if [ -z "$GITHUB_TOKEN" ]; then
     error_exit "GITHUB_TOKEN is required"
 fi
+
+# Configuration
+MAX_LOG_LINES_PER_STEP=${MAX_LOG_LINES_PER_STEP:-50}
+LOG_CONTEXT_LINES=${LOG_CONTEXT_LINES:-10}
 
 # Build the headers array for curl
 HEADERS=()
@@ -28,10 +34,6 @@ function perform_curl {
     response=$(curl -sS "${HEADERS[@]}" "$url") || error_exit "Failed to perform curl request to $url"
     echo "$response"
 }
-
-# Configuration for log extraction
-MAX_LOG_LINES_PER_STEP=${MAX_LOG_LINES_PER_STEP:-50}
-LOG_CONTEXT_LINES=${LOG_CONTEXT_LINES:-10}
 
 # Function to extract relevant log lines around failures
 function extract_failure_logs {
@@ -86,7 +88,7 @@ function extract_failure_logs {
 }
 
 # Function to get detailed failure information including logs
-function get_failure_details {
+function get_detailed_failure_info {
     local repo_name="$1"
     local run_id="$2"
     local workflow_name="$3"
@@ -119,55 +121,22 @@ function get_failure_details {
                         
                         detailed_info="$detailed_info\n\n--- FAILED STEP: $step_name (Step #$step_number) ---"
                         
-                        # Try to get logs for this specific job with enhanced debugging
-                        echo "Fetching logs for job $job_id (step: $step_name)..." >&2
-                        
-                        # First check if logs exist with HEAD request
-                        log_status=$(curl -sS -o /dev/null -w "%{http_code}" "${HEADERS[@]}" \
+                        # Try to get logs for this specific job
+                        echo "Fetching logs for job $job_id..." >&2
+                        if job_logs=$(curl -sS "${HEADERS[@]}" \
                             -H "Accept: application/vnd.github.v3.raw" \
-                            "https://api.github.com/repos/$repo_name/actions/jobs/$job_id/logs" 2>/dev/null || echo "000")
-                        
-                        echo "Log access status: HTTP $log_status" >&2
-                        
-                        case $log_status in
-                            200)
-                                # Logs are accessible, try to fetch them
-                                if job_logs=$(curl -sS "${HEADERS[@]}" \
-                                    -H "Accept: application/vnd.github.v3.raw" \
-                                    "https://api.github.com/repos/$repo_name/actions/jobs/$job_id/logs" 2>/dev/null); then
-                                    
-                                    log_size=${#job_logs}
-                                    echo "Retrieved $log_size bytes of log data" >&2
-                                    
-                                    if [ $log_size -gt 20 ]; then
-                                        failure_logs=$(extract_failure_logs "$job_logs" "$MAX_LOG_LINES_PER_STEP")
-                                        detailed_info="$detailed_info\n$failure_logs"
-                                    else
-                                        detailed_info="$detailed_info\nJob logs are empty or very small ($log_size bytes)."
-                                        detailed_info="$detailed_info\nThis usually indicates the job failed during setup/initialization."
-                                        if [ $log_size -gt 0 ]; then
-                                            detailed_info="$detailed_info\nRaw log content: '$job_logs'"
-                                        fi
-                                    fi
-                                else
-                                    detailed_info="$detailed_info\nFailed to download logs despite 200 response."
-                                fi
-                                ;;
-                            404)
-                                detailed_info="$detailed_info\nLogs not found (404) - logs may have expired."
-                                detailed_info="$detailed_info\nGitHub typically retains logs for 90 days."
-                                ;;
-                            403)
-                                detailed_info="$detailed_info\nLog access forbidden (403) - check token permissions."
-                                ;;
-                            410)
-                                detailed_info="$detailed_info\nLogs have been archived or expired (410)."
-                                ;;
-                            *)
-                                detailed_info="$detailed_info\nLog access failed with HTTP $log_status."
-                                detailed_info="$detailed_info\nThis may indicate network issues or API problems."
-                                ;;
-                        esac
+                            "https://api.github.com/repos/$repo_name/actions/jobs/$job_id/logs" 2>/dev/null); then
+                            
+                            # Extract relevant failure logs
+                            if [ -n "$job_logs" ]; then
+                                failure_logs=$(extract_failure_logs "$job_logs" "$MAX_LOG_LINES_PER_STEP")
+                                detailed_info="$detailed_info\n$failure_logs"
+                            else
+                                detailed_info="$detailed_info\nNo logs available for this step."
+                            fi
+                        else
+                            detailed_info="$detailed_info\nFailed to fetch logs for this job."
+                        fi
                         
                         # Rate limit protection
                         sleep 0.3
@@ -175,29 +144,15 @@ function get_failure_details {
                     done <<< $(echo "$job_steps" | jq -c '.[]')
                 else
                     # Job failed but no specific step failure - get job logs anyway
-                    detailed_info="$detailed_info\nJob failed without specific step failures."
                     echo "Job failed without specific step failure, fetching job logs..." >&2
-                    
-                    # Check log availability for job-level failure
-                    log_status=$(curl -sS -o /dev/null -w "%{http_code}" "${HEADERS[@]}" \
+                    if job_logs=$(curl -sS "${HEADERS[@]}" \
                         -H "Accept: application/vnd.github.v3.raw" \
-                        "https://api.github.com/repos/$repo_name/actions/jobs/$job_id/logs" 2>/dev/null || echo "000")
-                    
-                    if [ "$log_status" = "200" ]; then
-                        if job_logs=$(curl -sS "${HEADERS[@]}" \
-                            -H "Accept: application/vnd.github.v3.raw" \
-                            "https://api.github.com/repos/$repo_name/actions/jobs/$job_id/logs" 2>/dev/null); then
-                            
-                            log_size=${#job_logs}
-                            if [ $log_size -gt 20 ]; then
-                                failure_logs=$(extract_failure_logs "$job_logs" "$MAX_LOG_LINES_PER_STEP")
-                                detailed_info="$detailed_info\n$failure_logs"
-                            else
-                                detailed_info="$detailed_info\nJob-level logs are empty ($log_size bytes) - likely workflow setup failure."
-                            fi
+                        "https://api.github.com/repos/$repo_name/actions/jobs/$job_id/logs" 2>/dev/null); then
+                        
+                        if [ -n "$job_logs" ]; then
+                            failure_logs=$(extract_failure_logs "$job_logs" "$MAX_LOG_LINES_PER_STEP")
+                            detailed_info="$detailed_info\n$failure_logs"
                         fi
-                    else
-                        detailed_info="$detailed_info\nJob-level logs unavailable (HTTP $log_status)."
                     fi
                 fi
                 
@@ -288,7 +243,7 @@ while IFS= read -r repo_name; do
         echo "Checking repository: $repo_name" >&2
         
         # Get workflow runs from the repository
-        runs_json=$(perform_curl "https://api.github.com/repos/$repo_name/actions/runs?status=failure&created=>$date_threshold&per_page=100" || echo '{"workflow_runs":[]}')
+        runs_json=$(perform_curl "https://api.github.com/repos/$repo_name/actions/runs?status=failure&created=>$date_threshold&per_page=50" || echo '{"workflow_runs":[]}')
         
         # Check if the response contains workflow runs
         if echo "$runs_json" | jq -e '.workflow_runs' >/dev/null 2>&1; then
@@ -307,7 +262,7 @@ while IFS= read -r repo_name; do
                     head_branch: .head_branch,
                     head_sha: (.head_sha // ""),
                     actor: .actor.login,
-                    failure_details: "pending"
+                    failure_details: "pending_detailed_analysis"
                 }
             ]')
             
@@ -322,10 +277,11 @@ while IFS= read -r repo_name; do
                     echo "Getting detailed logs for workflow: $workflow_name (run $run_id)..." >&2
                     
                     # Get detailed failure information including logs
-                    failure_details=$(get_failure_details "$repo_name" "$run_id" "$workflow_name")
+                    detailed_info=$(get_detailed_failure_info "$repo_name" "$run_id" "$workflow_name")
                     
                     # Update the failure object with detailed info (safely handle newlines and special chars)
-                    enhanced_failure=$(echo "$failure" | jq --arg details "$failure_details" '.failure_details = $details')
+                    enhanced_failure=$(echo "$failure" | jq --arg details "$detailed_info" '.failure_details = $details')
+                    
                     # Safely add to array by combining arrays
                     enhanced_failures=$(echo "$enhanced_failures [$enhanced_failure]" | jq -s '.[0] + .[1]')
                     
@@ -343,8 +299,8 @@ while IFS= read -r repo_name; do
             echo "No workflow runs found or access denied for repository: $repo_name" >&2
         fi
         
-        # Rate limiting protection (increased due to log fetching)
-        sleep 0.5
+        # Rate limiting protection
+        sleep 0.3
     fi
 done <<< "$repositories"
 

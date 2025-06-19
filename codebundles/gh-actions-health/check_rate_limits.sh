@@ -34,50 +34,86 @@ echo "Checking GitHub API rate limits..." >&2
 # Get rate limit information
 rate_limit_json=$(curl -sS "${HEADERS[@]}" "https://api.github.com/rate_limit") || error_exit "Failed to fetch rate limit information"
 
-# Extract core rate limit information
-core_limit=$(echo "$rate_limit_json" | jq '.rate.limit')
-core_remaining=$(echo "$rate_limit_json" | jq '.rate.remaining')
-core_reset=$(echo "$rate_limit_json" | jq '.rate.reset')
+# Extract core rate limit information (with null handling)
+core_limit=$(echo "$rate_limit_json" | jq '.rate.limit // 0')
+core_remaining=$(echo "$rate_limit_json" | jq '.rate.remaining // 0')
+core_reset=$(echo "$rate_limit_json" | jq '.rate.reset // 0')
 core_used=$(echo "$rate_limit_json" | jq '.rate.used // 0')
 
-# Calculate usage percentage
+# Validate extracted values are numbers
+if ! echo "$core_limit" | grep -E '^[0-9]+$' >/dev/null; then core_limit=0; fi
+if ! echo "$core_remaining" | grep -E '^[0-9]+$' >/dev/null; then core_remaining=0; fi
+if ! echo "$core_reset" | grep -E '^[0-9]+$' >/dev/null; then core_reset=0; fi
+if ! echo "$core_used" | grep -E '^[0-9]+$' >/dev/null; then core_used=0; fi
+
+# Calculate usage percentage (ensure valid number format)
 if [ "$core_limit" -gt 0 ]; then
-    usage_percentage=$(echo "scale=2; ($core_used / $core_limit) * 100" | bc -l)
+    usage_percentage=$(echo "scale=2; ($core_used / $core_limit) * 100" | bc -l | sed 's/^\./0./')
+    # Ensure it's a valid number, default to 0 if calculation fails
+    if ! echo "$usage_percentage" | grep -E '^[0-9]+\.?[0-9]*$' >/dev/null; then
+        usage_percentage="0.00"
+    fi
 else
-    usage_percentage=0
+    usage_percentage="0.00"
 fi
 
-# Convert reset time to human readable
-reset_time=$(date -d @"$core_reset" -u +%Y-%m-%dT%H:%M:%SZ)
+# Convert reset time to human readable (with error handling)
+if [ "$core_reset" != "null" ] && [ "$core_reset" -gt 0 ]; then
+    reset_time=$(date -d @"$core_reset" -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "unknown")
+else
+    reset_time="unknown"
+fi
 current_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-# Calculate minutes until reset
-minutes_until_reset=$(echo "scale=0; ($core_reset - $(date +%s)) / 60" | bc -l)
+# Calculate minutes until reset (ensure non-negative)
+if [ "$core_reset" != "null" ] && [ "$core_reset" -gt 0 ]; then
+    minutes_calc=$(echo "scale=0; ($core_reset - $(date +%s)) / 60" | bc -l 2>/dev/null || echo "0")
+    # Ensure minutes is non-negative
+    if [ "$minutes_calc" -lt 0 ]; then
+        minutes_until_reset=0
+    else
+        minutes_until_reset="$minutes_calc"
+    fi
+else
+    minutes_until_reset=0
+fi
 
-# Get search rate limits if available
+# Get search rate limits if available (with null handling)
 search_limit=0
 search_remaining=0
 search_used=0
 search_reset=0
 
 if echo "$rate_limit_json" | jq -e '.search' >/dev/null; then
-    search_limit=$(echo "$rate_limit_json" | jq '.search.limit')
-    search_remaining=$(echo "$rate_limit_json" | jq '.search.remaining')
-    search_reset=$(echo "$rate_limit_json" | jq '.search.reset')
+    search_limit=$(echo "$rate_limit_json" | jq '.search.limit // 0')
+    search_remaining=$(echo "$rate_limit_json" | jq '.search.remaining // 0')
+    search_reset=$(echo "$rate_limit_json" | jq '.search.reset // 0')
     search_used=$(echo "$rate_limit_json" | jq '.search.used // 0')
+    
+    # Validate values are numbers
+    if ! echo "$search_limit" | grep -E '^[0-9]+$' >/dev/null; then search_limit=0; fi
+    if ! echo "$search_remaining" | grep -E '^[0-9]+$' >/dev/null; then search_remaining=0; fi
+    if ! echo "$search_reset" | grep -E '^[0-9]+$' >/dev/null; then search_reset=0; fi
+    if ! echo "$search_used" | grep -E '^[0-9]+$' >/dev/null; then search_used=0; fi
 fi
 
-# Get GraphQL rate limits if available
+# Get GraphQL rate limits if available (with null handling)
 graphql_limit=0
 graphql_remaining=0
 graphql_used=0
 graphql_reset=0
 
 if echo "$rate_limit_json" | jq -e '.graphql' >/dev/null; then
-    graphql_limit=$(echo "$rate_limit_json" | jq '.graphql.limit')
-    graphql_remaining=$(echo "$rate_limit_json" | jq '.graphql.remaining')
-    graphql_reset=$(echo "$rate_limit_json" | jq '.graphql.reset')
+    graphql_limit=$(echo "$rate_limit_json" | jq '.graphql.limit // 0')
+    graphql_remaining=$(echo "$rate_limit_json" | jq '.graphql.remaining // 0')
+    graphql_reset=$(echo "$rate_limit_json" | jq '.graphql.reset // 0')
     graphql_used=$(echo "$rate_limit_json" | jq '.graphql.used // 0')
+    
+    # Validate values are numbers
+    if ! echo "$graphql_limit" | grep -E '^[0-9]+$' >/dev/null; then graphql_limit=0; fi
+    if ! echo "$graphql_remaining" | grep -E '^[0-9]+$' >/dev/null; then graphql_remaining=0; fi
+    if ! echo "$graphql_reset" | grep -E '^[0-9]+$' >/dev/null; then graphql_reset=0; fi
+    if ! echo "$graphql_used" | grep -E '^[0-9]+$' >/dev/null; then graphql_used=0; fi
 fi
 
 # Determine status
@@ -118,4 +154,4 @@ cat << EOF
     "warning_threshold": 70,
     "critical_threshold": 90
 }
-EOF 
+EOF
