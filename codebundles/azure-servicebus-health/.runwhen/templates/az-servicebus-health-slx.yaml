@@ -7,7 +7,7 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/security/10245-icon-service-Key-Vaults.svg
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/Service-Bus.svg
   alias: >-
     {{ match_resource.resource_group.name }} Service Bus Health
   asMeasuredBy: Composite health score of resources & activities.
