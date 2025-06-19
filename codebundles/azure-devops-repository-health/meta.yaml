@@ -39,10 +39,11 @@ spec:
       description: "Azure DevOps project name"
       required: true
       example: "MyProject"
-    - name: AZURE_DEVOPS_REPO
-      description: "Repository name to analyze"
+    - name: AZURE_DEVOPS_REPOS
+      description: "Repository name(s) to analyze. Can be a single repository, comma-separated list, or 'All' for all repositories in the project."
       required: true
-      example: "my-application"
+      default: "All"
+      example: "my-application,my-api,my-frontend"
     - name: AZURE_RESOURCE_GROUP  
       description: "Azure resource group"
       required: true

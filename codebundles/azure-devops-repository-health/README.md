@@ -28,9 +28,16 @@ The Azure DevOps Repository Health codebundle monitors:
 
 - `AZURE_DEVOPS_ORG`: Your Azure DevOps organization name
 - `AZURE_DEVOPS_PROJECT`: Azure DevOps project name
-- `AZURE_DEVOPS_REPO`: Repository name to analyze
+- `AZURE_DEVOPS_REPOS`: Repository name(s) to analyze
 - `AZURE_RESOURCE_GROUP`: Azure resource group
 - `azure_credentials`: Secret containing Azure service principal credentials
+
+### Repository Selection
+
+- `AZURE_DEVOPS_REPOS`: Repository selection options
+  - **Single repository**: `"my-application"`
+  - **Multiple repositories**: `"repo1,repo2,repo3"`
+  - **All repositories**: `"All"` (default)
 
 ### Optional Variables
 

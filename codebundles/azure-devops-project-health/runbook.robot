@@ -351,17 +351,12 @@ Suite Initialization
     ...    description=Azure DevOps organization name.
     ...    pattern=\w*
     
-    TRY
-        ${AZURE_DEVOPS_PROJECTS}=    RW.Core.Import User Variable    AZURE_DEVOPS_PROJECTS
-        ...    type=string
-        ...    description=Comma-separated list of Azure DevOps projects to monitor (e.g., "project1,project2,project3"). Leave empty to auto-discover all projects.
-        ...    pattern=.*
-        ...    default=
-        Log    AZURE_DEVOPS_PROJECTS: ${AZURE_DEVOPS_PROJECTS}    INFO
-    EXCEPT
-        Log    AZURE_DEVOPS_PROJECTS not provided, will auto-discover projects...    INFO
-        ${AZURE_DEVOPS_PROJECTS}=    Set Variable    
-    END
+    ${AZURE_DEVOPS_PROJECTS}=    RW.Core.Import User Variable    AZURE_DEVOPS_PROJECTS
+    ...    type=string
+    ...    description=Comma-separated list of Azure DevOps projects to monitor (e.g., "project1,project2,project3") or "All" to monitor all projects.
+    ...    pattern=.*
+    ...    default=All
+    Log    AZURE_DEVOPS_PROJECTS: ${AZURE_DEVOPS_PROJECTS}    INFO
     
     ${DURATION_THRESHOLD}=    RW.Core.Import User Variable    DURATION_THRESHOLD
     ...    type=string
@@ -375,10 +370,11 @@ Suite Initialization
     ...    pattern=\w*
     
     Log    Processing project list...    INFO
-    # Handle project list - either from user input or auto-discovery
-    ${projects_empty}=    Evaluate    "${AZURE_DEVOPS_PROJECTS}" == "" or "${AZURE_DEVOPS_PROJECTS}".strip() == ""
-    IF    ${projects_empty}
-        Log    No projects specified, auto-discovering all projects in organization...    INFO
+    # Handle project list - either "All" or explicit CSV list
+    ${projects_all}=    Evaluate    "${AZURE_DEVOPS_PROJECTS}".strip().lower() == "all"
+    
+    IF    ${projects_all}
+        Log    Auto-discovering all projects in organization...    INFO
         ${PROJECT_LIST}=    Discover All Projects
     ELSE
         Log    Processing provided project list: ${AZURE_DEVOPS_PROJECTS}    INFO
@@ -396,8 +392,7 @@ Suite Initialization
         # Validate that we have at least one project after cleanup
         ${project_count}=    Get Length    ${PROJECT_LIST}
         IF    ${project_count} == 0
-            Log    Project list is empty after cleanup, auto-discovering all projects...    WARN
-            ${PROJECT_LIST}=    Discover All Projects
+            Fail    No valid projects found in the provided list. Please provide either "All" or a comma-separated list of project names.
         END
     END
     
