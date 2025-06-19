@@ -274,18 +274,38 @@ tasks:
         done
     silent: true
   delete-slxs:
-    desc: "Delete generated SLX resources"
+    desc: "Delete SLX objects from the appropriate URL"
+    env:
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+      RW_API_URL: "{{.RW_API}}"
+      RW_PAT: "{{.RW_PAT}}"
     cmds:
+      - task: check-rwp-config
       - |
-        echo "Cleaning up generated SLX resources..."
-        if [ -f "workspaceInfo.yaml" ]; then
-          rm workspaceInfo.yaml
-          echo "✓ workspaceInfo.yaml removed"
+        BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
+        if [ ! -d "$BASE_DIR" ]; then
+          echo "Directory $BASE_DIR does not exist. Deletion aborted."
+          exit 1
         fi
-        if [ -d ".test/output" ]; then
-          rm -rf .test/output
-          echo "✓ Test output directory removed"
-        fi
+
+        for dir in "$BASE_DIR"/*; do
+          if [ -d "$dir" ]; then
+            SLX_NAME=$(basename "$dir")
+            URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/${SLX_NAME}"
+            echo "Deleting SLX: $SLX_NAME from $URL"
+            response=$(curl -v -X DELETE "$URL" \
+              -H "Authorization: Bearer $RW_PAT" \
+              -H "Content-Type: application/json" -w "%{http_code}" -o /dev/null -s 2>&1)
+
+            if [[ "$response" =~ 200|204 ]]; then
+              echo "Successfully deleted SLX: $SLX_NAME from $URL"
+            else
+              echo "Failed to delete SLX: $SLX_NAME from $URL. Response:"
+              echo "$response"
+            fi
+          fi
+        done
+    silent: true
 
   clean-rwl-discovery:
     desc: "Clean RunWhen Local discovery files"
