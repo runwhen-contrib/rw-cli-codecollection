@@ -5,7 +5,7 @@ Metadata            Display Name    Azure DevOps Project Health
 Metadata            Supports    Azure    DevOps    Projects    Health
 Force Tags          Azure    DevOps    Projects    Health
 
-Library    String
+Library             String
 Library             BuiltIn
 Library             Collections
 Library             RW.Core
