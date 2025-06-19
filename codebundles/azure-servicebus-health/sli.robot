@@ -35,11 +35,66 @@ Check for Resource Health Issues Service Bus `${SB_NAMESPACE_NAME}` In Resource 
     END
     Set Global Variable    ${sb_resource_score}
 
+Check Basic Connectivity for Service Bus `${SB_NAMESPACE_NAME}`
+    [Documentation]    Quick connectivity test to detect network issues
+    [Tags]    azure    servicebus    connectivity    access:read-only
+    ${connectivity}=    RW.CLI.Run Bash File
+    ...    bash_file=service_bus_connectivity_test.sh
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${connectivity_data}=    RW.CLI.Run Cli
+    ...    cmd=cat service_bus_connectivity.json
+    ...    env=${env}
+    ...    timeout_seconds=10
+    ...    include_in_history=false
+    ${connectivity_json}=    Evaluate    json.loads(r'''${connectivity_data.stdout}''')    json
+    
+    # Score based on connectivity tests
+    ${connectivity_score}=    Set Variable    1
+    IF    "${connectivity_json['tests']['amqp_port_connectivity']}" == "failure"
+        ${connectivity_score}=    Evaluate    ${connectivity_score} - 0.5
+    END
+    IF    "${connectivity_json['tests']['https_port_connectivity']}" == "failure"
+        ${connectivity_score}=    Evaluate    ${connectivity_score} - 0.5
+    END
+    IF    "${connectivity_json['tests']['dns_resolution']}" == "false"
+        ${connectivity_score}=    Evaluate    ${connectivity_score} - 0.5
+    END
+    Set Global Variable    ${connectivity_score}
 
-Generate Service Bus Health Score
-    ${sb_health_score}=      Evaluate  (${sb_resource_score} + ${sb_resource_score} ) / 2
-    ${health_score}=      Convert to Number    ${sb_health_score}  2
-    RW.Core.Push Metric    ${sb_health_score}
+Check Critical Metrics for Service Bus `${SB_NAMESPACE_NAME}`
+    [Documentation]    Quick check of critical metrics that indicate immediate issues
+    [Tags]    azure    servicebus    metrics    access:read-only
+    ${metrics}=    RW.CLI.Run Bash File
+    ...    bash_file=service_bus_metrics.sh
+    ...    env=${env}
+    ...    timeout_seconds=45
+    ...    include_in_history=false
+    ${metrics_data}=    RW.CLI.Run Cli
+    ...    cmd=cat service_bus_metrics_issues.json
+    ...    env=${env}
+    ...    timeout_seconds=10
+    ...    include_in_history=false
+    ${metrics_json}=    Evaluate    json.loads(r'''${metrics_data.stdout}''')    json
+    
+    # Score based on critical issues
+    ${metrics_score}=    Set Variable    1
+    IF    len(@{metrics_json["issues"]}) > 0
+        FOR    ${issue}    IN    @{metrics_json["issues"]}
+            IF    ${issue["severity"]} == 1
+                ${metrics_score}=    Evaluate    ${metrics_score} - 0.5
+            ELSE IF    ${issue["severity"]} == 2
+                ${metrics_score}=    Evaluate    ${metrics_score} - 0.25
+            END
+        END
+    END
+    Set Global Variable    ${metrics_score}
+
+Generate Enhanced Service Bus Health Score
+    ${enhanced_health_score}=    Evaluate    (${sb_resource_score} + ${connectivity_score} + ${metrics_score}) / 3
+    ${health_score}=    Convert to Number    ${enhanced_health_score}    2
+    RW.Core.Push Metric    ${health_score}
 
 *** Keywords ***
 Suite Initialization
