@@ -30,7 +30,7 @@ spec:
     - name: AZURE_DEVOPS_ORG
       value: "{{ organization }}"
     - name: AZURE_DEVOPS_PROJECTS
-      value: {{custom.azure_devops.projects | default("")}}
+      value: "{{custom.azure_devops.projects | default('')}}""
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}
