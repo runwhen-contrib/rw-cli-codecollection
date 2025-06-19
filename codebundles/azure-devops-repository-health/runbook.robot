@@ -412,7 +412,8 @@ Suite Initialization
     Set Suite Variable    ${STALE_BRANCH_DAYS}    ${STALE_BRANCH_DAYS}
     Set Suite Variable    ${MIN_CODE_COVERAGE}    ${MIN_CODE_COVERAGE}
     Set Suite Variable    ${ANALYSIS_DAYS}    ${ANALYSIS_DAYS}
-    
+
+    Set Suite Variable    ${AZURE_DEVOPS_CONFIG_DIR}    %{CODEBUNDLE_TEMP_DIR}/.azure-devops
     # Create the env dictionary for bash scripts
     ${env_dict}=    Create Dictionary
     ...    AZURE_DEVOPS_ORG=${AZURE_DEVOPS_ORG}
@@ -422,6 +423,7 @@ Suite Initialization
     ...    MIN_CODE_COVERAGE=${MIN_CODE_COVERAGE}
     ...    ANALYSIS_DAYS=${ANALYSIS_DAYS}
     ...    AUTH_TYPE=${AUTH_TYPE}
+    ...    AZURE_DEVOPS_CONFIG_DIR=${AZURE_DEVOPS_CONFIG_DIR}
     Set Suite Variable    ${env}    ${env_dict}
     
     Log    Suite Initialization completed successfully!    INFO
@@ -435,6 +437,7 @@ Discover All Repositories
     ...    AZURE_DEVOPS_ORG=${AZURE_DEVOPS_ORG}
     ...    AZURE_DEVOPS_PROJECT=${AZURE_DEVOPS_PROJECT}
     ...    AUTH_TYPE=${AUTH_TYPE}
+    ...    AZURE_DEVOPS_CONFIG_DIR=${AZURE_DEVOPS_CONFIG_DIR}
     
     ${discover_repos}=    RW.CLI.Run Bash File
     ...    bash_file=discover-repositories.sh

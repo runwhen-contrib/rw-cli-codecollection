@@ -322,12 +322,14 @@ Suite Initialization
     Set Suite Variable    ${AZURE_DEVOPS_ORG}    ${AZURE_DEVOPS_ORG}
     Set Suite Variable    ${AGENT_UTILIZATION_THRESHOLD}    ${AGENT_UTILIZATION_THRESHOLD}
     Set Suite Variable    ${LICENSE_UTILIZATION_THRESHOLD}    ${LICENSE_UTILIZATION_THRESHOLD}
-    # Get Azure service principal credentials from environment if available
-    ${AZURE_CLIENT_ID}=    Get Environment Variable    AZURE_CLIENT_ID    ${EMPTY}
-    ${AZURE_CLIENT_SECRET}=    Get Environment Variable    AZURE_CLIENT_SECRET    ${EMPTY}
-    ${AZURE_TENANT_ID}=    Get Environment Variable    AZURE_TENANT_ID    ${EMPTY}
-    ${AZURE_SUBSCRIPTION_ID}=    Get Environment Variable    AZURE_SUBSCRIPTION_ID    ${EMPTY}
-    
-    Set Suite Variable
-    ...    ${env}
-    ...    {"AZURE_DEVOPS_ORG":"${AZURE_DEVOPS_ORG}", "AGENT_UTILIZATION_THRESHOLD":"${AGENT_UTILIZATION_THRESHOLD}", "LICENSE_UTILIZATION_THRESHOLD":"${LICENSE_UTILIZATION_THRESHOLD}", "AUTH_TYPE":"${AUTH_TYPE}", "AZURE_DEVOPS_PAT":"${AZURE_DEVOPS_PAT}", "AZURE_CLIENT_ID":"${AZURE_CLIENT_ID}", "AZURE_CLIENT_SECRET":"${AZURE_CLIENT_SECRET}", "AZURE_TENANT_ID":"${AZURE_TENANT_ID}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}"} 
+
+    Set Suite Variable    ${AZURE_DEVOPS_CONFIG_DIR}    %{CODEBUNDLE_TEMP_DIR}/.azure-devops
+
+    # Create the env dictionary for bash scripts
+    ${env_dict}=    Create Dictionary
+    ...    AZURE_DEVOPS_ORG=${AZURE_DEVOPS_ORG}
+    ...    AGENT_UTILIZATION_THRESHOLD=${AGENT_UTILIZATION_THRESHOLD}
+    ...    LICENSE_UTILIZATION_THRESHOLD=${LICENSE_UTILIZATION_THRESHOLD}
+    ...    AUTH_TYPE=${AUTH_TYPE}
+    ...    AZURE_DEVOPS_CONFIG_DIR=${AZURE_DEVOPS_CONFIG_DIR}
+    Set Suite Variable    ${env}    ${env_dict} 

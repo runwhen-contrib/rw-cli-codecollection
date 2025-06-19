@@ -409,13 +409,16 @@ Suite Initialization
     Set Suite Variable    ${PROJECT_LIST}    ${PROJECT_LIST}
     Set Suite Variable    ${DURATION_THRESHOLD}    ${DURATION_THRESHOLD}
     Set Suite Variable    ${QUEUE_THRESHOLD}    ${QUEUE_THRESHOLD}
-    
+
+    Set Suite Variable    ${AZURE_DEVOPS_CONFIG_DIR}    %{CODEBUNDLE_TEMP_DIR}/.azure-devops
+
     # Create the env dictionary for bash scripts
     ${env_dict}=    Create Dictionary
     ...    AZURE_DEVOPS_ORG=${AZURE_DEVOPS_ORG}
     ...    DURATION_THRESHOLD=${DURATION_THRESHOLD}
     ...    QUEUE_THRESHOLD=${QUEUE_THRESHOLD}
     ...    AUTH_TYPE=${AUTH_TYPE}
+    ...    AZURE_CONFIG_DIR=${AZURE_DEVOPS_CONFIG_DIR}
     Set Suite Variable    ${env}    ${env_dict}
     
     Log    Suite Initialization completed successfully!    INFO
