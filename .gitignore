@@ -58,3 +58,4 @@ build
 **bashfile-**
 **db.sqlite3**
 **.cache**
+**.IdentityService**

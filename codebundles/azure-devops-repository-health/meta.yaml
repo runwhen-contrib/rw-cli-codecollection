@@ -3,7 +3,7 @@ kind: CodeBundle
 metadata:
   name: azure-devops-repository-health
   title: "Azure DevOps Repository Health"
-  description: "Repository-level health monitoring for Azure DevOps focusing on security, code quality, and configuration issues"
+  description: "Repository-level health monitoring for Azure DevOps focusing on security, code quality, and configuration issues with specific tasks for troubleshooting failing applications"
   author: "RunWhen"
   documentationURL: "https://docs.runwhen.com/public/v/codebundles/azure-devops-repository-health"
   tags:
@@ -62,6 +62,11 @@ spec:
       required: false
       default: "80"
       example: "85"
+    - name: ANALYSIS_DAYS
+      description: "Number of days to look back for recent changes and pipeline failures analysis"
+      required: false
+      default: "7"
+      example: "14"
   secrets:
     - name: azure_credentials
       description: "Azure service principal credentials for authentication"
@@ -132,4 +137,12 @@ spec:
         - "Review and audit repository permissions"
         - "Scan for exposed secrets or credentials"
         - "Implement security scanning in CI/CD"
-        - "Strengthen access controls and policies" 
+        - "Strengthen access controls and policies"
+    - name: "Troubleshoot Application Failures"
+      description: "Analyze recent changes and pipeline failures to identify root cause of application issues"
+      steps:
+        - "Review recent commits for breaking changes or configuration modifications"
+        - "Analyze pipeline failure patterns and deployment issues"
+        - "Check for emergency commits or rollbacks that might indicate problems"
+        - "Compare current state with last successful deployment"
+        - "Identify high-frequency commits that might indicate panic fixes" 

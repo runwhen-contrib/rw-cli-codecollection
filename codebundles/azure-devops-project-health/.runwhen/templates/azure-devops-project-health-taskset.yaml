@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   location: {{default_location}}
-  description: Check Azure DevOps health by examining pipeline status, agent pools, repository policies, and service connections in project {{ custom.devops_project }} of organization {{ custom.devops_org }}
+  description: Check Azure DevOps health by examining pipeline status, agent pools, repository policies, and service connections in projects in organization {{ organization }}
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -24,6 +24,8 @@ spec:
   configProvided:
     - name: AZURE_DEVOPS_ORG
       value: "{{ organization }}"
+    - name: AZURE_DEVOPS_PROJECT
+      value: "All"
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}

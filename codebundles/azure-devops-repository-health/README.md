@@ -1,6 +1,6 @@
 # Azure DevOps Repository Health
 
-This codebundle provides comprehensive repository-level health monitoring for Azure DevOps, focusing on identifying root causes of repository issues and misconfigurations that impact development workflows.
+This codebundle provides comprehensive repository-level health monitoring for Azure DevOps, focusing on identifying root causes of repository issues and misconfigurations that impact development workflows. It includes specific tasks for troubleshooting failing applications by analyzing recent code changes and pipeline failures.
 
 ## Overview
 
@@ -11,6 +11,7 @@ The Azure DevOps Repository Health codebundle monitors:
 - **Collaboration Health**: Pull request patterns, code review practices, and team collaboration
 - **Performance Issues**: Repository size, storage optimization, and performance bottlenecks
 - **Critical Issues**: Deep investigation when security or configuration problems are detected
+- **Application Troubleshooting**: Recent code changes and pipeline failures that may cause application issues
 
 ## Use Cases
 
@@ -19,6 +20,7 @@ The Azure DevOps Repository Health codebundle monitors:
 - **Workflow Optimization**: Analyze collaboration patterns and identify bottlenecks
 - **Performance Troubleshooting**: Find repository performance issues and optimization opportunities
 - **Incident Response**: Investigate security incidents and configuration problems
+- **Application Failure Troubleshooting**: Analyze recent changes and pipeline failures when applications crash or fail
 
 ## Configuration
 
@@ -35,6 +37,7 @@ The Azure DevOps Repository Health codebundle monitors:
 - `REPO_SIZE_THRESHOLD_MB`: Repository size threshold in MB (default: 500)
 - `STALE_BRANCH_DAYS`: Days after which branches are considered stale (default: 90)
 - `MIN_CODE_COVERAGE`: Minimum code coverage percentage threshold (default: 80)
+- `ANALYSIS_DAYS`: Number of days to look back for recent changes and pipeline failures analysis (default: 7)
 
 ### Azure Credentials Secret
 
@@ -58,6 +61,12 @@ The service principal needs the following permissions:
 - **Security**: Read access to repository permissions and security settings
 
 ## Tasks Overview
+
+### Investigate Recent Code Changes (Application Troubleshooting)
+Analyzes recent commits, releases, and code changes in the configurable analysis period to identify changes that might be causing application failures. Flags emergency commits, configuration changes, large commits, and high-frequency commit patterns.
+
+### Analyze Pipeline Failures (Application Troubleshooting) 
+Investigates recent CI/CD pipeline failures for the repository to identify deployment issues, test failures, and build problems that may correlate with application issues. Categorizes failures and provides actionable troubleshooting guidance.
 
 ### Calculate Repository Health Score
 Calculates an overall repository health score (0-100) based on security, quality, configuration, and collaboration metrics.
