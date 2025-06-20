@@ -12,8 +12,6 @@ This codebundle provides tools to monitor and check disk utilization on Azure Vi
 ## Tasks
 
 - `Check Disk Utilization for VM`: Checks disk utilization and reports issues if usage exceeds threshold
-- `Get VM Details`: Fetches detailed information about the VM
-- `List Attached Disks for VM`: Lists all disks attached to the VM
 
 ## Configuration
 
@@ -43,13 +41,3 @@ This codebundle can be used to:
 1. Monitor disk utilization across all VMs in a resource group
 2. Focus on a specific VM by providing its name
 3. Adjust the threshold for disk usage warnings
-
-## Example
-
-```
-# Check all VMs in a resource group with default threshold (80%)
-./runbook.robot AZ_RESOURCE_GROUP=my-resource-group
-
-# Check a specific VM with a custom threshold (90%)
-./runbook.robot AZ_RESOURCE_GROUP=my-resource-group VM_NAME=my-vm DISK_THRESHOLD=90
-```

@@ -37,6 +37,6 @@ echo "$vms" | jq -c '.[]' | while read -r vm; do
         --resource-group "$resource_group" \
         --name "$vm_name" \
         --command-id RunShellScript \
-        --scripts "df -h | grep -v tmpfs | grep -v cdrom | grep -v loop" \
+        --scripts "cat /proc/uptime | awk '{print \$1/86400}'" \
         > "${OUTPUT_DIR}/${vm_name}_raw_output.json"
 done

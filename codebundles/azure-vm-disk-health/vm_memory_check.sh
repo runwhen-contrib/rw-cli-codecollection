@@ -37,6 +37,6 @@ echo "$vms" | jq -c '.[]' | while read -r vm; do
         --resource-group "$resource_group" \
         --name "$vm_name" \
         --command-id RunShellScript \
-        --scripts "df -h | grep -v tmpfs | grep -v cdrom | grep -v loop" \
+        --scripts "top -bn1 | grep 'Cpu(s)' | awk '{print \$2}' | sed 's/%us,//'" \
         > "${OUTPUT_DIR}/${vm_name}_raw_output.json"
 done

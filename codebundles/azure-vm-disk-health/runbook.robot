@@ -1,8 +1,8 @@
 *** Settings ***
-Documentation       Runs diagnostic checks against Azure VMs to monitor disk utilization.
+Documentation       Runs diagnostic checks against Azure VMs to monitor disk utilization and system health.
 Metadata            Author    augment-code
-Metadata            Display Name    Azure VM Disk Health Check
-Metadata            Supports    Azure    Virtual Machine    Disk    Health
+Metadata            Display Name    Azure VM Health Check
+Metadata            Supports    Azure    Virtual Machine    Disk    Health    Uptime
 
 Library             BuiltIn
 Library             RW.Core
@@ -17,48 +17,52 @@ Suite Setup         Suite Initialization
 Check Disk Utilization for VM `${VM_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks disk utilization of Azure VM and reports issues if usage exceeds threshold.
     [Tags]    VM    Azure    Disk    Health
-    ${process}=    RW.CLI.Run Bash File
+    ${disk_usage}=    RW.CLI.Run Bash File
     ...    bash_file=vm_disk_utilization.sh
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
-    RW.Core.Add Pre To Report    ${process.stdout}
+    RW.Core.Add Pre To Report    ${disk_usage.stdout}
 
-    ${issues}=    RW.CLI.Run Cli    cmd=cat ${OUTPUT DIR}/issues.json 
-    Log    ${issues.stdout}
-    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    IF    len(@{issue_list["issues"]}) > 0
-        FOR    ${item}    IN    @{issue_list["issues"]}
-            RW.Core.Add Issue    
-            ...    title=${item["title"]}
-            ...    severity=${item["severity"]}
-            ...    next_steps=${item["next_step"]}
-            ...    expected=VM `${VM_NAME}` in resource group `${AZ_RESOURCE_GROUP}` should have disk usage below threshold
-            ...    actual=VM `${VM_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has disks with usage above threshold
-            ...    reproduce_hint=Run vm_disk_utilization.sh
-            ...    details=${item["details"]}        
+    # Parse the output using our invoke cmd parser
+    ${parsed_out}=      RW.CLI.Run Invoke Cmd Parser
+    ...     input_file=${disk_usage.stdout}
+    ...     timeout_seconds=60
+    
+    # check if parsed_out.stderr is empty, if its empty then run next steps script and then generate issue else generate issue with stderr value
+    IF    ${parsed_out.stderr} != ""
+        RW.Core.Add Issue    
+                ...    title=Error detected during disk check
+                ...    severity=1
+                ...    next_steps=Investigate the error: ${parsed_out.stderr}
+                ...    expected=No errors should occur during disk health check
+                ...    actual={parsed_out.stderr}
+                ...    reproduce_hint=Run vm_disk_utilization.sh
+                ...    details=${parsed_out}
+    ELSE
+        ${issues_list}=    RW.CLI.Run Bash File
+        ...    bash_file=next_steps_disk_utilization.sh
+        ...    env=${env}
+        ...    timeout_seconds=180
+        ...    include_in_history=false
+
+        # Process issues if any were found
+        ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
+        IF    len(@{issues}) > 0
+            FOR    ${issue}    IN    @{issues}
+                RW.Core.Add Issue
+                ...    severity=${issue['severity']}
+                ...    expected=${issue['expected']}
+                ...    actual=${issue['actual']}
+                ...    title=${issue['title']}
+                ...    reproduce_hint=${results.cmd}
+                ...    next_steps=${issue['next_steps']}
+                ...    details=${issue['details']}
+            END
         END
     END
+    
 
-Get VM Details for `${VM_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Fetches detailed information about the VM.
-    [Tags]    VM    Azure    Info
-    ${vm_details}=    RW.CLI.Run Cli
-    ...    cmd=az vm show --name ${VM_NAME} --resource-group ${AZ_RESOURCE_GROUP} --query "{name:name, location:location, vmSize:hardwareProfile.vmSize, osType:storageProfile.osDisk.osType, provisioningState:provisioningState}" -o json
-    ...    env=${env}
-    ...    timeout_seconds=60
-    ...    include_in_history=false
-    RW.Core.Add Pre To Report    VM Details:\n${vm_details.stdout}
-
-List Attached Disks for VM `${VM_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Lists all disks attached to the VM.
-    [Tags]    VM    Azure    Disk    Info
-    ${disks}=    RW.CLI.Run Cli
-    ...    cmd=az vm show --name ${VM_NAME} --resource-group ${AZ_RESOURCE_GROUP} --query "storageProfile.dataDisks[].{name:name, diskSizeGB:diskSizeGB, lun:lun, caching:caching}" -o json
-    ...    env=${env}
-    ...    timeout_seconds=60
-    ...    include_in_history=false
-    RW.Core.Add Pre To Report    Attached Data Disks:\n${disks.stdout}
 
 
 *** Keywords ***
@@ -76,6 +80,16 @@ Suite Initialization
     ...    type=string
     ...    description=The threshold percentage for disk usage warnings.
     ...    pattern=\d*
+    ...    default=60
+    ${UPTIME_THRESHOLD}=    RW.Core.Import User Variable    UPTIME_THRESHOLD
+    ...    type=string
+    ...    description=The threshold in days for system uptime warnings.
+    ...    pattern=\d*
+    ...    default=2
+    ${MEMORY_THRESHOLD}=    RW.Core.Import User Variable    MEMORY_THRESHOLD
+    ...    type=string
+    ...    description=The threshold percentage for memory usage warnings.
+    ...    pattern=\d*
     ...    default=80
     ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_ID
     ...    type=string
@@ -89,6 +103,8 @@ Suite Initialization
     Set Suite Variable    ${VM_NAME}    ${VM_NAME}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable    ${DISK_THRESHOLD}    ${DISK_THRESHOLD}
+    Set Suite Variable    ${UPTIME_THRESHOLD}    ${UPTIME_THRESHOLD}
+    Set Suite Variable    ${MEMORY_THRESHOLD}    ${MEMORY_THRESHOLD}
     Set Suite Variable
     ...    ${env}
-    ...    {"VM_NAME":"${VM_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "DISK_THRESHOLD": "${DISK_THRESHOLD}", "AZURE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}
+    ...    {"VM_NAME":"${VM_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "DISK_THRESHOLD": "${DISK_THRESHOLD}", "UPTIME_THRESHOLD": "${UPTIME_THRESHOLD}", "MEMORY_THRESHOLD": "${MEMORY_THRESHOLD}", "AZURE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}

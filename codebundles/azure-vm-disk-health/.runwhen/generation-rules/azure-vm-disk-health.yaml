@@ -3,7 +3,7 @@ kind: GenerationRules
 spec:
   generationRules:
   - resourceTypes:
-    - microsoft.compute/virtualmachines
+    - resource_group
     matchRules:
     - type: pattern
       pattern: "."
@@ -11,8 +11,8 @@ spec:
       mode: substring
     slxs:
     - baseName: vm-disk-health
-      levelOfDetail: detailed
-      qualifiers: ["resource", "resourcegroup", "subscription"]
+      levelOfDetail: basic
+      qualifiers: ["resource", "resource_group", "subscription_id"]
       baseTemplateName: azure-vm-disk-health
       outputItems:
         - type: slx
