@@ -90,7 +90,7 @@ if [ "$HTTPS_ONLY" != "true" ]; then
     issues_json=$(echo "$issues_json" | jq \
         --arg title "HTTPS Enforcement Disabled" \
         --arg nextStep "Enable the HTTPS-only setting for \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`." \
-        --arg severity "2" \
+        --arg severity "4" \
         --arg details "HTTPS is not enforced on the Function App." \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
     )
@@ -112,7 +112,7 @@ if [ -n "$APP_SERVICE_PLAN" ] && [[ "$APP_SERVICE_PLAN" != "null" ]]; then
             issues_json=$(echo "$issues_json" | jq \
                 --arg title "Free App Service Plan in Use" \
                 --arg nextStep "Consider upgrading to a paid App Service Plan for \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`." \
-                --arg severity "3" \
+                --arg severity "4" \
                 --arg details "App Service Plan SKU: $SKUID" \
                 '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
             )
