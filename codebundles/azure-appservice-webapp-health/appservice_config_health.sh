@@ -77,7 +77,7 @@ if [ "$HTTPS_ONLY" != "true" ]; then
     issues_json=$(echo "$issues_json" | jq \
         --arg title "HTTPS Enforcement Disabled" \
         --arg nextStep "Enable HTTPS-only setting for \`$APP_SERVICE_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`" \
-        --arg severity "2" \
+        --arg severity "4" \
         --arg details "HTTPS is not enforced on the App Service." \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
     )
@@ -94,7 +94,7 @@ if [ "$SKUID" == "F1" ]; then
     issues_json=$(echo "$issues_json" | jq \
         --arg title "Free App Service Plan in Use" \
         --arg nextStep "Consider upgrading to a paid App Service Plan for \`$APP_SERVICE_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`" \
-        --arg severity "3" \
+        --arg severity "4" \
         --arg details "App Service Plan SKU: $SKUID" \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
     )

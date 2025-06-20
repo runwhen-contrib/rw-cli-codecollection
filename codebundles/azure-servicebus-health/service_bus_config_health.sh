@@ -63,17 +63,17 @@ add_issue() {
 ns_bt="\`$SB_NAMESPACE_NAME\`"   # back-ticked
 
 # --- Rules that apply to ALL SKUs --------------------------------------------------
-[[ "$tls" != 1.2 && "$tls" != 1.3 ]] && add_issue 3 \
+[[ "$tls" != 1.2 && "$tls" != 1.3 ]] && add_issue 4 \
   "TLS minimum version for $ns_bt is $tls (≥1.2 recommended)" \
   "az servicebus namespace update -g $AZ_RESOURCE_GROUP -n $SB_NAMESPACE_NAME --minimum-tls-version 1.2" \
   "minimumTlsVersion=$tls"
 
-[[ "$pna" == "Enabled" ]] && add_issue 2 \
+[[ "$pna" == "Enabled" ]] && add_issue 4 \
   "Public network access enabled on $ns_bt" \
   "Disable or restrict public access via firewall / Private Link" \
   "publicNetworkAccess=Enabled"
 
-[[ "$identity" == "None" ]] && add_issue 2 \
+[[ "$identity" == "None" ]] && add_issue 4 \
   "No managed identity assigned to $ns_bt" \
   "az servicebus namespace update -g $AZ_RESOURCE_GROUP -n $SB_NAMESPACE_NAME --assign-identity" \
   "identity.type=None"
@@ -81,7 +81,7 @@ ns_bt="\`$SB_NAMESPACE_NAME\`"   # back-ticked
 # --- Premium-only features ----------------------------------------------------------
 if [[ "$sku" == "Premium" ]]; then
   # Zone redundancy check (real warning)
-  [[ "$zone" != "true" ]] && add_issue 1 \
+  [[ "$zone" != "true" ]] && add_issue 4 \
     "Zone redundancy disabled on Premium $ns_bt" \
     "az servicebus namespace update -g $AZ_RESOURCE_GROUP -n $SB_NAMESPACE_NAME --zone-redundant true" \
     "zoneRedundant=$zone"

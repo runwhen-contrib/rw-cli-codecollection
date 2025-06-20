@@ -83,7 +83,7 @@ if [ "$AUTOSCALING_DISABLED_COUNT" -gt 0 ]; then
     issues_json=$(echo "$issues_json" | jq \
         --arg title "Autoscaling Disabled in Node Pools" \
         --arg nextStep "Enable autoscaling on all node pools for better resource management." \
-        --arg severity "3" \
+        --arg severity "4" \
         --arg details "$AUTOSCALING_DISABLED_COUNT node pools have autoscaling disabled." \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
     )
