@@ -655,3 +655,22 @@ user_variables:
     examples:
       - "true"
       - "false"
+  - name: MAX_LOG_LINES
+    default: "100"
+    description: "Maximum number of log lines to fetch per container to prevent API overload. Optimized for frequent SLI checks."
+    type: string
+    required: false
+    examples:
+      - "50"
+      - "100"
+      - "200"
+      
+  - name: MAX_LOG_BYTES
+    default: "256000"
+    description: "Maximum log size in bytes to fetch per container to prevent API overload. Optimized for frequent SLI checks."
+    type: string
+    required: false
+    examples:
+      - "128000"
+      - "256000"
+      - "512000"
