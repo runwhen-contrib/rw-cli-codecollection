@@ -53,6 +53,18 @@ Suite Initialization
     ...    pattern=((\d+?)m|(\d+?)h)?
     ...    example=10m
     ...    default=10m
+    ${MAX_LOG_LINES}=    RW.Core.Import User Variable    MAX_LOG_LINES
+    ...    type=string
+    ...    description=Maximum number of log lines to fetch per container to prevent API overload.
+    ...    pattern=^\d+$
+    ...    example=100
+    ...    default=100
+    ${MAX_LOG_BYTES}=    RW.Core.Import User Variable    MAX_LOG_BYTES
+    ...    type=string
+    ...    description=Maximum log size in bytes to fetch per container to prevent API overload.
+    ...    pattern=^\d+$
+    ...    example=256000
+    ...    default=256000
     ${EVENT_AGE}=    RW.Core.Import User Variable    EVENT_AGE
     ...    type=string
     ...    description=The time window to check for recent warning events.
@@ -82,6 +94,8 @@ Suite Initialization
     Set Suite Variable    ${CONTAINER_RESTART_AGE}    ${CONTAINER_RESTART_AGE}
     Set Suite Variable    ${CONTAINER_RESTART_THRESHOLD}    ${CONTAINER_RESTART_THRESHOLD}
     Set Suite Variable    ${LOG_AGE}    ${LOG_AGE}
+    Set Suite Variable    ${MAX_LOG_LINES}    ${MAX_LOG_LINES}
+    Set Suite Variable    ${MAX_LOG_BYTES}    ${MAX_LOG_BYTES}
     Set Suite Variable    ${EVENT_AGE}    ${EVENT_AGE}
     Set Suite Variable    ${EVENT_THRESHOLD}    ${EVENT_THRESHOLD}
     Set Suite Variable    ${CHECK_SERVICE_ENDPOINTS}    ${CHECK_SERVICE_ENDPOINTS}
@@ -126,6 +140,8 @@ Get Critical Log Errors and Score for Deployment `${DEPLOYMENT_NAME}`
     ...    context=${CONTEXT}
     ...    kubeconfig=${kubeconfig}
     ...    log_age=${LOG_AGE}
+    ...    max_log_lines=${MAX_LOG_LINES}
+    ...    max_log_bytes=${MAX_LOG_BYTES}
     
     # Use only critical error patterns for fast SLI checks
     @{critical_categories}=    Create List    GenericError    AppFailure    StackTrace

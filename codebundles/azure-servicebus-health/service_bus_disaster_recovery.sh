@@ -95,7 +95,7 @@ if [[ "$dr_supported" == "true" ]]; then
   pairing_count=$(jq '.pairings | length' < "$DR_OUTPUT")
   
   if [[ "$pairing_count" -eq 0 ]]; then
-    add_issue 2 \
+    add_issue 4 \
       "No geo-disaster recovery configured for Premium tier Service Bus namespace $SB_NAMESPACE_NAME" \
       "Consider configuring geo-disaster recovery pairing for business continuity" \
       "Premium namespace without disaster recovery configuration"
@@ -134,7 +134,7 @@ if [[ "$dr_supported" == "true" ]]; then
           "Ensure applications are configured to use the alias name for connection strings" \
           "Secondary namespace in DR pairing with $partner_namespace"
       elif [[ "$role" == "PrimaryBeingSeconded" ]]; then
-        add_issue 2 \
+        add_issue 4 \
           "DR pairing '$alias_name' is in transitional state 'PrimaryBeingSeconded'" \
           "Wait for the pairing to complete initialization" \
           "DR pairing is in transitional state"
@@ -142,7 +142,7 @@ if [[ "$dr_supported" == "true" ]]; then
     done
   fi
 else
-  add_issue 3 \
+  add_issue 4 \
     "Geo-disaster recovery is not supported for $tier tier Service Bus namespace $SB_NAMESPACE_NAME" \
     "Consider upgrading to Premium tier if geo-disaster recovery is required for business continuity" \
     "Current tier ($tier) does not support geo-disaster recovery"

@@ -82,7 +82,7 @@ recommended_alerts=$(cat <<EOF
     "metric": "ServerErrors",
     "operator": "GreaterThan",
     "threshold": 0,
-    "severity": 1,
+    "severity": 4,
     "description": "Alerts when any server errors occur in the Service Bus namespace."
   },
   {
@@ -90,7 +90,7 @@ recommended_alerts=$(cat <<EOF
     "metric": "UserErrors",
     "operator": "GreaterThan",
     "threshold": 10,
-    "severity": 2,
+    "severity": 4,
     "description": "Alerts when a significant number of user errors occur."
   },
   {
@@ -98,7 +98,7 @@ recommended_alerts=$(cat <<EOF
     "metric": "ThrottledRequests",
     "operator": "GreaterThan",
     "threshold": 0,
-    "severity": 2,
+    "severity": 4,
     "description": "Alerts when requests are being throttled."
   },
   {
@@ -106,7 +106,7 @@ recommended_alerts=$(cat <<EOF
     "metric": "ActiveMessages",
     "operator": "GreaterThan",
     "threshold": 1000,
-    "severity": 3,
+    "severity": 4,
     "description": "Alerts when a large number of messages are waiting to be processed."
   },
   {
@@ -114,7 +114,7 @@ recommended_alerts=$(cat <<EOF
     "metric": "DeadletteredMessages",
     "operator": "GreaterThan",
     "threshold": 0,
-    "severity": 2,
+    "severity": 4,
     "description": "Alerts when messages are moved to the dead-letter queue."
   },
   {
@@ -122,7 +122,7 @@ recommended_alerts=$(cat <<EOF
     "metric": "Size",
     "operator": "GreaterThan",
     "threshold": 80,
-    "severity": 2,
+    "severity": 4,
     "description": "Alerts when the namespace is approaching its size limit."
   }
 ]
@@ -164,7 +164,7 @@ add_issue() {
 # Check if any alerts exist
 existing_count=$(jq '.existing_count' <<< "$alerts_data")
 if [[ "$existing_count" -eq 0 ]]; then
-  add_issue 2 \
+  add_issue 4 \
     "No alert rules found for Service Bus namespace $SB_NAMESPACE_NAME" \
     "Configure recommended Azure Monitor alert rules for monitoring Service Bus health" \
     "Monitoring alerts are essential for proactive issue detection"
@@ -173,7 +173,7 @@ fi
 # Check for action groups
 action_groups_count=$(jq '.action_groups_count' <<< "$alerts_data")
 if [[ "$action_groups_count" -eq 0 ]]; then
-  add_issue 2 \
+  add_issue 4 \
     "No action groups found for alerting" \
     "Create action groups to define how alerts should be sent (email, SMS, webhook, etc.)" \
     "Action groups are required for alerts to notify the appropriate personnel"
@@ -206,7 +206,7 @@ if [[ "$existing_count" -gt 0 && "$action_groups_count" -gt 0 ]]; then
     has_actions=$(jq -r ".existing_alerts[$i].actions | length > 0" <<< "$alerts_data")
     
     if [[ "$has_actions" == "false" ]]; then
-      add_issue 2 \
+      add_issue 4 \
         "Alert rule '$alert_name' has no action groups configured" \
         "Associate action groups with this alert rule to ensure notifications are sent" \
         "Alerts without action groups won't notify anyone when triggered"

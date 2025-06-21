@@ -59,47 +59,61 @@ echo "Discovering resources related to Service Bus namespace: $SB_NAMESPACE_NAME
 
 # 4.1) Check for Event Grid subscriptions using the Service Bus
 echo "Checking for Event Grid subscriptions..."
-event_grid_subs=$(az eventgrid event-subscription list \
+event_grid_subs_raw=$(az eventgrid event-subscription list \
   --source-resource-id "$resource_id" \
   -o json 2>/dev/null || echo "[]")
+# Validate JSON before using
+event_grid_subs=$(echo "$event_grid_subs_raw" | jq . 2>/dev/null || echo "[]")
 
 # 4.2) Check for Private Endpoints connected to the Service Bus
 echo "Checking for Private Endpoints..."
-private_endpoints=$(az network private-endpoint list \
+private_endpoints_raw=$(az network private-endpoint list \
   --query "[?contains(privateLinkServiceConnections[].privateLinkServiceId, '$resource_id')]" \
   -o json 2>/dev/null || echo "[]")
+# Validate JSON before using
+private_endpoints=$(echo "$private_endpoints_raw" | jq . 2>/dev/null || echo "[]")
 
 # 4.3) Check for Logic Apps potentially using the Service Bus
 echo "Checking for Logic Apps potentially using Service Bus..."
 # This is a heuristic search, we're looking for Logic Apps in the same resource group
 # that might be using the Service Bus
-logic_apps=$(az logic workflow list \
+logic_apps_raw=$(az logic workflow list \
   --resource-group "$AZ_RESOURCE_GROUP" \
   -o json 2>/dev/null || echo "[]")
+# Validate JSON before using
+logic_apps=$(echo "$logic_apps_raw" | jq . 2>/dev/null || echo "[]")
 
 # 4.4) Check for App Service configurations potentially using the Service Bus
 echo "Checking for App Services potentially using Service Bus..."
-web_apps=$(az webapp list \
+web_apps_raw=$(az webapp list \
   --query "[?contains(to_string(siteConfig.appSettings), '$SB_NAMESPACE_NAME')]" \
   -o json 2>/dev/null || echo "[]")
+# Validate JSON before using
+web_apps=$(echo "$web_apps_raw" | jq . 2>/dev/null || echo "[]")
 
 # 4.5) Check for Azure Functions potentially using the Service Bus
 echo "Checking for Azure Functions potentially using Service Bus..."
-function_apps=$(az functionapp list \
+function_apps_raw=$(az functionapp list \
   --query "[?contains(to_string(siteConfig.appSettings), '$SB_NAMESPACE_NAME')]" \
   -o json 2>/dev/null || echo "[]")
+# Validate JSON before using
+function_apps=$(echo "$function_apps_raw" | jq . 2>/dev/null || echo "[]")
 
 # 4.6) Check for diagnostic settings sending data to Log Analytics or Storage
 echo "Checking for diagnostic settings..."
-diag_settings=$(az monitor diagnostic-settings list \
+diag_settings_raw=$(az monitor diagnostic-settings list \
   --resource "$resource_id" \
   -o json 2>/dev/null || echo "[]")
+# Validate JSON before using
+diag_settings=$(echo "$diag_settings_raw" | jq . 2>/dev/null || echo "[]")
 
 # 4.7) Check for Azure Monitor action groups using Service Bus
 echo "Checking for Azure Monitor action groups..."
-action_groups=$(az monitor action-group list \
+action_groups_raw=$(az monitor action-group list \
   --query "[?contains(to_string(servicebus), '$SB_NAMESPACE_NAME')]" \
   -o json 2>/dev/null || echo "[]")
+# Validate JSON before using
+action_groups=$(echo "$action_groups_raw" | jq . 2>/dev/null || echo "[]")
 
 # ---------------------------------------------------------------------------
 # 5) Combine related resources data
@@ -151,7 +165,7 @@ add_issue() {
 # Check if private endpoints are configured (important for security)
 private_endpoint_count=$(jq '.summary.private_endpoint_count' <<< "$related_data")
 if [[ "$private_endpoint_count" -eq 0 ]]; then
-  add_issue 3 \
+  add_issue 4 \
     "No private endpoints found for Service Bus namespace $SB_NAMESPACE_NAME" \
     "Consider using private endpoints to securely access the Service Bus from your virtual network" \
     "Private endpoints enhance security by allowing access to Service Bus over a private link"
@@ -160,7 +174,7 @@ fi
 # Check if diagnostic settings are configured
 diag_settings_count=$(jq '.summary.diagnostic_settings_count' <<< "$related_data")
 if [[ "$diag_settings_count" -eq 0 ]]; then
-  add_issue 3 \
+  add_issue 4 \
     "No diagnostic settings found for Service Bus namespace $SB_NAMESPACE_NAME" \
     "Configure diagnostic settings to send logs to Log Analytics or a Storage Account" \
     "Diagnostic settings are important for monitoring and troubleshooting"

@@ -74,7 +74,7 @@ add_issue() {
 # Check for disabled topics
 disabled_topics=$(jq -r '[.[] | select(.status == "Disabled") | .name] | join(", ")' <<< "$topics")
 if [[ -n "$disabled_topics" ]]; then
-  add_issue 2 \
+  add_issue 3 \
     "Service Bus namespace $SB_NAMESPACE_NAME has disabled topics: $disabled_topics" \
     "Investigate why these topics are disabled and enable them if needed" \
     "Disabled topics detected"
@@ -98,7 +98,7 @@ for topic_name in $(jq -r '.[].name' <<< "$topics"); do
   size_percent=$(( (size_bytes * 100) / max_size_bytes ))
   
   if [[ "$size_percent" -gt 80 ]]; then
-    add_issue 2 \
+    add_issue 3 \
       "Topic '$topic_name' is at ${size_percent}% of maximum size" \
       "Consider implementing auto-delete of processed messages or increasing topic size" \
       "Topic approaching size limit: $topic_name ($size_percent%)"
@@ -137,7 +137,7 @@ for topic_name in $(jq -r '.[].name' <<< "$topics"); do
     # Check dead letter count
     dead_letter_count=$(jq -r '.countDetails.deadLetterMessageCount' <<< "$sub_details")
     if [[ "$dead_letter_count" -gt 0 ]]; then
-      add_issue 2 \
+      add_issue 3 \
         "Subscription '$sub_name' for topic '$topic_name' has $dead_letter_count dead-lettered messages" \
         "Investigate dead-lettered messages to identify and fix processing issues" \
         "Dead-lettered messages detected in subscription: $topic_name/$sub_name"
@@ -155,7 +155,7 @@ for topic_name in $(jq -r '.[].name' <<< "$topics"); do
     # Check for disabled status
     status=$(jq -r '.status' <<< "$sub_details")
     if [[ "$status" == "Disabled" ]]; then
-      add_issue 2 \
+      add_issue 3 \
         "Subscription '$sub_name' for topic '$topic_name' is disabled" \
         "Investigate why this subscription is disabled and enable it if needed" \
         "Disabled subscription detected: $topic_name/$sub_name"

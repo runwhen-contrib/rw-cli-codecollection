@@ -30,7 +30,8 @@ class K8sLog:
         
     @keyword
     def fetch_workload_logs(self, workload_type: str, workload_name: str, namespace: str, 
-                           context: str, kubeconfig: platform.Secret, log_age: str = "10m") -> str:
+                           context: str, kubeconfig: platform.Secret, log_age: str = "10m",
+                           max_log_lines: str = "1000", max_log_bytes: str = "256000") -> str:
         """Fetch logs for a Kubernetes workload and prepare them for analysis.
         
         Args:
@@ -40,6 +41,8 @@ class K8sLog:
             context: Kubernetes context
             kubeconfig: Kubernetes kubeconfig secret
             log_age: How far back to fetch logs (default: 10m)
+            max_log_lines: Maximum number of log lines to fetch per container (default: 1000)
+            max_log_bytes: Maximum log size in bytes to fetch per container (default: 256000)
             
         Returns:
             Path to the directory containing fetched logs
@@ -53,7 +56,7 @@ class K8sLog:
         with open(kubeconfig_path, 'w') as f:
             f.write(kubeconfig.value)
         
-        # Set environment variables
+        # Set environment variables including volume controls
         env = os.environ.copy()
         env.update({
             'KUBECONFIG': kubeconfig_path,
@@ -61,7 +64,9 @@ class K8sLog:
             'WORKLOAD_NAME': workload_name,
             'NAMESPACE': namespace,
             'CONTEXT': context,
-            'LOG_AGE': log_age
+            'LOG_AGE': log_age,
+            'MAX_LOG_LINES': max_log_lines,
+            'MAX_LOG_BYTES': max_log_bytes
         })
         
         # Copy necessary files to temp directory
