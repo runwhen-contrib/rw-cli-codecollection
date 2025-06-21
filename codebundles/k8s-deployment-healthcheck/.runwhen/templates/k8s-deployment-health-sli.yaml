@@ -25,7 +25,7 @@ spec:
     {% endif %}
     pathToRobot: codebundles/k8s-deployment-healthcheck/sli.robot
   intervalStrategy: intermezzo
-  intervalSeconds: 180
+  intervalSeconds: 600
   description: Measures the health of the {{match_resource.resource.metadata.name}} deployment.
   configProvided:
     - name: NAMESPACE

@@ -20,3 +20,4 @@ spec:
             - type: sli
             - type: runbook
               templateName: az-servicebus-health-taskset.yaml
+            - type: workflow

@@ -121,6 +121,7 @@ Suite Initialization
     Set Suite Variable    ${LOG_AGE}
     Set Suite Variable    ${LOG_ANALYSIS_DEPTH}
     Set Suite Variable    ${LOG_SEVERITY_THRESHOLD}
+    Set Suite Variable    ${LOG_PATTERN_CATEGORIES_STR}
     Set Suite Variable    @{LOG_PATTERN_CATEGORIES}
     Set Suite Variable    ${ANOMALY_THRESHOLD}
     Set Suite Variable    ${LOGS_ERROR_PATTERN}
@@ -129,6 +130,40 @@ Suite Initialization
     Set Suite Variable    ${CONTAINER_RESTART_THRESHOLD}
     ${env}=    Evaluate    {"KUBECONFIG":"${kubeconfig.key}","KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}","CONTEXT":"${CONTEXT}","NAMESPACE":"${NAMESPACE}","LOGS_ERROR_PATTERN":"${LOGS_ERROR_PATTERN}","LOGS_EXCLUDE_PATTERN":"${LOGS_EXCLUDE_PATTERN}","ANOMALY_THRESHOLD":"${ANOMALY_THRESHOLD}","DEPLOYMENT_NAME":"${DEPLOYMENT_NAME}","CONTAINER_RESTART_AGE":"${CONTAINER_RESTART_AGE}","CONTAINER_RESTART_THRESHOLD":"${CONTAINER_RESTART_THRESHOLD}"}
     Set Suite Variable    ${env}
+    
+    # Check if deployment is scaled to 0 and handle appropriately
+    ${scale_check}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '{spec_replicas: .spec.replicas, ready_replicas: (.status.readyReplicas // 0), available_condition: (.status.conditions[] | select(.type == "Available") | .status // "Unknown")}'
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=30
+    
+    TRY
+        ${scale_status}=    Evaluate    json.loads(r'''${scale_check.stdout}''') if r'''${scale_check.stdout}'''.strip() else {}    json
+        ${spec_replicas}=    Evaluate    $scale_status.get('spec_replicas', 1)
+        
+        IF    ${spec_replicas} == 0
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    expected=Deployment `${DEPLOYMENT_NAME}` operational status documented
+            ...    actual=Deployment `${DEPLOYMENT_NAME}` is intentionally scaled to zero replicas
+            ...    title=Deployment `${DEPLOYMENT_NAME}` is Scaled Down (Informational)
+            ...    reproduce_hint=kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o yaml
+            ...    details=Deployment `${DEPLOYMENT_NAME}` is currently scaled to 0 replicas (spec.replicas=0). This is an intentional configuration and not an error. All pod-related healthchecks have been skipped for efficiency. If the deployment should be running, scale it up using:\nkubectl scale deployment/${DEPLOYMENT_NAME} --replicas=<desired_count> --context ${CONTEXT} -n ${NAMESPACE}
+            ...    next_steps=This is informational only. If the deployment should be running, scale it up.
+            
+            RW.Core.Add Pre To Report    ℹ️ **Deployment `${DEPLOYMENT_NAME}` is scaled to 0 replicas - Skipping pod-related checks**
+            RW.Core.Add Pre To Report    **Available Condition:** ${scale_status.get('available_condition', 'Unknown')}
+            
+            Set Suite Variable    ${SKIP_POD_CHECKS}    ${True}
+        ELSE
+            Set Suite Variable    ${SKIP_POD_CHECKS}    ${False}
+        END
+        
+    EXCEPT
+        Log    Warning: Failed to check deployment scale, continuing with normal checks
+        Set Suite Variable    ${SKIP_POD_CHECKS}    ${False}
+    END
 
 
 *** Tasks ***
@@ -143,287 +178,251 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
     ...    deployment
     ...    stacktrace
     ...    access:read-only
-    ${log_dir}=    RW.K8sLog.Fetch Workload Logs
-    ...    workload_type=deployment
-    ...    workload_name=${DEPLOYMENT_NAME}
-    ...    namespace=${NAMESPACE}
-    ...    context=${CONTEXT}
-    ...    kubeconfig=${kubeconfig}
-    ...    log_age=${LOG_AGE}
-    
-    ${scan_results}=    RW.K8sLog.Scan Logs For Issues
-    ...    log_dir=${log_dir}
-    ...    workload_type=deployment
-    ...    workload_name=${DEPLOYMENT_NAME}
-    ...    namespace=${NAMESPACE}
-    ...    categories=@{LOG_PATTERN_CATEGORIES}
-    
-    ${log_health_score}=    RW.K8sLog.Calculate Log Health Score    scan_results=${scan_results}
-    
-    # Process each issue found in the logs
-    ${issues}=    Evaluate    $scan_results.get('issues', [])
-    IF    len($issues) > 0
+    # Skip pod-related checks if deployment is scaled to 0
+    IF    not ${SKIP_POD_CHECKS}
+        ${log_dir}=    RW.K8sLog.Fetch Workload Logs
+        ...    workload_type=deployment
+        ...    workload_name=${DEPLOYMENT_NAME}
+        ...    namespace=${NAMESPACE}
+        ...    context=${CONTEXT}
+        ...    kubeconfig=${kubeconfig}
+        ...    log_age=${LOG_AGE}
+        
+        ${scan_results}=    RW.K8sLog.Scan Logs For Issues
+        ...    log_dir=${log_dir}
+        ...    workload_type=deployment
+        ...    workload_name=${DEPLOYMENT_NAME}
+        ...    namespace=${NAMESPACE}
+        ...    categories=@{LOG_PATTERN_CATEGORIES}
+        
+        ${log_health_score}=    RW.K8sLog.Calculate Log Health Score    scan_results=${scan_results}
+        
+        # Process each issue found in the logs
+        ${issues}=    Evaluate    $scan_results.get('issues', [])
         FOR    ${issue}    IN    @{issues}
-            ${summarized_details}=    RW.K8sLog.Summarize Log Issues    issue_details=${issue["details"]}
-            ${next_steps_text}=    Catenate    SEPARATOR=\n    @{issue["next_steps"]}
-            
-            RW.Core.Add Issue
-            ...    severity=${issue["severity"]}
-            ...    expected=No application errors should be present in deployment `${DEPLOYMENT_NAME}` logs in namespace `${NAMESPACE}`
-            ...    actual=Application errors detected in deployment `${DEPLOYMENT_NAME}` logs in namespace `${NAMESPACE}`
-            ...    title=${issue["title"]}
-            ...    reproduce_hint=Use RW.K8sLog.Fetch Workload Logs and RW.K8sLog.Scan Logs For Issues keywords to reproduce this analysis
-            ...    details=${summarized_details}
-            ...    next_steps=${next_steps_text}
+            ${severity}=    Evaluate    $issue.get('severity', ${LOG_SEVERITY_THRESHOLD})
+            IF    ${severity} <= ${LOG_SEVERITY_THRESHOLD}
+                RW.Core.Add Issue
+                ...    severity=${severity}
+                ...    expected=Application logs should be free of critical errors for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                ...    actual=${issue.get('title', 'Log pattern issue detected')} in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                ...    title=${issue.get('title', 'Log Pattern Issue')} in Deployment `${DEPLOYMENT_NAME}`
+                ...    reproduce_hint=Check application logs for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                ...    details=${issue.get('details', 'Application log analysis detected potential issues')}
+                ...    next_steps=${issue.get('next_steps', 'Review application logs and resolve underlying issues')}
+            END
         END
+        
+        RW.Core.Add Pre To Report    **Log Analysis Summary for Deployment `${DEPLOYMENT_NAME}`**
+        RW.Core.Add Pre To Report    **Health Score:** ${log_health_score}
+        RW.Core.Add Pre To Report    **Analysis Depth:** ${LOG_ANALYSIS_DEPTH}
+        RW.Core.Add Pre To Report    **Categories Analyzed:** ${LOG_PATTERN_CATEGORIES_STR}
+        ${issues_count}=    Get Length    ${issues}
+        RW.Core.Add Pre To Report    **Issues Found:** ${issues_count}
+        
+        RW.K8sLog.Cleanup Temp Files
     END
-    
-    # Add summary to report
-    ${summary_text}=    Catenate    SEPARATOR=\n    @{scan_results["summary"]}
-    RW.Core.Add Pre To Report    Application Log Analysis Summary for Deployment ${DEPLOYMENT_NAME}:\n${summary_text}
-    RW.Core.Add Pre To Report    Log Health Score: ${log_health_score} (1.0 = healthy, 0.0 = unhealthy)
-    
-    RW.K8sLog.Cleanup Temp Files
 
 Detect Log Anomalies for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
-    [Documentation]    Analyzes logs for repeating patterns, anomalous behavior, and unusual log volume that may indicate underlying issues.
+    [Documentation]    Analyzes log patterns to identify anomalies such as sudden spikes in error rates, unusual patterns, or recurring issues that might indicate underlying problems.
     [Tags]
     ...    logs
-    ...    anomalies
+    ...    anomaly
     ...    patterns
-    ...    volume
+    ...    trends
     ...    deployment
-    ...    ${DEPLOYMENT_NAME}
+    ...    monitoring
     ...    access:read-only
-    ${log_dir}=    RW.K8sLog.Fetch Workload Logs
-    ...    workload_type=deployment
-    ...    workload_name=${DEPLOYMENT_NAME}
-    ...    namespace=${NAMESPACE}
-    ...    context=${CONTEXT}
-    ...    kubeconfig=${kubeconfig}
-    ...    log_age=${LOG_AGE}
-    
-    ${anomaly_results}=    RW.K8sLog.Analyze Log Anomalies
-    ...    log_dir=${log_dir}
-    ...    workload_type=deployment
-    ...    workload_name=${DEPLOYMENT_NAME}
-    ...    namespace=${NAMESPACE}
-    
-    # Process anomaly issues
-    ${anomaly_issues}=    Evaluate    $anomaly_results.get('issues', [])
-    IF    len($anomaly_issues) > 0
-        FOR    ${issue}    IN    @{anomaly_issues}
-            ${summarized_details}=    RW.K8sLog.Summarize Log Issues    issue_details=${issue["details"]}
-            ${next_steps_text}=    Catenate    SEPARATOR=\n    @{issue["next_steps"]}
-            
+    # Skip pod-related checks if deployment is scaled to 0
+    IF    not ${SKIP_POD_CHECKS}
+        ${anomaly_results}=    RW.CLI.Run Bash File
+        ...    bash_file=event_anomalies.sh
+        ...    env=${env}
+        ...    secret_file__kubeconfig=${kubeconfig}
+        ...    include_in_history=false
+        
+        IF    ${anomaly_results.returncode} != 0
             RW.Core.Add Issue
-            ...    severity=${issue["severity"]}
-            ...    expected=No log anomalies should be present in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    actual=Log anomalies detected in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    title=${issue["title"]}
-            ...    reproduce_hint=Use RW.K8sLog.Analyze Log Anomalies keyword to reproduce this analysis
-            ...    details=${summarized_details}
-            ...    next_steps=${next_steps_text}
-        END
-    END
-    
-    # Add summary to report
-    ${anomaly_summary}=    Catenate    SEPARATOR=\n    @{anomaly_results["summary"]}
-    RW.Core.Add Pre To Report    Log Anomaly Analysis for Deployment ${DEPLOYMENT_NAME}:\n${anomaly_summary}
-    
-    RW.K8sLog.Cleanup Temp Files
-
-Check Deployment Log For Issues with `${DEPLOYMENT_NAME}`
-    [Documentation]    Comprehensive log analysis with pattern detection, Kubernetes event correlation, and actionable insights. Combines modern pattern matching with lnav-powered analysis for deep log investigation.
-    [Tags]
-    ...    logs
-    ...    errors
-    ...    analysis
-    ...    events
-    ...    correlation
-    ...    deployment
-    ...    ${DEPLOYMENT_NAME}
-    ...    access:read-only
-    
-    # Fetch and analyze logs using K8sLog library
-    ${log_dir}=    RW.K8sLog.Fetch Workload Logs
-    ...    workload_type=deployment
-    ...    workload_name=${DEPLOYMENT_NAME}
-    ...    namespace=${NAMESPACE}
-    ...    context=${CONTEXT}
-    ...    kubeconfig=${kubeconfig}
-    ...    log_age=3h
-    
-    # Pattern-based analysis with configurable categories
-    ${categories_by_depth}=    Run Keyword If    '${LOG_ANALYSIS_DEPTH}' == 'basic'
-    ...    Create List    GenericError    AppFailure    StackTrace
-    ...    ELSE IF    '${LOG_ANALYSIS_DEPTH}' == 'comprehensive'
-    ...    Create List    GenericError    AppFailure    StackTrace    Connection    Timeout    Auth    Exceptions    Anomaly    AppRestart    Resource
-    ...    ELSE
-    ...    Create List    GenericError    AppFailure    StackTrace    Connection    Timeout    Auth    Exceptions    Resource
-    
-    ${scan_results}=    RW.K8sLog.Scan Logs For Issues
-    ...    log_dir=${log_dir}
-    ...    workload_type=deployment
-    ...    workload_name=${DEPLOYMENT_NAME}
-    ...    namespace=${NAMESPACE}
-    ...    categories=${categories_by_depth}
-    
-    # Run original deployment_logs.sh for lnav analysis and event correlation
-    ${legacy_analysis}=    RW.CLI.Run Bash File
-    ...    bash_file=deployment_logs.sh 
-    ...    cmd_override=./deployment_logs.sh | tee "legacy_log_analysis"
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
-    
-    # Extract legacy recommendations and event correlations
-    ${legacy_recommendations}=    RW.CLI.Run Cli
-    ...    cmd=awk "/Recommended Next Steps:/ {start=1; getline} start" "legacy_log_analysis"
-    ...    env=${env}
-    ...    include_in_history=false
-    
-    ${legacy_issues}=    RW.CLI.Run Cli
-    ...    cmd=awk '/Issues Identified:/ {start=1; next} /The namespace `${NAMESPACE}` has produced the following interesting events:/ {start=0} start' "legacy_log_analysis"
-    ...    env=${env}
-    ...    include_in_history=false
-    
-    ${event_correlations}=    RW.CLI.Run Cli
-    ...    cmd=awk '/The namespace.*has produced the following interesting events:/ {start=1; next} start' "legacy_log_analysis"
-    ...    env=${env}
-    ...    include_in_history=false
-    
-    # Process pattern-based issues with severity filtering
-    ${issues}=    Evaluate    $scan_results.get('issues', [])
-    ${actionable_issues}=    Create List
-    ${warning_events}=    Create List
-    ${info_findings}=    Create List
-    
-    # Filter issues by severity threshold and categorize
-    FOR    ${issue}    IN    @{issues}
-        IF    ${issue["severity"]} <= ${LOG_SEVERITY_THRESHOLD}
-            Append To List    ${actionable_issues}    ${issue}
+            ...    severity=3
+            ...    expected=Log anomaly detection should complete successfully for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    actual=Failed to analyze log anomalies for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    title=Log Anomaly Detection Failed for Deployment `${DEPLOYMENT_NAME}`
+            ...    reproduce_hint=${anomaly_results.cmd}
+            ...    details=Anomaly detection failed with exit code ${anomaly_results.returncode}:\n\nSTDOUT:\n${anomaly_results.stdout}\n\nSTDERR:\n${anomaly_results.stderr}
+            ...    next_steps=Verify log collection is working properly\nCheck if pods are accessible and generating logs\nReview anomaly detection thresholds
         ELSE
-            Append To List    ${info_findings}    ${issue}
+            TRY
+                ${anomaly_data}=    Evaluate    json.loads(r'''${anomaly_results.stdout}''') if r'''${anomaly_results.stdout}'''.strip() else []    json
+                # Handle both array format (direct list) and object format (with 'anomalies' key)
+                ${anomalies}=    Evaluate    $anomaly_data if isinstance($anomaly_data, list) else $anomaly_data.get('anomalies', [])
+                
+                FOR    ${anomaly}    IN    @{anomalies}
+                    # Check if this is actually an anomaly or just normal operations
+                    ${is_normal_operation}=    Evaluate    any(reason in ['Created', 'Started', 'Pulled', 'SuccessfulCreate', 'SuccessfulDelete', 'ScalingReplicaSet'] for reason in $anomaly.get('reasons', []))
+                    ${events_per_minute}=    Evaluate    $anomaly.get('average_events_per_minute', 0)
+                    
+                    # Only treat as anomaly if events per minute exceeds threshold and it's not normal operations
+                    IF    not ${is_normal_operation} and ${events_per_minute} > ${ANOMALY_THRESHOLD}
+                        ${severity}=    Evaluate    $anomaly.get('severity', 3)
+                        RW.Core.Add Issue
+                        ...    severity=${severity}
+                        ...    expected=Log patterns should be consistent and normal for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                        ...    actual=Event anomaly detected: ${anomaly.get('kind', 'Unknown')}/${anomaly.get('name', 'Unknown')} with ${events_per_minute} events/minute in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                        ...    title=Event Anomaly: High Event Rate for ${anomaly.get('kind', 'Unknown')} in Deployment `${DEPLOYMENT_NAME}`
+                        ...    reproduce_hint=Review events for ${anomaly.get('kind', 'Unknown')}/${anomaly.get('name', 'Unknown')} in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                        ...    details=Detected unusually high event rate of ${events_per_minute} events/minute (threshold: ${ANOMALY_THRESHOLD})\n\nReasons: ${anomaly.get('reasons', [])}\n\nSample Messages: ${anomaly.get('messages', [])[:3]}
+                        ...    next_steps=Investigate why ${anomaly.get('kind', 'Unknown')}/${anomaly.get('name', 'Unknown')} is generating high event volume\nCheck for resource constraints, misconfigurations, or application issues\nReview the specific event messages for patterns
+                    END
+                END
+                
+                RW.Core.Add Pre To Report    **Log Anomaly Detection Results for Deployment `${DEPLOYMENT_NAME}`**
+                ${anomalies_count}=    Get Length    ${anomalies}
+                
+                # Count normal vs anomalous events
+                ${normal_operations_count}=    Set Variable    ${0}
+                ${actual_anomalies_count}=    Set Variable    ${0}
+                
+                FOR    ${item}    IN    @{anomalies}
+                    ${is_normal}=    Evaluate    any(reason in ['Created', 'Started', 'Pulled', 'SuccessfulCreate', 'SuccessfulDelete', 'ScalingReplicaSet'] for reason in $item.get('reasons', []))
+                    ${events_per_minute}=    Evaluate    $item.get('average_events_per_minute', 0)
+                    
+                    IF    ${is_normal} or ${events_per_minute} <= ${ANOMALY_THRESHOLD}
+                        ${normal_operations_count}=    Evaluate    ${normal_operations_count} + 1
+                    ELSE
+                        ${actual_anomalies_count}=    Evaluate    ${actual_anomalies_count} + 1
+                    END
+                END
+                
+                RW.Core.Add Pre To Report    **Total Events Analyzed:** ${anomalies_count}
+                RW.Core.Add Pre To Report    **Normal Operations:** ${normal_operations_count} | **Actual Anomalies:** ${actual_anomalies_count}
+                RW.Core.Add Pre To Report    **Threshold:** ${ANOMALY_THRESHOLD} events/minute
+                
+                IF    ${actual_anomalies_count} == 0
+                    RW.Core.Add Pre To Report    **✅ No significant anomalies detected - All events appear to be normal operations**
+                END
+                
+            EXCEPT
+                Log    Warning: Failed to parse anomaly detection results
+                RW.Core.Add Pre To Report    **Log Anomaly Detection:** Completed but results parsing failed
+            END
         END
     END
-    
-    # Create issues for actionable problems
-    FOR    ${issue}    IN    @{actionable_issues}
-        ${summarized_details}=    RW.K8sLog.Summarize Log Issues    issue_details=${issue["details"]}
-        ${next_steps_text}=    Catenate    SEPARATOR=\n    @{issue["next_steps"]}
-        
-        # Add legacy recommendations if available
-        ${enhanced_next_steps}=    Set Variable If    len($legacy_recommendations.stdout.strip()) > 0
-        ...    ${next_steps_text}\n\n**Additional Context:**\n${legacy_recommendations.stdout}
-        ...    ${next_steps_text}
-        
-        RW.Core.Add Issue
-        ...    severity=${issue["severity"]}
-        ...    expected=No ${issue.get("category", "log")} errors should be present in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-        ...    actual=${issue.get("category", "Log")} errors detected in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-        ...    title=[${issue.get("category", "Unknown")}] ${issue["title"]}
-        ...    reproduce_hint=Use RW.K8sLog keywords or run deployment_logs.sh to reproduce this analysis
-        ...    details=**Pattern Category:** ${issue.get("category", "Unknown")}\n**Severity Level:** ${issue["severity"]}\n\n${summarized_details}
-        ...    next_steps=${enhanced_next_steps}
-    END
-    
-    # Create issue for legacy-detected problems if any
-    IF    len($legacy_issues.stdout.strip()) > 0
-        RW.Core.Add Issue
-        ...    severity=3
-        ...    expected=No log anomalies or resource correlation issues in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-        ...    actual=Log anomalies or resource correlations detected in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-        ...    title=[Legacy Analysis] Log Pattern and Resource Correlation Issues
-        ...    reproduce_hint=Run deployment_logs.sh script to reproduce this analysis
-        ...    details=**Legacy lnav Analysis Results:**\n${legacy_issues.stdout}\n\n**Event Correlations:**\n${event_correlations.stdout}
-        ...    next_steps=${legacy_recommendations.stdout}
-    END
-    
-    # Generate actionable metrics summary
-    ${total_issues}=    Evaluate    len($actionable_issues)
-    ${critical_count}=    Evaluate    len([i for i in $actionable_issues if i['severity'] <= 2])
-    ${warning_count}=    Evaluate    len([i for i in $actionable_issues if i['severity'] == 3])
-    ${info_count}=    Evaluate    len($info_findings)
-    
-    # Create issues categories breakdown
-    ${category_counts}=    Create Dictionary
-    FOR    ${issue}    IN    @{actionable_issues}
-        ${category}=    Set Variable    ${issue.get("category", "Unknown")}
-        ${current_count}=    Evaluate    $category_counts.get("${category}", 0)
-        ${new_count}=    Evaluate    ${current_count} + 1
-        ${updated_counts}=    Evaluate    {**$category_counts, "${category}": ${new_count}}
-        Set Test Variable    ${category_counts}    ${updated_counts}
-    END
-    
-    # Enhanced report with actionable metrics
-    RW.Core.Add Pre To Report    🔍 **Log Analysis Results for Deployment ${DEPLOYMENT_NAME}**
-    RW.Core.Add Pre To Report    **Analysis Period:** 3 hours | **Analysis Depth:** ${LOG_ANALYSIS_DEPTH} | **Severity Threshold:** ${LOG_SEVERITY_THRESHOLD}
-    RW.Core.Add Pre To Report    \n**📊 Issue Breakdown:**
-    RW.Core.Add Pre To Report    • **Actionable Issues:** ${total_issues} (${critical_count} critical, ${warning_count} warnings)
-    RW.Core.Add Pre To Report    • **Informational Findings:** ${info_count} (below severity threshold)
-    ${legacy_status}=    Set Variable If    len($legacy_analysis.stdout.strip()) > 0    ✅ Completed    ❌ Failed
-    RW.Core.Add Pre To Report    • **Legacy Analysis:** ${legacy_status}
-    ${event_status}=    Set Variable If    len($event_correlations.stdout.strip()) > 0    ✅ Available    ℹ️ None found
-    RW.Core.Add Pre To Report    • **Event Correlation:** ${event_status}
-    
-    # Category breakdown
-    IF    len($category_counts) > 0
-        ${category_summary}=    Create List
-        FOR    ${category}    IN    @{category_counts.keys()}
-            ${count}=    Evaluate    $category_counts["${category}"]
-            Append To List    ${category_summary}    • **${category}:** ${count} issues
-        END
-        ${category_text}=    Catenate    SEPARATOR=\n    @{category_summary}
-        RW.Core.Add Pre To Report    \n**📋 Issues by Category:**\n${category_text}
-    END
-    
-    # Detailed findings summary
-    ${summary_text}=    Catenate    SEPARATOR=\n    @{scan_results["summary"]}
-    RW.Core.Add Pre To Report    \n**🔍 Pattern Analysis Summary:**\n${summary_text}
-    
-    # Legacy analysis integration
-    IF    len($legacy_analysis.stdout.strip()) > 0
-        RW.Core.Add Pre To Report    \n**🧬 Advanced Log Analysis (lnav + Event Correlation):**
-        RW.Core.Add Pre To Report    ${legacy_analysis.stdout}
-    END
-    
-    # Informational findings (not issues, but useful context)
-    IF    len($info_findings) > 0
-        ${info_summary}=    Create List
-        FOR    ${finding}    IN    @{info_findings}
-            Append To List    ${info_summary}    • **${finding["title"]}** (${finding.get("category", "Unknown")}): ${finding.get("summary", "No summary available")}
-        END
-        ${info_text}=    Catenate    SEPARATOR=\n    @{info_summary}
-        RW.Core.Add Pre To Report    \n**ℹ️ Additional Findings (Below Severity Threshold):**\n${info_text}
-    END
-    
-    RW.K8sLog.Cleanup Temp Files
 
-Fetch Deployments Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` and Add to Report
-    [Documentation]    Fetches logs from running pods and adds content to the report
+Perform Comprehensive Log Analysis for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
+    [Documentation]    Performs in-depth log analysis including security events, resource warnings, connectivity issues, and application lifecycle problems.
     [Tags]
-    ...    kubernetes
-    ...    deployment
     ...    logs
+    ...    comprehensive
+    ...    security
+    ...    resources
+    ...    connectivity
     ...    deployment
-    ...    ${DEPLOYMENT_NAME}
     ...    access:read-only
-    ${logs}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --tail=${LOG_LINES} --all-containers=true --max-log-requests=20 --context ${CONTEXT}
-    ...    env=${env}
-    ...    include_in_history=true
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ...    timeout_seconds=180
-    ...    show_in_rwl_cheatsheet=true
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
-    RW.Core.Add Pre To Report
-    ...    Recent logs from Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE}:\n\n${logs.stdout}
+    # Skip pod-related checks if deployment is scaled to 0
+    IF    not ${SKIP_POD_CHECKS}
+        # Only run comprehensive analysis if depth is set to comprehensive
+        IF    '${LOG_ANALYSIS_DEPTH}' == 'comprehensive'
+            ${comprehensive_results}=    RW.CLI.Run Bash File
+            ...    bash_file=deployment_logs.sh
+            ...    env=${env}
+            ...    secret_file__kubeconfig=${kubeconfig}
+            ...    include_in_history=false
+            
+            IF    ${comprehensive_results.returncode} != 0
+                RW.Core.Add Issue
+                ...    severity=3
+                ...    expected=Comprehensive log analysis should complete successfully for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                ...    actual=Failed to perform comprehensive log analysis for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                ...    title=Comprehensive Log Analysis Failed for Deployment `${DEPLOYMENT_NAME}`
+                ...    reproduce_hint=${comprehensive_results.cmd}
+                ...    details=Comprehensive analysis failed with exit code ${comprehensive_results.returncode}:\n\nSTDOUT:\n${comprehensive_results.stdout}\n\nSTDERR:\n${comprehensive_results.stderr}
+                ...    next_steps=Verify log collection is working properly\nCheck if pods are accessible and generating logs\nReview comprehensive analysis script configuration
+            ELSE
+                RW.Core.Add Pre To Report    **Comprehensive Log Analysis Results for Deployment `${DEPLOYMENT_NAME}`**
+                RW.Core.Add Pre To Report    ${comprehensive_results.stdout}
+            END
+        END
+    END
+
+Fetch Deployment Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
+    [Documentation]    Collects logs from all pods in the deployment for manual review and troubleshooting.
+    [Tags]
+    ...    logs
+    ...    collection
+    ...    deployment
+    ...    troubleshooting
+    ...    access:read-only
+    # Skip pod-related checks if deployment is scaled to 0
+    IF    not ${SKIP_POD_CHECKS}
+        # First get raw logs
+        ${deployment_logs}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} --tail=${LOG_LINES} --since=${LOG_AGE}
+        ...    env=${env}
+        ...    secret_file__kubeconfig=${kubeconfig}
+        ...    show_in_rwl_cheatsheet=true
+        ...    render_in_commandlist=true
+        
+        IF    ${deployment_logs.returncode} != 0
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Deployment logs should be accessible for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    actual=Failed to fetch deployment logs for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    title=Unable to Fetch Logs for Deployment `${DEPLOYMENT_NAME}`
+            ...    reproduce_hint=${deployment_logs.cmd}
+            ...    details=Log collection failed with exit code ${deployment_logs.returncode}:\n\nSTDOUT:\n${deployment_logs.stdout}\n\nSTDERR:\n${deployment_logs.stderr}
+            ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck if pods are running and accessible
+        ELSE
+            # Filter logs to remove repetitive health check messages and focus on meaningful content
+            ${filtered_logs}=    RW.CLI.Run Cli
+            ...    cmd=echo "${deployment_logs.stdout}" | grep -v -E "(Checking.*Health|Health.*Check|healthcheck|/health|GET /|POST /health|probe|liveness|readiness)" | grep -E "(error|ERROR|warn|WARN|exception|Exception|fail|FAIL|fatal|FATAL|panic|stack|trace|timeout|connection.*refused|unable.*connect|authentication.*failed|denied|forbidden|unauthorized|500|502|503|504)" | tail -50 || echo "No significant errors or warnings found in recent logs"
+            ...    env=${env}
+            ...    include_in_history=false
+            
+            # Also get a sample of non-health-check logs for context
+            ${context_logs}=    RW.CLI.Run Cli
+            ...    cmd=echo "${deployment_logs.stdout}" | grep -v -E "(Checking.*Health|Health.*Check|healthcheck|/health|GET /|POST /health|probe|liveness|readiness)" | head -20 | tail -10
+            ...    env=${env}
+            ...    include_in_history=false
+            
+            ${history}=    RW.CLI.Pop Shell History
+            
+            # Determine if logs are mostly health checks
+            ${total_lines}=    RW.CLI.Run Cli
+            ...    cmd=echo "${deployment_logs.stdout}" | wc -l
+            ...    env=${env}
+            ...    include_in_history=false
+            
+            ${health_check_lines}=    RW.CLI.Run Cli
+            ...    cmd=echo "${deployment_logs.stdout}" | grep -E "(Checking.*Health|Health.*Check|healthcheck|/health)" | wc -l
+            ...    env=${env}
+            ...    include_in_history=false
+            
+            ${total_count}=    Convert To Integer    ${total_lines.stdout.strip()}
+            ${health_count}=    Convert To Integer    ${health_check_lines.stdout.strip()}
+            
+            RW.Core.Add Pre To Report    **📋 Log Analysis for Deployment `${DEPLOYMENT_NAME}`** (Last ${LOG_LINES} lines, ${LOG_AGE} age)
+            RW.Core.Add Pre To Report    **Total Log Lines:** ${total_count} | **Health Check Lines:** ${health_count}
+            
+            IF    ${health_count} > ${total_count} * 0.8
+                RW.Core.Add Pre To Report    **ℹ️ Logs are mostly health check messages (${health_count}/${total_count} lines)**
+                RW.Core.Add Pre To Report    **🔍 Filtered Error/Warning Logs:**
+                RW.Core.Add Pre To Report    ${filtered_logs.stdout}
+                
+                IF    "${context_logs.stdout.strip()}" != ""
+                    RW.Core.Add Pre To Report    **📝 Sample Application Logs (Non-Health Check):**
+                    RW.Core.Add Pre To Report    ${context_logs.stdout}
+                END
+            ELSE
+                RW.Core.Add Pre To Report    **📝 Recent Application Logs:**
+                RW.Core.Add Pre To Report    ${deployment_logs.stdout}
+            END
+            
+            RW.Core.Add Pre To Report    Commands Used: ${history}
+        END
+    END
 
 Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
-    [Documentation]    Validates if a Liveliness probe has possible misconfigurations
+    [Documentation]    Validates if a Liveness probe has possible misconfigurations
     [Tags]
     ...    liveliness
     ...    probe
@@ -435,45 +434,49 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
     ...    access:read-only
-    ${liveness_probe_health}=    RW.CLI.Run Bash File
-    ...    bash_file=validate_probes.sh
-    ...    cmd_override=./validate_probes.sh livenessProbe | tee "liveness_probe_output"
-    ...    env=${env}
-    ...    include_in_history=False
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ...    show_in_rwl_cheatsheet=true
-    
-    # Check for command failure and create generic issue if needed
-    IF    ${liveness_probe_health.returncode} != 0
-        RW.Core.Add Issue
-        ...    severity=2
-        ...    expected=Liveness probe validation should complete for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-        ...    actual=Failed to validate liveness probe for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-        ...    title=Unable to Validate Liveness Probe for Deployment `${DEPLOYMENT_NAME}`
-        ...    reproduce_hint=${liveness_probe_health.cmd}
-        ...    details=Validation script failed with exit code ${liveness_probe_health.returncode}:\n\nSTDOUT:\n${liveness_probe_health.stdout}\n\nSTDERR:\n${liveness_probe_health.stderr}
-        ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
-        ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Failed to validate liveness probe:\n\n${liveness_probe_health.stderr}
-        RW.Core.Add Pre To Report    Commands Used: ${liveness_probe_health.cmd}
-    ELSE
-        ${recommendations}=    RW.CLI.Run Cli
-        ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' "liveness_probe_output"
+    # Skip pod-related checks if deployment is scaled to 0
+    IF    not ${SKIP_POD_CHECKS}
+        ${liveness_probe_health}=    RW.CLI.Run Bash File
+        ...    bash_file=validate_probes.sh
+        ...    cmd_override=./validate_probes.sh livenessProbe | tee "liveness_probe_output"
         ...    env=${env}
-        ...    include_in_history=false
-        IF    len($recommendations.stdout) > 0
+        ...    include_in_history=False
+        ...    secret_file__kubeconfig=${kubeconfig}
+        ...    show_in_rwl_cheatsheet=true
+        
+        # Check for command failure and create generic issue if needed
+        IF    ${liveness_probe_health.returncode} != 0
             RW.Core.Add Issue
             ...    severity=2
-            ...    expected=Liveness probes should be configured and functional for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    actual=Issues found with liveness probe configuration for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    title=Configuration Issues with Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    reproduce_hint=View Commands Used in Report Output
-            ...    details=Liveness Probe Configuration Issues with Deployment ${DEPLOYMENT_NAME}\n${liveness_probe_health.stdout}
-            ...    next_steps=${recommendations.stdout}
+            ...    expected=Liveness probe validation should complete for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    actual=Failed to validate liveness probe for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    title=Unable to Validate Liveness Probe for Deployment `${DEPLOYMENT_NAME}`
+            ...    reproduce_hint=${liveness_probe_health.cmd}
+            ...    details=Validation script failed with exit code ${liveness_probe_health.returncode}:\n\nSTDOUT:\n${liveness_probe_health.stdout}\n\nSTDERR:\n${liveness_probe_health.stderr}
+            ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
+            ${history}=    RW.CLI.Pop Shell History
+            RW.Core.Add Pre To Report    Failed to validate liveness probe:\n\n${liveness_probe_health.stderr}
+            RW.Core.Add Pre To Report    Commands Used: ${liveness_probe_health.cmd}
+        ELSE
+            ${recommendations}=    RW.CLI.Run Cli
+            ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' "liveness_probe_output"
+            ...    env=${env}
+            ...    include_in_history=false
+            ${rec_length}=    Get Length    ${recommendations.stdout}
+            IF    ${rec_length} > 0
+                RW.Core.Add Issue
+                ...    severity=2
+                ...    expected=Liveness probes should be configured and functional for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                ...    actual=Issues found with liveness probe configuration for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                ...    title=Configuration Issues with Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                ...    reproduce_hint=View Commands Used in Report Output
+                ...    details=Liveness Probe Configuration Issues with Deployment ${DEPLOYMENT_NAME}\n${liveness_probe_health.stdout}
+                ...    next_steps=${recommendations.stdout}
+            END
+            ${history}=    RW.CLI.Pop Shell History
+            RW.Core.Add Pre To Report    Liveness probe testing results:\n\n${liveness_probe_health.stdout}
+            RW.Core.Add Pre To Report    Commands Used: ${liveness_probe_health.cmd}
         END
-        ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Liveness probe testing results:\n\n${liveness_probe_health.stdout}
-        RW.Core.Add Pre To Report    Commands Used: ${liveness_probe_health.cmd}
     END
 
 Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
@@ -489,100 +492,56 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}` in Names
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
     ...    access:read-only
-    ${readiness_probe_health}=    RW.CLI.Run Bash File
-    ...    bash_file=validate_probes.sh
-    ...    cmd_override=./validate_probes.sh readinessProbe | tee "readiness_probe_output"
-    ...    env=${env}
-    ...    include_in_history=False
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ...    show_in_rwl_cheatsheet=true
-    
-    # Check for command failure and create generic issue if needed
-    IF    ${readiness_probe_health.returncode} != 0
-        RW.Core.Add Issue
-        ...    severity=2
-        ...    expected=Readiness probe validation should complete for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-        ...    actual=Failed to validate readiness probe for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-        ...    title=Unable to Validate Readiness Probe for Deployment `${DEPLOYMENT_NAME}`
-        ...    reproduce_hint=${readiness_probe_health.cmd}
-        ...    details=Validation script failed with exit code ${readiness_probe_health.returncode}:\n\nSTDOUT:\n${readiness_probe_health.stdout}\n\nSTDERR:\n${readiness_probe_health.stderr}
-        ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
-        ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Failed to validate readiness probe:\n\n${readiness_probe_health.stderr}
-        RW.Core.Add Pre To Report    Commands Used: ${readiness_probe_health.cmd}
-    ELSE
-        ${recommendations}=    RW.CLI.Run Cli
-        ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' "readiness_probe_output"
+    # Skip pod-related checks if deployment is scaled to 0
+    IF    not ${SKIP_POD_CHECKS}
+        ${readiness_probe_health}=    RW.CLI.Run Bash File
+        ...    bash_file=validate_probes.sh
+        ...    cmd_override=./validate_probes.sh readinessProbe | tee "readiness_probe_output"
         ...    env=${env}
-        ...    include_in_history=false
-        IF    len($recommendations.stdout) > 0
+        ...    include_in_history=False
+        ...    secret_file__kubeconfig=${kubeconfig}
+        ...    show_in_rwl_cheatsheet=true
+        
+        # Check for command failure and create generic issue if needed
+        IF    ${readiness_probe_health.returncode} != 0
             RW.Core.Add Issue
             ...    severity=2
-            ...    expected=Readiness probes should be configured and functional for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    actual=Issues found with readiness probe configuration for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    title=Configuration Issues with Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    reproduce_hint=View Commands Used in Report Output
-            ...    details=Readiness Probe Issues with Deployment ${DEPLOYMENT_NAME}\n${readiness_probe_health.stdout}
-            ...    next_steps=${recommendations.stdout}
-        END
-        ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${readiness_probe_health.stdout}
-        RW.Core.Add Pre To Report    Commands Used: ${readiness_probe_health.cmd}
-    END
-
-Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
-    [Documentation]    Fetches pods that have container restarts and provides a report of the restart issues.
-    [Tags]    access:read-only  namespace    containers    status    restarts    ${DEPLOYMENT_NAME}    ${NAMESPACE}
-    ${container_restart_analysis}=    RW.CLI.Run Bash File
-    ...    bash_file=container_restarts.sh
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ...    include_in_history=False
-    ${recommendations}=    RW.CLI.Run Cli
-    ...    cmd=echo '${container_restart_analysis.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
-    ...    env=${env}
-    ...    include_in_history=false
-    IF    $recommendations.stdout != ""
-        TRY
-            ${recommendation_list}=    Evaluate    json.loads(r'''${recommendations.stdout}''')    json
-        EXCEPT
-            Log    Warning: Failed to parse container restart JSON, creating generic issue
-            ${recommendation_list}=    Create List
-        END
-        
-        IF    len(@{recommendation_list}) > 0
-            FOR    ${item}    IN    @{recommendation_list}
+            ...    expected=Readiness probe validation should complete for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    actual=Failed to validate readiness probe for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    title=Unable to Validate Readiness Probe for Deployment `${DEPLOYMENT_NAME}`
+            ...    reproduce_hint=${readiness_probe_health.cmd}
+            ...    details=Validation script failed with exit code ${readiness_probe_health.returncode}:\n\nSTDOUT:\n${readiness_probe_health.stdout}\n\nSTDERR:\n${readiness_probe_health.stderr}
+            ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
+            ${history}=    RW.CLI.Pop Shell History
+            RW.Core.Add Pre To Report    Failed to validate readiness probe:\n\n${readiness_probe_health.stderr}
+            RW.Core.Add Pre To Report    Commands Used: ${readiness_probe_health.cmd}
+        ELSE
+            ${recommendations}=    RW.CLI.Run Cli
+            ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' "readiness_probe_output"
+            ...    env=${env}
+            ...    include_in_history=false
+            ${rec_length}=    Get Length    ${recommendations.stdout}
+            IF    ${rec_length} > 0
                 RW.Core.Add Issue
-                ...    severity=${item["severity"]}
-                ...    expected=Containers should not be restarting for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                ...    actual=We found containers with restarts for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                ...    title=${item["title"]}
-                ...    reproduce_hint=${container_restart_analysis.cmd}
-                ...    details=${item["details"]}
-                ...    next_steps=${item["next_steps"]}
+                ...    severity=2
+                ...    expected=Readiness probes should be configured and functional for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                ...    actual=Issues found with readiness probe configuration for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                ...    title=Configuration Issues with Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                ...    reproduce_hint=View Commands Used in Report Output
+                ...    details=Readiness Probe Issues with Deployment ${DEPLOYMENT_NAME}\n${readiness_probe_health.stdout}
+                ...    next_steps=${recommendations.stdout}
             END
-        ELSE IF    "restart" in $recommendations.stdout.lower()
-            # Create generic issue if we detect restart content but parsing failed
-            RW.Core.Add Issue
-            ...    severity=3
-            ...    expected=Containers should not be restarting for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    actual=Container restart issues detected for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    title=Container Restart Issues Detected for Deployment `${DEPLOYMENT_NAME}`
-            ...    reproduce_hint=${container_restart_analysis.cmd}
-            ...    details=Container restart analysis output:\n${recommendations.stdout}
-            ...    next_steps=Review container restart analysis and investigate pod restart causes
+            ${history}=    RW.CLI.Pop Shell History
+            RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${readiness_probe_health.stdout}
+            RW.Core.Add Pre To Report    Commands Used: ${readiness_probe_health.cmd}
         END
     END
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Summary of container restarts for Deployment `${DEPLOYMENT_NAME}` in namespace: ${NAMESPACE}
-    RW.Core.Add Pre To Report    ${container_restart_analysis.stdout}
-    RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches warning events related to the deployment workload in the namespace and triages any issues found in the events.
     [Tags]    access:read-only  events    workloads    errors    warnings    get    deployment    ${DEPLOYMENT_NAME}
     ${events}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '(now - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind == "Deployment" or .involvedObject.kind == "ReplicaSet" or .involvedObject.kind == "Pod") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}")) and (.lastTimestamp | fromdateiso8601) >= $time_limit) | {kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp} ] | group_by([.kind, .name]) | map({kind: .[0].kind, name: .[0].name, count: length, reasons: map(.reason) | unique, messages: map(.message) | unique, firstTimestamp: map(.firstTimestamp | fromdateiso8601) | sort | .[0] | todateiso8601, lastTimestamp: map(.lastTimestamp | fromdateiso8601) | sort | reverse | .[0] | todateiso8601})'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '(now - (60*60*3)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind == "Deployment" or .involvedObject.kind == "Pod" or .involvedObject.kind == "ReplicaSet") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}")) and (.lastTimestamp // empty | if . then fromdateiso8601 else 0 end) >= $time_limit) | {kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, count: .count} ] | group_by([.kind, .name]) | map(if length > 0 then {kind: .[0].kind, name: .[0].name, total_count: (map(.count // 1) | add), reasons: (map(.reason) | unique), messages: (map(.message) | unique), firstTimestamp: (map(.firstTimestamp // empty | if . then fromdateiso8601 else 0 end) | sort | .[0] | if . > 0 then todateiso8601 else null end), lastTimestamp: (map(.lastTimestamp // empty | if . then fromdateiso8601 else 0 end) | sort | reverse | .[0] | if . > 0 then todateiso8601 else null end)} else empty end) | map(. + {summary: "\(.kind) \(.name): \(.total_count) events (\(.reasons | join(", ")))"}) | {events_summary: map(.summary), total_objects: length, events: .}'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
@@ -602,267 +561,300 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
         RW.Core.Add Pre To Report    Failed to retrieve events:\n\n${events.stderr}
         RW.Core.Add Pre To Report    Commands Used: ${history}
     ELSE
-        ${k8s_deployment_details}=    RW.CLI.Run Cli
-        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json
+        # Collect ALL events (Normal + Warning) for last 3 hours including Deployment, ReplicaSet, and Pod levels
+        ${all_events}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq --argjson hours 3 '(now - ($hours * 3600)) as $time_limit | [.items[] | select((.involvedObject.kind == "Deployment" or .involvedObject.kind == "Pod" or .involvedObject.kind == "ReplicaSet") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}")) and (.lastTimestamp // empty | if . then fromdateiso8601 else now end) >= $time_limit)] | sort_by(.lastTimestamp // .firstTimestamp) | {total_events: length, normal_events: (map(select(.type == "Normal")) | length), warning_events: (map(select(.type == "Warning")) | length), deployment_events: (map(select(.involvedObject.kind == "Deployment")) | length), replicaset_events: (map(select(.involvedObject.kind == "ReplicaSet")) | length), pod_events: (map(select(.involvedObject.kind == "Pod")) | length), events_by_type: (group_by(.type) | map({type: .[0].type, count: length, reasons: (map(.reason) | group_by(.) | map({reason: .[0], count: length}))})), chronological_events: (map({timestamp: (.lastTimestamp // .firstTimestamp), type: .type, kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message}) | sort_by(.timestamp)), recent_warnings: (map(select(.type == "Warning")) | map({timestamp: (.lastTimestamp // .firstTimestamp), kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message}) | sort_by(.timestamp) | reverse | .[0:10])}'
         ...    env=${env}
         ...    secret_file__kubeconfig=${kubeconfig}
+        ...    include_in_history=false
         
-        # Check for deployment details command failure
-        IF    ${k8s_deployment_details.returncode} != 0
-            RW.Core.Add Issue
-            ...    severity=2
-            ...    expected=Deployment details should be retrievable for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    actual=Failed to retrieve deployment details for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    title=Unable to Fetch Deployment Details for `${DEPLOYMENT_NAME}`
-            ...    reproduce_hint=${k8s_deployment_details.cmd}
-            ...    details=Command failed with exit code ${k8s_deployment_details.returncode}:\n\nSTDOUT:\n${k8s_deployment_details.stdout}\n\nSTDERR:\n${k8s_deployment_details.stderr}
-            ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
-            ${history}=    RW.CLI.Pop Shell History
-            RW.Core.Add Pre To Report    Failed to retrieve deployment details:\n\n${k8s_deployment_details.stderr}
-            RW.Core.Add Pre To Report    Commands Used: ${history}
-        ELSE
-            ${related_resource_recommendations}=    RW.K8sHelper.Get Related Resource Recommendations
-            ...    k8s_object=${k8s_deployment_details.stdout}
+        TRY
+            ${event_data}=    Evaluate    json.loads(r'''${all_events.stdout}''') if r'''${all_events.stdout}'''.strip() else {}    json
+            ${warning_count}=    Evaluate    $event_data.get('warning_events', 0)
+            ${total_count}=    Evaluate    $event_data.get('total_events', 0)
             
-            # Simple JSON parsing with fallback
-            TRY
-                ${object_list}=    Evaluate    json.loads(r'''${events.stdout}''')    json
-            EXCEPT
-                Log    Warning: Failed to parse events JSON, creating generic warning issue
-                ${object_list}=    Create List
-                # Create generic issue if we have events but can't parse them
-                IF    "Warning" in $events.stdout
-                    RW.Core.Add Issue
-                    ...    severity=3
-                    ...    expected=No warning events should be present for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                    ...    actual=Warning events detected for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                    ...    title=Warning Events Detected for Deployment `${DEPLOYMENT_NAME}` (Parse Failed)
-                    ...    reproduce_hint=${events.cmd}
-                    ...    details=Warning events detected but JSON parsing failed. Raw output:\n${events.stdout}
-                    ...    next_steps=Manually review events output and investigate warning conditions\n${related_resource_recommendations}
-                END
-            END
+            # Add comprehensive events report  
+            RW.Core.Add Pre To Report    **📊 Complete Event Summary for Deployment `${DEPLOYMENT_NAME}` (Last 3 Hours)**
+            RW.Core.Add Pre To Report    **Total Events:** ${total_count} (${event_data.get('normal_events', 0)} Normal, ${event_data.get('warning_events', 0)} Warning)
+            RW.Core.Add Pre To Report    **Event Distribution:** ${event_data.get('deployment_events', 0)} Deployment, ${event_data.get('replicaset_events', 0)} ReplicaSet, ${event_data.get('pod_events', 0)} Pod
             
-            # Consolidate issues by type to avoid duplicates
-            ${pod_issues}=    Create List
-            ${deployment_issues}=    Create List
-            ${unique_issue_types}=    Create Dictionary
-            
-            IF    len(@{object_list}) > 0
-                FOR    ${item}    IN    @{object_list}
-                    ${message_string}=    Catenate    SEPARATOR;    @{item["messages"]}
-                    ${messages}=    RW.K8sHelper.Sanitize Messages    ${message_string}
-                    ${issues}=    RW.CLI.Run Bash File
-                    ...    bash_file=workload_issues.sh
-                    ...    cmd_override=./workload_issues.sh "${messages}" "Deployment" "${DEPLOYMENT_NAME}"
-                    ...    env=${env}
-                    ...    include_in_history=False
-                    
-                    # Simple JSON parsing with fallback
-                    TRY
-                        ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-                    EXCEPT
-                        Log    Warning: Failed to parse workload issues JSON, creating generic issue
-                        ${issue_list}=    Create List
-                        # Create generic issue if we have content but can't parse it
-                        IF    len($messages) > 0
-                            ${generic_issue}=    Create Dictionary    
-                            ...    severity=3    
-                            ...    title=Event Issues for ${item["kind"]} ${item["name"]}    
-                            ...    next_steps=Investigate event messages: ${messages}    
-                            ...    details=Event detected but issue parsing failed: ${messages}
-                            Append To List    ${issue_list}    ${generic_issue}
-                        END
-                    END
-                    
-                    # Process issues normally
-                    FOR    ${issue}    IN    @{issue_list}
-                        ${issue_key}=    Set Variable    ${issue["title"]}
-                        ${current_count}=    Evaluate    $unique_issue_types.get("${issue_key}", 0)
-                        ${new_count}=    Evaluate    ${current_count} + 1
-                        ${updated_dict}=    Evaluate    {**$unique_issue_types, "${issue_key}": ${new_count}}
-                        Set Test Variable    ${unique_issue_types}    ${updated_dict}
-                        
-                        IF    '${item["kind"]}' == 'Pod'
-                            Append To List    ${pod_issues}    ${issue}
-                        ELSE
-                            Append To List    ${deployment_issues}    ${issue}
-                        END
-                    END
-                    
-                    # If no structured issues but we have event content, create generic issue
-                    IF    len(@{issue_list}) == 0 and len($messages) > 0
-                        ${generic_issue}=    Create Dictionary    
-                        ...    severity=3    
-                        ...    title=Event Issues for ${item["kind"]} ${item["name"]}    
-                        ...    next_steps=Investigate event messages: ${messages}    
-                        ...    details=Event detected but issue parsing failed: ${messages}
-                        
-                        IF    '${item["kind"]}' == 'Pod'
-                            Append To List    ${pod_issues}    ${generic_issue}
-                        ELSE
-                            Append To List    ${deployment_issues}    ${generic_issue}
-                        END
-                    END
-                END
+            IF    ${warning_count} > 0
+                ${event_object_data}=    Evaluate    json.loads(r'''${events.stdout}''') if r'''${events.stdout}'''.strip() else {}    json
+                ${object_list}=    Evaluate    $event_object_data.get('events', [])
                 
-                # Create consolidated issues
-                IF    len($pod_issues) > 0
-                    # Group pod issues by type and create single consolidated issue
-                    ${pod_count}=    Evaluate    len([item for item in $object_list if item['kind'] == 'Pod'])
-                    ${sample_pod_issue}=    Set Variable    ${pod_issues[0]}
-                    ${all_pod_messages}=    Create List
+                # Check if deployment is currently scaled to 0 to filter stale events
+                ${deployment_scaled_down}=    Set Variable    ${SKIP_POD_CHECKS}
+                
+                # Create consolidated issues for warnings found
+                ${object_list_length}=    Get Length    ${object_list}
+                IF    ${object_list_length} > 0
+                    # Consolidate issues by collecting unique issue types and their details
+                    ${consolidated_issues}=    Create Dictionary
+                    ${total_affected_objects}=    Set Variable    ${0}
+                    
                     FOR    ${item}    IN    @{object_list}
-                        IF    '${item["kind"]}' == 'Pod'
-                            ${pod_msg}=    Catenate    **Pod ${item["name"]}**: ${item["messages"][0]}
-                            Append To List    ${all_pod_messages}    ${pod_msg}
+                        ${total_affected_objects}=    Evaluate    ${total_affected_objects} + 1
+                        ${message_string}=    Catenate    SEPARATOR=;    @{item["messages"]}
+                        ${messages}=    RW.K8sHelper.Sanitize Messages    ${message_string}
+                        
+                        # Skip stale pod events if deployment is scaled down
+                        ${skip_stale_event}=    Set Variable    ${False}
+                        IF    ${deployment_scaled_down} and '${item["kind"]}' == 'Pod'
+                            # Find scale-down timestamp from chronological events
+                            ${scale_events}=    Evaluate    [event for event in $event_data.get('chronological_events', []) if 'ScalingReplicaSet' in event.get('reason', '') and 'Scaled down' in event.get('message', '')]
+                            ${scale_events_length}=    Get Length    ${scale_events}
+                            IF    ${scale_events_length} > 0
+                                ${latest_scale_event}=    Evaluate    $scale_events[-1]
+                                ${scale_down_timestamp}=    Evaluate    $latest_scale_event.get('timestamp', '')
+                                ${event_timestamp}=    Set Variable    ${item.get("lastTimestamp", "")}
+                                
+                                # Check if this event is from before scale-down
+                                IF    "${event_timestamp}" < "${scale_down_timestamp}"
+                                    ${skip_stale_event}=    Set Variable    ${True}
+                                    Log    Skipping stale pod event from before scale-down: ${item["kind"]}/${item["name"]} at ${event_timestamp} (scale-down at ${scale_down_timestamp})
+                                END
+                            END
+                        END
+                        
+                        IF    not ${skip_stale_event}
+                            ${issues}=    RW.CLI.Run Bash File
+                            ...    bash_file=workload_issues.sh
+                            ...    cmd_override=./workload_issues.sh "${messages}" "Deployment" "${DEPLOYMENT_NAME}"
+                            ...    env=${env}
+                            ...    include_in_history=False
+                            
+                            TRY
+                                ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''') if r'''${issues.stdout}'''.strip() else []    json
+                                FOR    ${issue}    IN    @{issue_list}
+                                    ${issue_key}=    Set Variable    ${issue["title"]}
+                                    
+                                    # Consolidate issues by title
+                                    IF    "${issue_key}" in $consolidated_issues
+                                        ${existing_issue}=    Evaluate    $consolidated_issues["${issue_key}"]
+                                        ${updated_count}=    Evaluate    $existing_issue.get('count', 1) + 1
+                                        ${updated_objects}=    Catenate    ${existing_issue.get('affected_objects', '')}    ${item["kind"]}/${item["name"]},${SPACE}
+                                        ${updated_issue}=    Evaluate    {**$existing_issue, 'count': ${updated_count}, 'affected_objects': "${updated_objects}"}
+                                        ${updated_dict}=    Evaluate    {**$consolidated_issues, "${issue_key}": $updated_issue}
+                                        Set Test Variable    ${consolidated_issues}    ${updated_dict}
+                                    ELSE
+                                        ${new_issue}=    Evaluate    {**$issue, 'count': 1, 'affected_objects': "${item["kind"]}/${item["name"]}, "}
+                                        ${updated_dict}=    Evaluate    {**$consolidated_issues, "${issue_key}": $new_issue}
+                                        Set Test Variable    ${consolidated_issues}    ${updated_dict}
+                                    END
+                                END
+                            EXCEPT
+                                Log    Warning: Failed to parse workload issues for ${item["kind"]} ${item["name"]}
+                            END
                         END
                     END
-                    ${consolidated_pod_details}=    Catenate    SEPARATOR=\n    @{all_pod_messages}
                     
-                    RW.Core.Add Issue
-                    ...    severity=${sample_pod_issue["severity"]}
-                    ...    expected=Pod readiness and health should be maintained for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                    ...    actual=${pod_count} pods are experiencing issues for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                    ...    title=Multiple Pod Issues for Deployment `${DEPLOYMENT_NAME}` (${pod_count} pods affected)
-                    ...    reproduce_hint=${events.cmd}
-                    ...    details=**Affected Pods:** ${pod_count}\n\n${consolidated_pod_details}
-                    ...    next_steps=${sample_pod_issue["next_steps"]}\n${related_resource_recommendations}
-                END
-                
-                # Create issues for deployment/replicaset level problems (should be fewer)
-                ${processed_deployment_titles}=    Create Dictionary
-                FOR    ${issue}    IN    @{deployment_issues}
-                    ${title_key}=    Set Variable    ${issue["title"]}
-                    ${is_duplicate}=    Evaluate    $processed_deployment_titles.get("${title_key}", False)
-                    IF    not ${is_duplicate}
-                        ${updated_titles}=    Evaluate    {**$processed_deployment_titles, "${title_key}": True}
-                        Set Test Variable    ${processed_deployment_titles}    ${updated_titles}
+                    # Create consolidated issues
+                    ${issue_keys}=    Evaluate    list($consolidated_issues.keys())
+                    FOR    ${issue_key}    IN    @{issue_keys}
+                        ${issue}=    Evaluate    $consolidated_issues["${issue_key}"]
+                        ${count}=    Evaluate    $issue.get('count', 1)
+                        ${affected_objects}=    Evaluate    $issue.get('affected_objects', '').rstrip(', ')
+                        
+                        IF    ${count} > 1
+                            ${title_suffix}=    Set Variable    (${count} objects affected)
+                            ${details_prefix}=    Set Variable    **Affected Objects (${count}):** ${affected_objects}\n\n
+                        ELSE
+                            ${title_suffix}=    Set Variable    ${EMPTY}
+                            ${details_prefix}=    Set Variable    **Affected Object:** ${affected_objects}\n\n
+                        END
+                        
                         RW.Core.Add Issue
                         ...    severity=${issue["severity"]}
-                        ...    expected=No deployment-level warning events should be present for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                        ...    actual=Deployment-level warning events found for Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                        ...    title=${issue["title"]}
+                        ...    expected=No warning events should be present for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                        ...    actual=${issue["title"]} detected for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                        ...    title=${issue["title"]} in Deployment `${DEPLOYMENT_NAME}` ${title_suffix}
                         ...    reproduce_hint=${events.cmd}
-                        ...    details=${issue["details"]}
-                        ...    next_steps=${issue["next_steps"]}\n${related_resource_recommendations}
+                        ...    details=${details_prefix}${issue["details"]}
+                        ...    next_steps=${issue["next_steps"]}
                     END
+                    
+                    # Add note about filtered stale events if applicable
+                    IF    ${deployment_scaled_down}
+                        ${issue_keys_length}=    Get Length    ${issue_keys}
+                        ${filtered_count}=    Evaluate    ${total_affected_objects} - ${issue_keys_length}
+                        IF    ${filtered_count} > 0
+                            RW.Core.Add Pre To Report    **ℹ️ Filtered ${filtered_count} stale pod events from before scale-down**
+                        END
+                    END
+                END
+                
+                RW.Core.Add Pre To Report    **⚠️ Recent Warning Events:** ${warning_count} warnings detected
+                RW.Core.Add Pre To Report    **Warning Event Categories:** 
+                FOR    ${event_type}    IN    @{event_data.get('events_by_type', [])}
+                    IF    '${event_type["type"]}' == 'Warning'
+                        FOR    ${reason_info}    IN    @{event_type.get('reasons', [])}
+                            RW.Core.Add Pre To Report    - **${reason_info["reason"]}**: ${reason_info["count"]} events
+                        END
+                    END
+                END
+            ELSE
+                RW.Core.Add Pre To Report    **✅ No Warning Events:** Clean event history
+            END
+            
+            # Add chronological timeline
+            ${recent_events}=    Evaluate    $event_data.get('chronological_events', [])[-10:]
+            ${recent_events_length}=    Get Length    ${recent_events}
+            IF    ${recent_events_length} > 0
+                RW.Core.Add Pre To Report    **🕒 Recent Event Timeline (Last 10 Events):**
+                FOR    ${event}    IN    @{recent_events}
+                    ${event_emoji}=    Set Variable If    '${event["type"]}' == 'Warning'    ⚠️    ℹ️
+                    RW.Core.Add Pre To Report    ${event_emoji} **${event["timestamp"]}** [${event["kind"]}/${event["name"]}] ${event["reason"]}: ${event["message"]}
                 END
             END
             
-            ${history}=    RW.CLI.Pop Shell History
-            RW.Core.Add Pre To Report    ${events.stdout}
-            RW.Core.Add Pre To Report    Commands Used: ${history}
+        EXCEPT
+            Log    Warning: Failed to parse comprehensive event data
+            RW.Core.Add Pre To Report    **Event Collection:** Completed but detailed parsing failed
         END
+        
+        ${history}=    RW.CLI.Pop Shell History
+        RW.Core.Add Pre To Report    Commands Used: ${history}
     END
 
-Fetch Deployment Workload Details For `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
-    [Documentation]    Fetches the current state of the deployment for future review in the report.
-    [Tags]    access:read-only  deployment    details    manifest    info    ${DEPLOYMENT_NAME}
-    ${deployment}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o yaml
+Check Deployment Replica Status for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
+    [Documentation]    Inspects the deployment replica status including desired vs available replicas and identifies any scaling issues.
+    [Tags]    access:read-only    deployment    replicas    scaling    status    ${DEPLOYMENT_NAME}
+    ${replica_status}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '{name: .metadata.name, namespace: .metadata.namespace, spec_replicas: .spec.replicas, status_replicas: (.status.replicas // 0), ready_replicas: (.status.readyReplicas // 0), available_replicas: (.status.availableReplicas // 0), unavailable_replicas: (.status.unavailableReplicas // 0), updated_replicas: (.status.updatedReplicas // 0), conditions: .status.conditions, strategy: .spec.strategy, debug: {spec_replicas: .spec.replicas, status_replicas: .status.replicas, ready_replicas: .status.readyReplicas, available_replicas: .status.availableReplicas}}'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
     
-    # Check for command failure and create generic issue if needed
-    IF    ${deployment.returncode} != 0
+    IF    ${replica_status.returncode} != 0
         RW.Core.Add Issue
-        ...    severity=2
-        ...    expected=Deployment manifest should be retrievable for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-        ...    actual=Failed to retrieve deployment manifest for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-        ...    title=Unable to Fetch Deployment Manifest for `${DEPLOYMENT_NAME}`
-        ...    reproduce_hint=${deployment.cmd}
-        ...    details=Command failed with exit code ${deployment.returncode}:\n\nSTDOUT:\n${deployment.stdout}\n\nSTDERR:\n${deployment.stderr}
-        ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
-        ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Failed to retrieve deployment manifest:\n\n${deployment.stderr}
-        RW.Core.Add Pre To Report    Commands Used: ${history}
-    ELSE
-        ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Snapshot of deployment state:\n\n${deployment.stdout}
-        RW.Core.Add Pre To Report    Commands Used: ${history}
-    END
-
-Inspect Deployment Replicas for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-    [Documentation]    Pulls the replica information for a given deployment and checks if it's highly available
-    ...    , if the replica counts are the expected / healthy values, and raises issues if it is not progressing
-    ...    and is missing pods.
-    [Tags]
-    ...    deployment
-    ...    replicas
-    ...    desired
-    ...    actual
-    ...    available
-    ...    ready
-    ...    unhealthy
-    ...    rollout
-    ...    stuck
-    ...    pods
-    ...    ${DEPLOYMENT_NAME}
-    ...    access:read-only
-    ${deployment_replicas}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '.status | {desired_replicas: .replicas, ready_replicas: (.readyReplicas // 0), missing_replicas: ((.replicas // 0) - (.readyReplicas // 0)), unavailable_replicas: (.unavailableReplicas // 0), available_condition: (if any(.conditions[]; .type == "Available") then (.conditions[] | select(.type == "Available")) else "Condition not available" end), progressing_condition: (if any(.conditions[]; .type == "Progressing") then (.conditions[] | select(.type == "Progressing")) else "Condition not available" end)}'
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ...    env=${env}
-    ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
-    
-    # Check for command failure and create generic issue if needed
-    IF    ${deployment_replicas.returncode} != 0
-        RW.Core.Add Issue
-        ...    severity=2
+        ...    severity=1
         ...    expected=Deployment replica status should be retrievable for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
         ...    actual=Failed to retrieve deployment replica status for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-        ...    title=Unable to Inspect Deployment Replicas for `${DEPLOYMENT_NAME}`
-        ...    reproduce_hint=${deployment_replicas.cmd}
-        ...    details=Command failed with exit code ${deployment_replicas.returncode}:\n\nSTDOUT:\n${deployment_replicas.stdout}\n\nSTDERR:\n${deployment_replicas.stderr}
-        ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
-        ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Failed to retrieve deployment replica status:\n\n${deployment_replicas.stderr}
-        RW.Core.Add Pre To Report    Commands Used: ${history}
+        ...    title=Unable to Check Replica Status for Deployment `${DEPLOYMENT_NAME}`
+        ...    reproduce_hint=${replica_status.cmd}
+        ...    details=Command failed with exit code ${replica_status.returncode}:\n\nSTDOUT:\n${replica_status.stdout}\n\nSTDERR:\n${replica_status.stderr}
+        ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace
     ELSE
         TRY
-            ${deployment_status}=    Evaluate    json.loads(r'''${deployment_replicas.stdout}''') if r'''${deployment_replicas.stdout}'''.strip() else {}    json
+            ${status_data}=    Evaluate    json.loads(r'''${replica_status.stdout}''')    json
+            ${desired_replicas}=    Evaluate    $status_data.get('spec_replicas', 0)
+            ${ready_replicas}=    Evaluate    $status_data.get('ready_replicas', 0)
+            ${available_replicas}=    Evaluate    $status_data.get('available_replicas', 0)
+            ${unavailable_replicas}=    Evaluate    $status_data.get('unavailable_replicas', 0)
+            
+            RW.Core.Add Pre To Report    **Deployment Replica Status for `${DEPLOYMENT_NAME}`**
+            RW.Core.Add Pre To Report    **Desired:** ${desired_replicas} | **Ready:** ${ready_replicas} | **Available:** ${available_replicas} | **Unavailable:** ${unavailable_replicas}
+            RW.Core.Add Pre To Report    **Debug Info:** ${status_data.get('debug', {})}
+            
+            # Check for scaling issues (corrected logic for scale-to-zero)
+            IF    ${ready_replicas} == 0 and ${desired_replicas} > 0
+                RW.Core.Add Issue
+                ...    severity=1
+                ...    expected=${desired_replicas} ready replicas for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                ...    actual=${ready_replicas} ready replicas for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                ...    title=Deployment `${DEPLOYMENT_NAME}` Has No Ready Replicas
+                ...    reproduce_hint=${replica_status.cmd}
+                ...    details=Deployment is configured to run ${desired_replicas} replicas but has ${ready_replicas} ready replicas.\n\nStatus: Ready=${ready_replicas}, Available=${available_replicas}, Unavailable=${unavailable_replicas}
+                ...    next_steps=Check pod status and events for deployment issues\nInvestigate resource constraints or scheduling problems\nReview deployment configuration and health checks
+            ELSE IF    ${ready_replicas} < ${desired_replicas} and ${desired_replicas} > 0
+                ${missing_replicas}=    Evaluate    ${desired_replicas} - ${ready_replicas}
+                RW.Core.Add Issue
+                ...    severity=2
+                ...    expected=${desired_replicas} ready replicas for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                ...    actual=${ready_replicas} ready replicas for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                ...    title=Deployment `${DEPLOYMENT_NAME}` is Missing ${missing_replicas} Ready Replicas
+                ...    reproduce_hint=${replica_status.cmd}
+                ...    details=Deployment needs ${missing_replicas} more ready replicas to meet desired state of ${desired_replicas}.\n\nStatus: Ready=${ready_replicas}, Available=${available_replicas}, Unavailable=${unavailable_replicas}
+                ...    next_steps=Check pod status and events for scaling issues\nInvestigate resource constraints or scheduling problems\nReview deployment rollout status
+            ELSE IF    ${desired_replicas} == 0
+                RW.Core.Add Pre To Report    **ℹ️ Deployment is intentionally scaled to 0 replicas**
+            ELSE
+                RW.Core.Add Pre To Report    **✅ Replica status is healthy**
+            END
+            
         EXCEPT
-            Log    Warning: Failed to parse deployment status JSON, using empty status
-            ${deployment_status}=    Create Dictionary
-        END
-        
-        # Set safe defaults for missing keys
-        ${available_condition}=    Evaluate    $deployment_status.get('available_condition', {'status': 'Unknown', 'message': 'Status unavailable'})
-        ${ready_replicas}=    Evaluate    $deployment_status.get('ready_replicas', 0)
-        ${desired_replicas}=    Evaluate    $deployment_status.get('desired_replicas', 0)
-        ${unavailable_replicas}=    Evaluate    $deployment_status.get('unavailable_replicas', 0)
-        ${progressing_condition}=    Evaluate    $deployment_status.get('progressing_condition', {'status': 'Unknown'})
-        
-        IF    "${available_condition['status']}" == "False" or ${ready_replicas} == 0
-            ${item_next_steps}=    RW.CLI.Run Bash File
-            ...    bash_file=workload_next_steps.sh
-            ...    cmd_override=./workload_next_steps.sh "${available_condition['message']}" "Deployment" "${DEPLOYMENT_NAME}"
-            ...    env=${env}
-            ...    include_in_history=False
-            RW.Core.Add Issue
-            ...    severity=1
-            ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should have minimum availability / pod.
-            ...    actual=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` does not have minimum availability / pods.
-            ...    title=Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` is unavailable
-            ...    reproduce_hint=View Commands Used in Report Output
-            ...    details=Deployment `${DEPLOYMENT_NAME}` has ${ready_replicas} ready pods and needs ${desired_replicas}
-            ...    next_steps=${item_next_steps.stdout}
-        ELSE IF    ${unavailable_replicas} > 0 and "${available_condition['status']}" == "True" and "${progressing_condition['status']}" == "False"
+            Log    Warning: Failed to parse replica status JSON
             RW.Core.Add Issue
             ...    severity=3
-            ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should have ${desired_replicas} pods.
-            ...    actual=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` has ${ready_replicas} pods.
-            ...    title=Deployment `${DEPLOYMENT_NAME}` has Missing Replicas in Namespace `${NAMESPACE}`
-            ...    reproduce_hint=View Commands Used in Report Output
-            ...    details=Deployment `${DEPLOYMENT_NAME}` has ${ready_replicas} ready pods but needs ${desired_replicas}
-            ...    next_steps=Check pod status and investigate why replicas are not ready
+            ...    expected=Replica status should be parseable for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    actual=Failed to parse replica status for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    title=Replica Status Parsing Failed for Deployment `${DEPLOYMENT_NAME}`
+            ...    reproduce_hint=${replica_status.cmd}
+            ...    details=Command succeeded but JSON parsing failed. Raw output:\n${replica_status.stdout}
+            ...    next_steps=Review deployment status output manually\nCheck for formatting issues in kubectl output
         END
         
         ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Deployment Replica Status: Ready=${ready_replicas}/${desired_replicas}, Unavailable=${unavailable_replicas}
         RW.Core.Add Pre To Report    Commands Used: ${history}
+    END
+
+Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
+    [Documentation]    Checks for container restarts and provides details on restart patterns that might indicate application issues.
+    [Tags]    access:read-only    containers    restarts    pods    deployment    ${DEPLOYMENT_NAME}
+    # Skip pod-related checks if deployment is scaled to 0
+    IF    not ${SKIP_POD_CHECKS}
+        ${container_restarts}=    RW.CLI.Run Bash File
+        ...    bash_file=container_restarts.sh
+        ...    env=${env}
+        ...    secret_file__kubeconfig=${kubeconfig}
+        ...    include_in_history=false
+        
+        IF    ${container_restarts.returncode} != 0
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Container restart analysis should complete successfully for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    actual=Failed to analyze container restarts for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    title=Container Restart Analysis Failed for Deployment `${DEPLOYMENT_NAME}`
+            ...    reproduce_hint=${container_restarts.cmd}
+            ...    details=Restart analysis failed with exit code ${container_restarts.returncode}:\n\nSTDOUT:\n${container_restarts.stdout}\n\nSTDERR:\n${container_restarts.stderr}
+            ...    next_steps=Verify pod access and kubectl connectivity\nCheck if deployment exists and has running pods\nReview container restart analysis script
+        ELSE
+            TRY
+                # Try to parse as JSON first, but handle plain text responses gracefully
+                ${output_text}=    Set Variable    ${container_restarts.stdout.strip()}
+                
+                # Check if output looks like JSON (starts with { or [)
+                ${is_json}=    Evaluate    $output_text.startswith(('{', '[')) if $output_text else False
+                
+                IF    ${is_json}
+                    ${restart_data}=    Evaluate    json.loads(r'''${container_restarts.stdout}''')    json
+                    ${restart_issues}=    Evaluate    $restart_data.get('issues', [])
+                    ${restart_summary}=    Evaluate    $restart_data.get('summary', {})
+                ELSE
+                    # Handle plain text response (no restarts found)
+                    ${restart_data}=    Create Dictionary    issues=@{EMPTY}    summary=@{EMPTY}
+                    ${restart_issues}=    Create List
+                    ${restart_summary}=    Create Dictionary    total_containers=0    containers_with_restarts=0
+                END
+                
+                FOR    ${issue}    IN    @{restart_issues}
+                    RW.Core.Add Issue
+                    ...    severity=${issue.get('severity', 3)}
+                    ...    expected=Containers should run without frequent restarts for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                    ...    actual=${issue.get('title', 'Container restart issue detected')} in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                    ...    title=${issue.get('title', 'Container Restart Issue')} in Deployment `${DEPLOYMENT_NAME}`
+                    ...    reproduce_hint=Check container status and logs for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                    ...    details=${issue.get('details', 'Container restart analysis detected potential issues')}
+                    ...    next_steps=${issue.get('next_steps', 'Investigate container logs and health checks\nReview resource limits and application configuration')}
+                END
+                
+                RW.Core.Add Pre To Report    **Container Restart Analysis for Deployment `${DEPLOYMENT_NAME}`**
+                
+                IF    ${is_json}
+                    RW.Core.Add Pre To Report    **Total Containers Analyzed:** ${restart_summary.get('total_containers', 0)}
+                    RW.Core.Add Pre To Report    **Containers with Restarts:** ${restart_summary.get('containers_with_restarts', 0)}
+                ELSE
+                    RW.Core.Add Pre To Report    **Result:** ${output_text}
+                END
+                
+                RW.Core.Add Pre To Report    **Time Window:** ${CONTAINER_RESTART_AGE}
+                RW.Core.Add Pre To Report    **Restart Threshold:** ${CONTAINER_RESTART_THRESHOLD}
+                
+            EXCEPT
+                Log    Warning: Failed to parse container restart data
+                RW.Core.Add Pre To Report    **Container Restart Analysis:** Completed but results parsing failed
+                RW.Core.Add Pre To Report    ${container_restarts.stdout}
+            END
+        END
     END

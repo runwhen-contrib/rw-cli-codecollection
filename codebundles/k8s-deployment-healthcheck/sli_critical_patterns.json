@@ -3,7 +3,6 @@
     "GenericError": {
       "description": "Generic error patterns that indicate application failures",
       "patterns": [
-        "error|ERROR",
         "exception|Exception|EXCEPTION",
         "fatal|Fatal|FATAL",
         "panic|Panic|PANIC",

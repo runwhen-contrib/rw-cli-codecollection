@@ -138,7 +138,7 @@ def main():
         issues_json["issues"].append({
             "title": title,
             "details": details_json,
-            "next_steps": unique_next_steps,
+            "next_steps": "\n".join(unique_next_steps),
             "severity": max_severity, 
             "severity_label": severity_label
         })

@@ -290,7 +290,7 @@
     {
       "match": "unauthorized",
       "category": "Auth",
-      "severity": 3,
+      "severity": 4,
       "next_steps": [
         "Verify user credentials and authentication settings for ${WORKLOAD_TYPE} ${WORKLOAD_NAME} in namespace ${NAMESPACE}",
         "Check for missing or expired tokens"

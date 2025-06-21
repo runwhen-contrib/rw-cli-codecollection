@@ -340,13 +340,12 @@ commands:
     or trends that require further investigation and remediation to ensure the overall
     health of the Kubernetes environment.'
 - command: 'kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE}
-    -o json | jq ''.status | {desired_replicas: .replicas, ready_replicas: (.readyReplicas
-    // 0), missing_replicas: ((.replicas // 0) - (.readyReplicas // 0)), unavailable_replicas:
-    (.unavailableReplicas // 0), available_condition: (if any(.conditions[]; .type
-    == "Available") then (.conditions[] | select(.type == "Available")) else "Condition
-    not available" end), progressing_condition: (if any(.conditions[]; .type == "Progressing")
-    then (.conditions[] | select(.type == "Progressing")) else "Condition not available"
-    end)}'''
+    -o json | jq ''{desired_replicas: (.spec.replicas // .status.replicas // 0), ready_replicas: (.status.readyReplicas
+    // 0), missing_replicas: ((.spec.replicas // .status.replicas // 0) - (.status.readyReplicas // 0)), unavailable_replicas:
+    (.status.unavailableReplicas // 0), available_condition: (if any(.status.conditions[]; .type
+    == "Available") then (.status.conditions[] | select(.type == "Available")) else {"status": "Unknown", "message": "Condition not available"} end), progressing_condition: (if any(.status.conditions[]; .type == "Progressing")
+    then (.status.conditions[] | select(.type == "Progressing")) else {"status": "Unknown", "message": "Condition not available"}
+    end), spec_replicas: .spec.replicas, status_replicas: .status.replicas}'''
   doc_links: '
 
     '
@@ -384,6 +383,92 @@ commands:
     5. Gathering detailed information about the current state of a deployment in order
     to make informed decisions and take appropriate actions, such as scaling or modifying
     its configuration.'
+- command: 'kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq ''(now
+    - (3*60*60)) as $time_limit | [ .items[] | select((.involvedObject.kind == "Deployment"
+    or .involvedObject.kind == "ReplicaSet" or .involvedObject.kind == "Pod") and
+    (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}")) and (.lastTimestamp
+    | fromdateiso8601) >= $time_limit) | {type: .type, kind: .involvedObject.kind,
+    name: .involvedObject.name, reason: .reason, message: .message, count: .count,
+    firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp} ] | sort_by(.lastTimestamp)'''
+  doc_links: '
+
+    - [Kubectl Events Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#events){:target="_blank"}
+
+    - [Kubernetes Events API](https://kubernetes.io/docs/reference/using-api/api-concepts/#kubernetes-events){:target="_blank"}
+
+    - [Debugging Kubernetes Applications](https://kubernetes.io/docs/tasks/debug/debug-application/){:target="_blank"}'
+  explanation: This command retrieves all events (Normal and Warning) related to a
+    specific deployment, its replicasets, and pods within the last 3 hours. It provides
+    comprehensive debugging context by showing the complete event timeline with timestamps,
+    event types, reasons, and messages in chronological order.
+  multi_line_details: '
+
+    # Get all events for the deployment and related resources in the last 3 hours
+
+    kubectl get events --context ${CONTEXT} -n ${NAMESPACE} -o json | \
+
+    jq ''(now - (3*60*60)) as $time_limit |
+
+    [ .items[] |
+
+    select(
+
+    (.involvedObject.kind == "Deployment" or 
+
+     .involvedObject.kind == "ReplicaSet" or 
+
+     .involvedObject.kind == "Pod") and
+
+    (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}")) and
+
+    (.lastTimestamp | fromdateiso8601) >= $time_limit
+
+    ) |
+
+    {
+
+    type: .type,
+
+    kind: .involvedObject.kind,
+
+    name: .involvedObject.name,
+
+    reason: .reason,
+
+    message: .message,
+
+    count: .count,
+
+    firstTimestamp: .firstTimestamp,
+
+    lastTimestamp: .lastTimestamp
+
+    }
+
+    ] |
+
+    sort_by(.lastTimestamp)''
+
+    '
+  name: collect_all_events_related_to_deployment_deployment_name_in_namespace_namespace
+  when_is_it_useful: '1. Comprehensive debugging when investigating deployment issues,
+    providing complete event history including both normal operations and warnings.
+
+
+    2. Understanding the sequence of events that led to a deployment problem, especially
+    useful when troubleshooting CrashLoopBackoff scenarios or scaling issues.
+
+
+    3. Post-incident analysis to review what happened during deployment updates, scaling
+    events, or pod lifecycle changes over time.
+
+
+    4. Correlating different types of events (Normal and Warning) across deployment,
+    replicaset, and pod levels to get a complete picture of system behavior.
+
+
+    5. Monitoring deployment health patterns and identifying recurring issues by reviewing
+    historical event data across all related Kubernetes resources.'
 - command: bash 'event_anomalies.sh'
   doc_links: '
 
@@ -655,3 +740,22 @@ user_variables:
     examples:
       - "true"
       - "false"
+  - name: MAX_LOG_LINES
+    default: "100"
+    description: "Maximum number of log lines to fetch per container to prevent API overload. Optimized for frequent SLI checks."
+    type: string
+    required: false
+    examples:
+      - "50"
+      - "100"
+      - "200"
+      
+  - name: MAX_LOG_BYTES
+    default: "256000"
+    description: "Maximum log size in bytes to fetch per container to prevent API overload. Optimized for frequent SLI checks."
+    type: string
+    required: false
+    examples:
+      - "128000"
+      - "256000"
+      - "512000"
