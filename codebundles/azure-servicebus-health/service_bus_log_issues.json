@@ -2,7 +2,7 @@
   "namespace": "sb-demo-primary",
   "issues": [
     {
-      "severity": 3,
+      "severity": 4,
       "title": "No logs found for Service Bus namespace sb-demo-primary",
       "next_step": "Verify that diagnostic settings are configured to send logs to Log Analytics",
       "details": "No logs detected in Log Analytics"

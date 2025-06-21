@@ -267,7 +267,7 @@ add_issue() {
 # Check namespace size
 size_percent=$(jq '.size.current_percent' <<< "$capacity_data")
 if (( $(echo "$size_percent > 80" | bc -l) )); then
-  add_issue 2 \
+  add_issue 3 \
     "Service Bus namespace $SB_NAMESPACE_NAME is approaching size limit (${size_percent}%)" \
     "Consider implementing message cleanup strategies or upgrading SKU/capacity" \
     "Current size: $(jq '.size.current_gb' <<< "$capacity_data") GB of $(jq '.size.max_gb' <<< "$capacity_data") GB"
@@ -276,7 +276,7 @@ fi
 # Check for throttling
 throttled_max=$(jq '.throughput.throttled_max' <<< "$capacity_data")
 if (( $(echo "$throttled_max > 0" | bc -l) )); then
-  add_issue 2 \
+  add_issue 3 \
     "Service Bus namespace $SB_NAMESPACE_NAME is experiencing throttling" \
     "Consider increasing capacity units or optimizing message processing" \
     "Throttled requests detected: $throttled_max"
@@ -310,7 +310,7 @@ fi
 # Check connection usage
 connections_percent=$(jq '.connections.percent' <<< "$capacity_data")
 if (( $(echo "$connections_percent > 80" | bc -l) )); then
-  add_issue 2 \
+  add_issue 3 \
     "Service Bus namespace $SB_NAMESPACE_NAME is approaching connection limit (${connections_percent}%)" \
     "Review connection usage patterns and consider upgrading capacity if needed" \
     "Current connections: $(jq '.connections.current' <<< "$capacity_data") of $(jq '.connections.max' <<< "$capacity_data")"

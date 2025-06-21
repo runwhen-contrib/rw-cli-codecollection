@@ -2,7 +2,7 @@
   "namespace": "sb-demo-primary",
   "issues": [
     {
-      "severity": 2,
+      "severity": 4,
       "title": "Public network access enabled on `sb-demo-primary`",
       "next_step": "Disable or restrict public access via firewall / Private Link",
       "details": "publicNetworkAccess=Enabled"

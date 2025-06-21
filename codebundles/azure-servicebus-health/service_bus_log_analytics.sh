@@ -80,7 +80,7 @@ if [[ -z "$workspace_id" ]]; then
   # Create a minimal output indicating no workspace
   jq -n '{operationLogs: [], requestLogs: [], errorLogs: []}' > "$LOG_OUTPUT"
   jq -n --arg ns "$SB_NAMESPACE_NAME" \
-    '{namespace:$ns,issues:[{severity:3,title:"No Log Analytics workspace found",next_step:"Configure diagnostic settings to send logs to Log Analytics",details:"No Log Analytics workspace detected"}]}' > "$ISSUES_OUTPUT"
+    '{namespace:$ns,issues:[{severity:4,title:"No Log Analytics workspace found",next_step:"Configure diagnostic settings to send logs to Log Analytics",details:"No Log Analytics workspace detected"}]}' > "$ISSUES_OUTPUT"
   echo "✅ Analysis complete (no workspace found). Issues written to $ISSUES_OUTPUT"
   exit 0
 fi
@@ -179,7 +179,7 @@ if [[ "$failed_ops_count" -gt 0 ]]; then
   # Get the most recent failed operations (up to 5)
   recent_failed_ops=$(jq '.operationLogs[] | select(.status_s == "Failed") | .[0:5]' <<< "$logs_data")
   
-  add_issue 2 \
+  add_issue 3 \
     "Service Bus namespace $SB_NAMESPACE_NAME has $failed_ops_count failed operations" \
     "Review the failed operations and investigate the root causes" \
     "Failed operations detected"
@@ -187,7 +187,7 @@ fi
 
 # Check if Log Analytics isn't set up properly
 if [[ "$error_count" -eq 0 && "$failed_ops_count" -eq 0 && $(jq '.operationLogs | length' <<< "$logs_data") -eq 0 ]]; then
-  add_issue 3 \
+  add_issue 4 \
     "No logs found for Service Bus namespace $SB_NAMESPACE_NAME" \
     "Verify that diagnostic settings are configured to send logs to Log Analytics" \
     "No logs detected in Log Analytics"

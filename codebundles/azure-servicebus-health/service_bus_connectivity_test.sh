@@ -146,7 +146,7 @@ add_issue() {
 # Check for AMQP port connectivity
 amqp_port_result=$(jq -r '.tests.amqp_port_connectivity' <<< "$connectivity_data")
 if [[ "$amqp_port_result" == "failure" ]]; then
-  add_issue 1 \
+  add_issue 2 \
     "AMQP port (5671) connectivity failed for Service Bus namespace $SB_NAMESPACE_NAME" \
     "Check network security groups, firewall rules, and private endpoint configuration" \
     "AMQP connectivity is required for Service Bus clients using the AMQP protocol"
@@ -155,7 +155,7 @@ fi
 # Check for HTTPS port connectivity
 https_port_result=$(jq -r '.tests.https_port_connectivity' <<< "$connectivity_data")
 if [[ "$https_port_result" == "failure" ]]; then
-  add_issue 1 \
+  add_issue 2 \
     "HTTPS port (443) connectivity failed for Service Bus namespace $SB_NAMESPACE_NAME" \
     "Check network security groups, firewall rules, and private endpoint configuration" \
     "HTTPS connectivity is required for Service Bus clients using the REST API"
@@ -164,7 +164,7 @@ fi
 # Check for DNS resolution
 dns_success=$(jq -r '.tests.dns_resolution' <<< "$connectivity_data")
 if [[ "$dns_success" == "false" ]]; then
-  add_issue 1 \
+  add_issue 2 \
     "DNS resolution failed for Service Bus hostname: $hostname" \
     "Check DNS configuration and private DNS zones if using private endpoints" \
     "DNS resolution is required for Service Bus connectivity"
@@ -191,7 +191,7 @@ if [[ "$public_network_access" == "Deny" ]]; then
       "Configure IP rules to allow your IP address or set up private endpoints" \
       "Current configuration prevents all access to the namespace"
   elif [[ "$https_port_result" == "failure" || "$amqp_port_result" == "failure" ]]; then
-    add_issue 2 \
+    add_issue 3 \
       "Current IP address may not be allowed to access Service Bus namespace $SB_NAMESPACE_NAME" \
       "Add your current IP address to the network rules if needed" \
       "Public network access is restricted, and your current IP may not be in the allowed list"

@@ -73,7 +73,7 @@ add_issue() {
 # Check for disabled queues
 disabled_queues=$(jq -r '[.[] | select(.status == "Disabled") | .name] | join(", ")' <<< "$queues")
 if [[ -n "$disabled_queues" ]]; then
-  add_issue 2 \
+  add_issue 3 \
     "Service Bus namespace $SB_NAMESPACE_NAME has disabled queues: $disabled_queues" \
     "Investigate why these queues are disabled and enable them if needed" \
     "Disabled queues detected"
@@ -93,7 +93,7 @@ for queue_name in $(jq -r '.[].name' <<< "$queues"); do
   # Check dead letter count
   dead_letter_count=$(jq -r '.countDetails.deadLetterMessageCount' <<< "$queue_details")
   if [[ "$dead_letter_count" -gt 0 ]]; then
-    add_issue 2 \
+    add_issue 3 \
       "Queue '$queue_name' has $dead_letter_count dead-lettered messages" \
       "Investigate dead-lettered messages to identify and fix processing issues" \
       "Dead-lettered messages detected in queue: $queue_name"
@@ -115,7 +115,7 @@ for queue_name in $(jq -r '.[].name' <<< "$queues"); do
   size_percent=$(( (size_bytes * 100) / max_size_bytes ))
   
   if [[ "$size_percent" -gt 80 ]]; then
-    add_issue 2 \
+    add_issue 3 \
       "Queue '$queue_name' is at ${size_percent}% of maximum size" \
       "Consider implementing auto-delete of processed messages or increasing queue size" \
       "Queue approaching size limit: $queue_name ($size_percent%)"

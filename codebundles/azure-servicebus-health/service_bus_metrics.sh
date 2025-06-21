@@ -107,7 +107,7 @@ fi
 # Check for throttling
 throttled=$(jq -r '.ThrottledRequests.value[0].timeseries[0].data | map(select(.total > 0)) | length' <<< "$metrics_data")
 if [[ "$throttled" -gt 0 ]]; then
-  add_issue 2 \
+  add_issue 3 \
     "Service Bus namespace $SB_NAMESPACE_NAME is experiencing throttling" \
     "Consider upgrading the SKU or scaling up capacity units if this is a persistent issue" \
     "Throttling detected in metrics"
@@ -116,7 +116,7 @@ fi
 # Check for high user errors
 user_errors=$(jq -r '.UserErrors.value[0].timeseries[0].data | map(select(.total > 10)) | length' <<< "$metrics_data")
 if [[ "$user_errors" -gt 0 ]]; then
-  add_issue 2 \
+  add_issue 3 \
     "Service Bus namespace $SB_NAMESPACE_NAME has a high number of user errors" \
     "Review application logs and SAS key policies to ensure proper authentication and permissions" \
     "High user error count detected in metrics"
@@ -125,7 +125,7 @@ fi
 # Check for namespace size usage
 size_percent=$(jq -r '.Size.value[0].timeseries[0].data | map(.maximum) | max // 0' <<< "$metrics_data")
 if (( $(echo "$size_percent > 80" | bc -l) )); then
-  add_issue 2 \
+  add_issue 3 \
     "Service Bus namespace $SB_NAMESPACE_NAME is approaching storage limit (${size_percent}%)" \
     "Consider implementing a message purging strategy or increasing the namespace size limit" \
     "Storage usage exceeding 80%"

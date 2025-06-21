@@ -149,8 +149,8 @@ Suite Initialization
             ...    actual=Deployment `${DEPLOYMENT_NAME}` is intentionally scaled to zero replicas
             ...    title=Deployment `${DEPLOYMENT_NAME}` is Scaled Down (Informational)
             ...    reproduce_hint=kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o yaml
-            ...    details=Deployment `${DEPLOYMENT_NAME}` is currently scaled to 0 replicas (spec.replicas=0). This is an intentional configuration and not an error. All pod-related healthchecks have been skipped for efficiency.
-            ...    next_steps=This is informational only. If the deployment should be running, scale it up using:\nkubectl scale deployment/${DEPLOYMENT_NAME} --replicas=<desired_count> --context ${CONTEXT} -n ${NAMESPACE}
+            ...    details=Deployment `${DEPLOYMENT_NAME}` is currently scaled to 0 replicas (spec.replicas=0). This is an intentional configuration and not an error. All pod-related healthchecks have been skipped for efficiency. If the deployment should be running, scale it up using:\nkubectl scale deployment/${DEPLOYMENT_NAME} --replicas=<desired_count> --context ${CONTEXT} -n ${NAMESPACE}
+            ...    next_steps=This is informational only. If the deployment should be running, scale it up.
             
             RW.Core.Add Pre To Report    ℹ️ **Deployment `${DEPLOYMENT_NAME}` is scaled to 0 replicas - Skipping pod-related checks**
             RW.Core.Add Pre To Report    **Available Condition:** ${scale_status.get('available_condition', 'Unknown')}

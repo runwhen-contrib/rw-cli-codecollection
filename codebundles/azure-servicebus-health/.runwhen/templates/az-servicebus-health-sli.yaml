@@ -25,7 +25,7 @@ spec:
     {% endif %}
     pathToRobot: codebundles/azure-servicebus-health/sli.robot
   intervalStrategy: intermezzo
-  intervalSeconds: 30
+  intervalSeconds: 600
   configProvided:
     - name: AZ_RESOURCE_GROUP
       value: "{{resource_group.name}}"
