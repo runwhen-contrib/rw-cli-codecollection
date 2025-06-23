@@ -1,4 +1,4 @@
-:nodesapiVersion: runwhen.com/v1
+apiVersion: runwhen.com/v1
 kind: Runbook
 metadata:
   name: {{slx_name}}
