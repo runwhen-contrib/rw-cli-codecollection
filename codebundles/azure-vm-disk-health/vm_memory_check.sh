@@ -1,11 +1,10 @@
 #!/bin/bash
-# invoke_disk_usage.sh
+# vm_memory_check.sh
 
 SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
 RESOURCE_GROUP=${AZ_RESOURCE_GROUP}
 VM_NAME=${VM_NAME:-""}
-OUTPUT_DIR="invoke_outputs"
-mkdir -p "$OUTPUT_DIR"
+OUTPUT_FILE="vm-memory-check.json"
 
 az account set --subscription "${SUBSCRIPTION_ID}"
 
@@ -20,6 +19,8 @@ if [ "$(echo $vms | jq length)" -eq "0" ]; then
     exit 0
 fi
 
+results=()
+
 echo "$vms" | jq -c '.[]' | while read -r vm; do
     vm_name=$(echo $vm | jq -r '.name')
     resource_group=$(echo $vm | jq -r '.resourceGroup')
@@ -32,11 +33,15 @@ echo "$vms" | jq -c '.[]' | while read -r vm; do
         continue
     fi
 
-    echo "Running disk check on $vm_name..."
-    az vm run-command invoke \
+    echo "Checking memory usage on $vm_name..."
+    memory_output=$(az vm run-command invoke \
         --resource-group "$resource_group" \
         --name "$vm_name" \
         --command-id RunShellScript \
-        --scripts "top -bn1 | grep 'Cpu(s)' | awk '{print \$2}' | sed 's/%us,//'" \
-        > "${OUTPUT_DIR}/${vm_name}_raw_output.json"
+        --scripts "free -m")
+
+    results+=("$(jq -n --arg name "$vm_name" --argjson output "$(echo "$memory_output" | jq '.')" \
+        '{vm_name: $name, memory_output: $output}')")
 done
+
+printf '%s\n' "${results[@]}" | jq -s '.' > "$OUTPUT_FILE"
