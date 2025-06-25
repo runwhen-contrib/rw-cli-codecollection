@@ -1,68 +1,45 @@
-#!/usr/bin/env bash
-#
-# Check Azure Activity Logs for APIM Management Operations
-#
-# Usage:
-#   export AZ_RESOURCE_GROUP="myResourceGroup"
-#   export APIM_NAME="myApimInstance"
-#   export TIME_PERIOD_MINUTES="60"  # Optional, defaults to 60
-#   # Optional: export AZURE_RESOURCE_SUBSCRIPTION_ID="your-subscription-id"
-#   ./apim_activity_logs.sh
-#
-# Description:
-#   - Ensures subscription context
-#   - Retrieves APIM Resource ID
-#   - Queries Azure Activity Logs for administrative operations on the APIM instance
-#   - Checks for failed operations, configuration changes, and security-related events
-#   - Writes output to apim_activity_log_issues.json => { "issues": [...] }
+#!/bin/bash
+# Script to check Azure Activity Logs for APIM management operations
+# Focuses on administrative issues that might affect functionality
 
-set -euo pipefail
+set -eo pipefail
 
-###############################################################################
-# 1) Subscription context & environment checks
-###############################################################################
-if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
-    subscription=$(az account show --query "id" -o tsv)
-    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
-else
-    subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
-    echo "Using specified subscription ID: $subscription"
-fi
+: "${APIM_NAME:?Environment variable APIM_NAME must be set}"
+: "${AZ_RESOURCE_GROUP:?Environment variable AZ_RESOURCE_GROUP must be set}"
+: "${TIME_PERIOD_MINUTES:?Environment variable TIME_PERIOD_MINUTES must be set}"
 
-echo "Switching to subscription ID: $subscription"
-az account set --subscription "$subscription" || {
-    echo "Failed to set subscription."
-    exit 1
-}
-
-: "${AZ_RESOURCE_GROUP:?Must set AZ_RESOURCE_GROUP}"
-: "${APIM_NAME:?Must set APIM_NAME}"
-
-TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-60}"
 OUTPUT_FILE="apim_activity_log_issues.json"
 issues_json='{"issues": []}'
 
-echo "[INFO] Checking APIM Activity Logs..."
-echo " APIM Name:     $APIM_NAME"
-echo " ResourceGroup: $AZ_RESOURCE_GROUP"
-echo " Time Period:   $TIME_PERIOD_MINUTES minutes"
+echo "[INFO] Checking Activity Logs for APIM \`$APIM_NAME\` in RG \`$AZ_RESOURCE_GROUP\` (last $TIME_PERIOD_MINUTES minutes)..."
 
 ###############################################################################
-# 2) Retrieve APIM resource ID
+# Set subscription context if provided
 ###############################################################################
-echo "[INFO] Retrieving APIM resource ID..."
+if [[ -n "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
+    echo "[INFO] Setting subscription context to: $AZURE_RESOURCE_SUBSCRIPTION_ID"
+    az account set --subscription "$AZURE_RESOURCE_SUBSCRIPTION_ID" || {
+        echo "ERROR: Failed to set subscription context"
+        exit 1
+    }
+fi
+
+###############################################################################
+# Get APIM resource information and construct portal URL
+###############################################################################
+echo "[INFO] Getting APIM resource information..."
 if ! apim_resource_id=$(az apim show \
-      --name "$APIM_NAME" \
-      --resource-group "$AZ_RESOURCE_GROUP" \
-      --query "id" -o tsv 2>apim_show_err.log); then
-    err_msg=$(cat apim_show_err.log)
-    rm -f apim_show_err.log
+        --name "$APIM_NAME" \
+        --resource-group "$AZ_RESOURCE_GROUP" \
+        --query "id" -o tsv 2>apim_err.log); then
+    err_msg=$(cat apim_err.log)
+    rm -f apim_err.log
     echo "ERROR: Could not fetch APIM resource ID."
     issues_json=$(echo "$issues_json" | jq \
-        --arg t "Failed to Retrieve APIM Resource ID" \
-        --arg d "$err_msg" \
+        --arg t "Failed to Retrieve APIM Resource ID for \`$APIM_NAME\`" \
+        --arg d "$err_msg. Azure Portal: https://portal.azure.com" \
         --arg s "1" \
-        --arg n "Check APIM name/RG and permissions." \
+        --arg n "Check APIM name \`$APIM_NAME\` and RG \`$AZ_RESOURCE_GROUP\` or verify permissions" \
         '.issues += [{
            "title": $t,
            "details": $d,
@@ -72,15 +49,15 @@ if ! apim_resource_id=$(az apim show \
     echo "$issues_json" > "$OUTPUT_FILE"
     exit 1
 fi
-rm -f apim_show_err.log
+rm -f apim_err.log
 
 if [[ -z "$apim_resource_id" ]]; then
     echo "No resource ID returned. Possibly the APIM doesn't exist."
     issues_json=$(echo "$issues_json" | jq \
-        --arg t "APIM Resource Not Found" \
-        --arg d "az apim show returned empty ID." \
+        --arg t "APIM Resource \`$APIM_NAME\` Not Found" \
+        --arg d "az apim show returned empty ID. Azure Portal: https://portal.azure.com" \
         --arg s "1" \
-        --arg n "Check name/RG or create APIM." \
+        --arg n "Check APIM name \`$APIM_NAME\` and RG \`$AZ_RESOURCE_GROUP\` or create APIM instance" \
         '.issues += [{
            "title": $t,
            "details": $d,
@@ -91,7 +68,11 @@ if [[ -z "$apim_resource_id" ]]; then
     exit 1
 fi
 
+# Construct Azure portal URL for the APIM resource
+PORTAL_URL="https://portal.azure.com/#@/resource${apim_resource_id}/overview"
+
 echo "[INFO] APIM Resource ID: $apim_resource_id"
+echo "[INFO] Azure Portal URL: $PORTAL_URL"
 
 ###############################################################################
 # 3) Calculate time range for activity log query
@@ -114,14 +95,16 @@ if ! activity_logs=$(az monitor activity-log list \
     rm -f activity_err.log
     echo "ERROR: Failed to retrieve activity logs."
     issues_json=$(echo "$issues_json" | jq \
-        --arg t "Failed to Query Activity Logs" \
-        --arg d "$err_msg" \
+        --arg t "Failed to Query Activity Logs for APIM \`$APIM_NAME\`" \
+        --arg d "$err_msg. Azure Portal: $PORTAL_URL" \
         --arg s "1" \
-        --arg n "Check permissions for reading activity logs." \
+        --arg n "Check permissions for reading activity logs for RG \`$AZ_RESOURCE_GROUP\`" \
+        --arg portal "$PORTAL_URL" \
         '.issues += [{
            "title": $t,
            "details": $d,
            "next_steps": $n,
+           "portal_url": $portal,
            "severity": ($s | tonumber)
         }]')
     echo "$issues_json" > "$OUTPUT_FILE"
@@ -134,7 +117,12 @@ rm -f activity_err.log
 ###############################################################################
 if [[ "$activity_logs" == "[]" || -z "$activity_logs" ]]; then
     echo "[INFO] No activity log entries found for the specified time period."
-    echo "$issues_json" > "$OUTPUT_FILE"
+    final_json="$(jq -n \
+      --argjson i "$(echo "$issues_json" | jq '.issues')" \
+      --arg portal "$PORTAL_URL" \
+      '{ "issues": $i, "portal_url": $portal }'
+    )"
+    echo "$final_json" > "$OUTPUT_FILE"
     exit 0
 fi
 
@@ -172,14 +160,16 @@ if [[ "$critical_operations" -gt 0 ]]; then
     }]')
     
     issues_json=$(echo "$issues_json" | jq \
-        --arg t "Critical Level Operations Detected for APIM $APIM_NAME" \
-        --arg d "$critical_details" \
+        --arg t "Critical Level Operations Detected for APIM \`$APIM_NAME\`" \
+        --arg d "$critical_details. Azure Portal: $PORTAL_URL" \
         --arg s "1" \
-        --arg n "Review critical operations immediately. Check Azure portal for detailed error information." \
+        --arg n "Review critical operations immediately for APIM \`$APIM_NAME\` in RG \`$AZ_RESOURCE_GROUP\`" \
+        --arg portal "$PORTAL_URL" \
         '.issues += [{
            "title": $t,
            "details": $d,
            "next_steps": $n,
+           "portal_url": $portal,
            "severity": ($s | tonumber)
         }]')
 fi
@@ -196,14 +186,16 @@ if [[ "$failed_operations" -gt 0 ]]; then
     }]')
     
     issues_json=$(echo "$issues_json" | jq \
-        --arg t "Failed Operations Detected for APIM $APIM_NAME" \
-        --arg d "$failed_details" \
+        --arg t "Failed Operations Detected for APIM \`$APIM_NAME\`" \
+        --arg d "$failed_details. Azure Portal: $PORTAL_URL" \
         --arg s "2" \
-        --arg n "Investigate failed operations. Check user permissions and resource configuration." \
+        --arg n "Investigate failed operations for APIM \`$APIM_NAME\` in RG \`$AZ_RESOURCE_GROUP\`. Check user permissions and resource configuration" \
+        --arg portal "$PORTAL_URL" \
         '.issues += [{
            "title": $t,
            "details": $d,
            "next_steps": $n,
+           "portal_url": $portal,
            "severity": ($s | tonumber)
         }]')
 fi
@@ -220,14 +212,16 @@ if [[ "$error_operations" -gt 0 ]]; then
     }]')
     
     issues_json=$(echo "$issues_json" | jq \
-        --arg t "Error Level Operations for APIM $APIM_NAME" \
-        --arg d "$error_details" \
+        --arg t "Error Level Operations for APIM \`$APIM_NAME\`" \
+        --arg d "$error_details. Azure Portal: $PORTAL_URL" \
         --arg s "2" \
-        --arg n "Review error-level administrative operations for potential issues." \
+        --arg n "Review error-level administrative operations for APIM \`$APIM_NAME\` in RG \`$AZ_RESOURCE_GROUP\`" \
+        --arg portal "$PORTAL_URL" \
         '.issues += [{
            "title": $t,
            "details": $d,
            "next_steps": $n,
+           "portal_url": $portal,
            "severity": ($s | tonumber)
         }]')
 fi
@@ -248,29 +242,38 @@ if [[ "$config_changes" -gt 0 ]]; then
     if [[ "$config_changes" -gt 10 ]] || [[ "$failed_config_changes" -gt 0 ]]; then
         severity="3"
         if [[ "$failed_config_changes" -gt 0 ]]; then
-            title="Recent Failed Configuration Changes for APIM $APIM_NAME"
-            next_steps="Review failed configuration changes. These may be causing current issues."
+            title="Recent Failed Configuration Changes for APIM \`$APIM_NAME\`"
+            next_steps="Review failed configuration changes for APIM \`$APIM_NAME\` in RG \`$AZ_RESOURCE_GROUP\`. These may be causing current issues"
         else
-            title="High Volume of Recent Configuration Changes for APIM $APIM_NAME"
-            next_steps="Review recent configuration changes that may have introduced current issues."
+            title="High Volume of Recent Configuration Changes for APIM \`$APIM_NAME\`"
+            next_steps="Review recent configuration changes for APIM \`$APIM_NAME\` in RG \`$AZ_RESOURCE_GROUP\` that may have introduced current issues"
         fi
         
         issues_json=$(echo "$issues_json" | jq \
             --arg t "$title" \
-            --arg d "$config_details" \
+            --arg d "$config_details. Azure Portal: $PORTAL_URL" \
             --arg s "$severity" \
             --arg n "$next_steps" \
+            --arg portal "$PORTAL_URL" \
             '.issues += [{
                "title": $t,
                "details": $d,
                "next_steps": $n,
+               "portal_url": $portal,
                "severity": ($s | tonumber)
             }]')
     fi
 fi
 
 ###############################################################################
-# 7) Final JSON output
+# 7) Final JSON output with portal URL
 ###############################################################################
-echo "$issues_json" > "$OUTPUT_FILE"
-echo "[INFO] APIM Activity Log check complete. Results -> $OUTPUT_FILE" 
+final_json="$(jq -n \
+  --argjson i "$(echo "$issues_json" | jq '.issues')" \
+  --arg portal "$PORTAL_URL" \
+  '{ "issues": $i, "portal_url": $portal }'
+)"
+
+echo "$final_json" > "$OUTPUT_FILE"
+echo "[INFO] APIM Activity Log check complete. Results -> $OUTPUT_FILE"
+echo "[INFO] Azure Portal: $PORTAL_URL" 
