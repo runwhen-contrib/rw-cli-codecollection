@@ -1,7 +1,7 @@
 *** Settings ***
 Documentation       Triages an Azure App Service and its workloads, checking its status and logs and verifying key metrics.
 Metadata            Author    stewartshea
-Metadata            Display Name    Azure App Service Triage
+Metadata            Display Name    Azure App Service Webapp Health
 Metadata            Supports    Azure    AppService    Triage
 
 Library             BuiltIn
@@ -23,6 +23,15 @@ Check for Resource Health Issues Affecting App Service `${APP_SERVICE_NAME}` In 
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    ${resource_health.stdout}
+    
+    # Add portal URL for Resource Health
+    ${app_service_resource_id}=    RW.CLI.Run Cli
+    ...    cmd=az webapp show --name "${APP_SERVICE_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${resource_health_url}=    Set Variable    https://portal.azure.com/#@/resource${app_service_resource_id.stdout.strip()}/resourceHealth
+    RW.Core.Add Pre To Report    🔗 View Resource Health in Azure Portal: ${resource_health_url}
 
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat app_service_health.json 
@@ -95,15 +104,23 @@ Check App Service `${APP_SERVICE_NAME}` Health in Resource Group `${AZ_RESOURCE_
             ...    details=${item["details"]}        
         END
     END
-    RW.Core.Add Pre To Report    ${health_check_metric.stdout}
+    
+    # Add portal URL for Health Check configuration
+    ${app_service_resource_id_health}=    RW.CLI.Run Cli
+    ...    cmd=az webapp show --name "${APP_SERVICE_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${health_check_url}=    Set Variable    https://portal.azure.com/#@/resource${app_service_resource_id_health.stdout.strip()}/healthcheck
+    RW.Core.Add Pre To Report    🔗 Configure Health Check in Azure Portal: ${health_check_url}
 
 Fetch App Service `${APP_SERVICE_NAME}` Utilization Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Reviews key metrics for the app service and generates a report
-    [Tags]    access:read-only     appservice    utilization
+    [Documentation]    Reviews all key metrics (CPU, Requests, Bandwidth, HTTP status codes, Threads, Disk, Response Time) for the last 30 minutes with 5-minute intervals
+    [Tags]    access:read-only     appservice    utilization    metrics
     ${metric_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_metric_health.sh
     ...    env=${env}
-    ...    timeout_seconds=180
+    ...    timeout_seconds=90
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${metric_health.stdout}
     ${summary}=    RW.CLI.Run Cli
@@ -131,17 +148,34 @@ Fetch App Service `${APP_SERVICE_NAME}` Utilization Metrics In Resource Group `$
             ...    details=${item["details"]}        
         END
     END
-
+    
+    # Add portal URL for Metrics
+    ${app_service_resource_id_metrics}=    RW.CLI.Run Cli
+    ...    cmd=az webapp show --name "${APP_SERVICE_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${metrics_url}=    Set Variable    https://portal.azure.com/#@/resource${app_service_resource_id_metrics.stdout.strip()}/metrics
+    RW.Core.Add Pre To Report    🔗 View Metrics in Azure Portal: ${metrics_url}
 
 Get App Service `${APP_SERVICE_NAME}` Logs In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Fetch logs of appservice workload
-    [Tags]    appservice    logs    tail    access:read-only
+    [Documentation]    Download and display recent raw log files from App Service (last 50 lines from each log file)
+    [Tags]    appservice    logs    display    raw    access:read-only
     ${logs}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_logs.sh
     ...    env=${env}
-    ...    timeout_seconds=180
+    ...    timeout_seconds=90
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${logs.stdout}
+    
+    # Add portal URL for Logs
+    ${app_service_resource_id_logs}=    RW.CLI.Run Cli
+    ...    cmd=az webapp show --name "${APP_SERVICE_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${logs_url}=    Set Variable    https://portal.azure.com/#@/resource${app_service_resource_id_logs.stdout.strip()}/logStream
+    RW.Core.Add Pre To Report    🔗 View Log Stream in Azure Portal: ${logs_url}
 
 Check Configuration Health of App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the configuration health of the App Service
@@ -171,6 +205,15 @@ Check Configuration Health of App Service `${APP_SERVICE_NAME}` In Resource Grou
             ...    details=${item["details"]}        
         END
     END
+    
+    # Add portal URL for Configuration
+    ${app_service_resource_id_config}=    RW.CLI.Run Cli
+    ...    cmd=az webapp show --name "${APP_SERVICE_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${config_url}=    Set Variable    https://portal.azure.com/#@/resource${app_service_resource_id_config.stdout.strip()}/configuration
+    RW.Core.Add Pre To Report    🔗 View Configuration in Azure Portal: ${config_url}
 
 Check Deployment Health of App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch deployment health of the App Service
@@ -200,6 +243,15 @@ Check Deployment Health of App Service `${APP_SERVICE_NAME}` In Resource Group `
             ...    details=${item["details"]}        
         END
     END
+    
+    # Add portal URL for Deployment Center
+    ${app_service_resource_id_deployment}=    RW.CLI.Run Cli
+    ...    cmd=az webapp show --name "${APP_SERVICE_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${deployment_url}=    Set Variable    https://portal.azure.com/#@/resource${app_service_resource_id_deployment.stdout.strip()}/deployment
+    RW.Core.Add Pre To Report    🔗 View Deployment Center in Azure Portal: ${deployment_url}
 
 Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events of appservice and checks for errors
@@ -226,31 +278,64 @@ Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOU
             ...    details=${item["details"]}        
         END
     END
+    
+    # Add portal URL for Activity Log
+    ${app_service_resource_id_activity}=    RW.CLI.Run Cli
+    ...    cmd=az webapp show --name "${APP_SERVICE_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${activity_url}=    Set Variable    https://portal.azure.com/#@/resource${app_service_resource_id_activity.stdout.strip()}/activitylog
+    RW.Core.Add Pre To Report    🔗 View Activity Log in Azure Portal: ${activity_url}
+
 Check Logs for Errors in App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Gets the events of appservice and checks for errors
-    [Tags]    appservice    logs    errors    access:read-only
+    [Documentation]    Analyze App Service logs for errors using Azure Monitor APIs and Application Insights - creates structured issues for detected problems
+    [Tags]    appservice    logs    errors    analysis    azure-monitor    access:read-only
     ${log_errors}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_log_analysis.sh
     ...    env=${env}
-    ...    timeout_seconds=180
+    ...    timeout_seconds=60
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${log_errors.stdout}
 
+    IF    "${log_errors.stderr}" != ''
+        RW.Core.Add Issue
+        ...    title=Error Running Log Analysis Script
+        ...    severity=3
+        ...    next_steps=Review debug logs in report
+        ...    expected=No stderr output
+        ...    actual=stderr encountered
+        ...    reproduce_hint=${log_errors.cmd}
+        ...    details=${log_errors.stderr}
+    END
+
     ${issues}=    RW.CLI.Run Cli    
     ...    cmd=cat app_service_log_issues_report.json
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
             RW.Core.Add Issue    
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
-            ...    next_steps=${item["next_step"]}
-            ...    expected=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no Warning/Error/Critical logs
-            ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has Warning/Error/Critical logs
+            ...    next_steps=${item["next_steps"]}
+            ...    expected=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no critical errors in logs
+            ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has errors detected in logs
             ...    reproduce_hint=${log_errors.cmd}
             ...    details=${item["details"]}        
         END
     END
+    
+    # Add portal URL for Log Analytics and Diagnostics
+    ${app_service_resource_id_analytics}=    RW.CLI.Run Cli
+    ...    cmd=az webapp show --name "${APP_SERVICE_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${log_analytics_url}=    Set Variable    https://portal.azure.com/#@/resource${app_service_resource_id_analytics.stdout.strip()}/diagnostics
+    RW.Core.Add Pre To Report    🔗 View Diagnostics and Log Analytics in Azure Portal: ${log_analytics_url}
 
 *** Keywords ***
 Suite Initialization
@@ -333,3 +418,4 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"APP_SERVICE_NAME":"${APP_SERVICE_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "TIME_PERIOD_MINUTES":"${TIME_PERIOD_MINUTES}","CPU_THRESHOLD":"${CPU_THRESHOLD}", "REQUESTS_THRESHOLD":"${REQUESTS_THRESHOLD}", "BYTES_RECEIVED_THRESHOLD":"${BYTES_RECEIVED_THRESHOLD}", "HTTP5XX_THRESHOLD":"${HTTP5XX_THRESHOLD}","HTTP2XX_THRESHOLD":"${HTTP2XX_THRESHOLD}", "HTTP4XX_THRESHOLD":"${HTTP4XX_THRESHOLD}", "DISK_USAGE_THRESHOLD":"${DISK_USAGE_THRESHOLD}", "AVG_RSP_TIME":"${AVG_RSP_TIME}"}
+
