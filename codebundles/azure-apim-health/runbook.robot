@@ -140,7 +140,7 @@ Fetch Key Metrics for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP
             ...    next_steps=${issue["next_steps"]}
             ...    expected=APIM performance should remain within healthy thresholds
             ...    actual=Potential problem flagged in metrics
-            ...    reproduce_hint=${run_metrics.cmd}
+            ...    reproduce_hint=${apim_metrics.cmd}
             ...    details=${issue["details"]}
         END
     END
@@ -187,6 +187,52 @@ Check Logs for Errors with APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_
             ...    expected=APIM logs show no repeated errors/warnings
             ...    actual=Some errors/warnings found above threshold
             ...    reproduce_hint=${diag_run.cmd}
+            ...    details=${item["details"]}
+        END
+    END
+
+Check Activity Logs for APIM Management Operations `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Review Azure Activity Logs for administrative operations on the APIM instance
+    [Tags]    apim    activity-logs    management    access:read-only
+
+    ${activity_run}=    RW.CLI.Run Bash File
+    ...    bash_file=apim_activity_logs.sh
+    ...    env=${env}
+    ...    timeout_seconds=120
+    ...    include_in_history=false
+
+    RW.Core.Add Pre To Report    ${activity_run.stdout}
+
+    IF    "${activity_run.stderr}" != ''
+        RW.Core.Add Issue
+        ...    title=Error/Warning Running APIM Activity Log Script
+        ...    severity=3
+        ...    next_steps=Review debug logs in report
+        ...    expected=No stderr output
+        ...    actual=stderr encountered
+        ...    reproduce_hint=${activity_run.cmd}
+        ...    details=${activity_run.stderr}
+    END
+
+    # Parse the JSON file for issues
+    ${activity_json}=    RW.CLI.Run Cli
+    ...    cmd=cat apim_activity_log_issues.json
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+
+    ${parsed}=    Evaluate    json.loads(r'''${activity_json.stdout}''')    json
+    ${activity_issues}=    Set Variable    ${parsed["issues"]}
+
+    IF    len(@{activity_issues}) > 0
+        FOR    ${item}    IN    @{activity_issues}
+            RW.Core.Add Issue
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_steps"]}
+            ...    expected=APIM management operations should be successful
+            ...    actual=Administrative issues detected in activity logs
+            ...    reproduce_hint=${activity_run.cmd}
             ...    details=${item["details"]}
         END
     END

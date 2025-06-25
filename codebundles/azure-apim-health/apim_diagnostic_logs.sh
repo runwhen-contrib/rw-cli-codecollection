@@ -111,10 +111,10 @@ if [[ -z "$diag_settings_json" || "$diag_settings_json" == "[]" ]]; then
   err_msg=$(cat diag_err.log)
   rm -f diag_err.log
   issues_json=$(echo "$issues_json" | jq \
-    --arg t "No Diagnostic Settings for APIM" \
-    --arg d "No diag settings route logs to Log Analytics. $err_msg" \
+    --arg t "No Diagnostic Settings Configured for APIM" \
+    --arg d "No diagnostic settings route logs to Log Analytics. Log analysis unavailable. $err_msg" \
     --arg s "4" \
-    --arg n "Configure at least one diag setting for APIM logs => Log Analytics." \
+    --arg n "Note: Diagnostic settings not configured. Cannot perform log-based troubleshooting." \
     '.issues += [{
        "title": $t,
        "details": $d,
@@ -130,10 +130,10 @@ ws_resource_id=$(echo "$diag_settings_json" | jq -r '.[] | select(.workspaceId !
 if [[ -z "$ws_resource_id" || "$ws_resource_id" == "null" ]]; then
   echo "[WARN] No Log Analytics workspace found in diag settings."
   issues_json=$(echo "$issues_json" | jq \
-    --arg t "No LA Workspace Configured" \
-    --arg d "Diag settings exist but none route to a workspace." \
-    --arg s "1" \
-    --arg n "Enable a diag setting with a workspace to query APIM logs." \
+    --arg t "No Log Analytics Workspace Configured" \
+    --arg d "Diagnostic settings exist but none route to a Log Analytics workspace. Cannot perform log queries." \
+    --arg s "4" \
+    --arg n "Note: No Log Analytics workspace configured. Cannot perform log-based troubleshooting." \
     '.issues += [{
        "title": $t,
        "details": $d,
@@ -245,15 +245,24 @@ for (( i=0; i<rows_len; i++ )); do
 
   # If count_val > threshold => log an issue
   if (( $(echo "$count_val > $WARNINGS_THRESHOLD" | bc -l) )); then
-    # Adjust severity as needed
-    severity="2"
-    # If you want different thresholds or severities per error_type, handle that here
+    # Adjust severity based on error type - these are active issues affecting API operations
+    case "$error_type" in
+      "BackendServiceUnreachable"|"BackendOperationTimedOut")
+        severity="2"  # Major - backend connectivity issues
+        ;;
+      "JwtValidationFailed"|"InvalidCertificate")
+        severity="3"  # Error - authentication/security issues
+        ;;
+      *)
+        severity="3"  # Error - other operational issues
+        ;;
+    esac
 
     issues_json=$(echo "$issues_json" | jq \
-      --arg t "Frequent APIM $error_type" \
+      --arg t "Frequent APIM $error_type Errors" \
       --arg d "$count_val occurrences in last $TIME_RANGE" \
       --arg s "$severity" \
-      --arg n "Investigate $error_type root cause for APIM '$APIM_NAME' in RG '$AZ_RESOURCE_GROUP'." \
+      --arg n "Investigate $error_type root cause. Check backend services and APIM configuration." \
       '.issues += [{
          "title": $t,
          "details": $d,
