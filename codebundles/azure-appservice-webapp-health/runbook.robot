@@ -1,7 +1,7 @@
 *** Settings ***
 Documentation       Triages an Azure App Service and its workloads, checking its status and logs and verifying key metrics.
 Metadata            Author    stewartshea
-Metadata            Display Name    Azure App Service Triage
+Metadata            Display Name    Azure App Service Webapp Health
 Metadata            Supports    Azure    AppService    Triage
 
 Library             BuiltIn
