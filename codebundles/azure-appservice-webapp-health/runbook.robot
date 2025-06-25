@@ -322,6 +322,21 @@ Suite Initialization
     ...    description=Maximum lines per log file to display
     ...    pattern=\w*
     ...    default=100
+    ${INCLUDE_DOCKER_LOGS}=    RW.Core.Import User Variable    INCLUDE_DOCKER_LOGS
+    ...    type=string
+    ...    description=Include Docker container logs in output (true/false)
+    ...    pattern=\w*
+    ...    default=true
+    ${INCLUDE_DEPLOYMENT_LOGS}=    RW.Core.Import User Variable    INCLUDE_DEPLOYMENT_LOGS
+    ...    type=string
+    ...    description=Include deployment history logs in output (true/false)
+    ...    pattern=\w*
+    ...    default=true
+    ${INCLUDE_PERFORMANCE_TRACES}=    RW.Core.Import User Variable    INCLUDE_PERFORMANCE_TRACES
+    ...    type=string
+    ...    description=Include performance traces in output (true/false)
+    ...    pattern=\w*
+    ...    default=false
     Set Suite Variable    ${APP_SERVICE_NAME}    ${APP_SERVICE_NAME}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable    ${TIME_PERIOD_MINUTES}    ${TIME_PERIOD_MINUTES}
@@ -335,7 +350,10 @@ Suite Initialization
     Set Suite Variable    ${AVG_RSP_TIME}    ${AVG_RSP_TIME}
     Set Suite Variable    ${LOG_LEVEL}    ${LOG_LEVEL}
     Set Suite Variable    ${MAX_LOG_LINES}    ${MAX_LOG_LINES}
+    Set Suite Variable    ${INCLUDE_DOCKER_LOGS}    ${INCLUDE_DOCKER_LOGS}
+    Set Suite Variable    ${INCLUDE_DEPLOYMENT_LOGS}    ${INCLUDE_DEPLOYMENT_LOGS}
+    Set Suite Variable    ${INCLUDE_PERFORMANCE_TRACES}    ${INCLUDE_PERFORMANCE_TRACES}
 
     Set Suite Variable
     ...    ${env}
-    ...    {"APP_SERVICE_NAME":"${APP_SERVICE_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "TIME_PERIOD_MINUTES":"${TIME_PERIOD_MINUTES}","CPU_THRESHOLD":"${CPU_THRESHOLD}", "REQUESTS_THRESHOLD":"${REQUESTS_THRESHOLD}", "BYTES_RECEIVED_THRESHOLD":"${BYTES_RECEIVED_THRESHOLD}", "HTTP5XX_THRESHOLD":"${HTTP5XX_THRESHOLD}","HTTP2XX_THRESHOLD":"${HTTP2XX_THRESHOLD}", "HTTP4XX_THRESHOLD":"${HTTP4XX_THRESHOLD}", "DISK_USAGE_THRESHOLD":"${DISK_USAGE_THRESHOLD}", "AVG_RSP_TIME":"${AVG_RSP_TIME}", "LOG_LEVEL":"${LOG_LEVEL}", "MAX_LOG_LINES":"${MAX_LOG_LINES}"}
+    ...    {"APP_SERVICE_NAME":"${APP_SERVICE_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "TIME_PERIOD_MINUTES":"${TIME_PERIOD_MINUTES}","CPU_THRESHOLD":"${CPU_THRESHOLD}", "REQUESTS_THRESHOLD":"${REQUESTS_THRESHOLD}", "BYTES_RECEIVED_THRESHOLD":"${BYTES_RECEIVED_THRESHOLD}", "HTTP5XX_THRESHOLD":"${HTTP5XX_THRESHOLD}","HTTP2XX_THRESHOLD":"${HTTP2XX_THRESHOLD}", "HTTP4XX_THRESHOLD":"${HTTP4XX_THRESHOLD}", "DISK_USAGE_THRESHOLD":"${DISK_USAGE_THRESHOLD}", "AVG_RSP_TIME":"${AVG_RSP_TIME}", "LOG_LEVEL":"${LOG_LEVEL}", "MAX_LOG_LINES":"${MAX_LOG_LINES}", "INCLUDE_DOCKER_LOGS":"${INCLUDE_DOCKER_LOGS}", "INCLUDE_DEPLOYMENT_LOGS":"${INCLUDE_DEPLOYMENT_LOGS}", "INCLUDE_PERFORMANCE_TRACES":"${INCLUDE_PERFORMANCE_TRACES}"}

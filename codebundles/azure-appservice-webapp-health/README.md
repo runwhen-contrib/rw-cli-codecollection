@@ -9,9 +9,9 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 export APP_SERVICE_NAME
 export AZ_RESOURCE_GROUP
 
-## Log Collection Configuration (Optimized for Size)
+## Log Collection Configuration (Enhanced & Optimized)
 
-The log collection has been optimized to prevent large report files while maintaining diagnostic value. You can control the verbosity:
+The log collection has been enhanced with multiple log sources while maintaining size optimization. You can control both verbosity and which log sources to include:
 
 ### Log Levels
 
@@ -21,22 +21,54 @@ The log collection has been optimized to prevent large report files while mainta
 - `DEBUG`: Detailed debugging information
 - `VERBOSE`: All logs including system events (use with caution)
 
+### Enhanced Features
+
+- **Docker Container Logs**: Container startup, runtime, and error diagnostics
+- **Deployment History**: Recent deployment success/failure status and build logs
+- **Performance Traces**: Slow requests and failed API calls (DEBUG+ only)
+
 ### Configuration Variables
+
+#### Core Settings
 
 - `LOG_LEVEL`: Set log verbosity (default: INFO)
 - `MAX_LOG_LINES`: Maximum lines per log file (default: 100)
 - `MAX_TOTAL_SIZE`: Maximum total output size in bytes (default: 500000)
 
-### Examples
+#### Enhanced Features (New)
+
+- `INCLUDE_DOCKER_LOGS`: Include Docker container logs (default: true)
+- `INCLUDE_DEPLOYMENT_LOGS`: Include deployment history (default: true)
+- `INCLUDE_PERFORMANCE_TRACES`: Include performance traces (default: false)
+
+### Configuration Examples
 
 ```bash
-# For production troubleshooting (minimal output)
+# Production troubleshooting (minimal output)
 export LOG_LEVEL=ERROR
-export MAX_LOG_LINES=50
+export INCLUDE_DOCKER_LOGS=false
+export INCLUDE_DEPLOYMENT_LOGS=false
 
-# For development debugging (more detailed)
+# Standard configuration (recommended default)
+export LOG_LEVEL=INFO
+export INCLUDE_DOCKER_LOGS=true
+export INCLUDE_DEPLOYMENT_LOGS=true
+
+# Docker container troubleshooting
+export LOG_LEVEL=INFO
+export INCLUDE_DOCKER_LOGS=true
+export INCLUDE_DEPLOYMENT_LOGS=false
+
+# Deployment troubleshooting
+export LOG_LEVEL=INFO
+export INCLUDE_DOCKER_LOGS=false
+export INCLUDE_DEPLOYMENT_LOGS=true
+
+# Full diagnostic mode (advanced)
 export LOG_LEVEL=DEBUG
-export MAX_LOG_LINES=200
+export INCLUDE_DOCKER_LOGS=true
+export INCLUDE_DEPLOYMENT_LOGS=true
+export INCLUDE_PERFORMANCE_TRACES=true
 ```
 
 ## Size Optimization
