@@ -81,6 +81,23 @@ if [[ -z "$resource_id" ]]; then
     exit 0
 fi
 
+# Check the status of the App Service
+app_service_state=$(az webapp show --name "$APP_SERVICE_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "state" -o tsv 2>/dev/null)
+
+if [[ "$app_service_state" != "Running" ]]; then
+    echo "CRITICAL: App Service $APP_SERVICE_NAME is $app_service_state (not running)!"
+    portal_url="https://portal.azure.com/#@/resource${resource_id}/overview"
+    issues_json=$(echo "$issues_json" | jq \
+        --arg title "App Service \`$APP_SERVICE_NAME\` is $app_service_state (Not Running)" \
+        --arg nextStep "Start the App Service \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` immediately to restore service availability." \
+        --arg severity "1" \
+        --arg details "App Service state: $app_service_state. Service is unavailable to users. Portal URL: $portal_url" \
+        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]')
+    echo "$issues_json" > "$OUTPUT_FILE"
+    echo "App Service is stopped. Results saved to $OUTPUT_FILE"
+    exit 0
+fi
+
 # List activity logs for the App Service
 echo "Fetching activity logs for resource ID: $resource_id"
 az monitor activity-log list --resource-id "$resource_id" --start-time "$start_time" --end-time "$end_time" --resource-group "$AZ_RESOURCE_GROUP" --output table
