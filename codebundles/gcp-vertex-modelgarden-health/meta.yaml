@@ -1,0 +1,608 @@
+commands:
+- command: python3 -c "
+import os
+import sys
+from google.cloud import monitoring_v3
+from google.auth import default
+from datetime import datetime, timedelta
+
+# Set up authentication
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', '')
+
+try:
+    credentials, project_id = default()
+    client = monitoring_v3.MetricServiceClient(credentials=credentials)
+    project_name = f'projects/{os.environ.get(\"GCP_PROJECT_ID\", \"\")}'
+    
+    print(f'Checking Model Garden metrics for project: {project_name}')
+    
+    # Try to list metric descriptors
+    try:
+        descriptors = client.list_metric_descriptors(name=project_name)
+        
+        vertex_metrics = []
+        total_checked = 0
+        
+        for descriptor in descriptors:
+            total_checked += 1
+            if 'aiplatform.googleapis.com/publisher/online_serving' in descriptor.type:
+                vertex_metrics.append(f'{descriptor.type} - {descriptor.display_name}')
+            
+            # Limit iterations to avoid timeout
+            if total_checked > 500:
+                break
+        
+        print(f'Scanned {total_checked} metric descriptors')
+        
+        if vertex_metrics:
+            print(f'Found {len(vertex_metrics)} Model Garden metrics:')
+            for metric in vertex_metrics[:10]:
+                print(f'  {metric}')
+            if len(vertex_metrics) > 10:
+                print(f'  ... and {len(vertex_metrics) - 10} more')
+        else:
+            print('✅ No Model Garden metrics found - this could indicate:')
+            print('   • No active Model Garden usage in this project')
+            print('   • Model Garden not available in current region')
+            print('   • Monitoring metrics not yet generated')
+            
+    except Exception as metric_error:
+        if '403' in str(metric_error) or 'Permission' in str(metric_error):
+            print('❌ Permission denied accessing monitoring metrics')
+            print('   Required permission: monitoring.metricDescriptors.list')
+            print('   Service account needs: Monitoring Viewer role')
+            print('   This would prevent health monitoring from working')
+        else:
+            print(f'⚠️  Error accessing metric descriptors: {metric_error}')
+            
+except Exception as auth_error:
+    print(f'❌ Authentication error: {auth_error}')
+    print('   Check GOOGLE_APPLICATION_CREDENTIALS and service account setup')
+    sys.exit(1)
+"
+  doc_links: '
+
+    - [GCP Vertex AI Model Garden Metrics](https://cloud.google.com/vertex-ai/docs/model-garden/monitor-models){:target="_blank"}
+
+    - [Google Cloud Monitoring Python SDK](https://cloud.google.com/monitoring/api/libraries#python){:target="_blank"}
+
+    - [GCP Service Account Authentication](https://cloud.google.com/iam/docs/creating-managing-service-accounts){:target="_blank"}'
+  explanation: This command uses the Google Cloud Monitoring Python SDK to check for available Vertex AI Model Garden monitoring metrics and validates authentication and permissions.
+  multi_line_details: |
+    # Python script using Google Cloud Monitoring SDK
+    # - Handles authentication errors gracefully
+    # - Checks for Model Garden metrics with proper error handling
+    # - Provides diagnostic information for troubleshooting
+  name: list_vertex_ai_model_garden_monitoring_metrics_for_project_gcp_project_id
+  when_is_it_useful: '1. Verifying that Vertex AI Model Garden metrics are being collected and are available for monitoring.
+    
+    2. Understanding what operational metrics are available for health monitoring of deployed foundational models.
+    
+    3. Troubleshooting monitoring setup issues when Model Garden metrics are not appearing in dashboards.
+    
+    4. Auditing the monitoring capabilities for ML model operations and performance tracking.
+    
+    5. Setting up new monitoring and alerting based on available Model Garden metrics.'
+
+- command: python3 -c "
+import os
+import sys
+from google.cloud import monitoring_v3
+from google.auth import default
+from datetime import datetime, timedelta
+
+# Set up authentication
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', '')
+
+try:
+    credentials, project_id = default()
+    client = monitoring_v3.MetricServiceClient(credentials=credentials)
+    project_name = f'projects/{os.environ.get(\"GCP_PROJECT_ID\", \"\")}'
+    
+    # Set time range for last hour
+    end_time = datetime.utcnow()
+    start_time = end_time - timedelta(hours=1)
+    
+    interval = monitoring_v3.TimeInterval(
+        end_time=end_time,
+        start_time=start_time
+    )
+    
+    print(f'Checking model invocations for project: {project_name}')
+    print(f'Time range: {start_time.strftime(\"%Y-%m-%d %H:%M:%S\")} to {end_time.strftime(\"%Y-%m-%d %H:%M:%S\")} UTC')
+    
+    try:
+        # Query model invocation count metrics
+        results = client.list_time_series(
+            name=project_name,
+            filter='metric.type=\"aiplatform.googleapis.com/publisher/online_serving/model_invocation_count\"',
+            interval=interval,
+            view=monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL
+        )
+        
+        invocation_data = []
+        total_invocations = 0
+        
+        for result in results:
+            model_id = result.resource.labels.get('model_user_id', 'unknown')
+            response_code = result.metric.labels.get('response_code', 'unknown')
+            
+            series_total = sum(point.value.double_value for point in result.points)
+            total_invocations += series_total
+            
+            invocation_data.append({
+                'model_id': model_id,
+                'response_code': response_code,
+                'total_invocations': series_total
+            })
+        
+        if invocation_data:
+            print(f'✅ Found model invocation data:')
+            print(f'   Total invocations: {total_invocations:.0f}')
+            
+            # Group by response code for overview
+            code_summary = {}
+            for item in invocation_data:
+                code = item['response_code']
+                code_summary[code] = code_summary.get(code, 0) + item['total_invocations']
+            
+            print('   Response code distribution:')
+            for code, count in sorted(code_summary.items()):
+                percentage = (count / total_invocations) * 100 if total_invocations > 0 else 0
+                print(f'     {code}: {count:.0f} ({percentage:.1f}%)')
+            
+            print('   Top models by invocation count:')
+            model_summary = {}
+            for item in invocation_data:
+                model = item['model_id']
+                model_summary[model] = model_summary.get(model, 0) + item['total_invocations']
+            
+            for model, count in sorted(model_summary.items(), key=lambda x: x[1], reverse=True)[:5]:
+                print(f'     {model}: {count:.0f} invocations')
+                
+        else:
+            print('✅ No model invocation data found in the last hour')
+            print('   This indicates either:')
+            print('   • No Model Garden usage in this time period')
+            print('   • Models not actively receiving requests')
+            print('   • Metrics collection not configured')
+            
+    except Exception as query_error:
+        if '403' in str(query_error) or 'Permission' in str(query_error):
+            print('❌ Permission denied accessing time series data')
+            print('   Required permission: monitoring.timeSeries.list')
+            print('   Service account needs: Monitoring Viewer role')
+        else:
+            print(f'⚠️  Error querying invocation metrics: {query_error}')
+            
+except Exception as auth_error:
+    print(f'❌ Authentication error: {auth_error}')
+    sys.exit(1)
+"
+  doc_links: '
+
+    - [Model Invocation Count Metric](https://cloud.google.com/vertex-ai/docs/model-garden/monitor-models#model_invocation_metrics){:target="_blank"}
+
+    - [Google Cloud Monitoring Time Series](https://cloud.google.com/monitoring/api/ref_v3/rest/v3/projects.timeSeries/list){:target="_blank"}
+
+    - [Vertex AI Model Garden Monitoring](https://cloud.google.com/vertex-ai/docs/model-garden/monitor-models){:target="_blank"}'
+  explanation: This command uses the Google Cloud Monitoring Python SDK to retrieve and analyze model invocation count metrics from the last hour with comprehensive error handling.
+  multi_line_details: |
+    # Python script using Google Cloud Monitoring SDK
+    # - Retrieves model invocation counts from last hour
+    # - Groups by model and response code with summaries
+    # - Handles permissions errors gracefully
+  name: get_vertex_ai_model_invocation_rates_last_hour_gcp_project_id
+  when_is_it_useful: '1. Monitoring model throughput and identifying models with unusually low or high invocation rates.
+    
+    2. Detecting models that may have stopped receiving traffic due to configuration or deployment issues.
+    
+    3. Analyzing usage patterns to understand peak traffic times and model popularity.
+    
+    4. Troubleshooting traffic routing issues between different model versions or deployments.
+    
+    5. Capacity planning by understanding current traffic patterns and growth trends.'
+
+- command: python3 -c "
+import os
+import sys
+from google.cloud import monitoring_v3
+from google.auth import default
+from datetime import datetime, timedelta
+
+# Set up authentication
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', '')
+
+try:
+    credentials, project_id = default()
+    client = monitoring_v3.MetricServiceClient(credentials=credentials)
+    project_name = f'projects/{os.environ.get(\"GCP_PROJECT_ID\", \"\")}'
+    
+    # Set time range for last hour
+    end_time = datetime.utcnow()
+    start_time = end_time - timedelta(hours=1)
+    
+    interval = monitoring_v3.TimeInterval(
+        end_time=end_time,
+        start_time=start_time
+    )
+    
+    print(f'Analyzing error patterns for project: {project_name}')
+    print(f'Time range: {start_time.strftime(\"%Y-%m-%d %H:%M:%S\")} to {end_time.strftime(\"%Y-%m-%d %H:%M:%S\")} UTC')
+    
+    try:
+        # Query error invocations (non-2xx response codes)
+        results = client.list_time_series(
+            name=project_name,
+            filter='metric.type=\"aiplatform.googleapis.com/publisher/online_serving/model_invocation_count\" AND metric.label.response_code!~\"^2.*\"',
+            interval=interval,
+            view=monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL
+        )
+        
+        error_data = []
+        total_errors = 0
+        
+        for result in results:
+            model_id = result.resource.labels.get('model_user_id', 'unknown')
+            response_code = result.metric.labels.get('response_code', 'unknown')
+            
+            error_count = sum(point.value.double_value for point in result.points)
+            total_errors += error_count
+            
+            error_data.append({
+                'model_id': model_id,
+                'response_code': response_code,
+                'error_count': error_count
+            })
+        
+        if error_data:
+            print(f'⚠️  Found {total_errors:.0f} total errors')
+            
+            # Group by response code
+            code_summary = {}
+            for item in error_data:
+                code = item['response_code']
+                code_summary[code] = code_summary.get(code, 0) + item['error_count']
+            
+            print('   Error distribution by response code:')
+            for code, count in sorted(code_summary.items()):
+                percentage = (count / total_errors) * 100 if total_errors > 0 else 0
+                error_type = 'Client Error' if code.startswith('4') else 'Server Error' if code.startswith('5') else 'Other'
+                print(f'     {code} ({error_type}): {count:.0f} ({percentage:.1f}%)')
+            
+            # Group by model
+            model_errors = {}
+            for item in error_data:
+                model = item['model_id']
+                model_errors[model] = model_errors.get(model, 0) + item['error_count']
+            
+            print('   Models with highest error counts:')
+            for model, count in sorted(model_errors.items(), key=lambda x: x[1], reverse=True)[:5]:
+                print(f'     {model}: {count:.0f} errors')
+                
+            # Recommendations based on error types
+            if any(code.startswith('4') for code in code_summary.keys()):
+                print('   🔍 Client errors (4xx) detected - check authentication, quotas, or request format')
+            if any(code.startswith('5') for code in code_summary.keys()):
+                print('   🔍 Server errors (5xx) detected - may indicate service issues or capacity problems')
+                
+        else:
+            print('✅ No errors detected in Model Garden invocations')
+            print('   All requests in the analyzed period were successful (2xx response codes)')
+            
+    except Exception as query_error:
+        if '403' in str(query_error) or 'Permission' in str(query_error):
+            print('❌ Permission denied accessing error metrics')
+            print('   Required permission: monitoring.timeSeries.list')
+            print('   Service account needs: Monitoring Viewer role')
+        else:
+            print(f'⚠️  Error querying error metrics: {query_error}')
+            
+except Exception as auth_error:
+    print(f'❌ Authentication error: {auth_error}')
+    sys.exit(1)
+"
+  doc_links: '
+
+    - [Model Invocation Error Rates](https://cloud.google.com/vertex-ai/docs/model-garden/monitor-models#error_monitoring){:target="_blank"}
+
+    - [HTTP Response Codes](https://cloud.google.com/vertex-ai/docs/reference/rest/v1/HttpBody){:target="_blank"}
+
+    - [Error Rate Monitoring](https://cloud.google.com/monitoring/support/notification-options){:target="_blank"}'
+  explanation: This command uses the Google Cloud Monitoring Python SDK to analyze error patterns in Model Garden invocations with detailed categorization and troubleshooting recommendations.
+  multi_line_details: |
+    # Python script using Google Cloud Monitoring SDK
+    # - Filters for non-2xx response codes only
+    # - Provides error breakdown by code and model with analysis
+    # - Includes troubleshooting recommendations based on error types
+  name: get_vertex_ai_model_error_rates_last_hour_gcp_project_id
+  when_is_it_useful: '1. Identifying models with high error rates that may indicate deployment or configuration issues.
+    
+    2. Monitoring for quota exceeded errors, authentication failures, or other service-level problems.
+    
+    3. Detecting patterns in error types to diagnose root causes of model serving issues.
+    
+    4. Setting up alerting thresholds based on acceptable error rates for production models.
+    
+    5. Troubleshooting sudden spikes in errors that may indicate infrastructure or model problems.'
+
+- command: python3 -c "
+import os
+import sys
+from google.cloud import monitoring_v3
+from google.auth import default
+from datetime import datetime, timedelta
+
+# Set up authentication
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', '')
+
+try:
+    credentials, project_id = default()
+    client = monitoring_v3.MetricServiceClient(credentials=credentials)
+    project_name = f'projects/{os.environ.get(\"GCP_PROJECT_ID\", \"\")}'
+    
+    # Set time range for last hour
+    end_time = datetime.utcnow()
+    start_time = end_time - timedelta(hours=1)
+    
+    interval = monitoring_v3.TimeInterval(
+        end_time=end_time,
+        start_time=start_time
+    )
+    
+    print(f'Analyzing latency performance for project: {project_name}')
+    print(f'Time range: {start_time.strftime(\"%Y-%m-%d %H:%M:%S\")} to {end_time.strftime(\"%Y-%m-%d %H:%M:%S\")} UTC')
+    
+    try:
+        # Query model invocation latency metrics
+        results = client.list_time_series(
+            name=project_name,
+            filter='metric.type=\"aiplatform.googleapis.com/publisher/online_serving/model_invocation_latencies\"',
+            interval=interval,
+            view=monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL
+        )
+        
+        latency_data = []
+        
+        for result in results:
+            model_id = result.resource.labels.get('model_user_id', 'unknown')
+            
+            # Calculate statistics for this model
+            latencies = [point.value.double_value for point in result.points]
+            if latencies:
+                avg_latency = sum(latencies) / len(latencies)
+                max_latency = max(latencies)
+                min_latency = min(latencies)
+                
+                latency_data.append({
+                    'model_id': model_id,
+                    'avg_latency': avg_latency,
+                    'max_latency': max_latency,
+                    'min_latency': min_latency,
+                    'sample_count': len(latencies)
+                })
+        
+        if latency_data:
+            print(f'📊 Found latency data for {len(latency_data)} models')
+            
+            # Overall statistics
+            all_avg_latencies = [item['avg_latency'] for item in latency_data]
+            overall_avg = sum(all_avg_latencies) / len(all_avg_latencies)
+            
+            print(f'   Overall average latency: {overall_avg:.2f} seconds')
+            
+            # Performance categorization
+            excellent = [item for item in latency_data if item['avg_latency'] < 5]
+            good = [item for item in latency_data if 5 <= item['avg_latency'] < 10]
+            fair = [item for item in latency_data if 10 <= item['avg_latency'] < 20]
+            poor = [item for item in latency_data if item['avg_latency'] >= 20]
+            
+            print('   Performance breakdown:')
+            print(f'     Excellent (<5s): {len(excellent)} models')
+            print(f'     Good (5-10s): {len(good)} models')
+            print(f'     Fair (10-20s): {len(fair)} models')
+            print(f'     Poor (≥20s): {len(poor)} models')
+            
+            if poor:
+                print('   ⚠️  Models with poor performance (≥20s):')
+                for item in sorted(poor, key=lambda x: x['avg_latency'], reverse=True)[:3]:
+                    print(f'     {item[\"model_id\"]}: {item[\"avg_latency\"]:.2f}s avg, {item[\"max_latency\"]:.2f}s max')
+            
+            # Show top performers and worst performers
+            sorted_by_latency = sorted(latency_data, key=lambda x: x['avg_latency'])
+            
+            print('   Best performing models:')
+            for item in sorted_by_latency[:3]:
+                print(f'     {item[\"model_id\"]}: {item[\"avg_latency\"]:.2f}s avg ({item[\"sample_count\"]} samples)')
+                
+            if len(sorted_by_latency) > 3:
+                print('   Slowest models:')
+                for item in sorted_by_latency[-3:]:
+                    print(f'     {item[\"model_id\"]}: {item[\"avg_latency\"]:.2f}s avg ({item[\"sample_count\"]} samples)')
+                    
+        else:
+            print('✅ No latency data found for Model Garden invocations')
+            print('   This indicates either:')
+            print('   • No Model Garden usage in this time period')
+            print('   • Latency metrics not being collected')
+            print('   • Models not actively processing requests')
+            
+    except Exception as query_error:
+        if '403' in str(query_error) or 'Permission' in str(query_error):
+            print('❌ Permission denied accessing latency metrics')
+            print('   Required permission: monitoring.timeSeries.list')
+            print('   Service account needs: Monitoring Viewer role')
+        else:
+            print(f'⚠️  Error querying latency metrics: {query_error}')
+            
+except Exception as auth_error:
+    print(f'❌ Authentication error: {auth_error}')
+    sys.exit(1)
+"
+  doc_links: '
+
+    - [Model Invocation Latency Metrics](https://cloud.google.com/vertex-ai/docs/model-garden/monitor-models#latency_metrics){:target="_blank"}
+
+    - [Performance Monitoring](https://cloud.google.com/vertex-ai/docs/model-garden/monitor-models#performance){:target="_blank"}
+
+    - [Latency Percentiles](https://cloud.google.com/monitoring/charts/metrics-selector#aggregation){:target="_blank"}'
+  explanation: This command uses the Google Cloud Monitoring Python SDK to analyze model latency performance with statistical breakdown and performance categorization.
+  multi_line_details: |
+    # Python script using Google Cloud Monitoring SDK
+    # - Calculates comprehensive latency statistics per model
+    # - Provides performance categorization and recommendations
+    # - Identifies best and worst performing models
+  name: get_vertex_ai_model_latency_metrics_last_hour_gcp_project_id
+  when_is_it_useful: '1. Monitoring model response times to ensure they meet performance SLAs and user expectations.
+    
+    2. Identifying models with degrading performance that may need optimization or scaling.
+    
+    3. Comparing latency across different models to optimize model selection for applications.
+    
+    4. Detecting sudden increases in latency that may indicate infrastructure issues or increased load.
+    
+    5. Setting up alerting for latency thresholds to proactively address performance problems.'
+
+- command: python3 -c "
+import os
+import sys
+from google.cloud import monitoring_v3
+from google.auth import default
+from datetime import datetime, timedelta
+
+# Set up authentication
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', '')
+
+try:
+    credentials, project_id = default()
+    client = monitoring_v3.MetricServiceClient(credentials=credentials)
+    project_name = f'projects/{os.environ.get(\"GCP_PROJECT_ID\", \"\")}'
+    
+    # Set time range for last hour
+    end_time = datetime.utcnow()
+    start_time = end_time - timedelta(hours=1)
+    
+    interval = monitoring_v3.TimeInterval(
+        end_time=end_time,
+        start_time=start_time
+    )
+    
+    print(f'Analyzing throughput consumption for project: {project_name}')
+    print(f'Time range: {start_time.strftime(\"%Y-%m-%d %H:%M:%S\")} to {end_time.strftime(\"%Y-%m-%d %H:%M:%S\")} UTC')
+    
+    try:
+        # Query consumed throughput metrics
+        results = client.list_time_series(
+            name=project_name,
+            filter='metric.type=\"aiplatform.googleapis.com/publisher/online_serving/consumed_throughput\"',
+            interval=interval,
+            view=monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL
+        )
+        
+        throughput_data = []
+        total_throughput = 0
+        
+        for result in results:
+            model_id = result.resource.labels.get('model_user_id', 'unknown')
+            request_type = result.metric.labels.get('request_type', 'on_demand')
+            
+            throughput_consumed = sum(point.value.double_value for point in result.points)
+            total_throughput += throughput_consumed
+            
+            throughput_data.append({
+                'model_id': model_id,
+                'request_type': request_type,
+                'throughput_consumed': throughput_consumed
+            })
+        
+        if throughput_data:
+            print(f'💰 Found throughput consumption data')
+            print(f'   Total throughput consumed: {total_throughput:.0f} characters/sec')
+            
+            # Group by model
+            model_summary = {}
+            for item in throughput_data:
+                model = item['model_id']
+                if model not in model_summary:
+                    model_summary[model] = {'on_demand': 0, 'provisioned': 0, 'total': 0}
+                
+                req_type = item['request_type']
+                consumption = item['throughput_consumed']
+                
+                if req_type in model_summary[model]:
+                    model_summary[model][req_type] += consumption
+                else:
+                    model_summary[model]['other'] = model_summary[model].get('other', 0) + consumption
+                model_summary[model]['total'] += consumption
+            
+            print('   Consumption by model:')
+            for model, data in sorted(model_summary.items(), key=lambda x: x[1]['total'], reverse=True)[:5]:
+                print(f'     {model}: {data[\"total\"]:.0f} chars/sec total')
+                if data.get('provisioned', 0) > 0:
+                    print(f'       Provisioned: {data[\"provisioned\"]:.0f} chars/sec')
+                if data.get('on_demand', 0) > 0:
+                    print(f'       On-demand: {data[\"on_demand\"]:.0f} chars/sec')
+                if data.get('other', 0) > 0:
+                    print(f'       Other: {data[\"other\"]:.0f} chars/sec')
+                    
+            # Request type summary
+            request_types = {}
+            for item in throughput_data:
+                req_type = item['request_type']
+                request_types[req_type] = request_types.get(req_type, 0) + item['throughput_consumed']
+            
+            print('   Request type distribution:')
+            for req_type, consumption in sorted(request_types.items(), key=lambda x: x[1], reverse=True):
+                percentage = (consumption / total_throughput) * 100 if total_throughput > 0 else 0
+                print(f'     {req_type}: {consumption:.0f} chars/sec ({percentage:.1f}%)')
+            
+            # Cost implications
+            print('   💡 Optimization recommendations:')
+            if request_types.get('on_demand', 0) > request_types.get('provisioned', 0) * 2:
+                print('     • High on-demand usage detected - consider provisioned throughput for cost savings')
+            if len(model_summary) > 5:
+                print('     • Multiple models in use - review usage patterns for consolidation opportunities')
+            print('     • Monitor consumption trends to predict quota needs and optimize costs')
+                
+        else:
+            print('✅ No throughput consumption data found')
+            print('   This may indicate:')
+            print('   • No Model Garden usage requiring throughput allocation')
+            print('   • All usage is through standard API calls (not provisioned throughput)')
+            print('   • Provisioned throughput not configured for any models')
+            
+    except Exception as query_error:
+        if '403' in str(query_error) or 'Permission' in str(query_error):
+            print('❌ Permission denied accessing throughput metrics')
+            print('   Required permission: monitoring.timeSeries.list')
+            print('   Service account needs: Monitoring Viewer role')
+        else:
+            print(f'⚠️  Error querying throughput metrics: {query_error}')
+            
+except Exception as auth_error:
+    print(f'❌ Authentication error: {auth_error}')
+    sys.exit(1)
+"
+  doc_links: '
+
+    - [Provisioned Throughput Monitoring](https://cloud.google.com/vertex-ai/generative-ai/docs/provisioned-throughput#metrics){:target="_blank"}
+
+    - [Token and Character Consumption](https://cloud.google.com/vertex-ai/docs/model-garden/monitor-models#token_metrics){:target="_blank"}
+
+    - [Quota and Usage Monitoring](https://cloud.google.com/vertex-ai/quotas){:target="_blank"}'
+  explanation: This command uses the Google Cloud Monitoring Python SDK to analyze throughput consumption patterns with cost optimization recommendations and usage insights.
+  multi_line_details: |
+    # Python script using Google Cloud Monitoring SDK
+    # - Analyzes throughput consumption by model and request type
+    # - Provides cost optimization recommendations
+    # - Shows consumption patterns for capacity planning
+  name: get_vertex_ai_throughput_consumption_metrics_last_hour_gcp_project_id
+  when_is_it_useful: '1. Monitoring token and character consumption to track costs and approach to quota limits.
+    
+    2. Analyzing provisioned throughput utilization to optimize capacity planning and cost management.
+    
+    3. Identifying models with unexpectedly high consumption that may indicate inefficient usage patterns.
+    
+    4. Setting up alerts for quota thresholds to prevent service interruptions due to limit exhaustion.
+    
+    5. Understanding usage patterns to optimize model selection and deployment strategies for cost efficiency.' 
