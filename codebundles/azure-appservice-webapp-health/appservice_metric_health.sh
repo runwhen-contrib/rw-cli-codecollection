@@ -41,9 +41,23 @@ subscription_id=$(az account show --query "id" -o tsv)
 [ -f "app_service_issues.json" ] && rm "app_service_issues.json"
 [ -f "app_service_metrics.json" ] && rm "app_service_metrics.json"
 
-# Set default time range (last hour)
-start_time=$(date -u -d "1 hour ago" '+%Y-%m-%dT%H:%M:%SZ')
+# Configurable time range for metrics (default to last 30 minutes for efficiency)
+METRICS_TIME_HOURS="${METRICS_TIME_HOURS:-0.5}"
+MAX_METRIC_POINTS="${MAX_METRIC_POINTS:-6}"         # Only 6 data points (5-minute intervals)
+
+# Set time range based on configuration
+if [[ "$METRICS_TIME_HOURS" == "0.5" ]]; then
+    start_time=$(date -u -d "30 minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
+else
+    start_time=$(date -u -d "$METRICS_TIME_HOURS hours ago" '+%Y-%m-%dT%H:%M:%SZ')
+fi
 end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+
+echo "Metrics Collection Configuration:"
+echo "- Time range: Last ${METRICS_TIME_HOURS} hours"
+echo "- Maximum data points per metric: ${MAX_METRIC_POINTS}"
+echo "- Start time: $start_time"
+echo "- End time: $end_time"
 
 # Initialize JSON structures - ensure we always have valid output
 issues_json='{"issues": []}'
@@ -113,7 +127,7 @@ if [[ -z "$resource_id" ]]; then
     exit 0
 fi
 
-# List of metrics to fetch
+# List of metrics to fetch (optimized with better time intervals)
 metrics=(
     "CpuTime"
     "Requests"
@@ -137,8 +151,8 @@ metric_time_grains=(
 for metric in "${metrics[@]}"; do
     echo "Fetching metric: $metric"
 
-    # Adjust time grain if required
-    time_grain="PT1M"
+    # Use 5-minute intervals for efficiency (PT5M)
+    time_grain="PT5M"
     if [[ -n "${metric_time_grains[$metric]}" ]]; then
         time_grain="${metric_time_grains[$metric]}"
     fi
@@ -183,70 +197,70 @@ for metric in "${metrics[@]}"; do
             if [[ "$metric" == "CpuTime" && $(echo "$value > $CPU_THRESHOLD" | bc -l) -eq 1 ]]; then
                 issues_json=$(echo "$issues_json" | jq \
                     --arg title "High CPU Time Usage" \
-                    --arg nextStep "Investigate high CPU usage for $APP_SERVICE_NAME in $AZ_RESOURCE_GROUP." \
+                    --arg nextStep "Investigate high CPU usage for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\`." \
                     --arg severity "2" \
                     --arg details "Metric: $metric, Value: $value, Timestamp: $timestamp" \
                     '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]')
             elif [[ "$metric" == "Requests" && $(echo "$value > $REQUESTS_THRESHOLD" | bc -l) -eq 1 ]]; then
                 issues_json=$(echo "$issues_json" | jq \
                     --arg title "High Number of Requests" \
-                    --arg nextStep "Analyze traffic patterns and optimize handling for $APP_SERVICE_NAME in $AZ_RESOURCE_GROUP." \
+                    --arg nextStep "Analyze traffic patterns and optimize handling for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\`." \
                     --arg severity "3" \
                     --arg details "Metric: $metric, Value: $value, Timestamp: $timestamp" \
                     '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]')
             elif [[ "$metric" == "BytesReceived" && $(echo "$value > 10485760" | bc -l) -eq 1 ]]; then
                 issues_json=$(echo "$issues_json" | jq \
                     --arg title "High Incoming Bandwidth" \
-                    --arg nextStep "Investigate large data transfers for $APP_SERVICE_NAME in $AZ_RESOURCE_GROUP." \
+                    --arg nextStep "Investigate large data transfers for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\`." \
                     --arg severity "3" \
                     --arg details "Metric: $metric, Value: $value, Timestamp: $timestamp" \
                     '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]')
             elif [[ "$metric" == "BytesSent" && $(echo "$value > BYTES_RECEIVED_THRESHOLD" | bc -l) -eq 1 ]]; then
                 issues_json=$(echo "$issues_json" | jq \
                     --arg title "High Outgoing Bandwidth" \
-                    --arg nextStep "Check outgoing traffic from $APP_SERVICE_NAME in $AZ_RESOURCE_GROUP." \
+                    --arg nextStep "Check outgoing traffic from \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\`." \
                     --arg severity "3" \
                     --arg details "Metric: $metric, Value: $value, Timestamp: $timestamp" \
                     '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]')
             elif [[ "$metric" == "Http5xx" && $(echo "$value > $HTTP5XX_THRESHOLD" | bc -l) -eq 1 ]]; then
                 issues_json=$(echo "$issues_json" | jq \
                     --arg title "High Server Error Rate" \
-                    --arg nextStep "Review server errors for $APP_SERVICE_NAME in $AZ_RESOURCE_GROUP." \
+                    --arg nextStep "Review server errors for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\`." \
                     --arg severity "1" \
                     --arg details "Metric: $metric, Value: $value, Timestamp: $timestamp" \
                     '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]')
             elif [[ "$metric" == "Http2xx" && $(echo "$value < $HTTP2XX_THRESHOLD" | bc -l) -eq 1 ]]; then
                 issues_json=$(echo "$issues_json" | jq \
                     --arg title "Low Successful Requests" \
-                    --arg nextStep "Investigate low success rates for $APP_SERVICE_NAME in $AZ_RESOURCE_GROUP." \
+                    --arg nextStep "Investigate low success rates for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\`." \
                     --arg severity "2" \
                     --arg details "Metric: $metric, Value: $value, Timestamp: $timestamp" \
                     '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]')
             elif [[ "$metric" == "Http4xx" && $(echo "$value > 50" | bc -l) -eq 1 ]]; then
                 issues_json=$(echo "$issues_json" | jq \
                     --arg title "High Client Error Rate" \
-                    --arg nextStep "Review client-side errors for $APP_SERVICE_NAME in $AZ_RESOURCE_GROUP." \
+                    --arg nextStep "Review client-side errors for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\`." \
                     --arg severity "2" \
                     --arg details "Metric: $metric, Value: $value, Timestamp: $timestamp" \
                     '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]')
             elif [[ "$metric" == "Threads" && $(echo "$value > $HTTP4XX_THRESHOLD" | bc -l) -eq 1 ]]; then
                 issues_json=$(echo "$issues_json" | jq \
                     --arg title "High Thread Count" \
-                    --arg nextStep "Investigate thread usage for $APP_SERVICE_NAME in $AZ_RESOURCE_GROUP." \
+                    --arg nextStep "Investigate thread usage for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\`." \
                     --arg severity "3" \
                     --arg details "Metric: $metric, Value: $value, Timestamp: $timestamp" \
                     '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]')
             elif [[ "$metric" == "FileSystemUsage" && $(echo "$value > $DISK_USAGE_THRESHOLD" | bc -l) -eq 1 ]]; then
                 issues_json=$(echo "$issues_json" | jq \
                     --arg title "High File System Usage" \
-                    --arg nextStep "Increase storage capacity or cleanup for $APP_SERVICE_NAME in $AZ_RESOURCE_GROUP." \
+                    --arg nextStep "Increase storage capacity or cleanup for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\`." \
                     --arg severity "2" \
                     --arg details "Metric: $metric, Value: $value, Timestamp: $timestamp" \
                     '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]')
             elif [[ "$metric" == "AverageResponseTime" && $(echo "$value > $AVG_RSP_TIME" | bc -l) -eq 1 ]]; then
                 issues_json=$(echo "$issues_json" | jq \
                     --arg title "High Average Response Time" \
-                    --arg nextStep "Optimize response times for $APP_SERVICE_NAME in $AZ_RESOURCE_GROUP." \
+                    --arg nextStep "Optimize response times for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\`." \
                     --arg severity "2" \
                     --arg details "Metric: $metric, Value: $value, Timestamp: $timestamp" \
                     '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]')

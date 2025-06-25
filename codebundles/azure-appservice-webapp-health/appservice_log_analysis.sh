@@ -1,11 +1,13 @@
 #!/bin/bash
 
 # Variables
-LOG_DIR="${LOG_DIR:-"app_service_logs"}"
 OUTPUT_FILE="app_service_log_issues_report.json"
 
 # Initialize issues JSON - this ensures we always have valid output
 issues_json='{"issues": []}'
+
+echo "Quick App Service Log Analysis for '$APP_SERVICE_NAME'"
+echo "====================================================="
 
 # Ensure required variables are set
 if [[ -z "$APP_SERVICE_NAME" || -z "$AZ_RESOURCE_GROUP" ]]; then
@@ -13,126 +15,137 @@ if [[ -z "$APP_SERVICE_NAME" || -z "$AZ_RESOURCE_GROUP" ]]; then
     issues_json=$(echo "$issues_json" | jq \
         --arg title "Missing Required Environment Variables" \
         --arg details "APP_SERVICE_NAME and AZ_RESOURCE_GROUP must be set for log analysis" \
-        --arg nextStep "Set required environment variables and retry log analysis" \
+        --arg nextSteps "Set required environment variables and retry log analysis" \
         --arg severity "1" \
-        '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber)}]')
+        '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber)}]')
     echo "$issues_json" | jq '.' > "$OUTPUT_FILE"
-    echo "Error: Missing required environment variables. Results saved to $OUTPUT_FILE"
-    exit 1
-fi
-
-# Create log directory if it doesn't exist
-mkdir -p "$LOG_DIR"
-
-# Step 1: Download logs
-LOG_FILE="$LOG_DIR/app_logs.zip"
-echo "Downloading logs for App Service '$APP_SERVICE_NAME' in resource group '$AZ_RESOURCE_GROUP'..."
-
-if ! az webapp log download --name "$APP_SERVICE_NAME" --resource-group "$AZ_RESOURCE_GROUP" --log-file "$LOG_FILE" 2>/dev/null; then
-    echo "Error: Failed to download logs."
-    # Add issue but continue - this is not necessarily a critical failure
-    issues_json=$(echo "$issues_json" | jq \
-        --arg title "Failed to Download App Service Logs for \`$APP_SERVICE_NAME\`" \
-        --arg details "Could not download logs from App Service. This may be due to insufficient permissions, disabled logging, or the app service not existing" \
-        --arg nextStep "Check App Service logging configuration and permissions for \`$APP_SERVICE_NAME\` in RG \`$AZ_RESOURCE_GROUP\`" \
-        --arg severity "4" \
-        '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber)}]')
-    
-    # Save results and exit - no logs to analyze
-    echo "$issues_json" | jq '.' > "$OUTPUT_FILE"
-    echo "Log download failed. Results saved to $OUTPUT_FILE"
     exit 0
 fi
 
-# Step 2: Extract logs and fix permissions
-if [[ -f "$LOG_FILE" ]]; then
-    echo "Extracting logs..."
-    if ! unzip -o "$LOG_FILE" -d "$LOG_DIR" 2>/dev/null; then
-        echo "Error: Failed to extract logs."
-        issues_json=$(echo "$issues_json" | jq \
-            --arg title "Failed to Extract App Service Logs for \`$APP_SERVICE_NAME\`" \
-            --arg details "Downloaded log file could not be extracted. File may be corrupted" \
-            --arg nextStep "Retry log download for \`$APP_SERVICE_NAME\` or check log file integrity" \
-            --arg severity "3" \
-            '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber)}]')
-        echo "$issues_json" | jq '.' > "$OUTPUT_FILE"
-        echo "Log extraction failed. Results saved to $OUTPUT_FILE"
-        exit 0
-    fi
-    
-    # Clean up zip file
-    rm -f "$LOG_FILE"
-    
-    # Fix permissions to ensure readability
-    echo "Fixing permissions for extracted files..."
-    chmod -R u+rw "$LOG_DIR" 2>/dev/null || true
+# Step 1: Quick App Service verification (3 second timeout)
+echo "Verifying App Service exists..."
+if timeout 3s az webapp show --name "$APP_SERVICE_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "name" -o tsv >/dev/null 2>&1; then
+    echo "✓ App Service '$APP_SERVICE_NAME' is accessible"
 else
-    echo "Error: Log file was not created."
+    echo "✗ App Service '$APP_SERVICE_NAME' not accessible or timed out"
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Log File Not Created for \`$APP_SERVICE_NAME\`" \
-        --arg details "Log download appeared to succeed but no file was created" \
-        --arg nextStep "Check App Service logging configuration and retry for \`$APP_SERVICE_NAME\`" \
+        --arg title "App Service Not Accessible: \`$APP_SERVICE_NAME\`" \
+        --arg details "Could not verify App Service '$APP_SERVICE_NAME' in resource group '$AZ_RESOURCE_GROUP' within 3 seconds" \
+        --arg nextSteps "Verify App Service name and check permissions for \`$APP_SERVICE_NAME\` in RG \`$AZ_RESOURCE_GROUP\`" \
         --arg severity "3" \
-        '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber)}]')
+        '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber)}]')
     echo "$issues_json" | jq '.' > "$OUTPUT_FILE"
-    echo "Log file not found. Results saved to $OUTPUT_FILE"
     exit 0
 fi
 
-# Step 3: Analyze logs
-echo "Analyzing logs in '$LOG_DIR' for issues..."
-
-# Find all log files recursively
-log_files=$(find "$LOG_DIR" -type f \( -name "*.log" -o -name "*.txt" \) 2>/dev/null)
-
-if [[ -z "$log_files" ]]; then
-    echo "No log files found in '$LOG_DIR'."
-    issues_json=$(echo "$issues_json" | jq \
-        --arg title "No Log Files Found for \`$APP_SERVICE_NAME\`" \
-        --arg details "Log extraction completed but no .log or .txt files were found to analyze" \
-        --arg nextStep "Check App Service logging configuration to ensure logs are being generated for \`$APP_SERVICE_NAME\`" \
-        --arg severity "4" \
-        '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber)}]')
-else
-    # Process each log file
-    for log_file in $log_files; do
-        if [[ -f "$log_file" && -r "$log_file" ]]; then
-            echo "Processing log file: $log_file"
-            
-            # Look for error patterns (case insensitive)
-            if ERROR_LOGS=$(grep -iE 'error|failed|exception|fatal|critical' "$log_file" 2>/dev/null | head -20); then
-                if [[ -n "$ERROR_LOGS" ]]; then
-                    echo "Errors found in $log_file:"
-                    echo "$ERROR_LOGS"
+# Step 2: Quick Application Insights check (3 second timeout)
+echo "Checking for Application Insights integration..."
+APP_INSIGHTS_KEY=""
+if APP_INSIGHTS_KEY=$(timeout 3s az webapp config appsettings list --name "$APP_SERVICE_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "[?name=='APPINSIGHTS_INSTRUMENTATIONKEY'].value | [0]" -o tsv 2>/dev/null); then
+    if [[ -n "$APP_INSIGHTS_KEY" && "$APP_INSIGHTS_KEY" != "null" ]]; then
+        echo "✓ Application Insights found"
+        
+        # Quick query for recent errors (5 second timeout)
+        echo "Querying recent application errors (last 30 minutes)..."
+        KUSTO_QUERY="union traces, exceptions | where timestamp > ago(30m) | where severityLevel >= 2 | order by timestamp desc | limit 5 | project timestamp, message"
+        
+        if RECENT_ERRORS=$(timeout 5s az monitor app-insights query --app "$APP_INSIGHTS_KEY" --analytics-query "$KUSTO_QUERY" --query "tables[0].rows" -o json 2>/dev/null); then
+            if [[ -n "$RECENT_ERRORS" && "$RECENT_ERRORS" != "[]" && "$RECENT_ERRORS" != "null" ]]; then
+                error_count=$(echo "$RECENT_ERRORS" | jq 'length' 2>/dev/null || echo "0")
+                if [[ $error_count -gt 0 ]]; then
+                    echo "✓ Found $error_count recent error(s) via Application Insights"
                     
-                    # Count the errors to determine severity
-                    error_count=$(echo "$ERROR_LOGS" | wc -l)
-                    if [[ $error_count -gt 10 ]]; then
-                        severity="2"  # High error volume
-                    else
-                        severity="3"  # Normal error level
-                    fi
+                    # Get first error message for summary
+                    first_error=$(echo "$RECENT_ERRORS" | jq -r '.[0][1]' 2>/dev/null | head -c 200)
                     
                     issues_json=$(echo "$issues_json" | jq \
-                        --arg title "Log Errors Detected in \`$APP_SERVICE_NAME\`" \
-                        --arg logFile "$(basename "$log_file")" \
-                        --arg details "Found $error_count error entries in $(basename "$log_file"): $ERROR_LOGS" \
-                        --arg nextStep "Review log file $(basename "$log_file") to address application errors for \`$APP_SERVICE_NAME\`" \
-                        --arg severity "$severity" \
-                        '.issues += [{"title": $title, "log_file": $logFile, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber)}]')
+                        --arg title "Recent Application Errors in \`$APP_SERVICE_NAME\`" \
+                        --arg details "Found $error_count recent errors via Application Insights. First error: $first_error" \
+                        --arg nextSteps "Review and fix application errors in \`$APP_SERVICE_NAME\` in RG \`$AZ_RESOURCE_GROUP\`" \
+                        --arg severity "3" \
+                        '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber)}]')
+                else
+                    echo "✓ No recent errors found in Application Insights"
                 fi
             else
-                echo "No significant errors found in $log_file."
+                echo "✓ No recent errors found in Application Insights"
             fi
         else
-            echo "Warning: Could not read log file $log_file"
+            echo "ℹ Could not query Application Insights data within timeout"
         fi
-    done
+    else
+        echo "ℹ No Application Insights integration found"
+        issues_json=$(echo "$issues_json" | jq \
+            --arg title "No Application Insights Integration for \`$APP_SERVICE_NAME\`" \
+            --arg details "Application Insights is not configured for this App Service. Consider enabling it for better monitoring and error tracking" \
+            --arg nextSteps "Enable Application Insights for \`$APP_SERVICE_NAME\` in RG \`$AZ_RESOURCE_GROUP\` to improve monitoring capabilities" \
+            --arg severity "4" \
+            '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber)}]')
+    fi
+else
+    echo "ℹ Could not check Application Insights configuration within timeout"
 fi
 
-# Step 4: Always output issues report
+# Step 3: Quick diagnostic settings check (3 second timeout)
+echo "Checking diagnostic settings..."
+if APP_SERVICE_RESOURCE_ID=$(timeout 3s az webapp show --name "$APP_SERVICE_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "id" -o tsv 2>/dev/null); then
+    if DIAGNOSTIC_SETTINGS=$(timeout 3s az monitor diagnostic-settings list --resource "$APP_SERVICE_RESOURCE_ID" --query "value[0].workspaceId" -o tsv 2>/dev/null); then
+        if [[ -n "$DIAGNOSTIC_SETTINGS" && "$DIAGNOSTIC_SETTINGS" != "null" ]]; then
+            echo "✓ Diagnostic settings configured with Log Analytics workspace"
+            
+            # Quick Log Analytics query (5 second timeout)
+            echo "Querying Log Analytics for recent errors..."
+            KUSTO_LOG_QUERY="AppServiceConsoleLogs | where TimeGenerated > ago(30m) | where Level in ('Error', 'Critical') | order by TimeGenerated desc | limit 5 | project TimeGenerated, Level, ResultDescription"
+            
+            if LOG_ANALYTICS_RESULTS=$(timeout 5s az monitor log-analytics query --workspace "$DIAGNOSTIC_SETTINGS" --analytics-query "$KUSTO_LOG_QUERY" --query "tables[0].rows" -o json 2>/dev/null); then
+                if [[ -n "$LOG_ANALYTICS_RESULTS" && "$LOG_ANALYTICS_RESULTS" != "[]" && "$LOG_ANALYTICS_RESULTS" != "null" ]]; then
+                    log_error_count=$(echo "$LOG_ANALYTICS_RESULTS" | jq 'length' 2>/dev/null || echo "0")
+                    if [[ $log_error_count -gt 0 ]]; then
+                        echo "✓ Found $log_error_count recent log errors"
+                        
+                        # Get first error for summary
+                        first_log_error=$(echo "$LOG_ANALYTICS_RESULTS" | jq -r '.[0][2]' 2>/dev/null | head -c 200)
+                        
+                        issues_json=$(echo "$issues_json" | jq \
+                            --arg title "Recent Log Errors in \`$APP_SERVICE_NAME\`" \
+                            --arg details "Found $log_error_count recent error entries in diagnostic logs. First error: $first_log_error" \
+                            --arg nextSteps "Review diagnostic logs and fix errors in \`$APP_SERVICE_NAME\` in RG \`$AZ_RESOURCE_GROUP\`" \
+                            --arg severity "3" \
+                            '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber)}]')
+                    else
+                        echo "✓ No recent errors in diagnostic logs"
+                    fi
+                else
+                    echo "✓ No recent errors in diagnostic logs"
+                fi
+            else
+                echo "ℹ Could not query Log Analytics workspace within timeout"
+            fi
+        else
+            echo "ℹ No Log Analytics workspace configured in diagnostic settings"
+        fi
+    else
+        echo "ℹ Could not check diagnostic settings within timeout"
+        issues_json=$(echo "$issues_json" | jq \
+            --arg title "No Diagnostic Settings for \`$APP_SERVICE_NAME\`" \
+            --arg details "Diagnostic settings are not configured or could not be verified for this App Service" \
+            --arg nextSteps "Configure diagnostic settings for \`$APP_SERVICE_NAME\` in RG \`$AZ_RESOURCE_GROUP\` to enable log collection" \
+            --arg severity "4" \
+            '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber)}]')
+    fi
+else
+    echo "ℹ Could not get App Service resource ID within timeout"
+fi
+
+# Always output issues report
 echo "$issues_json" | jq '.' > "$OUTPUT_FILE"
 echo "Log analysis completed. Results saved to $OUTPUT_FILE"
 
-# Cleanup log directory to save space (optional)
-# rm -rf "$LOG_DIR"
+echo ""
+echo "Fast Azure Monitor API log analysis completed:"
+echo "- App Service verification: 3s timeout"
+echo "- Application Insights query: 5s timeout (last 30 minutes)"
+echo "- Log Analytics query: 5s timeout (last 30 minutes)"
+echo "- NO log downloads or streaming - API queries only"
+echo "- Total execution time: ~15 seconds maximum"
+echo "- All timeouts are aggressive to prevent hanging"

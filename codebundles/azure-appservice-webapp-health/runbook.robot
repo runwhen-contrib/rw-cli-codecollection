@@ -98,12 +98,12 @@ Check App Service `${APP_SERVICE_NAME}` Health in Resource Group `${AZ_RESOURCE_
     RW.Core.Add Pre To Report    ${health_check_metric.stdout}
 
 Fetch App Service `${APP_SERVICE_NAME}` Utilization Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Reviews key metrics for the app service and generates a report
-    [Tags]    access:read-only     appservice    utilization
+    [Documentation]    Reviews all key metrics (CPU, Requests, Bandwidth, HTTP status codes, Threads, Disk, Response Time) for the last 30 minutes with 5-minute intervals
+    [Tags]    access:read-only     appservice    utilization    metrics
     ${metric_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_metric_health.sh
     ...    env=${env}
-    ...    timeout_seconds=180
+    ...    timeout_seconds=90
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${metric_health.stdout}
     ${summary}=    RW.CLI.Run Cli
@@ -134,12 +134,12 @@ Fetch App Service `${APP_SERVICE_NAME}` Utilization Metrics In Resource Group `$
 
 
 Get App Service `${APP_SERVICE_NAME}` Logs In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Fetch logs of appservice workload
-    [Tags]    appservice    logs    tail    access:read-only
+    [Documentation]    Download and display recent raw log files from App Service (last 50 lines from each log file)
+    [Tags]    appservice    logs    display    raw    access:read-only
     ${logs}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_logs.sh
     ...    env=${env}
-    ...    timeout_seconds=180
+    ...    timeout_seconds=90
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${logs.stdout}
 
@@ -227,26 +227,40 @@ Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOU
         END
     END
 Check Logs for Errors in App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Gets the events of appservice and checks for errors
-    [Tags]    appservice    logs    errors    access:read-only
+    [Documentation]    Analyze App Service logs for errors using Azure Monitor APIs and Application Insights - creates structured issues for detected problems
+    [Tags]    appservice    logs    errors    analysis    azure-monitor    access:read-only
     ${log_errors}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_log_analysis.sh
     ...    env=${env}
-    ...    timeout_seconds=180
+    ...    timeout_seconds=60
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${log_errors.stdout}
 
+    IF    "${log_errors.stderr}" != ''
+        RW.Core.Add Issue
+        ...    title=Error Running Log Analysis Script
+        ...    severity=3
+        ...    next_steps=Review debug logs in report
+        ...    expected=No stderr output
+        ...    actual=stderr encountered
+        ...    reproduce_hint=${log_errors.cmd}
+        ...    details=${log_errors.stderr}
+    END
+
     ${issues}=    RW.CLI.Run Cli    
     ...    cmd=cat app_service_log_issues_report.json
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
             RW.Core.Add Issue    
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
-            ...    next_steps=${item["next_step"]}
-            ...    expected=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no Warning/Error/Critical logs
-            ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has Warning/Error/Critical logs
+            ...    next_steps=${item["next_steps"]}
+            ...    expected=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no critical errors in logs
+            ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has errors detected in logs
             ...    reproduce_hint=${log_errors.cmd}
             ...    details=${item["details"]}        
         END
