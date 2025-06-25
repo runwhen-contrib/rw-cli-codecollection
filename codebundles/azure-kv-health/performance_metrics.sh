@@ -3,7 +3,6 @@
 # Environment variables expected:
 # AZURE_RESOURCE_GROUP - The resource group containing Key Vaults
 # AZURE_RESOURCE_SUBSCRIPTION_ID - The Azure subscription ID
-# AZURE_SUBSCRIPTION_NAME - The Azure subscription name (optional)
 # REQUEST_THRESHOLD - Threshold for excessive requests (requests/hour, default: 1000)
 # LATENCY_THRESHOLD - Threshold for high latency (milliseconds, default: 500)
 # REQUEST_INTERVAL - Interval for request metrics (default: PT1H)
@@ -14,7 +13,6 @@
 
 subscription_id="$AZURE_RESOURCE_SUBSCRIPTION_ID"
 resource_group="$AZURE_RESOURCE_GROUP"
-: "${AZURE_SUBSCRIPTION_NAME:?Must set AZURE_SUBSCRIPTION_NAME}"
 
 # Severity levels
 : "${SEVERITY_CRITICAL:=4}"    # Critical issues (e.g., failed to list Key Vaults)
@@ -70,8 +68,8 @@ if ! keyvaults_json=$(az keyvault list -g "$resource_group" --subscription "$sub
         --arg details "$err_msg" \
         --arg severity "$SEVERITY_CRITICAL" \
         --arg nextStep "Check if the resource group exists and you have the right CLI permissions." \
-        --arg expected "Key Vaults should be accessible in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
-        --arg actual "Failed to list Key Vaults in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+        --arg expected "Key Vaults should be accessible in resource group \`${AZURE_RESOURCE_GROUP}\`" \
+        --arg actual "Failed to list Key Vaults in resource group \`${AZURE_RESOURCE_GROUP}\`" \
         --arg reproduceHint "az keyvault list -g \"$resource_group\" --subscription \"$subscription_id\"" \
         '.issues += [{
            "title": $title,
@@ -95,8 +93,8 @@ if [ -z "$keyvaults_json" ] || [ "$keyvaults_json" = "[]" ]; then
         --arg details "No Key Vaults were found in resource group: $resource_group" \
         --arg severity "$SEVERITY_CRITICAL" \
         --arg nextStep "Verify that Key Vaults exist in the specified resource group." \
-        --arg expected "Key Vaults should exist in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
-        --arg actual "No Key Vaults found in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+        --arg expected "Key Vaults should exist in resource group \`${AZURE_RESOURCE_GROUP}\`" \
+        --arg actual "No Key Vaults found in resource group \`${AZURE_RESOURCE_GROUP}\`" \
         --arg reproduceHint "az keyvault list -g \"$resource_group\" --subscription \"$subscription_id\"" \
         '.issues += [{
            "title": $title,
@@ -167,10 +165,10 @@ echo "$keyvaults_json" | jq -c '.[]' | while read -r kv_data; do
     if [[ "$request_count" != "N/A" && $(echo "$request_count > $REQUEST_THRESHOLD" | bc -l) -eq 1 ]]; then
         echo "Excessive requests detected for $kv_name"
         cat "$output_file" | jq \
-            --arg title "Excessive Requests Detected in Key Vault \`$kv_name\` in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+            --arg title "Excessive Requests Detected in Key Vault \`$kv_name\` in resource group \`${AZURE_RESOURCE_GROUP}\`" \
             --arg details "$keyvaults_json" \
             --arg severity "$SEVERITY_REQUEST" \
-            --arg nextStep "Check Key Vault access in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`\nSet rate limit for Key Vault backend service in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+            --arg nextStep "Check Key Vault access in resource group \`${AZURE_RESOURCE_GROUP}\`\nSet rate limit for Key Vault backend service in resource group \`${AZURE_RESOURCE_GROUP}\`" \
             --arg name "$kv_name" \
             --arg kv_location "$kv_location" \
             --arg kv_sku "$kv_sku" \
@@ -178,8 +176,8 @@ echo "$keyvaults_json" | jq -c '.[]' | while read -r kv_data; do
             --arg resource_url "$resource_url" \
             --arg request_count "$request_count" \
             --arg request_threshold "$REQUEST_THRESHOLD-req/hr" \
-            --arg expected "Key Vault \`$kv_name\` should have request count below $REQUEST_THRESHOLD requests/hour in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
-            --arg actual "Key Vault \`$kv_name\` has $request_count requests/hour (threshold: $REQUEST_THRESHOLD) in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+            --arg expected "Key Vault \`$kv_name\` should have request count below $REQUEST_THRESHOLD requests/hour in resource group \`${AZURE_RESOURCE_GROUP}\`" \
+            --arg actual "Key Vault \`$kv_name\` has $request_count requests/hour (threshold: $REQUEST_THRESHOLD) in resource group \`${AZURE_RESOURCE_GROUP}\`" \
             --arg reproduceHint "az monitor metrics list --resource \"/subscriptions/$subscription_id/resourceGroups/$resource_group/providers/Microsoft.KeyVault/vaults/$kv_name\" --metric ServiceApiHit --aggregation count --interval \"$REQUEST_INTERVAL\" --query \"value[0].timeseries[0].data[-1].count\" --start-time \"$start_time\" --end-time \"$end_time\" --output tsv" \
             '.issues += [{
                "title": $title,
@@ -204,10 +202,10 @@ echo "$keyvaults_json" | jq -c '.[]' | while read -r kv_data; do
     if [[ "$latency" != "N/A" && $(echo "$latency > $LATENCY_THRESHOLD" | bc -l) -eq 1 ]]; then
         echo "High latency detected for $kv_name"
         cat "$output_file" | jq \
-            --arg title "High Latency Detected in Key Vault \`$kv_name\` in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+            --arg title "High Latency Detected in Key Vault \`$kv_name\` in resource group \`${AZURE_RESOURCE_GROUP}\`" \
             --arg details "$keyvaults_json" \
             --arg severity "$SEVERITY_LATENCY" \
-            --arg nextStep "Check Key Vault SKU limit in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`\nUpgrade Key Vault sku in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+            --arg nextStep "Check Key Vault SKU limit in resource group \`${AZURE_RESOURCE_GROUP}\`\nUpgrade Key Vault sku in resource group \`${AZURE_RESOURCE_GROUP}\`" \
             --arg name "$kv_name" \
             --arg kv_location "$kv_location" \
             --arg kv_sku "$kv_sku" \
@@ -215,8 +213,8 @@ echo "$keyvaults_json" | jq -c '.[]' | while read -r kv_data; do
             --arg resource_url "$resource_url" \
             --arg latency "$latency" \
             --arg latency_threshold "$LATENCY_THRESHOLD-ms" \
-            --arg expected "Key Vault \`$kv_name\` should have latency below $LATENCY_THRESHOLD ms in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
-            --arg actual "Key Vault \`$kv_name\` has latency of $latency ms in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+            --arg expected "Key Vault \`$kv_name\` should have latency below $LATENCY_THRESHOLD ms in resource group \`${AZURE_RESOURCE_GROUP}\`" \
+            --arg actual "Key Vault \`$kv_name\` has latency of $latency ms in resource group \`${AZURE_RESOURCE_GROUP}\`" \
             --arg reproduceHint "az monitor metrics list --resource \"/subscriptions/$subscription_id/resourceGroups/$resource_group/providers/Microsoft.KeyVault/vaults/$kv_name\" --metric ServiceApiLatency --aggregation average --interval \"$LATENCY_INTERVAL\" --query \"value[0].timeseries[0].data[-1].average\" --start-time \"$start_time\" --end-time \"$end_time\" --output tsv" \
             '.issues += [{
                "title": $title,

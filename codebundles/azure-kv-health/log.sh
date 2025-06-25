@@ -15,7 +15,6 @@ set -euo pipefail
 
 : "${AZURE_RESOURCE_GROUP:?Must set AZURE_RESOURCE_GROUP}"
 : "${AZURE_RESOURCE_SUBSCRIPTION_ID:?Must set AZURE_RESOURCE_SUBSCRIPTION_ID}"
-: "${AZURE_SUBSCRIPTION_NAME:?Must set AZURE_SUBSCRIPTION_NAME}"
 : "${LOG_QUERY_DAYS:=1d}"
 
 OUTPUT_FILE="kv_log_issues.json"
@@ -25,7 +24,6 @@ issues_json='{"issues": []}'
 echo "Analyzing Key Vault Logs..."
 echo "Subscription ID: $AZURE_RESOURCE_SUBSCRIPTION_ID"
 echo "Resource Group:  $AZURE_RESOURCE_GROUP"
-echo "Subscription Name:  $AZURE_SUBSCRIPTION_NAME"
 
 # Check if log-analytics extension is installed
 if ! az extension show --name log-analytics &>/dev/null; then
@@ -195,16 +193,16 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
                     })
                 ')
                 nextStep=$(cat <<EOF
-Verify identity permissions in access policies and RBAC in resource group \`$AZURE_RESOURCE_GROUP\` in subscription \`$AZURE_SUBSCRIPTION_NAME\`
-Check if IP is allowed in network rules in resource group \`$AZURE_RESOURCE_GROUP\` in subscription \`$AZURE_SUBSCRIPTION_NAME\`
-Review client application details in resource group \`$AZURE_RESOURCE_GROUP\` in subscription \`$AZURE_SUBSCRIPTION_NAME\`
-Check if tenant ID matches in resource group \`$AZURE_RESOURCE_GROUP\` in subscription \`$AZURE_SUBSCRIPTION_NAME\`
-Verify object ID has correct permissions in resource group \`$AZURE_RESOURCE_GROUP\` in subscription \`$AZURE_SUBSCRIPTION_NAME\`
-If unauthorized, consider blocking IP and reviewing client applications in resource group \`$AZURE_RESOURCE_GROUP\` in subscription \`$AZURE_SUBSCRIPTION_NAME\`
+Verify identity permissions in access policies and RBAC in resource group \`$AZURE_RESOURCE_GROUP\`
+Check if IP is allowed in network rules in resource group \`$AZURE_RESOURCE_GROUP\`
+Review client application details in resource group \`$AZURE_RESOURCE_GROUP\`
+Check if tenant ID matches in resource group \`$AZURE_RESOURCE_GROUP\`
+Verify object ID has correct permissions in resource group \`$AZURE_RESOURCE_GROUP\`
+If unauthorized, consider blocking IP and reviewing client applications in resource group \`$AZURE_RESOURCE_GROUP\`
 EOF
 )
                 issues_json=$(echo "$issues_json" | jq \
-                    --arg title "Authentication Failures Detected in Key Vault $name in resource group \`$AZURE_RESOURCE_GROUP\` in subscription \`$AZURE_SUBSCRIPTION_NAME\`" \
+                    --arg title "Authentication Failures Detected in Key Vault $name in resource group \`$AZURE_RESOURCE_GROUP\`" \
                     --argjson details "$details_json" \
                     --arg severity "3" \
                     --arg nextStep "$nextStep" \
@@ -235,7 +233,7 @@ EOF
                 ')
 
                 issues_json=$(echo "$issues_json" | jq \
-                    --arg title "Key Vault Throttling Detected (HTTP 429) in $name in in resource group \`$AZURE_RESOURCE_GROUP\` in subscription \`$AZURE_SUBSCRIPTION_NAME\`" \
+                    --arg title "Key Vault Throttling Detected (HTTP 429) in $name in in resource group \`$AZURE_RESOURCE_GROUP\`" \
                     --argjson details "$details_json" \
                     --arg severity "3" \
                     --arg nextStep "Review Key vault client retry logic.\n Split workloads across multiple key vaults if needed." \

@@ -4,7 +4,6 @@ set -euo pipefail
 : "${AZURE_RESOURCE_GROUP:?Must set AZURE_RESOURCE_GROUP}"
 : "${AZURE_RESOURCE_SUBSCRIPTION_ID:?Must set AZURE_RESOURCE_SUBSCRIPTION_ID}"
 : "${THRESHOLD_DAYS:?Must set THRESHOLD_DAYS}"
-: "${AZURE_SUBSCRIPTION_NAME:?Must set AZURE_SUBSCRIPTION_NAME}"
 
 subscription_id="$AZURE_RESOURCE_SUBSCRIPTION_ID"
 resource_group="$AZURE_RESOURCE_GROUP"
@@ -30,7 +29,7 @@ if ! keyvaults=$(az keyvault list -g "$resource_group" --subscription "$subscrip
     issues_json=$(echo "$issues_json" | jq \
         --arg title "Failed to List Key Vaults" \
         --arg details "$err_msg" \
-        --arg severity "3" \
+        --arg severity "4" \
         --arg nextStep "Check if the resource group exists and you have the right CLI permissions." \
         '.issues += [{
            "title": $title,
@@ -58,7 +57,7 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
         issues_json=$(echo "$issues_json" | jq \
             --arg title "Failed to List Secrets in Key Vault $name" \
             --arg details "$err_msg" \
-            --arg severity "3" \
+            --arg severity "4" \
             --arg nextStep "Check if you have Reader or higher role on the Key Vault resource." \
             --arg name "$name" \
             '.issues += [{
@@ -104,10 +103,10 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
             remainingDays=$(( (expiryTimestamp - CURRENT_DATE) / 86400 ))
             if [[ $remainingDays -eq 0 ]]; then
                 issues_json=$(echo "$issues_json" | jq \
-                    --arg title "Expired Secret \`$secretName\` found in Key Vault \`$name\` in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`"   \
+                    --arg title "Expired Secret \`$secretName\` found in Key Vault \`$name\` in resource group \`${AZURE_RESOURCE_GROUP}\`"   \
                     --arg details $secret \
                     --arg severity "3" \
-                    --arg nextStep "Rotate secret in Key Vault in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+                    --arg nextStep "Rotate secret in Key Vault in resource group \`${AZURE_RESOURCE_GROUP}\`" \
                     --arg name "$name" \
                     --arg resource_url "$resource_url/secret" \
                     --arg secretName "$secretName" \
@@ -125,10 +124,10 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
 
             elif [[ $remainingDays -lt $threshold_days ]]; then
                 issues_json=$(echo "$issues_json" | jq \
-                    --arg title "Expiring Secret \`$secretName\` found in Key Vault \`$name\` in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+                    --arg title "Expiring Secret \`$secretName\` found in Key Vault \`$name\` in resource group \`${AZURE_RESOURCE_GROUP}\`" \
                     --arg details $secret \
                     --arg severity "3" \
-                    --arg nextStep "Rotate secret in Key Vault in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+                    --arg nextStep "Rotate secret in Key Vault in resource group \`${AZURE_RESOURCE_GROUP}\`" \
                     --arg name "$name" \
                     --arg resource_url "$resource_url/secret" \
                     --arg secretName "$secretName" \
@@ -153,7 +152,7 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
         rm -f certs_err.log
         
         issues_json=$(echo "$issues_json" | jq \
-            --arg title "Failed to List Certificates in Key Vault \`$name\` in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+            --arg title "Failed to List Certificates in Key Vault \`$name\` in resource group \`${AZURE_RESOURCE_GROUP}\`" \
             --arg details "$err_msg" \
             --arg severity "3" \
             --arg nextStep "Check if you have Reader or higher role on the Key Vault resource." \
@@ -178,7 +177,7 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
             rm -f cert_expiry_err.log
             
             issues_json=$(echo "$issues_json" | jq \
-                --arg title "Failed to Get Certificate Expiry for \`$certName\` in Key Vault \`$name\` in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+                --arg title "Failed to Get Certificate Expiry for \`$certName\` in Key Vault \`$name\` in resource group \`${AZURE_RESOURCE_GROUP}\`" \
                 --arg details "$err_msg" \
                 --arg severity "3" \
                 --arg nextStep "Check if you have Reader or higher role on the Key Vault resource." \
@@ -202,10 +201,10 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
 
             if [[ $remainingDays -eq 0 ]]; then
                 issues_json=$(echo "$issues_json" | jq \
-                    --arg title "Expired Certificate \`$certName\` found in Key Vault \`$name\` in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+                    --arg title "Expired Certificate \`$certName\` found in Key Vault \`$name\` in resource group \`${AZURE_RESOURCE_GROUP}\`" \
                     --arg details $certificates \
                     --arg severity "3" \
-                    --arg nextStep "Rotate certificate in Key Vault in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+                    --arg nextStep "Rotate certificate in Key Vault in resource group \`${AZURE_RESOURCE_GROUP}\`" \
                     --arg name "$name" \
                     --arg certName "$certName" \
                     --arg resource_url "$resource_url/certificate" \
@@ -222,10 +221,10 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
                      }]')
             elif [[ $remainingDays -gt 0 && $remainingDays -le $threshold_days ]]; then
                 issues_json=$(echo "$issues_json" | jq \
-                    --arg title "Certificate \`$certName\` is expiring in Key Vault \`$name\` in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+                    --arg title "Certificate \`$certName\` is expiring in Key Vault \`$name\` in resource group \`${AZURE_RESOURCE_GROUP}\`" \
                     --arg details "$certificates" \
                     --arg severity "3" \
-                    --arg nextStep "Rotate certificate in Key Vault in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+                    --arg nextStep "Rotate certificate in Key Vault in resource group \`${AZURE_RESOURCE_GROUP}\`" \
                     --arg name "$name" \
                     --arg certName "$certName" \
                     --arg resource_url "$resource_url/certificates" \
@@ -252,10 +251,10 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
         rm -f keys_err.log
         
         issues_json=$(echo "$issues_json" | jq \
-            --arg title "Failed to List Keys in Key Vault \`$name\` in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+            --arg title "Failed to List Keys in Key Vault \`$name\` in resource group \`${AZURE_RESOURCE_GROUP}\`" \
             --arg details "$err_msg" \
             --arg severity "3" \
-            --arg nextStep "Verify you have Reader or higher role on the Key Vault resource in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`\nCheck Key Vault access policies\nValidate network restrictions if applicable" \
+            --arg nextStep "Verify you have Reader or higher role on the Key Vault resource in resource group \`${AZURE_RESOURCE_GROUP}\`\nCheck Key Vault access policies\nValidate network restrictions if applicable" \
             --arg name "$name" \
             '.issues += [{
                "title": $title,
@@ -278,10 +277,10 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
 
             if [[ $remainingDays -eq 0 ]]; then
                 issues_json=$(echo "$issues_json" | jq \
-                    --arg title "Expired Key \`$keyName\` found in Key Vault \`$name\` in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+                    --arg title "Expired Key \`$keyName\` found in Key Vault \`$name\` in resource group \`${AZURE_RESOURCE_GROUP}\`" \
                     --arg details "$keys" \
                     --arg severity "3" \
-                    --arg nextStep "Rotate key in Key Vault in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+                    --arg nextStep "Rotate key in Key Vault in resource group \`${AZURE_RESOURCE_GROUP}\`" \
                     --arg name "$name" \
                     --arg keyName "$keyName" \
                     --arg resource_url "$resource_url/keys" \
@@ -298,10 +297,10 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
                      }]')
             elif [[ $remainingDays -gt 0 && $remainingDays -le $threshold_days ]]; then
                 issues_json=$(echo "$issues_json" | jq \
-                    --arg title "Key \`$keyName\` is expiring in Key Vault \`$name\` in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+                    --arg title "Key \`$keyName\` is expiring in Key Vault \`$name\` in resource group \`${AZURE_RESOURCE_GROUP}\`" \
                     --arg details "$keys" \
                     --arg severity "3" \
-                    --arg nextStep "Rotate key in Key Vault in resource group \`${AZURE_RESOURCE_GROUP}\` in subscription \`${AZURE_SUBSCRIPTION_NAME}\`" \
+                    --arg nextStep "Rotate key in Key Vault in resource group \`${AZURE_RESOURCE_GROUP}\`" \
                     --arg name "$name" \
                     --arg keyName "$keyName" \
                     --arg resource_url "$resource_url/keys" \
