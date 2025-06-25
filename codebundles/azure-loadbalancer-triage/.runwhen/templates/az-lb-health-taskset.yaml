@@ -29,7 +29,9 @@ spec:
     - name: AZ_LB_ID
       value: {{match_resource.resource.id}}
     - name: AZURE_RESOURCE_SUBSCRIPTION_ID
-      value: "{{ match_resource.subscription_id }}"
+      value: "{{ subscription_id }}"
+    - name: AZURE_SUBSCRIPTION_NAME
+      value: "{{ subscription_name }}"
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}

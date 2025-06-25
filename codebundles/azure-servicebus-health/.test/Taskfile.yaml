@@ -20,6 +20,47 @@ tasks:
     cmds:
       - task: build-terraform-infra
 
+  prepare-test-data:
+    desc: "Prepare test data in Service Bus"
+    cmds:
+      - task: inject-test-messages
+      - task: configure-security-test
+      - task: generate-traffic
+      - task: generate-log-activity
+
+  inject-test-messages:
+    desc: "Inject test messages into queues and topics"
+    cmds:
+      - bash ./inject_test_messages.sh
+
+  configure-security-test:
+    desc: "Set up security configurations for testing"
+    cmds:
+      - bash ./configure_security_test.sh
+
+  generate-traffic:
+    desc: "Generate traffic for a short period to create metrics"
+    cmds:
+      - DURATION_MINUTES=5 INTENSITY=medium bash ./generate_traffic.sh
+
+  generate-log-activity:
+    desc: "Generate activity that will be logged in Log Analytics"
+    cmds:
+      - bash ./generate_log_activity.sh
+
+  setup-connectivity-test:
+    desc: "Configure network rules for connectivity testing"
+    cmds:
+      - bash ./setup_connectivity_test.sh
+
+  run-with-test-data:
+    desc: "Build infrastructure, inject test data, run tests, then clean up"
+    cmds:
+      - task: build-infra
+      - task: prepare-test-data
+      - task: run-rwl-discovery
+      - task: clean
+
   check-unpushed-commits:
     desc: Check if outstanding commits or file updates need to be pushed before testing.
     vars:

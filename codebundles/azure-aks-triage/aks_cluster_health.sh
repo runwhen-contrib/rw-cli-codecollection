@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Check if AZURE_RESOURCE_SUBSCRIPTION_ID is set, otherwise get the current subscription ID
-if [ -z "$AZURE_RESOURCE_SUBSCRIPTION_ID" ]; then
+# Get or set subscription ID
+if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
     subscription=$(az account show --query "id" -o tsv)
     echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
 else
@@ -83,7 +83,7 @@ if [ "$AUTOSCALING_DISABLED_COUNT" -gt 0 ]; then
     issues_json=$(echo "$issues_json" | jq \
         --arg title "Autoscaling Disabled in Node Pools" \
         --arg nextStep "Enable autoscaling on all node pools for better resource management." \
-        --arg severity "3" \
+        --arg severity "4" \
         --arg details "$AUTOSCALING_DISABLED_COUNT node pools have autoscaling disabled." \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
     )

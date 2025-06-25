@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 #
 # Gather APIM Diagnostics & Logs from Log Analytics, highlighting known errors
 #
@@ -19,7 +19,7 @@
 #   - If any error type count > threshold, logs an issue
 #   - Writes output to apim_diagnostic_log_issues.json => { "issues": [...] }
 
-set -euo pipefail
+set -eo pipefail
 
 ###############################################################################
 # 1) Subscription context & environment checks
@@ -46,11 +46,7 @@ TIME_RANGE="${TIME_RANGE:-1h}"
 OUTPUT_FILE="apim_diagnostic_log_issues.json"
 issues_json='{"issues": []}'
 
-echo "[INFO] Gathering APIM Diagnostics & Logs (enhanced known errors)..."
-echo " APIM Name:     $APIM_NAME"
-echo " ResourceGroup: $AZ_RESOURCE_GROUP"
-echo " Time Range:    $TIME_RANGE"
-echo " Threshold:     $WARNINGS_THRESHOLD"
+echo "[INFO] Enhanced APIM Diagnostic Log Analysis for \`$APIM_NAME\` in RG \`$AZ_RESOURCE_GROUP\` (Time Range: $TIME_RANGE)..."
 
 ###############################################################################
 # 2) Retrieve APIM resource ID
@@ -65,10 +61,10 @@ if ! apim_resource_id=$(az apim show \
   rm -f apim_show_err.log
   echo "ERROR: Could not fetch APIM resource ID."
   issues_json=$(echo "$issues_json" | jq \
-    --arg t "Failed to Retrieve APIM Resource ID" \
-    --arg d "$err_msg" \
+    --arg t "Failed to Retrieve APIM Resource ID for \`$APIM_NAME\`" \
+    --arg d "$err_msg. Azure Portal: https://portal.azure.com" \
     --arg s "1" \
-    --arg n "Check APIM name/RG and permissions." \
+    --arg n "Check APIM name \`$APIM_NAME\` and RG \`$AZ_RESOURCE_GROUP\` or verify permissions" \
     '.issues += [{
        "title": $t,
        "details": $d,
@@ -83,10 +79,10 @@ rm -f apim_show_err.log
 if [[ -z "$apim_resource_id" ]]; then
   echo "No resource ID returned. Possibly the APIM doesn't exist."
   issues_json=$(echo "$issues_json" | jq \
-    --arg t "APIM Resource Not Found" \
-    --arg d "az apim show returned empty ID." \
+    --arg t "APIM Resource \`$APIM_NAME\` Not Found" \
+    --arg d "az apim show returned empty ID. Azure Portal: https://portal.azure.com" \
     --arg s "1" \
-    --arg n "Check name/RG or create APIM." \
+    --arg n "Check name/RG or create APIM" \
     '.issues += [{
        "title": $t,
        "details": $d,
@@ -97,7 +93,11 @@ if [[ -z "$apim_resource_id" ]]; then
   exit 1
 fi
 
+# Construct Azure portal URL for the APIM resource
+PORTAL_URL="https://portal.azure.com/#@/resource${apim_resource_id}/overview"
+
 echo "[INFO] APIM Resource ID: $apim_resource_id"
+echo "[INFO] Azure Portal URL: $PORTAL_URL"
 
 ###############################################################################
 # 3) Check Diagnostic Settings for Log Analytics
@@ -111,14 +111,16 @@ if [[ -z "$diag_settings_json" || "$diag_settings_json" == "[]" ]]; then
   err_msg=$(cat diag_err.log)
   rm -f diag_err.log
   issues_json=$(echo "$issues_json" | jq \
-    --arg t "No Diagnostic Settings for APIM" \
-    --arg d "No diag settings route logs to Log Analytics. $err_msg" \
+    --arg t "No Diagnostic Settings Configured for APIM \`$APIM_NAME\`" \
+    --arg d "No diagnostic settings route logs to Log Analytics. Log analysis unavailable. $err_msg. Azure Portal: $PORTAL_URL" \
     --arg s "4" \
-    --arg n "Configure at least one diag setting for APIM logs => Log Analytics." \
+    --arg n "Note: Configure diagnostic settings for APIM \`$APIM_NAME\` to enable log-based troubleshooting" \
+    --arg portal "$PORTAL_URL" \
     '.issues += [{
        "title": $t,
        "details": $d,
        "next_steps": $n,
+       "portal_url": $portal,
        "severity": ($s | tonumber)
     }]')
   echo "$issues_json" > "$OUTPUT_FILE"
@@ -130,14 +132,16 @@ ws_resource_id=$(echo "$diag_settings_json" | jq -r '.[] | select(.workspaceId !
 if [[ -z "$ws_resource_id" || "$ws_resource_id" == "null" ]]; then
   echo "[WARN] No Log Analytics workspace found in diag settings."
   issues_json=$(echo "$issues_json" | jq \
-    --arg t "No LA Workspace Configured" \
-    --arg d "Diag settings exist but none route to a workspace." \
-    --arg s "1" \
-    --arg n "Enable a diag setting with a workspace to query APIM logs." \
+    --arg t "No Log Analytics Workspace Configured for APIM \`$APIM_NAME\`" \
+    --arg d "Diagnostic settings exist but none route to a Log Analytics workspace. Cannot perform log queries. Azure Portal: $PORTAL_URL" \
+    --arg s "4" \
+    --arg n "Note: Configure Log Analytics workspace for APIM \`$APIM_NAME\` to enable log-based troubleshooting" \
+    --arg portal "$PORTAL_URL" \
     '.issues += [{
        "title": $t,
        "details": $d,
        "next_steps": $n,
+       "portal_url": $portal,
        "severity": ($s | tonumber)
     }]')
   echo "$issues_json" > "$OUTPUT_FILE"
@@ -155,14 +159,16 @@ if ! workspace_id=$(az monitor log-analytics workspace show \
   rm -f la_guid_err.log
   echo "ERROR: Could not retrieve workspace GUID."
   issues_json=$(echo "$issues_json" | jq \
-    --arg t "Failed to Retrieve Workspace GUID" \
-    --arg d "$err_msg" \
+    --arg t "Failed to Retrieve Workspace GUID for APIM \`$APIM_NAME\`" \
+    --arg d "$err_msg. Azure Portal: $PORTAL_URL" \
     --arg s "1" \
-    --arg n "Check roles or validity of workspace ID." \
+    --arg n "Check roles or validity of workspace ID for RG \`$AZ_RESOURCE_GROUP\`" \
+    --arg portal "$PORTAL_URL" \
     '.issues += [{
        "title": $t,
        "details": $d,
        "next_steps": $n,
+       "portal_url": $portal,
        "severity": ($s | tonumber)
     }]')
   echo "$issues_json" > "$OUTPUT_FILE"
@@ -172,18 +178,56 @@ rm -f la_guid_err.log
 echo "[INFO] Workspace GUID: $workspace_id"
 
 ###############################################################################
-# 5) Enhanced Kusto Query for known APIM errors/warnings
-#    We label each error with KnownErrorType via a 'case' expression:
-#      - 'Backend service unreachable'
-#      - 'JWT validation failed'
-#      - 'Operation timed out'
-#      - 'Invalid certificate'
-#      - fallback => 'OtherError'
+# 5) Check available diagnostic log categories and build enhanced queries
+###############################################################################
+echo "[INFO] Checking available diagnostic log categories..."
+
+# Check what log categories are available in the workspace
+available_categories=$(az monitor log-analytics query \
+  --workspace "$workspace_id" \
+  --analytics-query "search in (AzureDiagnostics) TimeGenerated >= ago(${TIME_RANGE}) | where ResourceId == \"${apim_resource_id}\" | distinct Category" \
+  -o json 2>/dev/null | jq -r '.tables[0].rows[]?[0]? // empty' | sort -u)
+
+echo "[INFO] Available log categories: $available_categories"
+
+# Build category list for query
+category_list="GatewayLogs"
+additional_categories=""
+
+if echo "$available_categories" | grep -q "DeveloperPortalAuditLogs"; then
+  category_list="$category_list, \"DeveloperPortalAuditLogs\""
+  additional_categories="$additional_categories DeveloperPortalAuditLogs"
+fi
+
+if echo "$available_categories" | grep -q "WebSocketConnectionLogs"; then
+  category_list="$category_list, \"WebSocketConnectionLogs\""
+  additional_categories="$additional_categories WebSocketConnectionLogs"
+fi
+
+if echo "$available_categories" | grep -q "GatewayLlmLogs"; then
+  category_list="$category_list, \"GatewayLlmLogs\""
+  additional_categories="$additional_categories GatewayLlmLogs"
+fi
+
+# Note what categories are not available
+missing_categories=""
+for cat in "DeveloperPortalAuditLogs" "WebSocketConnectionLogs" "GatewayLlmLogs"; do
+  if ! echo "$available_categories" | grep -q "$cat"; then
+    missing_categories="$missing_categories $cat"
+  fi
+done
+
+if [[ -n "$missing_categories" ]]; then
+  echo "[INFO] Note: The following log categories are not configured:$missing_categories"
+fi
+
+###############################################################################
+# 6) Enhanced Kusto Query for known APIM errors/warnings across all categories
 ###############################################################################
 KUSTO_QUERY=$(cat <<EOF
 AzureDiagnostics
 | where TimeGenerated >= ago(${TIME_RANGE})
-| where Category in ("GatewayLogs", "AuditLogs")
+| where Category in ($category_list)
 | where ResourceId == "${apim_resource_id}"
 | where Level in ("Error","Warning")
 | extend KnownErrorType = case(
@@ -191,9 +235,12 @@ AzureDiagnostics
     Message has "JWT validation failed","JwtValidationFailed",
     Message has "operation timed out","BackendOperationTimedOut",
     Message has "invalid certificate","InvalidCertificate",
+    Message has "WebSocket connection failed","WebSocketConnectionFailed",
+    Message has "Developer portal authentication failed","DevPortalAuthFailed",
+    Message has "LLM request failed","LLMRequestFailed",
     "OtherError"
 )
-| summarize CountOfMatches = count() by KnownErrorType
+| summarize CountOfMatches = count() by KnownErrorType, Category
 EOF
 )
 
@@ -201,7 +248,7 @@ echo "[INFO] Kusto Query for known APIM errors:"
 echo "$KUSTO_QUERY"
 
 ###############################################################################
-# 6) Run the log query
+# 7) Run the log query
 ###############################################################################
 if ! query_output=$(az monitor log-analytics query \
       --workspace "$workspace_id" \
@@ -211,14 +258,16 @@ if ! query_output=$(az monitor log-analytics query \
   rm -f la_query_err.log
   echo "ERROR: Log Analytics query failed."
   issues_json=$(echo "$issues_json" | jq \
-    --arg t "Failed APIM Log Analytics Query" \
-    --arg d "$err_msg" \
+    --arg t "Failed APIM Log Analytics Query for \`$APIM_NAME\`" \
+    --arg d "$err_msg. Azure Portal: $PORTAL_URL" \
     --arg s "1" \
-    --arg n "Check query syntax or ensure logs appear in the workspace." \
+    --arg n "Check query syntax or ensure logs appear in the workspace for RG \`$AZ_RESOURCE_GROUP\`" \
+    --arg portal "$PORTAL_URL" \
     '.issues += [{
        "title": $t,
        "details": $d,
        "next_steps": $n,
+       "portal_url": $portal,
        "severity": ($s | tonumber)
     }]')
   echo "$issues_json" > "$OUTPUT_FILE"
@@ -230,7 +279,7 @@ echo "[INFO] Raw query output:"
 echo "$query_output"
 
 ###############################################################################
-# 7) Parse each KnownErrorType row => [ KnownErrorType, CountOfMatches ]
+# 8) Parse each KnownErrorType row => [ KnownErrorType, CountOfMatches, Category ]
 #    We'll create an issue if CountOfMatches > WARNINGS_THRESHOLD
 ###############################################################################
 rows_len=$(echo "$query_output" | jq -r '.tables[0].rows | length')
@@ -241,23 +290,35 @@ fi
 for (( i=0; i<rows_len; i++ )); do
   error_type=$(echo "$query_output" | jq -r ".tables[0].rows[$i][0] // \"UnknownError\"")
   count_val=$(echo "$query_output" | jq -r ".tables[0].rows[$i][1] // 0")
-  echo "[INFO] Found error type '$error_type' => count=$count_val"
+  category=$(echo "$query_output" | jq -r ".tables[0].rows[$i][2] // \"Unknown\"")
+  echo "[INFO] Found error type \`$error_type\` in \`$category\` => count=$count_val"
 
   # If count_val > threshold => log an issue
   if (( $(echo "$count_val > $WARNINGS_THRESHOLD" | bc -l) )); then
-    # Adjust severity as needed
-    severity="2"
-    # If you want different thresholds or severities per error_type, handle that here
+    # Adjust severity based on error type - these are active issues affecting API operations
+    case "$error_type" in
+      "BackendServiceUnreachable"|"BackendOperationTimedOut")
+        severity="2"  # Major - backend connectivity issues
+        ;;
+      "JwtValidationFailed"|"InvalidCertificate")
+        severity="3"  # Error - authentication/security issues
+        ;;
+      *)
+        severity="3"  # Error - other operational issues
+        ;;
+    esac
 
     issues_json=$(echo "$issues_json" | jq \
-      --arg t "Frequent APIM $error_type" \
-      --arg d "$count_val occurrences in last $TIME_RANGE" \
+      --arg t "Frequent APIM \`$error_type\` Errors in \`$category\` for \`$APIM_NAME\`" \
+      --arg d "$count_val occurrences in last $TIME_RANGE (Category: $category). Azure Portal: $PORTAL_URL" \
       --arg s "$severity" \
-      --arg n "Investigate $error_type root cause for APIM '$APIM_NAME' in RG '$AZ_RESOURCE_GROUP'." \
+      --arg n "Investigate \`$error_type\` root cause for APIM \`$APIM_NAME\` in RG \`$AZ_RESOURCE_GROUP\`. Check backend services and APIM configuration" \
+      --arg portal "$PORTAL_URL" \
       '.issues += [{
          "title": $t,
          "details": $d,
          "next_steps": $n,
+         "portal_url": $portal,
          "severity": ($s | tonumber)
        }]')
   fi
@@ -267,7 +328,14 @@ done
 # or just remain silent. The script won't produce an issue if everything's below threshold.
 
 ###############################################################################
-# 8) Final JSON => apim_diagnostic_log_issues.json
+# 9) Final JSON with portal URL
 ###############################################################################
-echo "$issues_json" > "$OUTPUT_FILE"
+final_json="$(jq -n \
+  --argjson i "$(echo "$issues_json" | jq '.issues')" \
+  --arg portal "$PORTAL_URL" \
+  '{ "issues": $i, "portal_url": $portal }'
+)"
+
+echo "$final_json" > "$OUTPUT_FILE"
 echo "[INFO] Enhanced APIM log check done. Results -> $OUTPUT_FILE"
+echo "[INFO] Azure Portal: $PORTAL_URL"

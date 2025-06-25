@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 #
 # Collect APIM Resource Information & Potential Issues
 # For APIM ${APIM_NAME} in Resource Group ${AZ_RESOURCE_GROUP}
@@ -21,14 +21,17 @@ set -euo pipefail
 
 ###############################################################################
 # Get or set subscription ID
-if [ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]; then
+if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
     subscription=$(az account show --query "id" -o tsv)
     echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
 else
     subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
     echo "Using specified subscription ID: $subscription"
 fi
-az account set --subscription "$subscription"
+
+# Set the subscription to the determined ID
+echo "Switching to subscription ID: $subscription"
+az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
 ###############################################################################
 
 # Ensure required environment variables
@@ -114,46 +117,46 @@ echo "${APIM_HOSTNAME_CONFIGS}" | jq -cr '.[]?' | while read -r config; do
   echo "   TLS Min:  ${tlsVersion}"
   echo "   Cert:     ${certSubject}"
 
-  # Example check: TLS < 1.2 => severity=1 (critical)
+  # Example check: TLS < 1.2 => severity=4 (informational)
   if [ "${tlsVersion}" != "N/A" ] && [ "${tlsVersion}" != "1.2" ] && [ "${tlsVersion}" != "1.3" ]; then
     t="TLS version below 1.2"
     d="Host '${hostName}' is using TLS < 1.2 (current: ${tlsVersion})."
     n="Review runbook task for adjusting TLS settings. A minimum of 1.2 is recommended for APIM '${APIM_NAME}' in RG '${AZ_RESOURCE_GROUP}'."
-    s=1
+    s=4
     echo "[WARNING] ${d}"
     add_issue "${t}" "${d}" "${n}" "${s}"
   fi
 
-  # Example check: Missing cert for Proxy => severity=2 (major)
+  # Example check: Missing cert for Proxy => severity=4 (informational)
   if [ "${certSubject}" == "No Certificate Found" ] && [ "${hostType}" == "Proxy" ]; then
     t="Proxy host missing certificate"
     d="Host '${hostName}' is configured as Proxy but no certificate is attached."
     n="Review runbook task for custom domain certificate assignment. APIM '${APIM_NAME}' in RG '${AZ_RESOURCE_GROUP}'."
-    s=2
+    s=4
     echo "[WARNING] ${d}"
     add_issue "${t}" "${d}" "${n}" "${s}"
   fi
 done
 
 ###############################################################################
-# Example: No VNET integration => severity=3 (minor)
+# Example: No VNET integration => severity=4 (informational)
 if [ -z "${APIM_VNET_TYPE}" ]; then
   echo "[INFO] APIM is NOT using a VNET (publicly accessible)."
   t="No VNET integration for APIM \`${APIM_NAME}\`"
   d="APIM ${APIM_NAME} in is publicly accessible; no VNET integration is configured."
   n="Enable VNET integration on APIM \`${APIM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`."
-  s=3
+  s=4
   add_issue "${t}" "${d}" "${n}" "${s}"
 fi
 
-# Example: Public IP assigned => severity=2 (major)
+# Example: Public IP assigned => severity=4 (informational)
 if [ -n "${APIM_PUBLIC_IP_ID}" ]; then
   echo "[WARNING] APIM has a Public IP (${APIM_PUBLIC_IP_ID}). Ensure external access is intended."
 
   t="APIM \`${APIM_NAME}\` is assigned a Public IP"
   d="APIM ${APIM_NAME} has a public IP bound, making it externally reachable."
   n="Remove or disable the Public IP if private access is required. APIM \`${APIM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`."
-  s=2
+  s=4
   add_issue "${t}" "${d}" "${n}" "${s}"
 fi
 

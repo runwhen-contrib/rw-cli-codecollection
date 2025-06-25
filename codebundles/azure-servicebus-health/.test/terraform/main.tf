@@ -20,13 +20,11 @@ resource "azurerm_log_analytics_workspace" "law" {
 ###############################################################################
 
 resource "azurerm_servicebus_namespace" "primary" {
-  name                         = "sb-demo-primary"
-  location                     = azurerm_resource_group.sb_rg.location
-  resource_group_name          = azurerm_resource_group.sb_rg.name
-  sku                          = "Standard" # keep Premium to test features
-  capacity                     = 1
-  premium_messaging_partitions = 1
-  minimum_tls_version          = "1.2"
+  name                = "sb-demo-primary"
+  location            = azurerm_resource_group.sb_rg.location
+  resource_group_name = azurerm_resource_group.sb_rg.name
+  sku                 = "Standard" # Standard tier is more cost-effective for testing
+  minimum_tls_version = "1.2"
 
   # Allow public access so no PE / VNet is required
   public_network_access_enabled = true
@@ -100,7 +98,7 @@ resource "azurerm_monitor_metric_alert" "dead_letter_alert" {
 }
 
 ###############################################################################
-# “KNOWN-BAD” TEST OBJECTS  – disabled queue and stale SAS rule
+# "KNOWN-BAD" TEST OBJECTS  – disabled queue and stale SAS rule
 ###############################################################################
 
 resource "azurerm_servicebus_queue" "disabled_queue" {

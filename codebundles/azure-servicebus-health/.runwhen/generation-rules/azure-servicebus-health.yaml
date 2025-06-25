@@ -15,8 +15,9 @@ spec:
           qualifiers: ["resource", "resource_group"]
           baseTemplateName: az-servicebus-health
           levelOfDetail: basic
-          outputItems: []
-            # - type: slx
-            # - type: sli
-            # - type: runbook
-            #   templateName: az-servicebus-health-taskset.yaml
+          outputItems: 
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: az-servicebus-health-taskset.yaml
+            - type: workflow

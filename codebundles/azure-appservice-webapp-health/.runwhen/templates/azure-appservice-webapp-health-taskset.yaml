@@ -26,6 +26,10 @@ spec:
       value: {{resource_group.name}}
     - name: APP_SERVICE_NAME
       value: {{match_resource.resource.name}}
+    - name: AZURE_RESOURCE_SUBSCRIPTION_ID
+      value: "{{ subscription_id }}"
+    - name: AZURE_SUBSCRIPTION_NAME
+      value: "{{ subscription_name }}"
     - name: TIME_PERIOD_MINUTES
       value: "10"
   secretsProvided:

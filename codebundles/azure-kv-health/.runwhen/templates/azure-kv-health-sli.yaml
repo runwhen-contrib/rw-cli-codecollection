@@ -11,7 +11,7 @@ spec:
   displayUnitsShort: ok
   locations:
     - {{default_location}}
-  description: Counts Azure Key Vault health by checking availability metrics, configuration settings, expiring items (secrets/certificates/keys), log issues, and performance metrics in resource group {{ match_resource.resource_group.name }} in azure subscription {{ custom.subscription_name }}
+  description: Counts Azure Key Vault health by checking availability metrics, configuration settings, expiring items (secrets/certificates/keys), log issues, and performance metrics in resource group {{ match_resource.resource_group.name }} in azure subscription {{ subscription_name }}
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -29,8 +29,10 @@ spec:
   configProvided:
     - name: AZURE_RESOURCE_GROUP
       value: "{{resource_group.name}}"
-    - name: AZURE_SUBSCRIPTION_ID
-      value: "{{ match_resource.subscription_id }}"
+    - name: AZURE_RESOURCE_SUBSCRIPTION_ID
+      value: "{{ subscription_id }}"
+    - name: AZURE_SUBSCRIPTION_NAME
+      value: "{{ subscription_name }}"
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}

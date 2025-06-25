@@ -1,0 +1,108 @@
+commands:
+- command: bash 'service_bus_resource_health.sh'
+  doc_links: '
+    - [Azure Service Bus documentation](https://docs.microsoft.com/en-us/azure/service-bus-messaging/){:target="_blank"}
+    - [Azure Resource Health overview](https://docs.microsoft.com/en-us/azure/service-health/resource-health-overview){:target="_blank"}
+    - [Service Bus metrics and diagnostics](https://docs.microsoft.com/en-us/azure/service-bus-messaging/service-bus-metrics-azure-monitor){:target="_blank"}'
+  explanation: This script retrieves the health status of an Azure Service Bus namespace using the Microsoft.ResourceHealth provider.
+  multi_line_details: |
+    #!/bin/bash
+    
+    # Set up for output
+    HEALTH_OUTPUT="service_bus_health.json"
+    echo "[]" > "$HEALTH_OUTPUT"
+    
+    # Determine subscription ID
+    if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
+      subscription=$(az account show --query "id" -o tsv)
+      echo "Using current Azure CLI subscription: $subscription"
+    else
+      subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
+      echo "Using AZURE_RESOURCE_SUBSCRIPTION_ID: $subscription"
+    fi
+    
+    az account set --subscription "$subscription"
+    
+    # Ensure Microsoft.ResourceHealth provider is registered
+    echo "Checking Microsoft.ResourceHealth provider registration…"
+    reg_state=$(az provider show --namespace Microsoft.ResourceHealth --query "registrationState" -o tsv)
+    
+    if [[ "$reg_state" != "Registered" ]]; then
+      echo "Registering provider…"
+      az provider register --namespace Microsoft.ResourceHealth
+      # wait (max ~2 min)
+      for i in {1..12}; do
+        sleep 10
+        reg_state=$(az provider show --namespace Microsoft.ResourceHealth --query "registrationState" -o tsv)
+        [[ "$reg_state" == "Registered" ]] && break
+        echo "  still $reg_state …"
+      done
+    fi
+    
+    # Validate required env vars
+    : "${SB_NAMESPACE_NAME:?Must set SB_NAMESPACE_NAME}"
+    : "${AZ_RESOURCE_GROUP:?Must set AZ_RESOURCE_GROUP}"
+    
+    # Query Resource Health
+    echo "Retrieving Resource Health status for $SB_NAMESPACE_NAME …"
+    
+    az rest --method get \
+      --url "https://management.azure.com/subscriptions/${subscription}/resourceGroups/${AZ_RESOURCE_GROUP}/providers/Microsoft.ServiceBus/namespaces/${SB_NAMESPACE_NAME}/providers/Microsoft.ResourceHealth/availabilityStatuses/current?api-version=2023-07-01-preview" \
+      -o json > "$HEALTH_OUTPUT"
+    
+    echo "Health status written to $HEALTH_OUTPUT"
+    cat "$HEALTH_OUTPUT"
+  name: check_for_resource_health_issues_service_bus_sb_namespace_name_in_resource_group_az_resource_group
+  when_is_it_useful: '1. During incident response: When investigating messaging issues, check if the Service Bus namespace has any health problems reported by Azure.
+    
+    2. Proactive monitoring: Run this check on a schedule to detect service issues before they impact applications.
+    
+    3. During deployment validation: Verify the health status of Service Bus resources after new deployments or configuration changes.
+    
+    4. Troubleshooting message delivery problems: When applications report message delivery issues, check the health of the Service Bus infrastructure.
+    
+    5. Setting up new messaging pipelines: Verify resource health before relying on a Service Bus namespace for critical messaging workloads.'
+
+- command: bash 'service_bus_config_health.sh'
+  doc_links: '
+    - [Azure Service Bus best practices](https://docs.microsoft.com/en-us/azure/service-bus-messaging/service-bus-performance-improvements){:target="_blank"}
+    - [Service Bus security controls](https://docs.microsoft.com/en-us/azure/service-bus-messaging/service-bus-messaging-security-controls){:target="_blank"}'
+  explanation: This script analyzes the configuration of an Azure Service Bus namespace and checks for best practices and potential issues.
+  multi_line_details: |
+    #!/bin/bash
+    
+    OUT_TXT="service_bus_namespace.txt"
+    OUT_ISSUES="service_bus_config_health.json"
+    
+    : "${SB_NAMESPACE_NAME:?Must set SB_NAMESPACE_NAME}"
+    : "${AZ_RESOURCE_GROUP:?Must set AZ_RESOURCE_GROUP}"
+    
+    # Pull namespace properties
+    ns_json=$(az servicebus namespace show \
+                --name "$SB_NAMESPACE_NAME" \
+                --resource-group "$AZ_RESOURCE_GROUP" \
+                -o json)
+    
+    # Build issues list based on configuration best practices
+    issues='[]'
+    add_issue() {
+      local sev="$1" title="$2" next="$3" details="$4"
+      issues=$(jq --arg s "$sev" --arg t "$title" \
+                    --arg n "$next" --arg d "$details" \
+                    '. += [ {severity:($s|tonumber),title:$t,next_step:$n,details:$d} ]' \
+                    <<<"$issues")
+    }
+    
+    # Write issues to JSON file
+    jq -n --arg ns "$SB_NAMESPACE_NAME" --argjson issues "$issues" \
+          '{namespace:$ns,issues:$issues}' > "$OUT_ISSUES"
+  name: check_configuration_health_for_service_bus_sb_namespace_name_in_resource_group_az_resource_group
+  when_is_it_useful: '1. During security reviews: Check if Service Bus namespaces follow security best practices regarding TLS versions, network isolation, and managed identities.
+    
+    2. Cost optimization: Identify if the right SKU is being used for the workload requirements.
+    
+    3. High availability planning: Determine if zone redundancy is properly configured for Premium SKUs to ensure resilience.
+    
+    4. Auditing configuration: Regular checks to ensure Service Bus configuration adheres to organizational standards.
+    
+    5. Preparing for production: Validate that Service Bus namespaces are properly configured before migrating critical workloads.' 

@@ -4,15 +4,15 @@ HEALTH_OUTPUT="keyvault_health.json"
 echo "[]" > "$HEALTH_OUTPUT"
 
 # Get or set subscription ID
-if [ -z "$AZURE_SUBSCRIPTION_ID" ]; then
+if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
     subscription=$(az account show --query "id" -o tsv)
-    echo "AZURE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
+    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
 else
-    subscription="$AZURE_SUBSCRIPTION_ID"
+    subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
     echo "Using specified subscription ID: $subscription"
 fi
 
-# Set the subscription ID
+# Set the subscription to the determined ID
 echo "Switching to subscription ID: $subscription"
 az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
 

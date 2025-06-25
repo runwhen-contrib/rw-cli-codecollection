@@ -16,6 +16,7 @@ Suite Setup         Suite Initialization
 Check for Resource Health Issues Affecting App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the APP Service as reported from Azure. 
     [Tags]    aks    resource    health    service    azure
+    Skip If    not ${APP_SERVICE_RUNNING}    App Service is not running - skipping resource health check
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_resource_health.sh
     ...    env=${env}
@@ -40,6 +41,7 @@ Check for Resource Health Issues Affecting App Service `${APP_SERVICE_NAME}` In 
 Check App Service `${APP_SERVICE_NAME}` Health Check Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks the health check metric of a appservice workload. If issues are generated with severity 1 or 2, the score is 0 / unhealthy. 
     [Tags]    healthcheck    metric    appservice   
+    Skip If    not ${APP_SERVICE_RUNNING}    App Service is not running - skipping health check metrics
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_health_metric.sh
     ...    env=${env}
@@ -66,6 +68,7 @@ Check App Service `${APP_SERVICE_NAME}` Health Check Metrics In Resource Group `
 Check App Service `${APP_SERVICE_NAME}` Configuration Health In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks the configuration health of a appservice workload. 1 = healthy, 0 = unhealthy. 
     [Tags]    appservice    configuration    health
+    Skip If    not ${APP_SERVICE_RUNNING}    App Service is not running - skipping configuration health check
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_config_health.sh
     ...    env=${env}
@@ -92,6 +95,7 @@ Check App Service `${APP_SERVICE_NAME}` Configuration Health In Resource Group `
 Check Deployment Health of App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch deployment health of the App Service
     [Tags]    appservice    deployment
+    Skip If    not ${APP_SERVICE_RUNNING}    App Service is not running - skipping deployment health check
     ${deployment_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_deployment_health.sh
     ...    env=${env}
@@ -119,6 +123,7 @@ Check Deployment Health of App Service `${APP_SERVICE_NAME}` In Resource Group `
 Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events of appservice and checks for errors
     [Tags]    appservice    monitor    events    errors
+    Skip If    not ${APP_SERVICE_RUNNING}    App Service is not running - skipping activities check
     ${activities}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_activities.sh
     ...    env=${env}
@@ -142,6 +147,7 @@ Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOU
     END
 
 Generate App Service Health Score for `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}`
+    Skip If    not ${APP_SERVICE_RUNNING}    App Service is not running - metric already pushed as 0
     ${app_service_health_score}=      Evaluate  (${appservice_resource_score} + ${app_service_health_check_score} + ${app_service_config_score} + ${app_service_activities_score} + ${app_service_deployment_score}) / 5
     ${health_score}=      Convert to Number    ${app_service_health_score}  2
     RW.Core.Push Metric    ${health_score}
@@ -162,6 +168,11 @@ Suite Initialization
     ...    type=string
     ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
     ...    pattern=\w*
+    ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_RESOURCE_SUBSCRIPTION_ID
+    ...    type=string
+    ...    description=The Azure Subscription ID for the resource.
+    ...    pattern=\w*
+    ...    default=""
     ${TIME_PERIOD_MINUTES}=    RW.Core.Import User Variable    TIME_PERIOD_MINUTES
     ...    type=string
     ...    description=The time period, in minutes, to look back for activites/events. 
@@ -209,6 +220,7 @@ Suite Initialization
     ...    default=300
     Set Suite Variable    ${APP_SERVICE_NAME}    ${APP_SERVICE_NAME}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
+    Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     Set Suite Variable    ${TIME_PERIOD_MINUTES}    ${TIME_PERIOD_MINUTES}
     Set Suite Variable    ${CPU_THRESHOLD}    ${CPU_THRESHOLD}
     Set Suite Variable    ${REQUESTS_THRESHOLD}    ${REQUESTS_THRESHOLD}
@@ -221,4 +233,20 @@ Suite Initialization
 
     Set Suite Variable
     ...    ${env}
-    ...    {"APP_SERVICE_NAME":"${APP_SERVICE_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "TIME_PERIOD_MINUTES":"${TIME_PERIOD_MINUTES}","CPU_THRESHOLD":"${CPU_THRESHOLD}", "REQUESTS_THRESHOLD":"${REQUESTS_THRESHOLD}", "BYTES_RECEIVED_THRESHOLD":"${BYTES_RECEIVED_THRESHOLD}", "HTTP5XX_THRESHOLD":"${HTTP5XX_THRESHOLD}","HTTP2XX_THRESHOLD":"${HTTP2XX_THRESHOLD}", "HTTP4XX_THRESHOLD":"${HTTP4XX_THRESHOLD}", "DISK_USAGE_THRESHOLD":"${DISK_USAGE_THRESHOLD}", "AVG_RSP_TIME":"${AVG_RSP_TIME}"}
+    ...    {"APP_SERVICE_NAME":"${APP_SERVICE_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "TIME_PERIOD_MINUTES":"${TIME_PERIOD_MINUTES}","CPU_THRESHOLD":"${CPU_THRESHOLD}", "REQUESTS_THRESHOLD":"${REQUESTS_THRESHOLD}", "BYTES_RECEIVED_THRESHOLD":"${BYTES_RECEIVED_THRESHOLD}", "HTTP5XX_THRESHOLD":"${HTTP5XX_THRESHOLD}","HTTP2XX_THRESHOLD":"${HTTP2XX_THRESHOLD}", "HTTP4XX_THRESHOLD":"${HTTP4XX_THRESHOLD}", "DISK_USAGE_THRESHOLD":"${DISK_USAGE_THRESHOLD}", "AVG_RSP_TIME":"${AVG_RSP_TIME}"}
+
+    # Check if App Service is running - if not, skip all other tasks and return 0
+    ${app_service_state}=    RW.CLI.Run Cli
+    ...    cmd=az webapp show --name "${APP_SERVICE_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "state" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    
+    IF    "${app_service_state.stdout.strip()}" != "Running"
+        Set Suite Variable    ${APP_SERVICE_RUNNING}    False
+        RW.Core.Add Pre To Report    App Service ${APP_SERVICE_NAME} is ${app_service_state.stdout.strip()} (not running) - SLI score is 0
+        # Push metric 0 immediately and skip all other tasks
+        RW.Core.Push Metric    0
+    ELSE
+        Set Suite Variable    ${APP_SERVICE_RUNNING}    True
+    END

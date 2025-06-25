@@ -1,12 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
-: "${AZURE_SUBSCRIPTION_ID:?Must set AZURE_SUBSCRIPTION_ID}"
 : "${AZURE_RESOURCE_GROUP:?Must set AZURE_RESOURCE_GROUP}"
+: "${AZURE_RESOURCE_SUBSCRIPTION_ID:?Must set AZURE_RESOURCE_SUBSCRIPTION_ID}"
 : "${THRESHOLD_DAYS:?Must set THRESHOLD_DAYS}"
 : "${AZURE_SUBSCRIPTION_NAME:?Must set AZURE_SUBSCRIPTION_NAME}"
 
-subscription_id="$AZURE_SUBSCRIPTION_ID"
+subscription_id="$AZURE_RESOURCE_SUBSCRIPTION_ID"
 resource_group="$AZURE_RESOURCE_GROUP"
 threshold_days="$THRESHOLD_DAYS"
 
@@ -16,7 +16,7 @@ issues_json='{"issues": []}'
 CURRENT_DATE=$(date +%s)
 
 echo "Checking for expiring Key Vault items..."
-echo "Subscription ID: $AZURE_SUBSCRIPTION_ID"
+echo "Subscription ID: $AZURE_RESOURCE_SUBSCRIPTION_ID"
 echo "Resource Group:  $AZURE_RESOURCE_GROUP"
 echo "Threshold Days:  $THRESHOLD_DAYS"
 

@@ -1,10 +1,10 @@
-#!/usr/bin/env bash
+#!/bin/bash
 set -euo pipefail
 
 # -----------------------------------------------------------------------------
 # REQUIRED ENV VARS:
-#   AZURE_SUBSCRIPTION_ID
 #   AZURE_RESOURCE_GROUP
+#   AZURE_RESOURCE_SUBSCRIPTION_ID
 #
 # This script:
 #   1) Lists all Key Vaults in the specified resource group
@@ -13,8 +13,8 @@ set -euo pipefail
 #   4) Outputs results in JSON format
 # -----------------------------------------------------------------------------
 
-: "${AZURE_SUBSCRIPTION_ID:?Must set AZURE_SUBSCRIPTION_ID}"
 : "${AZURE_RESOURCE_GROUP:?Must set AZURE_RESOURCE_GROUP}"
+: "${AZURE_RESOURCE_SUBSCRIPTION_ID:?Must set AZURE_RESOURCE_SUBSCRIPTION_ID}"
 : "${AZURE_SUBSCRIPTION_NAME:?Must set AZURE_SUBSCRIPTION_NAME}"
 : "${LOG_QUERY_DAYS:=1d}"
 
@@ -23,7 +23,7 @@ TEMP_LOG_FILE="kv_log_query_temp.json"
 issues_json='{"issues": []}'
 
 echo "Analyzing Key Vault Logs..."
-echo "Subscription ID: $AZURE_SUBSCRIPTION_ID"
+echo "Subscription ID: $AZURE_RESOURCE_SUBSCRIPTION_ID"
 echo "Resource Group:  $AZURE_RESOURCE_GROUP"
 echo "Subscription Name:  $AZURE_SUBSCRIPTION_NAME"
 
@@ -35,7 +35,7 @@ fi
 
 # Get list of Key Vaults
 echo "Retrieving Key Vaults in resource group..."
-if ! keyvaults=$(az keyvault list -g "$AZURE_RESOURCE_GROUP" --subscription "$AZURE_SUBSCRIPTION_ID" --query "[].{id:id,name:name, resourceGroup:resourceGroup}" -o json 2>kv_list_err.log); then
+if ! keyvaults=$(az keyvault list -g "$AZURE_RESOURCE_GROUP" --subscription "$AZURE_RESOURCE_SUBSCRIPTION_ID" --query "[].{id:id,name:name, resourceGroup:resourceGroup}" -o json 2>kv_list_err.log); then
     err_msg=$(cat kv_list_err.log)
     rm -f kv_list_err.log
     

@@ -3,11 +3,21 @@
 # ENV:
 #   FUNCTION_APP_NAME   - Name of the Azure Function App
 #   AZ_RESOURCE_GROUP   - Resource group containing the Function App
-#   AZ_SUBSCRIPTION     - (Optional) Subscription ID (if needed)
+#   AZURE_RESOURCE_SUBSCRIPTION_ID - (Optional) Subscription ID (defaults to current subscription)
 #   TIME_PERIOD_MINUTES - (Optional) How many minutes of data to fetch (default 5)
 
-# (Optional) If you need to set a specific subscription:
-az account set --subscription "$AZ_SUBSCRIPTION"
+# Get or set subscription ID
+if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
+    subscription=$(az account show --query "id" -o tsv)
+    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
+else
+    subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
+    echo "Using specified subscription ID: $subscription"
+fi
+
+# Set the subscription to the determined ID
+echo "Switching to subscription ID: $subscription"
+az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
 
 TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-5}"
 
@@ -58,7 +68,7 @@ declare -a FUNCTION_METRICS=(
   "FunctionErrors"
 )
 
-# We’ll store the raw metric data in a dictionary (by metric name) so we can parse each
+# We'll store the raw metric data in a dictionary (by metric name) so we can parse each
 declare -A RAW_METRIC_DATA
 
 # Fetch each metric from Azure Monitor
