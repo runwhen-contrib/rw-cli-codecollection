@@ -71,12 +71,13 @@ fi
 app_service_state=$(az webapp show --name "$APP_SERVICE_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "state" -o tsv)
 
 if [[ "$app_service_state" != "Running" ]]; then
-    echo "App Service $APP_SERVICE_NAME is not running. Health check metrics may not be reliable."
+    echo "CRITICAL: App Service $APP_SERVICE_NAME is $app_service_state (not running)!"
+    portal_url="https://portal.azure.com/#@/resource${resource_id}/overview"
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "App Service Not Running" \
-        --arg nextStep "Ensure the App Service \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` is running before performing health checks." \
-        --arg severity "2" \
-        --arg details "App Service state: $app_service_state" \
+        --arg title "App Service \`$APP_SERVICE_NAME\` is $app_service_state (Not Running)" \
+        --arg nextStep "Start the App Service \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` immediately to restore service availability." \
+        --arg severity "1" \
+        --arg details "App Service state: $app_service_state. Service is unavailable to users. Portal URL: $portal_url" \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
     )
     echo "Health Check Summary for App Service: $APP_SERVICE_NAME" > "$summary_file"
@@ -99,7 +100,7 @@ if [[ -z "$health_check_path" || "$health_check_path" == "null" ]]; then
     issues_json=$(echo "$issues_json" | jq \
         --arg title "Health Check Not Configured" \
         --arg nextStep "Enable Health Check for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\`." \
-        --arg severity "2" \
+        --arg severity "4" \
         --arg details "Health Check is not configured for this App Service." \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
     )

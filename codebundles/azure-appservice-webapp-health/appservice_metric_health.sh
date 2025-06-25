@@ -127,6 +127,35 @@ if [[ -z "$resource_id" ]]; then
     exit 0
 fi
 
+# Check the status of the App Service
+app_service_state=$(az webapp show --name "$APP_SERVICE_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "state" -o tsv 2>/dev/null)
+
+if [[ "$app_service_state" != "Running" ]]; then
+    echo "CRITICAL: App Service $APP_SERVICE_NAME is $app_service_state (not running)!"
+    portal_url="https://portal.azure.com/#@/resource${resource_id}/overview"
+    issues_json=$(echo "$issues_json" | jq \
+        --arg title "App Service \`$APP_SERVICE_NAME\` is $app_service_state (Not Running)" \
+        --arg nextStep "Start the App Service \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` immediately to restore service availability." \
+        --arg severity "1" \
+        --arg details "App Service state: $app_service_state. Service is unavailable to users. Portal URL: $portal_url" \
+        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]')
+    
+    # Generate summary for stopped service
+    echo "Azure App Service Metrics Summary" > "app_service_metrics_summary.txt"
+    echo "=================================" >> "app_service_metrics_summary.txt"
+    echo "App Service: $APP_SERVICE_NAME" >> "app_service_metrics_summary.txt"
+    echo "Status: $app_service_state (STOPPED)" >> "app_service_metrics_summary.txt"
+    echo "Issues Detected: 1 (CRITICAL)" >> "app_service_metrics_summary.txt"
+    echo "$issues_json" | jq -r '.issues[] | "Title: \(.title)\nSeverity: \(.severity)\nDetails: \(.details)\nNext Steps: \(.next_step)\n"' >> "app_service_metrics_summary.txt"
+    
+    # Save outputs and exit
+    echo "$issues_json" > "app_service_issues.json"
+    echo "$metrics_json" > "app_service_metrics.json"
+    
+    echo "App Service is stopped. Results saved to app_service_issues.json"
+    exit 0
+fi
+
 # List of metrics to fetch (optimized with better time intervals)
 metrics=(
     "CpuTime"
