@@ -134,8 +134,8 @@ Fetch App Service `${APP_SERVICE_NAME}` Utilization Metrics In Resource Group `$
 
 
 Get App Service `${APP_SERVICE_NAME}` Logs In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Fetch logs of appservice workload
-    [Tags]    appservice    logs    tail    access:read-only
+    [Documentation]    Fetch filtered logs of appservice workload (application-level only, optimized for report size)
+    [Tags]    appservice    logs    filtered    access:read-only
     ${logs}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_logs.sh
     ...    env=${env}
@@ -312,6 +312,16 @@ Suite Initialization
     ...    description=The threshold of average response time (ms) in which to generate an issue. Higher than this value indicates slow response time.
     ...    pattern=\w*
     ...    default=300
+    ${LOG_LEVEL}=    RW.Core.Import User Variable    LOG_LEVEL
+    ...    type=string
+    ...    description=Log verbosity level: ERROR, WARN, INFO, DEBUG, VERBOSE
+    ...    pattern=\w*
+    ...    default=INFO
+    ${MAX_LOG_LINES}=    RW.Core.Import User Variable    MAX_LOG_LINES
+    ...    type=string
+    ...    description=Maximum lines per log file to display
+    ...    pattern=\w*
+    ...    default=100
     Set Suite Variable    ${APP_SERVICE_NAME}    ${APP_SERVICE_NAME}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable    ${TIME_PERIOD_MINUTES}    ${TIME_PERIOD_MINUTES}
@@ -323,7 +333,9 @@ Suite Initialization
     Set Suite Variable    ${HTTP4XX_THRESHOLD}    ${HTTP4XX_THRESHOLD}
     Set Suite Variable    ${DISK_USAGE_THRESHOLD}    ${DISK_USAGE_THRESHOLD}
     Set Suite Variable    ${AVG_RSP_TIME}    ${AVG_RSP_TIME}
+    Set Suite Variable    ${LOG_LEVEL}    ${LOG_LEVEL}
+    Set Suite Variable    ${MAX_LOG_LINES}    ${MAX_LOG_LINES}
 
     Set Suite Variable
     ...    ${env}
-    ...    {"APP_SERVICE_NAME":"${APP_SERVICE_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "TIME_PERIOD_MINUTES":"${TIME_PERIOD_MINUTES}","CPU_THRESHOLD":"${CPU_THRESHOLD}", "REQUESTS_THRESHOLD":"${REQUESTS_THRESHOLD}", "BYTES_RECEIVED_THRESHOLD":"${BYTES_RECEIVED_THRESHOLD}", "HTTP5XX_THRESHOLD":"${HTTP5XX_THRESHOLD}","HTTP2XX_THRESHOLD":"${HTTP2XX_THRESHOLD}", "HTTP4XX_THRESHOLD":"${HTTP4XX_THRESHOLD}", "DISK_USAGE_THRESHOLD":"${DISK_USAGE_THRESHOLD}", "AVG_RSP_TIME":"${AVG_RSP_TIME}"}
+    ...    {"APP_SERVICE_NAME":"${APP_SERVICE_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "TIME_PERIOD_MINUTES":"${TIME_PERIOD_MINUTES}","CPU_THRESHOLD":"${CPU_THRESHOLD}", "REQUESTS_THRESHOLD":"${REQUESTS_THRESHOLD}", "BYTES_RECEIVED_THRESHOLD":"${BYTES_RECEIVED_THRESHOLD}", "HTTP5XX_THRESHOLD":"${HTTP5XX_THRESHOLD}","HTTP2XX_THRESHOLD":"${HTTP2XX_THRESHOLD}", "HTTP4XX_THRESHOLD":"${HTTP4XX_THRESHOLD}", "DISK_USAGE_THRESHOLD":"${DISK_USAGE_THRESHOLD}", "AVG_RSP_TIME":"${AVG_RSP_TIME}", "LOG_LEVEL":"${LOG_LEVEL}", "MAX_LOG_LINES":"${MAX_LOG_LINES}"}
