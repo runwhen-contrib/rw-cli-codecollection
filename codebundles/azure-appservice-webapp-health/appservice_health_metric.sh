@@ -74,7 +74,7 @@ if [[ "$app_service_state" != "Running" ]]; then
     echo "App Service $APP_SERVICE_NAME is not running. Health check metrics may not be reliable."
     issues_json=$(echo "$issues_json" | jq \
         --arg title "App Service Not Running" \
-        --arg nextStep "Ensure the App Service $APP_SERVICE_NAME in $AZ_RESOURCE_GROUP is running before performing health checks." \
+        --arg nextStep "Ensure the App Service \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` is running before performing health checks." \
         --arg severity "2" \
         --arg details "App Service state: $app_service_state" \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
@@ -98,7 +98,7 @@ if [[ -z "$health_check_path" || "$health_check_path" == "null" ]]; then
     echo "Health Check is not configured."
     issues_json=$(echo "$issues_json" | jq \
         --arg title "Health Check Not Configured" \
-        --arg nextStep "Enable Health Check for $APP_SERVICE_NAME in $AZ_RESOURCE_GROUP." \
+        --arg nextStep "Enable Health Check for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\`." \
         --arg severity "2" \
         --arg details "Health Check is not configured for this App Service." \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
@@ -127,7 +127,7 @@ if [[ -n "$health_check_path" && "$health_check_path" != "null" ]]; then
             echo "No HealthCheckStatus data found."
             issues_json=$(echo "$issues_json" | jq \
                 --arg title "No Health Check Data" \
-                --arg nextStep "Investigate why HealthCheckStatus data is not available for $APP_SERVICE_NAME in $AZ_RESOURCE_GROUP." \
+                --arg nextStep "Investigate why HealthCheckStatus data is not available for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\`." \
                 --arg severity "3" \
                 --arg details "No data points returned for HealthCheckStatus metric." \
                 '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
@@ -174,7 +174,7 @@ if [[ -n "$health_check_path" && "$health_check_path" != "null" ]]; then
             if [ "$has_missing_data" = true ]; then
                 issues_json=$(echo "$issues_json" | jq \
                     --arg title "Missing Health Check Data" \
-                    --arg nextStep "Investigate missing HealthCheckStatus data for $APP_SERVICE_NAME." \
+                    --arg nextStep "Investigate missing HealthCheckStatus data for \`$APP_SERVICE_NAME\`." \
                     --arg severity "4" \
                     --arg details "Some HealthCheckStatus data points are missing values." \
                     '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
@@ -184,7 +184,7 @@ if [[ -n "$health_check_path" && "$health_check_path" != "null" ]]; then
             if [ "$has_unhealthy_instances" = true ]; then
                 issues_json=$(echo "$issues_json" | jq \
                     --arg title "Unhealthy Instances Detected" \
-                    --arg nextStep "Investigate the health of instances for $APP_SERVICE_NAME." \
+                    --arg nextStep "Investigate the health of instances for \`$APP_SERVICE_NAME\`." \
                     --arg severity "1" \
                     --arg details "$unhealthy_count instances reported unhealthy during the queried interval." \
                     '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
@@ -195,7 +195,7 @@ if [[ -n "$health_check_path" && "$health_check_path" != "null" ]]; then
         echo "Failed to fetch HealthCheckStatus metric."
         issues_json=$(echo "$issues_json" | jq \
             --arg title "Failed to Fetch Health Check Metrics" \
-            --arg nextStep "Check permissions and retry metric collection for $APP_SERVICE_NAME." \
+            --arg nextStep "Check permissions and retry metric collection for \`$APP_SERVICE_NAME\`." \
             --arg severity "3" \
             --arg details "Could not retrieve HealthCheckStatus metric from Azure Monitor." \
             '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
