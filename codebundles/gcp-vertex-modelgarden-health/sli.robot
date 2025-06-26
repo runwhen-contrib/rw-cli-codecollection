@@ -10,7 +10,7 @@ Library             RW.CLI
 Library             RW.platform
 Library             OperatingSystem
 Library             Collections
-Resource            VertexAIKeywords.robot
+Library             String
 
 Suite Setup         Suite Initialization
 
@@ -24,12 +24,31 @@ Calculate Vertex AI Model Garden Health Score
     ${latency_score}=    Set Variable    1.0
     ${throughput_score}=    Set Variable    1.0
     
-    # Get error rate analysis using custom keyword
-    ${error_analysis}=    Analyze Model Garden Error Patterns    hours=2
-    ${error_results}=    Parse Error Analysis Results    ${error_analysis.stdout}
+    # Get error rate analysis using direct CLI call
+    ${error_analysis}=    RW.CLI.Run Cli
+    ...    cmd=python3 vertex_ai_monitoring.py errors --hours 2
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    show_in_rwl_cheatsheet=true
+    ...    timeout_seconds=240
+    
+    # Parse error results directly
+    ${high_error_rate}=    Run Keyword And Return Status    Should Contain    ${error_analysis.stdout}    HIGH_ERROR_RATE:true
+    ${error_count}=    Set Variable    0
+    
+    @{output_lines}=    Split String    ${error_analysis.stdout}    \n
+    FOR    ${line}    IN    @{output_lines}
+        ${line}=    Strip String    ${line}
+        IF    'ERROR_COUNT:' in '${line}'
+            ${count_part}=    Split String    ${line}    :
+            ${error_count}=    Strip String    ${count_part}[1]
+            ${error_count}=    Convert To Number    ${error_count}
+            BREAK
+        END
+    END
     
     # Calculate error score (1.0 = no errors, 0.0 = high errors)
-    IF    ${error_results['error_count']} > 0
+    IF    ${error_count} > 0
         # Extract error rate from stdout
         @{output_lines}=    Split String    ${error_analysis.stdout}    \n
         FOR    ${line}    IN    @{output_lines}
@@ -56,9 +75,31 @@ Calculate Vertex AI Model Garden Health Score
         END
     END
     
-    # Get latency analysis using custom keyword
-    ${latency_analysis}=    Analyze Model Garden Latency Performance    hours=2
-    ${latency_results}=    Parse Latency Analysis Results    ${latency_analysis.stdout}
+    # Get latency analysis using direct CLI call
+    ${latency_analysis}=    RW.CLI.Run Cli
+    ...    cmd=python3 vertex_ai_monitoring.py latency --hours 2
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    show_in_rwl_cheatsheet=true
+    ...    timeout_seconds=240
+    
+    # Parse latency results directly
+    ${high_latency_count}=    Set Variable    0
+    ${elevated_latency_count}=    Set Variable    0
+    
+    @{output_lines}=    Split String    ${latency_analysis.stdout}    \n
+    FOR    ${line}    IN    @{output_lines}
+        ${line}=    Strip String    ${line}
+        IF    'HIGH_LATENCY_MODELS:' in '${line}'
+            ${count_part}=    Split String    ${line}    :
+            ${high_latency_count}=    Strip String    ${count_part}[1]
+            ${high_latency_count}=    Convert To Number    ${high_latency_count}
+        ELSE IF    'ELEVATED_LATENCY_MODELS:' in '${line}'  
+            ${count_part}=    Split String    ${line}    :
+            ${elevated_latency_count}=    Strip String    ${count_part}[1]
+            ${elevated_latency_count}=    Convert To Number    ${elevated_latency_count}
+        END
+    END
     
     # Calculate latency score based on model performance
     ${total_models}=    Set Variable    0
@@ -81,8 +122,13 @@ Calculate Vertex AI Model Garden Health Score
         ${latency_score}=    Evaluate    ${good_models} / ${total_models}
     END
     
-    # Get throughput analysis using custom keyword
-    ${throughput_analysis}=    Analyze Model Garden Throughput Consumption    hours=2
+    # Get throughput analysis using direct CLI call
+    ${throughput_analysis}=    RW.CLI.Run Cli
+    ...    cmd=python3 vertex_ai_monitoring.py throughput --hours 2
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    show_in_rwl_cheatsheet=true
+    ...    timeout_seconds=240
     
     # Calculate throughput score (1.0 if has usage data, 0.5 if no data)
     ${has_usage}=    Run Keyword And Return Status    Should Contain    ${throughput_analysis.stdout}    HAS_USAGE_DATA:true

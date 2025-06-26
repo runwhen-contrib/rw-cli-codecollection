@@ -11,7 +11,7 @@ Library             RW.platform
 Library             OperatingSystem
 Library             Collections
 Library             DateTime
-Resource            VertexAIKeywords.robot
+Library             String
 
 Suite Setup         Suite Initialization
 
@@ -21,29 +21,50 @@ Analyze Vertex AI Model Garden Error Patterns and Response Codes
     [Tags]    vertex-ai    error-analysis    response-codes    troubleshooting
     RW.Core.Add Pre To Report    Analyzing Vertex AI Model Garden error patterns and response codes...
     
-    # Analyze error patterns using custom keyword
-    ${error_analysis}=    Analyze Model Garden Error Patterns    hours=2
+    # Analyze error patterns using Python script
+    ${error_analysis}=    RW.CLI.Run Cli
+    ...    cmd=python3 vertex_ai_monitoring.py errors --hours 2
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    show_in_rwl_cheatsheet=true
+    ...    timeout_seconds=240
+    
     RW.Core.Add To Report    ${error_analysis.stdout}
+    RW.Core.Add Pre To Report    Commands Used:\n${error_analysis.cmd}
     
     # Parse results and create issues if needed
-    ${results}=    Parse Error Analysis Results    ${error_analysis.stdout}
+    ${high_error_rate}=    Run Keyword And Return Status    Should Contain    ${error_analysis.stdout}    HIGH_ERROR_RATE:true
+    ${error_count}=    Set Variable    0
     
-    IF    ${results['high_error_rate']}
+    @{output_lines}=    Split String    ${error_analysis.stdout}    \n
+    FOR    ${line}    IN    @{output_lines}
+        ${line}=    Strip String    ${line}
+        IF    'ERROR_COUNT:' in '${line}'
+            ${count_part}=    Split String    ${line}    :
+            ${error_count}=    Strip String    ${count_part}[1]
+            ${error_count}=    Convert To Number    ${error_count}
+            BREAK
+        END
+    END
+    
+    IF    ${high_error_rate}
         RW.Core.Add Issue    
         ...    title=High error rate in Model Garden    
         ...    severity=1    
         ...    expected=Error rate <5%    
         ...    actual=Error rate >5%    
         ...    reproduce_hint=Review response codes and check for quota limits, authentication issues, or model availability
+        ...    next_steps=Review Vertex AI Model Garden error logs and check for quota limits, authentication issues, or model availability
     END
     
-    IF    ${results['error_count']} > 0
+    IF    ${error_count} > 0
         RW.Core.Add Issue    
         ...    title=Model Garden errors detected    
         ...    severity=2    
         ...    expected=Zero errors    
-        ...    actual=${results['error_count']} errors detected    
+        ...    actual=${error_count} errors detected    
         ...    reproduce_hint=Check model configuration and quota limits for affected models
+        ...    next_steps=Check model configuration and quota limits for affected models
     END
 
 Investigate Vertex AI Model Latency Performance Issues
@@ -51,29 +72,53 @@ Investigate Vertex AI Model Latency Performance Issues
     [Tags]    vertex-ai    latency    performance    analysis
     RW.Core.Add Pre To Report    Investigating Vertex AI Model Garden latency performance...
     
-    # Analyze latency performance using custom keyword
-    ${latency_analysis}=    Analyze Model Garden Latency Performance    hours=2
+    # Analyze latency performance using Python script
+    ${latency_analysis}=    RW.CLI.Run Cli
+    ...    cmd=python3 vertex_ai_monitoring.py latency --hours 2
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    show_in_rwl_cheatsheet=true
+    ...    timeout_seconds=240
+    
     RW.Core.Add To Report    ${latency_analysis.stdout}
+    RW.Core.Add Pre To Report    Commands Used:\n${latency_analysis.cmd}
     
     # Parse results and create issues if needed
-    ${results}=    Parse Latency Analysis Results    ${latency_analysis.stdout}
+    ${high_latency_count}=    Set Variable    0
+    ${elevated_latency_count}=    Set Variable    0
     
-    IF    ${results['high_latency_count']} > 0
+    @{output_lines}=    Split String    ${latency_analysis.stdout}    \n
+    FOR    ${line}    IN    @{output_lines}
+        ${line}=    Strip String    ${line}
+        IF    'HIGH_LATENCY_MODELS:' in '${line}'
+            ${count_part}=    Split String    ${line}    :
+            ${high_latency_count}=    Strip String    ${count_part}[1]
+            ${high_latency_count}=    Convert To Number    ${high_latency_count}
+        ELSE IF    'ELEVATED_LATENCY_MODELS:' in '${line}'  
+            ${count_part}=    Split String    ${line}    :
+            ${elevated_latency_count}=    Strip String    ${count_part}[1]
+            ${elevated_latency_count}=    Convert To Number    ${elevated_latency_count}
+        END
+    END
+    
+    IF    ${high_latency_count} > 0
         RW.Core.Add Issue    
         ...    title=High latency models detected    
         ...    severity=1    
         ...    expected=Latency <30s    
-        ...    actual=${results['high_latency_count']} models with >30s latency    
+        ...    actual=${high_latency_count} models with >30s latency    
         ...    reproduce_hint=Check model load, increase provisioned throughput, or optimize requests
+        ...    next_steps=Check model load, increase provisioned throughput, or optimize requests
     END
     
-    IF    ${results['elevated_latency_count']} > 0
+    IF    ${elevated_latency_count} > 0
         RW.Core.Add Issue    
         ...    title=Elevated latency models detected    
         ...    severity=2    
         ...    expected=Latency <10s    
-        ...    actual=${results['elevated_latency_count']} models with 10-30s latency    
+        ...    actual=${elevated_latency_count} models with 10-30s latency    
         ...    reproduce_hint=Monitor model performance and consider optimization
+        ...    next_steps=Monitor model performance and consider optimization
     END
 
 Monitor Vertex AI Throughput and Token Consumption Patterns
@@ -81,9 +126,16 @@ Monitor Vertex AI Throughput and Token Consumption Patterns
     [Tags]    vertex-ai    throughput    tokens    capacity-planning
     RW.Core.Add Pre To Report    Monitoring Vertex AI Model Garden throughput and token consumption...
     
-    # Analyze throughput and token consumption using custom keyword
-    ${throughput_analysis}=    Analyze Model Garden Throughput Consumption    hours=2
+    # Analyze throughput and token consumption using Python script
+    ${throughput_analysis}=    RW.CLI.Run Cli
+    ...    cmd=python3 vertex_ai_monitoring.py throughput --hours 2
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    show_in_rwl_cheatsheet=true
+    ...    timeout_seconds=240
+    
     RW.Core.Add To Report    ${throughput_analysis.stdout}
+    RW.Core.Add Pre To Report    Commands Used:\n${throughput_analysis.cmd}
 
 Check Vertex AI Model Garden Service Health and Quotas
     [Documentation]    Verifies service availability and quota status for Model Garden using Python SDK
@@ -96,8 +148,12 @@ Check Vertex AI Model Garden Service Health and Quotas
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     
-    # Check service health using custom keyword
-    ${metrics_check}=    Check Model Garden Service Health
+    # Check service health using Python script
+    ${metrics_check}=    RW.CLI.Run Cli
+    ...    cmd=python3 vertex_ai_monitoring.py health
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    show_in_rwl_cheatsheet=true
     
     ${api_enabled}=    Run Keyword And Return Status    Should Contain    ${service_status.stdout}    aiplatform.googleapis.com
     IF    ${api_enabled}
@@ -110,9 +166,11 @@ Check Vertex AI Model Garden Service Health and Quotas
         ...    expected=API should be enabled    
         ...    actual=API not found in enabled services    
         ...    reproduce_hint=Run: gcloud services enable aiplatform.googleapis.com --project=${GCP_PROJECT_ID}
+        ...    next_steps=Run: gcloud services enable aiplatform.googleapis.com --project=${GCP_PROJECT_ID}
     END
     
     RW.Core.Add To Report    ${metrics_check.stdout}
+    RW.Core.Add Pre To Report    Commands Used:\n${metrics_check.cmd}
 
 Generate Vertex AI Model Garden Health Summary and Next Steps
     [Documentation]    Generates a comprehensive health summary with actionable recommendations
