@@ -281,7 +281,7 @@ if (( $(echo "$total_requests > 0" | bc -l) )); then
          "details": $d,
          "next_steps": $n,
          "portal_url": $portal,
-         "severity": 2
+         "severity": 4
        }]')"
   fi
 fi
@@ -300,7 +300,7 @@ if (( $(echo "$total_requests > 0" | bc -l) )); then
          "details": $d,
          "next_steps": $n,
          "portal_url": $portal,
-         "severity": 3
+         "severity": 4
        }]')"
   fi
 fi
@@ -333,7 +333,7 @@ if (( $(echo "$backend_avg > 200" | bc -l) )); then
        "details": $d,
        "next_steps": $n,
        "portal_url": $portal,
-       "severity": 2
+       "severity": 4
      }]')"
 fi
 
@@ -349,7 +349,7 @@ if (( $(echo "$cpu_avg > 80" | bc -l) )); then
        "details": $d,
        "next_steps": $n,
        "portal_url": $portal,
-       "severity": 2
+       "severity": 4
      }]')"
 fi
 
@@ -365,7 +365,7 @@ if (( $(echo "$mem_avg > 80" | bc -l) )); then
        "details": $d,
        "next_steps": $n,
        "portal_url": $portal,
-       "severity": 2
+       "severity": 4
      }]')"
 fi
 
@@ -382,7 +382,7 @@ if (( $(echo "$capacity_avg >= 1" | bc -l) )); then
        "details": $d,
        "next_steps": $n,
        "portal_url": $portal,
-       "severity": 3
+       "severity": 4
      }]')"
 fi
 
