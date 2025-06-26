@@ -78,8 +78,10 @@ Check for Resource Health Issues Affecting APIM `${APIM_NAME}` in Resource Group
     IF    len(${issue_list}) > 0
         # We assume the returned JSON is an object, not an array. Adjust accordingly if it's different.
         ${status_title}=    Set Variable    ${issue_list["properties"]["title"]}
+        # Check if the category is "Not Applicable" to suppress issue for ondemand/serverless deployments
+        ${category}=    Set Variable    ${issue_list["properties"]["category"]}
 
-        IF    "${status_title}" != "Available"
+        IF    "${status_title}" != "Available" and "${category}" != "Not Applicable"
             RW.Core.Add Issue
             ...    severity=2
             ...    expected=APIM should be marked "Available" in Resource Health
