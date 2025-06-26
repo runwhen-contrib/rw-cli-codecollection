@@ -10,8 +10,8 @@ Documentation       Troubleshooting and remediation tasks for GCP Vertex AI Mode
 ...                 - monitoring.timeSeries.list
 ...                 - logging.privateLogEntries.list
 ...                 - serviceusage.services.list
-Metadata            Author    runwhen
-Metadata            Display Name    GCP Vertex AI Model Garden Troubleshooting
+Metadata            Author    stewartshea
+Metadata            Display Name    GCP Vertex AI Model Garden Health
 Metadata            Supports    GCP,Vertex AI,Model Garden
 
 Library             BuiltIn
@@ -417,13 +417,6 @@ Generate Vertex AI Model Garden Health Summary and Next Steps for `${GCP_PROJECT
     ...    Project: ${GCP_PROJECT_ID}
     ...    Analysis Period: Last 2 hours
     ...    Timestamp: ${current_date}
-    ...    ${EMPTY}
-    ...    🔍 RECOMMENDED NEXT STEPS:
-    ...    1. Monitor error rates with Cloud Monitoring Python SDK
-    ...    2. Check latency trends with dashboard: https://console.cloud.google.com/monitoring/dashboards?project=${GCP_PROJECT_ID}
-    ...    3. Review quota usage at: https://console.cloud.google.com/iam-admin/quotas?project=${GCP_PROJECT_ID}
-    ...    4. Set up alerting for error rates > 5% and latency > 10s
-    ...    5. Monitor token consumption for cost optimization
     ...    ${EMPTY}
     ...    📚 USEFUL DOCUMENTATION:
     ...    - Model Garden Monitoring: https://cloud.google.com/vertex-ai/docs/model-garden/monitor-models

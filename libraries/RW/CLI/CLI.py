@@ -203,17 +203,17 @@ def resolve_path_to_robot():
     repo_path_to_robot = os.getenv("RW_PATH_TO_ROBOT", "").lstrip('/')
 
     # Check if the path includes environment variable placeholders
-    if "$(RUNWHEN_HOME)" in repo_path_to_robot:
+    if repo_path_to_robot and "$(RUNWHEN_HOME)" in repo_path_to_robot:
         repo_path_to_robot = repo_path_to_robot.replace("$(RUNWHEN_HOME)", runwhen_home)
-    if "$(HOME)" in repo_path_to_robot:
+    if repo_path_to_robot and "$(HOME)" in repo_path_to_robot:
         repo_path_to_robot = repo_path_to_robot.replace("$(HOME)", home)
 
-    # Prepare a list of paths to check
-    paths_to_check = set()
+    # Use ordered list to maintain priority, not set
+    paths_to_check = []
     
-    # If RW_PATH_TO_ROBOT is set, use those paths
+    # Priority 1: If RW_PATH_TO_ROBOT is set, check derived paths first
     if repo_path_to_robot:
-        paths_to_check.update([
+        paths_to_check.extend([
             os.path.join('/', repo_path_to_robot),  # Check as absolute path
             os.path.join(runwhen_home, repo_path_to_robot),  # Path relative to RUNWHEN_HOME
             os.path.join(runwhen_home, 'collection', repo_path_to_robot),  # Further nested within RUNWHEN_HOME
@@ -223,25 +223,38 @@ def resolve_path_to_robot():
             os.path.join("/root/", repo_path_to_robot), # Backwards compatible /root
             os.path.join("/root/collection", repo_path_to_robot), # Backwards compatible /root
         ])
+        
+        # Try to find the file in the RW_PATH_TO_ROBOT derived paths first
+        file_path = find_file(*paths_to_check)
+        if file_path:
+            return file_path
+    else:
+        # Priority 2: Standard fallback paths (only if RW_PATH_TO_ROBOT is not set)
+        standard_fallback_paths = [
+            os.path.join("/collection", "sli.robot"),
+            os.path.join("/collection", "runbook.robot"), 
+            os.path.join("/root/collection", "sli.robot"),
+            os.path.join("/root/collection", "runbook.robot"),
+            os.path.join("/root/", "sli.robot"),
+            os.path.join("/root/", "runbook.robot"),
+            os.path.join("/", "sli.robot"),
+            os.path.join("/", "runbook.robot"),
+        ]
+        
+        file_path = find_file(*standard_fallback_paths)
+        if file_path:
+            return file_path
     
-    # Fallback: look for robot files in current working directory tree
+    # Priority 3: Last resort - scan current working directory tree (only if nothing found yet)
+    # This is expensive so we only do it as a last resort
     cwd = os.getcwd()
     for root, dirs, files in os.walk(cwd):
         for file in files:
             if file.endswith('.robot'):
                 candidate = os.path.join(root, file)
-                paths_to_check.add(candidate)
+                if os.path.isfile(candidate):
+                    return candidate
     
-    # Try to find the file in any of the specified paths
-    file_path = find_file(*paths_to_check)
-    if file_path:
-        return file_path
-
-    # Final fallback to a default robot file or raise an error
-    default_robot_file = os.path.join("/", "sli.robot")  # Default file path
-    if os.path.isfile(default_robot_file):
-        return default_robot_file
-
     raise FileNotFoundError("Could not find the robot file in any known locations.")
 
 

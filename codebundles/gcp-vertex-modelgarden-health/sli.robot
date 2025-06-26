@@ -8,7 +8,7 @@ Documentation       Calculates SLI for GCP Vertex AI Model Garden health using G
 ...                 Required Permissions:
 ...                 - monitoring.timeSeries.list
 ...                 - logging.privateLogEntries.list
-Metadata            Author    runwhen
+Metadata            Author    stewartshea
 Metadata            Display Name    GCP Vertex AI Model Garden Health SLI
 Metadata            Supports    GCP,Vertex AI,Model Garden
 
