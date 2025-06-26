@@ -1,5 +1,13 @@
 *** Settings ***
 Documentation       Calculates SLI for GCP Vertex AI Model Garden health using Google Cloud Monitoring Python SDK.
+...                 
+...                 Required IAM Roles:
+...                 - roles/monitoring.viewer (for metrics access)
+...                 - roles/logging.privateLogViewer (for quick log health check)
+...                 
+...                 Required Permissions:
+...                 - monitoring.timeSeries.list
+...                 - logging.privateLogEntries.list
 Metadata            Author    runwhen
 Metadata            Display Name    GCP Vertex AI Model Garden Health SLI
 Metadata            Supports    GCP,Vertex AI,Model Garden
@@ -15,9 +23,9 @@ Library             String
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Quick Vertex AI Log Health Check
+Quick Vertex AI Log Health Check for `${GCP_PROJECT_ID}`
     [Documentation]    Performs a quick check of recent Vertex AI logs for immediate health assessment
-    [Tags]    vertex-ai    logs    health-check    quick
+    [Tags]    vertex-ai    logs    health-check    quick    access:read-only
     
     # Quick check for recent errors using configurable lookback time
     ${recent_errors}=    RW.CLI.Run Cli
@@ -68,9 +76,9 @@ Quick Vertex AI Log Health Check
     
     RW.Core.Push Metric    ${log_health_score}
 
-Calculate Vertex AI Model Garden Health Score
+Calculate Vertex AI Model Garden Health Score for `${GCP_PROJECT_ID}`
     [Documentation]    Calculates a composite health score based on error rate, latency, and throughput metrics using Python SDK
-    [Tags]    vertex-ai    health-score    sli    monitoring
+    [Tags]    vertex-ai    health-score    sli    monitoring    access:read-only
     
     # Initialize scores
     ${error_score}=    Set Variable    1.0

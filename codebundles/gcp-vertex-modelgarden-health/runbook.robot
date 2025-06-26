@@ -1,5 +1,15 @@
 *** Settings ***
 Documentation       Troubleshooting and remediation tasks for GCP Vertex AI Model Garden using Google Cloud Monitoring Python SDK.
+...                 
+...                 Required IAM Roles:
+...                 - roles/monitoring.viewer (for metrics access)
+...                 - roles/logging.privateLogViewer (for audit logs access)
+...                 - roles/serviceusage.serviceUsageConsumer (for service status checks)
+...                 
+...                 Required Permissions:
+...                 - monitoring.timeSeries.list
+...                 - logging.privateLogEntries.list
+...                 - serviceusage.services.list
 Metadata            Author    runwhen
 Metadata            Display Name    GCP Vertex AI Model Garden Troubleshooting
 Metadata            Supports    GCP,Vertex AI,Model Garden
@@ -16,9 +26,9 @@ Library             String
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Analyze Vertex AI Model Garden Error Patterns and Response Codes
+Analyze Vertex AI Model Garden Error Patterns and Response Codes in `${GCP_PROJECT_ID}`
     [Documentation]    Analyzes error patterns and response codes from Model Garden invocations to identify issues using Python SDK
-    [Tags]    vertex-ai    error-analysis    response-codes    troubleshooting
+    [Tags]    vertex-ai    error-analysis    response-codes    troubleshooting    access:read-only
     RW.Core.Add Pre To Report    Analyzing Vertex AI Model Garden error patterns and response codes...
     
     # Analyze error patterns using Python script
@@ -67,9 +77,9 @@ Analyze Vertex AI Model Garden Error Patterns and Response Codes
         ...    next_steps=Check model configuration and quota limits for affected models
     END
 
-Investigate Vertex AI Model Latency Performance Issues
+Investigate Vertex AI Model Latency Performance Issues in `${GCP_PROJECT_ID}`
     [Documentation]    Analyzes latency metrics to identify performance bottlenecks and degradation using Python SDK
-    [Tags]    vertex-ai    latency    performance    analysis
+    [Tags]    vertex-ai    latency    performance    analysis    access:read-only
     RW.Core.Add Pre To Report    Investigating Vertex AI Model Garden latency performance...
     
     # Analyze latency performance using Python script
@@ -121,9 +131,9 @@ Investigate Vertex AI Model Latency Performance Issues
         ...    next_steps=Monitor model performance and consider optimization
     END
 
-Monitor Vertex AI Throughput and Token Consumption Patterns
+Monitor Vertex AI Throughput and Token Consumption Patterns in `${GCP_PROJECT_ID}`
     [Documentation]    Analyzes throughput consumption and token usage patterns for capacity planning using Python SDK
-    [Tags]    vertex-ai    throughput    tokens    capacity-planning
+    [Tags]    vertex-ai    throughput    tokens    capacity-planning    access:read-only
     RW.Core.Add Pre To Report    Monitoring Vertex AI Model Garden throughput and token consumption...
     
     # Analyze throughput and token consumption using Python script
@@ -137,9 +147,9 @@ Monitor Vertex AI Throughput and Token Consumption Patterns
     RW.Core.Add To Report    ${throughput_analysis.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${throughput_analysis.cmd}
 
-Check Vertex AI Model Garden API Logs for Issues
+Check Vertex AI Model Garden API Logs for Issues in `${GCP_PROJECT_ID}`
     [Documentation]    Analyzes recent API logs for error patterns and usage issues
-    [Tags]    vertex-ai    logs    api-calls    monitoring
+    [Tags]    vertex-ai    logs    api-calls    monitoring    access:read-only
     RW.Core.Add Pre To Report    Checking Vertex AI Model Garden API logs for issues...
     
     # Use the exact working query from console - Vertex AI errors
@@ -360,9 +370,9 @@ Check Vertex AI Model Garden API Logs for Issues
     
     RW.Core.Add Pre To Report    Commands Used:\n${vertex_errors.cmd}
 
-Check Vertex AI Model Garden Service Health and Quotas
+Check Vertex AI Model Garden Service Health and Quotas in `${GCP_PROJECT_ID}`
     [Documentation]    Verifies service availability and quota status for Model Garden using Python SDK
-    [Tags]    vertex-ai    service-health    quotas    configuration
+    [Tags]    vertex-ai    service-health    quotas    configuration    access:read-only
     RW.Core.Add Pre To Report    Checking Vertex AI Model Garden service health and quotas...
     
     # Check if Vertex AI services are enabled
@@ -395,9 +405,9 @@ Check Vertex AI Model Garden Service Health and Quotas
     RW.Core.Add To Report    ${metrics_check.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${metrics_check.cmd}
 
-Generate Vertex AI Model Garden Health Summary and Next Steps
+Generate Vertex AI Model Garden Health Summary and Next Steps for `${GCP_PROJECT_ID}`
     [Documentation]    Generates a comprehensive health summary with actionable recommendations
-    [Tags]    summary    health-report    recommendations
+    [Tags]    summary    health-report    recommendations    access:read-only
     RW.Core.Add Pre To Report    Generating comprehensive Vertex AI Model Garden health summary...
     
     ${current_date}=    Get Current Date    result_format=%Y-%m-%d %H:%M:%S UTC
