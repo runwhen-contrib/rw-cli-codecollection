@@ -15,6 +15,59 @@ Library             String
 Suite Setup         Suite Initialization
 
 *** Tasks ***
+Quick Vertex AI Log Health Check
+    [Documentation]    Performs a quick check of recent Vertex AI logs for immediate health assessment
+    [Tags]    vertex-ai    logs    health-check    quick
+    
+    # Quick check for recent errors using configurable lookback time
+    ${recent_errors}=    RW.CLI.Run Cli
+    ...    cmd=gcloud logging read 'resource.type="audited_resource" AND resource.labels.service="aiplatform.googleapis.com" AND severity="ERROR"' --format="json" --freshness="${SLI_LOG_LOOKBACK}" --project=${GCP_PROJECT_ID}
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    timeout_seconds=60
+    
+    # Count recent errors
+    ${recent_error_count}=    RW.CLI.Run Cli
+    ...    cmd=echo '${recent_errors.stdout}' | jq '. | length'
+    ...    env=${env}
+    ${recent_error_count}=    Convert To Number    ${recent_error_count.stdout}
+    
+    # Calculate log health score (1.0 = no recent errors, decreases with more errors)
+    ${log_health_score}=    Set Variable If
+    ...    ${recent_error_count} == 0    1.0
+    ...    ${recent_error_count} <= 2    0.8
+    ...    ${recent_error_count} <= 5    0.6
+    ...    ${recent_error_count} <= 10   0.4
+    ...    0.2
+    
+    ${log_health_percentage}=    Evaluate    ${log_health_score} * 100
+    ${log_health_status}=    Set Variable If
+    ...    ${log_health_score} >= 0.8    Healthy
+    ...    ${log_health_score} >= 0.6    Warning
+    ...    Critical
+    
+    RW.Core.Add To Report    🚀 QUICK LOG HEALTH CHECK (Last ${SLI_LOG_LOOKBACK})
+    RW.Core.Add To Report    • Recent Errors: ${recent_error_count}
+    RW.Core.Add To Report    • Log Health: ${log_health_percentage}% (${log_health_status})
+    
+    # Show recent errors if any
+    IF    ${recent_error_count} > 0
+        ${recent_error_details}=    RW.CLI.Run Cli
+        ...    cmd=echo '${recent_errors.stdout}' | jq -r '.[] | "- " + .timestamp + " | " + .protoPayload.methodName + " | " + (.protoPayload.resourceName // "unknown") + " | Code " + (.protoPayload.status.code | tostring) + ": " + .protoPayload.status.message'
+        ...    env=${env}
+        RW.Core.Add To Report    ${EMPTY}
+        RW.Core.Add To Report    ⚠️ Recent Errors:
+        @{error_lines}=    Split String    ${recent_error_details.stdout}    \n
+        FOR    ${error_line}    IN    @{error_lines}
+            ${error_line}=    Strip String    ${error_line}
+            IF    '${error_line}' != ''
+                RW.Core.Add To Report    ${error_line}
+            END
+        END
+    END
+    
+    RW.Core.Push Metric    ${log_health_score}
+
 Calculate Vertex AI Model Garden Health Score
     [Documentation]    Calculates a composite health score based on error rate, latency, and throughput metrics using Python SDK
     [Tags]    vertex-ai    health-score    sli    monitoring
@@ -188,9 +241,22 @@ Suite Initialization
     ...    description=The GCP Project ID to scope the API to.
     ...    pattern=\w*
     ...    example=myproject-ID
+    ${SLI_LOG_LOOKBACK}=    RW.Core.Import User Variable    SLI_LOG_LOOKBACK
+    ...    type=string
+    ...    description=Time window for SLI log health check (e.g., 15m, 30m, 1h).
+    ...    pattern=\w*
+    ...    example=15m
+    ...    default=15m
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
+    Set Suite Variable    ${SLI_LOG_LOOKBACK}    ${SLI_LOG_LOOKBACK}
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
     Set Suite Variable
     ...    ${env}
-    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}","PATH":"$PATH:${OS_PATH}"} 
+    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}","PATH":"$PATH:${OS_PATH}"}
+    
+    # Activate service account once for all gcloud commands
+    RW.CLI.Run Cli
+    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json} 
