@@ -1,0 +1,98 @@
+version: '3'
+
+tasks:
+  default:
+    desc: "Run/refresh config"
+    cmds:
+      - task: check-unpushed-commits
+      - task: generate-rwl-config
+      - task: run-rwl-discovery
+
+  clean: 
+    desc: "Run cleanup tasks"
+    cmds: 
+      - task: check-and-cleanup-terraform
+      - task: delete-slxs
+      - task: clean-rwl-discovery
+
+  check-unpushed-commits:
+    desc: "Check for unpushed commits"
+    cmds: |
+      BASE_DIR=$(basename $(pwd))
+      echo "Checking for unpushed commits in $BASE_DIR and $BASE_DIR.runwhen, excluding '.test'..."
+      git fetch origin
+      UNPUSHED_FILES=$(git diff --name-only origin/$(git rev-parse --abbrev-ref HEAD) HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+      if [ -n "$UNPUSHED_FILES" ]; then
+        echo "✗"
+        echo "Unpushed commits found:"
+        echo "$UNPUSHED_FILES"
+        echo "Remember to push changes before executing the `run-rwl-discovery` task."
+        echo "------------"        
+      else
+        echo "√"
+        echo "No unpushed commits in specified directories."
+        echo "------------"        
+      fi
+    silent: true
+
+  generate-rwl-config:
+    desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
+    env: 
+      ARM_SUBSCRIPTION_ID: '{{.ARM_SUBSCRIPTION_ID}}'
+      AZ_TENANT_ID: '{{.AZ_TENANT_ID}}'
+    cmds:
+      - |
+        cat > workspaceInfo.yaml << EOF
+        workspaceInfo:
+          name: azure-vm-disk-health-test
+          owner: test@runwhen.com
+          defaultLocation: default
+          defaultContext: default
+          defaultNamespace: default
+          subscriptions:
+            - id: ${ARM_SUBSCRIPTION_ID}
+              name: Test Subscription
+              tenantId: ${AZ_TENANT_ID}
+          resourceGroups:
+            - name: test-vm-rg
+              subscriptionId: ${ARM_SUBSCRIPTION_ID}
+        EOF
+    silent: true
+
+  run-rwl-discovery:
+    desc: "Run RunWhen Local discovery"
+    cmds:
+      - |
+        echo "Running discovery..."
+        rwl discover --workspace-info workspaceInfo.yaml --generation-rules-dir .runwhen/generation-rules --templates-dir .runwhen/templates --output-dir .test/slxs
+    silent: true
+
+  check-and-cleanup-terraform:
+    desc: "Check and cleanup Terraform resources"
+    dir: .test/terraform
+    cmds:
+      - |
+        if [ -d ".terraform" ]; then
+          echo "Cleaning up Terraform resources..."
+          terraform destroy -auto-approve || true
+          rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup
+        else
+          echo "No Terraform resources to clean up."
+        fi
+    silent: true
+
+  delete-slxs:
+    desc: "Delete generated SLXs"
+    cmds:
+      - |
+        echo "Deleting generated SLXs..."
+        rm -rf .test/slxs
+    silent: true
+
+  clean-rwl-discovery:
+    desc: "Clean RunWhen Local discovery artifacts"
+    cmds:
+      - |
+        echo "Cleaning RunWhen Local discovery artifacts..."
+        rm -f workspaceInfo.yaml
+    silent: true
