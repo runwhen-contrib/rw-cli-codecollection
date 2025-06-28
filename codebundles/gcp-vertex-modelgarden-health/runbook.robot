@@ -154,218 +154,234 @@ Check Vertex AI Model Garden API Logs for Issues in `${GCP_PROJECT_ID}`
     
     # Use the exact working query from console - Vertex AI errors
     ${vertex_errors}=    RW.CLI.Run Cli
-    ...    cmd=gcloud logging read 'resource.type="audited_resource" AND resource.labels.service="aiplatform.googleapis.com" AND severity="ERROR"' --format="json" --freshness="${LOG_FRESHNESS}" --project=${GCP_PROJECT_ID}
+    ...    cmd=gcloud logging read 'resource.type="audited_resource" AND resource.labels.service="aiplatform.googleapis.com" AND severity="ERROR"' --format="json" --freshness="${LOG_FRESHNESS}" --limit=50 --project=${GCP_PROJECT_ID}
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    show_in_rwl_cheatsheet=true
     ...    timeout_seconds=120
     
-    # Check if we got empty results due to permissions
+    # Check if we got empty results and for permission errors
     ${has_vertex_errors}=    Run Keyword And Return Status    Should Not Be Empty    ${vertex_errors.stdout}
     ${empty_result}=    Run Keyword And Return Status    Should Be Equal    ${vertex_errors.stdout}    []\n
     
-    IF    ${empty_result}
+    # Check for actual permission errors in stderr or error messages
+    ${has_permission_error}=    Run Keyword And Return Status    Should Contain Any    ${vertex_errors.stderr}    permission    denied    PERMISSION_DENIED    not authorized
+    
+    IF    ${has_permission_error}
         RW.Core.Add Issue    
         ...    title=Unable to access audit logs - missing permissions    
         ...    severity=2    
         ...    expected=Service account should have audit log access    
-        ...    actual=Service account may be missing roles/logging.privateLogViewer permission    
+        ...    actual=Permission denied error when accessing audit logs    
         ...    reproduce_hint=Grant roles/logging.privateLogViewer to the service account to access audit logs
         ...    next_steps=Grant roles/logging.privateLogViewer role to the service account used by this robot
-        RW.Core.Add To Report    ⚠️ Empty audit log results - service account may need roles/logging.privateLogViewer permission
-        RETURN
-    END
-    
-    # Parse the vertex errors we found
-    ${vertex_error_count}=    Set Variable    0
-    ${auth_error_count}=    Set Variable    0
-    ${quota_error_count}=    Set Variable    0
-    ${service_unavailable_count}=    Set Variable    0
-    
-    # Count total errors
-    ${vertex_count_result}=    RW.CLI.Run Cli
-    ...    cmd=echo '${vertex_errors.stdout}' | jq '. | length'
-    ...    env=${env}
-    ${vertex_error_count}=    Convert To Number    ${vertex_count_result.stdout}
-    
-    # Check for specific error types
-    ${auth_errors}=    RW.CLI.Run Cli
-    ...    cmd=echo '${vertex_errors.stdout}' | jq '[.[] | select(.protoPayload.status.code == 7 or .protoPayload.status.code == 16)] | length'
-    ...    env=${env}
-    ${auth_error_count}=    Convert To Number    ${auth_errors.stdout}
-    
-    ${quota_errors}=    RW.CLI.Run Cli
-    ...    cmd=echo '${vertex_errors.stdout}' | jq '[.[] | select(.protoPayload.status.code == 8)] | length'
-    ...    env=${env}
-    ${quota_error_count}=    Convert To Number    ${quota_errors.stdout}
-    
-    # Check for service unavailable errors (code 14)
-    ${service_errors}=    RW.CLI.Run Cli
-    ...    cmd=echo '${vertex_errors.stdout}' | jq '[.[] | select(.protoPayload.status.code == 14)] | length'
-    ...    env=${env}
-    ${service_unavailable_count}=    Convert To Number    ${service_errors.stdout}
-    
-    # Count ChatCompletions vs Predict calls
-    ${chat_error_count}=    RW.CLI.Run Cli
-    ...    cmd=echo '${vertex_errors.stdout}' | jq '[.[] | select(.protoPayload.methodName == "google.cloud.aiplatform.v1.PredictionService.ChatCompletions")] | length'
-    ...    env=${env}
-    ${chat_error_count}=    Convert To Number    ${chat_error_count.stdout}
-    
-    ${predict_error_count}=    RW.CLI.Run Cli
-    ...    cmd=echo '${vertex_errors.stdout}' | jq '[.[] | select(.protoPayload.methodName == "google.cloud.aiplatform.v1.PredictionService.Predict")] | length'
-    ...    env=${env}
-    ${predict_error_count}=    Convert To Number    ${predict_error_count.stdout}
-    
-    # Report findings
-    RW.Core.Add To Report    📋 VERTEX AI ERROR LOG ANALYSIS (Last ${LOG_FRESHNESS})
-    RW.Core.Add To Report    • Total Vertex AI Errors: ${vertex_error_count}
-    RW.Core.Add To Report    • ChatCompletions errors: ${chat_error_count}
-    RW.Core.Add To Report    • Predict API errors: ${predict_error_count}
-    RW.Core.Add To Report    • Authentication errors (code 7,16): ${auth_error_count}
-    RW.Core.Add To Report    • Quota exceeded errors (code 8): ${quota_error_count}
-    RW.Core.Add To Report    • Service unavailable errors (code 14): ${service_unavailable_count}
-    
-    # Include detailed log entries if we found errors
-    IF    ${vertex_error_count} > 0
-        RW.Core.Add To Report    ${EMPTY}
-        RW.Core.Add To Report    📝 DETAILED ERROR LOGS:
+        RW.Core.Add To Report    ❌ Permission denied accessing audit logs - service account needs roles/logging.privateLogViewer permission
+    ELSE IF    ${empty_result}
+        # If we got empty results, it means no errors were found (not a permissions issue)
+        RW.Core.Add To Report    ✅ No Vertex AI errors found in logs for the last ${LOG_FRESHNESS} - system appears healthy
+    ELSE
+        # We have actual log data to process
+        # Parse the vertex errors we found
+        ${vertex_error_count}=    Set Variable    0
+        ${auth_error_count}=    Set Variable    0
+        ${quota_error_count}=    Set Variable    0
+        ${service_unavailable_count}=    Set Variable    0
         
-        # Format the logs with timestamps, endpoints, and key details
-        ${formatted_logs}=    RW.CLI.Run Cli
-        ...    cmd=echo '${vertex_errors.stdout}' | jq -r '.[] | "🕐 " + .timestamp + " | " + .protoPayload.methodName + " | Endpoint: " + (.protoPayload.resourceName // "unknown") + " | Code: " + (.protoPayload.status.code | tostring) + " | " + .protoPayload.status.message + " | Caller: " + .protoPayload.authenticationInfo.principalEmail'
+        # Count total errors
+        ${vertex_count_result}=    RW.CLI.Run Cli
+        ...    cmd=echo '${vertex_errors.stdout}' > vertex_errors_runbook.json && jq '. | length' vertex_errors_runbook.json && rm -f vertex_errors_runbook.json
         ...    env=${env}
+        ${vertex_error_count}=    Convert To Number    ${vertex_count_result.stdout}
         
-        @{log_lines}=    Split String    ${formatted_logs.stdout}    \n
-        FOR    ${log_line}    IN    @{log_lines}
-            ${log_line}=    Strip String    ${log_line}
-            IF    '${log_line}' != ''
-                RW.Core.Add To Report    ${log_line}
-            END
-        END
+        # Check for specific error types
+        ${auth_errors}=    RW.CLI.Run Cli
+        ...    cmd=echo '${vertex_errors.stdout}' > vertex_errors_runbook.json && jq '[.[] | select(.protoPayload.status.code == 7 or .protoPayload.status.code == 16)] | length' vertex_errors_runbook.json
+        ...    env=${env}
+        ${auth_error_count}=    Convert To Number    ${auth_errors.stdout}
         
-        RW.Core.Add To Report    ${EMPTY}
-        RW.Core.Add To Report    📊 ERROR BREAKDOWN BY TYPE:
+        ${quota_errors}=    RW.CLI.Run Cli
+        ...    cmd=jq '[.[] | select(.protoPayload.status.code == 8)] | length' vertex_errors_runbook.json
+        ...    env=${env}
+        ${quota_error_count}=    Convert To Number    ${quota_errors.stdout}
         
-        # Show service unavailable details if present
-        IF    ${service_unavailable_count} > 0
-            ${service_unavailable_details}=    RW.CLI.Run Cli
-            ...    cmd=echo '${vertex_errors.stdout}' | jq -r '.[] | select(.protoPayload.status.code == 14) | "• " + .timestamp + " - " + .protoPayload.methodName + " - " + .protoPayload.status.message'
+        # Check for service unavailable errors (code 14)
+        ${service_errors}=    RW.CLI.Run Cli
+        ...    cmd=jq '[.[] | select(.protoPayload.status.code == 14)] | length' vertex_errors_runbook.json
+        ...    env=${env}
+        ${service_unavailable_count}=    Convert To Number    ${service_errors.stdout}
+        
+        # Count ChatCompletions vs Predict calls
+        ${chat_error_count}=    RW.CLI.Run Cli
+        ...    cmd=jq '[.[] | select(.protoPayload.methodName == "google.cloud.aiplatform.v1.PredictionService.ChatCompletions")] | length' vertex_errors_runbook.json
+        ...    env=${env}
+        ${chat_error_count}=    Convert To Number    ${chat_error_count.stdout}
+        
+        ${predict_error_count}=    RW.CLI.Run Cli
+        ...    cmd=jq '[.[] | select(.protoPayload.methodName == "google.cloud.aiplatform.v1.PredictionService.Predict")] | length' vertex_errors_runbook.json && rm -f vertex_errors_runbook.json
+        ...    env=${env}
+        ${predict_error_count}=    Convert To Number    ${predict_error_count.stdout}
+        
+        # Report findings
+        RW.Core.Add To Report    📋 VERTEX AI ERROR LOG ANALYSIS (Last ${LOG_FRESHNESS})
+        RW.Core.Add To Report    • Total Vertex AI Errors: ${vertex_error_count}
+        RW.Core.Add To Report    • ChatCompletions errors: ${chat_error_count}
+        RW.Core.Add To Report    • Predict API errors: ${predict_error_count}
+        RW.Core.Add To Report    • Authentication errors (code 7,16): ${auth_error_count}
+        RW.Core.Add To Report    • Quota exceeded errors (code 8): ${quota_error_count}
+        RW.Core.Add To Report    • Service unavailable errors (code 14): ${service_unavailable_count}
+        
+        # Include detailed log entries if we found errors
+        IF    ${vertex_error_count} > 0
+            RW.Core.Add To Report    ${EMPTY}
+            RW.Core.Add To Report    📝 DETAILED ERROR LOGS:
+            
+            # Format the logs with timestamps, endpoints, and key details
+            ${formatted_logs}=    RW.CLI.Run Cli
+            ...    cmd=echo '${vertex_errors.stdout}' > vertex_errors_detail.json && jq -r '.[] | "🕐 " + .timestamp + " | " + .protoPayload.methodName + " | Endpoint: " + (.protoPayload.resourceName // "unknown") + " | Code: " + (.protoPayload.status.code | tostring) + " | " + .protoPayload.status.message + " | Caller: " + .protoPayload.authenticationInfo.principalEmail' vertex_errors_detail.json
             ...    env=${env}
-            RW.Core.Add To Report    Service Unavailable Errors (${service_unavailable_count}):
-            @{service_lines}=    Split String    ${service_unavailable_details.stdout}    \n
-            FOR    ${service_line}    IN    @{service_lines}
-                ${service_line}=    Strip String    ${service_line}
-                IF    '${service_line}' != ''
-                    RW.Core.Add To Report    ${service_line}
+            
+            @{log_lines}=    Split String    ${formatted_logs.stdout}    \n
+            FOR    ${log_line}    IN    @{log_lines}
+                ${log_line}=    Strip String    ${log_line}
+                IF    '${log_line}' != ''
+                    RW.Core.Add To Report    ${log_line}
                 END
             END
+            
+            RW.Core.Add To Report    ${EMPTY}
+            RW.Core.Add To Report    📊 ERROR BREAKDOWN BY TYPE:
+            
+            # Show service unavailable details if present
+            IF    ${service_unavailable_count} > 0
+                ${service_unavailable_details}=    RW.CLI.Run Cli
+                ...    cmd=jq -r '.[] | select(.protoPayload.status.code == 14) | "• " + .timestamp + " - " + .protoPayload.methodName + " - " + .protoPayload.status.message' vertex_errors_detail.json
+                ...    env=${env}
+                RW.Core.Add To Report    Service Unavailable Errors (${service_unavailable_count}):
+                @{service_lines}=    Split String    ${service_unavailable_details.stdout}    \n
+                FOR    ${service_line}    IN    @{service_lines}
+                    ${service_line}=    Strip String    ${service_line}
+                    IF    '${service_line}' != ''
+                        RW.Core.Add To Report    ${service_line}
+                    END
+                END
+            END
+            
+            # Show auth errors if present
+            IF    ${auth_error_count} > 0
+                ${auth_error_details}=    RW.CLI.Run Cli
+                ...    cmd=jq -r '.[] | select(.protoPayload.status.code == 7 or .protoPayload.status.code == 16) | "• " + .timestamp + " - " + .protoPayload.methodName + " - " + .protoPayload.status.message' vertex_errors_detail.json
+                ...    env=${env}
+                RW.Core.Add To Report    Authentication Errors (${auth_error_count}):
+                @{auth_lines}=    Split String    ${auth_error_details.stdout}    \n
+                FOR    ${auth_line}    IN    @{auth_lines}
+                    ${auth_line}=    Strip String    ${auth_line}
+                    IF    '${auth_line}' != ''
+                        RW.Core.Add To Report    ${auth_line}
+                    END
+                END
+            END
+            
+            # Show quota errors if present
+            IF    ${quota_error_count} > 0
+                ${quota_error_details}=    RW.CLI.Run Cli
+                ...    cmd=jq -r '.[] | select(.protoPayload.status.code == 8) | "• " + .timestamp + " - " + .protoPayload.methodName + " - " + .protoPayload.status.message' vertex_errors_detail.json
+                ...    env=${env}
+                RW.Core.Add To Report    Quota Exceeded Errors (${quota_error_count}):
+                @{quota_lines}=    Split String    ${quota_error_details.stdout}    \n
+                FOR    ${quota_line}    IN    @{quota_lines}
+                    ${quota_line}=    Strip String    ${quota_line}
+                    IF    '${quota_line}' != ''
+                        RW.Core.Add To Report    ${quota_line}
+                    END
+                END
+            END
+            
+            # Cleanup the temporary file
+            RW.CLI.Run Cli
+            ...    cmd=rm -f vertex_errors_detail.json
+            ...    env=${env}
         END
         
-        # Show auth errors if present
+        # Create issues for problems found with log snippets
+        IF    ${vertex_error_count} > 10
+            # Get recent log snippets for the issue
+            ${recent_logs}=    RW.CLI.Run Cli
+            ...    cmd=echo '${vertex_errors.stdout}' > vertex_errors_issues.json && jq -r '.[:5] | .[] | "- " + .timestamp + " | " + .protoPayload.methodName + " | " + (.protoPayload.resourceName // "unknown") + " | Code " + (.protoPayload.status.code | tostring) + ": " + .protoPayload.status.message' vertex_errors_issues.json
+            ...    env=${env}
+            
+            RW.Core.Add Issue    
+            ...    title=High number of Vertex AI errors detected in audit logs    
+            ...    severity=2    
+            ...    expected=Few or no API errors    
+            ...    actual=${vertex_error_count} errors in the last ${LOG_FRESHNESS}    
+            ...    details=Recent error examples:\n${recent_logs.stdout}    
+            ...    reproduce_hint=Use query: resource.type="audited_resource" AND resource.labels.service="aiplatform.googleapis.com" AND severity="ERROR"
+            ...    next_steps=Review error logs for patterns and root causes. Check the Vertex AI audit resource logs for detailed error information.
+        ELSE IF    ${vertex_error_count} > 0
+            # Get all log snippets for smaller number of errors
+            ${all_logs}=    RW.CLI.Run Cli
+            ...    cmd=jq -r '.[] | "- " + .timestamp + " | " + .protoPayload.methodName + " | " + (.protoPayload.resourceName // "unknown") + " | Code " + (.protoPayload.status.code | tostring) + ": " + .protoPayload.status.message' vertex_errors_issues.json
+            ...    env=${env}
+            
+            RW.Core.Add Issue    
+            ...    title=Vertex AI errors detected in audit logs    
+            ...    severity=2    
+            ...    expected=No API errors    
+            ...    actual=${vertex_error_count} errors in the last ${LOG_FRESHNESS}    
+            ...    details=Error details:\n${all_logs.stdout}    
+            ...    reproduce_hint=Use query: resource.type="audited_resource" AND resource.labels.service="aiplatform.googleapis.com" AND severity="ERROR"
+            ...    next_steps=Review error logs to identify specific issues. Check Vertex AI audit resource logs for detailed error information.
+        END
+        
         IF    ${auth_error_count} > 0
-            ${auth_error_details}=    RW.CLI.Run Cli
-            ...    cmd=echo '${vertex_errors.stdout}' | jq -r '.[] | select(.protoPayload.status.code == 7 or .protoPayload.status.code == 16) | "• " + .timestamp + " - " + .protoPayload.methodName + " - " + .protoPayload.status.message'
+            ${auth_log_snippets}=    RW.CLI.Run Cli
+            ...    cmd=jq -r '.[] | select(.protoPayload.status.code == 7 or .protoPayload.status.code == 16) | "- " + .timestamp + " | " + .protoPayload.methodName + " | " + (.protoPayload.resourceName // "unknown") + " | " + .protoPayload.authenticationInfo.principalEmail + " | " + .protoPayload.status.message' vertex_errors_issues.json
             ...    env=${env}
-            RW.Core.Add To Report    Authentication Errors (${auth_error_count}):
-            @{auth_lines}=    Split String    ${auth_error_details.stdout}    \n
-            FOR    ${auth_line}    IN    @{auth_lines}
-                ${auth_line}=    Strip String    ${auth_line}
-                IF    '${auth_line}' != ''
-                    RW.Core.Add To Report    ${auth_line}
-                END
-            END
+            
+            RW.Core.Add Issue    
+            ...    title=Authentication errors detected in Vertex AI logs    
+            ...    severity=2    
+            ...    expected=No authentication errors    
+            ...    actual=${auth_error_count} authentication errors found in logs    
+            ...    details=Authentication error details:\n${auth_log_snippets.stdout}    
+            ...    reproduce_hint=Use query: resource.type="audited_resource" AND resource.labels.service="aiplatform.googleapis.com" AND severity="ERROR"
+            ...    next_steps=Check service account permissions and API key configuration
         END
         
-        # Show quota errors if present
         IF    ${quota_error_count} > 0
-            ${quota_error_details}=    RW.CLI.Run Cli
-            ...    cmd=echo '${vertex_errors.stdout}' | jq -r '.[] | select(.protoPayload.status.code == 8) | "• " + .timestamp + " - " + .protoPayload.methodName + " - " + .protoPayload.status.message'
+            ${quota_log_snippets}=    RW.CLI.Run Cli
+            ...    cmd=jq -r '.[] | select(.protoPayload.status.code == 8) | "- " + .timestamp + " | " + .protoPayload.methodName + " | " + (.protoPayload.resourceName // "unknown") + " | " + .protoPayload.authenticationInfo.principalEmail + " | " + .protoPayload.status.message' vertex_errors_issues.json
             ...    env=${env}
-            RW.Core.Add To Report    Quota Exceeded Errors (${quota_error_count}):
-            @{quota_lines}=    Split String    ${quota_error_details.stdout}    \n
-            FOR    ${quota_line}    IN    @{quota_lines}
-                ${quota_line}=    Strip String    ${quota_line}
-                IF    '${quota_line}' != ''
-                    RW.Core.Add To Report    ${quota_line}
-                END
-            END
+            
+            RW.Core.Add Issue    
+            ...    title=Quota exceeded errors detected in Vertex AI logs    
+            ...    severity=2    
+            ...    expected=No quota errors    
+            ...    actual=${quota_error_count} quota exceeded errors found in logs    
+            ...    details=Quota error details:\n${quota_log_snippets.stdout}    
+            ...    reproduce_hint=Use query: resource.type="audited_resource" AND resource.labels.service="aiplatform.googleapis.com" AND severity="ERROR"
+            ...    next_steps=Review quota limits and request increases if needed
         END
-    END
-    
-    # Create issues for problems found with log snippets
-    IF    ${vertex_error_count} > 10
-        # Get recent log snippets for the issue
-        ${recent_logs}=    RW.CLI.Run Cli
-        ...    cmd=echo '${vertex_errors.stdout}' | jq -r '.[:5] | .[] | "- " + .timestamp + " | " + .protoPayload.methodName + " | " + (.protoPayload.resourceName // "unknown") + " | Code " + (.protoPayload.status.code | tostring) + ": " + .protoPayload.status.message'
-        ...    env=${env}
         
-        RW.Core.Add Issue    
-        ...    title=High number of Vertex AI errors detected in audit logs    
-        ...    severity=1    
-        ...    expected=Few or no API errors    
-        ...    actual=${vertex_error_count} errors in the last ${LOG_FRESHNESS}    
-        ...    details=Recent error examples:\n${recent_logs.stdout}    
-        ...    reproduce_hint=Use query: resource.type="audited_resource" AND resource.labels.service="aiplatform.googleapis.com" AND severity="ERROR"
-        ...    next_steps=Review error logs for patterns and root causes. Check the Vertex AI audit resource logs for detailed error information.
-    ELSE IF    ${vertex_error_count} > 0
-        # Get all log snippets for smaller number of errors
-        ${all_logs}=    RW.CLI.Run Cli
-        ...    cmd=echo '${vertex_errors.stdout}' | jq -r '.[] | "- " + .timestamp + " | " + .protoPayload.methodName + " | " + (.protoPayload.resourceName // "unknown") + " | Code " + (.protoPayload.status.code | tostring) + ": " + .protoPayload.status.message'
-        ...    env=${env}
+        IF    ${service_unavailable_count} > 0
+            ${service_log_snippets}=    RW.CLI.Run Cli
+            ...    cmd=jq -r '.[] | select(.protoPayload.status.code == 14) | "- " + .timestamp + " | " + .protoPayload.methodName + " | " + (.protoPayload.resourceName // "unknown") + " | " + .protoPayload.authenticationInfo.principalEmail + " | " + .protoPayload.status.message' vertex_errors_issues.json
+            ...    env=${env}
+            
+            RW.Core.Add Issue    
+            ...    title=Service unavailable errors detected in Vertex AI logs    
+            ...    severity=2    
+            ...    expected=Vertex AI service should be available    
+            ...    actual=${service_unavailable_count} service unavailable errors found in logs    
+            ...    details=Service unavailable error details:\n${service_log_snippets.stdout}    
+            ...    reproduce_hint=Use query: resource.type="audited_resource" AND resource.labels.service="aiplatform.googleapis.com" AND severity="ERROR"
+            ...    next_steps=Check Vertex AI service status and endpoint availability. The service may be experiencing outages.
+        END
         
-        RW.Core.Add Issue    
-        ...    title=Vertex AI errors detected in audit logs    
-        ...    severity=2    
-        ...    expected=No API errors    
-        ...    actual=${vertex_error_count} errors in the last ${LOG_FRESHNESS}    
-        ...    details=Error details:\n${all_logs.stdout}    
-        ...    reproduce_hint=Use query: resource.type="audited_resource" AND resource.labels.service="aiplatform.googleapis.com" AND severity="ERROR"
-        ...    next_steps=Review error logs to identify specific issues. Check Vertex AI audit resource logs for detailed error information.
-    END
-    
-    IF    ${auth_error_count} > 0
-        ${auth_log_snippets}=    RW.CLI.Run Cli
-        ...    cmd=echo '${vertex_errors.stdout}' | jq -r '.[] | select(.protoPayload.status.code == 7 or .protoPayload.status.code == 16) | "- " + .timestamp + " | " + .protoPayload.methodName + " | " + (.protoPayload.resourceName // "unknown") + " | " + .protoPayload.authenticationInfo.principalEmail + " | " + .protoPayload.status.message'
+        # Cleanup issue processing temp file
+        RW.CLI.Run Cli
+        ...    cmd=rm -f vertex_errors_issues.json
         ...    env=${env}
-        
-        RW.Core.Add Issue    
-        ...    title=Authentication errors detected in Vertex AI logs    
-        ...    severity=1    
-        ...    expected=No authentication errors    
-        ...    actual=${auth_error_count} authentication errors found in logs    
-        ...    details=Authentication error details:\n${auth_log_snippets.stdout}    
-        ...    reproduce_hint=Use query: resource.type="audited_resource" AND resource.labels.service="aiplatform.googleapis.com" AND severity="ERROR"
-        ...    next_steps=Check service account permissions and API key configuration
-    END
-    
-    IF    ${quota_error_count} > 0
-        ${quota_log_snippets}=    RW.CLI.Run Cli
-        ...    cmd=echo '${vertex_errors.stdout}' | jq -r '.[] | select(.protoPayload.status.code == 8) | "- " + .timestamp + " | " + .protoPayload.methodName + " | " + (.protoPayload.resourceName // "unknown") + " | " + .protoPayload.authenticationInfo.principalEmail + " | " + .protoPayload.status.message'
-        ...    env=${env}
-        
-        RW.Core.Add Issue    
-        ...    title=Quota exceeded errors detected in Vertex AI logs    
-        ...    severity=1    
-        ...    expected=No quota errors    
-        ...    actual=${quota_error_count} quota exceeded errors found in logs    
-        ...    details=Quota error details:\n${quota_log_snippets.stdout}    
-        ...    reproduce_hint=Use query: resource.type="audited_resource" AND resource.labels.service="aiplatform.googleapis.com" AND severity="ERROR"
-        ...    next_steps=Review quota limits and request increases if needed
-    END
-    
-    IF    ${service_unavailable_count} > 0
-        ${service_log_snippets}=    RW.CLI.Run Cli
-        ...    cmd=echo '${vertex_errors.stdout}' | jq -r '.[] | select(.protoPayload.status.code == 14) | "- " + .timestamp + " | " + .protoPayload.methodName + " | " + (.protoPayload.resourceName // "unknown") + " | " + .protoPayload.authenticationInfo.principalEmail + " | " + .protoPayload.status.message'
-        ...    env=${env}
-        
-        RW.Core.Add Issue    
-        ...    title=Service unavailable errors detected in Vertex AI logs    
-        ...    severity=1    
-        ...    expected=Vertex AI service should be available    
-        ...    actual=${service_unavailable_count} service unavailable errors found in logs    
-        ...    details=Service unavailable error details:\n${service_log_snippets.stdout}    
-        ...    reproduce_hint=Use query: resource.type="audited_resource" AND resource.labels.service="aiplatform.googleapis.com" AND severity="ERROR"
-        ...    next_steps=Check Vertex AI service status and endpoint availability. The service may be experiencing outages.
     END
     
     RW.Core.Add Pre To Report    Commands Used:\n${vertex_errors.cmd}

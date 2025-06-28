@@ -27,18 +27,30 @@ Quick Vertex AI Log Health Check for `${GCP_PROJECT_ID}`
     [Documentation]    Performs a quick check of recent Vertex AI logs for immediate health assessment
     [Tags]    vertex-ai    logs    health-check    quick    access:read-only
     
+    Log    Starting Quick Vertex AI Log Health Check for project: ${GCP_PROJECT_ID}
+    Log    Looking back ${SLI_LOG_LOOKBACK} for recent errors
+    
     # Quick check for recent errors using configurable lookback time
     ${recent_errors}=    RW.CLI.Run Cli
-    ...    cmd=gcloud logging read 'resource.type="audited_resource" AND resource.labels.service="aiplatform.googleapis.com" AND severity="ERROR"' --format="json" --freshness="${SLI_LOG_LOOKBACK}" --project=${GCP_PROJECT_ID}
+    ...    cmd=gcloud logging read 'resource.type="audited_resource" AND resource.labels.service="aiplatform.googleapis.com" AND severity="ERROR"' --format="json" --freshness="${SLI_LOG_LOOKBACK}" --limit=20 --project=${GCP_PROJECT_ID}
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    timeout_seconds=60
     
     # Count recent errors
     ${recent_error_count}=    RW.CLI.Run Cli
-    ...    cmd=echo '${recent_errors.stdout}' | jq '. | length'
+    ...    cmd=echo '${recent_errors.stdout}' > vertex_errors_sli.json && jq '. | length' vertex_errors_sli.json && rm -f vertex_errors_sli.json
     ...    env=${env}
-    ${recent_error_count}=    Convert To Number    ${recent_error_count.stdout}
+    ${recent_error_count_result}=    Set Variable    ${recent_error_count.stdout}
+    ${conversion_success}=    Run Keyword And Return Status    Convert To Number    ${recent_error_count_result}
+    IF    not ${conversion_success}
+        Log    Error parsing recent error count (got: '${recent_error_count_result}'), defaulting to 0
+        ${recent_error_count}=    Set Variable    0
+    ELSE
+        ${recent_error_count}=    Convert To Number    ${recent_error_count_result}
+    END
+    
+    Log    Found ${recent_error_count} recent errors in logs
     
     # Calculate log health score (1.0 = no recent errors, decreases with more errors)
     ${log_health_score}=    Set Variable If
@@ -54,49 +66,31 @@ Quick Vertex AI Log Health Check for `${GCP_PROJECT_ID}`
     ...    ${log_health_score} >= 0.6    Warning
     ...    Critical
     
-    RW.Core.Add To Report    🚀 QUICK LOG HEALTH CHECK (Last ${SLI_LOG_LOOKBACK})
-    RW.Core.Add To Report    • Recent Errors: ${recent_error_count}
-    RW.Core.Add To Report    • Log Health: ${log_health_percentage}% (${log_health_status})
+    Log    Log Health Check (Last ${SLI_LOG_LOOKBACK}): ${recent_error_count} errors, Score: ${log_health_percentage}% (${log_health_status})
+    Log    Log health score calculation: ${recent_error_count} errors → ${log_health_score} score
     
-    # Show recent errors if any
-    IF    ${recent_error_count} > 0
-        ${recent_error_details}=    RW.CLI.Run Cli
-        ...    cmd=echo '${recent_errors.stdout}' | jq -r '.[] | "- " + .timestamp + " | " + .protoPayload.methodName + " | " + (.protoPayload.resourceName // "unknown") + " | Code " + (.protoPayload.status.code | tostring) + ": " + .protoPayload.status.message'
-        ...    env=${env}
-        RW.Core.Add To Report    ${EMPTY}
-        RW.Core.Add To Report    ⚠️ Recent Errors:
-        @{error_lines}=    Split String    ${recent_error_details.stdout}    \n
-        FOR    ${error_line}    IN    @{error_lines}
-            ${error_line}=    Strip String    ${error_line}
-            IF    '${error_line}' != ''
-                RW.Core.Add To Report    ${error_line}
-            END
-        END
-    END
+    RW.Core.Add To Report    📊 Log Health Check: ${recent_error_count} errors (${SLI_LOG_LOOKBACK}) → Score: ${log_health_score}
     
-    RW.Core.Push Metric    ${log_health_score}
+    Set Global Variable    ${log_health_score}
 
-Calculate Vertex AI Model Garden Health Score for `${GCP_PROJECT_ID}`
-    [Documentation]    Calculates a composite health score based on error rate, latency, and throughput metrics using Python SDK
-    [Tags]    vertex-ai    health-score    sli    monitoring    access:read-only
+Calculate Error Rate Score for `${GCP_PROJECT_ID}`
+    [Documentation]    Calculates error rate score based on Model Garden invocation errors
+    [Tags]    vertex-ai    error-rate    sli    monitoring    access:read-only
     
-    # Initialize scores
-    ${error_score}=    Set Variable    1.0
-    ${latency_score}=    Set Variable    1.0
-    ${throughput_score}=    Set Variable    1.0
+    Log    Starting Error Rate Score calculation for project: ${GCP_PROJECT_ID}
+    Log    Analyzing last 2 hours of Model Garden invocation metrics
     
-    # Get error rate analysis using direct CLI call
+    # Get error rate analysis
     ${error_analysis}=    RW.CLI.Run Cli
     ...    cmd=python3 vertex_ai_monitoring.py errors --hours 2
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
-    ...    show_in_rwl_cheatsheet=true
     ...    timeout_seconds=240
     
-    # Parse error results directly
-    ${high_error_rate}=    Run Keyword And Return Status    Should Contain    ${error_analysis.stdout}    HIGH_ERROR_RATE:true
-    ${error_count}=    Set Variable    0
+    Log    Error analysis output: ${error_analysis.stdout}
     
+    # Parse error results
+    ${error_count}=    Set Variable    0
     @{output_lines}=    Split String    ${error_analysis.stdout}    \n
     FOR    ${line}    IN    @{output_lines}
         ${line}=    Strip String    ${line}
@@ -104,14 +98,18 @@ Calculate Vertex AI Model Garden Health Score for `${GCP_PROJECT_ID}`
             ${count_part}=    Split String    ${line}    :
             ${error_count}=    Strip String    ${count_part}[1]
             ${error_count}=    Convert To Number    ${error_count}
+            Log    Parsed error count from output: ${error_count}
             BREAK
         END
     END
     
-    # Calculate error score (1.0 = no errors, 0.0 = high errors)
+    # Calculate error score (1.0 = no errors, decreases with error rate)
+    ${error_rate_score}=    Set Variable    1.0
+    ${error_rate_display}=    Set Variable    0%
     IF    ${error_count} > 0
+        Log    Errors detected, calculating error rate score...
         # Extract error rate from stdout
-        @{output_lines}=    Split String    ${error_analysis.stdout}    \n
+        @{output_lines}=    Split String    ${error_analysis.stdout}    \n  
         FOR    ${line}    IN    @{output_lines}
             ${contains_rate}=    Run Keyword And Return Status    Should Contain    ${line}    Error Rate:
             IF    ${contains_rate}
@@ -119,32 +117,49 @@ Calculate Vertex AI Model Garden Health Score for `${GCP_PROJECT_ID}`
                 ${rate_with_percent}=    Strip String    ${rate_parts}[1]
                 ${rate_str}=    Replace String    ${rate_with_percent}    %    ${EMPTY}
                 ${error_rate}=    Convert To Number    ${rate_str}
+                ${error_rate_display}=    Set Variable    ${error_rate}%
+                Log    Parsed error rate: ${error_rate}%
                 # Score: 1.0 for 0%, 0.8 for 1-5%, 0.5 for 5-10%, 0.2 for 10-20%, 0.0 for >20%
                 IF    ${error_rate} == 0
-                    ${error_score}=    Set Variable    1.0
+                    ${error_rate_score}=    Set Variable    1.0
                 ELSE IF    ${error_rate} <= 5
-                    ${error_score}=    Set Variable    0.8
+                    ${error_rate_score}=    Set Variable    0.8
                 ELSE IF    ${error_rate} <= 10
-                    ${error_score}=    Set Variable    0.5
+                    ${error_rate_score}=    Set Variable    0.5
                 ELSE IF    ${error_rate} <= 20
-                    ${error_score}=    Set Variable    0.2
+                    ${error_rate_score}=    Set Variable    0.2
                 ELSE
-                    ${error_score}=    Set Variable    0.0
+                    ${error_rate_score}=    Set Variable    0.0
                 END
+                Log    Error rate ${error_rate}% mapped to score: ${error_rate_score}
                 BREAK
             END
         END
+    ELSE
+        Log    No errors detected, using perfect score: 1.0
     END
     
-    # Get latency analysis using direct CLI call
+    Log    Error Rate Score: ${error_rate_score} (${error_count} errors detected)
+    RW.Core.Add To Report    📊 Error Rate Score: ${error_count} errors, ${error_rate_display} rate → Score: ${error_rate_score}
+    Set Global Variable    ${error_rate_score}
+
+Calculate Latency Performance Score for `${GCP_PROJECT_ID}`
+    [Documentation]    Calculates latency performance score based on model response times
+    [Tags]    vertex-ai    latency    performance    sli    access:read-only
+    
+    Log    Starting Latency Performance Score calculation for project: ${GCP_PROJECT_ID}
+    Log    Analyzing last 2 hours of model latency metrics
+    
+    # Get latency analysis
     ${latency_analysis}=    RW.CLI.Run Cli
     ...    cmd=python3 vertex_ai_monitoring.py latency --hours 2
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
-    ...    show_in_rwl_cheatsheet=true
     ...    timeout_seconds=240
     
-    # Parse latency results directly
+    Log    Latency analysis output: ${latency_analysis.stdout}
+    
+    # Parse latency results
     ${high_latency_count}=    Set Variable    0
     ${elevated_latency_count}=    Set Variable    0
     
@@ -155,10 +170,12 @@ Calculate Vertex AI Model Garden Health Score for `${GCP_PROJECT_ID}`
             ${count_part}=    Split String    ${line}    :
             ${high_latency_count}=    Strip String    ${count_part}[1]
             ${high_latency_count}=    Convert To Number    ${high_latency_count}
+            Log    Parsed high latency models count: ${high_latency_count}
         ELSE IF    'ELEVATED_LATENCY_MODELS:' in '${line}'  
             ${count_part}=    Split String    ${line}    :
             ${elevated_latency_count}=    Strip String    ${count_part}[1]
             ${elevated_latency_count}=    Convert To Number    ${elevated_latency_count}
+            Log    Parsed elevated latency models count: ${elevated_latency_count}
         END
     END
     
@@ -166,6 +183,7 @@ Calculate Vertex AI Model Garden Health Score for `${GCP_PROJECT_ID}`
     ${total_models}=    Set Variable    0
     ${good_models}=    Set Variable    0
     
+    Log    Analyzing individual model performance...
     @{output_lines}=    Split String    ${latency_analysis.stdout}    \n
     FOR    ${line}    IN    @{output_lines}
         ${is_model_line}=    Run Keyword And Return Status    Should Match Regexp    ${line}    ^\\s+\\w+.*:\\s+\\d+\\.\\d+s avg
@@ -176,66 +194,141 @@ Calculate Vertex AI Model Garden Health Score for `${GCP_PROJECT_ID}`
             IF    ${is_good}
                 ${good_models}=    Evaluate    ${good_models} + 1
             END
+            Log    Model performance line: ${line} → Good: ${is_good}
         END
     END
     
+    Log    Total models analyzed: ${total_models}, Good performing models: ${good_models}
+    
+    ${latency_performance_score}=    Set Variable    1.0
     IF    ${total_models} > 0
-        ${latency_score}=    Evaluate    ${good_models} / ${total_models}
+        ${latency_performance_score}=    Evaluate    ${good_models} / ${total_models}
+        Log    Calculated latency performance score: ${good_models}/${total_models} = ${latency_performance_score}
+    ELSE
+        Log    No models found for latency analysis, using default score: 1.0
     END
     
-    # Get throughput analysis using direct CLI call
+    Log    Latency Performance Score: ${latency_performance_score} (${good_models}/${total_models} models performing well)
+    RW.Core.Add To Report    📊 Latency Performance Score: ${good_models}/${total_models} models good → Score: ${latency_performance_score}
+    Set Global Variable    ${latency_performance_score}
+
+Calculate Throughput Usage Score for `${GCP_PROJECT_ID}`
+    [Documentation]    Calculates throughput usage score based on token consumption data
+    [Tags]    vertex-ai    throughput    usage    sli    access:read-only
+    
+    Log    Starting Throughput Usage Score calculation for project: ${GCP_PROJECT_ID}
+    Log    Analyzing last 2 hours of token consumption data
+    
+    # Get throughput analysis
     ${throughput_analysis}=    RW.CLI.Run Cli
     ...    cmd=python3 vertex_ai_monitoring.py throughput --hours 2
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
-    ...    show_in_rwl_cheatsheet=true
     ...    timeout_seconds=240
+    
+    Log    Throughput analysis output: ${throughput_analysis.stdout}
     
     # Calculate throughput score (1.0 if has usage data, 0.5 if no data)
     ${has_usage}=    Run Keyword And Return Status    Should Contain    ${throughput_analysis.stdout}    HAS_USAGE_DATA:true
-    IF    ${has_usage}
-        ${throughput_score}=    Set Variable    1.0
-    ELSE
-        ${throughput_score}=    Set Variable    0.5
+    ${throughput_usage_score}=    Set Variable If    ${has_usage}    1.0    0.5
+    
+    Log    Usage data detected: ${has_usage}
+    Log    Throughput score calculation: Usage data available → ${throughput_usage_score}
+    Log    Throughput Usage Score: ${throughput_usage_score} (Usage data available: ${has_usage})
+    RW.Core.Add To Report    📊 Throughput Usage Score: Usage data available (${has_usage}) → Score: ${throughput_usage_score}
+    Set Global Variable    ${throughput_usage_score}
+
+Check Service Availability Score for `${GCP_PROJECT_ID}`
+    [Documentation]    Checks Vertex AI service availability and configuration
+    [Tags]    vertex-ai    service-health    availability    sli    access:read-only
+    
+    Log    Starting Service Availability Score check for project: ${GCP_PROJECT_ID}
+    Log    Checking Vertex AI API enablement and metrics availability
+    
+    # Check if Vertex AI services are enabled
+    ${service_status}=    RW.CLI.Run Cli
+    ...    cmd=gcloud services list --enabled --filter="name:aiplatform.googleapis.com" --format="table[no-heading](name)" --project=${GCP_PROJECT_ID}
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    
+    Log    Service status check output: ${service_status.stdout}
+    
+    # Check service health using Python script
+    ${metrics_check}=    RW.CLI.Run Cli
+    ...    cmd=python3 vertex_ai_monitoring.py health
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    
+    Log    Metrics availability check output: ${metrics_check.stdout}
+    
+    ${api_enabled}=    Run Keyword And Return Status    Should Contain    ${service_status.stdout}    aiplatform.googleapis.com
+    Log    Vertex AI API enabled: ${api_enabled}
+    
+    # Parse metrics availability
+    ${metrics_available}=    Set Variable    0
+    @{output_lines}=    Split String    ${metrics_check.stdout}    \n
+    FOR    ${line}    IN    @{output_lines}
+        ${line}=    Strip String    ${line}
+        IF    'METRICS_AVAILABLE:' in '${line}'
+            ${count_part}=    Split String    ${line}    :
+            ${metrics_available}=    Strip String    ${count_part}[1]
+            ${metrics_available}=    Convert To Number    ${metrics_available}
+            Log    Parsed metrics available count: ${metrics_available}
+            BREAK
+        END
     END
     
-    # Calculate weighted composite health score
-    # Error rate: 50% weight, Latency: 30% weight, Throughput: 20% weight
-    ${health_score}=    Evaluate    (${error_score} * 0.5) + (${latency_score} * 0.3) + (${throughput_score} * 0.2)
-    ${health_score}=    Evaluate    round(${health_score}, 3)
+    # Calculate service availability score
+    ${service_availability_score}=    Set Variable If
+    ...    ${api_enabled} and ${metrics_available} > 0    1.0
+    ...    ${api_enabled}    0.5
+    ...    0.0
     
-    # Convert to percentage for display
-    ${health_percentage}=    Evaluate    ${health_score} * 100
+    Log    Service availability score calculation: API enabled (${api_enabled}) + Metrics available (${metrics_available}) → ${service_availability_score}
+    Log    Service Availability Score: ${service_availability_score} (API enabled: ${api_enabled}, Metrics available: ${metrics_available})
+    RW.Core.Add To Report    📊 Service Availability Score: API enabled (${api_enabled}), Metrics (${metrics_available}) → Score: ${service_availability_score}
+    Set Global Variable    ${service_availability_score}
+
+Generate Final Vertex AI Model Garden Health Score for `${GCP_PROJECT_ID}`
+    [Documentation]    Generates final composite health score from all individual measurements
+    [Tags]    vertex-ai    health-score    sli    final-score
+    
+    Log    Starting Final Health Score calculation for project: ${GCP_PROJECT_ID}
+    Log    Aggregating all component scores...
+    
+    # Log all component scores before calculation
+    Log    Component Score Summary:
+    Log    • Log Health Score: ${log_health_score}
+    Log    • Error Rate Score: ${error_rate_score}
+    Log    • Latency Performance Score: ${latency_performance_score}
+    Log    • Throughput Usage Score: ${throughput_usage_score}
+    Log    • Service Availability Score: ${service_availability_score}
+    
+    # Calculate final composite health score by averaging all component scores
+    ${final_health_score}=    Evaluate    (${log_health_score} + ${error_rate_score} + ${latency_performance_score} + ${throughput_usage_score} + ${service_availability_score}) / 5
+    ${final_health_score}=    Evaluate    round(${final_health_score}, 3)
+    
+    Log    Final score calculation: (${log_health_score} + ${error_rate_score} + ${latency_performance_score} + ${throughput_usage_score} + ${service_availability_score}) / 5 = ${final_health_score}
+    
+    # Convert to percentage for logging
+    ${health_percentage}=    Evaluate    ${final_health_score} * 100
     ${health_percentage}=    Evaluate    round(${health_percentage}, 1)
     
     # Determine health status
     ${health_status}=    Set Variable If
-    ...    ${health_score} >= 0.9    Excellent
-    ...    ${health_score} >= 0.7    Good  
-    ...    ${health_score} >= 0.5    Fair
-    ...    ${health_score} >= 0.3    Poor
+    ...    ${final_health_score} >= 0.9    Excellent
+    ...    ${final_health_score} >= 0.7    Good  
+    ...    ${final_health_score} >= 0.5    Fair
+    ...    ${final_health_score} >= 0.3    Poor
     ...    Critical
     
-    # Add comprehensive report
-    RW.Core.Add To Report    📊 VERTEX AI MODEL GARDEN HEALTH ANALYSIS
-    RW.Core.Add To Report    ${EMPTY}
-    RW.Core.Add To Report    🎯 Overall Health Score: ${health_percentage}% (${health_status})
-    RW.Core.Add To Report    ${EMPTY}
-    RW.Core.Add To Report    📈 Component Scores:
-    RW.Core.Add To Report    • Error Rate Score: ${error_score} (Weight: 50%)
-    RW.Core.Add To Report    • Latency Performance Score: ${latency_score} (Weight: 30%)  
-    RW.Core.Add To Report    • Throughput Usage Score: ${throughput_score} (Weight: 20%)
-    RW.Core.Add To Report    ${EMPTY}
-    RW.Core.Add To Report    📋 Detailed Analysis:
-    RW.Core.Add To Report    ${error_analysis.stdout}
-    RW.Core.Add To Report    ${EMPTY}
-    RW.Core.Add To Report    ${latency_analysis.stdout}
-    RW.Core.Add To Report    ${EMPTY}
-    RW.Core.Add To Report    ${throughput_analysis.stdout}
     
-    # Set the final SLI metric
-    RW.Core.Add Pre To Report    Health Score: ${health_score}
-    RW.Core.Push Metric    ${health_score}
+    RW.Core.Add To Report    ${health_percentage}% (${health_status})
+    RW.Core.Add To Report    Log Health: ${log_health_score} | Error Rate: ${error_rate_score} | Latency Performance: ${latency_performance_score} | Throughput Usage: ${throughput_usage_score} | Service Availability: ${service_availability_score}
+    RW.Core.Add To Report    Pushing Healh Score: ${final_health_score}
+    
+    # Push the final SLI metric
+    RW.Core.Push Metric    ${final_health_score}
 
 *** Keywords ***
 Suite Initialization
