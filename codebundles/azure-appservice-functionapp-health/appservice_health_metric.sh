@@ -159,9 +159,9 @@ echo ""
 # If we have 0 executions in the entire time range, might be an issue
 if (( $(echo "$execution_count_total == 0" | bc -l) )); then
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "No Function Executions for Funcation App \`$FUNCTION_APP_NAME\`" \
+        --arg title "No Function Executions for Function App \`$FUNCTION_APP_NAME\`" \
         --arg nextStep "Verify that triggers are set up for Function App \`$FUNCTION_APP_NAME\` and that the function is invoked" \
-        --arg severity "3" \
+        --arg severity "4" \
         --arg details "No executions recorded for '$FUNCTION_APP_NAME' over the last $TIME_PERIOD_MINUTES minute(s)." \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
     )
