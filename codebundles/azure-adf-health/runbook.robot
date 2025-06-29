@@ -9,7 +9,6 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
-Library             Jenkins
 Suite Setup         Suite Initialization
 
 
