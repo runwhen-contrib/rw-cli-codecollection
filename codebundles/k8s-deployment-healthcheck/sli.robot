@@ -83,6 +83,12 @@ Suite Initialization
     ...    enum=[true,false]
     ...    example=true
     ...    default=true
+    ${LOGS_EXCLUDE_PATTERN}=    RW.Core.Import User Variable    LOGS_EXCLUDE_PATTERN
+    ...    type=string
+    ...    description=Pattern used to exclude entries from log analysis when searching for errors. Use regex patterns to filter out false positives like JSON structures.
+    ...    pattern=.*
+    ...    example="errors":\s*\[\]|"warnings":\s*\[\]
+    ...    default="errors":\s*\[\]
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
@@ -99,6 +105,7 @@ Suite Initialization
     Set Suite Variable    ${EVENT_AGE}    ${EVENT_AGE}
     Set Suite Variable    ${EVENT_THRESHOLD}    ${EVENT_THRESHOLD}
     Set Suite Variable    ${CHECK_SERVICE_ENDPOINTS}    ${CHECK_SERVICE_ENDPOINTS}
+    Set Suite Variable    ${LOGS_EXCLUDE_PATTERN}    ${LOGS_EXCLUDE_PATTERN}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${DEPLOYMENT_NAME}    ${DEPLOYMENT_NAME}
@@ -252,6 +259,17 @@ Get Critical Log Errors and Score for Deployment `${DEPLOYMENT_NAME}`
     ...    workload_name=${DEPLOYMENT_NAME}
     ...    namespace=${NAMESPACE}
     ...    categories=${critical_categories}
+    
+    # Post-process results to filter out patterns matching LOGS_EXCLUDE_PATTERN
+    TRY
+        IF    "${LOGS_EXCLUDE_PATTERN}" != ""
+            ${filtered_issues}=    Evaluate    [issue for issue in $scan_results.get('issues', []) if not __import__('re').search(r'${LOGS_EXCLUDE_PATTERN}', issue.get('details', ''), __import__('re').IGNORECASE)]    modules=re
+            ${filtered_results}=    Evaluate    {**$scan_results, 'issues': $filtered_issues}
+            Set Test Variable    ${scan_results}    ${filtered_results}
+        END
+    EXCEPT
+        Log    Warning: Failed to apply LOGS_EXCLUDE_PATTERN filter, using unfiltered results
+    END
     
     ${log_health_score}=    RW.K8sLog.Calculate Log Health Score    scan_results=${scan_results}
     

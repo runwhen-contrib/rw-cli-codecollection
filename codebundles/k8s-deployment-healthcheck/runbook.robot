@@ -93,10 +93,10 @@ Suite Initialization
     ...    default=error|ERROR
     ${LOGS_EXCLUDE_PATTERN}=    RW.Core.Import User Variable    LOGS_EXCLUDE_PATTERN
     ...    type=string
-    ...    description=Pattern used to exclude entries from log results when searching in log results.
-    ...    pattern=\w*
-    ...    example=(node_modules|opentelemetry)
-    ...    default=info
+    ...    description=Pattern used to exclude entries from log analysis when searching for errors. Use regex patterns to filter out false positives like JSON structures.
+    ...    pattern=.*
+    ...    example="errors":\s*\[\]|"warnings":\s*\[\]
+    ...    default="errors":\s*\[\]
     ${CONTAINER_RESTART_AGE}=    RW.Core.Import User Variable    CONTAINER_RESTART_AGE
     ...    type=string
     ...    description=The time window (in (h) hours or (m) minutes) to search for container restarts. Only containers that restarted within this time period will be reported.
@@ -128,8 +128,19 @@ Suite Initialization
     Set Suite Variable    ${LOGS_EXCLUDE_PATTERN}
     Set Suite Variable    ${CONTAINER_RESTART_AGE}
     Set Suite Variable    ${CONTAINER_RESTART_THRESHOLD}
-    ${env}=    Evaluate    {"KUBECONFIG":"${kubeconfig.key}","KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}","CONTEXT":"${CONTEXT}","NAMESPACE":"${NAMESPACE}","LOGS_ERROR_PATTERN":"${LOGS_ERROR_PATTERN}","LOGS_EXCLUDE_PATTERN":"${LOGS_EXCLUDE_PATTERN}","ANOMALY_THRESHOLD":"${ANOMALY_THRESHOLD}","DEPLOYMENT_NAME":"${DEPLOYMENT_NAME}","CONTAINER_RESTART_AGE":"${CONTAINER_RESTART_AGE}","CONTAINER_RESTART_THRESHOLD":"${CONTAINER_RESTART_THRESHOLD}"}
-    Set Suite Variable    ${env}
+    # Construct environment dictionary safely to handle special characters in regex patterns
+    &{env_dict}=    Create Dictionary    
+    ...    KUBECONFIG=${kubeconfig.key}
+    ...    KUBERNETES_DISTRIBUTION_BINARY=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    CONTEXT=${CONTEXT}
+    ...    NAMESPACE=${NAMESPACE}
+    ...    LOGS_ERROR_PATTERN=${LOGS_ERROR_PATTERN}
+    ...    LOGS_EXCLUDE_PATTERN=${LOGS_EXCLUDE_PATTERN}
+    ...    ANOMALY_THRESHOLD=${ANOMALY_THRESHOLD}
+    ...    DEPLOYMENT_NAME=${DEPLOYMENT_NAME}
+    ...    CONTAINER_RESTART_AGE=${CONTAINER_RESTART_AGE}
+    ...    CONTAINER_RESTART_THRESHOLD=${CONTAINER_RESTART_THRESHOLD}
+    Set Suite Variable    ${env}    ${env_dict}
     
     # Check if deployment is scaled to 0 and handle appropriately
     ${scale_check}=    RW.CLI.Run Cli
@@ -194,6 +205,17 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
         ...    workload_name=${DEPLOYMENT_NAME}
         ...    namespace=${NAMESPACE}
         ...    categories=@{LOG_PATTERN_CATEGORIES}
+        
+        # Post-process results to filter out patterns matching LOGS_EXCLUDE_PATTERN
+        TRY
+            IF    "${LOGS_EXCLUDE_PATTERN}" != ""
+                ${filtered_issues}=    Evaluate    [issue for issue in $scan_results.get('issues', []) if not __import__('re').search(r'${LOGS_EXCLUDE_PATTERN}', issue.get('details', ''), __import__('re').IGNORECASE)]    modules=re
+                ${filtered_results}=    Evaluate    {**$scan_results, 'issues': $filtered_issues}
+                Set Test Variable    ${scan_results}    ${filtered_results}
+            END
+        EXCEPT
+            Log    Warning: Failed to apply LOGS_EXCLUDE_PATTERN filter, using unfiltered results
+        END
         
         ${log_health_score}=    RW.K8sLog.Calculate Log Health Score    scan_results=${scan_results}
         
