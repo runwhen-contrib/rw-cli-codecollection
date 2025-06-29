@@ -83,9 +83,7 @@ Inspect Warning Events in Namespace `${NAMESPACE}`
         END
     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Summary of Warning events in namespace: ${NAMESPACE}
-    RW.Core.Add Pre To Report    ${warning_events_by_object.stdout}
-    RW.Core.Add Pre To Report    Commands Used:\n${history}
+    RW.Core.Add Pre To Report    **Summary of Warning Events in Namespace: ${NAMESPACE}**\n\n${warning_events_by_object.stdout}\n\n**Commands Used:**\n${history}
 
 Inspect Container Restarts In Namespace `${NAMESPACE}`
     [Documentation]    Fetches pods that have container restarts and provides a report of the restart issues.
@@ -126,9 +124,7 @@ Inspect Container Restarts In Namespace `${NAMESPACE}`
     ELSE
         ${container_restart_details}=    Set Variable    ${container_restart_details.stdout}
     END
-    RW.Core.Add Pre To Report    Summary of container restarts in namespace: ${NAMESPACE}
-    RW.Core.Add Pre To Report    ${container_restart_analysis.stdout}
-    RW.Core.Add Pre To Report    Commands Used:\n${history}
+    RW.Core.Add Pre To Report    **Summary of Container Restarts in Namespace: ${NAMESPACE}**\n\n${container_restart_analysis.stdout}\n\n**Commands Used:**\n${history}
 
 Inspect Pending Pods In Namespace `${NAMESPACE}`
     [Documentation]    Fetches pods that are pending and provides details.
@@ -181,9 +177,7 @@ Inspect Pending Pods In Namespace `${NAMESPACE}`
         END
     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Summary of pendind pods in namespace: ${NAMESPACE}
-    RW.Core.Add Pre To Report    ${pending_pods.stdout}
-    RW.Core.Add Pre To Report    Commands Used:\n${history}
+    RW.Core.Add Pre To Report    **Summary of Pending Pods in Namespace: ${NAMESPACE}**\n\n${pending_pods.stdout}\n\n**Commands Used:**\n${history}
 
 Inspect Failed Pods In Namespace `${NAMESPACE}`
     [Documentation]    Fetches all pods which are not running (unready) in the namespace and adds them to a report for future review.
@@ -240,9 +234,7 @@ Inspect Failed Pods In Namespace `${NAMESPACE}`
     ELSE
         ${unreadypods_details}=    Set Variable    ${unreadypods_details.stdout}
     END
-    RW.Core.Add Pre To Report    Summary of unready pods in namespace: ${NAMESPACE}
-    RW.Core.Add Pre To Report    ${unreadypods_details}
-    RW.Core.Add Pre To Report    Commands Used:\n${history}
+    RW.Core.Add Pre To Report    **Summary of Unready Pods in Namespace: ${NAMESPACE}**\n\n${unreadypods_details}\n\n**Commands Used:**\n${history}
 
 Inspect Workload Status Conditions In Namespace `${NAMESPACE}`
     [Documentation]    Parses all workloads in a namespace and inspects their status conditions for issues. Status conditions with a status value of False are considered an error.
@@ -310,9 +302,7 @@ Inspect Workload Status Conditions In Namespace `${NAMESPACE}`
         END
     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Summary of Pods with Failing Conditions in Namespace `${NAMESPACE}`
-    RW.Core.Add Pre To Report    ${workload_info.stdout}
-    RW.Core.Add Pre To Report    Commands Used:\n${history}
+    RW.Core.Add Pre To Report    **Summary of Pods with Failing Conditions in Namespace `${NAMESPACE}`**\n\n${workload_info.stdout}\n\n**Commands Used:**\n${history}
 
 Get Listing Of Resources In Namespace `${NAMESPACE}`
     [Documentation]    Simple fetch all to provide a snapshot of information about the workloads in the namespace for future review in a report.
@@ -325,9 +315,7 @@ Get Listing Of Resources In Namespace `${NAMESPACE}`
     ...    render_in_commandlist=true
     ...    timeout_seconds=180
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Informational Get All for Namespace: ${NAMESPACE}
-    RW.Core.Add Pre To Report    ${all_results.stdout}
-    RW.Core.Add Pre To Report    Commands Used:\n${history}
+    RW.Core.Add Pre To Report    **Informational Get All for Namespace: ${NAMESPACE}**\n\n${all_results.stdout}\n\n**Commands Used:**\n${history}
 
 Check Event Anomalies in Namespace `${NAMESPACE}`
     [Documentation]    Fetches non warning events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
@@ -388,9 +376,7 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
     END
 
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Summary Of Anomalies Detected:\n
-    RW.Core.Add Pre To Report    ${recent_events_by_object.stdout}\n
-    RW.Core.Add Pre To Report    Commands Used:\n${history}
+    RW.Core.Add Pre To Report    **Summary of Event Anomalies Detected in Namespace `${NAMESPACE}`**\n\n${recent_events_by_object.stdout}\n\n**Commands Used:**\n${history}
 
 Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`
     [Documentation]    Searches through deployemnts and statefulsets to determine if PodDistruptionBudgets are missing and/or are configured in a risky way that might affect maintenance activities.
@@ -445,8 +431,7 @@ Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`
         END
     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    ${pdb_check.stdout}\n
-    RW.Core.Add Pre To Report    Commands Used:\n${history}
+    RW.Core.Add Pre To Report    **PodDisruptionBudget Analysis for Namespace `${NAMESPACE}`**\n\n${pdb_check.stdout}\n\n**Commands Used:**\n${history}
 
 Check Resource Quota Utilization in Namespace `${NAMESPACE}`
     [Documentation]    Lists any namespace resource quotas and checks their utilization, raising issues if they are above 80%
@@ -477,7 +462,10 @@ Check Resource Quota Utilization in Namespace `${NAMESPACE}`
             END
         END
     END
-    RW.Core.Add Pre To Report    ${quota_usage.stdout}\n
+    RW.Core.Add Pre To Report    **Resource Quota Utilization Analysis for Namespace `${NAMESPACE}`**\n\n${quota_usage.stdout}
+    
+    ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    **Commands Used:**\n${history}
 
 
 *** Keywords ***

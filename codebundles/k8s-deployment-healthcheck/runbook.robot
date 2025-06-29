@@ -163,8 +163,7 @@ Suite Initialization
             ...    details=Deployment `${DEPLOYMENT_NAME}` is currently scaled to 0 replicas (spec.replicas=0). This is an intentional configuration and not an error. All pod-related healthchecks have been skipped for efficiency. If the deployment should be running, scale it up using:\nkubectl scale deployment/${DEPLOYMENT_NAME} --replicas=<desired_count> --context ${CONTEXT} -n ${NAMESPACE}
             ...    next_steps=This is informational only. If the deployment should be running, scale it up.
             
-            RW.Core.Add Pre To Report    ℹ️ **Deployment `${DEPLOYMENT_NAME}` is scaled to 0 replicas - Skipping pod-related checks**
-            RW.Core.Add Pre To Report    **Available Condition:** ${scale_status.get('available_condition', 'Unknown')}
+            RW.Core.Add Pre To Report    **ℹ️ Deployment `${DEPLOYMENT_NAME}` is scaled to 0 replicas - Skipping pod-related checks**\n**Available Condition:** ${scale_status.get('available_condition', 'Unknown')}
             
             Set Suite Variable    ${SKIP_POD_CHECKS}    ${True}
         ELSE
@@ -235,12 +234,8 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
             END
         END
         
-        RW.Core.Add Pre To Report    **Log Analysis Summary for Deployment `${DEPLOYMENT_NAME}`**
-        RW.Core.Add Pre To Report    **Health Score:** ${log_health_score}
-        RW.Core.Add Pre To Report    **Analysis Depth:** ${LOG_ANALYSIS_DEPTH}
-        RW.Core.Add Pre To Report    **Categories Analyzed:** ${LOG_PATTERN_CATEGORIES_STR}
         ${issues_count}=    Get Length    ${issues}
-        RW.Core.Add Pre To Report    **Issues Found:** ${issues_count}
+        RW.Core.Add Pre To Report    **Log Analysis Summary for Deployment `${DEPLOYMENT_NAME}`**\n**Health Score:** ${log_health_score}\n**Analysis Depth:** ${LOG_ANALYSIS_DEPTH}\n**Categories Analyzed:** ${LOG_PATTERN_CATEGORIES_STR}\n**Issues Found:** ${issues_count}
         
         RW.K8sLog.Cleanup Temp Files
     END
@@ -278,26 +273,6 @@ Detect Log Anomalies for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
                 # Handle both array format (direct list) and object format (with 'anomalies' key)
                 ${anomalies}=    Evaluate    $anomaly_data if isinstance($anomaly_data, list) else $anomaly_data.get('anomalies', [])
                 
-                FOR    ${anomaly}    IN    @{anomalies}
-                    # Check if this is actually an anomaly or just normal operations
-                    ${is_normal_operation}=    Evaluate    any(reason in ['Created', 'Started', 'Pulled', 'SuccessfulCreate', 'SuccessfulDelete', 'ScalingReplicaSet'] for reason in $anomaly.get('reasons', []))
-                    ${events_per_minute}=    Evaluate    $anomaly.get('average_events_per_minute', 0)
-                    
-                    # Only treat as anomaly if events per minute exceeds threshold and it's not normal operations
-                    IF    not ${is_normal_operation} and ${events_per_minute} > ${ANOMALY_THRESHOLD}
-                        ${severity}=    Evaluate    $anomaly.get('severity', 3)
-                        RW.Core.Add Issue
-                        ...    severity=${severity}
-                        ...    expected=Log patterns should be consistent and normal for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                        ...    actual=Event anomaly detected: ${anomaly.get('kind', 'Unknown')}/${anomaly.get('name', 'Unknown')} with ${events_per_minute} events/minute in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                        ...    title=Event Anomaly: High Event Rate for ${anomaly.get('kind', 'Unknown')} in Deployment `${DEPLOYMENT_NAME}`
-                        ...    reproduce_hint=Review events for ${anomaly.get('kind', 'Unknown')}/${anomaly.get('name', 'Unknown')} in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                        ...    details=Detected unusually high event rate of ${events_per_minute} events/minute (threshold: ${ANOMALY_THRESHOLD})\n\nReasons: ${anomaly.get('reasons', [])}\n\nSample Messages: ${anomaly.get('messages', [])[:3]}
-                        ...    next_steps=Investigate why ${anomaly.get('kind', 'Unknown')}/${anomaly.get('name', 'Unknown')} is generating high event volume\nCheck for resource constraints, misconfigurations, or application issues\nReview the specific event messages for patterns
-                    END
-                END
-                
-                RW.Core.Add Pre To Report    **Log Anomaly Detection Results for Deployment `${DEPLOYMENT_NAME}`**
                 ${anomalies_count}=    Get Length    ${anomalies}
                 
                 # Count normal vs anomalous events
@@ -312,19 +287,24 @@ Detect Log Anomalies for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
                         ${normal_operations_count}=    Evaluate    ${normal_operations_count} + 1
                     ELSE
                         ${actual_anomalies_count}=    Evaluate    ${actual_anomalies_count} + 1
+                        # Create issue for actual anomalies
+                        ${severity}=    Evaluate    $item.get('severity', 3)
+                        RW.Core.Add Issue
+                        ...    severity=${severity}
+                        ...    expected=Log patterns should be consistent and normal for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                        ...    actual=Event anomaly detected: ${item.get('kind', 'Unknown')}/${item.get('name', 'Unknown')} with ${events_per_minute} events/minute in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                        ...    title=Event Anomaly: High Event Rate for ${item.get('kind', 'Unknown')} in Deployment `${DEPLOYMENT_NAME}`
+                        ...    reproduce_hint=Review events for ${item.get('kind', 'Unknown')}/${item.get('name', 'Unknown')} in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                        ...    details=Detected unusually high event rate of ${events_per_minute} events/minute (threshold: ${ANOMALY_THRESHOLD})\n\nReasons: ${item.get('reasons', [])}\n\nSample Messages: ${item.get('messages', [])[:3]}
+                        ...    next_steps=Investigate why ${item.get('kind', 'Unknown')}/${item.get('name', 'Unknown')} is generating high event volume\nCheck for resource constraints, misconfigurations, or application issues\nReview the specific event messages for patterns
                     END
                 END
                 
-                RW.Core.Add Pre To Report    **Total Events Analyzed:** ${anomalies_count}
-                RW.Core.Add Pre To Report    **Normal Operations:** ${normal_operations_count} | **Actual Anomalies:** ${actual_anomalies_count}
-                RW.Core.Add Pre To Report    **Threshold:** ${ANOMALY_THRESHOLD} events/minute
-                
-                IF    ${actual_anomalies_count} == 0
-                    RW.Core.Add Pre To Report    **✅ No significant anomalies detected - All events appear to be normal operations**
-                END
+                # Generate consolidated anomaly report
+                ${anomaly_status}=    Set Variable If    ${actual_anomalies_count} == 0    ✅ No significant anomalies detected - All events appear to be normal operations    ⚠️ ${actual_anomalies_count} anomalies detected
+                RW.Core.Add Pre To Report    **Log Anomaly Detection Results for Deployment `${DEPLOYMENT_NAME}`**\n**Total Events Analyzed:** ${anomalies_count}\n**Normal Operations:** ${normal_operations_count} | **Actual Anomalies:** ${actual_anomalies_count}\n**Threshold:** ${ANOMALY_THRESHOLD} events/minute\n\n${anomaly_status}
                 
             EXCEPT
-                Log    Warning: Failed to parse anomaly detection results
                 RW.Core.Add Pre To Report    **Log Anomaly Detection:** Completed but results parsing failed
             END
         END
@@ -360,8 +340,7 @@ Perform Comprehensive Log Analysis for Deployment `${DEPLOYMENT_NAME}` in Namesp
                 ...    details=Comprehensive analysis failed with exit code ${comprehensive_results.returncode}:\n\nSTDOUT:\n${comprehensive_results.stdout}\n\nSTDERR:\n${comprehensive_results.stderr}
                 ...    next_steps=Verify log collection is working properly\nCheck if pods are accessible and generating logs\nReview comprehensive analysis script configuration
             ELSE
-                RW.Core.Add Pre To Report    **Comprehensive Log Analysis Results for Deployment `${DEPLOYMENT_NAME}`**
-                RW.Core.Add Pre To Report    ${comprehensive_results.stdout}
+                RW.Core.Add Pre To Report    **Comprehensive Log Analysis Results for Deployment `${DEPLOYMENT_NAME}`**\n\n${comprehensive_results.stdout}
             END
         END
     END
@@ -422,24 +401,13 @@ Fetch Deployment Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
             ${total_count}=    Convert To Integer    ${total_lines.stdout.strip()}
             ${health_count}=    Convert To Integer    ${health_check_lines.stdout.strip()}
             
-            RW.Core.Add Pre To Report    **📋 Log Analysis for Deployment `${DEPLOYMENT_NAME}`** (Last ${LOG_LINES} lines, ${LOG_AGE} age)
-            RW.Core.Add Pre To Report    **Total Log Lines:** ${total_count} | **Health Check Lines:** ${health_count}
-            
+            # Create consolidated logs report
             IF    ${health_count} > ${total_count} * 0.8
-                RW.Core.Add Pre To Report    **ℹ️ Logs are mostly health check messages (${health_count}/${total_count} lines)**
-                RW.Core.Add Pre To Report    **🔍 Filtered Error/Warning Logs:**
-                RW.Core.Add Pre To Report    ${filtered_logs.stdout}
-                
-                IF    "${context_logs.stdout.strip()}" != ""
-                    RW.Core.Add Pre To Report    **📝 Sample Application Logs (Non-Health Check):**
-                    RW.Core.Add Pre To Report    ${context_logs.stdout}
-                END
+                ${log_content}=    Set Variable If    "${context_logs.stdout.strip()}" != ""    **🔍 Filtered Error/Warning Logs:**\n${filtered_logs.stdout}\n\n**📝 Sample Application Logs (Non-Health Check):**\n${context_logs.stdout}    **🔍 Filtered Error/Warning Logs:**\n${filtered_logs.stdout}
+                RW.Core.Add Pre To Report    **📋 Log Analysis for Deployment `${DEPLOYMENT_NAME}`** (Last ${LOG_LINES} lines, ${LOG_AGE} age)\n**Total Log Lines:** ${total_count} | **Health Check Lines:** ${health_count}\n**ℹ️ Logs are mostly health check messages (${health_count}/${total_count} lines)**\n\n${log_content}\n\n**Commands Used:** ${history}
             ELSE
-                RW.Core.Add Pre To Report    **📝 Recent Application Logs:**
-                RW.Core.Add Pre To Report    ${deployment_logs.stdout}
+                RW.Core.Add Pre To Report    **📋 Log Analysis for Deployment `${DEPLOYMENT_NAME}`** (Last ${LOG_LINES} lines, ${LOG_AGE} age)\n**Total Log Lines:** ${total_count} | **Health Check Lines:** ${health_count}\n\n**📝 Recent Application Logs:**\n${deployment_logs.stdout}\n\n**Commands Used:** ${history}
             END
-            
-            RW.Core.Add Pre To Report    Commands Used: ${history}
         END
     END
 
@@ -477,8 +445,7 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
             ...    details=Validation script failed with exit code ${liveness_probe_health.returncode}:\n\nSTDOUT:\n${liveness_probe_health.stdout}\n\nSTDERR:\n${liveness_probe_health.stderr}
             ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
             ${history}=    RW.CLI.Pop Shell History
-            RW.Core.Add Pre To Report    Failed to validate liveness probe:\n\n${liveness_probe_health.stderr}
-            RW.Core.Add Pre To Report    Commands Used: ${liveness_probe_health.cmd}
+            RW.Core.Add Pre To Report    **Liveness Probe Validation Failed for Deployment `${DEPLOYMENT_NAME}`**\n\nFailed to validate liveness probe:\n\n${liveness_probe_health.stderr}\n\n**Commands Used:** ${liveness_probe_health.cmd}
         ELSE
             ${recommendations}=    RW.CLI.Run Cli
             ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' "liveness_probe_output"
@@ -496,8 +463,7 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
                 ...    next_steps=${recommendations.stdout}
             END
             ${history}=    RW.CLI.Pop Shell History
-            RW.Core.Add Pre To Report    Liveness probe testing results:\n\n${liveness_probe_health.stdout}
-            RW.Core.Add Pre To Report    Commands Used: ${liveness_probe_health.cmd}
+            RW.Core.Add Pre To Report    **Liveness Probe Testing Results for Deployment `${DEPLOYMENT_NAME}`**\n\n${liveness_probe_health.stdout}\n\n**Commands Used:** ${liveness_probe_health.cmd}
         END
     END
 
@@ -535,8 +501,7 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}` in Names
             ...    details=Validation script failed with exit code ${readiness_probe_health.returncode}:\n\nSTDOUT:\n${readiness_probe_health.stdout}\n\nSTDERR:\n${readiness_probe_health.stderr}
             ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
             ${history}=    RW.CLI.Pop Shell History
-            RW.Core.Add Pre To Report    Failed to validate readiness probe:\n\n${readiness_probe_health.stderr}
-            RW.Core.Add Pre To Report    Commands Used: ${readiness_probe_health.cmd}
+            RW.Core.Add Pre To Report    **Readiness Probe Validation Failed for Deployment `${DEPLOYMENT_NAME}`**\n\nFailed to validate readiness probe:\n\n${readiness_probe_health.stderr}\n\n**Commands Used:** ${readiness_probe_health.cmd}
         ELSE
             ${recommendations}=    RW.CLI.Run Cli
             ...    cmd=awk '/Recommended Next Steps:/ {flag=1; next} flag' "readiness_probe_output"
@@ -554,8 +519,7 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}` in Names
                 ...    next_steps=${recommendations.stdout}
             END
             ${history}=    RW.CLI.Pop Shell History
-            RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${readiness_probe_health.stdout}
-            RW.Core.Add Pre To Report    Commands Used: ${readiness_probe_health.cmd}
+            RW.Core.Add Pre To Report    **Readiness Probe Validation Results for Deployment `${DEPLOYMENT_NAME}`**\n\n${readiness_probe_health.stdout}\n\n**Commands Used:** ${readiness_probe_health.cmd}
         END
     END
 
@@ -580,8 +544,7 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
         ...    details=Command failed with exit code ${events.returncode}:\n\nSTDOUT:\n${events.stdout}\n\nSTDERR:\n${events.stderr}
         ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
         ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Failed to retrieve events:\n\n${events.stderr}
-        RW.Core.Add Pre To Report    Commands Used: ${history}
+        RW.Core.Add Pre To Report    **Event Retrieval Failed for Deployment `${DEPLOYMENT_NAME}`**\n\nFailed to retrieve events:\n\n${events.stderr}\n\n**Commands Used:** ${history}
     ELSE
         # Collect ALL events (Normal + Warning) for last 3 hours including Deployment, ReplicaSet, and Pod levels
         ${all_events}=    RW.CLI.Run Cli
@@ -595,10 +558,8 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
             ${warning_count}=    Evaluate    $event_data.get('warning_events', 0)
             ${total_count}=    Evaluate    $event_data.get('total_events', 0)
             
-            # Add comprehensive events report  
-            RW.Core.Add Pre To Report    **📊 Complete Event Summary for Deployment `${DEPLOYMENT_NAME}` (Last 3 Hours)**
-            RW.Core.Add Pre To Report    **Total Events:** ${total_count} (${event_data.get('normal_events', 0)} Normal, ${event_data.get('warning_events', 0)} Warning)
-            RW.Core.Add Pre To Report    **Event Distribution:** ${event_data.get('deployment_events', 0)} Deployment, ${event_data.get('replicaset_events', 0)} ReplicaSet, ${event_data.get('pod_events', 0)} Pod
+            # Build comprehensive event report
+            RW.Core.Add Pre To Report    **📊 Complete Event Summary for Deployment `${DEPLOYMENT_NAME}` (Last 3 Hours)**\n**Total Events:** ${total_count} (${event_data.get('normal_events', 0)} Normal, ${event_data.get('warning_events', 0)} Warning)\n**Event Distribution:** ${event_data.get('deployment_events', 0)} Deployment, ${event_data.get('replicaset_events', 0)} ReplicaSet, ${event_data.get('pod_events', 0)} Pod
             
             IF    ${warning_count} > 0
                 ${event_object_data}=    Evaluate    json.loads(r'''${events.stdout}''') if r'''${events.stdout}'''.strip() else {}    json
@@ -699,43 +660,57 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
                     IF    ${deployment_scaled_down}
                         ${issue_keys_length}=    Get Length    ${issue_keys}
                         ${filtered_count}=    Evaluate    ${total_affected_objects} - ${issue_keys_length}
-                        IF    ${filtered_count} > 0
-                            RW.Core.Add Pre To Report    **ℹ️ Filtered ${filtered_count} stale pod events from before scale-down**
+                        # Note: Filtered events count is now included in the consolidated event report below
+                    END
+                END
+                
+                # Build warning categories list
+                ${warning_categories}=    Set Variable    ${EMPTY}
+                FOR    ${event_type}    IN    @{event_data.get('events_by_type', [])}
+                    IF    '${event_type["type"]}' == 'Warning'
+                        FOR    ${reason_info}    IN    @{event_type.get('reasons', [])}
+                            ${warning_categories}=    Catenate    ${warning_categories}    - **${reason_info["reason"]}**: ${reason_info["count"]} events\n
                         END
                     END
                 END
                 
-                RW.Core.Add Pre To Report    **⚠️ Recent Warning Events:** ${warning_count} warnings detected
-                RW.Core.Add Pre To Report    **Warning Event Categories:** 
-                FOR    ${event_type}    IN    @{event_data.get('events_by_type', [])}
-                    IF    '${event_type["type"]}' == 'Warning'
-                        FOR    ${reason_info}    IN    @{event_type.get('reasons', [])}
-                            RW.Core.Add Pre To Report    - **${reason_info["reason"]}**: ${reason_info["count"]} events
-                        END
-                    END
-                END
-            ELSE
-                RW.Core.Add Pre To Report    **✅ No Warning Events:** Clean event history
-            END
-            
-            # Add chronological timeline
-            ${recent_events}=    Evaluate    $event_data.get('chronological_events', [])[-10:]
-            ${recent_events_length}=    Get Length    ${recent_events}
-            IF    ${recent_events_length} > 0
-                RW.Core.Add Pre To Report    **🕒 Recent Event Timeline (Last 10 Events):**
+                # Build event timeline
+                ${recent_events}=    Evaluate    $event_data.get('chronological_events', [])[-10:]
+                ${timeline_content}=    Set Variable    ${EMPTY}
                 FOR    ${event}    IN    @{recent_events}
                     ${event_emoji}=    Set Variable If    '${event["type"]}' == 'Warning'    ⚠️    ℹ️
-                    RW.Core.Add Pre To Report    ${event_emoji} **${event["timestamp"]}** [${event["kind"]}/${event["name"]}] ${event["reason"]}: ${event["message"]}
+                    ${timeline_content}=    Catenate    ${timeline_content}    ${event_emoji} **${event["timestamp"]}** [${event["kind"]}/${event["name"]}] ${event["reason"]}: ${event["message"]}\n
                 END
+                
+                # Build filtered events note if applicable
+                ${filtered_note}=    Set Variable    ${EMPTY}
+                IF    ${deployment_scaled_down}
+                    ${issue_keys_length}=    Get Length    ${issue_keys}
+                    ${filtered_count}=    Evaluate    ${total_affected_objects} - ${issue_keys_length}
+                    IF    ${filtered_count} > 0
+                        ${filtered_note}=    Set Variable    \n\n**ℹ️ Note:** Filtered ${filtered_count} stale pod events from before scale-down
+                    END
+                END
+                
+                RW.Core.Add Pre To Report    **⚠️ Recent Warning Events:** ${warning_count} warnings detected\n\n**Warning Event Categories:**\n${warning_categories}\n**🕒 Recent Event Timeline (Last 10 Events):**\n${timeline_content}${filtered_note}
+            ELSE
+                # Build event timeline for clean events
+                ${recent_events}=    Evaluate    $event_data.get('chronological_events', [])[-10:]
+                ${timeline_content}=    Set Variable    ${EMPTY}
+                FOR    ${event}    IN    @{recent_events}
+                    ${event_emoji}=    Set Variable If    '${event["type"]}' == 'Warning'    ⚠️    ℹ️
+                    ${timeline_content}=    Catenate    ${timeline_content}    ${event_emoji} **${event["timestamp"]}** [${event["kind"]}/${event["name"]}] ${event["reason"]}: ${event["message"]}\n
+                END
+                
+                RW.Core.Add Pre To Report    **✅ No Warning Events:** Clean event history\n\n**🕒 Recent Event Timeline (Last 10 Events):**\n${timeline_content}
             END
             
         EXCEPT
-            Log    Warning: Failed to parse comprehensive event data
             RW.Core.Add Pre To Report    **Event Collection:** Completed but detailed parsing failed
         END
         
         ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Commands Used: ${history}
+        RW.Core.Add Pre To Report    **Deployment Replica Status Commands for `${DEPLOYMENT_NAME}`**\n\n**Commands Used:** ${history}
     END
 
 Check Deployment Replica Status for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
@@ -765,9 +740,10 @@ Check Deployment Replica Status for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
             ${available_replicas}=    Evaluate    $status_data.get('available_replicas', 0)
             ${unavailable_replicas}=    Evaluate    $status_data.get('unavailable_replicas', 0)
             
-            RW.Core.Add Pre To Report    **Deployment Replica Status for `${DEPLOYMENT_NAME}`**
-            RW.Core.Add Pre To Report    **Desired:** ${desired_replicas} | **Ready:** ${ready_replicas} | **Available:** ${available_replicas} | **Unavailable:** ${unavailable_replicas}
-            RW.Core.Add Pre To Report    **Debug Info:** ${status_data.get('debug', {})}
+            # Create status message based on replica health
+            ${replica_status_msg}=    Set Variable If    ${desired_replicas} == 0    ℹ️ Deployment is intentionally scaled to 0 replicas    Set Variable If    ${ready_replicas} == ${desired_replicas}    ✅ Replica status is healthy    ⚠️ Replica issues detected
+            
+            RW.Core.Add Pre To Report    **Deployment Replica Status for `${DEPLOYMENT_NAME}`**\n**Desired:** ${desired_replicas} | **Ready:** ${ready_replicas} | **Available:** ${available_replicas} | **Unavailable:** ${unavailable_replicas}\n**Debug Info:** ${status_data.get('debug', {})}\n\n${replica_status_msg}
             
             # Check for scaling issues (corrected logic for scale-to-zero)
             IF    ${ready_replicas} == 0 and ${desired_replicas} > 0
@@ -790,9 +766,11 @@ Check Deployment Replica Status for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
                 ...    details=Deployment needs ${missing_replicas} more ready replicas to meet desired state of ${desired_replicas}.\n\nStatus: Ready=${ready_replicas}, Available=${available_replicas}, Unavailable=${unavailable_replicas}
                 ...    next_steps=Check pod status and events for scaling issues\nInvestigate resource constraints or scheduling problems\nReview deployment rollout status
             ELSE IF    ${desired_replicas} == 0
-                RW.Core.Add Pre To Report    **ℹ️ Deployment is intentionally scaled to 0 replicas**
+                # Status already shown in consolidated report
+                Log    Deployment is scaled to 0 replicas
             ELSE
-                RW.Core.Add Pre To Report    **✅ Replica status is healthy**
+                # Status already shown in consolidated report  
+                Log    Replica status is healthy
             END
             
         EXCEPT
@@ -808,7 +786,7 @@ Check Deployment Replica Status for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
         END
         
         ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Commands Used: ${history}
+        RW.Core.Add Pre To Report    **Deployment Replica Status Commands for `${DEPLOYMENT_NAME}`**\n\n**Commands Used:** ${history}
     END
 
 Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
@@ -861,22 +839,18 @@ Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` in Namespace `${N
                     ...    next_steps=${issue.get('next_steps', 'Investigate container logs and health checks\nReview resource limits and application configuration')}
                 END
                 
-                RW.Core.Add Pre To Report    **Container Restart Analysis for Deployment `${DEPLOYMENT_NAME}`**
-                
+                # Create consolidated restart analysis report
                 IF    ${is_json}
-                    RW.Core.Add Pre To Report    **Total Containers Analyzed:** ${restart_summary.get('total_containers', 0)}
-                    RW.Core.Add Pre To Report    **Containers with Restarts:** ${restart_summary.get('containers_with_restarts', 0)}
+                    ${container_summary}=    Set Variable    **Total Containers Analyzed:** ${restart_summary.get('total_containers', 0)}\n**Containers with Restarts:** ${restart_summary.get('containers_with_restarts', 0)}
                 ELSE
-                    RW.Core.Add Pre To Report    **Result:** ${output_text}
+                    ${container_summary}=    Set Variable    **Result:** ${output_text}
                 END
                 
-                RW.Core.Add Pre To Report    **Time Window:** ${CONTAINER_RESTART_AGE}
-                RW.Core.Add Pre To Report    **Restart Threshold:** ${CONTAINER_RESTART_THRESHOLD}
+                RW.Core.Add Pre To Report    **Container Restart Analysis for Deployment `${DEPLOYMENT_NAME}`**\n${container_summary}\n**Time Window:** ${CONTAINER_RESTART_AGE}\n**Restart Threshold:** ${CONTAINER_RESTART_THRESHOLD}
                 
             EXCEPT
                 Log    Warning: Failed to parse container restart data
-                RW.Core.Add Pre To Report    **Container Restart Analysis:** Completed but results parsing failed
-                RW.Core.Add Pre To Report    ${container_restarts.stdout}
+                RW.Core.Add Pre To Report    **Container Restart Analysis for Deployment `${DEPLOYMENT_NAME}`**\n**Status:** Completed but results parsing failed\n\n**Raw Output:**\n${container_restarts.stdout}
             END
         END
     END
