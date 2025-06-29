@@ -302,7 +302,7 @@ AzureDiagnostics
 | where TimeGenerated > ago($LOOKBACK_PERIOD)
 | extend duration = datetime_diff('second', end_t, start_t)
 | where duration > $RUN_TIME_THRESHOLD
-| project pipelineName_s, start_t, end_t, duration, status_s, runId_g
+| project pipelineName_s, Start_time_t = start_t, End_time_t = end_t, duration, status_s, runId_g
 | order by duration desc
 EOF
 )
@@ -355,8 +355,8 @@ EOF
         fi
         
         pipeline_name=$(safe_jq "$pipeline" '.pipelineName_s' "unknown")
-        start_time=$(safe_jq "$pipeline" '.start_t' "unknown")
-        end_time=$(safe_jq "$pipeline" '.end_t' "unknown")
+        start_time=$(safe_jq "$pipeline" '.Start_time_t' "unknown")
+        end_time=$(safe_jq "$pipeline" '.End_time_t' "unknown")
         duration=$(safe_jq "$pipeline" '.duration' "0")
         status=$(safe_jq "$pipeline" '.status_s' "unknown")
         run_id=$(safe_jq "$pipeline" '.runId_g' "unknown")

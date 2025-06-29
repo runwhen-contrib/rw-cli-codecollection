@@ -9,6 +9,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             Jenkins
 Suite Setup         Suite Initialization
 
 
@@ -91,7 +92,7 @@ List Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOU
             IF    ${failure_count} > ${FAILURE_THRESHOLD}
                 ${next_steps}=    Analyze Logs
                 ...    logs=${messages[0]}
-                ...    error_patterns_file=error_patterns.json
+                ...    error_patterns_file=${CURDIR}/error_patterns.json
                 ${suggestions}=    Set Variable    ${EMPTY}
                 ${logs_details}=    Set Variable    ${EMPTY}
                 FOR    ${step}    IN    @{next_steps}
@@ -148,7 +149,7 @@ List Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GROU
             ${merged}=    Evaluate    dict(${details_json}, linked_services=${linked_services})
             ${next_steps}=    Analyze Logs
             ...    logs=${details_json["Message"]}
-            ...    error_patterns_file=error_patterns.json
+            ...    error_patterns_file=${CURDIR}/error_patterns.json
             ${suggestions}=    Set Variable    ${EMPTY}
             ${logs_details}=    Set Variable    ${EMPTY}
             FOR    ${step}    IN    @{next_steps}
