@@ -513,10 +513,10 @@ Suite Initialization
     ...    default=kubectl
     ${EVENT_AGE}=    RW.Core.Import User Variable    EVENT_AGE
     ...    type=string
-    ...    description=The age in minutes in which Warning events are evaluated. 
-    ...    pattern=\w*
-    ...    example=30
-    ...    default=30
+    ...    description=The time window in minutes as to when the event was last seen.
+    ...    pattern=((\d+?)m)?
+    ...    example=30m
+    ...    default=30m
     ${CONTAINER_RESTART_AGE}=    RW.Core.Import User Variable    CONTAINER_RESTART_AGE
     ...    type=string
     ...    description=The time window (in (h) hours or (m) minutes) as search for container restarts.
