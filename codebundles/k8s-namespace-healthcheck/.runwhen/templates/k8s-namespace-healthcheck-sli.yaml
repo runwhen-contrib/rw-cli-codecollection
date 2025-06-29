@@ -30,7 +30,7 @@ spec:
     - name: EVENT_TYPE
       value: Warning
     - name: EVENT_AGE
-      value: '5'
+      value: '5m'
     - name: CONTAINER_RESTART_AGE
       value: 5m
     - name: NAMESPACE

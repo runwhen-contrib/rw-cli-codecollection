@@ -17,9 +17,41 @@ resource_group="$AZURE_RESOURCE_GROUP"
 output_file="failed_pipelines.json"
 failed_pipelines_json='{"failed_pipelines": []}'
 
+# Function to validate JSON
+validate_json() {
+    local json_data="$1"
+    if [[ -z "$json_data" ]]; then
+        echo "Empty JSON data" >&2
+        return 1
+    fi
+    if ! echo "$json_data" | jq empty 2>/dev/null; then
+        echo "Invalid JSON format" >&2
+        return 1
+    fi
+    return 0
+}
+
+# Function to safely extract JSON field
+safe_jq() {
+    local json_data="$1"
+    local filter="$2"
+    local default="${3:-}"
+    
+    if validate_json "$json_data"; then
+        echo "$json_data" | jq -r "$filter" 2>/dev/null || echo "$default"
+    else
+        echo "$default"
+    fi
+}
+
 # Get or set subscription ID
 if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
-    subscription=$(az account show --query "id" -o tsv)
+    subscription=$(az account show --query "id" -o tsv 2>/dev/null || echo "")
+    if [[ -z "$subscription" ]]; then
+        echo "ERROR: Could not determine current subscription ID and AZURE_RESOURCE_SUBSCRIPTION_ID is not set."
+        echo "$failed_pipelines_json" > "$output_file"
+        exit 1
+    fi
     echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
 else
     subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
@@ -28,7 +60,11 @@ fi
 
 # Set the subscription to the determined ID
 echo "Switching to subscription ID: $subscription"
-az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
+if ! az account set --subscription "$subscription" 2>/dev/null; then
+    echo "ERROR: Failed to set subscription to $subscription"
+    echo "$failed_pipelines_json" > "$output_file"
+    exit 1
+fi
 
 echo "Checking Data Factories and retrieving failed pipeline runs..."
 echo "Resource Group: $resource_group"

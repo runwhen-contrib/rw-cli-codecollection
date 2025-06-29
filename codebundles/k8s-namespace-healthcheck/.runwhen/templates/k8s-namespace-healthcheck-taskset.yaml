@@ -30,7 +30,7 @@ spec:
     - name: ANOMALY_THRESHOLD
       value: "3.0"
     - name: EVENT_AGE
-      value: "5m"
+      value: "30m"
   secretsProvided:
   {% if wb_version %}
     {% include "kubernetes-auth.yaml" ignore missing %}

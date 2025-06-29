@@ -9,6 +9,7 @@ Library           RW.Core
 Library           RW.CLI
 Library           RW.platform
 Library           OperatingSystem
+Library           Collections
 
 *** Keywords ***
 Suite Initialization
@@ -82,8 +83,14 @@ Get Error Event Count within ${EVENT_AGE} and calculate Score
     ...    from_var_with_path__recent_error_events__to__event_count=length(@)
     ...    assign_stdout_from_var=event_count
     Log    ${error_event_count.stdout} total events found with event type Warning up to age ${EVENT_AGE}
-    ${event_score}=    Evaluate    1 if ${error_event_count.stdout} <= ${EVENT_THRESHOLD} else 0
-    Set Global Variable    ${event_score}
+    
+    ${event_count}=    Convert To Integer    ${error_event_count.stdout}
+    ${threshold}=    Convert To Integer    ${EVENT_THRESHOLD}
+    ${event_score}=    Evaluate    1 if ${event_count} <= ${threshold} else 0
+    
+    # Store details for final score calculation logging
+    Set Suite Variable    ${event_details}    ${event_count} events (threshold: ${threshold})
+    Set Suite Variable    ${event_score}
 
 Get Container Restarts and Score in Namespace `${NAMESPACE}`
     [Documentation]    Counts the total sum of container restarts within a timeframe and determines if they're beyond a threshold.
@@ -100,8 +107,14 @@ Get Container Restarts and Score in Namespace `${NAMESPACE}`
     ...    from_var_with_path__pods_with_recent_restarts__to__restart_sum=sum([].restartSum)
     ...    assign_stdout_from_var=restart_sum
     Log    ${container_restarts_sum.stdout} total container restarts found in the last ${CONTAINER_RESTART_AGE}
-    ${container_restart_score}=    Evaluate    1 if ${container_restarts_sum.stdout} <= ${CONTAINER_RESTART_THRESHOLD} else 0
-    Set Global Variable    ${container_restart_score}
+    
+    ${restart_count}=    Convert To Integer    ${container_restarts_sum.stdout}
+    ${threshold}=    Convert To Integer    ${CONTAINER_RESTART_THRESHOLD}
+    ${container_restart_score}=    Evaluate    1 if ${restart_count} <= ${threshold} else 0
+    
+    # Store details for final score calculation logging
+    Set Suite Variable    ${container_restart_details}    ${restart_count} restarts (threshold: ${threshold})
+    Set Suite Variable    ${container_restart_score}
 
 Get NotReady Pods in `${NAMESPACE}`
     [Documentation]    Fetches a count of unready pods.
@@ -111,10 +124,31 @@ Get NotReady Pods in `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     Log    ${unreadypods_results.stdout} total unready pods
-    ${pods_notready_score}=    Evaluate    1 if ${unreadypods_results.stdout} == 0 else 0
-    Set Global Variable    ${pods_notready_score}
+    
+    ${unready_count}=    Convert To Integer    ${unreadypods_results.stdout}
+    ${pods_notready_score}=    Evaluate    1 if ${unready_count} == 0 else 0
+    
+    # Store details for final score calculation logging
+    Set Suite Variable    ${pod_readiness_details}    ${unready_count} unready pods
+    Set Suite Variable    ${pods_notready_score}
 
 Generate Namespace Score in `${NAMESPACE}`
+    @{unhealthy_components}=    Create List
     ${namespace_health_score}=      Evaluate  (${event_score} + ${container_restart_score} + ${pods_notready_score}) / 3
     ${health_score}=      Convert to Number    ${namespace_health_score}  2
+    
+    # Create detailed breakdown of unhealthy components using stored suite variables
+    IF    ${event_score} < 1    Append To List    ${unhealthy_components}    Warning Events (${event_details})
+    IF    ${container_restart_score} < 1    Append To List    ${unhealthy_components}    Container Restarts (${container_restart_details})
+    IF    ${pods_notready_score} < 1    Append To List    ${unhealthy_components}    Pod Readiness (${pod_readiness_details})
+    
+    ${unhealthy_count}=    Get Length    ${unhealthy_components}
+    IF    ${unhealthy_count} > 0
+        ${unhealthy_list}=    Evaluate    ', '.join(@{unhealthy_components})
+    ELSE
+        ${unhealthy_list}=    Set Variable    None
+        Log    Health Score: ${health_score} - All components healthy
+    END
+    
+    RW.Core.Add to Report    Health Score: ${health_score} - Unhealthy components: ${unhealthy_list}
     RW.Core.Push Metric    ${health_score}

@@ -9,6 +9,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             Collections
 
 Suite Setup         Suite Initialization
 
@@ -31,8 +32,17 @@ Identify Health Issues Affecting Data Factories in resource group `${AZURE_RESOU
         Log    Failed to parse JSON from ${json_file}.    WARN
         ${issue_list}=    Create List
     END
-    ${availability_score}=    Evaluate    1 if len([issue for issue in ${issue_list} if issue["properties"]["title"] != "Available"]) > 0 else 0
+    
+    # Count unhealthy resources (fix inverted logic)
+    ${unhealthy_resources}=    Evaluate    len([issue for issue in ${issue_list} if issue.get("properties", {}).get("title", "") != "Available"])
+    ${total_resources}=    Evaluate    len(${issue_list})
+    
+    # Calculate availability score (1 = healthy, 0 = unhealthy)
+    ${availability_score}=    Evaluate    1 if ${unhealthy_resources} == 0 and ${total_resources} > 0 else (0 if ${total_resources} == 0 else (${total_resources} - ${unhealthy_resources}) / ${total_resources})
     Set Global Variable    ${availability_score}
+    Set Global Variable    ${unhealthy_resources}
+    Set Global Variable    ${total_resources}
+    
     RW.CLI.Run Cli
     ...    cmd=rm -f ${json_file}
 
@@ -55,8 +65,11 @@ Count Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESO
         ${error_trends}=    Create Dictionary    error_trends=[]
     END
 
-    ${pipeline_error_score}=    Evaluate    1 if len(${error_trends['error_trends']}) > 0 else 0
+    # Count pipeline errors and calculate score (fix inverted logic)
+    ${error_count}=    Evaluate    len(${error_trends.get('error_trends', [])})
+    ${pipeline_error_score}=    Evaluate    1 if ${error_count} == 0 else 0
     Set Global Variable    ${pipeline_error_score}
+    Set Global Variable    ${error_count}
 
     RW.CLI.Run Cli
     ...    cmd=rm -f ${json_file}
@@ -78,11 +91,14 @@ Count Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GRO
         ${failed_json}=    Evaluate    json.loads(r'''${failed_data.stdout}''')    json
     EXCEPT
         Log    Failed to load JSON payload, defaulting to empty list.    WARN
-        ${failed_json}=    Create Dictionary    failed_json=[]
+        ${failed_json}=    Create Dictionary    failed_pipelines=[]
     END
 
-    ${failed_pipeline_score}=    Evaluate    1 if len(${failed_json["failed_pipelines"]}) > 0 else 0
+    # Count failed pipelines and calculate score (fix inverted logic)
+    ${failed_count}=    Evaluate    len(${failed_json.get("failed_pipelines", [])})
+    ${failed_pipeline_score}=    Evaluate    1 if ${failed_count} == 0 else 0
     Set Global Variable    ${failed_pipeline_score}
+    Set Global Variable    ${failed_count}
 
     RW.CLI.Run Cli
     ...    cmd=rm -f ${json_file}
@@ -103,11 +119,14 @@ Count Large Data Operations in Data Factories in resource group `${AZURE_RESOURC
         ${metrics_data}=    Evaluate    json.loads(r'''${data_volume_data.stdout}''')    json
     EXCEPT
         Log    Failed to load JSON payload, defaulting to empty list.    WARN
-        ${metrics_data}=    Create Dictionary    metrics_data=[]
+        ${metrics_data}=    Create Dictionary    data_volume_alerts=[]
     END
 
-    ${data_volume_score}=    Evaluate    1 if len(${metrics_data.get("data_volume_alerts", [])}) > 0 else 0
+    # Count large data operations and calculate score (fix inverted logic)
+    ${data_volume_alerts_count}=    Evaluate    len(${metrics_data.get("data_volume_alerts", [])})
+    ${data_volume_score}=    Evaluate    1 if ${data_volume_alerts_count} == 0 else 0
     Set Global Variable    ${data_volume_score}
+    Set Global Variable    ${data_volume_alerts_count}
 
     RW.CLI.Run Cli
     ...    cmd=rm -f ${json_file}
@@ -129,18 +148,58 @@ Count Long Running Pipeline Runs in Data Factories in resource group `${AZURE_RE
         ${long_runs}=    Evaluate    json.loads(r'''${long_run_data.stdout}''')    json
     EXCEPT
         Log    Failed to load JSON payload, defaulting to empty list.    WARN
-        ${long_runs}=    Create Dictionary    long_runs=[]
+        ${long_runs}=    Create Dictionary    long_running_pipelines=[]
     END
 
-    ${long_pipeline_score}=    Evaluate    1 if len(${long_runs.get("long_running_pipelines", [])}) > 0 else 0
+    # Count long running pipelines and calculate score (fix inverted logic)
+    ${long_running_count}=    Evaluate    len(${long_runs.get("long_running_pipelines", [])})
+    ${long_pipeline_score}=    Evaluate    1 if ${long_running_count} == 0 else 0
     Set Global Variable    ${long_pipeline_score}
+    Set Global Variable    ${long_running_count}
 
     RW.CLI.Run Cli
     ...    cmd=rm -f ${json_file}
 
 Generate Health Score
-    ${health_score}=      Evaluate  (${availability_score} + ${pipeline_error_score} + ${failed_pipeline_score} + ${data_volume_score} + ${long_pipeline_score}) / 5
-    ${health_score}=      Convert to Number    ${health_score}  2
+    [Documentation]    Calculate comprehensive health score with detailed reporting of each component
+    [Tags]    health-score    sli    reporting
+    
+    # Initialize lists for healthy and unhealthy components
+    @{unhealthy_components}=    Create List
+    
+    # Check each component and add to unhealthy list if needed
+    IF    ${availability_score} < 1
+        Append To List    ${unhealthy_components}    Resource Availability (${unhealthy_resources}/${total_resources} unhealthy)
+    END
+    IF    ${pipeline_error_score} < 1
+        Append To List    ${unhealthy_components}    Pipeline Errors (${error_count} found)
+    END
+    IF    ${failed_pipeline_score} < 1
+        Append To List    ${unhealthy_components}    Failed Pipelines (${failed_count} found)
+    END
+    IF    ${data_volume_score} < 1
+        Append To List    ${unhealthy_components}    Large Data Operations (${data_volume_alerts_count} found)
+    END
+    IF    ${long_pipeline_score} < 1
+        Append To List    ${unhealthy_components}    Long Running Pipelines (${long_running_count} found)
+    END
+    
+    # Calculate overall health score
+    ${health_score}=    Evaluate    (${availability_score} + ${pipeline_error_score} + ${failed_pipeline_score} + ${data_volume_score} + ${long_pipeline_score}) / 5
+    ${health_score}=    Convert to Number    ${health_score}    3
+    
+    # Create simple unhealthy components list for reporting
+    ${unhealthy_count}=    Get Length    ${unhealthy_components}
+    IF    ${unhealthy_count} > 0
+        ${unhealthy_list}=    Evaluate    ', '.join(@{unhealthy_components})
+    ELSE
+        ${unhealthy_list}=    Set Variable    None
+    END
+    
+    # Simple one-line health score report
+    RW.Core.Add to Report    Health Score: ${health_score} - Unhealthy components: ${unhealthy_list}
+    
+    # Push the health metric
     RW.Core.Push Metric    ${health_score}
 
 *** Keywords ***

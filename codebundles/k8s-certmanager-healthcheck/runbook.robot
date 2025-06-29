@@ -35,9 +35,8 @@ Get Namespace Certificate Summary for Namespace `${NAMESPACE}`
     ...    set_issue_details=cert-manager certificates not renewing: "$_stdout".
     ...    set_issue_next_steps=Find Failed Certificate Requests and Identify Issues for Namespace `${NAMESPACE}` \nCheck Logs for Cert-Manager Deployment in Cluster `${CONTEXT}`
     ...    _line__raise_issue_if_contains=Namespace
-    RW.Core.Add Pre To Report    Certificate Information:\n${cert_info.stdout}
+    RW.Core.Add Pre To Report    **Certificate Summary for Namespace `${NAMESPACE}`**\n\n${cert_info.stdout}\n\n**Commands Used:** ${history}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Find Unhealthy Certificates in Namespace `${NAMESPACE}`
     [Documentation]    Gets a list of cert-manager certificates are not available.
@@ -62,9 +61,8 @@ Find Unhealthy Certificates in Namespace `${NAMESPACE}`
         END
     END
 
-    RW.Core.Add Pre To Report    Unready Certificates:\n${unready_certs.stdout}
+    RW.Core.Add Pre To Report    **Unready Certificates in Namespace `${NAMESPACE}`**\n\n${unready_certs.stdout}\n\n**Commands Used:** ${history}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Find Failed Certificate Requests and Identify Issues for Namespace `${NAMESPACE}`
     [Documentation]    Gets a list of failed cert-manager certificates and summarize their issues.
@@ -117,9 +115,8 @@ Find Failed Certificate Requests and Identify Issues for Namespace `${NAMESPACE}
             END
         END
     END
-    RW.Core.Add Pre To Report    Certificate Information:\n${failed_certificaterequests.stdout}
+    RW.Core.Add Pre To Report    **Failed Certificate Requests Analysis for Namespace `${NAMESPACE}`**\n\n${failed_certificaterequests.stdout}\n\n**Commands Used:** ${history}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
 *** Keywords ***
