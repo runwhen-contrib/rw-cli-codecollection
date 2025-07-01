@@ -159,8 +159,8 @@ Fetch App Service `${APP_SERVICE_NAME}` Utilization Metrics In Resource Group `$
     RW.Core.Add Pre To Report    🔗 View Metrics in Azure Portal: ${metrics_url}
 
 Get App Service `${APP_SERVICE_NAME}` Logs In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Download and display recent raw log files from App Service (last 50 lines from each log file)
-    [Tags]    appservice    logs    display    raw    access:read-only
+    [Documentation]    Fetch enhanced logs of appservice workload (application-level, Docker, deployment, performance traces - optimized for report size)
+    [Tags]    appservice    logs    enhanced    filtered    access:read-only
     ${logs}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_logs.sh
     ...    env=${env}
@@ -402,6 +402,31 @@ Suite Initialization
     ...    description=The threshold of average response time (ms) in which to generate an issue. Higher than this value indicates slow response time.
     ...    pattern=\w*
     ...    default=300
+    ${LOG_LEVEL}=    RW.Core.Import User Variable    LOG_LEVEL
+    ...    type=string
+    ...    description=Log verbosity level: ERROR, WARN, INFO, DEBUG, VERBOSE
+    ...    pattern=\w*
+    ...    default=INFO
+    ${MAX_LOG_LINES}=    RW.Core.Import User Variable    MAX_LOG_LINES
+    ...    type=string
+    ...    description=Maximum lines per log file to display
+    ...    pattern=\w*
+    ...    default=100
+    ${INCLUDE_DOCKER_LOGS}=    RW.Core.Import User Variable    INCLUDE_DOCKER_LOGS
+    ...    type=string
+    ...    description=Include Docker container logs in output (true/false)
+    ...    pattern=\w*
+    ...    default=true
+    ${INCLUDE_DEPLOYMENT_LOGS}=    RW.Core.Import User Variable    INCLUDE_DEPLOYMENT_LOGS
+    ...    type=string
+    ...    description=Include deployment history logs in output (true/false)
+    ...    pattern=\w*
+    ...    default=true
+    ${INCLUDE_PERFORMANCE_TRACES}=    RW.Core.Import User Variable    INCLUDE_PERFORMANCE_TRACES
+    ...    type=string
+    ...    description=Include performance traces in output (true/false)
+    ...    pattern=\w*
+    ...    default=false
     Set Suite Variable    ${APP_SERVICE_NAME}    ${APP_SERVICE_NAME}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
@@ -414,8 +439,12 @@ Suite Initialization
     Set Suite Variable    ${HTTP4XX_THRESHOLD}    ${HTTP4XX_THRESHOLD}
     Set Suite Variable    ${DISK_USAGE_THRESHOLD}    ${DISK_USAGE_THRESHOLD}
     Set Suite Variable    ${AVG_RSP_TIME}    ${AVG_RSP_TIME}
+    Set Suite Variable    ${LOG_LEVEL}    ${LOG_LEVEL}
+    Set Suite Variable    ${MAX_LOG_LINES}    ${MAX_LOG_LINES}
+    Set Suite Variable    ${INCLUDE_DOCKER_LOGS}    ${INCLUDE_DOCKER_LOGS}
+    Set Suite Variable    ${INCLUDE_DEPLOYMENT_LOGS}    ${INCLUDE_DEPLOYMENT_LOGS}
+    Set Suite Variable    ${INCLUDE_PERFORMANCE_TRACES}    ${INCLUDE_PERFORMANCE_TRACES}
 
     Set Suite Variable
     ...    ${env}
-    ...    {"APP_SERVICE_NAME":"${APP_SERVICE_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "TIME_PERIOD_MINUTES":"${TIME_PERIOD_MINUTES}","CPU_THRESHOLD":"${CPU_THRESHOLD}", "REQUESTS_THRESHOLD":"${REQUESTS_THRESHOLD}", "BYTES_RECEIVED_THRESHOLD":"${BYTES_RECEIVED_THRESHOLD}", "HTTP5XX_THRESHOLD":"${HTTP5XX_THRESHOLD}","HTTP2XX_THRESHOLD":"${HTTP2XX_THRESHOLD}", "HTTP4XX_THRESHOLD":"${HTTP4XX_THRESHOLD}", "DISK_USAGE_THRESHOLD":"${DISK_USAGE_THRESHOLD}", "AVG_RSP_TIME":"${AVG_RSP_TIME}"}
-
+    ...    {"APP_SERVICE_NAME":"${APP_SERVICE_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "TIME_PERIOD_MINUTES":"${TIME_PERIOD_MINUTES}","CPU_THRESHOLD":"${CPU_THRESHOLD}", "REQUESTS_THRESHOLD":"${REQUESTS_THRESHOLD}", "BYTES_RECEIVED_THRESHOLD":"${BYTES_RECEIVED_THRESHOLD}", "HTTP5XX_THRESHOLD":"${HTTP5XX_THRESHOLD}","HTTP2XX_THRESHOLD":"${HTTP2XX_THRESHOLD}", "HTTP4XX_THRESHOLD":"${HTTP4XX_THRESHOLD}", "DISK_USAGE_THRESHOLD":"${DISK_USAGE_THRESHOLD}", "AVG_RSP_TIME":"${AVG_RSP_TIME}", "LOG_LEVEL":"${LOG_LEVEL}", "MAX_LOG_LINES":"${MAX_LOG_LINES}", "INCLUDE_DOCKER_LOGS":"${INCLUDE_DOCKER_LOGS}", "INCLUDE_DEPLOYMENT_LOGS":"${INCLUDE_DEPLOYMENT_LOGS}", "INCLUDE_PERFORMANCE_TRACES":"${INCLUDE_PERFORMANCE_TRACES}"}

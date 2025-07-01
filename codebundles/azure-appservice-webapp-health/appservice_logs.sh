@@ -1,118 +1,126 @@
 #!/bin/bash
 
 # ENV:
+# AZ_USERNAME
+# AZ_SECRET_VALUE
+# AZ_SUBSCRIPTION
+# AZ_TENANT
 # APP_SERVICE_NAME
 # AZ_RESOURCE_GROUP
-# AZURE_RESOURCE_SUBSCRIPTION_ID (Optional, defaults to current subscription)
+# LOG_LEVEL (Optional, default is INFO)
+# MAX_LOG_LINES (Optional, default is 100)
 
-# Configuration for log display limits
-MAX_LOG_LINES="${MAX_LOG_LINES:-50}"                # Maximum lines to display per file
-MAX_LOG_SIZE_MB="${MAX_LOG_SIZE_MB:-2}"             # Maximum log file size to process (MB)
-LOG_DISPLAY_RECENT_HOURS="${LOG_DISPLAY_RECENT_HOURS:-1}"  # Show logs from last 1 hour
+# Set defaults
+LOG_LEVEL="${LOG_LEVEL:-INFO}"
+MAX_LOG_LINES="${MAX_LOG_LINES:-100}"
+MAX_TOTAL_SIZE="${MAX_TOTAL_SIZE:-500000}"  # 500KB limit
 
-LOG_PATH="app_service_logs.zip"
+LOG_PATH="_rw_logs_$APP_SERVICE_NAME.zip"
+subscription_id=$(az account show --query "id" -o tsv)
 
-echo "App Service Log Display Configuration:"
-echo "- Maximum lines to display: ${MAX_LOG_LINES}"
-echo "- Maximum log file size: ${MAX_LOG_SIZE_MB} MB"
-echo "- Show logs from last: ${LOG_DISPLAY_RECENT_HOURS} hours"
+# Set the subscription
+az account set --subscription $subscription_id
 
-# Get or set subscription ID
-if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
-    subscription_id=$(timeout 10s az account show --query "id" -o tsv)
-    if [[ -z "$subscription_id" ]]; then
-        echo "Failed to get current subscription ID within 10 seconds."
-        exit 1
-    fi
-    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription_id"
-else
-    subscription_id="$AZURE_RESOURCE_SUBSCRIPTION_ID"
-    echo "Using specified subscription ID: $subscription_id"
-fi
+# Download and extract logs
+az webapp log download --name $APP_SERVICE_NAME --resource-group $AZ_RESOURCE_GROUP --subscription $subscription_id --log-file $LOG_PATH
 
-# Set the subscription to the determined ID
-echo "Switching to subscription ID: $subscription_id"
-if ! timeout 10s az account set --subscription "$subscription_id"; then
-    echo "Failed to set subscription within 10 seconds."
-    exit 1
-fi
+TEMP_DIR="/tmp/_temp_logs_$$"
+mkdir -p "$TEMP_DIR"
+unzip -o $LOG_PATH -d "$TEMP_DIR" >/dev/null 2>&1
+# Fix permissions on extracted files
+chmod -R 755 "$TEMP_DIR" 2>/dev/null || true
 
-echo "Downloading recent logs for App Service '$APP_SERVICE_NAME'..."
+output_size=0
+max_exceeded=false
 
-# Download logs with timeout to prevent hanging
-if ! timeout 60s az webapp log download --name "$APP_SERVICE_NAME" --resource-group "$AZ_RESOURCE_GROUP" --subscription "$subscription_id" --log-file "$LOG_PATH" 2>/dev/null; then
-    echo "Error: Failed to download logs for App Service '$APP_SERVICE_NAME' within 60 seconds."
-    echo "This may be due to:"
-    echo "- App Service not found"
-    echo "- Insufficient permissions"
-    echo "- Logging not enabled"
-    echo "- Download timeout (large log files)"
-    exit 1
-fi
+echo "Azure App Service $APP_SERVICE_NAME logs (Level: $LOG_LEVEL, Max Lines: $MAX_LOG_LINES):"
+echo ""
 
-# Check downloaded file size
-if [[ -f "$LOG_PATH" ]]; then
-    file_size_mb=$(( $(stat -f%z "$LOG_PATH" 2>/dev/null || stat -c%s "$LOG_PATH" 2>/dev/null || echo 0) / 1024 / 1024 ))
-    echo "Downloaded log file size: ${file_size_mb} MB"
+# Function to add content with size check
+add_content() {
+    local content="$1"
+    local content_size=${#content}
     
-    if [[ $file_size_mb -gt $MAX_LOG_SIZE_MB ]]; then
-        echo "Warning: Log file is ${file_size_mb} MB (exceeds ${MAX_LOG_SIZE_MB} MB limit)."
-        echo "Only showing recent entries to prevent overwhelming the report."
+    if (( output_size + content_size > MAX_TOTAL_SIZE )); then
+        if [ "$max_exceeded" = false ]; then
+            echo ""
+            echo "⚠️  Output truncated - size limit reached (${MAX_TOTAL_SIZE} bytes)"
+            echo "💡 To see more logs, reduce LOG_LEVEL to ERROR or WARN, or download logs directly from Azure Portal"
+            max_exceeded=true
+        fi
+        return 1
     fi
+    
+    echo "$content"
+    output_size=$((output_size + content_size))
+    return 0
+}
+
+# Define log level priorities for filtering (compatible with older bash)
+case "$LOG_LEVEL" in
+    "ERROR") CURRENT_PRIORITY=1 ;;
+    "WARN") CURRENT_PRIORITY=2 ;;
+    "INFO") CURRENT_PRIORITY=3 ;;
+    "DEBUG") CURRENT_PRIORITY=4 ;;
+    "VERBOSE") CURRENT_PRIORITY=5 ;;
+    *) CURRENT_PRIORITY=3 ;;  # Default to INFO
+esac
+
+# Display Application logs (errors, warnings, app output)
+if [ -d "$TEMP_DIR/LogFiles/Application" ]; then
+    add_content "=== Application Logs ===" || exit 0
+    
+    for log_file in "$TEMP_DIR/LogFiles/Application"/*; do
+        if [ -f "$log_file" ]; then
+            add_content "--- $(basename "$log_file") ---" || exit 0
+            
+            # Filter by log level - only show errors/warnings for INFO and above
+            if [ "$CURRENT_PRIORITY" -le 3 ]; then
+                # For INFO level and higher, filter for important entries
+                filtered_content=$(grep -iE 'error|warn|exception|fail|critical' "$log_file" | tail -n "$MAX_LOG_LINES" 2>/dev/null || echo "No errors/warnings found in recent logs")
+            else
+                # For DEBUG/VERBOSE, show more content but still limited
+                filtered_content=$(tail -n "$MAX_LOG_LINES" "$log_file")
+            fi
+            
+            add_content "$filtered_content" || exit 0
+            add_content "" || exit 0
+        fi
+    done
 else
-    echo "Error: Log file was not created."
-    exit 1
+    add_content "No Application logs directory found" || exit 0
 fi
 
-# Extract and filter logs
-echo "Extracting and filtering logs (last ${LOG_DISPLAY_RECENT_HOURS} hours, max ${MAX_LOG_LINES} lines)..."
-
-# Create temporary directory for extraction in current working directory
-temp_dir="./log_extraction_$$"
-mkdir -p "$temp_dir"
-if ! unzip -qq "$LOG_PATH" -d "$temp_dir" 2>/dev/null; then
-    echo "Error: Failed to extract log file."
-    rm -rf "$temp_dir"
-    rm -f "$LOG_PATH"
-    exit 1
-fi
-
-echo "Azure App Service $APP_SERVICE_NAME recent logs:"
-echo "============================================================"
-
-# Find and process log files - simplified approach
-log_files_found=false
-total_lines_shown=0
-
-# Simple log display - just show recent content from each log file
-echo "Showing last ${MAX_LOG_LINES} lines from each log file:"
-
-# Process log files - simple tail of recent content
-find "$temp_dir" -name "*.log" -type f -not -name "*.xml" -exec stat -c '%s %n' {} \; | sort -nr | head -3 | while read size filepath; do
-    if [[ $size -gt 0 ]]; then
-        log_files_found=true
-        echo ""
-        echo "=== $(basename "$filepath") (last ${MAX_LOG_LINES} lines) ==="
-        cat "$filepath" | tail -${MAX_LOG_LINES}
-    fi
-done
-
-if [[ "$log_files_found" == false ]]; then
-    echo "No log files with content found in the downloaded archive."
-    echo ""
-    echo "Available files:"
-    find "$temp_dir" -type f | head -10 | while read -r file; do
-        size=$(stat -c%s "$file" 2>/dev/null || echo 0)
-        echo "  $(basename "$file") (${size} bytes)"
+# Display Detailed Error logs (4xx/5xx errors) - always include if present
+if [ -d "$TEMP_DIR/LogFiles/DetailedErrors" ]; then
+    add_content "=== Detailed Error Logs ===" || exit 0
+    
+    for error_file in "$TEMP_DIR/LogFiles/DetailedErrors"/*; do
+        if [ -f "$error_file" ]; then
+            add_content "--- $(basename "$error_file") ---" || exit 0
+            error_content=$(cat "$error_file")
+            add_content "$error_content" || exit 0
+            add_content "" || exit 0
+        fi
     done
 fi
 
-echo ""
-echo "============================================================"
-echo "Log display completed:"
-echo "- Lines shown: ${total_lines_shown}"
-echo "- File size processed: ${file_size_mb} MB"
+# Display System Event Log (summary only) - avoid verbose XML dumps
+if [ -f "$TEMP_DIR/LogFiles/eventlog.xml" ] && [ "$CURRENT_PRIORITY" -ge 4 ]; then
+    add_content "=== System Events (Last 20 Events) ===" || exit 0
+    if command -v xmllint &>/dev/null; then
+        event_summary=$(xmllint --xpath '//Event[position()<=20]/concat("Time=", System/TimeCreated/@SystemTime, " | Level=", System/Level/text(), " | Message=", substring(RenderingInfo/Message/text(), 1, 100), "\n")' "$TEMP_DIR/LogFiles/eventlog.xml" 2>/dev/null || echo "No recent system events")
+        add_content "$event_summary" || exit 0
+    else
+        add_content "xmllint not available, skipping system events" || exit 0
+    fi
+fi
 
-# Clean up
-rm -rf "$temp_dir"
-rm -f "$LOG_PATH"
+# # Cleanup
+# rm -rf "$TEMP_DIR" "$LOG_PATH"
+
+echo ""
+echo "📊 Output size: ${output_size} bytes (Limit: ${MAX_TOTAL_SIZE} bytes)"
+if [ "$max_exceeded" = true ]; then
+    echo "🔍 For complete logs, visit: https://portal.azure.com and navigate to your App Service > Logs"
+fi
