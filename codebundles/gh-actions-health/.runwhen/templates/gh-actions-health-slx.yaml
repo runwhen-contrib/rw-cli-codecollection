@@ -17,9 +17,9 @@ spec:
   - {{workspace.owner_email}}
   statement: GitHub Actions should be healthy and performant across workflows and infrastructure.
   additionalContext:
+    hierarchy: 
+    - platform
     qualified_name: "{{ match_resource.qualified_name }}"
-    platform: "github"
-    resource_type: "{{ match_resource.resource_type }}"
   tags:
     - name: service
       value: github-actions
