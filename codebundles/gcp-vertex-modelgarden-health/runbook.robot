@@ -29,8 +29,6 @@ Suite Setup         Suite Initialization
 Analyze Vertex AI Model Garden Error Patterns and Response Codes in `${GCP_PROJECT_ID}`
     [Documentation]    Analyzes error patterns and response codes from Model Garden invocations to identify issues using Python SDK
     [Tags]    vertex-ai    error-analysis    response-codes    troubleshooting    access:read-only
-    RW.Core.Add Pre To Report    Analyzing Vertex AI Model Garden error patterns and response codes...
-    
     # Analyze error patterns using Python script
     ${error_analysis}=    RW.CLI.Run Cli
     ...    cmd=python3 vertex_ai_monitoring.py errors --hours 2
@@ -39,8 +37,15 @@ Analyze Vertex AI Model Garden Error Patterns and Response Codes in `${GCP_PROJE
     ...    show_in_rwl_cheatsheet=true
     ...    timeout_seconds=240
     
-    RW.Core.Add To Report    ${error_analysis.stdout}
-    RW.Core.Add Pre To Report    Commands Used:\n${error_analysis.cmd}
+    # Consolidate all pre-report content into a single call
+    ${consolidated_report}=    Catenate    SEPARATOR=\n
+    ...    📊 ANALYZING VERTEX AI MODEL GARDEN ERROR PATTERNS
+    ...    ═══════════════════════════════════════════════════
+    ...    ${error_analysis.stdout}
+    ...    ${EMPTY}
+    ...    Commands Used: ${error_analysis.cmd}
+    
+    RW.Core.Add Pre To Report    ${consolidated_report}
     
     # Parse results and create issues if needed
     ${high_error_rate}=    Run Keyword And Return Status    Should Contain    ${error_analysis.stdout}    HIGH_ERROR_RATE:true
@@ -80,8 +85,6 @@ Analyze Vertex AI Model Garden Error Patterns and Response Codes in `${GCP_PROJE
 Investigate Vertex AI Model Latency Performance Issues in `${GCP_PROJECT_ID}`
     [Documentation]    Analyzes latency metrics to identify performance bottlenecks and degradation using Python SDK
     [Tags]    vertex-ai    latency    performance    analysis    access:read-only
-    RW.Core.Add Pre To Report    Investigating Vertex AI Model Garden latency performance...
-    
     # Analyze latency performance using Python script
     ${latency_analysis}=    RW.CLI.Run Cli
     ...    cmd=python3 vertex_ai_monitoring.py latency --hours 2
@@ -90,8 +93,15 @@ Investigate Vertex AI Model Latency Performance Issues in `${GCP_PROJECT_ID}`
     ...    show_in_rwl_cheatsheet=true
     ...    timeout_seconds=240
     
-    RW.Core.Add To Report    ${latency_analysis.stdout}
-    RW.Core.Add Pre To Report    Commands Used:\n${latency_analysis.cmd}
+    # Consolidate all pre-report content into a single call
+    ${consolidated_report}=    Catenate    SEPARATOR=\n
+    ...    🚀 INVESTIGATING VERTEX AI MODEL LATENCY PERFORMANCE
+    ...    ═══════════════════════════════════════════════════════
+    ...    ${latency_analysis.stdout}
+    ...    ${EMPTY}
+    ...    Commands Used: ${latency_analysis.cmd}
+    
+    RW.Core.Add Pre To Report    ${consolidated_report}
     
     # Parse results and create issues if needed
     ${high_latency_count}=    Set Variable    0
@@ -134,8 +144,7 @@ Investigate Vertex AI Model Latency Performance Issues in `${GCP_PROJECT_ID}`
 Monitor Vertex AI Throughput and Token Consumption Patterns in `${GCP_PROJECT_ID}`
     [Documentation]    Analyzes throughput consumption and token usage patterns for capacity planning using Python SDK
     [Tags]    vertex-ai    throughput    tokens    capacity-planning    access:read-only
-    RW.Core.Add Pre To Report    Monitoring Vertex AI Model Garden throughput and token consumption...
-    
+
     # Analyze throughput and token consumption using Python script
     ${throughput_analysis}=    RW.CLI.Run Cli
     ...    cmd=python3 vertex_ai_monitoring.py throughput --hours 2
@@ -144,13 +153,19 @@ Monitor Vertex AI Throughput and Token Consumption Patterns in `${GCP_PROJECT_ID
     ...    show_in_rwl_cheatsheet=true
     ...    timeout_seconds=240
     
-    RW.Core.Add To Report    ${throughput_analysis.stdout}
-    RW.Core.Add Pre To Report    Commands Used:\n${throughput_analysis.cmd}
+    # Consolidate throughput report into a single call
+    ${consolidated_report}=    Catenate    SEPARATOR=\n
+    ...    📈 MONITORING VERTEX AI THROUGHPUT AND TOKEN CONSUMPTION
+    ...    ══════════════════════════════════════════════════════════
+    ...    ${throughput_analysis.stdout}
+    ...    ${EMPTY}
+    ...    Commands Used: ${throughput_analysis.cmd}
+    
+    RW.Core.Add Pre to Report    ${consolidated_report}
 
 Check Vertex AI Model Garden API Logs for Issues in `${GCP_PROJECT_ID}`
     [Documentation]    Analyzes recent API logs for error patterns and usage issues
     [Tags]    vertex-ai    logs    api-calls    monitoring    access:read-only
-    RW.Core.Add Pre To Report    Checking Vertex AI Model Garden API logs for issues...
     
     # Use the exact working query from console - Vertex AI errors
     ${vertex_errors}=    RW.CLI.Run Cli
@@ -175,10 +190,25 @@ Check Vertex AI Model Garden API Logs for Issues in `${GCP_PROJECT_ID}`
         ...    actual=Permission denied error when accessing audit logs    
         ...    reproduce_hint=Grant roles/logging.privateLogViewer to the service account to access audit logs
         ...    next_steps=Grant roles/logging.privateLogViewer role to the service account used by this robot
-        RW.Core.Add To Report    ❌ Permission denied accessing audit logs - service account needs roles/logging.privateLogViewer permission
+        
+        ${consolidated_report}=    Catenate    SEPARATOR=\n
+        ...    🔍 CHECKING VERTEX AI MODEL GARDEN API LOGS
+        ...    ═══════════════════════════════════════════════
+        ...    ❌ Permission denied accessing audit logs - service account needs roles/logging.privateLogViewer permission
+        ...    ${EMPTY}
+        ...    Commands Used: ${vertex_errors.cmd}
+        
+        RW.Core.Add Pre to Report    ${consolidated_report}
     ELSE IF    ${empty_result}
         # If we got empty results, it means no errors were found (not a permissions issue)
-        RW.Core.Add To Report    ✅ No Vertex AI errors found in logs for the last ${LOG_FRESHNESS} - system appears healthy
+        ${consolidated_report}=    Catenate    SEPARATOR=\n
+        ...    🔍 CHECKING VERTEX AI MODEL GARDEN API LOGS
+        ...    ═══════════════════════════════════════════════
+        ...    ✅ No Vertex AI errors found in logs for the last ${LOG_FRESHNESS} - system appears healthy
+        ...    ${EMPTY}
+        ...    Commands Used: ${vertex_errors.cmd}
+        
+        RW.Core.Add Pre to Report    ${consolidated_report}
     ELSE
         # We have actual log data to process
         # Parse the vertex errors we found
@@ -221,49 +251,57 @@ Check Vertex AI Model Garden API Logs for Issues in `${GCP_PROJECT_ID}`
         ...    env=${env}
         ${predict_error_count}=    Convert To Number    ${predict_error_count.stdout}
         
-        # Report findings
-        RW.Core.Add To Report    📋 VERTEX AI ERROR LOG ANALYSIS (Last ${LOG_FRESHNESS})
-        RW.Core.Add To Report    • Total Vertex AI Errors: ${vertex_error_count}
-        RW.Core.Add To Report    • ChatCompletions errors: ${chat_error_count}
-        RW.Core.Add To Report    • Predict API errors: ${predict_error_count}
-        RW.Core.Add To Report    • Authentication errors (code 7,16): ${auth_error_count}
-        RW.Core.Add To Report    • Quota exceeded errors (code 8): ${quota_error_count}
-        RW.Core.Add To Report    • Service unavailable errors (code 14): ${service_unavailable_count}
+        # Build comprehensive error analysis report
+        ${error_summary}=    Catenate    SEPARATOR=\n
+        ...    🔍 VERTEX AI ERROR LOG ANALYSIS (Last ${LOG_FRESHNESS})
+        ...    ═══════════════════════════════════════════════════════════
+        ...    📋 ERROR SUMMARY:
+        ...    • Total Vertex AI Errors: ${vertex_error_count}
+        ...    • ChatCompletions errors: ${chat_error_count}
+        ...    • Predict API errors: ${predict_error_count}
+        ...    • Authentication errors (code 7,16): ${auth_error_count}
+        ...    • Quota exceeded errors (code 8): ${quota_error_count}
+        ...    • Service unavailable errors (code 14): ${service_unavailable_count}
         
         # Include detailed log entries if we found errors
         IF    ${vertex_error_count} > 0
-            RW.Core.Add To Report    ${EMPTY}
-            RW.Core.Add To Report    📝 DETAILED ERROR LOGS:
-            
             # Format the logs with timestamps, endpoints, and key details
             ${formatted_logs}=    RW.CLI.Run Cli
             ...    cmd=echo '${vertex_errors.stdout}' > vertex_errors_detail.json && jq -r '.[] | "🕐 " + .timestamp + " | " + .protoPayload.methodName + " | Endpoint: " + (.protoPayload.resourceName // "unknown") + " | Code: " + (.protoPayload.status.code | tostring) + " | " + .protoPayload.status.message + " | Caller: " + .protoPayload.authenticationInfo.principalEmail' vertex_errors_detail.json
             ...    env=${env}
             
+            ${detailed_logs}=    Set Variable    ${EMPTY}
             @{log_lines}=    Split String    ${formatted_logs.stdout}    \n
             FOR    ${log_line}    IN    @{log_lines}
                 ${log_line}=    Strip String    ${log_line}
                 IF    '${log_line}' != ''
-                    RW.Core.Add To Report    ${log_line}
+                    ${detailed_logs}=    Catenate    SEPARATOR=\n    ${detailed_logs}    ${log_line}
                 END
             END
             
-            RW.Core.Add To Report    ${EMPTY}
-            RW.Core.Add To Report    📊 ERROR BREAKDOWN BY TYPE:
+            # Build error breakdown by type
+            ${error_breakdown}=    Set Variable    ${EMPTY}
             
             # Show service unavailable details if present
             IF    ${service_unavailable_count} > 0
                 ${service_unavailable_details}=    RW.CLI.Run Cli
                 ...    cmd=jq -r '.[] | select(.protoPayload.status.code == 14) | "• " + .timestamp + " - " + .protoPayload.methodName + " - " + .protoPayload.status.message' vertex_errors_detail.json
                 ...    env=${env}
-                RW.Core.Add To Report    Service Unavailable Errors (${service_unavailable_count}):
-                @{service_lines}=    Split String    ${service_unavailable_details.stdout}    \n
-                FOR    ${service_line}    IN    @{service_lines}
+                
+                ${service_lines}=    Set Variable    ${EMPTY}
+                @{service_lines_array}=    Split String    ${service_unavailable_details.stdout}    \n
+                FOR    ${service_line}    IN    @{service_lines_array}
                     ${service_line}=    Strip String    ${service_line}
                     IF    '${service_line}' != ''
-                        RW.Core.Add To Report    ${service_line}
+                        ${service_lines}=    Catenate    SEPARATOR=\n    ${service_lines}    ${service_line}
                     END
                 END
+                
+                ${error_breakdown}=    Catenate    SEPARATOR=\n
+                ...    ${error_breakdown}
+                ...    ${EMPTY}
+                ...    Service Unavailable Errors (${service_unavailable_count}):
+                ...    ${service_lines}
             END
             
             # Show auth errors if present
@@ -271,14 +309,21 @@ Check Vertex AI Model Garden API Logs for Issues in `${GCP_PROJECT_ID}`
                 ${auth_error_details}=    RW.CLI.Run Cli
                 ...    cmd=jq -r '.[] | select(.protoPayload.status.code == 7 or .protoPayload.status.code == 16) | "• " + .timestamp + " - " + .protoPayload.methodName + " - " + .protoPayload.status.message' vertex_errors_detail.json
                 ...    env=${env}
-                RW.Core.Add To Report    Authentication Errors (${auth_error_count}):
-                @{auth_lines}=    Split String    ${auth_error_details.stdout}    \n
-                FOR    ${auth_line}    IN    @{auth_lines}
+                
+                ${auth_lines}=    Set Variable    ${EMPTY}
+                @{auth_lines_array}=    Split String    ${auth_error_details.stdout}    \n
+                FOR    ${auth_line}    IN    @{auth_lines_array}
                     ${auth_line}=    Strip String    ${auth_line}
                     IF    '${auth_line}' != ''
-                        RW.Core.Add To Report    ${auth_line}
+                        ${auth_lines}=    Catenate    SEPARATOR=\n    ${auth_lines}    ${auth_line}
                     END
                 END
+                
+                ${error_breakdown}=    Catenate    SEPARATOR=\n
+                ...    ${error_breakdown}
+                ...    ${EMPTY}
+                ...    Authentication Errors (${auth_error_count}):
+                ...    ${auth_lines}
             END
             
             # Show quota errors if present
@@ -286,21 +331,47 @@ Check Vertex AI Model Garden API Logs for Issues in `${GCP_PROJECT_ID}`
                 ${quota_error_details}=    RW.CLI.Run Cli
                 ...    cmd=jq -r '.[] | select(.protoPayload.status.code == 8) | "• " + .timestamp + " - " + .protoPayload.methodName + " - " + .protoPayload.status.message' vertex_errors_detail.json
                 ...    env=${env}
-                RW.Core.Add To Report    Quota Exceeded Errors (${quota_error_count}):
-                @{quota_lines}=    Split String    ${quota_error_details.stdout}    \n
-                FOR    ${quota_line}    IN    @{quota_lines}
+                
+                ${quota_lines}=    Set Variable    ${EMPTY}
+                @{quota_lines_array}=    Split String    ${quota_error_details.stdout}    \n
+                FOR    ${quota_line}    IN    @{quota_lines_array}
                     ${quota_line}=    Strip String    ${quota_line}
                     IF    '${quota_line}' != ''
-                        RW.Core.Add To Report    ${quota_line}
+                        ${quota_lines}=    Catenate    SEPARATOR=\n    ${quota_lines}    ${quota_line}
                     END
                 END
+                
+                ${error_breakdown}=    Catenate    SEPARATOR=\n
+                ...    ${error_breakdown}
+                ...    ${EMPTY}
+                ...    Quota Exceeded Errors (${quota_error_count}):
+                ...    ${quota_lines}
             END
             
             # Cleanup the temporary file
             RW.CLI.Run Cli
             ...    cmd=rm -f vertex_errors_detail.json
             ...    env=${env}
+            
+            # Consolidate the complete error analysis into one report
+            ${consolidated_report}=    Catenate    SEPARATOR=\n
+            ...    ${error_summary}
+            ...    ${EMPTY}
+            ...    📝 DETAILED ERROR LOGS:
+            ...    ${detailed_logs}
+            ...    ${EMPTY}
+            ...    📊 ERROR BREAKDOWN BY TYPE:
+            ...    ${error_breakdown}
+            ...    ${EMPTY}
+            ...    Commands Used: ${vertex_errors.cmd}
+        ELSE
+            ${consolidated_report}=    Catenate    SEPARATOR=\n
+            ...    ${error_summary}
+            ...    ${EMPTY}
+            ...    Commands Used: ${vertex_errors.cmd}
         END
+        
+        RW.Core.Add Pre to Report    ${consolidated_report}
         
         # Create issues for problems found with log snippets
         IF    ${vertex_error_count} > 10
@@ -383,13 +454,10 @@ Check Vertex AI Model Garden API Logs for Issues in `${GCP_PROJECT_ID}`
         ...    cmd=rm -f vertex_errors_issues.json
         ...    env=${env}
     END
-    
-    RW.Core.Add Pre To Report    Commands Used:\n${vertex_errors.cmd}
 
 Check Vertex AI Model Garden Service Health and Quotas in `${GCP_PROJECT_ID}`
     [Documentation]    Verifies service availability and quota status for Model Garden using Python SDK
     [Tags]    vertex-ai    service-health    quotas    configuration    access:read-only
-    RW.Core.Add Pre To Report    Checking Vertex AI Model Garden service health and quotas...
     
     # Check if Vertex AI services are enabled
     ${service_status}=    RW.CLI.Run Cli
@@ -405,10 +473,22 @@ Check Vertex AI Model Garden Service Health and Quotas in `${GCP_PROJECT_ID}`
     ...    show_in_rwl_cheatsheet=true
     
     ${api_enabled}=    Run Keyword And Return Status    Should Contain    ${service_status.stdout}    aiplatform.googleapis.com
-    IF    ${api_enabled}
-        RW.Core.Add To Report    ✅ Vertex AI API is enabled
-    ELSE
-        RW.Core.Add To Report    ❌ Vertex AI API is not enabled
+    
+    # Build consolidated service health report
+    ${service_status_text}=    Set Variable If    ${api_enabled}    ✅ Vertex AI API is enabled    ❌ Vertex AI API is not enabled
+    ${consolidated_report}=    Catenate    SEPARATOR=\n
+    ...    🏥 CHECKING VERTEX AI MODEL GARDEN SERVICE HEALTH
+    ...    ═══════════════════════════════════════════════════════
+    ...    ${service_status_text}
+    ...    ${EMPTY}
+    ...    📊 HEALTH METRICS:
+    ...    ${metrics_check.stdout}
+    ...    ${EMPTY}
+    ...    Commands Used: ${metrics_check.cmd}
+    
+    RW.Core.Add  To Report    ${consolidated_report}
+    
+    IF    not ${api_enabled}
         RW.Core.Add Issue    
         ...    title=Vertex AI API not enabled    
         ...    severity=1    
@@ -417,19 +497,16 @@ Check Vertex AI Model Garden Service Health and Quotas in `${GCP_PROJECT_ID}`
         ...    reproduce_hint=Run: gcloud services enable aiplatform.googleapis.com --project=${GCP_PROJECT_ID}
         ...    next_steps=Run: gcloud services enable aiplatform.googleapis.com --project=${GCP_PROJECT_ID}
     END
-    
-    RW.Core.Add To Report    ${metrics_check.stdout}
-    RW.Core.Add Pre To Report    Commands Used:\n${metrics_check.cmd}
 
 Generate Vertex AI Model Garden Health Summary and Next Steps for `${GCP_PROJECT_ID}`
     [Documentation]    Generates a comprehensive health summary with actionable recommendations
     [Tags]    summary    health-report    recommendations    access:read-only
-    RW.Core.Add Pre To Report    Generating comprehensive Vertex AI Model Garden health summary...
     
     ${current_date}=    Get Current Date    result_format=%Y-%m-%d %H:%M:%S UTC
     
     ${summary_report}=    Catenate    SEPARATOR=\n
     ...    📊 VERTEX AI MODEL GARDEN HEALTH SUMMARY
+    ...    ══════════════════════════════════════════════
     ...    Project: ${GCP_PROJECT_ID}
     ...    Analysis Period: Last 2 hours
     ...    Timestamp: ${current_date}
@@ -440,7 +517,7 @@ Generate Vertex AI Model Garden Health Summary and Next Steps for `${GCP_PROJECT
     ...    - Error Troubleshooting: https://cloud.google.com/vertex-ai/docs/general/troubleshooting
     ...    - Quota Management: https://cloud.google.com/vertex-ai/quotas
     
-    RW.Core.Add To Report    ${summary_report}
+    RW.Core.Add Pre To Report    ${summary_report}
 
 *** Keywords ***
 Suite Initialization
