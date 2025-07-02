@@ -250,3 +250,7 @@ Suite Initialization
     ELSE
         Set Suite Variable    ${APP_SERVICE_RUNNING}    True
     END
+    # Set Azure subscription context
+    RW.CLI.Run Cli
+    ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
+    ...    include_in_history=false
