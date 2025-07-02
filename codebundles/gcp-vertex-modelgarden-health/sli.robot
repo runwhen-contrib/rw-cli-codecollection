@@ -322,10 +322,22 @@ Generate Final Vertex AI Model Garden Health Score for `${GCP_PROJECT_ID}`
     ...    ${final_health_score} >= 0.3    Poor
     ...    Critical
     
+    # Consolidate final health score report
+    ${consolidated_health_report}=    Catenate    SEPARATOR=\n
+    ...    🏆 FINAL VERTEX AI MODEL GARDEN HEALTH SCORE
+    ...    ═══════════════════════════════════════════════════
+    ...    Overall Health: ${health_percentage}% (${health_status})
+    ...    ${EMPTY}
+    ...    📊 COMPONENT SCORES:
+    ...    • Log Health: ${log_health_score}
+    ...    • Error Rate: ${error_rate_score}
+    ...    • Latency Performance: ${latency_performance_score}
+    ...    • Throughput Usage: ${throughput_usage_score}
+    ...    • Service Availability: ${service_availability_score}
+    ...    ${EMPTY}
+    ...    🚀 Pushing Health Score: ${final_health_score}
     
-    RW.Core.Add To Report    ${health_percentage}% (${health_status})
-    RW.Core.Add To Report    Log Health: ${log_health_score} | Error Rate: ${error_rate_score} | Latency Performance: ${latency_performance_score} | Throughput Usage: ${throughput_usage_score} | Service Availability: ${service_availability_score}
-    RW.Core.Add To Report    Pushing Healh Score: ${final_health_score}
+    RW.Core.Add Pre To Report    ${consolidated_health_report}
     
     # Push the final SLI metric
     RW.Core.Push Metric    ${final_health_score}
