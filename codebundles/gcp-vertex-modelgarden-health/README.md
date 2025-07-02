@@ -161,6 +161,10 @@ google-auth>=2.0.0
 ### Optional Configuration
 - `LOG_FRESHNESS`: Time window for runbook log analysis (default: 2h)
 - `SLI_LOG_LOOKBACK`: Time window for SLI quick health check (default: 15m)
+- `VERTEX_AI_REGIONS`: Comma-separated list of regions to check for model discovery (optional)
+  - Example: `us-central1,us-east4,europe-west4`
+  - If not set, checks all available Vertex AI regions worldwide
+  - Useful for limiting discovery scope or faster execution
 
 ## Tasks Overview
 
@@ -203,31 +207,146 @@ google-auth>=2.0.0
 
 ### Command Line Testing
 ```bash
-# Test error analysis
+# Test error analysis with full model discovery (all regions)
 python3 vertex_ai_monitoring.py errors --hours 4
 
-# Test latency analysis  
-python3 vertex_ai_monitoring.py latency --hours 1
+# FAST: Test with common US regions only (saves time)
+python3 vertex_ai_monitoring.py latency --hours 1 --fast
 
-# Test throughput analysis
-python3 vertex_ai_monitoring.py throughput --hours 6
+# US-ONLY: Test with all US regions
+python3 vertex_ai_monitoring.py throughput --hours 6 --us-only
+
+# PRIORITY: Test with most common regions worldwide
+python3 vertex_ai_monitoring.py errors --hours 2 --priority-regions
+
+# CUSTOM: Test with specific regions only
+python3 vertex_ai_monitoring.py discover --regions us-central1,us-east5,europe-west4
+
+# DEBUG: Show detailed API information and discrepancies
+python3 vertex_ai_monitoring.py discover --debug --fast
 
 # Test service health
 python3 vertex_ai_monitoring.py health
+
+# Skip proactive discovery (use only monitoring metrics)
+python3 vertex_ai_monitoring.py errors --hours 2 --no-discovery
 ```
 
-### Manual Log Analysis
-```bash
-# Check recent Vertex AI errors
-gcloud logging read 'resource.type="audited_resource" AND resource.labels.service="aiplatform.googleapis.com" AND severity="ERROR"' \
-  --format="json" --freshness="1h" --project=your-project-id
+### Time-Saving Region Options
 
-# Check specific endpoint errors
-gcloud logging read 'resource.type="audited_resource" AND resource.labels.service="aiplatform.googleapis.com" AND protoPayload.resourceName:"endpoints/your-endpoint"' \
-  --format="json" --freshness="2h" --project=your-project-id
+**🚀 Fast Mode** (saves the most time):
+```bash
+python3 vertex_ai_monitoring.py discover --fast
+# Checks only: us-central1, us-east1, us-east4, us-east5, us-west1
+```
+
+**🇺🇸 US-Only Mode**:
+```bash
+python3 vertex_ai_monitoring.py discover --us-only  
+# Checks all US regions: us-central1, us-east1, us-east4, us-east5, us-west1-4
+```
+
+**⭐ Priority Mode**:
+```bash
+python3 vertex_ai_monitoring.py discover --priority-regions
+# Checks: us-central1, us-east1, us-east4, us-east5, us-west1, europe-west1, europe-west4, asia-east1, asia-southeast1
+```
+
+**🎯 Custom Regions**:
+```bash
+python3 vertex_ai_monitoring.py discover --regions us-central1,us-east5
+# Checks only the regions you specify
+```
+
+### API Service Discrepancy Analysis
+
+**NEW FEATURE**: The codebundle now **cross-references multiple Google Cloud APIs** to identify and explain discrepancies between what different services report.
+
+**API Services Used:**
+1. **Discovery API** (`aiplatform.Endpoint.list()`): Finds deployed models on endpoints
+2. **Monitoring Metrics API** (`monitoring_v3.list_time_series()`): Finds models with recent activity
+3. **Token Metrics API** (`token_count` metrics): Finds models with token usage
+4. **Audit Logs API** (`gcloud logging read`): Finds API call errors and usage
+
+### Understanding API Discrepancies
+
+**Common Scenarios:**
+
+**📊 Models with Metrics but NOT in Discovery:**
+```
+• llama-4-maverick-17b-128e-instruct-maas (us-east5) - ACTIVE MODEL NOT DISCOVERED
+```
+**Possible Reasons:**
+- Model deployed in region not checked by discovery
+- Insufficient permissions for Discovery API (`aiplatform.endpoints.list`)
+- Model deployed via different method (AutoML, custom deployment)
+- Model Garden vs custom model differences
+
+**🔍 Models Discovered but NO Recent Metrics:**
+```
+• my-deployed-model (us-central1) - deployed but idle
+```
+**Reasons:**
+- Model deployed but not receiving traffic
+- Need to send test requests to generate metrics
+- Model recently deployed (metrics not accumulated yet)
+
+### Debug Mode for API Analysis
+
+**Enable detailed API debugging:**
+```bash
+python3 vertex_ai_monitoring.py discover --debug --fast
+```
+
+**Debug output shows:**
+- Exact API calls being made
+- Detailed response data from each API
+- Cross-reference analysis between APIs
+- Specific error messages and reasons
+- Recommendations for resolving discrepancies
+
+**Example debug output:**
+```
+🐛 DEBUG: Using project: projects/your-project-id
+🐛 DEBUG: Time range: 2025-01-15 10:00:00 to 2025-01-15 12:00:00
+🐛 DEBUG: Invocation details:
+  • llama-4-maverick-17b-128e-instruct-maas (us-east5): {'200': 1245, '4': 23}
+🐛 DEBUG: This suggests the model exists in region but Discovery API didn't find it
+🐛 DEBUG: Recommend running with --regions us-east5
 ```
 
 ## Troubleshooting
+
+### Self-Hosted Models Not Appearing in Monitoring
+
+**Problem**: Your model (like `llama-3-1-8b-instruct-mg-one-click-deploy`) is deployed but doesn't show up in health checks.
+
+**Root Cause**: The model is deployed but hasn't generated recent monitoring metrics due to:
+- No recent traffic/requests  
+- Recently deployed (metrics haven't accumulated)
+- Self-hosted models may have different metric generation patterns
+
+**Solution**:
+1. **Run discovery first**: `python3 vertex_ai_monitoring.py discover`
+2. **Verify model is found**: Look for "LLAMA MODEL DETECTED!" in output  
+3. **Generate metrics**: Send test requests to your model endpoint
+4. **Check monitoring**: `python3 vertex_ai_monitoring.py errors --hours 2`
+
+**Example workflow**:
+```bash
+# Step 1: Discover all models
+python3 vertex_ai_monitoring.py discover
+
+# Step 2: Send test request to generate metrics
+curl -X POST \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json" \
+  "https://us-central1-aiplatform.googleapis.com/v1/projects/YOUR_PROJECT/locations/us-central1/endpoints/YOUR_ENDPOINT_ID:predict" \
+  -d '{"instances": [{"input": "test prompt"}]}'
+
+# Step 3: Wait a few minutes, then check monitoring
+python3 vertex_ai_monitoring.py errors --hours 1
+```
 
 ### Common Permission Issues
 
@@ -242,6 +361,18 @@ gcloud logging read 'resource.type="audited_resource" AND resource.labels.servic
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:$SERVICE_ACCOUNT" \
     --role="roles/monitoring.viewer"
+```
+
+**Model Discovery Access Denied (403)**
+```
+❌ Permission denied for region us-central1
+   Required permissions: aiplatform.endpoints.list, aiplatform.models.list
+```
+**Solution**: Grant `roles/aiplatform.viewer` for model discovery:
+```bash
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:$SERVICE_ACCOUNT" \
+    --role="roles/aiplatform.viewer"
 ```
 
 **Audit Logs Empty Results**
@@ -287,6 +418,51 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 ❌ Authentication error: Could not automatically determine credentials
 ```
 **Solution**: Verify the `gcp_credentials_json` secret is properly configured with a valid service account key.
+
+### Model Discovery Shows Endpoints But No Models
+
+**Problem**: Discovery finds endpoints but reports 0 models deployed.
+
+**Possible Causes**:
+- **Permission Issues**: Service account may lack `aiplatform.endpoints.get` permission
+- **Empty Endpoints**: Endpoints exist but have no models deployed to them
+- **Model Undeployment**: Models were recently undeployed from endpoints
+- **Different Model Types**: Only certain model types are counted in discovery
+
+**Solution**:
+1. **Check Permissions**: Ensure service account has `roles/aiplatform.viewer`
+2. **Verify Endpoint Status**: Check if models are actually deployed to the endpoints
+3. **Check All Regions**: Your model might be in a region not scanned by default
+4. **Look at Metrics**: If you see metrics for models, they exist somewhere
+
+**Example Debug Commands**:
+```bash
+# Check what's actually on the endpoint
+gcloud ai endpoints describe YOUR_ENDPOINT_ID \
+  --region=us-central1 \
+  --project=YOUR_PROJECT
+
+# List all models across regions  
+for region in us-central1 us-east4 us-east5 us-west1; do
+  echo "=== $region ==="
+  gcloud ai endpoints list --region=$region --project=YOUR_PROJECT
+done
+```
+
+### Discovery vs. Metrics Mismatch
+
+**Problem**: Discovery finds models in one region, but metrics show activity in another region.
+
+**Root Cause**: Models can be deployed in multiple regions, or you might have multiple models with similar names.
+
+**Example from Test Results**:
+- Discovery: Looking for `llama-3-1-8b-instruct-mg-one-click-deploy` in `us-central1`
+- Metrics: Found `llama-4-maverick-17b-128e-instruct-maas` active in `us-east5`
+
+**Solution**:
+1. **Verify Model Names**: Check exact model names and deployment locations
+2. **Expand Region Coverage**: The discovery now includes `us-east5` 
+3. **Cross-Reference**: Compare discovery results with metrics to find all active models
 
 ## Outputs
 
