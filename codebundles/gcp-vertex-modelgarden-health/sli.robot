@@ -78,14 +78,14 @@ Calculate Error Rate Score for `${GCP_PROJECT_ID}`
     [Tags]    vertex-ai    error-rate    sli    monitoring    access:read-only
     
     Log    Starting Error Rate Score calculation for project: ${GCP_PROJECT_ID}
-    Log    Analyzing last 2 hours of Model Garden invocation metrics
+    Log    Analyzing last 2 hours of Model Garden metrics with full model discovery
     
-    # Get error rate analysis
+    # Get error rate analysis with discovery
     ${error_analysis}=    RW.CLI.Run Cli
-    ...    cmd=python3 vertex_ai_monitoring.py errors --hours 2
+    ...    cmd=python3 vertex_ai_monitoring.py errors --hours 2 ${region_args}
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
-    ...    timeout_seconds=240
+    ...    timeout_seconds=300
     
     Log    Error analysis output: ${error_analysis.stdout}
     
@@ -94,7 +94,7 @@ Calculate Error Rate Score for `${GCP_PROJECT_ID}`
     @{output_lines}=    Split String    ${error_analysis.stdout}    \n
     FOR    ${line}    IN    @{output_lines}
         ${line}=    Strip String    ${line}
-        IF    'ERROR_COUNT:' in '${line}'
+        IF    'ERROR_COUNT:' in $line
             ${count_part}=    Split String    ${line}    :
             ${error_count}=    Strip String    ${count_part}[1]
             ${error_count}=    Convert To Number    ${error_count}
@@ -148,14 +148,14 @@ Calculate Latency Performance Score for `${GCP_PROJECT_ID}`
     [Tags]    vertex-ai    latency    performance    sli    access:read-only
     
     Log    Starting Latency Performance Score calculation for project: ${GCP_PROJECT_ID}
-    Log    Analyzing last 2 hours of model latency metrics
+    Log    Analyzing last 2 hours of model latency metrics with full model discovery
     
-    # Get latency analysis
+    # Get latency analysis with discovery
     ${latency_analysis}=    RW.CLI.Run Cli
-    ...    cmd=python3 vertex_ai_monitoring.py latency --hours 2
+    ...    cmd=python3 vertex_ai_monitoring.py latency --hours 2 ${region_args}
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
-    ...    timeout_seconds=240
+    ...    timeout_seconds=300
     
     Log    Latency analysis output: ${latency_analysis.stdout}
     
@@ -166,12 +166,12 @@ Calculate Latency Performance Score for `${GCP_PROJECT_ID}`
     @{output_lines}=    Split String    ${latency_analysis.stdout}    \n
     FOR    ${line}    IN    @{output_lines}
         ${line}=    Strip String    ${line}
-        IF    'HIGH_LATENCY_MODELS:' in '${line}'
+        IF    'HIGH_LATENCY_MODELS:' in $line
             ${count_part}=    Split String    ${line}    :
             ${high_latency_count}=    Strip String    ${count_part}[1]
             ${high_latency_count}=    Convert To Number    ${high_latency_count}
             Log    Parsed high latency models count: ${high_latency_count}
-        ELSE IF    'ELEVATED_LATENCY_MODELS:' in '${line}'  
+        ELSE IF    'ELEVATED_LATENCY_MODELS:' in $line  
             ${count_part}=    Split String    ${line}    :
             ${elevated_latency_count}=    Strip String    ${count_part}[1]
             ${elevated_latency_count}=    Convert To Number    ${elevated_latency_count}
@@ -217,14 +217,14 @@ Calculate Throughput Usage Score for `${GCP_PROJECT_ID}`
     [Tags]    vertex-ai    throughput    usage    sli    access:read-only
     
     Log    Starting Throughput Usage Score calculation for project: ${GCP_PROJECT_ID}
-    Log    Analyzing last 2 hours of token consumption data
+    Log    Analyzing last 2 hours of token consumption data with full model discovery
     
-    # Get throughput analysis
+    # Get throughput analysis with discovery
     ${throughput_analysis}=    RW.CLI.Run Cli
-    ...    cmd=python3 vertex_ai_monitoring.py throughput --hours 2
+    ...    cmd=python3 vertex_ai_monitoring.py throughput --hours 2 ${region_args}
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
-    ...    timeout_seconds=240
+    ...    timeout_seconds=300
     
     Log    Throughput analysis output: ${throughput_analysis.stdout}
     
@@ -232,11 +232,85 @@ Calculate Throughput Usage Score for `${GCP_PROJECT_ID}`
     ${has_usage}=    Run Keyword And Return Status    Should Contain    ${throughput_analysis.stdout}    HAS_USAGE_DATA:true
     ${throughput_usage_score}=    Set Variable If    ${has_usage}    1.0    0.5
     
+    # Check if we discovered models even without usage data
+    ${models_discovered}=    Set Variable    0
+    @{output_lines}=    Split String    ${throughput_analysis.stdout}    \n
+    FOR    ${line}    IN    @{output_lines}
+        ${line}=    Strip String    ${line}
+        IF    'MODELS_DISCOVERED:' in $line
+            ${count_part}=    Split String    ${line}    :
+            ${models_discovered}=    Strip String    ${count_part}[1]
+            ${models_discovered}=    Convert To Number    ${models_discovered}
+            Log    Parsed discovered models count: ${models_discovered}
+            BREAK
+        END
+    END
+    
+    # Adjust score based on discovery results
+    IF    not ${has_usage} and ${models_discovered} > 0
+        ${throughput_usage_score}=    Set Variable    0.7
+        Log    No usage data but ${models_discovered} models discovered, adjusted score to 0.7
+    END
+    
     Log    Usage data detected: ${has_usage}
+    Log    Models discovered: ${models_discovered}
     Log    Throughput score calculation: Usage data available → ${throughput_usage_score}
-    Log    Throughput Usage Score: ${throughput_usage_score} (Usage data available: ${has_usage})
-    RW.Core.Add To Report    📊 Throughput Usage Score: Usage data available (${has_usage}) → Score: ${throughput_usage_score}
+    Log    Throughput Usage Score: ${throughput_usage_score} (Usage data available: ${has_usage}, Models discovered: ${models_discovered})
+    RW.Core.Add To Report    📊 Throughput Usage Score: Usage data (${has_usage}), Models discovered (${models_discovered}) → Score: ${throughput_usage_score}
     Set Global Variable    ${throughput_usage_score}
+
+Discover All Deployed Models for `${GCP_PROJECT_ID}`
+    [Documentation]    Proactively discovers all deployed Vertex AI models and endpoints
+    [Tags]    vertex-ai    discovery    model-inventory    access:read-only
+    
+    Log    Starting Proactive Model Discovery for project: ${GCP_PROJECT_ID}
+    Log    Discovering all deployed models across all regions
+    
+    # Get full model discovery
+    ${discovery_results}=    RW.CLI.Run Cli
+    ...    cmd=python3 vertex_ai_monitoring.py discover ${region_args}
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    timeout_seconds=300
+    
+    Log    Discovery results: ${discovery_results.stdout}
+    
+    # Parse discovery results
+    ${models_discovered}=    Set Variable    0
+    ${endpoints_discovered}=    Set Variable    0
+    
+    @{output_lines}=    Split String    ${discovery_results.stdout}    \n
+    FOR    ${line}    IN    @{output_lines}
+        ${line}=    Strip String    ${line}
+        IF    'ALL_MODELS_DISCOVERED:' in $line
+            ${count_part}=    Split String    ${line}    :
+            ${models_discovered}=    Strip String    ${count_part}[1]
+            ${models_discovered}=    Convert To Number    ${models_discovered}
+            Log    Parsed models discovered: ${models_discovered}
+        ELSE IF    'ALL_ENDPOINTS_DISCOVERED:' in $line
+            ${count_part}=    Split String    ${line}    :
+            ${endpoints_discovered}=    Strip String    ${count_part}[1]
+            ${endpoints_discovered}=    Convert To Number    ${endpoints_discovered}
+            Log    Parsed endpoints discovered: ${endpoints_discovered}
+        END
+    END
+    
+    # Calculate discovery score
+    ${discovery_score}=    Set Variable If    ${models_discovered} > 0    1.0    0.0
+    
+    Log    Model Discovery Results: ${models_discovered} models, ${endpoints_discovered} endpoints
+    RW.Core.Add To Report    📊 Model Discovery: ${models_discovered} models, ${endpoints_discovered} endpoints → Score: ${discovery_score}
+    
+    # Check for LLAMA models specifically
+    ${llama_detected}=    Run Keyword And Return Status    Should Contain    ${discovery_results.stdout}    LLAMA MODEL DETECTED
+    IF    ${llama_detected}
+        Log    🎯 LLAMA MODEL FOUND in discovery results!
+        RW.Core.Add To Report    🎯 LLAMA MODEL DETECTED: Your llama-3-1-8b-instruct-mg-one-click-deploy model was found!
+    END
+    
+    Set Global Variable    ${discovery_score}
+    Set Global Variable    ${models_discovered}
+    Set Global Variable    ${endpoints_discovered}
 
 Check Service Availability Score for `${GCP_PROJECT_ID}`
     [Documentation]    Checks Vertex AI service availability and configuration
@@ -269,7 +343,7 @@ Check Service Availability Score for `${GCP_PROJECT_ID}`
     @{output_lines}=    Split String    ${metrics_check.stdout}    \n
     FOR    ${line}    IN    @{output_lines}
         ${line}=    Strip String    ${line}
-        IF    'METRICS_AVAILABLE:' in '${line}'
+        IF    'METRICS_AVAILABLE:' in $line
             ${count_part}=    Split String    ${line}    :
             ${metrics_available}=    Strip String    ${count_part}[1]
             ${metrics_available}=    Convert To Number    ${metrics_available}
@@ -322,10 +396,22 @@ Generate Final Vertex AI Model Garden Health Score for `${GCP_PROJECT_ID}`
     ...    ${final_health_score} >= 0.3    Poor
     ...    Critical
     
+    # Consolidate final health score report
+    ${consolidated_health_report}=    Catenate    SEPARATOR=\n
+    ...    🏆 FINAL VERTEX AI MODEL GARDEN HEALTH SCORE
+    ...    ═══════════════════════════════════════════════════
+    ...    Overall Health: ${health_percentage}% (${health_status})
+    ...    ${EMPTY}
+    ...    📊 COMPONENT SCORES:
+    ...    • Log Health: ${log_health_score}
+    ...    • Error Rate: ${error_rate_score}
+    ...    • Latency Performance: ${latency_performance_score}
+    ...    • Throughput Usage: ${throughput_usage_score}
+    ...    • Service Availability: ${service_availability_score}
+    ...    ${EMPTY}
+    ...    🚀 Pushing Health Score: ${final_health_score}
     
-    RW.Core.Add To Report    ${health_percentage}% (${health_status})
-    RW.Core.Add To Report    Log Health: ${log_health_score} | Error Rate: ${error_rate_score} | Latency Performance: ${latency_performance_score} | Throughput Usage: ${throughput_usage_score} | Service Availability: ${service_availability_score}
-    RW.Core.Add To Report    Pushing Healh Score: ${final_health_score}
+    RW.Core.Add Pre To Report    ${consolidated_health_report}
     
     # Push the final SLI metric
     RW.Core.Push Metric    ${final_health_score}
@@ -348,13 +434,34 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=15m
     ...    default=15m
+    ${VERTEX_AI_REGIONS}=    RW.Core.Import User Variable    VERTEX_AI_REGIONS
+    ...    type=string
+    ...    description=Comma-separated list of regions to check for model discovery (optional). Use 'fast' for common US regions, 'us-only' for all US regions, 'priority' for worldwide common regions.
+    ...    pattern=\w*
+    ...    example=us-central1,us-east4,us-east5
+    ...    default=
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${SLI_LOG_LOOKBACK}    ${SLI_LOG_LOOKBACK}
+    Set Suite Variable    ${VERTEX_AI_REGIONS}    ${VERTEX_AI_REGIONS}
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
+    
+    # Build environment with region settings
+    ${region_args}=    Set Variable    ${EMPTY}
+    IF    '${VERTEX_AI_REGIONS}' == 'fast'
+        ${region_args}=    Set Variable    --fast
+    ELSE IF    '${VERTEX_AI_REGIONS}' == 'us-only'
+        ${region_args}=    Set Variable    --us-only
+    ELSE IF    '${VERTEX_AI_REGIONS}' == 'priority'
+        ${region_args}=    Set Variable    --priority-regions
+    ELSE IF    '${VERTEX_AI_REGIONS}' != ''
+        ${region_args}=    Set Variable    --regions ${VERTEX_AI_REGIONS}
+    END
+    Set Suite Variable    ${region_args}    ${region_args}
+    
     Set Suite Variable
     ...    ${env}
-    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}","PATH":"$PATH:${OS_PATH}"}
+    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}","PATH":"$PATH:${OS_PATH}","VERTEX_AI_REGIONS":"${VERTEX_AI_REGIONS}"}
     
     # Activate service account once for all gcloud commands
     RW.CLI.Run Cli
