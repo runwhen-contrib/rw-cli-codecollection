@@ -8,7 +8,8 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure-vm.svg
-  alias: {{match_resource.resource.name}} Disk Health
+  alias: >-
+    {{match_resource.resource.name}} VM Disk Health
   asMeasuredBy: Disk utilization on the Azure VM.
   configProvided:
   - name: VM_NAME

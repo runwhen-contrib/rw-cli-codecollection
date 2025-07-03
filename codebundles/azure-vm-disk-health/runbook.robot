@@ -24,46 +24,49 @@ Check Disk Utilization for VM `${VM_NAME}` In Resource Group `${AZ_RESOURCE_GROU
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${disk_usage.stdout}
 
-    # Parse the output using our invoke cmd parser
-    ${parsed_out}=      RW.CLI.Run Invoke Cmd Parser
-    ...     input_file=${disk_usage.stdout}
-    ...     timeout_seconds=60
-    
-    # check if parsed_out.stderr is empty, if its empty then run next steps script and then generate issue else generate issue with stderr value
-    IF    ${parsed_out.stderr} != ""
-        RW.Core.Add Issue    
-                ...    title=Error detected during disk check
-                ...    severity=1
-                ...    next_steps=Investigate the error: ${parsed_out.stderr}
-                ...    expected=No errors should occur during disk health check
-                ...    actual={parsed_out.stderr}
-                ...    reproduce_hint=Run vm_disk_utilization.sh
-                ...    details=${parsed_out}
-    ELSE
-        ${issues_list}=    RW.CLI.Run Bash File
-        ...    bash_file=next_steps_disk_utilization.sh
-        ...    env=${env}
-        ...    timeout_seconds=180
-        ...    include_in_history=false
+    ${disk_usg_out}=    Evaluate    json.loads(r'''${disk_usage.stdout}''')    json
+    IF    len(@{disk_usg_out}) > 0
+        FOR    ${disk_usg}    IN    @{disk_usg_out}
 
-        # Process issues if any were found
-        ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
-        IF    len(@{issues}) > 0
-            FOR    ${issue}    IN    @{issues}
-                RW.Core.Add Issue
-                ...    severity=${issue['severity']}
-                ...    expected=${issue['expected']}
-                ...    actual=${issue['actual']}
-                ...    title=${issue['title']}
-                ...    reproduce_hint=${results.cmd}
-                ...    next_steps=${issue['next_steps']}
-                ...    details=${issue['details']}
+            # Parse the output using our invoke cmd parser
+            ${parsed_out}=      RW.CLI.Run Invoke Cmd Parser
+            ...     input_file=${disk_usg}
+            ...     timeout_seconds=60
+    
+            # check if parsed_out.stderr is empty, if its empty then run next steps script and then generate issue else generate issue with stderr value
+            IF    ${parsed_out.stderr} != ""
+                RW.Core.Add Issue    
+                        ...    title=Error detected during disk check
+                        ...    severity=1
+                        ...    next_steps=Investigate the error: ${parsed_out.stderr}
+                        ...    expected=No errors should occur during disk health check
+                        ...    actual=${parsed_out.stderr}
+                        ...    reproduce_hint=Run vm_disk_utilization.sh
+                        ...    details=${parsed_out}
+        ELSE
+                ${issues_list}=    RW.CLI.Run Bash File
+                ...    bash_file=next_steps_disk_utilization.sh
+                ...    env=${env}
+                ...    timeout_seconds=180
+                ...    include_in_history=false
+
+                # Process issues if any were found
+                ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
+                IF    len(@{issues}) > 0
+                    FOR    ${issue}    IN    @{issues}
+                        RW.Core.Add Issue
+                        ...    severity=${issue['severity']}
+                        ...    expected=${issue['expected']}
+                        ...    actual=${issue['actual']}
+                        ...    title=${issue['title']}
+                        ...    reproduce_hint=${results.cmd}
+                        ...    next_steps=${issue['next_steps']}
+                        ...    details=${issue['details']}
+                    END
+                END
             END
         END
     END
-    
-
-
 
 *** Keywords ***
 Suite Initialization
@@ -80,12 +83,12 @@ Suite Initialization
     ...    type=string
     ...    description=The threshold percentage for disk usage warnings.
     ...    pattern=\d*
-    ...    default=60
+    ...    default=80
     ${UPTIME_THRESHOLD}=    RW.Core.Import User Variable    UPTIME_THRESHOLD
     ...    type=string
     ...    description=The threshold in days for system uptime warnings.
     ...    pattern=\d*
-    ...    default=2
+    ...    default=30
     ${MEMORY_THRESHOLD}=    RW.Core.Import User Variable    MEMORY_THRESHOLD
     ...    type=string
     ...    description=The threshold percentage for memory usage warnings.

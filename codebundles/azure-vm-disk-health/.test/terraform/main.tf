@@ -106,8 +106,8 @@ resource "tls_private_key" "vm_key" {
 }
 
 resource "local_file" "private_key" {
-  content  = tls_private_key.vm_key.private_key_pem
-  filename = "${path.module}/generated_id_rsa"
+  content         = tls_private_key.vm_key.private_key_pem
+  filename        = "${path.module}/generated_id_rsa"
   file_permission = "0600"
 }
 

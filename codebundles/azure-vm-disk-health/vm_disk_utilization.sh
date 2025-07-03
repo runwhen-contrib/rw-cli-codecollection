@@ -1,10 +1,10 @@
 #!/bin/bash
 # vm_disk_utilization.sh
-
+#set -x
 SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
 RESOURCE_GROUP=${AZ_RESOURCE_GROUP}
 VM_NAME=${VM_NAME:-""}
-OUTPUT_FILE="vm-disk-utilization.json"
+#OUTPUT_FILE="vm-disk-utilization.json"
 
 az account set --subscription "${SUBSCRIPTION_ID}"
 
@@ -19,9 +19,7 @@ if [ "$(echo $vms | jq length)" -eq "0" ]; then
     exit 0
 fi
 
-results=()
-
-echo "$vms" | jq -c '.[]' | while read -r vm; do
+while read -r vm; do
     vm_name=$(echo $vm | jq -r '.name')
     resource_group=$(echo $vm | jq -r '.resourceGroup')
 
@@ -29,21 +27,22 @@ echo "$vms" | jq -c '.[]' | while read -r vm; do
         --query "instanceView.statuses[?starts_with(code,'PowerState/')].displayStatus" -o tsv)
 
     if [[ "$vm_status" != *"running"* ]]; then
-        echo "Skipping VM $vm_name (status: $vm_status)"
+        echo "Skipping VM $vm_name (status: $vm_status)" >&2
         continue
     fi
 
-    echo "Checking disk utilization on $vm_name..."
+    echo "Checking disk utilization on $vm_name..." >&2
     disk_output=$(az vm run-command invoke \
         --resource-group "$resource_group" \
         --name "$vm_name" \
         --command-id RunShellScript \
         --scripts "df -h")
 
-    # Add result as a JSON object to the results array
-    results+=("$(jq -n --arg name "$vm_name" --argjson output "$(echo "$disk_output" | jq '.')" \
-        '{vm_name: $name, disk_output: $output}')")
-done
+    jq -n --arg name "$vm_name" --argjson output "$(echo "$disk_output" | jq '.')" \
+        '{vm_name: $name, disk_output: $output}'
+done < <(echo "$vms" | jq -c '.[]') > tmp_results.jsonl
 
-# Output the results array as a JSON array to the output file
-printf '%s\n' "${results[@]}" | jq -s '.' > "$OUTPUT_FILE"
+cat tmp_results.jsonl
+
+#jq -s '.' tmp_results.jsonl > "$OUTPUT_FILE"
+rm tmp_results.jsonl
