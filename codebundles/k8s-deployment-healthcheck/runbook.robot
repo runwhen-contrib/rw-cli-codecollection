@@ -741,10 +741,7 @@ Check Deployment Replica Status for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
             ${unavailable_replicas}=    Evaluate    $status_data.get('unavailable_replicas', 0)
             
             # Create status message based on replica health
-            ${replica_status_msg}=    Set Variable If    
-            ...    ${desired_replicas} == 0    ℹ️ Deployment is intentionally scaled to 0 replicas    
-            ...    ${ready_replicas} == ${desired_replicas}    ✅ Replica status is healthy    
-            ...    ⚠️ Replica issues detected
+            ${replica_status_msg}=    Set Variable If    ${desired_replicas} == 0    ℹ️ Deployment is intentionally scaled to 0 replicas    ${ready_replicas} == ${desired_replicas}    ✅ Replica status is healthy    ⚠️ Replica issues detected
             
             RW.Core.Add Pre To Report    **Deployment Replica Status for `${DEPLOYMENT_NAME}`**\n**Desired:** ${desired_replicas} | **Ready:** ${ready_replicas} | **Available:** ${available_replicas} | **Unavailable:** ${unavailable_replicas}\n**Debug Info:** ${status_data.get('debug', {})}\n\n${replica_status_msg}
             
