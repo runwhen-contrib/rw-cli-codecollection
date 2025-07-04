@@ -4,7 +4,7 @@
 SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
 RESOURCE_GROUP=${AZ_RESOURCE_GROUP}
 VM_NAME=${VM_NAME:-""}
-#OUTPUT_FILE="vm-disk-utilization.json"
+OUTPUT_FILE="vm-disk-utilization.json"
 
 az account set --subscription "${SUBSCRIPTION_ID}"
 
@@ -38,11 +38,9 @@ while read -r vm; do
         --command-id RunShellScript \
         --scripts "df -h")
 
-    jq -n --arg name "$vm_name" --argjson output "$(echo "$disk_output" | jq '.')" \
-        '{vm_name: $name, disk_output: $output}'
+    jq -n --arg name "$vm_name" --arg output "$disk_output" \
+        '{vm_name: $name, command_output: $output}'
 done < <(echo "$vms" | jq -c '.[]') > tmp_results.jsonl
 
-cat tmp_results.jsonl
-
-#jq -s '.' tmp_results.jsonl > "$OUTPUT_FILE"
+jq -s '.' tmp_results.jsonl > "$OUTPUT_FILE"
 rm tmp_results.jsonl

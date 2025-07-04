@@ -9,8 +9,7 @@ import json
 import logging
 
 from RW import platform
-from RW.Core import Core
-from RW.CLI.local_process import execute_local_command
+#from RW.Core import Core
 
 logger = logging.getLogger(__name__)
 ROBOT_LIBRARY_SCOPE = "GLOBAL"

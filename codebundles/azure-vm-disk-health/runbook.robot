@@ -7,6 +7,7 @@ Metadata            Supports    Azure    Virtual Machine    Disk    Health    Up
 Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
+Library             Azure
 Library             RW.platform
 Library             String
 
@@ -14,8 +15,8 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check Disk Utilization for VM `${VM_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Checks disk utilization of Azure VM and reports issues if usage exceeds threshold.
+Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Checks disk utilization for VMs and parses each result.
     [Tags]    VM    Azure    Disk    Health
     ${disk_usage}=    RW.CLI.Run Bash File
     ...    bash_file=vm_disk_utilization.sh
@@ -27,10 +28,17 @@ Check Disk Utilization for VM `${VM_NAME}` In Resource Group `${AZ_RESOURCE_GROU
     ${disk_usg_out}=    Evaluate    json.loads(r'''${disk_usage.stdout}''')    json
     IF    len(@{disk_usg_out}) > 0
         FOR    ${disk_usg}    IN    @{disk_usg_out}
+            ${vm_name}=    Set Variable    ${disk_usg_out['vm_name']}
+            ${command_output}=    Set Variable    ${disk_usg_out['command_output']}
+
+            # Write command_output to a temp file
+            ${tmpfile}=    Generate Random String    8
+            ${tmpfile_path}=    Set Variable    /tmp/vm_disk_${tmpfile}.txt
+            Create File    ${tmpfile_path}    ${command_output}
 
             # Parse the output using our invoke cmd parser
-            ${parsed_out}=      RW.CLI.Run Invoke Cmd Parser
-            ...     input_file=${disk_usg}
+            ${parsed_out}=  Azure.Run Invoke Cmd Parser
+            ...     input_file=${tmpfile_path}
             ...     timeout_seconds=60
     
             # check if parsed_out.stderr is empty, if its empty then run next steps script and then generate issue else generate issue with stderr value
