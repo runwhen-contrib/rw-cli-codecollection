@@ -23,7 +23,7 @@ spec:
     pathToRobot: codebundles/azure-devops-triage/runbook.robot
   configProvided:
     - name: AZURE_RESOURCE_GROUP
-      value: "{{ match_resource.resource_group.name }}"
+      value: "{{ resource_group.name }}"
     - name: AZURE_DEVOPS_ORG
       value: "{{ custom.devops_org }}"
     - name: AZURE_DEVOPS_PROJECT
