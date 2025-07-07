@@ -37,15 +37,15 @@ Check App Service Plan Capacity and Recommendations in resource group `${AZURE_R
     END
     IF    len(@{high_usage_json}) > 0
         ${high_usage_table}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '["Plan_Name", "Resource_Group", "CPU_Usage", "Memory_Usage", "Disk_Queue", "Resource_Link"], (.[] | [ .name, .resourceGroup, .metrics.cpu.usage, .metrics.memory.usage, .metrics.disk.queueLength, .resourceLink ]) | @tsv' asp_high_usage_metrics.json | column -t
+        ...    cmd=jq -r '["Plan_Name", "Resource_Group", "CPU_Usage%", "Memory_Usage%", "Disk_Queue", "Resource_Link"], (.[] | [ .name, .resourceGroup, .metrics.cpu.usage, .metrics.memory.usage, .metrics.disk.queueLength, .resourceLink ]) | @tsv' asp_high_usage_metrics.json | column -t
         RW.Core.Add Pre To Report    High Usage App Service Plans Summary:\n========================\n${high_usage_table.stdout}
 
         FOR    ${plan}    IN    @{high_usage_json}
             RW.Core.Add Issue
             ...    severity=3
             ...    expected=App Service Plan should not have high resource usage
-            ...    actual=High resource usage detected in App Service Plan
-            ...    title=High Resource Usage in App Service Plan: ${plan['name']}
+            ...    actual=High resource usage detected in App Service Plan ${plan['name']} in resource group ${plan['resourceGroup']}
+            ...    title=High Resource Usage in App Service Plan ${plan['name']} in resource group ${plan['resourceGroup']}
             ...    details=${plan}
             ...    next_steps=Consider scaling up the App Service Plan or optimizing the application code.
             ...    reproduce_hint=${script_output.cmd}
@@ -80,8 +80,8 @@ Check App Service Plan Capacity and Recommendations in resource group `${AZURE_R
             RW.Core.Add Issue
             ...    severity=4
             ...    expected=App Service Plan should be optimally configured for current usage
-            ...    actual=Scaling recommendations available for App Service Plan
-            ...    title=Scaling Recommendations for App Service Plan: ${plan['name']}
+            ...    actual=Scaling recommendations available for App Service Plan ${plan['name']} in resource group ${plan['resourceGroup']}
+            ...    title=Scaling Recommendations for App Service Plan ${plan['name']} in resource group ${plan['resourceGroup']}
             ...    details=${plan}
             ...    next_steps=${joined_recommendations}
             ...    reproduce_hint=${script_output.cmd}
