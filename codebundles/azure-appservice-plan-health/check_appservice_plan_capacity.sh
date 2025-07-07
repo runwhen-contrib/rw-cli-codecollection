@@ -236,13 +236,31 @@ echo "$app_service_plans" | jq -c '.[]' | while read -r plan; do
             --query "value[].timeseries[0].data[-1].average" \
             -o tsv 2>/dev/null || echo "")
     fi
-    cpu_usage=$(echo "$metrics" | awk 'NR==1')
-    memory_usage=$(echo "$metrics" | awk 'NR==2')
-    disk_queue=$(echo "$metrics" | awk 'NR==3')
-    
+    # Format metrics to one decimal place, or empty string if missing
+    cpu_usage_raw=$(echo "$metrics" | awk 'NR==1')
+    memory_usage_raw=$(echo "$metrics" | awk 'NR==2')
+    disk_queue_raw=$(echo "$metrics" | awk 'NR==3')
+    cpu_usage=""
+    memory_usage=""
+    disk_queue=""
+    if [ -n "$cpu_usage_raw" ]; then
+        cpu_usage=$(printf "%.1f" "$cpu_usage_raw" 2>/dev/null || echo "")
+    fi
+    if [ -n "$memory_usage_raw" ]; then
+        memory_usage=$(printf "%.1f" "$memory_usage_raw" 2>/dev/null || echo "")
+    fi
+    if [ -n "$disk_queue_raw" ]; then
+        disk_queue=$(printf "%.1f" "$disk_queue_raw" 2>/dev/null || echo "")
+    fi
     # Calculate available capacity
-    available_cpu=$(awk -v cpu="$cpu_usage" 'BEGIN { printf "%.2f", 100 - cpu }')
-    available_memory=$(awk -v mem="$memory_usage" 'BEGIN { printf "%.2f", 100 - mem }')
+    available_cpu=""
+    available_memory=""
+    if [ -n "$cpu_usage" ]; then
+        available_cpu=$(awk -v cpu="$cpu_usage" 'BEGIN { printf "%.1f", 100 - cpu }')
+    fi
+    if [ -n "$memory_usage" ]; then
+        available_memory=$(awk -v mem="$memory_usage" 'BEGIN { printf "%.1f", 100 - mem }')
+    fi
     
     # Print plan details
     echo "App Service Plan: $name"
@@ -250,8 +268,8 @@ echo "$app_service_plans" | jq -c '.[]' | while read -r plan; do
     echo "Location: $location"
     echo "SKU: $sku ($tier)"
     echo "Instance Capacity: $capacity"
-    echo "Current CPU Usage: ${cpu_usage:-N/A}% (${available_cpu}% available)"
-    echo "Current Memory Usage: ${memory_usage:-N/A}% (${available_memory}% available)"
+    echo "Current CPU Usage: ${cpu_usage:-N/A}% (${available_cpu:-N/A}% available)"
+    echo "Current Memory Usage: ${memory_usage:-N/A}% (${available_memory:-N/A}% available)"
     echo "Disk Queue Length: ${disk_queue:-N/A}"
     
     # Get recommendations
@@ -288,6 +306,9 @@ echo "$app_service_plans" | jq -c '.[]' | while read -r plan; do
     timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     
     # Create JSON object for current metrics
+    subscription_id=$(az account show --query id -o tsv)
+    resource_link="https://portal.azure.com/#@/resource/subscriptions/${subscription_id}/resourceGroups/${rg}/providers/Microsoft.Web/serverfarms/${name}/overview"
+    
     json_data=$(jq -n \
         --arg name "$name" \
         --arg rg "$rg" \
@@ -301,6 +322,7 @@ echo "$app_service_plans" | jq -c '.[]' | while read -r plan; do
         --arg available_cpu "$available_cpu" \
         --arg available_memory "$available_memory" \
         --arg timestamp "$timestamp" \
+        --arg resource_link "$resource_link" \
         '{
             name: $name,
             resourceGroup: $rg,
@@ -323,7 +345,8 @@ echo "$app_service_plans" | jq -c '.[]' | while read -r plan; do
                     queueLength: $disk_queue
                 }
             },
-            timestamp: $timestamp
+            timestamp: $timestamp,
+            resourceLink: $resource_link
         }')
     
     # Add to main output
@@ -378,6 +401,7 @@ echo "$app_service_plans" | jq -c '.[]' | while read -r plan; do
         --argjson tier_recommendations "$tier_recs_json" \
         --argjson capacity_recommendations "$capacity_recs_json" \
         --arg timestamp "$timestamp" \
+        --arg resource_link "$resource_link" \
         '{
             name: $name,
             resourceGroup: $rg,
@@ -392,7 +416,8 @@ echo "$app_service_plans" | jq -c '.[]' | while read -r plan; do
                 tier: $tier_recommendations,
                 capacity: $capacity_recommendations
             },
-            timestamp: $timestamp
+            timestamp: $timestamp,
+            resourceLink: $resource_link
         }')
     
     add_to_json "$RECOMMENDATIONS_JSON" "$recommendations_data"
