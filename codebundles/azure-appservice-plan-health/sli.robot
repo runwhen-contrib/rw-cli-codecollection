@@ -101,3 +101,7 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}"}
+    # Set Azure subscription context for Cloud Custodian
+    RW.CLI.Run Cli
+    ...    cmd=az account set --subscription ${AZURE_SUBSCRIPTION_ID}
+    ...    include_in_history=false
