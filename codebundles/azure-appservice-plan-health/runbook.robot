@@ -90,6 +90,117 @@ Check App Service Plan Capacity and Recommendations in resource group `${AZURE_R
         RW.Core.Add Pre To Report    No scaling recommendations found for App Service Plans in resource group `${AZURE_RESOURCE_GROUP}`
     END
 
+Check App Service Plan Changes in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Lists App Service Plan changes and operations from Azure Activity Log
+    [Tags]    AppServicePlan    Azure    Audit    Security    access:read-only
+
+    ${success_file}=    Set Variable    asp_changes_success.json
+    ${failed_file}=     Set Variable    asp_changes_failed.json
+
+    ${audit_cmd}=    RW.CLI.Run Bash File
+    ...    bash_file=asp-audit.sh
+    ...    env=${env}
+    ...    timeout_seconds=300
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+
+    # Process successful operations
+    ${success_data}=    RW.CLI.Run Cli
+    ...    cmd=cat ${success_file}
+    TRY
+        ${success_changes}=    Evaluate    json.loads(r'''${success_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load successful changes JSON, defaulting to empty dict.    WARN
+        ${success_changes}=    Create Dictionary
+    END
+
+    # Process failed operations
+    ${failed_data}=    RW.CLI.Run Cli
+    ...    cmd=cat ${failed_file}
+    TRY
+        ${failed_changes}=    Evaluate    json.loads(r'''${failed_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load failed changes JSON, defaulting to empty dict.    WARN
+        ${failed_changes}=    Create Dictionary
+    END
+
+    # Process successful changes
+    ${success_length}=    Get Length    ${success_changes}
+    IF    ${success_length} > 0
+        FOR    ${asp_name}    IN    @{success_changes.keys()}
+            ${asp_changes}=    Set Variable    ${success_changes["${asp_name}"]}
+            ${asp_changes_length}=    Get Length    ${asp_changes}
+            IF    ${asp_changes_length} == 0
+                CONTINUE
+            END
+            ${asp_changes_json}=    Evaluate    json.dumps(${asp_changes})    json
+            ${formatted_results}=    RW.CLI.Run Cli
+            ...    cmd=printf '%s' '${asp_changes_json}' | jq -r '["Operation", "Timestamp", "Caller", "Security_Level", "Reason"] as $headers | [$headers] + [.[] | [.operation, .timestamp, .caller, .security_classification, .reason]] | .[] | @tsv' | column -t -s $'\\t'
+            RW.Core.Add Pre To Report    Successful Changes for App Service Plan (${asp_name}):\n-------------------------------------------------------\n${formatted_results.stdout}\n
+            FOR    ${change}    IN    @{asp_changes}
+                ${pretty_change}=    Evaluate    pprint.pformat(${change})    modules=pprint
+                ${operation}=    Set Variable    ${change['operation']}
+                ${caller}=    Set Variable    ${change['caller']}
+                ${timestamp}=    Set Variable    ${change['timestamp']}
+                ${security_level}=    Set Variable    ${change['security_classification']}
+                ${reason}=    Set Variable    ${change['reason']}
+                ${resource_url}=    Set Variable    ${change['resourceUrl']}
+                ${severity}=    Set Variable If
+                ...    '${security_level}' == 'Critical'    3
+                ...    '${security_level}' == 'High'        3
+                ...    '${security_level}' == 'Medium'      4
+                ...    4
+                ${enhanced_details}=    Set Variable    ${pretty_change}\\n\\nAzure Portal Link: ${resource_url}
+                RW.Core.Add Issue
+                ...    severity=${severity}
+                ...    expected=App Service Plan operations should be reviewed for security implications in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    actual=${security_level.lower()} security operation detected: ${operation} by ${caller} at ${timestamp} on App Service Plan `${asp_name}`
+                ...    title=App Service Plan Change - ${security_level} Security: ${operation} on `${asp_name}` in Resource Group `${AZURE_RESOURCE_GROUP}`
+                ...    details=${enhanced_details}
+                ...    reproduce_hint=${audit_cmd.cmd}
+                ...    next_steps=Review the operation for security implications.
+            END
+        END
+    ELSE
+        RW.Core.Add Pre To Report    No successful App Service Plan changes found in resource group `${AZURE_RESOURCE_GROUP}` within the specified timeframe
+    END
+
+    # Process failed changes
+    ${failed_length}=    Get Length    ${failed_changes}
+    IF    ${failed_length} > 0
+        FOR    ${asp_name}    IN    @{failed_changes.keys()}
+            ${asp_changes}=    Set Variable    ${failed_changes["${asp_name}"]}
+            ${asp_changes_length}=    Get Length    ${asp_changes}
+            IF    ${asp_changes_length} == 0
+                CONTINUE
+            END
+            ${asp_changes_json}=    Evaluate    json.dumps(${asp_changes})    json
+            ${formatted_results}=    RW.CLI.Run Cli
+            ...    cmd=printf '%s' '${asp_changes_json}' | jq -r '["Operation", "Timestamp", "Caller", "Security_Level", "Reason"] as $headers | [$headers] + [.[] | [.operation, .timestamp, .caller, .security_classification, .reason]] | .[] | @tsv' | column -t -s $'\\t'
+            RW.Core.Add Pre To Report    Failed Changes for App Service Plan (${asp_name}):\\n-----------------------------------------------------\\n${formatted_results.stdout}\\n
+            FOR    ${change}    IN    @{asp_changes}
+                ${pretty_change}=    Evaluate    pprint.pformat(${change})    modules=pprint
+                ${operation}=    Set Variable    ${change['operation']}
+                ${caller}=    Set Variable    ${change['caller']}
+                ${timestamp}=    Set Variable    ${change['timestamp']}
+                ${security_level}=    Set Variable    ${change['security_classification']}
+                ${reason}=    Set Variable    ${change['reason']}
+                ${resource_url}=    Set Variable    ${change['resourceUrl']}
+                ${enhanced_details}=    Set Variable    ${pretty_change}\\n\\nAzure Portal Link: ${resource_url}
+                RW.Core.Add Issue
+                ...    severity=4
+                ...    expected=App Service Plan operations should complete successfully in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    actual=Failed operation detected: ${operation} by ${caller} at ${timestamp} on App Service Plan `${asp_name}`
+                ...    title=App Service Plan Failed Operation: ${operation} on `${asp_name}` in Resource Group `${AZURE_RESOURCE_GROUP}`
+                ...    details=${enhanced_details}
+                ...    reproduce_hint=${audit_cmd.cmd}
+                ...    next_steps=Investigate the failed operation.
+            END
+        END
+    ELSE
+        RW.Core.Add Pre To Report    No failed App Service Plan changes found in resource group `${AZURE_RESOURCE_GROUP}` within the specified timeframe
+    END
+
 
 
 
@@ -109,11 +220,11 @@ Suite Initialization
     ...    description=The Azure Subscription ID for the resource.  
     ...    pattern=\w*
     ...    default=""
-    ${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}=    RW.Core.Import User Variable    UNUSED_STORAGE_ACCOUNT_TIMEFRAME
+    ${AZURE_ACTIVITY_LOG_OFFSET}=    RW.Core.Import User Variable    AZURE_ACTIVITY_LOG_OFFSET
     ...    type=string
-    ...    description=The timeframe in hours to check for unused storage accounts (e.g., 720 for 30 days)
-    ...    pattern=\d+
-    ...    default=24
+    ...    description=Time offset for activity log collection (e.g., 24h, 7d) (default: 24h)
+    ...    pattern=\w+
+    ...    default=24h
     ${CPU_THRESHOLD}=    RW.Core.Import User Variable    CPU_THRESHOLD
     ...    type=string
     ...    description=CPU usage threshold percentage for high usage alerts (default: 80)
@@ -161,7 +272,7 @@ Suite Initialization
     ...    default=PT1H
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
-    Set Suite Variable    ${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}    ${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}
+    Set Suite Variable    ${AZURE_ACTIVITY_LOG_OFFSET}    ${AZURE_ACTIVITY_LOG_OFFSET}
     Set Suite Variable    ${CPU_THRESHOLD}    ${CPU_THRESHOLD}
     Set Suite Variable    ${MEMORY_THRESHOLD}    ${MEMORY_THRESHOLD}
     Set Suite Variable    ${DISK_QUEUE_THRESHOLD}    ${DISK_QUEUE_THRESHOLD}
@@ -173,4 +284,8 @@ Suite Initialization
     Set Suite Variable    ${METRICS_INTERVAL}    ${METRICS_INTERVAL}
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "CPU_THRESHOLD":"${CPU_THRESHOLD}", "MEMORY_THRESHOLD":"${MEMORY_THRESHOLD}", "DISK_QUEUE_THRESHOLD":"${DISK_QUEUE_THRESHOLD}", "SCALE_UP_CPU_THRESHOLD":"${SCALE_UP_CPU_THRESHOLD}", "SCALE_UP_MEMORY_THRESHOLD":"${SCALE_UP_MEMORY_THRESHOLD}", "SCALE_DOWN_CPU_THRESHOLD":"${SCALE_DOWN_CPU_THRESHOLD}", "SCALE_DOWN_MEMORY_THRESHOLD":"${SCALE_DOWN_MEMORY_THRESHOLD}", "METRICS_OFFSET":"${METRICS_OFFSET}", "METRICS_INTERVAL":"${METRICS_INTERVAL}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "CPU_THRESHOLD":"${CPU_THRESHOLD}", "MEMORY_THRESHOLD":"${MEMORY_THRESHOLD}", "DISK_QUEUE_THRESHOLD":"${DISK_QUEUE_THRESHOLD}", "SCALE_UP_CPU_THRESHOLD":"${SCALE_UP_CPU_THRESHOLD}", "SCALE_UP_MEMORY_THRESHOLD":"${SCALE_UP_MEMORY_THRESHOLD}", "SCALE_DOWN_CPU_THRESHOLD":"${SCALE_DOWN_CPU_THRESHOLD}", "SCALE_DOWN_MEMORY_THRESHOLD":"${SCALE_DOWN_MEMORY_THRESHOLD}", "METRICS_OFFSET":"${METRICS_OFFSET}", "METRICS_INTERVAL":"${METRICS_INTERVAL}", "AZURE_ACTIVITY_LOG_OFFSET": "${AZURE_ACTIVITY_LOG_OFFSET}"}
+    # Set Azure subscription context for Cloud Custodian
+    RW.CLI.Run Cli
+    ...    cmd=az account set --subscription ${AZURE_SUBSCRIPTION_ID}
+    ...    include_in_history=false
