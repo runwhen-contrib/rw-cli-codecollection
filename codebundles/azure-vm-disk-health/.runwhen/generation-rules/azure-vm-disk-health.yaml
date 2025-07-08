@@ -12,7 +12,7 @@ spec:
     slxs:
     - baseName: vm-disk-health
       levelOfDetail: basic
-      qualifiers: ["resource", "resource_group", "subscription_id"]
+      qualifiers: ["resource_group"]
       baseTemplateName: azure-vm-disk-health
       outputItems:
         - type: slx
