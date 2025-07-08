@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       Check Azure App Service Plan health by identifying high usage issues and providing scaling recommendations
+Documentation       Check Azure App Service Plan health by identifying availability issues, high usage issues, and providing scaling recommendations 
 Metadata            Author    saurabh3460
 Metadata            Display Name    Azure    App Service Plan Health
 Metadata            Supports    Azure    App Service Plan Health
@@ -15,6 +15,51 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
+Check Azure App Service Plan Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Check the Azure Resource Health API for any known issues affecting App Service Plans
+    [Tags]    AppServicePlan    Azure    Health    access:read-only
+    ${output}=    RW.CLI.Run Bash File
+    ...    bash_file=asp-health-check.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat asp_health.json
+    TRY
+        ${health_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${health_list}=    Create List
+    END
+    IF    $health_list
+        FOR    ${health}    IN    @{health_list}
+            ${pretty_health}=    Evaluate    pprint.pformat(${health})    modules=pprint
+            ${plan_name}=    Set Variable    ${health['resourceName']}
+            ${health_status}=    Set Variable    ${health['properties']['availabilityState']}
+            IF    "${health_status}" != "Available"
+                RW.Core.Add Issue
+                ...    severity=3
+                ...    expected=Azure App Service Plan `${plan_name}` should have health status of `Available` in resource group `${AZURE_RESOURCE_GROUP}` 
+                ...    actual=Azure App Service Plan `${plan_name}` has health status of `${health_status}` in resource group `${AZURE_RESOURCE_GROUP}` 
+                ...    title=Azure App Service Plan `${plan_name}` with Health Status of `${health_status}` found in Resource Group `${AZURE_RESOURCE_GROUP}` 
+                ...    reproduce_hint=${output.cmd}
+                ...    details=${pretty_health}
+                ...    next_steps=Investigate the health status of the Azure App Service Plan in resource group `${AZURE_RESOURCE_GROUP}` 
+            END
+        END
+    ELSE
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=Azure App Service Plan health should be enabled in resource group `${AZURE_RESOURCE_GROUP}`
+        ...    actual=Azure App Service Plan health appears unavailable in resource group `${AZURE_RESOURCE_GROUP}`
+        ...    title=Azure resource health is unavailable for App Service Plan in resource group `${AZURE_RESOURCE_GROUP}`
+        ...    reproduce_hint=${output.cmd}
+        ...    details=${health_list}
+        ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
+    END
+
+
 Check App Service Plan Capacity and Recommendations in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Check App Service Plan capacity, report high usage issues, and provide scaling recommendations
     [Tags]    AppService    Azure    Capacity    Recommendations    access:read-only
