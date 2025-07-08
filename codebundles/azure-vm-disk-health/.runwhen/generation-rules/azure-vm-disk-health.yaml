@@ -1,6 +1,7 @@
 apiVersion: runwhen.com/v1
 kind: GenerationRules
 spec:
+  platform: azure
   generationRules:
   - resourceTypes:
     - azure_compute_virtual_machines
