@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       Check Azure App Service Plan health by identifying high capacity usage
+Documentation       Check Azure App Service Plan health by identifying availability issues, high capacity usage
 Metadata            Author    saurabh3460
 Metadata            Display Name    Azure    App Service Plan
 Metadata            Supports    Azure    App Service Plan    Health
@@ -13,6 +13,27 @@ Library             RW.platform
 
 Suite Setup         Suite Initialization
 *** Tasks ***
+Count App Service Plans with Health Status of `Available` in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Count Azure App Service Plans with health status of `Available`
+    [Tags]    AppServicePlan    Azure    Health    access:read-only
+    ${output}=    RW.CLI.Run Bash File
+    ...    bash_file=asp-health-check.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat asp_health.json
+    TRY
+        ${health_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${health_list}=    Create List
+    END
+    ${count}=    Evaluate    len([health for health in ${health_list} if health['properties']['availabilityState'] == 'Available'])
+    ${available_asp_score}=    Evaluate    1 if int(${count}) >= 1 else 0
+    Set Global Variable    ${available_asp_score}
+
+
 Count App Service Plans with High Capacity Usage in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count App Service Plans with high CPU, memory, or disk queue usage
     [Tags]    AppService    Azure    Health    access:read-only
@@ -34,7 +55,7 @@ Count App Service Plans with High Capacity Usage in resource group `${AZURE_RESO
     Set Global Variable    ${appservice_high_usage_score}
 
 Generate Health Score
-    ${health_score}=    Evaluate  (${appservice_high_usage_score} / 1) * 100
+    ${health_score}=    Evaluate  (${appservice_high_usage_score} + ${available_asp_score}) / 2
     ${health_score}=    Convert to Number    ${health_score}  2
     RW.Core.Push Metric    ${health_score}
 
