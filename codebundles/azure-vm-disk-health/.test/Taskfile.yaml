@@ -73,7 +73,7 @@ tasks:
         branch_name=$(git rev-parse --abbrev-ref HEAD)
         codebundle=$(basename "$(dirname "$PWD")")
         AZURE_SUBSCRIPTION_ID=$ARM_SUBSCRIPTION_ID
-        subscription_name=$(az account show --subscription ${AZURE_SUBSCRIPTION_ID} --query name -o tsv)
+        #subscription_name=$(az account show --subscription ${AZURE_SUBSCRIPTION_ID} --query name -o tsv)
         # Fetch individual cluster details from Terraform state
         pushd terraform > /dev/null
         resource_group=$(terraform show -json terraform.tfstate | jq -r '
@@ -105,8 +105,8 @@ tasks:
         - repoURL: "$repo_url"
           branch: "$branch_name"
           codeBundles: ["$codebundle"]
-        custom:
-          subscription_name: $subscription_name
+        # custom:
+        #   subscription_name: $subscription_name
         EOF
     silent: true
 
