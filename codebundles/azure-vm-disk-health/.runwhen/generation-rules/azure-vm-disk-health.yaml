@@ -3,7 +3,7 @@ kind: GenerationRules
 spec:
   generationRules:
   - resourceTypes:
-    - resource_group
+    - azure_compute_virtual_machines
     matchRules:
     - type: pattern
       pattern: "."
