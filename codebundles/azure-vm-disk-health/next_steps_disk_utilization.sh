@@ -67,4 +67,4 @@ if [ "$issues_count" -eq 0 ]; then
     echo "No disk utilization issues found for VM ${VM_NAME}."
 fi
 
-#rm -f "${STDOUT_FILE}"
+rm -f "${STDOUT_FILE}"

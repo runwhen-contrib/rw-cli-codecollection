@@ -4,7 +4,7 @@
 SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
 RESOURCE_GROUP=${AZ_RESOURCE_GROUP}
 VM_NAME=${VM_NAME:-""}
-OUTPUT_FILE="vm-uptime-check.json"
+OUTPUT_FILE="vm-uptime.json"
 
 az account set --subscription "${SUBSCRIPTION_ID}"
 
@@ -19,9 +19,7 @@ if [ "$(echo $vms | jq length)" -eq "0" ]; then
     exit 0
 fi
 
-results=()
-
-echo "$vms" | jq -c '.[]' | while read -r vm; do
+while read -r vm; do
     vm_name=$(echo $vm | jq -r '.name')
     resource_group=$(echo $vm | jq -r '.resourceGroup')
 
@@ -29,19 +27,22 @@ echo "$vms" | jq -c '.[]' | while read -r vm; do
         --query "instanceView.statuses[?starts_with(code,'PowerState/')].displayStatus" -o tsv)
 
     if [[ "$vm_status" != *"running"* ]]; then
-        echo "Skipping VM $vm_name (status: $vm_status)"
+        echo "Skipping VM $vm_name (status: $vm_status)" >&2
         continue
     fi
 
-    echo "Checking uptime on $vm_name..."
+    echo "Checking uptime on $vm_name..." >&2
     uptime_output=$(az vm run-command invoke \
         --resource-group "$resource_group" \
         --name "$vm_name" \
         --command-id RunShellScript \
         --scripts "cat /proc/uptime")
 
-    results+=("$(jq -n --arg name "$vm_name" --argjson output "$(echo "$uptime_output" | jq '.')" \
-        '{vm_name: $name, uptime_output: $output}')")
-done
+    jq -n --arg name "$vm_name" --argjson output "$(echo "$uptime_output" | jq '.')" \
+        '{($name): {"output": $output}}'
+done < <(echo "$vms" | jq -c '.[]') > tmp_results.jsonl
 
-printf '%s\n' "${results[@]}" | jq -s '.' > "$OUTPUT_FILE"
+cat tmp_results.jsonl
+
+#jq -s '.' tmp_results.jsonl > "$OUTPUT_FILE"
+rm tmp_results.jsonl
