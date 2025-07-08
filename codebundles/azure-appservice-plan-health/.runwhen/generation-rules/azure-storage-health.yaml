@@ -19,4 +19,4 @@ spec:
             - type: slx
             - type: sli
             - type: runbook
-            templateName: azure-appservice-plan-health-taskset.yaml
+              templateName: azure-appservice-plan-health-taskset.yaml
