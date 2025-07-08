@@ -1,10 +1,14 @@
 #!/bin/bash
 # next_steps_disk_utilization.sh
+set -x
 
-PARSED_FILE="$1"
-THRESHOLD=${DISK_THRESHOLD:-80}  # Default threshold of 80%
-ISSUES_FILE="disk_utilization_issues.json"
+THRESHOLD=${DISK_THRESHOLD:-70}  # Default threshold of 80%
 VM_NAME=${VM_NAME:-"unknown"}
+STDOUT_FILE="/tmp/vm_disk_stdout.txt"
+
+cat /tmp/vm_disk_stdout.txt
+
+ISSUES_FILE="disk_utilization_issues.json"
 
 # Initialize issues array
 echo '[]' > "${ISSUES_FILE}"
@@ -24,17 +28,8 @@ add_issue() {
     jq ". += [$issue]" "${ISSUES_FILE}" > temp.json && mv temp.json "${ISSUES_FILE}"
 }
 
-stdout=$(jq -r '.value[0].message' "$PARSED_FILE" 2>/dev/null)
-stderr=$(jq -r '.error' "$PARSED_FILE" 2>/dev/null)
-
-if [ -n "$stderr" ] && [ "$stderr" != "null" ]; then
-    echo "Error detected: $stderr"
-    add_issue "Error checking disk utilization for VM ${VM_NAME}" 3 "VM should be accessible for disk checks" "Error accessing VM ${VM_NAME}" "$stderr" "Check VM access permissions and connectivity"
-    exit 1
-fi
-
-# Parse the disk usage output
-echo "$stdout" | while IFS= read -r line; do
+# Use the STDOUT variable directly
+while IFS= read -r line; do
     # Skip header lines and empty lines
     if [[ "$line" =~ ^Filesystem|^$|^tmpfs|^udev|^none|^/dev/loop ]]; then
         continue
@@ -64,10 +59,12 @@ echo "$stdout" | while IFS= read -r line; do
         
         add_issue "$issue_title" "$issue_severity" "$issue_expected" "$issue_actual" "$issue_details" "$issue_next_steps"
     fi
-done
+done  < "$STDOUT_FILE"
 
 # Check if any issues were found
 issues_count=$(jq '. | length' "${ISSUES_FILE}")
 if [ "$issues_count" -eq 0 ]; then
     echo "No disk utilization issues found for VM ${VM_NAME}."
 fi
+
+#rm -f "${STDOUT_FILE}"

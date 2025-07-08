@@ -38,9 +38,11 @@ while read -r vm; do
         --command-id RunShellScript \
         --scripts "df -h")
 
-    jq -n --arg name "$vm_name" --arg output "$disk_output" \
-        '{vm_name: $name, command_output: $output}'
+    jq -n --arg name "$vm_name" --argjson output "$(echo "$disk_output" | jq '.')" \
+        '{($name): {$output}}'
 done < <(echo "$vms" | jq -c '.[]') > tmp_results.jsonl
 
-jq -s '.' tmp_results.jsonl > "$OUTPUT_FILE"
+cat tmp_results.jsonl
+
+#jq -s '.' tmp_results.jsonl > "$OUTPUT_FILE"
 rm tmp_results.jsonl

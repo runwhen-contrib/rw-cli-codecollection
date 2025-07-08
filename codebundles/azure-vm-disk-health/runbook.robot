@@ -10,6 +10,8 @@ Library             RW.CLI
 Library             Azure
 Library             RW.platform
 Library             String
+Library             OperatingSystem
+Library             Collections
 
 Suite Setup         Suite Initialization
 
@@ -26,51 +28,63 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     RW.Core.Add Pre To Report    ${disk_usage.stdout}
 
     ${disk_usg_out}=    Evaluate    json.loads(r'''${disk_usage.stdout}''')    json
-    IF    len(@{disk_usg_out}) > 0
-        FOR    ${disk_usg}    IN    @{disk_usg_out}
-            ${vm_name}=    Set Variable    ${disk_usg_out['vm_name']}
-            ${command_output}=    Set Variable    ${disk_usg_out['command_output']}
+    ${vm_names}=    Get Dictionary Keys    ${disk_usg_out}
+    FOR    ${vm_name}    IN    @{vm_names}
+        ${output}=    Get From Dictionary    ${disk_usg_out}    ${vm_name}
+        # output is a dict, e.g. {'output': {...}}
+        ${disk_output}=    Get From Dictionary    ${output}    output
+        ${value_list}=    Get From Dictionary    ${disk_output}    value
+        ${result}=    Get From List    ${value_list}    0
+        ${message}=    Get From Dictionary    ${result}    message
 
-            # Write command_output to a temp file
-            ${tmpfile}=    Generate Random String    8
-            ${tmpfile_path}=    Set Variable    /tmp/vm_disk_${tmpfile}.txt
-            Create File    ${tmpfile_path}    ${command_output}
+        # Write message to a temp file
+        ${tmpfile}=    Generate Random String    8
+        ${tmpfile_path}=    Set Variable    /tmp/vm_disk_${tmpfile}.txt
+        Create File    ${tmpfile_path}    ${message}
 
-            # Parse the output using our invoke cmd parser
-            ${parsed_out}=  Azure.Run Invoke Cmd Parser
-            ...     input_file=${tmpfile_path}
-            ...     timeout_seconds=60
-    
-            # check if parsed_out.stderr is empty, if its empty then run next steps script and then generate issue else generate issue with stderr value
-            IF    ${parsed_out.stderr} != ""
-                RW.Core.Add Issue    
-                        ...    title=Error detected during disk check
-                        ...    severity=1
-                        ...    next_steps=Investigate the error: ${parsed_out.stderr}
-                        ...    expected=No errors should occur during disk health check
-                        ...    actual=${parsed_out.stderr}
-                        ...    reproduce_hint=Run vm_disk_utilization.sh
-                        ...    details=${parsed_out}
+        # Parse the output using our invoke cmd parser
+        ${parsed_out}=  Azure.Run Invoke Cmd Parser
+        ...     input_file=${tmpfile_path}
+        ...     timeout_seconds=60
+
+        # check if parsed_out.stderr is empty, if its empty then run next steps script and then generate issue else generate issue with stderr value
+        IF    $parsed_out['stderr'] != ""
+            RW.Core.Add Issue    
+                ...    title=Error detected during disk check
+                ...    severity=1
+                ...    next_steps=Investigate the error: $parsed_out['stderr']
+                ...    expected=No errors should occur during disk health check
+                ...    actual=$parsed_out['stderr']
+                ...    reproduce_hint=Run vm_disk_utilization.sh
+                ...    details=${parsed_out}
         ELSE
-                ${issues_list}=    RW.CLI.Run Bash File
-                ...    bash_file=next_steps_disk_utilization.sh
-                ...    env=${env}
-                ...    timeout_seconds=180
-                ...    include_in_history=false
+            ${DISK_STDOUT}=    Set Variable    ${parsed_out['stdout']}
+            # Write DISK_STDOUT to a temp file
+            ${tmpfile2}=    Generate Random String    8
+            ${tmpfile_path2}=    Set Variable    /tmp/vm_disk_stdout.txt
+            Create File    ${tmpfile_path2}    ${DISK_STDOUT}
 
-                # Process issues if any were found
-                ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
-                IF    len(@{issues}) > 0
-                    FOR    ${issue}    IN    @{issues}
-                        RW.Core.Add Issue
-                        ...    severity=${issue['severity']}
-                        ...    expected=${issue['expected']}
-                        ...    actual=${issue['actual']}
-                        ...    title=${issue['title']}
-                        ...    reproduce_hint=${results.cmd}
-                        ...    next_steps=${issue['next_steps']}
-                        ...    details=${issue['details']}
-                    END
+            ${next_steps}=    RW.CLI.Run Bash File
+            ...    bash_file=next_steps_disk_utilization.sh
+            ...    args=${tmpfile_path2}
+            ...    env=${env}
+            ...    timeout_seconds=180
+            ...    include_in_history=false
+
+            ${issues_list}=     RW.CLI.Run Cli
+            ...     cmd=cat disk_utilization_issues.json
+            # Process issues if any were found
+            ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
+            IF    len(@{issues}) > 0
+                FOR    ${issue}    IN    @{issues}
+                    RW.Core.Add Issue
+                    ...    severity=${issue['severity']}
+                    ...    expected=${issue['expected']}
+                    ...    actual=${issue['actual']}
+                    ...    title=${issue['title']}
+                    ...    reproduce_hint=Run vm_disk_utilization.sh
+                    ...    next_steps=${issue['next_steps']}
+                    ...    details=${issue['details']}
                 END
             END
         END
@@ -91,7 +105,7 @@ Suite Initialization
     ...    type=string
     ...    description=The threshold percentage for disk usage warnings.
     ...    pattern=\d*
-    ...    default=80
+    ...    default=70
     ${UPTIME_THRESHOLD}=    RW.Core.Import User Variable    UPTIME_THRESHOLD
     ...    type=string
     ...    description=The threshold in days for system uptime warnings.
