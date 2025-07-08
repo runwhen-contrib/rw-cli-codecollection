@@ -1,6 +1,4 @@
 #!/bin/bash
-# next_steps_disk_utilization.sh
-set -x
 
 THRESHOLD=${DISK_THRESHOLD:-70}  # Default threshold of 80%
 VM_NAME=${VM_NAME:-"unknown"}
