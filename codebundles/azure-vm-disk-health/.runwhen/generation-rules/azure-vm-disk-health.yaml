@@ -6,7 +6,7 @@ spec:
     - azure_compute_virtual_machines
     matchRules:
     - type: pattern
-      pattern: "."
+      pattern: ".+"
       properties: [name]
       mode: substring
     slxs:
