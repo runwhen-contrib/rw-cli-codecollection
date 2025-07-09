@@ -10,7 +10,7 @@ set -euo pipefail
 
 : "${AZURE_RESOURCE_GROUP:?Must set AZURE_RESOURCE_GROUP}"
 : "${AZURE_RESOURCE_SUBSCRIPTION_ID:?Must set AZURE_RESOURCE_SUBSCRIPTION_ID}"
-: "${LOOKBACK_PERIOD:?Must set LOOKBACK_PERIOD}"
+: "${LOOKBACK_PERIOD:=7d}"
 
 subscription_id="$AZURE_RESOURCE_SUBSCRIPTION_ID"
 resource_group="$AZURE_RESOURCE_GROUP"
@@ -70,6 +70,9 @@ echo "Checking Data Factories and retrieving failed pipeline runs..."
 echo "Resource Group: $resource_group"
 echo "Subscription ID: $subscription_id"
 
+# Allow preview extensions to be installed
+az config set extension.dynamic_install_allow_preview=true
+
 # Ensure log-analytics extension is available
 if ! az extension show --name log-analytics &>/dev/null; then
     echo "Installing log-analytics extension..."
@@ -93,10 +96,18 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
 
     echo "Processing Data Factory: $df_name"
 
-    # Get linked services
-    echo "Getting linked services for $df_name..."
-    linked_services=$(az datafactory linked-service list --factory-name "$df_name" --resource-group "$df_rg" --subscription "$subscription_id" -o json)
-    linked_services=$(echo "$linked_services" | jq -c --arg df_id "$df_id" 'map(. + {url: ("https://adf.azure.com/en/management/datalinkedservices?factory=" + $df_id)})')
+    # Get linked services with robust error handling
+    linked_services=$(az datafactory linked-service list --factory-name "$df_name" --resource-group "$df_rg" --subscription "$subscription_id" -o json 2>az_linked_services_err.log) || linked_services="[]"
+    if ! echo "$linked_services" | jq empty 2>/dev/null; then
+        echo "Warning: Invalid JSON from linked services for $df_name: $(cat az_linked_services_err.log)"
+        linked_services="[]"
+    fi
+    rm -f az_linked_services_err.log
+    if [[ -z "$linked_services" || "$linked_services" == "[]" ]]; then
+        linked_services="[]"
+    else
+        linked_services=$(echo "$linked_services" | jq -c --arg df_id "$df_id" 'map(. + {url: ("https://adf.azure.com/en/management/datalinkedservices?factory=" + $df_id)})')
+    fi
     
     # Get diagnostic settings
     diagnostics=$(az monitor diagnostic-settings list --resource "$df_id" -o json 2>diag_err.log || true)
@@ -277,13 +288,29 @@ EOF
     rm -f pipeline_query_err.log
 
     # Parse failed pipeline results
-    if ! echo "${failed_pipelines}" | jq empty 2>/dev/null; then
-        echo "Error: Invalid JSON in failed_pipelines"
+    if ! echo "$failed_pipelines" | jq -e '.tables[0].rows' >/dev/null 2>&1; then
+        echo "No failed pipeline rows or invalid JSON returned for $df_name"
         continue
     fi
-    while read -r pipeline; do
+
+    row_count=$(echo "$failed_pipelines" | jq '.tables[0].rows | length')
+    if [[ "$row_count" -eq 0 ]]; then
+        echo "No failed pipeline runs found for $df_name"
+        continue
+    fi
+
+    rows=$(echo "$failed_pipelines" | jq -c '
+  .tables[0].rows[] as $row |
+  {
+    pipelineName_s: $row[0],
+    Message: $row[1],
+    runId_g: $row[2]
+  }
+')
+
+    while IFS= read -r pipeline; do
         pipeline_name=$(echo "$pipeline" | jq -r '.pipelineName_s')
-        message=$(echo "$pipeline" | jq -r '.Messages')
+        message=$(echo "$pipeline" | jq -r '.Message')
         run_id=$(echo "$pipeline" | jq -r '.runId_g')
         
         failed_pipelines_json=$(echo "$failed_pipelines_json" | jq \
@@ -311,7 +338,7 @@ EOF
                 "run_id": $run_id,
                 "linked_services": $linked_services
             }]')
-    done < <(echo "$failed_pipelines" | jq -c '.[]')
+    done <<< "$rows"
 done
 
 # Write output to file
