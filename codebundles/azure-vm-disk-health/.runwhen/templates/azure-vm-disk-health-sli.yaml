@@ -34,4 +34,4 @@ spec:
     - name: DISK_THRESHOLD
       value: "80"
     - name: AZURE_SUBSCRIPTION_ID
-      value: {{subscription.id}}
+      value: {{subscription_id}}
