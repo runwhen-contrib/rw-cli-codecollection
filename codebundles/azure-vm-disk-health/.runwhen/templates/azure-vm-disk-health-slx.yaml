@@ -19,5 +19,6 @@ spec:
   statement: VM disk utilization should be below threshold. 
   additionalContext:  
     resourceGroup: "{{resource_group.name}}"
-    # location: "{{match_resource.resource.location}}"
+    location: "{{match_resource.resource.location}}"
     # subscription: "{{subscription.name}}"
+    subscription: "{{subscription_id}}""
