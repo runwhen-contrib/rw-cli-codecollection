@@ -398,8 +398,12 @@ Fetch Deployment Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
             ...    env=${env}
             ...    include_in_history=false
             
-            ${total_count}=    Convert To Integer    ${total_lines.stdout.strip()}
-            ${health_count}=    Convert To Integer    ${health_check_lines.stdout.strip()}
+            # Handle empty output from wc -l by providing default values
+            ${total_lines_clean}=    Set Variable If    "${total_lines.stdout.strip()}" == ""    0    ${total_lines.stdout.strip()}
+            ${health_check_lines_clean}=    Set Variable If    "${health_check_lines.stdout.strip()}" == ""    0    ${health_check_lines.stdout.strip()}
+            
+            ${total_count}=    Convert To Integer    ${total_lines_clean}
+            ${health_count}=    Convert To Integer    ${health_check_lines_clean}
             
             # Create consolidated logs report
             IF    ${health_count} > ${total_count} * 0.8
