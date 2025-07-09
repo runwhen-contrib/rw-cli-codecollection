@@ -20,5 +20,4 @@ spec:
   additionalContext:  
     resourceGroup: "{{resource_group.name}}"
     location: "{{match_resource.resource.location}}"
-    # subscription: "{{subscription.name}}"
     subscription: "{{subscription_id}}""
