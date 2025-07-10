@@ -9,14 +9,14 @@ metadata:
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure-vm.svg
   alias: >-
-    {{match_resource.resource.name}} VM Disk Health
+    {{match_resource.resource.name}} VM Health
   asMeasuredBy: Disk utilization on the Azure VM.
   configProvided:
   - name: VM_NAME
     value: {{match_resource.resource.name}}
   owners:
   - {{workspace.owner_email}}
-  statement: VM disk utilization should be below threshold. 
+  statement: VM utilization should be below threshold. 
   additionalContext:  
     resourceGroup: "{{resource_group.name}}"
     location: "{{match_resource.resource.location}}"

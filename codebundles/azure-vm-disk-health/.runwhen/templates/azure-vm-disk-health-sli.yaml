@@ -11,7 +11,7 @@ spec:
   displayUnitsShort: ok
   locations:
     - {{default_location}}
-  description: Measures the health of Azure VM disk utilization.
+  description: Measures the health of Azure VM.
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}

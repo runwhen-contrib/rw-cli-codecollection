@@ -1,6 +1,6 @@
 *** Settings ***
-Documentation       Runs diagnostic checks against Azure VMs to monitor disk utilization and system health.
-Metadata            Author    augment-code
+Documentation       Runs diagnostic checks against Azure VMs to monitor disk utilization, memory utilization, uptime, patch status and system health.
+Metadata            Author    Nbarola
 Metadata            Display Name    Azure VM Health Check
 Metadata            Supports    Azure    Virtual Machine    Disk    Health    Uptime
 
