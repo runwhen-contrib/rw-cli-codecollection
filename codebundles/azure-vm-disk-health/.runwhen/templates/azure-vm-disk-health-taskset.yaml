@@ -26,7 +26,7 @@ spec:
     - name: VM_NAME
       value: {{match_resource.resource.name}}
     - name: DISK_THRESHOLD
-      value: "80"
+      value: "70"
     - name: AZURE_SUBSCRIPTION_ID
       value: {{subscription_id}}
   secretsProvided:
