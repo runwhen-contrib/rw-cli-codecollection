@@ -141,7 +141,7 @@ if [[ -n "$health_check_path" && "$health_check_path" != "null" ]]; then
 
             # Aggregate issues instead of logging per timestamp
             has_missing_data=false
-            has_unhealthy_instances=false
+            has_unhealthy_metrics=false
 
             # Read metric data using a mapfile to avoid subshell issues
             mapfile -t data_points < <(echo "$health_check_data" | jq -c ".value[].timeseries[] | .data[]")
@@ -160,7 +160,7 @@ if [[ -n "$health_check_path" && "$health_check_path" != "null" ]]; then
 
                 if (( $(echo "$value < 1" | bc -l) )); then
                     unhealthy_count=$((unhealthy_count + 1))
-                    has_unhealthy_instances=true
+                    has_unhealthy_metrics=true
                 fi
             done
 
@@ -182,12 +182,12 @@ if [[ -n "$health_check_path" && "$health_check_path" != "null" ]]; then
                 )
             fi
 
-            if [ "$has_unhealthy_instances" = true ]; then
+            if [ "$has_unhealthy_metrics" = true ]; then
                 issues_json=$(echo "$issues_json" | jq \
-                    --arg title "Unhealthy Instances Detected" \
-                    --arg nextStep "Investigate the health of instances for \`$APP_SERVICE_NAME\`." \
+                    --arg title "Unhealthy Metrics Detected" \
+                    --arg nextStep "Investigate the health of \`$APP_SERVICE_NAME\`." \
                     --arg severity "1" \
-                    --arg details "$unhealthy_count instances reported unhealthy during the queried interval." \
+                    --arg details "$unhealthy_count metrics reported unhealthy during the queried interval." \
                     '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
                 )
             fi
