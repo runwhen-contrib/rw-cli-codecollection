@@ -15,7 +15,7 @@ set -euo pipefail
 subscription_id="$AZURE_RESOURCE_SUBSCRIPTION_ID"
 resource_group="$AZURE_RESOURCE_GROUP"
 output_file="failed_pipelines.json"
-failed_pipelines_json='{"failed_pipelines": []}'
+output_json='{"failed_pipelines": [], "script_errors": []}'
 
 # Function to validate JSON
 validate_json() {
@@ -49,7 +49,7 @@ if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
     subscription=$(az account show --query "id" -o tsv 2>/dev/null || echo "")
     if [[ -z "$subscription" ]]; then
         echo "ERROR: Could not determine current subscription ID and AZURE_RESOURCE_SUBSCRIPTION_ID is not set."
-        echo "$failed_pipelines_json" > "$output_file"
+        echo "$output_json" > "$output_file"
         exit 1
     fi
     echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
@@ -62,7 +62,7 @@ fi
 echo "Switching to subscription ID: $subscription"
 if ! az account set --subscription "$subscription" 2>/dev/null; then
     echo "ERROR: Failed to set subscription to $subscription"
-    echo "$failed_pipelines_json" > "$output_file"
+    echo "$output_json" > "$output_file"
     exit 1
 fi
 
@@ -84,7 +84,7 @@ datafactories=$(az datafactory list -g "$resource_group" --subscription "$subscr
 
 if [[ -z "$datafactories" || "$datafactories" == "[]" ]]; then
     echo "No Data Factories found in resource group $resource_group"
-    echo "$failed_pipelines_json" > "$output_file"
+    echo "$output_json" > "$output_file"
     exit 0
 fi
 
@@ -116,7 +116,7 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
         err_msg=$(cat diag_err.log)
         rm -f diag_err.log
 
-        failed_pipelines_json=$(echo "$failed_pipelines_json" | jq \
+        output_json=$(echo "$output_json" | jq \
             --arg title "No Diagnostic Settings for Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg details "$err_msg" \
             --arg severity "4" \
@@ -125,7 +125,7 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
             --arg actual "Diagnostic settings not enabled for Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg resource_url "$df_url" \
             --arg reproduce_hint "az monitor diagnostic-settings list --resource \"$df_id\"" \
-            '.failed_pipelines += [{
+            '.script_errors += [{
                 "title": $title,
                 "details": $details,
                 "next_step": $nextStep,
@@ -148,7 +148,7 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
 
     # If PipelineRuns logging is not enabled, report failure
     if [[ "$enabled_pipeline_runs_count" -eq 0 ]]; then
-        failed_pipelines_json=$(echo "$failed_pipelines_json" | jq \
+        output_json=$(echo "$output_json" | jq \
             --arg title "PipelineRuns Logging Disabled in Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg details "$diagnostics" \
             --arg severity "3" \
@@ -157,7 +157,7 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
             --arg actual "PipelineRuns logging is disabled for Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg resource_url "$df_url" \
             --arg reproduce_hint "az monitor diagnostic-settings list --resource \"$df_id\"" \
-            '.failed_pipelines += [{
+            '.script_errors += [{
                 "title": $title,
                 "details": $details,
                 "next_step": $nextStep,
@@ -172,7 +172,7 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
 
     # Optional: Warn if ActivityRuns is not enabled
     if [[ "$enabled_activity_runs_count" -eq 0 ]]; then
-        failed_pipelines_json=$(echo "$failed_pipelines_json" | jq \
+        output_json=$(echo "$output_json" | jq \
             --arg title "ActivityRuns Logging Disabled in Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg details "You may miss detailed activity-level diagnostics without 'ActivityRuns' logging." \
             --arg severity "4" \
@@ -181,7 +181,7 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
             --arg actual "ActivityRuns logging is disabled for Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg resource_url "$df_url" \
             --arg reproduce_hint "az monitor diagnostic-settings list --resource \"$df_id\"" \
-            '.failed_pipelines += [{
+            '.script_errors += [{
                 "title": $title,
                 "details": $details,
                 "next_step": $nextStep,
@@ -194,7 +194,7 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
     fi
 
     if [[ -z "$workspace_id" || "$workspace_id" == "null" ]]; then
-        failed_pipelines_json=$(echo "$failed_pipelines_json" | jq \
+        output_json=$(echo "$output_json" | jq \
             --arg title "No Log Analytics Workspace for Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg details "Diagnostics are configured but no workspace is defined." \
             --arg severity "4" \
@@ -203,7 +203,7 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
             --arg actual "No Log Analytics workspace configured for Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg resource_url "$df_url" \
             --arg reproduce_hint "az monitor diagnostic-settings list --resource \"$df_id\"" \
-            '.failed_pipelines += [{
+            '.script_errors += [{
                 "title": $title,
                 "details": $details,
                 "next_step": $nextStep,
@@ -221,7 +221,7 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
         err_msg=$(cat guid_err.log)
         rm -f guid_err.log
 
-        failed_pipelines_json=$(echo "$failed_pipelines_json" | jq \
+        output_json=$(echo "$output_json" | jq \
             --arg title "Failed to Get Workspace GUID for Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg details "$err_msg" \
             --arg severity "4" \
@@ -230,7 +230,7 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
             --arg actual "Failed to get workspace GUID for Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg resource_url "$df_url" \
             --arg reproduce_hint "az monitor log-analytics workspace show --ids \"$workspace_id\" --query \"customerId\" -o tsv" \
-            '.failed_pipelines += [{
+            '.script_errors += [{
                 "title": $title,
                 "details": $details,
                 "next_step": $nextStep,
@@ -256,6 +256,7 @@ AzureDiagnostics
 EOF
 )
     echo "Querying failed pipeline runs for $df_name..."
+    # Example: Log Analytics Query Failure (script error)
     if ! failed_pipelines=$(az monitor log-analytics query \
         --workspace "$workspace_guid" \
         --analytics-query "$kql_query" \
@@ -264,7 +265,7 @@ EOF
         err_msg=$(cat pipeline_query_err.log)
         rm -f pipeline_query_err.log
 
-        failed_pipelines_json=$(echo "$failed_pipelines_json" | jq \
+        output_json=$(echo "$output_json" | jq \
             --arg title "Log Analytics Query Failed for Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg details "$err_msg" \
             --arg severity "3" \
@@ -273,7 +274,7 @@ EOF
             --arg actual "Log Analytics query failed for Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg resource_url "$df_url" \
             --arg reproduce_hint "az monitor log-analytics query --workspace \"$workspace_guid\" --analytics-query '$kql_query' --subscription \"$subscription_id\" --output json" \
-            '.failed_pipelines += [{
+            '.script_errors += [{
                 "title": $title,
                 "details": $details,
                 "next_step": $nextStep,
@@ -308,12 +309,13 @@ EOF
   }
 ')
 
+    # Example: Actual Failed Pipeline Run
     while IFS= read -r pipeline; do
         pipeline_name=$(echo "$pipeline" | jq -r '.pipelineName_s')
         message=$(echo "$pipeline" | jq -r '.Message')
         run_id=$(echo "$pipeline" | jq -r '.runId_g')
         
-        failed_pipelines_json=$(echo "$failed_pipelines_json" | jq \
+        output_json=$(echo "$output_json" | jq \
             --arg title "Failed Pipeline \`$pipeline_name\` in Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg details "$pipeline" \
             --arg severity "3" \
@@ -343,6 +345,6 @@ done
 
 # Write output to file
 echo "Final JSON contents:"
-echo "$failed_pipelines_json" | jq
-echo "$failed_pipelines_json" > "$output_file"
+echo "$output_json" | jq
+echo "$output_json" > "$output_file"
 echo "Failed pipeline check completed. Results saved to $output_file"
