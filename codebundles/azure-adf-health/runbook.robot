@@ -10,6 +10,7 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
 Library             Jenkins
+Library             Collections
 Suite Setup         Suite Initialization
 
 
@@ -133,17 +134,34 @@ List Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GROU
         ${failed_json}=    Evaluate    json.loads(r'''${failed_data.stdout}''')    json
     EXCEPT
         Log    Failed to load JSON payload, defaulting to empty list.    WARN
-        ${failed_json}=    Create Dictionary    failed_json=[]
+        ${failed_json}=    Evaluate    {}    # This creates an empty Python dict
     END
 
-    ${has_failures}=    Evaluate    len($failed_json["failed_pipelines"]) > 0
+    # Handle script/infra/command errors
+    ${script_errors}=    Get From Dictionary    ${failed_json}    script_errors    default=[]
+    ${has_script_errors}=    Get Length    ${script_errors}
+    IF    ${has_script_errors} > 0
+        FOR    ${error}    IN    @{script_errors}
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    title=${error.get('title', 'Script/Infra Error')}
+            ...    details=${error.get('details', 'No details')}
+            ...    next_steps=${error.get('next_step', 'No next steps')}
+            ...    expected=${error.get('expected', 'No expected value')}
+            ...    actual=${error.get('actual', 'No actual value')}
+            ...    reproduce_hint=${error.get('reproduce_hint', 'No reproduce hint')}
+        END
+    END
 
-    IF    ${has_failures}
+    # Handle actual failed pipelines
+    ${failed_pipelines}=    Get From Dictionary    ${failed_json}    failed_pipelines    default=[]
+    ${has_failures}=    Get Length    ${failed_pipelines}
+    IF    ${has_failures} > 0
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '.failed_pipelines[] | "Pipeline_Name: \\(.name)", "RunId: \\(.run_id)", "Resource_URL: \\(.resource_url)", "Linked_Services :", (.linked_services[] | " - \\(.name)\t\\(.properties.type)\t\\(.url)"), "----------------"' ${json_file}
+        ...    cmd=jq -r '.failed_pipelines[] | "Pipeline_Name: \\(.name)", "RunId: \\(.run_id)", "Resource_URL: \\(.resource_url)", "Linked_Services :", (.linked_services[] | " - \\(.name)\\t\\(.properties.type)\\t\\(.url)"), "----------------"' ${json_file}
         RW.Core.Add Pre To Report    Failed Pipelines Summary:\n==============================\n${formatted_results.stdout}
        
-        FOR    ${issue}    IN    @{failed_json["failed_pipelines"]}
+        FOR    ${issue}    IN    @{failed_pipelines}
             ${details_json}=    Evaluate    json.loads('''${issue["details"]}''')    json
             ${linked_services}=    Set Variable    ${issue.get("linked_services", [])}
             ${merged}=    Evaluate    dict(${details_json}, linked_services=${linked_services})
@@ -166,7 +184,9 @@ List Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GROU
             ...    reproduce_hint=${issue.get("reproduce_hint", "No reproduce hint")}
         END
     ELSE
-        RW.Core.Add Pre To Report    "No failed pipelines found in resource group `${AZURE_RESOURCE_GROUP}`"
+        IF    ${has_script_errors} == 0
+            RW.Core.Add Pre To Report    "No failed pipelines or script errors found in resource group `${AZURE_RESOURCE_GROUP}`"
+        END
     END
 
 
