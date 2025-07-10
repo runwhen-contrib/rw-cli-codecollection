@@ -78,10 +78,13 @@ List Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOU
         ${error_trends}=    Evaluate    json.loads(r'''${error_data.stdout}''')    json
     EXCEPT
         Log    Failed to load JSON payload, defaulting to empty list.    WARN
-        ${error_trends}=    Create Dictionary    error_trends=[]
+        ${error_trends}=    Create Dictionary    error_trends=[]    script_errors=[]
     END
 
-    IF    len(${error_trends['error_trends']}) > 0
+    ${has_error_trends}=    Evaluate    len(${error_trends.get('error_trends', [])}) > 0
+    ${has_script_errors}=    Evaluate    len(${error_trends.get('script_errors', [])}) > 0
+
+    IF    ${has_error_trends}
         ${formatted_results}=    RW.CLI.Run Cli
         ...    cmd=jq -r '["Pipeline_Name", "Last_Seen", "Failure_Count", "RunId", "Resource_URL"], (.error_trends[] | [ .name, (.details | fromjson).LastSeen, (.details | fromjson).FailureCount, .run_id, .resource_url]) | @tsv' ${json_file} | column -t
         RW.Core.Add Pre To Report    Pipeline Error Trends Summary:\n==============================\n${formatted_results.stdout}
@@ -112,8 +115,24 @@ List Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOU
                 RW.Core.Add Pre To Report    "No Frequent Pipeline Errors found in resource group `${AZURE_RESOURCE_GROUP}`"
             END
         END
-    ELSE
-        RW.Core.Add Pre To Report    "No Frequent Pipeline Errors found in resource group `${AZURE_RESOURCE_GROUP}`"
+    END
+
+    IF    ${has_script_errors}
+        ${script_errors}=    Set Variable    ${error_trends['script_errors']}
+        FOR    ${err}    IN    @{script_errors}
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    expected=${err.get("expected", "No expected value")}
+            ...    actual=${err.get("actual", "No actual value")}
+            ...    title=${err.get("title", "No title")}
+            ...    reproduce_hint=${err.get("reproduce_hint", "No reproduce hint")}
+            ...    details=${err.get("details", "No details")}
+            ...    next_steps=${err.get("next_step", "No next step")}
+        END
+    END
+
+    IF    not ${has_error_trends} and not ${has_script_errors}
+        RW.Core.Add Pre To Report    "No Frequent Pipeline Errors or Script/Infra Errors found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
 
