@@ -1,0 +1,16 @@
+{
+  "issues": [
+    {
+      "title": "Unable to Download Logs for Function App func-api-ojcjiczjudu42",
+      "details": "Unable to download logs for Function App func-api-ojcjiczjudu42. This may be due to the app being stopped or no logs being available.",
+      "next_step": "Check if Function App func-api-ojcjiczjudu42 is running and has logging enabled.",
+      "severity": 4
+    },
+    {
+      "title": "No Log Files Found for Function App func-api-ojcjiczjudu42",
+      "details": "No log files found for Function App func-api-ojcjiczjudu42. This may be normal if the app is not actively running or logging is disabled.",
+      "next_step": "Check if Function App func-api-ojcjiczjudu42 is running and has logging enabled.",
+      "severity": 4
+    }
+  ]
+}
