@@ -260,6 +260,32 @@ Check Logs for Errors in Function App `${FUNCTION_APP_NAME}` In Resource Group `
         END
     END
 
+Fetch Azure Recommendations and Notifications for Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Fetch Azure Advisor recommendations, Service Health notifications, and security assessments for the Function App
+    [Tags]    appservice    recommendations    advisor    notifications    access:read-only
+    ${recommendations}=    RW.CLI.Run Bash File
+    ...    bash_file=appservice_recommendations.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${recommendations.stdout}
+
+    ${issues}=    RW.CLI.Run Cli    
+    ...    cmd=cat function_app_recommendations_issues.json
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            RW.Core.Add Issue    
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_step"]}
+            ...    expected=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no recommendations or notifications
+            ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has recommendations or notifications that need attention
+            ...    reproduce_hint=${recommendations.cmd}
+            ...    details=${item["details"]}        
+        END
+    END
+
 *** Keywords ***
 Suite Initialization
     ${AZ_RESOURCE_GROUP}=    RW.Core.Import User Variable    AZ_RESOURCE_GROUP
@@ -285,6 +311,11 @@ Suite Initialization
     ...    description=The time period, in minutes, to look back for activites/events. 
     ...    pattern=\w*
     ...    default=10
+    ${TIME_PERIOD_DAYS}=    RW.Core.Import User Variable    TIME_PERIOD_DAYS
+    ...    type=string
+    ...    description=The time period, in days, to look back for recommendations and notifications. 
+    ...    pattern=\w*
+    ...    default=7
     ${CPU_THRESHOLD}=    RW.Core.Import User Variable    CPU_THRESHOLD
     ...    type=string
     ...    description=The CPU % threshold in which to generate an issue.
@@ -329,6 +360,7 @@ Suite Initialization
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     Set Suite Variable    ${TIME_PERIOD_MINUTES}    ${TIME_PERIOD_MINUTES}
+    Set Suite Variable    ${TIME_PERIOD_DAYS}    ${TIME_PERIOD_DAYS}
     Set Suite Variable    ${CPU_THRESHOLD}    ${CPU_THRESHOLD}
     Set Suite Variable    ${REQUESTS_THRESHOLD}    ${REQUESTS_THRESHOLD}
     Set Suite Variable    ${BYTES_RECEIVED_THRESHOLD}    ${BYTES_RECEIVED_THRESHOLD}
@@ -340,7 +372,7 @@ Suite Initialization
 
     Set Suite Variable
     ...    ${env}
-    ...    {"FUNCTION_APP_NAME":"${FUNCTION_APP_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "TIME_PERIOD_MINUTES":"${TIME_PERIOD_MINUTES}","CPU_THRESHOLD":"${CPU_THRESHOLD}", "REQUESTS_THRESHOLD":"${REQUESTS_THRESHOLD}", "BYTES_RECEIVED_THRESHOLD":"${BYTES_RECEIVED_THRESHOLD}", "HTTP5XX_THRESHOLD":"${HTTP5XX_THRESHOLD}","HTTP2XX_THRESHOLD":"${HTTP2XX_THRESHOLD}", "HTTP4XX_THRESHOLD":"${HTTP4XX_THRESHOLD}", "DISK_USAGE_THRESHOLD":"${DISK_USAGE_THRESHOLD}", "AVG_RSP_TIME":"${AVG_RSP_TIME}"}
+    ...    {"FUNCTION_APP_NAME":"${FUNCTION_APP_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "TIME_PERIOD_MINUTES":"${TIME_PERIOD_MINUTES}", "TIME_PERIOD_DAYS":"${TIME_PERIOD_DAYS}", "CPU_THRESHOLD":"${CPU_THRESHOLD}", "REQUESTS_THRESHOLD":"${REQUESTS_THRESHOLD}", "BYTES_RECEIVED_THRESHOLD":"${BYTES_RECEIVED_THRESHOLD}", "HTTP5XX_THRESHOLD":"${HTTP5XX_THRESHOLD}", "HTTP2XX_THRESHOLD":"${HTTP2XX_THRESHOLD}", "HTTP4XX_THRESHOLD":"${HTTP4XX_THRESHOLD}", "DISK_USAGE_THRESHOLD":"${DISK_USAGE_THRESHOLD}", "AVG_RSP_TIME":"${AVG_RSP_TIME}"}
     # Set Azure subscription context
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}

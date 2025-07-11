@@ -288,6 +288,62 @@ Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOU
     ${activity_url}=    Set Variable    https://portal.azure.com/#@/resource${app_service_resource_id_activity.stdout.strip()}/activitylog
     RW.Core.Add Pre To Report    🔗 View Activity Log in Azure Portal: ${activity_url}
 
+Check Recent Activities for App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Analyze recent Azure activities for the App Service, including critical operations and user actions.
+    [Tags]    access:read-only    appservice    activities    audit
+    ${activities}=    RW.CLI.Run Bash File
+    ...    bash_file=appservice_activities_enhanced.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${activities.stdout}
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat app_service_activities_enhanced.json
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            RW.Core.Add Issue    
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_step"]}
+            ...    expected=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no recent critical activities
+            ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has recent critical activities
+            ...    reproduce_hint=${activities.cmd}
+            ...    details=${item["details"]}        
+        END
+    END
+
+Check Recommendations and Notifications for App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Fetch Azure Advisor, Service Health, and Security Center recommendations for the App Service.
+    [Tags]    access:read-only    appservice    recommendations    notifications
+    ${recommendations}=    RW.CLI.Run Bash File
+    ...    bash_file=appservice_recommendations.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${recommendations.stdout}
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat app_service_recommendations.json
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list["recommendations"]}) > 0
+        FOR    ${item}    IN    @{issue_list["recommendations"]}
+            RW.Core.Add Issue    
+            ...    title=${item["title"]}
+            ...    severity=${item.get("severity", 4)}
+            ...    next_steps=${item.get("next_step", "Review recommendation details.")}
+            ...    expected=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no outstanding recommendations
+            ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has recommendations or notifications that need attention
+            ...    reproduce_hint=${recommendations.cmd}
+            ...    details=${item["details"]}        
+        END
+    END
+
 Check Logs for Errors in App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Analyze App Service logs for errors using Azure Monitor APIs and Application Insights - creates structured issues for detected problems
     [Tags]    appservice    logs    errors    analysis    azure-monitor    access:read-only
