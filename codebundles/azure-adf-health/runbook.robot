@@ -10,6 +10,7 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
 Library             Jenkins
+Library             Collections
 Suite Setup         Suite Initialization
 
 
@@ -77,10 +78,13 @@ List Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOU
         ${error_trends}=    Evaluate    json.loads(r'''${error_data.stdout}''')    json
     EXCEPT
         Log    Failed to load JSON payload, defaulting to empty list.    WARN
-        ${error_trends}=    Create Dictionary    error_trends=[]
+        ${error_trends}=    Create Dictionary    error_trends=[]    script_errors=[]
     END
 
-    IF    len(${error_trends['error_trends']}) > 0
+    ${has_error_trends}=    Evaluate    len(${error_trends.get('error_trends', [])}) > 0
+    ${has_script_errors}=    Evaluate    len(${error_trends.get('script_errors', [])}) > 0
+
+    IF    ${has_error_trends}
         ${formatted_results}=    RW.CLI.Run Cli
         ...    cmd=jq -r '["Pipeline_Name", "Last_Seen", "Failure_Count", "RunId", "Resource_URL"], (.error_trends[] | [ .name, (.details | fromjson).LastSeen, (.details | fromjson).FailureCount, .run_id, .resource_url]) | @tsv' ${json_file} | column -t
         RW.Core.Add Pre To Report    Pipeline Error Trends Summary:\n==============================\n${formatted_results.stdout}
@@ -92,7 +96,7 @@ List Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOU
             IF    ${failure_count} > ${FAILURE_THRESHOLD}
                 ${next_steps}=    Analyze Logs
                 ...    logs=${messages[0]}
-                ...    error_patterns_file=${CURDIR}/error_patterns.json
+                ...    error_patterns_file=error_patterns.json
                 ${suggestions}=    Set Variable    ${EMPTY}
                 ${logs_details}=    Set Variable    ${EMPTY}
                 FOR    ${step}    IN    @{next_steps}
@@ -111,8 +115,24 @@ List Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOU
                 RW.Core.Add Pre To Report    "No Frequent Pipeline Errors found in resource group `${AZURE_RESOURCE_GROUP}`"
             END
         END
-    ELSE
-        RW.Core.Add Pre To Report    "No Frequent Pipeline Errors found in resource group `${AZURE_RESOURCE_GROUP}`"
+    END
+
+    IF    ${has_script_errors}
+        ${script_errors}=    Set Variable    ${error_trends['script_errors']}
+        FOR    ${err}    IN    @{script_errors}
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    expected=${err.get("expected", "No expected value")}
+            ...    actual=${err.get("actual", "No actual value")}
+            ...    title=${err.get("title", "No title")}
+            ...    reproduce_hint=${err.get("reproduce_hint", "No reproduce hint")}
+            ...    details=${err.get("details", "No details")}
+            ...    next_steps=${err.get("next_step", "No next step")}
+        END
+    END
+
+    IF    not ${has_error_trends} and not ${has_script_errors}
+        RW.Core.Add Pre To Report    "No Frequent Pipeline Errors or Script/Infra Errors found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
 
@@ -133,23 +153,40 @@ List Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GROU
         ${failed_json}=    Evaluate    json.loads(r'''${failed_data.stdout}''')    json
     EXCEPT
         Log    Failed to load JSON payload, defaulting to empty list.    WARN
-        ${failed_json}=    Create Dictionary    failed_json=[]
+        ${failed_json}=    Evaluate    {}    # This creates an empty Python dict
     END
 
-    ${has_failures}=    Evaluate    len($failed_json["failed_pipelines"]) > 0
+    # Handle script/infra/command errors
+    ${script_errors}=    Get From Dictionary    ${failed_json}    script_errors    default=[]
+    ${has_script_errors}=    Get Length    ${script_errors}
+    IF    ${has_script_errors} > 0
+        FOR    ${error}    IN    @{script_errors}
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    title=${error.get('title', 'Script/Infra Error')}
+            ...    details=${error.get('details', 'No details')}
+            ...    next_steps=${error.get('next_step', 'No next steps')}
+            ...    expected=${error.get('expected', 'No expected value')}
+            ...    actual=${error.get('actual', 'No actual value')}
+            ...    reproduce_hint=${error.get('reproduce_hint', 'No reproduce hint')}
+        END
+    END
 
-    IF    ${has_failures}
+    # Handle actual failed pipelines
+    ${failed_pipelines}=    Get From Dictionary    ${failed_json}    failed_pipelines    default=[]
+    ${has_failures}=    Get Length    ${failed_pipelines}
+    IF    ${has_failures} > 0
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '.failed_pipelines[] | "Pipeline_Name: \\(.name)", "RunId: \\(.run_id)", "Resource_URL: \\(.resource_url)", "Linked_Services :", (.linked_services[] | " - \\(.name)\t\\(.properties.type)\t\\(.url)"), "----------------"' ${json_file}
+        ...    cmd=jq -r '.failed_pipelines[] | "Pipeline_Name: \\(.name)", "RunId: \\(.run_id)", "Resource_URL: \\(.resource_url)", "Linked_Services :", (.linked_services[] | " - \\(.name)\\t\\(.properties.type)\\t\\(.url)"), "----------------"' ${json_file}
         RW.Core.Add Pre To Report    Failed Pipelines Summary:\n==============================\n${formatted_results.stdout}
        
-        FOR    ${issue}    IN    @{failed_json["failed_pipelines"]}
+        FOR    ${issue}    IN    @{failed_pipelines}
             ${details_json}=    Evaluate    json.loads('''${issue["details"]}''')    json
             ${linked_services}=    Set Variable    ${issue.get("linked_services", [])}
             ${merged}=    Evaluate    dict(${details_json}, linked_services=${linked_services})
             ${next_steps}=    Analyze Logs
             ...    logs=${details_json["Message"]}
-            ...    error_patterns_file=${CURDIR}/error_patterns.json
+            ...    error_patterns_file=error_patterns.json
             ${suggestions}=    Set Variable    ${EMPTY}
             ${logs_details}=    Set Variable    ${EMPTY}
             FOR    ${step}    IN    @{next_steps}
@@ -166,7 +203,9 @@ List Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GROU
             ...    reproduce_hint=${issue.get("reproduce_hint", "No reproduce hint")}
         END
     ELSE
-        RW.Core.Add Pre To Report    "No failed pipelines found in resource group `${AZURE_RESOURCE_GROUP}`"
+        IF    ${has_script_errors} == 0
+            RW.Core.Add Pre To Report    "No failed pipelines or script errors found in resource group `${AZURE_RESOURCE_GROUP}`"
+        END
     END
 
 
@@ -193,7 +232,7 @@ Find Large Data Operations in Data Factories in resource group `${AZURE_RESOURCE
 
     IF    ${has_heavy_operations}
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '["Pipeline_Name", "RunId", "Output_dataRead_d", "Output_dataWritten_d", "Resource_URL"], (.data_volume_alerts[] | [ .name, .run_id, (.details | fromjson).Output_dataRead_d, (.details | fromjson).Output_dataWritten_d, .resource_url]) | @tsv' ${json_file} | column -t
+        ...    cmd=jq -r '["Pipeline_Name", "RunId", "Output_dataRead_d(byte)", "Output_dataWritten_d(byte)", "Resource_URL"], (.data_volume_alerts[] | [ .name, .run_id, (.details | fromjson).Output_dataRead_d, (.details | fromjson).Output_dataWritten_d, .resource_url]) | @tsv' ${json_file} | column -t
         RW.Core.Add Pre To Report    Heavy Data Operations Summary:\n==============================\n${formatted_results.stdout}
 
         FOR    ${issue}    IN    @{metrics_data["data_volume_alerts"]}
