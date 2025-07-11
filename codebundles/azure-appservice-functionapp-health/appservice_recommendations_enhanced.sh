@@ -114,7 +114,7 @@ if [[ -n "$advisor_recommendations" && "$advisor_recommendations" != "[]" ]]; th
         category: .category,
         impact: .impact,
         title: .shortDescription.problem,
-        description: .shortDescription.solution,
+        details: .shortDescription.solution,
         resourceType: .resourceMetadata.resourceType,
         resourceName: .resourceMetadata.resourceName,
         lastUpdated: .lastUpdated,
@@ -156,7 +156,7 @@ if [[ -n "$service_health_events" && "$service_health_events" != "[]" ]]; then
     processed_service_health=$(echo "$service_health_events" | jq -c '[.[] | {
         id: .id,
         title: .title,
-        description: .description,
+        details: .description,
         eventType: .eventType,
         status: .status,
         level: .level,
@@ -195,7 +195,7 @@ if [[ -n "$security_assessments" && "$security_assessments" != "[]" ]]; then
     processed_security=$(echo "$security_assessments" | jq -c '[.[] | {
         id: .id,
         displayName: .displayName,
-        description: .metadata.description,
+        details: .metadata.description,
         severity: .metadata.severity,
         status: .status.code,
         categories: .metadata.categories,

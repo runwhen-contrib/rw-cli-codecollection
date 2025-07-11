@@ -333,14 +333,24 @@ Check Recommendations and Notifications for App Service `${APP_SERVICE_NAME}` In
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list["recommendations"]}) > 0
         FOR    ${item}    IN    @{issue_list["recommendations"]}
+            ${severity}=    Set Variable    ${item.get("severity", 4)}
+            ${impact}=    Set Variable    ${item.get("impact", "Low")}
+            ${final_severity}=    Set Variable    ${4}
+            IF    "${impact}" == "High"
+                ${final_severity}=    Set Variable    ${1}
+            ELSE IF    "${impact}" == "Medium"
+                ${final_severity}=    Set Variable    ${2}
+            ELSE IF    "${impact}" == "Low"
+                ${final_severity}=    Set Variable    ${4}
+            END
             RW.Core.Add Issue    
             ...    title=${item["title"]}
-            ...    severity=${item.get("severity", 4)}
+            ...    severity=${final_severity}
             ...    next_steps=${item.get("next_step", "Review recommendation details.")}
             ...    expected=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no outstanding recommendations
             ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has recommendations or notifications that need attention
             ...    reproduce_hint=${recommendations.cmd}
-            ...    details=${item["details"]}        
+            ...    details=${item.get("details", "No details provided")}        
         END
     END
 
