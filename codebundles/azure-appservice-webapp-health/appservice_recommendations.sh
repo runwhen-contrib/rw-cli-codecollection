@@ -112,7 +112,7 @@ if [[ -n "$advisor_recommendations" && "$advisor_recommendations" != "[]" ]]; th
         category: .category,
         impact: .impact,
         title: .shortDescription.problem,
-        description: .shortDescription.solution,
+        details: .shortDescription.solution,
         resourceType: .resourceMetadata.resourceType,
         resourceName: .resourceMetadata.resourceName,
         lastUpdated: .lastUpdated,
@@ -154,7 +154,7 @@ if [[ -n "$service_health_events" && "$service_health_events" != "[]" ]]; then
     processed_service_health=$(echo "$service_health_events" | jq -c '[.[] | {
         id: .id,
         title: .title,
-        description: .description,
+        details: .description,
         eventType: .eventType,
         status: .status,
         level: .level,
@@ -193,7 +193,7 @@ if [[ -n "$security_assessments" && "$security_assessments" != "[]" ]]; then
     processed_security=$(echo "$security_assessments" | jq -c '[.[] | {
         id: .id,
         displayName: .displayName,
-        description: .metadata.description,
+        details: .metadata.description,
         severity: .metadata.severity,
         status: .status.code,
         categories: .metadata.categories,
@@ -241,7 +241,7 @@ if [[ -n "$app_service_plan_id" ]]; then
         if [[ "$plan_tier" == "Free" || "$plan_tier" == "Shared" ]]; then
             insight='{
                 "title": "Consider upgrading from Free/Shared tier",
-                "description": "Free and Shared tiers have significant limitations including CPU quotas, no custom domains, and limited scaling options.",
+                "details": "Free and Shared tiers have significant limitations including CPU quotas, no custom domains, and limited scaling options.",
                 "severity": "Medium",
                 "category": "Performance",
                 "recommendation": "Upgrade to Basic or Standard tier for production workloads",
@@ -254,7 +254,7 @@ if [[ -n "$app_service_plan_id" ]]; then
         if [[ "$plan_tier" == "Basic" && "$plan_capacity" == "1" ]]; then
             insight='{
                 "title": "Single instance in Basic tier",
-                "description": "Running a single instance provides no redundancy and may impact availability during maintenance.",
+                "details": "Running a single instance provides no redundancy and may impact availability during maintenance.",
                 "severity": "Medium",
                 "category": "Availability",
                 "recommendation": "Scale to multiple instances or upgrade to Standard tier for SLA coverage",
@@ -287,7 +287,7 @@ if [[ -n "$plan_details" ]]; then
     if [[ "$plan_tier" == "Premium" || "$plan_tier" == "PremiumV2" || "$plan_tier" == "PremiumV3" ]]; then
         insight='{
             "title": "Review Premium tier usage",
-            "description": "Premium tiers offer advanced features but may be costlier than necessary for some workloads.",
+            "details": "Premium tiers offer advanced features but may be costlier than necessary for some workloads.",
             "severity": "Low",
             "category": "Cost",
             "recommendation": "Review CPU and memory utilization to ensure Premium tier features are being utilized",
@@ -300,7 +300,7 @@ if [[ -n "$plan_details" ]]; then
     if [[ "$plan_capacity" -gt 1 ]]; then
         insight='{
             "title": "Multiple instances detected",
-            "description": "Running multiple instances increases costs. Verify if this is necessary for your workload.",
+            "details": "Running multiple instances increases costs. Verify if this is necessary for your workload.",
             "severity": "Low",
             "category": "Cost",
             "recommendation": "For development/testing environments, consider scaling down to single instance",

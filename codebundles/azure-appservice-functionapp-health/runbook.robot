@@ -23,6 +23,15 @@ Check for Resource Health Issues Affecting Function App `${FUNCTION_APP_NAME}` I
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    ${resource_health.stdout}
+    
+    # Add portal URL for Resource Health
+    ${function_app_resource_id}=    RW.CLI.Run Cli
+    ...    cmd=az functionapp show --name "${FUNCTION_APP_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${resource_health_url}=    Set Variable    https://portal.azure.com/#@/resource${function_app_resource_id.stdout.strip()}/resourceHealth
+    RW.Core.Add Pre To Report    🔗 View Resource Health in Azure Portal: ${resource_health_url}
 
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat function_app_health.json
@@ -95,7 +104,15 @@ Check Function App `${FUNCTION_APP_NAME}` Health in Resource Group `${AZ_RESOURC
             ...    details=${item["details"]}        
         END
     END
-    RW.Core.Add Pre To Report    ${health_check_metric.stdout}
+    
+    # Add portal URL for Health Check configuration
+    ${function_app_resource_id_health}=    RW.CLI.Run Cli
+    ...    cmd=az functionapp show --name "${FUNCTION_APP_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${health_check_url}=    Set Variable    https://portal.azure.com/#@/resource${function_app_resource_id_health.stdout.strip()}/healthcheck
+    RW.Core.Add Pre To Report    🔗 Configure Health Check in Azure Portal: ${health_check_url}
 
 Fetch Function App `${FUNCTION_APP_NAME}` Plan Utilization Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Reviews key metrics for the Function App plan and generates a report
@@ -120,7 +137,6 @@ Fetch Function App `${FUNCTION_APP_NAME}` Plan Utilization Metrics In Resource G
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${metrics.stdout}
 
-
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat function_app_plan_issues.json
     ...    env=${env}
@@ -139,7 +155,15 @@ Fetch Function App `${FUNCTION_APP_NAME}` Plan Utilization Metrics In Resource G
             ...    details=${item["details"]}        
         END
     END
-
+    
+    # Add portal URL for Metrics
+    ${function_app_resource_id_metrics}=    RW.CLI.Run Cli
+    ...    cmd=az functionapp show --name "${FUNCTION_APP_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${metrics_url}=    Set Variable    https://portal.azure.com/#@/resource${function_app_resource_id_metrics.stdout.strip()}/metrics
+    RW.Core.Add Pre To Report    🔗 View Metrics in Azure Portal: ${metrics_url}
 
 Get Function App `${FUNCTION_APP_NAME}` Logs In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch logs of appservice workload
@@ -150,6 +174,15 @@ Get Function App `${FUNCTION_APP_NAME}` Logs In Resource Group `${AZ_RESOURCE_GR
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${logs.stdout}
+    
+    # Add portal URL for Logs
+    ${function_app_resource_id_logs}=    RW.CLI.Run Cli
+    ...    cmd=az functionapp show --name "${FUNCTION_APP_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${logs_url}=    Set Variable    https://portal.azure.com/#@/resource${function_app_resource_id_logs.stdout.strip()}/logStream
+    RW.Core.Add Pre To Report    🔗 View Log Stream in Azure Portal: ${logs_url}
 
 Check Configuration Health of Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the configuration health of the Function App
@@ -179,6 +212,15 @@ Check Configuration Health of Function App `${FUNCTION_APP_NAME}` In Resource Gr
             ...    details=${item["details"]}        
         END
     END
+    
+    # Add portal URL for Configuration
+    ${function_app_resource_id_config}=    RW.CLI.Run Cli
+    ...    cmd=az functionapp show --name "${FUNCTION_APP_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${config_url}=    Set Variable    https://portal.azure.com/#@/resource${function_app_resource_id_config.stdout.strip()}/configuration
+    RW.Core.Add Pre To Report    🔗 View Configuration in Azure Portal: ${config_url}
 
 Check Deployment Health of Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch deployment health of the Function App
@@ -202,12 +244,21 @@ Check Deployment Health of Function App `${FUNCTION_APP_NAME}` In Resource Group
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
             ...    next_steps=${item["next_step"]}
-            ...    expected=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has a healthy deployments
+            ...    expected=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has healthy deployments
             ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has deployment issues
             ...    reproduce_hint=${deployment_health.cmd}
             ...    details=${item["details"]}        
         END
     END
+    
+    # Add portal URL for Deployment Center
+    ${function_app_resource_id_deploy}=    RW.CLI.Run Cli
+    ...    cmd=az functionapp show --name "${FUNCTION_APP_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${deploy_url}=    Set Variable    https://portal.azure.com/#@/resource${function_app_resource_id_deploy.stdout.strip()}/deploymentCenter
+    RW.Core.Add Pre To Report    🔗 View Deployment Center in Azure Portal: ${deploy_url}
 
 Fetch Function App `${FUNCTION_APP_NAME}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events of appservice and checks for errors
@@ -234,6 +285,16 @@ Fetch Function App `${FUNCTION_APP_NAME}` Activities In Resource Group `${AZ_RES
             ...    details=${item["details"]}        
         END
     END
+    
+    # Add portal URL for Activity Log
+    ${function_app_resource_id_activities}=    RW.CLI.Run Cli
+    ...    cmd=az functionapp show --name "${FUNCTION_APP_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${activity_url}=    Set Variable    https://portal.azure.com/#@/resource${function_app_resource_id_activities.stdout.strip()}/activitylog
+    RW.Core.Add Pre To Report    🔗 View Activity Log in Azure Portal: ${activity_url}
+
 Check Logs for Errors in Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events of appservice and checks for errors
     [Tags]    appservice    logs    errors    access:read-only
@@ -259,6 +320,15 @@ Check Logs for Errors in Function App `${FUNCTION_APP_NAME}` In Resource Group `
             ...    details=${item["details"]}        
         END
     END
+    
+    # Add portal URL for Log Stream
+    ${function_app_resource_id_logs}=    RW.CLI.Run Cli
+    ...    cmd=az functionapp show --name "${FUNCTION_APP_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${log_stream_url}=    Set Variable    https://portal.azure.com/#@/resource${function_app_resource_id_logs.stdout.strip()}/logStream
+    RW.Core.Add Pre To Report    🔗 View Log Stream in Azure Portal: ${log_stream_url}
 
 Fetch Azure Recommendations and Notifications for Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch Azure Advisor recommendations, Service Health notifications, and security assessments for the Function App
@@ -285,6 +355,15 @@ Fetch Azure Recommendations and Notifications for Function App `${FUNCTION_APP_N
             ...    details=${item["details"]}        
         END
     END
+    
+    # Add portal URL for Azure Advisor
+    ${function_app_resource_id_advisor}=    RW.CLI.Run Cli
+    ...    cmd=az functionapp show --name "${FUNCTION_APP_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${advisor_url}=    Set Variable    https://portal.azure.com/#@/resource${function_app_resource_id_advisor.stdout.strip()}/advisor
+    RW.Core.Add Pre To Report    🔗 View Azure Advisor in Azure Portal: ${advisor_url}
 
 *** Keywords ***
 Suite Initialization

@@ -1,0 +1,38 @@
+{
+  "recommendations": [
+    {
+      "id": "/subscriptions/2a0cf760-baef-4446-b75c-75c4f8a6267f/resourceGroups/rg-contoso-01-app/providers/Microsoft.Web/sites/app-ojcjiczjudu42-blog/providers/Microsoft.Advisor/recommendations/42e3a858-c5b8-c967-be7d-654b7f4bcf86",
+      "category": "HighAvailability",
+      "impact": "High",
+      "title": "Enable Health check for App Service",
+      "details": "Enable Health check for App Service",
+      "resourceType": null,
+      "resourceName": null,
+      "lastUpdated": "2025-07-10T19:23:23.500305+00:00",
+      "recommendationType": "Azure Advisor",
+      "portalUrl": "https://portal.azure.com/#@2022d72f-4153-4b41-ac30-f973cdcdda2e/blade/Microsoft_Azure_Expert/AdvisorMenuBlade/overview"
+    }
+  ],
+  "service_health": [],
+  "security_advisories": [],
+  "performance_insights": [],
+  "cost_optimization": [],
+  "summary": {
+    "total_recommendations": 1,
+    "azure_advisor_count": 1,
+    "service_health_count": 0,
+    "security_advisories_count": 0,
+    "performance_insights_count": 0,
+    "cost_optimization_count": 0,
+    "app_service_name": "app-ojcjiczjudu42-blog",
+    "resource_group": "rg-contoso-01-app",
+    "checked_at": "2025-07-11T04:21:21Z",
+    "analysis_period_days": 30,
+    "portal_links": {
+      "app_service": "https://portal.azure.com/#@2022d72f-4153-4b41-ac30-f973cdcdda2e/resource/subscriptions/2a0cf760-baef-4446-b75c-75c4f8a6267f/resourceGroups/rg-contoso-01-app/providers/Microsoft.Web/sites/app-ojcjiczjudu42-blog/overview",
+      "azure_advisor": "https://portal.azure.com/#@2022d72f-4153-4b41-ac30-f973cdcdda2e/blade/Microsoft_Azure_Expert/AdvisorMenuBlade/overview",
+      "service_health": "https://portal.azure.com/#@2022d72f-4153-4b41-ac30-f973cdcdda2e/blade/Microsoft_Azure_Health/AzureHealthBrowseBlade/serviceIssues",
+      "security_center": "https://portal.azure.com/#@2022d72f-4153-4b41-ac30-f973cdcdda2e/blade/Microsoft_Azure_Security/SecurityMenuBlade/0"
+    }
+  }
+}
