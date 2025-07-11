@@ -115,14 +115,26 @@ fi
 
 # Get all Data Factories in the resource group
 echo "Fetching Data Factories..."
-if ! datafactories=$(az datafactory list -g "$resource_group" --subscription "$subscription_id" -o json 2>/dev/null); then
+if ! datafactories=$(az datafactory list -g "$resource_group" --subscription "$subscription_id" -o json 2>az_datafactory_err.log); then
     echo "ERROR: Failed to list Data Factories in resource group $resource_group"
+    if [[ -s az_datafactory_err.log ]]; then
+        echo "Raw error output from az datafactory list:" >&2
+        cat az_datafactory_err.log >&2
+    fi
     echo "$error_trends_json" > "$output_file"
+    rm -f az_datafactory_err.log
     exit 1
 fi
+if [[ -s az_datafactory_err.log ]]; then
+    echo "Warning: az datafactory list stderr:" >&2
+    cat az_datafactory_err.log >&2
+fi
+rm -f az_datafactory_err.log
 
 if ! validate_json "$datafactories"; then
     echo "ERROR: Invalid JSON response from Data Factory list command"
+    echo "Raw output was:" >&2
+    echo "$datafactories" >&2
     echo "$error_trends_json" > "$output_file"
     exit 1
 fi
@@ -155,8 +167,10 @@ while IFS= read -r row; do
     diagnostics=""
     if ! diagnostics=$(az monitor diagnostic-settings list --resource "$df_id" -o json 2>diag_err.log); then
         err_msg="Failed to get diagnostic settings"
-        if [[ -f diag_err.log ]]; then
+        if [[ -f diag_err.log && -s diag_err.log ]]; then
             err_msg=$(cat diag_err.log 2>/dev/null || echo "$err_msg")
+            echo "Raw error output from az monitor diagnostic-settings list:" >&2
+            cat diag_err.log >&2
         fi
         rm -f diag_err.log
 
@@ -181,9 +195,15 @@ while IFS= read -r row; do
             }]')
         continue
     fi
+    if [[ -f diag_err.log && -s diag_err.log ]]; then
+        echo "Warning: az monitor diagnostic-settings list stderr:" >&2
+        cat diag_err.log >&2
+    fi
     rm -f diag_err.log
 
     if ! validate_json "$diagnostics" || [[ "$diagnostics" == "[]" ]]; then
+        echo "Warning: Invalid or empty diagnostics JSON for $df_name. Raw output:" >&2
+        echo "$diagnostics" >&2
         error_trends_json=$(echo "$error_trends_json" | jq \
             --arg title "No Diagnostic Settings for Data Factory $df_name in resource group \`${resource_group}\`" \
             --arg details "No diagnostic settings configured or invalid response" \
@@ -287,8 +307,10 @@ while IFS= read -r row; do
     workspace_guid=""
     if ! workspace_guid=$(az monitor log-analytics workspace show --ids "$workspace_id" --query "customerId" -o tsv 2>guid_err.log); then
         err_msg="Failed to get workspace GUID"
-        if [[ -f guid_err.log ]]; then
+        if [[ -f guid_err.log && -s guid_err.log ]]; then
             err_msg=$(cat guid_err.log 2>/dev/null || echo "$err_msg")
+            echo "Raw error output from az monitor log-analytics workspace show:" >&2
+            cat guid_err.log >&2
         fi
         rm -f guid_err.log
 
@@ -313,9 +335,15 @@ while IFS= read -r row; do
             }]')
         continue
     fi
+    if [[ -f guid_err.log && -s guid_err.log ]]; then
+        echo "Warning: az monitor log-analytics workspace show stderr:" >&2
+        cat guid_err.log >&2
+    fi
     rm -f guid_err.log
 
     if [[ -z "$workspace_guid" ]]; then
+        echo "Warning: Empty workspace GUID for $df_name. Raw output:" >&2
+        echo "$workspace_guid" >&2
         error_trends_json=$(echo "$error_trends_json" | jq \
             --arg title "Empty workspace GUID for \`$df_name\` in resource group \`${resource_group}\`" \
             --arg details "Workspace GUID is empty or null" \
@@ -360,8 +388,10 @@ EOF
         --subscription "$subscription_id" \
         --output json 2>pipeline_query_err.log); then
         err_msg="Log Analytics query failed"
-        if [[ -f pipeline_query_err.log ]]; then
+        if [[ -f pipeline_query_err.log && -s pipeline_query_err.log ]]; then
             err_msg=$(cat pipeline_query_err.log 2>/dev/null || echo "$err_msg")
+            echo "Raw error output from az monitor log-analytics query:" >&2
+            cat pipeline_query_err.log >&2
         fi
         rm -f pipeline_query_err.log
         
@@ -386,16 +416,40 @@ EOF
             }]')
         continue
     fi
+    if [[ -f pipeline_query_err.log && -s pipeline_query_err.log ]]; then
+        echo "Warning: az monitor log-analytics query stderr:" >&2
+        cat pipeline_query_err.log >&2
+    fi
     rm -f pipeline_query_err.log
 
     if ! validate_json "$error_trends"; then
-        echo "Warning: Invalid JSON in error_trends for $df_name, skipping..."
+        echo "Warning: Invalid JSON in error_trends for $df_name, skipping... Raw output:" >&2
+        echo "$error_trends" >&2
+        error_trends_json=$(echo "$error_trends_json" | jq \
+            --arg title "Invalid JSON from log-analytics query for $df_name" \
+            --arg details "Raw output: $error_trends" \
+            --arg severity "4" \
+            --arg nextStep "Check Azure CLI output and permissions." \
+            --arg expected "Valid JSON output from log-analytics query" \
+            --arg actual "Invalid JSON output from log-analytics query" \
+            '.script_errors += [{
+                "title": $title,
+                "details": $details,
+                "next_step": $nextStep,
+                "expected": $expected,
+                "actual": $actual,
+                "severity": ($severity | tonumber)
+            }]')
         continue
     fi
     
     # Process error trends if valid
     while IFS= read -r pipeline; do
         if [[ -z "$pipeline" ]] || ! validate_json "$pipeline"; then
+            if [[ -n "$pipeline" ]]; then
+                echo "Warning: Skipping invalid pipeline JSON for $df_name. Raw entry:" >&2
+                echo "$pipeline" >&2
+            fi
             continue
         fi
         
