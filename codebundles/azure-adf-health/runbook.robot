@@ -232,7 +232,7 @@ Find Large Data Operations in Data Factories in resource group `${AZURE_RESOURCE
 
     IF    ${has_heavy_operations}
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '["Pipeline_Name", "RunId", "Output_dataRead_d", "Output_dataWritten_d", "Resource_URL"], (.data_volume_alerts[] | [ .name, .run_id, (.details | fromjson).Output_dataRead_d, (.details | fromjson).Output_dataWritten_d, .resource_url]) | @tsv' ${json_file} | column -t
+        ...    cmd=jq -r '["Pipeline_Name", "RunId", "Output_dataRead_d(byte)", "Output_dataWritten_d(byte)", "Resource_URL"], (.data_volume_alerts[] | [ .name, .run_id, (.details | fromjson).Output_dataRead_d, (.details | fromjson).Output_dataWritten_d, .resource_url]) | @tsv' ${json_file} | column -t
         RW.Core.Add Pre To Report    Heavy Data Operations Summary:\n==============================\n${formatted_results.stdout}
 
         FOR    ${issue}    IN    @{metrics_data["data_volume_alerts"]}
