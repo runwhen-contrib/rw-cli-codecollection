@@ -59,6 +59,11 @@ if [[ "$function_app_state" != "Running" ]]; then
     echo "CRITICAL: Function App $FUNCTION_APP_NAME is $function_app_state (not running)!"
     portal_url="https://portal.azure.com/#@/resource${resource_id}/overview"
     
+    # Build a link for the Azure Portal event logs (optional convenience)
+    tenant_id=$(az account show --query "tenantId" -o tsv)
+    subscription_id=$(az account show --query "id" -o tsv)
+    event_log_url="https://portal.azure.com/#@$tenant_id/resource/subscriptions/$subscription_id/resourceGroups/$AZ_RESOURCE_GROUP/providers/Microsoft.Web/sites/$FUNCTION_APP_NAME/eventlogs"
+    
     # Add critical issue for stopped service
     issues_json=$(echo "$issues_json" | jq \
         --arg title "Function App \`$FUNCTION_APP_NAME\` is $function_app_state (Not Running)" \
@@ -76,11 +81,6 @@ az monitor activity-log list \
   --end-time "$end_time" \
   --resource-group "$AZ_RESOURCE_GROUP" \
   --output table
-
-# Build a link for the Azure Portal event logs (optional convenience)
-tenant_id=$(az account show --query "tenantId" -o tsv)
-subscription_id=$(az account show --query "id" -o tsv)
-event_log_url="https://portal.azure.com/#@$tenant_id/resource/subscriptions/$subscription_id/resourceGroups/$AZ_RESOURCE_GROUP/providers/Microsoft.Web/sites/$FUNCTION_APP_NAME/eventlogs"
 
 # Continue with activity analysis
 
