@@ -12,6 +12,10 @@ set -euo pipefail
 : "${AZURE_RESOURCE_SUBSCRIPTION_ID:?Must set AZURE_RESOURCE_SUBSCRIPTION_ID}"
 : "${THRESHOLD_MB:?Must set THRESHOLD_MB}"
 
+THRESHOLD_BYTES=$(echo "$THRESHOLD_MB * 1024 * 1024" | bc)
+THRESHOLD_BYTES=${THRESHOLD_BYTES%.*}
+echo "Threshold: $THRESHOLD_MB MB ($THRESHOLD_BYTES bytes)"
+
 subscription_id="$AZURE_RESOURCE_SUBSCRIPTION_ID"
 resource_group="$AZURE_RESOURCE_GROUP"
 output_file="data_volume_audit.json"
@@ -98,6 +102,21 @@ fi
 
 if ! validate_json "$datafactories"; then
     echo "ERROR: Invalid JSON response from Data Factory list command"
+    audit_json=$(echo "$audit_json" | jq \
+        --arg title "Invalid JSON from datafactory list" \
+        --arg details "Raw output: $datafactories" \
+        --arg severity "4" \
+        --arg nextStep "Check Azure CLI output and permissions." \
+        --arg expected "Valid JSON output from datafactory list" \
+        --arg actual "Invalid JSON output from datafactory list" \
+        '.data_volume_alerts += [{
+            "title": $title,
+            "details": $details,
+            "next_step": $nextStep,
+            "expected": $expected,
+            "actual": $actual,
+            "severity": ($severity | tonumber)
+        }]')
     echo "$audit_json" > "$output_file"
     exit 1
 fi
@@ -290,7 +309,7 @@ while IFS= read -r row; do
 
     # KQL Query to check for heavy data operations
     kql_query=$(cat <<EOF
-let threshold = $THRESHOLD_MB;
+let threshold = $THRESHOLD_BYTES;
 AzureDiagnostics
 | where ResourceProvider == "MICROSOFT.DATAFACTORY"
 | where Category == "ActivityRuns"
@@ -340,6 +359,21 @@ EOF
 
     if ! validate_json "$volume_data"; then
         echo "Warning: Invalid JSON in volume_data for $df_name, skipping..."
+        audit_json=$(echo "$audit_json" | jq \
+            --arg title "Invalid JSON from log-analytics query for $df_name" \
+            --arg details "Raw output: $volume_data" \
+            --arg severity "4" \
+            --arg nextStep "Check Azure CLI output and permissions." \
+            --arg expected "Valid JSON output from log-analytics query" \
+            --arg actual "Invalid JSON output from log-analytics query" \
+            '.data_volume_alerts += [{
+                "title": $title,
+                "details": $details,
+                "next_step": $nextStep,
+                "expected": $expected,
+                "actual": $actual,
+                "severity": ($severity | tonumber)
+            }]')
         continue
     fi
 
