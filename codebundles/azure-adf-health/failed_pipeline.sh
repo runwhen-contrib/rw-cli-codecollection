@@ -80,15 +80,36 @@ if ! az extension show --name log-analytics &>/dev/null; then
 fi
 
 # Get all Data Factories in the resource group
-datafactories=$(az datafactory list -g "$resource_group" --subscription "$subscription_id" -o json)
+raw_output=$(az datafactory list -g "$resource_group" --subscription "$subscription_id" -o json 2>az_datafactory_err.log || true)
+if ! validate_json "$raw_output"; then
+    err_msg=$(cat az_datafactory_err.log)
+    rm -f az_datafactory_err.log
+    output_json=$(echo "$output_json" | jq \
+        --arg title "Invalid JSON from datafactory list" \
+        --arg details "Error: $err_msg | Raw output: $raw_output" \
+        --arg severity "4" \
+        --arg nextStep "Check Azure CLI output and permissions." \
+        --arg expected "Valid JSON output from datafactory list" \
+        --arg actual "Invalid JSON output from datafactory list" \
+        '.script_errors += [{
+            "title": $title,
+            "details": $details,
+            "next_step": $nextStep,
+            "expected": $expected,
+            "actual": $actual,
+            "severity": ($severity | tonumber)
+        }]')
+    raw_output="[]"
+fi
+rm -f az_datafactory_err.log
 
-if [[ -z "$datafactories" || "$datafactories" == "[]" ]]; then
+if [[ -z "$raw_output" || "$raw_output" == "[]" ]]; then
     echo "No Data Factories found in resource group $resource_group"
     echo "$output_json" > "$output_file"
     exit 0
 fi
 
-for row in $(echo "$datafactories" | jq -c '.[]'); do
+for row in $(echo "$raw_output" | jq -c '.[]'); do
     df_name=$(echo "$row" | jq -r '.name')
     df_id=$(echo "$row" | jq -r '.id')
     df_rg=$(echo "$row" | jq -r '.resourceGroup')
@@ -98,8 +119,24 @@ for row in $(echo "$datafactories" | jq -c '.[]'); do
 
     # Get linked services with robust error handling
     linked_services=$(az datafactory linked-service list --factory-name "$df_name" --resource-group "$df_rg" --subscription "$subscription_id" -o json 2>az_linked_services_err.log) || linked_services="[]"
-    if ! echo "$linked_services" | jq empty 2>/dev/null; then
-        echo "Warning: Invalid JSON from linked services for $df_name: $(cat az_linked_services_err.log)"
+    if ! validate_json "$linked_services"; then
+        err_msg=$(cat az_linked_services_err.log)
+        rm -f az_linked_services_err.log
+        output_json=$(echo "$output_json" | jq \
+            --arg title "Invalid JSON from linked services for $df_name" \
+            --arg details "Error: $err_msg | Raw output: $linked_services" \
+            --arg severity "4" \
+            --arg nextStep "Check Azure CLI output and permissions." \
+            --arg expected "Valid JSON output from linked services for $df_name" \
+            --arg actual "Invalid JSON output from linked services for $df_name" \
+            '.script_errors += [{
+                "title": $title,
+                "details": $details,
+                "next_step": $nextStep,
+                "expected": $expected,
+                "actual": $actual,
+                "severity": ($severity | tonumber)
+            }]')
         linked_services="[]"
     fi
     rm -f az_linked_services_err.log
@@ -264,7 +301,7 @@ EOF
         --output json 2>pipeline_query_err.log); then
         err_msg=$(cat pipeline_query_err.log)
         rm -f pipeline_query_err.log
-
+        
         output_json=$(echo "$output_json" | jq \
             --arg title "Log Analytics Query Failed for Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
             --arg details "$err_msg" \
@@ -288,26 +325,32 @@ EOF
     fi
     rm -f pipeline_query_err.log
 
-    # Parse failed pipeline results
-    if ! echo "$failed_pipelines" | jq -e '.tables[0].rows' >/dev/null 2>&1; then
+    # Check if output is .tables[0].rows or a flat array
+    if echo "$failed_pipelines" | jq -e '.tables[0].rows' >/dev/null 2>&1; then
+        row_count=$(echo "$failed_pipelines" | jq '.tables[0].rows | length')
+        if [[ "$row_count" -eq 0 ]]; then
+            echo "No failed pipeline runs found for $df_name"
+            continue
+        fi
+        rows=$(echo "$failed_pipelines" | jq -c '
+          .tables[0].rows[] as $row |
+          {
+            pipelineName_s: $row[0],
+            Message: $row[1],
+            runId_g: $row[2]
+          }
+        ')
+    elif echo "$failed_pipelines" | jq -e '.[0].pipelineName_s' >/dev/null 2>&1; then
+        row_count=$(echo "$failed_pipelines" | jq 'length')
+        if [[ "$row_count" -eq 0 ]]; then
+            echo "No failed pipeline runs found for $df_name"
+            continue
+        fi
+        rows=$(echo "$failed_pipelines" | jq -c '.[] | { pipelineName_s, Message, runId_g }')
+    else
         echo "No failed pipeline rows or invalid JSON returned for $df_name"
         continue
     fi
-
-    row_count=$(echo "$failed_pipelines" | jq '.tables[0].rows | length')
-    if [[ "$row_count" -eq 0 ]]; then
-        echo "No failed pipeline runs found for $df_name"
-        continue
-    fi
-
-    rows=$(echo "$failed_pipelines" | jq -c '
-  .tables[0].rows[] as $row |
-  {
-    pipelineName_s: $row[0],
-    Message: $row[1],
-    runId_g: $row[2]
-  }
-')
 
     # Example: Actual Failed Pipeline Run
     while IFS= read -r pipeline; do
