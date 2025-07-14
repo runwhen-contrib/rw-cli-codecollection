@@ -93,6 +93,10 @@ for instance in $instances; do
         
         # Add the health status to the array in the JSON file
         jq --argjson health "$health_status" '. += [$health]' "$HEALTH_OUTPUT" > temp.json && mv temp.json "$HEALTH_OUTPUT"
+        if ! jq empty "$HEALTH_OUTPUT" 2>/dev/null; then
+            echo "Invalid JSON detected in $HEALTH_OUTPUT"
+            exit 1
+        fi
     else
         echo "Failed to retrieve health status for $instance ($provider_path/$instance). This might be due to unsupported resource type or other API limitations."
     fi
