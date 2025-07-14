@@ -70,6 +70,12 @@ add_to_json() {
     else
         echo "[$data]" > "$file"
     fi
+
+    # Check for invalid JSON
+    if ! jq empty "$file" 2>/dev/null; then
+        echo "Invalid JSON detected in $file"
+        exit 1
+    fi
 }
 
 # Function to get tier recommendations
