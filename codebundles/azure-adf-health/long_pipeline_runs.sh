@@ -102,6 +102,21 @@ fi
 
 if ! validate_json "$datafactories"; then
     echo "ERROR: Invalid JSON response from Data Factory list command"
+    long_runs_json=$(echo "$long_runs_json" | jq \
+        --arg title "Invalid JSON from datafactory list" \
+        --arg details "Raw output: $datafactories" \
+        --arg severity "4" \
+        --arg nextStep "Check Azure CLI output and permissions." \
+        --arg expected "Valid JSON output from datafactory list" \
+        --arg actual "Invalid JSON output from datafactory list" \
+        '.long_running_pipelines += [{
+            "title": $title,
+            "details": $details,
+            "next_step": $nextStep,
+            "expected": $expected,
+            "actual": $actual,
+            "severity": ($severity | tonumber)
+        }]')
     echo "$long_runs_json" > "$output_file"
     exit 1
 fi
@@ -345,6 +360,21 @@ EOF
 
     if ! validate_json "$long_running_pipelines"; then
         echo "Warning: Invalid JSON in long_running_pipelines for $df_name, skipping..."
+        long_runs_json=$(echo "$long_runs_json" | jq \
+            --arg title "Invalid JSON from log-analytics query for $df_name" \
+            --arg details "Raw output: $long_running_pipelines" \
+            --arg severity "4" \
+            --arg nextStep "Check Azure CLI output and permissions." \
+            --arg expected "Valid JSON output from log-analytics query" \
+            --arg actual "Invalid JSON output from log-analytics query" \
+            '.long_running_pipelines += [{
+                "title": $title,
+                "details": $details,
+                "next_step": $nextStep,
+                "expected": $expected,
+                "actual": $actual,
+                "severity": ($severity | tonumber)
+            }]')
         continue
     fi
     
