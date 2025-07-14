@@ -197,7 +197,7 @@ app_insights_check=$(az functionapp show --name "$FUNCTION_APP_NAME" --resource-
 if [[ -z "$app_insights_check" ]]; then
     add_issue "Application Insights Not Configured for Function App \`$FUNCTION_APP_NAME\`" \
               "Function App \`$FUNCTION_APP_NAME\` does not have Application Insights configured. This limits monitoring and troubleshooting capabilities." \
-              "3" \
+              "4" \
               "Application Insights provides performance monitoring, dependency tracking, and error analysis for Function Apps."
 fi
 
@@ -207,7 +207,7 @@ https_only=$(az functionapp show --name "$FUNCTION_APP_NAME" --resource-group "$
 if [[ "$https_only" != "true" ]]; then
     add_issue "HTTPS Not Enforced for Function App \`$FUNCTION_APP_NAME\`" \
               "Function App \`$FUNCTION_APP_NAME\` is not configured to enforce HTTPS only. This may expose data to security risks." \
-              "3" \
+              "4" \
               "Enable HTTPS only to ensure all traffic is encrypted in transit."
 fi
 

@@ -1,0 +1,157 @@
+# Codebundles Directory - General Cursor Rules
+
+## Overview
+This directory contains RunWhen codebundles for various cloud platforms and services. Each codebundle provides health monitoring, troubleshooting, and operational tasks for specific resources.
+
+## Directory Structure
+
+### Codebundle Organization
+- Each codebundle is in its own subdirectory
+- Subdirectory names follow pattern: `[platform]-[service]-[purpose]`
+- Examples: `azure-appservice-functionapp-health`, `k8s-deployment-healthcheck`
+- Each codebundle should have its own `.cursorrules` file for specific patterns
+
+### Common Files
+- **runbook.robot**: Main Robot Framework execution file
+- **sli.robot**: Service Level Indicator definitions
+- **meta.yaml**: Codebundle metadata and configuration
+- **README.md**: Documentation and usage instructions
+- **.test/**: Testing infrastructure and validation scripts
+
+## Universal Standards
+
+### Issue Reporting
+- **Issue Titles**: Must include entity name, resource type, and scope
+- **Issue Details**: Must provide context, metrics, and actionable next steps
+- **Severity Levels**: Use 1-4 scale (1=Critical, 2=High, 3=Medium, 4=Low)
+- **Portal Links**: Include direct links to cloud provider portals
+
+### Script Development
+- **Bash Scripts**: Must be executable and include error handling
+- **Output Format**: Provide both human-readable and machine-readable outputs
+- **Environment Variables**: Validate required variables at script start
+- **Logging**: Include meaningful progress indicators and error messages
+
+### Robot Framework
+- **Task Naming**: Use consistent patterns like `Check/Get/Fetch [Entity] [Action] for [Resource] In [Scope]`
+- **Documentation**: Include proper docstrings and tags for each task
+- **Variables**: Import and validate all required user variables and secrets
+- **Error Handling**: Use proper try-catch patterns and issue reporting
+
+## Platform-Specific Patterns
+
+### Azure Codebundles
+- Use Azure CLI for resource management
+- Include resource group and subscription context
+- Follow Azure naming conventions
+- Use Azure Monitor APIs for metrics
+
+### Kubernetes Codebundles
+- Use kubectl for cluster operations
+- Include namespace and cluster context
+- Follow Kubernetes naming conventions
+- Use Kubernetes APIs for resource monitoring
+
+### AWS Codebundles
+- Use AWS CLI for resource management
+- Include region and account context
+- Follow AWS naming conventions
+- Use CloudWatch APIs for metrics
+
+### GCP Codebundles
+- Use gcloud for resource management
+- Include project and region context
+- Follow GCP naming conventions
+- Use Cloud Monitoring APIs for metrics
+
+## Code Quality Standards
+
+### Documentation
+- **README.md**: Must include configuration, usage examples, and troubleshooting
+- **Comments**: Include meaningful comments for complex logic
+- **Examples**: Provide real-world usage examples
+- **Troubleshooting**: Include common issues and solutions
+
+### Testing
+- **Syntax Validation**: All scripts must pass syntax checks
+- **Mock Testing**: Test with mock data when possible
+- **Integration Testing**: Test with real resources when available
+- **Error Scenarios**: Test error handling and edge cases
+
+### Security
+- **Authentication**: Use service principals or IAM roles
+- **Secrets**: Never hardcode credentials
+- **Permissions**: Use least privilege access
+- **Data Handling**: Sanitize sensitive information
+
+## Development Workflow
+
+### Creating New Codebundles
+1. Follow the naming convention: `[platform]-[service]-[purpose]`
+2. Create the basic file structure (runbook.robot, README.md, etc.)
+3. Add platform-specific `.cursorrules` file
+4. Implement core functionality with proper error handling
+5. Add comprehensive testing and documentation
+6. Validate with real resources
+
+### Modifying Existing Codebundles
+1. Review existing patterns and conventions
+2. Maintain backward compatibility when possible
+3. Update documentation for new features
+4. Test changes thoroughly
+5. Update version information
+
+### Code Review Checklist
+- [ ] Follows platform-specific patterns
+- [ ] Includes proper error handling
+- [ ] Provides meaningful output and logging
+- [ ] Includes comprehensive documentation
+- [ ] Passes all tests and validations
+- [ ] Uses secure authentication methods
+- [ ] Follows naming conventions
+
+## Best Practices
+
+### Performance
+- Minimize API calls and resource usage
+- Use appropriate timeouts and retries
+- Cache results when possible
+- Handle large datasets efficiently
+
+### Maintainability
+- Use consistent code style and formatting
+- Include meaningful variable names
+- Document complex logic and algorithms
+- Follow DRY (Don't Repeat Yourself) principles
+
+### Reliability
+- Implement proper error handling
+- Use idempotent operations where possible
+- Include fallback mechanisms
+- Test edge cases and failure scenarios
+
+### Usability
+- Provide clear and actionable output
+- Include helpful error messages
+- Use consistent terminology
+- Provide examples and usage patterns
+
+## Integration Guidelines
+
+### RunWhen Platform
+- Follow RunWhen task patterns and conventions
+- Use consistent issue reporting formats
+- Include proper portal links and navigation
+- Provide meaningful next steps and reproduce hints
+
+### Cloud Provider APIs
+- Use official SDKs and CLI tools
+- Follow API best practices and rate limits
+- Handle authentication and authorization properly
+- Use appropriate resource naming and tagging
+
+### Monitoring and Observability
+- Include comprehensive logging
+- Provide metrics and performance data
+- Use appropriate alerting and notification
+- Include health checks and status reporting 

@@ -163,4 +163,5 @@ echo "No deployment logs to analyze. Skipping deployment log checks..."
 # 3. Output results
 #-----------------------------------------------------------------------------
 echo "$issues_json" | jq '.' > "deployment_health.json"
-echo "Deployment health check completed. Results saved to deployment_health.json"
+echo "Deployment health check completed."
+cat deployment_health.json
