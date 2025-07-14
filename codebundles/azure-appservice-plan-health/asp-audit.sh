@@ -66,14 +66,32 @@ for plan in $plans; do
          else "Miscellaneous operation" end)
     })' > _current.json
 
+  if ! jq empty _current.json 2>/dev/null; then
+    echo "Invalid JSON detected in _current.json"
+    exit 1
+  fi
+
   jq 'if length == 0 then {} else group_by(.aspName) | map({ (.[0].aspName): . }) | add end' _current.json > _grouped.json
+
+  if ! jq empty _grouped.json 2>/dev/null; then
+    echo "Invalid JSON detected in _grouped.json"
+    exit 1
+  fi
 
   jq 'with_entries(
     .value |= (map(select(.changeStatus == "Succeeded")) | unique_by(.correlationId))
   )' _grouped.json > _succ.json
+  if ! jq empty _succ.json 2>/dev/null; then
+    echo "Invalid JSON detected in _succ.json"
+    exit 1
+  fi
   jq 'with_entries(
     .value |= (map(select(.changeStatus == "Failed")) | unique_by(.correlationId))
   )' _grouped.json > _fail.json
+  if ! jq empty _fail.json 2>/dev/null; then
+    echo "Invalid JSON detected in _fail.json"
+    exit 1
+  fi
 
   jq -s 'add' "$tmp_success" _succ.json > _sc.tmp && mv _sc.tmp "$tmp_success"
   jq -s 'add' "$tmp_failed"  _fail.json > _fl.tmp && mv _fl.tmp "$tmp_failed"
