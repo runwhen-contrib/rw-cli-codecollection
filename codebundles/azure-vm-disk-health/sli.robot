@@ -48,11 +48,10 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
 
         # Run next steps script and check for issues
         ${tmpfile2}=    Generate Random String    8
-        ${tmpfile_path2}=    Set Variable    /tmp/vm_disk_stdout_${tmpfile2}.txt
+        ${tmpfile_path2}=    Set Variable    /tmp/vm_disk_stdout.txt
         Create File    ${tmpfile_path2}    ${parsed_out['stdout']}
         ${next_steps}=    RW.CLI.Run Bash File
         ...    bash_file=next_steps_disk_utilization.sh
-        ...    args=${tmpfile_path2}
         ...    env=${env}
         ...    timeout_seconds=180
         ...    include_in_history=false
@@ -94,11 +93,10 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
         ...     timeout_seconds=60
 
         ${tmpfile2}=    Generate Random String    8
-        ${tmpfile_path2}=    Set Variable    /tmp/vm_mem_stdout_${tmpfile2}.txt
+        ${tmpfile_path2}=    Set Variable    /tmp/vm_mem_stdout.txt
         Create File    ${tmpfile_path2}    ${parsed_out['stdout']}
         ${next_steps}=    RW.CLI.Run Bash File
         ...    bash_file=next_steps_memory_check.sh
-        ...    args=${tmpfile_path2}
         ...    env=${env}
         ...    timeout_seconds=180
         ...    include_in_history=false
@@ -140,11 +138,10 @@ Check Uptime for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
         ...     timeout_seconds=60
 
         ${tmpfile2}=    Generate Random String    8
-        ${tmpfile_path2}=    Set Variable    /tmp/vm_uptime_stdout_${tmpfile2}.txt
+        ${tmpfile_path2}=    Set Variable    /tmp/vm_uptime_stdout.txt
         Create File    ${tmpfile_path2}    ${parsed_out['stdout']}
         ${next_steps}=    RW.CLI.Run Bash File
         ...    bash_file=next_steps_uptime.sh
-        ...    args=${tmpfile_path2}
         ...    env=${env}
         ...    timeout_seconds=180
         ...    include_in_history=false
@@ -186,11 +183,10 @@ Check Last Patch Status for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
         ...     timeout_seconds=60
 
         ${tmpfile2}=    Generate Random String    8
-        ${tmpfile_path2}=    Set Variable    /tmp/vm_patch_stdout_${tmpfile2}.txt
+        ${tmpfile_path2}=    Set Variable    /tmp/vm_patch_stdout.txt
         Create File    ${tmpfile_path2}    ${parsed_out['stdout']}
         ${next_steps}=    RW.CLI.Run Bash File
         ...    bash_file=next_steps_patch_time.sh
-        ...    args=${tmpfile_path2}
         ...    env=${env}
         ...    timeout_seconds=180
         ...    include_in_history=false
