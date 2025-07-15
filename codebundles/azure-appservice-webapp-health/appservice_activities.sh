@@ -22,6 +22,9 @@ end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 # Initialize the JSON object to store issues only - this ensures we always have valid output
 issues_json=$(jq -n '{issues: []}')
 
+# Get subscription name from environment variable
+SUBSCRIPTION_NAME="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
+
 # Get or set subscription ID
 if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
     subscription_id=$(az account show --query "id" -o tsv)
@@ -36,9 +39,9 @@ echo "Switching to subscription ID: $subscription_id"
 if ! az account set --subscription "$subscription_id"; then
     echo "Failed to set subscription."
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Failed to Set Azure Subscription" \
+        --arg title "Azure subscription access failed for \`$SUBSCRIPTION_NAME\`" \
         --arg details "Could not switch to subscription $subscription_id. Check subscription access" \
-        --arg nextStep "Verify subscription access for $subscription_id and retry" \
+        --arg nextStep "Verify subscription access and authentication for \`$SUBSCRIPTION_NAME\`" \
         --arg severity "1" \
         '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber)}]')
     echo "$issues_json" > "$OUTPUT_FILE"
@@ -48,18 +51,24 @@ fi
 
 tenant_id=$(az account show --query "tenantId" -o tsv)
 
-# Remove previous app_service_activities_issues.json file if it exists
+# Remove previous file if it exists
 [ -f "$OUTPUT_FILE" ] && rm "$OUTPUT_FILE"
 
-echo "Azure App Service $APP_SERVICE_NAME activity logs (recent):"
+echo "===== AZURE APP SERVICE ACTIVITY MONITORING ====="
+echo "App Service: $APP_SERVICE_NAME"
+echo "Resource Group: $AZ_RESOURCE_GROUP"
+echo "Subscription: $SUBSCRIPTION_NAME"
+echo "Time Period: $TIME_PERIOD_MINUTES minutes"
+echo "Analysis Period: $start_time to $end_time"
+echo "===================================================="
 
 # Get the resource ID of the App Service
 if ! resource_id=$(az webapp show --name "$APP_SERVICE_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "id" -o tsv 2>/dev/null); then
     echo "Error: App Service $APP_SERVICE_NAME not found in resource group $AZ_RESOURCE_GROUP."
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "App Service \`$APP_SERVICE_NAME\` Not Found" \
+        --arg title "App Service \`$APP_SERVICE_NAME\` in subscription \`$SUBSCRIPTION_NAME\` not found" \
         --arg details "Could not find App Service $APP_SERVICE_NAME in resource group $AZ_RESOURCE_GROUP. Service may not exist or access may be restricted" \
-        --arg nextStep "Verify App Service name and resource group, or check access permissions for \`$APP_SERVICE_NAME\`" \
+        --arg nextStep "Verify App Service name and resource group exist, then check access permissions" \
         --arg severity "1" \
         '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber)}]')
     echo "$issues_json" > "$OUTPUT_FILE"
@@ -71,30 +80,13 @@ fi
 if [[ -z "$resource_id" ]]; then
     echo "Error: Empty resource ID returned for App Service $APP_SERVICE_NAME."
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Empty Resource ID for \`$APP_SERVICE_NAME\`" \
+        --arg title "App Service \`$APP_SERVICE_NAME\` in subscription \`$SUBSCRIPTION_NAME\` returned empty resource ID" \
         --arg details "App Service query returned empty resource ID. Service may not exist" \
-        --arg nextStep "Verify App Service \`$APP_SERVICE_NAME\` exists in resource group \`$AZ_RESOURCE_GROUP\`" \
+        --arg nextStep "Verify App Service exists and is properly configured in the resource group" \
         --arg severity "1" \
         '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber)}]')
     echo "$issues_json" > "$OUTPUT_FILE"
     echo "Empty resource ID. Results saved to $OUTPUT_FILE"
-    exit 0
-fi
-
-# Check the status of the App Service
-app_service_state=$(az webapp show --name "$APP_SERVICE_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "state" -o tsv 2>/dev/null)
-
-if [[ "$app_service_state" != "Running" ]]; then
-    echo "CRITICAL: App Service $APP_SERVICE_NAME is $app_service_state (not running)!"
-    portal_url="https://portal.azure.com/#@/resource${resource_id}/overview"
-    issues_json=$(echo "$issues_json" | jq \
-        --arg title "App Service \`$APP_SERVICE_NAME\` is $app_service_state (Not Running)" \
-        --arg nextStep "Start the App Service \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` immediately to restore service availability." \
-        --arg severity "1" \
-        --arg details "App Service state: $app_service_state. Service is unavailable to users. Portal URL: $portal_url" \
-        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]')
-    echo "$issues_json" > "$OUTPUT_FILE"
-    echo "App Service is stopped. Results saved to $OUTPUT_FILE"
     exit 0
 fi
 
@@ -115,8 +107,11 @@ for level in "${!log_levels[@]}"; do
     # Use a refined query to gather detailed log entries within the time range
     if details=$(az monitor activity-log list --resource-id "$resource_id" --start-time "$start_time" --end-time "$end_time" --resource-group "$AZ_RESOURCE_GROUP" --query "[?level=='$level']" -o json 2>/dev/null); then
         if [[ -n "$details" && "$details" != "[]" ]]; then
-            # Process the details with jq
-            processed_details=$(echo "$details" | jq -c "[.[] | {
+            # Filter out ignored operations from the details
+            filtered_details=$(echo "$details" | jq -c "[.[] | select(.authorization.action as \$action | [\"Microsoft.Web/sites/publishxml/action\", \"Microsoft.Web/sites/listsyncfunctiontriggerstatus/action\", \"Microsoft.Web/sites/read\", \"Microsoft.Web/sites/config/read\", \"Microsoft.Web/sites/slots/read\"] | contains([\$action]) | not)]")
+            
+            # Process the filtered details with jq
+            processed_details=$(echo "$filtered_details" | jq -c "[.[] | {
                 eventTimestamp,
                 caller,
                 level,
@@ -136,18 +131,19 @@ for level in "${!log_levels[@]}"; do
                 }
             }]")
             
-            if [[ $(echo "$processed_details" | jq length) -gt 0 ]]; then
-                echo "Found $level level activities"
+            activity_count=$(echo "$processed_details" | jq length)
+            if [[ "$activity_count" -gt 0 ]]; then
+                echo "Found $activity_count $level level activities"
                 # Build the issue entry and add it to the issues array in issues_json
                 issues_json=$(echo "$issues_json" | jq \
-                    --arg title "$level level issues detected for App Service \`$APP_SERVICE_NAME\` in Azure Resource Group \`$AZ_RESOURCE_GROUP\`" \
-                    --arg nextStep "Check the $level-level activity logs for Azure App Service \`$APP_SERVICE_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`. [Activity log URL]($event_log_url)" \
+                    --arg title "App Service \`$APP_SERVICE_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has $activity_count $level level activities" \
+                    --arg nextStep "Review the $level-level activity events to identify potential system issues or configuration problems" \
                     --arg severity "${log_levels[$level]}" \
                     --argjson logs "$processed_details" \
                     '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $logs}]'
                 )
             else
-                echo "No $level level activities found"
+                echo "No significant $level level activities found (filtered out routine operations)"
             fi
         else
             echo "No $level level activities found"

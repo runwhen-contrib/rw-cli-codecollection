@@ -1,17 +1,7 @@
 #!/bin/bash
 
-# Get or set subscription ID
-if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
-    subscription=$(az account show --query "id" -o tsv)
-    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
-else
-    subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
-    echo "Using specified subscription ID: $subscription"
-fi
-
-# Set the subscription to the determined ID
-echo "Switching to subscription ID: $subscription"
-az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
+# Use existing subscription name variable
+SUBSCRIPTION_NAME="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
 
 # Input variables for subscription ID, App Service name, and resource group
 issues_json='{"issues": []}'
@@ -47,7 +37,7 @@ echo "HTTPS Only: $HTTPS_ONLY"
 # Add an issue if the state is not "Running"
 if [ "$STATE" != "Running" ]; then
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "App Service Not Running" \
+        --arg title "App Service \`$APP_SERVICE_NAME\` Not Running in subscription \`$SUBSCRIPTION_NAME\`" \
         --arg nextStep "Check the App Service state and troubleshoot issues in the Azure Portal." \
         --arg severity "1" \
         --arg details "State: $STATE" \
@@ -63,7 +53,7 @@ if [ "$DIAGNOSTIC_SETTINGS" -gt 0 ]; then
 else
     echo "Diagnostics settings are not enabled."
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Diagnostics Settings Missing" \
+        --arg title "Diagnostics Settings Missing for \`$APP_SERVICE_NAME\` in subscription \`$SUBSCRIPTION_NAME\`" \
         --arg nextStep "Enable diagnostics settings in the Azure Portal for \`$APP_SERVICE_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`" \
         --arg severity "4" \
         --arg details "Diagnostics settings are not configured for this App Service." \
@@ -75,7 +65,7 @@ fi
 if [ "$HTTPS_ONLY" != "true" ]; then
     echo "HTTPS is not enforced."
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "HTTPS Enforcement Disabled" \
+        --arg title "HTTPS Enforcement Disabled for \`$APP_SERVICE_NAME\` in subscription \`$SUBSCRIPTION_NAME\`" \
         --arg nextStep "Enable HTTPS-only setting for \`$APP_SERVICE_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`" \
         --arg severity "4" \
         --arg details "HTTPS is not enforced on the App Service." \
@@ -92,7 +82,7 @@ SKUID=$(echo "$APP_SERVICE_PLAN_DETAILS" | jq -r '.sku.name')
 if [ "$SKUID" == "F1" ]; then
     echo "Free App Service Plan detected."
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Free App Service Plan in Use" \
+        --arg title "Free App Service Plan in Use for \`$APP_SERVICE_NAME\` in subscription \`$SUBSCRIPTION_NAME\`" \
         --arg nextStep "Consider upgrading to a paid App Service Plan for \`$APP_SERVICE_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`" \
         --arg severity "4" \
         --arg details "App Service Plan SKU: $SKUID" \

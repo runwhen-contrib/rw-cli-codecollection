@@ -216,7 +216,7 @@ Get Function App `${FUNCTION_APP_NAME}` Logs In Resource Group `${AZ_RESOURCE_GR
     ${logs}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_logs.sh
     ...    env=${env}
-    ...    timeout_seconds=60
+    ...    timeout_seconds=120
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${logs.stdout}
     
@@ -346,7 +346,7 @@ Check Logs for Errors in Function App `${FUNCTION_APP_NAME}` In Resource Group `
     ${log_errors}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_log_analysis.sh
     ...    env=${env}
-    ...    timeout_seconds=90
+    ...    timeout_seconds=120
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${log_errors.stdout}
 
@@ -555,7 +555,7 @@ Suite Initialization
     ...    type=string
     ...    description=The friendly name of the subscription ID. 
     ...    pattern=\w*
-    ...    default="subscription-01"
+    ...    default=subscription-01
     Set Suite Variable    ${FUNCTION_APP_NAME}    ${FUNCTION_APP_NAME}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}

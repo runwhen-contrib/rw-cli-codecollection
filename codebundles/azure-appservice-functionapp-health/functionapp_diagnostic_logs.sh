@@ -142,57 +142,85 @@ if [[ -n "$APP_INSIGHTS_ID" && "$APP_INSIGHTS_ID" != "None" ]]; then
     # Extract App Insights name from the resource ID
     app_insights_name=$(echo "$APP_INSIGHTS_ID" | sed 's|.*/components/||')
     
-    # Try to query Application Insights for recent exceptions with timeout
-    echo "🔍 Querying Application Insights for recent exceptions..."
+    # First, verify that Application Insights is actually accessible and working
+    echo "🔍 Verifying Application Insights accessibility..."
+    test_query="requests | where timestamp > ago(1h) | limit 1"
+    test_result=$(timeout 30 az monitor app-insights query --app "$app_insights_name" --analytics-query "$test_query" -o json 2>/dev/null || echo "ERROR")
     
-    # Simplified query for exceptions in the last time period
-    exceptions_query="exceptions | where timestamp >= datetime(\"$START_TIME\") and timestamp <= datetime(\"$END_TIME\") | summarize count() by type, severityLevel | limit 5"
-    
-    exceptions=$(timeout 45 az monitor app-insights query --app "$app_insights_name" --analytics-query "$exceptions_query" -o json 2>/dev/null || echo "[]")
-    
-    # Validate JSON response
-    if [[ "$exceptions" != "[]" && "$exceptions" != "" ]]; then
-        if echo "$exceptions" | jq empty >/dev/null 2>&1; then
-            echo "⚠️  Found exceptions in Application Insights:"
-            echo "$exceptions" | jq -r '.[] | "  - \(.type): \(.severityLevel) (\(.count_) occurrences)"' 2>/dev/null || echo "  - Unable to parse exception details"
-            
-            # Create issue for exceptions
-            exception_details=$(echo "$exceptions" | jq -r '.[] | "- \(.type): \(.severityLevel) (\(.count_) occurrences)" | join("\n")' 2>/dev/null || echo "Unable to parse exception details")
-            ISSUES+=("{\"title\":\"Function App \`$FUNCTION_APP_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has exceptions in Application Insights\",\"severity\":2,\"next_step\":\"Review exceptions in Application Insights\",\"details\":\"Exceptions found in Application Insights: $app_insights_name for Function App '$FUNCTION_APP_NAME' in subscription '$SUBSCRIPTION_NAME'\\n\\n$exception_details\"}")
-        else
-            echo "⚠️  Found exceptions in Application Insights (unable to parse details)"
-            ISSUES+=("{\"title\":\"Function App \`$FUNCTION_APP_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has exceptions in Application Insights\",\"severity\":2,\"next_step\":\"Review exceptions in Application Insights\",\"details\":\"Exceptions found in Application Insights: $app_insights_name for Function App '$FUNCTION_APP_NAME' in subscription '$SUBSCRIPTION_NAME' (unable to parse details)\"}")
-        fi
+    if [[ "$test_result" == "ERROR" || "$test_result" == "[]" || "$test_result" == "" ]]; then
+        echo "⚠️  Application Insights found but not accessible or not collecting data"
+        echo "   This could indicate Application Insights is not properly configured or not receiving data"
+        ISSUES+=("{\"title\":\"Function App \`$FUNCTION_APP_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has Application Insights but it's not accessible\",\"severity\":3,\"next_step\":\"Verify Application Insights configuration and data collection for \`$FUNCTION_APP_NAME\` in \`$AZ_RESOURCE_GROUP\` in subscription \`$SUBSCRIPTION_NAME\`\",\"details\":\"Application Insights resource found: $app_insights_name for Function App '$FUNCTION_APP_NAME' in subscription '$SUBSCRIPTION_NAME', but queries are not returning data. This may indicate the service is not properly configured or not receiving telemetry data.\"}")
     else
-        echo "✅ No recent exceptions found in Application Insights"
-    fi
-    
-    # Query for failed requests with timeout
-    echo "🔍 Querying Application Insights for failed requests..."
-    
-    # Simplified query for failed requests
-    failed_requests_query="requests | where timestamp >= datetime(\"$START_TIME\") and timestamp <= datetime(\"$END_TIME\") | where success == false | summarize count() by name, resultCode | limit 5"
-    
-    failed_requests=$(timeout 45 az monitor app-insights query --app "$app_insights_name" --analytics-query "$failed_requests_query" -o json 2>/dev/null || echo "[]")
-    
-    # Validate JSON response
-    if [[ "$failed_requests" != "[]" && "$failed_requests" != "" ]]; then
-        if echo "$failed_requests" | jq empty >/dev/null 2>&1; then
-            echo "⚠️  Found failed requests in Application Insights:"
-            echo "$failed_requests" | jq -r '.[] | "  - \(.name): HTTP \(.resultCode) (\(.count_) failures)"' 2>/dev/null || echo "  - Unable to parse failed request details"
-            
-            # Create issue for failed requests
-            failed_details=$(echo "$failed_requests" | jq -r '.[] | "- \(.name): HTTP \(.resultCode) (\(.count_) failures)" | join("\n")' 2>/dev/null || echo "Unable to parse failed request details")
-            ISSUES+=("{\"title\":\"Function App \`$FUNCTION_APP_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has failed requests in Application Insights\",\"severity\":2,\"next_step\":\"Review failed requests in Application Insights\",\"details\":\"Failed requests found in Application Insights: $app_insights_name for Function App '$FUNCTION_APP_NAME' in subscription '$SUBSCRIPTION_NAME'\\n\\n$failed_details\"}")
+        # Application Insights is working, now check for actual issues
+        echo "✅ Application Insights is accessible and collecting data"
+        
+        # Try to query Application Insights for recent exceptions with timeout
+        echo "🔍 Querying Application Insights for recent exceptions..."
+        
+        # Simplified query for exceptions in the last time period
+        exceptions_query="exceptions | where timestamp >= datetime(\"$START_TIME\") and timestamp <= datetime(\"$END_TIME\") | summarize count() by type, severityLevel | limit 5"
+        
+        exceptions=$(timeout 45 az monitor app-insights query --app "$app_insights_name" --analytics-query "$exceptions_query" -o json 2>/dev/null || echo "[]")
+        
+        # Validate JSON response and check if it actually contains data
+        if [[ "$exceptions" != "[]" && "$exceptions" != "" ]]; then
+            if echo "$exceptions" | jq empty >/dev/null 2>&1; then
+                # Check if the result actually contains exception data (not just empty tables)
+                exception_count=$(echo "$exceptions" | jq 'length' 2>/dev/null || echo "0")
+                if [[ "$exception_count" -gt 0 ]]; then
+                    echo "⚠️  Found exceptions in Application Insights:"
+                    echo "$exceptions" | jq -r '.[] | "  - \(.type): \(.severityLevel) (\(.count_) occurrences)"' 2>/dev/null || echo "  - Unable to parse exception details"
+                    
+                    # Create issue for exceptions
+                    exception_details=$(echo "$exceptions" | jq -r '.[] | "- \(.type): \(.severityLevel) (\(.count_) occurrences)" | join("\n")' 2>/dev/null || echo "Unable to parse exception details")
+                    ISSUES+=("{\"title\":\"Function App \`$FUNCTION_APP_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has exceptions in Application Insights\",\"severity\":2,\"next_step\":\"Review exceptions in Application Insights\",\"details\":\"Exceptions found in Application Insights: $app_insights_name for Function App '$FUNCTION_APP_NAME' in subscription '$SUBSCRIPTION_NAME'\\n\\n$exception_details\"}")
+                else
+                    echo "✅ No recent exceptions found in Application Insights"
+                fi
+            else
+                echo "⚠️  Application Insights query returned invalid JSON for exceptions"
+                echo "   This may indicate a configuration issue with Application Insights"
+            fi
         else
-            echo "⚠️  Found failed requests in Application Insights (unable to parse details)"
-            ISSUES+=("{\"title\":\"Function App \`$FUNCTION_APP_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has failed requests in Application Insights\",\"severity\":2,\"next_step\":\"Review failed requests in Application Insights\",\"details\":\"Failed requests found in Application Insights: $app_insights_name for Function App '$FUNCTION_APP_NAME' in subscription '$SUBSCRIPTION_NAME' (unable to parse details)\"}")
+            echo "✅ No recent exceptions found in Application Insights"
         fi
-    else
-        echo "✅ No recent failed requests found in Application Insights"
+        
+        # Query for failed requests with timeout
+        echo "🔍 Querying Application Insights for failed requests..."
+        
+        # Simplified query for failed requests
+        failed_requests_query="requests | where timestamp >= datetime(\"$START_TIME\") and timestamp <= datetime(\"$END_TIME\") | where success == false | summarize count() by name, resultCode | limit 5"
+        
+        failed_requests=$(timeout 45 az monitor app-insights query --app "$app_insights_name" --analytics-query "$failed_requests_query" -o json 2>/dev/null || echo "[]")
+        
+        # Validate JSON response and check if it actually contains data
+        if [[ "$failed_requests" != "[]" && "$failed_requests" != "" ]]; then
+            if echo "$failed_requests" | jq empty >/dev/null 2>&1; then
+                # Check if the result actually contains failed request data (not just empty tables)
+                failed_count=$(echo "$failed_requests" | jq 'length' 2>/dev/null || echo "0")
+                if [[ "$failed_count" -gt 0 ]]; then
+                    echo "⚠️  Found failed requests in Application Insights:"
+                    echo "$failed_requests" | jq -r '.[] | "  - \(.name): HTTP \(.resultCode) (\(.count_) failures)"' 2>/dev/null || echo "  - Unable to parse failed request details"
+                    
+                    # Create issue for failed requests
+                    failed_details=$(echo "$failed_requests" | jq -r '.[] | "- \(.name): HTTP \(.resultCode) (\(.count_) failures)" | join("\n")' 2>/dev/null || echo "Unable to parse failed request details")
+                    ISSUES+=("{\"title\":\"Function App \`$FUNCTION_APP_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has failed requests in Application Insights\",\"severity\":2,\"next_step\":\"Review failed requests in Application Insights\",\"details\":\"Failed requests found in Application Insights: $app_insights_name for Function App '$FUNCTION_APP_NAME' in subscription '$SUBSCRIPTION_NAME'\\n\\n$failed_details\"}")
+                else
+                    echo "✅ No recent failed requests found in Application Insights"
+                fi
+            else
+                echo "⚠️  Application Insights query returned invalid JSON for failed requests"
+                echo "   This may indicate a configuration issue with Application Insights"
+            fi
+        else
+            echo "✅ No recent failed requests found in Application Insights"
+        fi
     fi
 else
     echo "ℹ️  No Application Insights found for Function App '$FUNCTION_APP_NAME'"
+    echo "   Consider enabling Application Insights for better monitoring and error tracking"
+    ISSUES+=("{\"title\":\"Function App \`$FUNCTION_APP_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has no Application Insights configured\",\"severity\":4,\"next_step\":\"Enable Application Insights for \`$FUNCTION_APP_NAME\` in \`$AZ_RESOURCE_GROUP\` in subscription \`$SUBSCRIPTION_NAME\` for better monitoring\",\"details\":\"Application Insights is not configured for Function App '$FUNCTION_APP_NAME' in subscription '$SUBSCRIPTION_NAME'. This limits the ability to monitor application performance and detect errors.\"}")
 fi
 
 # Create JSON output

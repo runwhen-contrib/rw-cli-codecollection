@@ -343,8 +343,14 @@ Check Recommendations and Notifications for App Service `${APP_SERVICE_NAME}` In
             ELSE IF    "${impact}" == "Low"
                 ${final_severity}=    Set Variable    ${4}
             END
+            # Override severity and title for health check configuration recommendations
+            ${issue_title}=    Set Variable    ${item["title"]}
+            IF    "health check" in "${item["title"]}".lower() or "healthcheck" in "${item["title"]}".lower()
+                ${final_severity}=    Set Variable    ${4}
+                ${issue_title}=    Set Variable    Health Check Not Configured for `${APP_SERVICE_NAME}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            END
             RW.Core.Add Issue    
-            ...    title=${item["title"]}
+            ...    title=${issue_title}
             ...    severity=${final_severity}
             ...    next_steps=${item.get("next_step", "Review recommendation details.")}
             ...    expected=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no outstanding recommendations
@@ -353,6 +359,56 @@ Check Recommendations and Notifications for App Service `${APP_SERVICE_NAME}` In
             ...    details=${item.get("details", "No details provided")}        
         END
     END
+
+Check Diagnostic Logs for App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Check diagnostic settings, query Log Analytics and Application Insights for errors and failed requests
+    [Tags]    appservice    logs    diagnostics    analysis    azure-monitor    access:read-only
+    ${diagnostic_logs}=    RW.CLI.Run Bash File
+    ...    bash_file=appservice_diagnostic_logs.sh
+    ...    env=${env}
+    ...    timeout_seconds=120
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${diagnostic_logs.stdout}
+
+    IF    "${diagnostic_logs.stderr}" != ""
+        RW.Core.Add Issue
+        ...    title=Error Running Diagnostic Logs Script
+        ...    severity=3
+        ...    next_steps=Review debug logs in report
+        ...    expected=No stderr output
+        ...    actual=stderr encountered
+        ...    reproduce_hint=${diagnostic_logs.cmd}
+        ...    details=${diagnostic_logs.stderr}
+    END
+
+    ${issues}=    RW.CLI.Run Cli    
+    ...    cmd=cat app_service_diagnostic_issues.json
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+    ${issue_list}=    Evaluate    json.loads(r"""${issues.stdout}""")    json
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            RW.Core.Add Issue    
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_steps"]}
+            ...    expected=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no diagnostic log issues
+            ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has diagnostic log issues
+            ...    reproduce_hint=${diagnostic_logs.cmd}
+            ...    details=${item["details"]}        
+        END
+    END
+    
+    # Add portal URL for Log Analytics and Diagnostics
+    ${app_service_resource_id_analytics}=    RW.CLI.Run Cli
+    ...    cmd=az webapp show --name "${APP_SERVICE_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${log_analytics_url}=    Set Variable    https://portal.azure.com/#@/resource${app_service_resource_id_analytics.stdout.strip()}/diagnostics
+    RW.Core.Add Pre To Report    🔗 View Diagnostics and Log Analytics in Azure Portal: ${log_analytics_url}
+
 
 Check Logs for Errors in App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Analyze App Service logs for errors using Azure Monitor APIs and Application Insights - creates structured issues for detected problems
@@ -468,6 +524,11 @@ Suite Initialization
     ...    description=The threshold of average response time (ms) in which to generate an issue. Higher than this value indicates slow response time.
     ...    pattern=\w*
     ...    default=300
+    ${AZURE_SUBSCRIPTION_NAME}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_NAME
+    ...    type=string
+    ...    description=The friendly name of the subscription ID. 
+    ...    pattern=\w*
+    ...    default=subscription-01
     Set Suite Variable    ${APP_SERVICE_NAME}    ${APP_SERVICE_NAME}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
@@ -480,10 +541,11 @@ Suite Initialization
     Set Suite Variable    ${HTTP4XX_THRESHOLD}    ${HTTP4XX_THRESHOLD}
     Set Suite Variable    ${DISK_USAGE_THRESHOLD}    ${DISK_USAGE_THRESHOLD}
     Set Suite Variable    ${AVG_RSP_TIME}    ${AVG_RSP_TIME}
+    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}        ${AZURE_SUBSCRIPTION_NAME}
 
     Set Suite Variable
     ...    ${env}
-    ...    {"APP_SERVICE_NAME":"${APP_SERVICE_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "TIME_PERIOD_MINUTES":"${TIME_PERIOD_MINUTES}","CPU_THRESHOLD":"${CPU_THRESHOLD}", "REQUESTS_THRESHOLD":"${REQUESTS_THRESHOLD}", "BYTES_RECEIVED_THRESHOLD":"${BYTES_RECEIVED_THRESHOLD}", "HTTP5XX_THRESHOLD":"${HTTP5XX_THRESHOLD}","HTTP2XX_THRESHOLD":"${HTTP2XX_THRESHOLD}", "HTTP4XX_THRESHOLD":"${HTTP4XX_THRESHOLD}", "DISK_USAGE_THRESHOLD":"${DISK_USAGE_THRESHOLD}", "AVG_RSP_TIME":"${AVG_RSP_TIME}"}
+    ...    {"AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}", "APP_SERVICE_NAME":"${APP_SERVICE_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "TIME_PERIOD_MINUTES":"${TIME_PERIOD_MINUTES}","CPU_THRESHOLD":"${CPU_THRESHOLD}", "REQUESTS_THRESHOLD":"${REQUESTS_THRESHOLD}", "BYTES_RECEIVED_THRESHOLD":"${BYTES_RECEIVED_THRESHOLD}", "HTTP5XX_THRESHOLD":"${HTTP5XX_THRESHOLD}","HTTP2XX_THRESHOLD":"${HTTP2XX_THRESHOLD}", "HTTP4XX_THRESHOLD":"${HTTP4XX_THRESHOLD}", "DISK_USAGE_THRESHOLD":"${DISK_USAGE_THRESHOLD}", "AVG_RSP_TIME":"${AVG_RSP_TIME}"}
     # Set Azure subscription context
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}

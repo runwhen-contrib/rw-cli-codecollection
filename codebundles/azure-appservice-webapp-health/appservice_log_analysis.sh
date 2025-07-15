@@ -3,6 +3,9 @@
 # Variables
 OUTPUT_FILE="app_service_log_issues_report.json"
 
+# Use existing subscription name variable
+SUBSCRIPTION_NAME="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
+
 # Initialize issues JSON - this ensures we always have valid output
 issues_json='{"issues": []}'
 
@@ -29,7 +32,7 @@ if timeout 3s az webapp show --name "$APP_SERVICE_NAME" --resource-group "$AZ_RE
 else
     echo "✗ App Service '$APP_SERVICE_NAME' not accessible or timed out"
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "App Service Not Accessible: \`$APP_SERVICE_NAME\`" \
+        --arg title "App Service \`$APP_SERVICE_NAME\` Not Accessible in subscription \`$SUBSCRIPTION_NAME\`" \
         --arg details "Could not verify App Service '$APP_SERVICE_NAME' in resource group '$AZ_RESOURCE_GROUP' within 3 seconds" \
         --arg nextSteps "Verify App Service name and check permissions for \`$APP_SERVICE_NAME\` in RG \`$AZ_RESOURCE_GROUP\`" \
         --arg severity "3" \

@@ -13,6 +13,9 @@ issues_file="app_service_health_check_issues.json"
 metrics_file="app_service_health_check_metrics.json"
 summary_file="app_service_health_check_summary.txt"
 
+# Use existing subscription name variable
+SUBSCRIPTION_NAME="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
+
 # Initialize issues JSON - this ensures we always have valid output
 issues_json='{"issues": []}'
 
@@ -20,7 +23,7 @@ issues_json='{"issues": []}'
 if ! resource_id=$(az webapp show --name "$APP_SERVICE_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "id" -o tsv 2>/dev/null); then
     echo "Error: App Service $APP_SERVICE_NAME not found in resource group $AZ_RESOURCE_GROUP."
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "App Service \`$APP_SERVICE_NAME\` Not Found" \
+        --arg title "App Service \`$APP_SERVICE_NAME\` Not Found in subscription \`$SUBSCRIPTION_NAME\`" \
         --arg nextStep "Verify App Service name and resource group, or check access permissions for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\`" \
         --arg severity "1" \
         --arg details "Could not find App Service $APP_SERVICE_NAME in resource group $AZ_RESOURCE_GROUP. Service may not exist or access may be restricted." \
@@ -74,7 +77,7 @@ if [[ "$app_service_state" != "Running" ]]; then
     echo "CRITICAL: App Service $APP_SERVICE_NAME is $app_service_state (not running)!"
     portal_url="https://portal.azure.com/#@/resource${resource_id}/overview"
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "App Service \`$APP_SERVICE_NAME\` is $app_service_state (Not Running)" \
+        --arg title "App Service \`$APP_SERVICE_NAME\` is $app_service_state (Not Running) in subscription \`$SUBSCRIPTION_NAME\`" \
         --arg nextStep "Start the App Service \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` immediately to restore service availability." \
         --arg severity "1" \
         --arg details "App Service state: $app_service_state. Service is unavailable to users. Portal URL: $portal_url" \
@@ -98,7 +101,7 @@ health_check_path=$(az webapp show --name "$APP_SERVICE_NAME" --resource-group "
 if [[ -z "$health_check_path" || "$health_check_path" == "null" ]]; then
     echo "Health Check is not configured."
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Health Check Not Configured" \
+        --arg title "Health Check Not Configured for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\`" \
         --arg nextStep "Enable Health Check for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\`." \
         --arg severity "4" \
         --arg details "Health Check is not configured for this App Service." \
