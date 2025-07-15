@@ -37,6 +37,9 @@ else
     echo "Using specified subscription ID: $subscription_id"
 fi
 
+# Get subscription name from environment variable
+subscription_name="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
+
 echo "Switching to subscription ID: $subscription_id"
 if ! az account set --subscription "$subscription_id"; then
     echo "Failed to set subscription."
@@ -67,7 +70,7 @@ echo "========================================================"
 if ! resource_id=$(az functionapp show --name "$FUNCTION_APP_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "id" -o tsv 2>/dev/null); then
     echo "Error: Function App $FUNCTION_APP_NAME not found in resource group $AZ_RESOURCE_GROUP."
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Function App \`$FUNCTION_APP_NAME\` Not Found" \
+        --arg title "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` Not Found" \
         --arg details "Could not find Function App $FUNCTION_APP_NAME in resource group $AZ_RESOURCE_GROUP. Service may not exist or access may be restricted" \
         --arg nextStep "Verify Function App name and resource group, or check access permissions for \`$FUNCTION_APP_NAME\`" \
         --arg severity "1" \
@@ -132,7 +135,7 @@ if [[ "$function_app_state" != "Running" ]]; then
     echo "🚨 CRITICAL: Function App $FUNCTION_APP_NAME is $function_app_state (not running)!"
     
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Function App \`$FUNCTION_APP_NAME\` is $function_app_state (Not Running)" \
+        --arg title "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` is $function_app_state (Not Running)" \
         --arg nextStep "URGENT: Start the Function App \`$FUNCTION_APP_NAME\` in \`$AZ_RESOURCE_GROUP\` immediately to restore service availability. Check activity logs below to identify who stopped the service and when. [View Service]($overview_url)" \
         --arg severity "1" \
         --arg details "Function App state: $function_app_state. Service is unavailable to users. This may be impacting production traffic. | Activity Log: $activity_log_url" \
@@ -253,7 +256,7 @@ for operation in "${critical_operations[@]}"; do
                 echo ""
                 
                 issues_json=$(echo "$issues_json" | jq \
-                    --arg title "⚠️ CRITICAL: '$operation' performed by $user_info on Function App \`$FUNCTION_APP_NAME\`" \
+                    --arg title "⚠️ CRITICAL: '$operation' performed by $user_info on Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
                     --arg nextStep "IMMEDIATE ACTION REQUIRED: Review the critical operation '$operation' performed at $timestamp by $user_info (Status: $status). Impact: $impact. If this was unauthorized, investigate security implications immediately and consider restoring service. [View Activity Log]($activity_log_url) | [View Service]($overview_url)" \
                     --arg severity "$severity" \
                     --arg user "$user_info" \
@@ -320,7 +323,7 @@ for level in "${!log_levels[@]}"; do
                 
                 # Build the issue entry and add it to the issues array
                 issues_json=$(echo "$issues_json" | jq \
-                    --arg title "$level level activities detected for Function App \`$FUNCTION_APP_NAME\` ($activity_count events)" \
+                    --arg title "$level level activities detected for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` ($activity_count events)" \
                     --arg nextStep "Review the $activity_count $level-level activity events for Azure Function App \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`. These may indicate system issues or configuration problems. [View Activity Log]($activity_log_url)" \
                     --arg severity "${log_levels[$level]}" \
                     --arg count "$activity_count" \
