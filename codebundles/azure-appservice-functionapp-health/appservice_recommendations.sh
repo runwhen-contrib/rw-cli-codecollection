@@ -13,14 +13,9 @@ TIME_PERIOD_DAYS="${TIME_PERIOD_DAYS:-7}"
 start_time=$(date -u -d "$TIME_PERIOD_DAYS days ago" '+%Y-%m-%dT%H:%M:%SZ')
 end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
-# Get or set subscription ID
-if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
-    subscription=$(az account show --query "id" -o tsv)
-    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
-else
-    subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
-    echo "Using specified subscription ID: $subscription"
-fi
+# Use subscription ID from environment variable
+subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
+echo "Using subscription ID: $subscription"
 
 # Set the subscription
 echo "Switching to subscription ID: $subscription"
@@ -117,7 +112,7 @@ if [[ $(echo "$advisor_recommendations" | jq length) -gt 0 ]]; then
         security_summary=$(echo "$security_recs" | jq -r '.[] | "\(.shortDescription.problem) - \(.shortDescription.solution)"' | head -3)
         add_issue "Security Recommendations for Function App \`$FUNCTION_APP_NAME\`" \
                   "Review Azure Advisor security recommendations for Function App \`$FUNCTION_APP_NAME\`. These recommendations help improve security posture." \
-                  "3" \
+                  "4" \
                   "$security_summary"
     fi
     
@@ -125,7 +120,7 @@ if [[ $(echo "$advisor_recommendations" | jq length) -gt 0 ]]; then
         reliability_summary=$(echo "$reliability_recs" | jq -r '.[] | "\(.shortDescription.problem) - \(.shortDescription.solution)"' | head -3)
         add_issue "Reliability Recommendations for Function App \`$FUNCTION_APP_NAME\`" \
                   "Review Azure Advisor reliability recommendations for Function App \`$FUNCTION_APP_NAME\`. These recommendations help improve application reliability." \
-                  "3" \
+                  "4" \
                   "$reliability_summary"
     fi
 else
@@ -197,7 +192,7 @@ app_insights_check=$(az functionapp show --name "$FUNCTION_APP_NAME" --resource-
 if [[ -z "$app_insights_check" ]]; then
     add_issue "Application Insights Not Configured for Function App \`$FUNCTION_APP_NAME\`" \
               "Function App \`$FUNCTION_APP_NAME\` does not have Application Insights configured. This limits monitoring and troubleshooting capabilities." \
-              "3" \
+              "4" \
               "Application Insights provides performance monitoring, dependency tracking, and error analysis for Function Apps."
 fi
 
@@ -207,7 +202,7 @@ https_only=$(az functionapp show --name "$FUNCTION_APP_NAME" --resource-group "$
 if [[ "$https_only" != "true" ]]; then
     add_issue "HTTPS Not Enforced for Function App \`$FUNCTION_APP_NAME\`" \
               "Function App \`$FUNCTION_APP_NAME\` is not configured to enforce HTTPS only. This may expose data to security risks." \
-              "3" \
+              "4" \
               "Enable HTTPS only to ensure all traffic is encrypted in transit."
 fi
 

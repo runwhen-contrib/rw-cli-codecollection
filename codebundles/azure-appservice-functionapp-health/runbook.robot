@@ -165,13 +165,58 @@ Fetch Function App `${FUNCTION_APP_NAME}` Plan Utilization Metrics In Resource G
     ${metrics_url}=    Set Variable    https://portal.azure.com/#@/resource${function_app_resource_id_metrics.stdout.strip()}/metrics
     RW.Core.Add Pre To Report    🔗 View Metrics in Azure Portal: ${metrics_url}
 
+Check Individual Function Invocations Health for Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Analyzes the health and metrics of individual function invocations, including execution counts, errors, throttles, and performance metrics.
+    [Tags]    access:read-only    functionapp    functions    invocations    metrics    performance
+    ${function_invocation_health}=    RW.CLI.Run Bash File
+    ...    bash_file=function_invocation_health.sh
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${function_invocation_health.stdout}
+    
+    ${summary}=    RW.CLI.Run Cli
+    ...    cmd=cat function_invocation_summary.txt
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${summary.stdout}
+
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat function_invocation_health.json
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            RW.Core.Add Issue    
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_step"]}
+            ...    expected=All functions in Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` should be healthy
+            ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has function invocation issues
+            ...    reproduce_hint=${function_invocation_health.cmd}
+            ...    details=${item["details"]}        
+        END
+    END
+    
+    # Add portal URL for Function App Functions
+    ${function_app_resource_id_functions}=    RW.CLI.Run Cli
+    ...    cmd=az functionapp show --name "${FUNCTION_APP_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${functions_url}=    Set Variable    https://portal.azure.com/#@/resource${function_app_resource_id_functions.stdout.strip()}/functions
+    RW.Core.Add Pre To Report    🔗 View Functions in Azure Portal: ${functions_url}
+
 Get Function App `${FUNCTION_APP_NAME}` Logs In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch logs of appservice workload
     [Tags]    appservice    logs    tail    access:read-only
     ${logs}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_logs.sh
     ...    env=${env}
-    ...    timeout_seconds=180
+    ...    timeout_seconds=120
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${logs.stdout}
     
@@ -261,10 +306,10 @@ Check Deployment Health of Function App `${FUNCTION_APP_NAME}` In Resource Group
     RW.Core.Add Pre To Report    🔗 View Deployment Center in Azure Portal: ${deploy_url}
 
 Fetch Function App `${FUNCTION_APP_NAME}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Gets the events of appservice and checks for errors
+    [Documentation]    Gets the events of function app and checks for start/stop operations and errors
     [Tags]    appservice    monitor    events    errors    access:read-only
     ${activities}=    RW.CLI.Run Bash File
-    ...    bash_file=appservice_activities.sh
+    ...    bash_file=functionapp_activities.sh
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
@@ -279,8 +324,8 @@ Fetch Function App `${FUNCTION_APP_NAME}` Activities In Resource Group `${AZ_RES
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
             ...    next_steps=${item["next_step"]}
-            ...    expected=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no Warning/Error/Critical activities
-            ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has Warning/Error/Critical activities
+            ...    expected=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no critical activities or unexpected start/stop operations
+            ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has activities that need attention
             ...    reproduce_hint=${activities.cmd}
             ...    details=${item["details"]}        
         END
@@ -301,7 +346,7 @@ Check Logs for Errors in Function App `${FUNCTION_APP_NAME}` In Resource Group `
     ${log_errors}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_log_analysis.sh
     ...    env=${env}
-    ...    timeout_seconds=180
+    ...    timeout_seconds=120
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${log_errors.stdout}
 
@@ -364,6 +409,62 @@ Fetch Azure Recommendations and Notifications for Function App `${FUNCTION_APP_N
     ...    include_in_history=false
     ${advisor_url}=    Set Variable    https://portal.azure.com/#@/resource${function_app_resource_id_advisor.stdout.strip()}/advisor
     RW.Core.Add Pre To Report    🔗 View Azure Advisor in Azure Portal: ${advisor_url}
+
+Check Recent Activities for Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Analyze recent Azure activities for the Function App, including critical operations and user actions.
+    [Tags]    access:read-only    functionapp    activities    audit
+    ${activities}=    RW.CLI.Run Bash File
+    ...    bash_file=functionapp_activities.sh
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${activities.stdout}
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat function_app_activities_issues.json
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            RW.Core.Add Issue    
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_step"]}
+            ...    expected=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no recent critical activities
+            ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has recent critical activities
+            ...    reproduce_hint=${activities.cmd}
+            ...    details=${item["details"]}        
+        END
+    END
+
+Check Diagnostic Logs for Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Check for diagnostic logs configuration and search them for relevant events if they exist.
+    [Tags]    access:read-only    functionapp    diagnostic-logs    monitoring
+    ${diagnostic_logs}=    RW.CLI.Run Bash File
+    ...    bash_file=functionapp_diagnostic_logs.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${diagnostic_logs.stdout}
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat functionapp_diagnostic_logs.json
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            RW.Core.Add Issue    
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_step"]}
+            ...    expected=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no diagnostic log issues
+            ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has diagnostic log issues
+            ...    reproduce_hint=${diagnostic_logs.cmd}
+            ...    details=${item["details"]}        
+        END
+    END
 
 *** Keywords ***
 Suite Initialization
@@ -435,6 +536,26 @@ Suite Initialization
     ...    description=The threshold of average response time (ms) in which to generate an issue. Higher than this value indicates slow response time.
     ...    pattern=\w*
     ...    default=300
+    ${FUNCTION_ERROR_RATE_THRESHOLD}=    RW.Core.Import User Variable    FUNCTION_ERROR_RATE_THRESHOLD
+    ...    type=string
+    ...    description=The threshold of function error rate (%) in which to generate an issue. Higher than this value indicates high function error rate.
+    ...    pattern=\w*
+    ...    default=10
+    ${FUNCTION_MEMORY_THRESHOLD}=    RW.Core.Import User Variable    FUNCTION_MEMORY_THRESHOLD
+    ...    type=string
+    ...    description=The threshold of function memory usage (MB) in which to generate an issue. Higher than this value indicates high memory usage.
+    ...    pattern=\w*
+    ...    default=512
+    ${FUNCTION_DURATION_THRESHOLD}=    RW.Core.Import User Variable    FUNCTION_DURATION_THRESHOLD
+    ...    type=string
+    ...    description=The threshold of function execution duration (ms) in which to generate an issue. Higher than this value indicates slow function execution.
+    ...    pattern=\w*
+    ...    default=5000
+    ${AZURE_SUBSCRIPTION_NAME}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_NAME
+    ...    type=string
+    ...    description=The friendly name of the subscription ID. 
+    ...    pattern=\w*
+    ...    default=subscription-01
     Set Suite Variable    ${FUNCTION_APP_NAME}    ${FUNCTION_APP_NAME}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
@@ -448,10 +569,13 @@ Suite Initialization
     Set Suite Variable    ${HTTP4XX_THRESHOLD}    ${HTTP4XX_THRESHOLD}
     Set Suite Variable    ${DISK_USAGE_THRESHOLD}    ${DISK_USAGE_THRESHOLD}
     Set Suite Variable    ${AVG_RSP_TIME}    ${AVG_RSP_TIME}
-
+    Set Suite Variable    ${FUNCTION_ERROR_RATE_THRESHOLD}    ${FUNCTION_ERROR_RATE_THRESHOLD}
+    Set Suite Variable    ${FUNCTION_MEMORY_THRESHOLD}    ${FUNCTION_MEMORY_THRESHOLD}
+    Set Suite Variable    ${FUNCTION_DURATION_THRESHOLD}    ${FUNCTION_DURATION_THRESHOLD}
+    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}        ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable
     ...    ${env}
-    ...    {"FUNCTION_APP_NAME":"${FUNCTION_APP_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "TIME_PERIOD_MINUTES":"${TIME_PERIOD_MINUTES}", "TIME_PERIOD_DAYS":"${TIME_PERIOD_DAYS}", "CPU_THRESHOLD":"${CPU_THRESHOLD}", "REQUESTS_THRESHOLD":"${REQUESTS_THRESHOLD}", "BYTES_RECEIVED_THRESHOLD":"${BYTES_RECEIVED_THRESHOLD}", "HTTP5XX_THRESHOLD":"${HTTP5XX_THRESHOLD}", "HTTP2XX_THRESHOLD":"${HTTP2XX_THRESHOLD}", "HTTP4XX_THRESHOLD":"${HTTP4XX_THRESHOLD}", "DISK_USAGE_THRESHOLD":"${DISK_USAGE_THRESHOLD}", "AVG_RSP_TIME":"${AVG_RSP_TIME}"}
+    ...    {"AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}", "FUNCTION_APP_NAME":"${FUNCTION_APP_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "TIME_PERIOD_MINUTES":"${TIME_PERIOD_MINUTES}", "TIME_PERIOD_DAYS":"${TIME_PERIOD_DAYS}", "CPU_THRESHOLD":"${CPU_THRESHOLD}", "REQUESTS_THRESHOLD":"${REQUESTS_THRESHOLD}", "BYTES_RECEIVED_THRESHOLD":"${BYTES_RECEIVED_THRESHOLD}", "HTTP5XX_THRESHOLD":"${HTTP5XX_THRESHOLD}", "HTTP2XX_THRESHOLD":"${HTTP2XX_THRESHOLD}", "HTTP4XX_THRESHOLD":"${HTTP4XX_THRESHOLD}", "DISK_USAGE_THRESHOLD":"${DISK_USAGE_THRESHOLD}", "AVG_RSP_TIME":"${AVG_RSP_TIME}", "FUNCTION_ERROR_RATE_THRESHOLD":"${FUNCTION_ERROR_RATE_THRESHOLD}", "FUNCTION_MEMORY_THRESHOLD":"${FUNCTION_MEMORY_THRESHOLD}", "FUNCTION_DURATION_THRESHOLD":"${FUNCTION_DURATION_THRESHOLD}"}
     # Set Azure subscription context
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}

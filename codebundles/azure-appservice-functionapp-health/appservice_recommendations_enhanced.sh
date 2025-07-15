@@ -227,7 +227,7 @@ if [[ -z "$app_insights_check" ]]; then
     recommendations_json=$(echo "$recommendations_json" | jq \
         --arg title "Application Insights Not Configured for Function App \`$FUNCTION_APP_NAME\`" \
         --arg details "Function App \`$FUNCTION_APP_NAME\` does not have Application Insights configured. This limits monitoring and troubleshooting capabilities." \
-        --arg severity "3" \
+        --arg severity "4" \
         '.recommendations += [{"title": $title, "details": $details, "severity": ($severity | tonumber)}]')
     echo "⚠️ Application Insights is not configured for this Function App"
 fi

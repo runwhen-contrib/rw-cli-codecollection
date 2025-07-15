@@ -1,0 +1,197 @@
+# Azure Function App Health Codebundle - Cursor Rules
+
+## Overview
+This codebundle provides comprehensive health monitoring for Azure Function Apps, including individual function invocation analysis, resource health checks, and performance monitoring.
+
+## File Structure and Patterns
+
+### Robot Framework Files (.robot)
+- **runbook.robot**: Main execution file with tasks and keywords
+- **sli.robot**: Service Level Indicator definitions
+- Follow Robot Framework syntax and conventions
+- Use consistent task naming: `Check/Get/Fetch [Entity] [Action] for [Resource] In [Scope]`
+- Always include proper documentation and tags for each task
+
+### Bash Scripts (.sh)
+- All scripts must be executable (`chmod +x`)
+- Use consistent naming: `[entity]_[action].sh`
+- Include comprehensive error handling and validation
+- Provide clear stdout output with emojis and structured formatting
+- Generate both human-readable and machine-readable outputs
+
+## Issue Reporting Standards
+
+### Issue Severity Levels
+- **Severity 1**: Critical issues affecting service availability (Function App stopped, critical errors)
+- **Severity 2**: High-impact issues requiring immediate attention (high error rates, performance degradation)
+- **Severity 3**: Medium-impact issues that should be addressed (performance warnings, metric alerts, security recommendations, reliability issues)
+- **Severity 4**: Low-impact informational issues (configuration recommendations, best practices)
+- **Configuration Issues**: All "Not Configured", "Not Enabled", "Disabled" type issues should be **Severity 4** as they are recommendations rather than critical problems
+- **Metric Alerts**: High CPU/Memory usage and other performance warnings should be **Severity 3** as they are warnings that should be monitored but don't require immediate action
+
+### Issue Aggregation
+- **MUST** aggregate similar issues into single, comprehensive issues
+- **MUST NOT** create separate issues for each data point that exceeds thresholds
+- **MUST** provide summary statistics (count, max, average) in issue details
+- **Example**: Instead of 10 "High Memory Usage" issues, create 1 issue with "Memory exceeded 80% threshold in 10 out of 60 data points. Max: 85%, Average: 82%"
+- **Rationale**: Prevents issue noise and provides better context for troubleshooting
+
+### Issue Titles
+- **MUST** include entity name (function name, function app name)
+- **MUST** include resource group name
+- **SHOULD** include subscription ID for clarity
+- **MUST** be clear, concise, and descriptive
+- **Format**: `"[Entity] '[name]' in [Resource Type] '[resource_name]' (RG: [resource_group]) has [issue_description]"`
+
+### Issue Details
+- **MUST** include complete context (Function App, Resource Group, Subscription)
+- **MUST** include time period information
+- **MUST** include relevant metrics with clear labels
+- **MUST** include specific detected issues with values
+- **MUST** include actionable next steps for troubleshooting
+- **SHOULD** include possible causes for the issue
+- **Format**: Structured sections with clear headers and bullet points
+
+### Report Output
+- **MUST** provide comprehensive executive summary
+- **MUST** include all relevant metrics and thresholds
+- **MUST** show issue count and list of detected problems
+- **MUST** provide detailed metrics for each function
+- **SHOULD** use visual separators and emojis for readability
+- **SHOULD** include portal links for easy navigation
+
+## Configuration Variables
+
+### Required Variables
+- `FUNCTION_APP_NAME`: The Azure Function App name
+- `AZ_RESOURCE_GROUP`: The resource group name
+- `AZURE_RESOURCE_SUBSCRIPTION_ID`: The Azure subscription ID
+
+### Optional Threshold Variables
+- `TIME_PERIOD_MINUTES`: Time period for analysis (default: 30)
+- `FUNCTION_ERROR_RATE_THRESHOLD`: Error rate threshold % (default: 10)
+- `FUNCTION_MEMORY_THRESHOLD`: Memory usage threshold MB (default: 512)
+- `FUNCTION_DURATION_THRESHOLD`: Duration threshold ms (default: 5000)
+
+## Script Development Guidelines
+
+### Error Handling
+- Always validate required environment variables
+- Provide meaningful error messages with context
+- Use proper exit codes (0 for success, non-zero for errors)
+- Handle missing or null data gracefully
+
+### Output Generation
+- Generate both summary text files and JSON files
+- Use consistent file naming patterns
+- Include timestamps in reports
+- Provide both human-readable and machine-readable formats
+- **JSON Validation**: Always validate JSON output before writing to files
+- **Error Handling**: Provide fallback JSON if validation fails
+- **Character Escaping**: Properly escape special characters in JSON strings
+
+### Azure CLI Integration
+- Use proper resource ID construction
+- Handle API rate limits and timeouts
+- Provide fallback values for missing metrics
+- Use appropriate query filters and time ranges
+
+### JSON Output Handling
+- **Validation**: Always validate JSON before writing to files using `jq empty`
+- **Escaping**: Escape special characters (quotes, backslashes) in JSON strings
+- **Fallbacks**: Provide fallback JSON if validation fails
+- **Error Handling**: Handle cases where `jq` is not available
+- **Structure**: Ensure consistent JSON structure across all outputs
+
+## Testing Requirements
+
+### Script Validation
+- All scripts must pass syntax validation (`bash -n`)
+- Test with mock data to ensure output generation
+- Validate JSON structure and content
+- Test error handling scenarios
+
+### Integration Testing
+- Test with real Azure resources when possible
+- Verify issue detection and reporting
+- Test threshold configurations
+- Validate portal link generation
+
+## Code Quality Standards
+
+### Documentation
+- Include comprehensive README with configuration options
+- Document all environment variables and their purposes
+- Provide usage examples and troubleshooting guides
+- Include feature descriptions and capabilities
+
+### Code Style
+- Use consistent indentation and formatting
+- Include meaningful comments for complex logic
+- Use descriptive variable names
+- Follow bash best practices and shellcheck guidelines
+
+## Security Considerations
+
+### Authentication
+- Use service principal authentication
+- Never hardcode credentials in scripts
+- Validate Azure CLI authentication before operations
+- Handle authentication errors gracefully
+
+### Data Handling
+- Sanitize output data for sensitive information
+- Use appropriate permissions for resource access
+- Log operations for audit purposes
+- Handle PII data appropriately
+
+## Performance Guidelines
+
+### Resource Usage
+- Minimize API calls where possible
+- Use appropriate time intervals for metrics
+- Cache results when appropriate
+- Handle large datasets efficiently
+
+### Timeout Handling
+- Set appropriate timeouts for long-running operations
+- Provide progress indicators for lengthy operations
+- Handle partial failures gracefully
+- Use background processing when appropriate
+
+## Maintenance and Updates
+
+### Version Control
+- Use semantic versioning for releases
+- Maintain changelog for significant changes
+- Tag releases appropriately
+- Document breaking changes
+
+### Monitoring
+- Monitor script execution times
+- Track error rates and failure modes
+- Update thresholds based on production data
+- Regular review and optimization of queries
+
+## Integration Patterns
+
+### RunWhen Integration
+- Follow RunWhen task patterns and conventions
+- Use consistent issue severity levels (1-4)
+- Provide proper reproduce hints and next steps
+- Include portal links for easy navigation
+
+### Azure Integration
+- Use Azure Monitor APIs for metrics
+- Leverage Azure CLI for resource management
+- Follow Azure naming conventions
+- Use appropriate Azure regions and subscriptions
+
+### Activity Monitoring
+- **Function App Activities**: Focus on meaningful operations like start/stop/restart and function trigger sync operations
+- **Noise Filtering**: Filter out routine operations like `publishxml` actions, backup operations, and read operations
+- **Resource Coverage**: Check both the main function app resource and the host resource for sync operations
+- **Operation Detection**: Use specific operation names like `Microsoft.Web/sites/start/action` and `Microsoft.Web/sites/host/sync/action`
+- **User Context**: Include user information, IP addresses, and timestamps for audit purposes
+- **Severity Assignment**: Use severity 4 for informational operations like function trigger syncs
+- **Lookback Periods**: Use 7-day lookback for start/stop/restart operations to capture important operational events 

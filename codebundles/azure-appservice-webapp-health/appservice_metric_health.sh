@@ -13,6 +13,9 @@
 # Set the default time period to 60 minutes if not provided
 TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-60}"
 
+# Get subscription name for issue reporting
+subscription_name="${AZURE_SUBSCRIPTION_NAME:-$(az account show --query "name" -o tsv 2>/dev/null || echo "Unknown")}"
+
 # Convert TIME_PERIOD_MINUTES into ISO 8601 duration format
 if (( TIME_PERIOD_MINUTES < 60 )); then
     duration="PT${TIME_PERIOD_MINUTES}M"
@@ -59,6 +62,9 @@ echo "- Maximum data points per metric: ${MAX_METRIC_POINTS}"
 echo "- Start time: $start_time"
 echo "- End time: $end_time"
 
+# Get subscription name for issue reporting
+subscription_name="${AZURE_SUBSCRIPTION_NAME:-$(az account show --query "name" -o tsv 2>/dev/null || echo "Unknown")}"
+
 # Initialize JSON structures - ensure we always have valid output
 issues_json='{"issues": []}'
 metrics_json='{"metrics": []}'
@@ -79,9 +85,9 @@ echo "Azure App Service $APP_SERVICE_NAME metrics usage analysis:"
 if ! resource_id=$(az webapp show --name "$APP_SERVICE_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "id" -o tsv 2>/dev/null); then
     echo "Error: App Service $APP_SERVICE_NAME not found in resource group $AZ_RESOURCE_GROUP."
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "App Service \`$APP_SERVICE_NAME\` Not Found" \
-        --arg details "Could not find App Service $APP_SERVICE_NAME in resource group $AZ_RESOURCE_GROUP. Service may not exist or access may be restricted." \
-        --arg nextStep "Verify App Service name and resource group, or check access permissions for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\`" \
+        --arg title "App Service \`$APP_SERVICE_NAME\` Not Found in \`$AZ_RESOURCE_GROUP\` (Subscription: \`$subscription_name\`)" \
+        --arg details "Could not find App Service \`$APP_SERVICE_NAME\` in resource group \`$AZ_RESOURCE_GROUP\` in subscription \`$subscription_name\`. Service may not exist or access may be restricted." \
+        --arg nextStep "Verify App Service name and resource group, or check access permissions for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` in subscription \`$subscription_name\`" \
         --arg severity "1" \
         '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber)}]')
     
@@ -93,6 +99,8 @@ if ! resource_id=$(az webapp show --name "$APP_SERVICE_NAME" --resource-group "$
     echo "Azure App Service Metrics Summary" > "app_service_metrics_summary.txt"
     echo "=================================" >> "app_service_metrics_summary.txt"
     echo "App Service: $APP_SERVICE_NAME" >> "app_service_metrics_summary.txt"
+    echo "Resource Group: $AZ_RESOURCE_GROUP" >> "app_service_metrics_summary.txt"
+    echo "Subscription: $subscription_name" >> "app_service_metrics_summary.txt"
     echo "Status: Not Found" >> "app_service_metrics_summary.txt"
     echo "Issues Detected: 1" >> "app_service_metrics_summary.txt"
     echo "$issues_json" | jq -r '.issues[] | "Title: \(.title)\nSeverity: \(.severity)\nDetails: \(.details)\nNext Steps: \(.next_step)\n"' >> "app_service_metrics_summary.txt"
@@ -105,9 +113,9 @@ fi
 if [[ -z "$resource_id" ]]; then
     echo "Error: Empty resource ID returned for App Service $APP_SERVICE_NAME."
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Empty Resource ID for \`$APP_SERVICE_NAME\`" \
-        --arg details "App Service query returned empty resource ID. Service may not exist." \
-        --arg nextStep "Verify App Service \`$APP_SERVICE_NAME\` exists in resource group \`$AZ_RESOURCE_GROUP\`" \
+        --arg title "Empty Resource ID for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` (Subscription: \`$subscription_name\`)" \
+        --arg details "App Service query returned empty resource ID for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` in subscription \`$subscription_name\`. Service may not exist." \
+        --arg nextStep "Verify App Service \`$APP_SERVICE_NAME\` exists in resource group \`$AZ_RESOURCE_GROUP\` in subscription \`$subscription_name\`" \
         --arg severity "1" \
         '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber)}]')
     
@@ -119,6 +127,8 @@ if [[ -z "$resource_id" ]]; then
     echo "Azure App Service Metrics Summary" > "app_service_metrics_summary.txt"
     echo "=================================" >> "app_service_metrics_summary.txt"
     echo "App Service: $APP_SERVICE_NAME" >> "app_service_metrics_summary.txt"
+    echo "Resource Group: $AZ_RESOURCE_GROUP" >> "app_service_metrics_summary.txt"
+    echo "Subscription: $subscription_name" >> "app_service_metrics_summary.txt"
     echo "Status: Empty Resource ID" >> "app_service_metrics_summary.txt"
     echo "Issues Detected: 1" >> "app_service_metrics_summary.txt"
     echo "$issues_json" | jq -r '.issues[] | "Title: \(.title)\nSeverity: \(.severity)\nDetails: \(.details)\nNext Steps: \(.next_step)\n"' >> "app_service_metrics_summary.txt"
@@ -134,8 +144,8 @@ if [[ "$app_service_state" != "Running" ]]; then
     echo "CRITICAL: App Service $APP_SERVICE_NAME is $app_service_state (not running)!"
     portal_url="https://portal.azure.com/#@/resource${resource_id}/overview"
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "App Service \`$APP_SERVICE_NAME\` is $app_service_state (Not Running)" \
-        --arg nextStep "Start the App Service \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` immediately to restore service availability." \
+        --arg title "App Service \`$APP_SERVICE_NAME\` is $app_service_state (Not Running) in \`$AZ_RESOURCE_GROUP\` (Subscription: \`$subscription_name\`)" \
+        --arg nextStep "Start the App Service \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` in subscription \`$subscription_name\` immediately to restore service availability." \
         --arg severity "1" \
         --arg details "App Service state: $app_service_state. Service is unavailable to users. Portal URL: $portal_url" \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]')
@@ -144,6 +154,8 @@ if [[ "$app_service_state" != "Running" ]]; then
     echo "Azure App Service Metrics Summary" > "app_service_metrics_summary.txt"
     echo "=================================" >> "app_service_metrics_summary.txt"
     echo "App Service: $APP_SERVICE_NAME" >> "app_service_metrics_summary.txt"
+    echo "Resource Group: $AZ_RESOURCE_GROUP" >> "app_service_metrics_summary.txt"
+    echo "Subscription: $subscription_name" >> "app_service_metrics_summary.txt"
     echo "Status: $app_service_state (STOPPED)" >> "app_service_metrics_summary.txt"
     echo "Issues Detected: 1 (CRITICAL)" >> "app_service_metrics_summary.txt"
     echo "$issues_json" | jq -r '.issues[] | "Title: \(.title)\nSeverity: \(.severity)\nDetails: \(.details)\nNext Steps: \(.next_step)\n"' >> "app_service_metrics_summary.txt"

@@ -35,28 +35,13 @@ if [[ -z "$APP_SERVICE_NAME" || -z "$AZ_RESOURCE_GROUP" ]]; then
     exit 1
 fi
 
-# Get or set subscription ID
-if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
-    subscription_id=$(az account show --query "id" -o tsv)
-    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription_id"
-else
-    subscription_id="$AZURE_RESOURCE_SUBSCRIPTION_ID"
-    echo "Using specified subscription ID: $subscription_id"
-fi
+# Use existing subscription name variable
+SUBSCRIPTION_NAME="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
 
-# Set the subscription to the determined ID
-echo "Switching to subscription ID: $subscription_id"
-if ! az account set --subscription "$subscription_id"; then
-    echo "Failed to set subscription."
-    recommendations_json=$(echo "$recommendations_json" | jq \
-        --arg title "Failed to Set Azure Subscription" \
-        --arg details "Could not switch to subscription $subscription_id. Check subscription access" \
-        --arg severity "1" \
-        '.recommendations += [{"title": $title, "details": $details, "severity": ($severity | tonumber)}]')
-    echo "$recommendations_json" > "$OUTPUT_FILE"
-    exit 1
-fi
+# Get subscription ID for API calls
+subscription_id="${AZURE_RESOURCE_SUBSCRIPTION_ID:-$(az account show --query "id" -o tsv)}"
 
+# Get tenant ID
 tenant_id=$(az account show --query "tenantId" -o tsv)
 
 # Remove previous file if it exists
@@ -73,7 +58,7 @@ echo "=============================================================="
 if ! resource_id=$(az webapp show --name "$APP_SERVICE_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "id" -o tsv 2>/dev/null); then
     echo "Error: App Service $APP_SERVICE_NAME not found in resource group $AZ_RESOURCE_GROUP."
     recommendations_json=$(echo "$recommendations_json" | jq \
-        --arg title "App Service \`$APP_SERVICE_NAME\` Not Found" \
+        --arg title "App Service \`$APP_SERVICE_NAME\` Not Found in subscription \`$SUBSCRIPTION_NAME\`" \
         --arg details "Could not find App Service $APP_SERVICE_NAME in resource group $AZ_RESOURCE_GROUP" \
         --arg severity "1" \
         '.recommendations += [{"title": $title, "details": $details, "severity": ($severity | tonumber)}]')
