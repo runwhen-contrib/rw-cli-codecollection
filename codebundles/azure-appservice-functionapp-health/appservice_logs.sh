@@ -5,14 +5,9 @@
 #   AZ_RESOURCE_GROUP  - Resource group containing the Function App
 #   AZURE_RESOURCE_SUBSCRIPTION_ID - (Optional) Subscription ID (defaults to current subscription)
 
-# Get or set subscription ID
-if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
-    subscription_id=$(az account show --query "id" -o tsv)
-    echo "Using current subscription ID: $subscription_id"
-else
-    subscription_id="$AZURE_RESOURCE_SUBSCRIPTION_ID"
-    echo "Using specified subscription ID: $subscription_id"
-fi
+# Use subscription ID from environment variable
+subscription_id="$AZURE_RESOURCE_SUBSCRIPTION_ID"
+echo "Using subscription ID: $subscription_id"
 
 # Set the subscription to the determined ID
 az account set --subscription "$subscription_id" || { echo "Failed to set subscription."; exit 1; }

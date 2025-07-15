@@ -38,33 +38,37 @@ echo "Subscription: $AZURE_RESOURCE_SUBSCRIPTION_ID"
 echo "Time Period: Last $TIME_PERIOD_MINUTES minutes"
 echo ""
 
-# Get the function app resource ID
-FUNCTION_APP_ID=$(az functionapp show --name "$FUNCTION_APP_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "id" -o tsv 2>/dev/null)
+# Get the function app resource ID with timeout
+FUNCTION_APP_ID=$(timeout 30 az functionapp show --name "$FUNCTION_APP_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "id" -o tsv 2>/dev/null)
 if [[ -z "$FUNCTION_APP_ID" ]]; then
     echo "❌ ERROR: Could not retrieve Function App ID for $FUNCTION_APP_NAME"
     exit 1
 fi
+
+# Get subscription name from environment variable
+SUBSCRIPTION_NAME="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
 
 # Calculate time range for logs
 END_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 START_TIME=$(date -u -d "$TIME_PERIOD_MINUTES minutes ago" +"%Y-%m-%dT%H:%M:%SZ")
 
 echo "⏰ Time range: $START_TIME to $END_TIME"
+echo "📋 Subscription: $SUBSCRIPTION_NAME"
 echo ""
 
 # Initialize issues array
 ISSUES=()
 
-# Check for diagnostic settings
+# Check for diagnostic settings with timeout
 echo "📋 Checking diagnostic settings..."
-DIAGNOSTIC_SETTINGS=$(az monitor diagnostic-settings list --resource "$FUNCTION_APP_ID" --query "[].{name: name, storageAccountId: storageAccountId, logAnalyticsWorkspaceId: logAnalyticsWorkspaceId, eventHubAuthorizationRuleId: eventHubAuthorizationRuleId}" -o json 2>/dev/null)
+DIAGNOSTIC_SETTINGS=$(timeout 30 az monitor diagnostic-settings list --resource "$FUNCTION_APP_ID" --query "[].{name: name, storageAccountId: storageAccountId, logAnalyticsWorkspaceId: logAnalyticsWorkspaceId, eventHubAuthorizationRuleId: eventHubAuthorizationRuleId}" -o json 2>/dev/null)
 
 if [[ -z "$DIAGNOSTIC_SETTINGS" || "$DIAGNOSTIC_SETTINGS" == "[]" ]]; then
     echo "⚠️  No diagnostic settings found for Function App '$FUNCTION_APP_NAME'"
     echo "   Diagnostic logs are not configured. Consider enabling them for better monitoring."
     
     # Create informational issue about missing diagnostic settings
-    ISSUES+=("{\"title\":\"Function App '$FUNCTION_APP_NAME' has no diagnostic settings configured\",\"severity\":4,\"next_step\":\"Consider enabling diagnostic settings for better monitoring and troubleshooting\",\"details\":\"No diagnostic settings found for Function App '$FUNCTION_APP_NAME'. Diagnostic logs can provide valuable information for troubleshooting issues.\"}")
+    ISSUES+=("{\"title\":\"Function App \`$FUNCTION_APP_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has no diagnostic settings configured\",\"severity\":4,\"next_step\":\"Consider enabling diagnostic settings for better monitoring and troubleshooting\",\"details\":\"No diagnostic settings found for Function App '$FUNCTION_APP_NAME' in subscription '$SUBSCRIPTION_NAME'. Diagnostic logs can provide valuable information for troubleshooting issues.\"}")
 else
     echo "✅ Found $(echo "$DIAGNOSTIC_SETTINGS" | jq length) diagnostic setting(s)"
     
@@ -80,28 +84,27 @@ else
         echo "    Log Analytics: $log_analytics"
         echo "    Event Hub: $event_hub"
         
-        # If Log Analytics is configured, try to query it
+        # If Log Analytics is configured, try to query it with timeout
         if [[ "$log_analytics" != "Not configured" ]]; then
             echo "    🔍 Querying Log Analytics workspace..."
             
             # Extract workspace ID from the full resource ID
             workspace_id=$(echo "$log_analytics" | sed 's|.*/workspaces/||')
             
-            # Query for function app logs
-            # Note: This requires the Log Analytics workspace to be accessible and the user to have permissions
-            log_query="AzureDiagnostics | where ResourceId == \"$FUNCTION_APP_ID\" | where TimeGenerated >= datetime(\"$START_TIME\") and TimeGenerated <= datetime(\"$END_TIME\") | summarize count() by Category, Level"
+            # Simplified query for function app logs with timeout
+            log_query="AzureDiagnostics | where ResourceId == \"$FUNCTION_APP_ID\" | where TimeGenerated >= datetime(\"$START_TIME\") and TimeGenerated <= datetime(\"$END_TIME\") | summarize count() by Category, Level | limit 10"
             
             echo "    Query: $log_query"
             
-            # Try to execute the query (this may fail if user doesn't have access)
-            log_results=$(az monitor log-analytics query --workspace "$workspace_id" --analytics-query "$log_query" -o json 2>/dev/null || echo "[]")
+            # Try to execute the query with timeout
+            log_results=$(timeout 45 az monitor log-analytics query --workspace "$workspace_id" --analytics-query "$log_query" -o json 2>/dev/null || echo "[]")
             
             if [[ "$log_results" != "[]" ]]; then
                 echo "    ✅ Found log entries in Log Analytics"
                 echo "$log_results" | jq -r '.[] | "      \(.Category): \(.Level) (\(.count_) entries)"'
                 
-                # Check for error-level logs
-                error_logs=$(az monitor log-analytics query --workspace "$workspace_id" --analytics-query "AzureDiagnostics | where ResourceId == \"$FUNCTION_APP_ID\" | where TimeGenerated >= datetime(\"$START_TIME\") and TimeGenerated <= datetime(\"$END_TIME\") | where Level == \"Error\" | summarize count() by Category" -o json 2>/dev/null || echo "[]")
+                # Check for error-level logs with timeout
+                error_logs=$(timeout 45 az monitor log-analytics query --workspace "$workspace_id" --analytics-query "AzureDiagnostics | where ResourceId == \"$FUNCTION_APP_ID\" | where TimeGenerated >= datetime(\"$START_TIME\") and TimeGenerated <= datetime(\"$END_TIME\") | where Level == \"Error\" | summarize count() by Category | limit 5" -o json 2>/dev/null || echo "[]")
                 
                 if [[ $(echo "$error_logs" | jq length) -gt 0 ]]; then
                     echo "    ⚠️  Found error logs in Log Analytics"
@@ -109,7 +112,7 @@ else
                     
                     # Create issue for error logs
                     error_details=$(echo "$error_logs" | jq -r '.[] | "- \(.Category): \(.count_) errors" | join("\n")')
-                    ISSUES+=("{\"title\":\"Function App '$FUNCTION_APP_NAME' has error logs in Log Analytics\",\"severity\":2,\"next_step\":\"Review error logs in Log Analytics workspace\",\"details\":\"Error logs found in Log Analytics workspace: $workspace_id\\n\\n$error_details\"}")
+                    ISSUES+=("{\"title\":\"Function App \`$FUNCTION_APP_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has error logs in Log Analytics\",\"severity\":2,\"next_step\":\"Review error logs in Log Analytics workspace\",\"details\":\"Error logs found in Log Analytics workspace: $workspace_id for Function App '$FUNCTION_APP_NAME' in subscription '$SUBSCRIPTION_NAME'\\n\\n$error_details\"}")
                 fi
             else
                 echo "    ℹ️  No recent log entries found in Log Analytics"
@@ -128,10 +131,10 @@ else
     done
 fi
 
-# Check for Application Insights if available
+# Check for Application Insights if available with timeout
 echo ""
 echo "🔍 Checking for Application Insights..."
-APP_INSIGHTS_ID=$(az functionapp show --name "$FUNCTION_APP_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "tags.\"hidden-link: /app-insights-resource-id\"" -o tsv 2>/dev/null)
+APP_INSIGHTS_ID=$(timeout 30 az functionapp show --name "$FUNCTION_APP_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "tags.\"hidden-link: /app-insights-resource-id\"" -o tsv 2>/dev/null)
 
 if [[ -n "$APP_INSIGHTS_ID" && "$APP_INSIGHTS_ID" != "None" ]]; then
     echo "✅ Application Insights found: $APP_INSIGHTS_ID"
@@ -139,39 +142,52 @@ if [[ -n "$APP_INSIGHTS_ID" && "$APP_INSIGHTS_ID" != "None" ]]; then
     # Extract App Insights name from the resource ID
     app_insights_name=$(echo "$APP_INSIGHTS_ID" | sed 's|.*/components/||')
     
-    # Try to query Application Insights for recent exceptions
+    # Try to query Application Insights for recent exceptions with timeout
     echo "🔍 Querying Application Insights for recent exceptions..."
     
-    # Query for exceptions in the last time period
-    exceptions_query="exceptions | where timestamp >= datetime(\"$START_TIME\") and timestamp <= datetime(\"$END_TIME\") | summarize count() by type, severityLevel"
+    # Simplified query for exceptions in the last time period
+    exceptions_query="exceptions | where timestamp >= datetime(\"$START_TIME\") and timestamp <= datetime(\"$END_TIME\") | summarize count() by type, severityLevel | limit 5"
     
-    exceptions=$(az monitor app-insights query --app "$app_insights_name" --analytics-query "$exceptions_query" -o json 2>/dev/null || echo "[]")
+    exceptions=$(timeout 45 az monitor app-insights query --app "$app_insights_name" --analytics-query "$exceptions_query" -o json 2>/dev/null || echo "[]")
     
-    if [[ "$exceptions" != "[]" ]]; then
-        echo "⚠️  Found exceptions in Application Insights:"
-        echo "$exceptions" | jq -r '.[] | "  - \(.type): \(.severityLevel) (\(.count_) occurrences)"'
-        
-        # Create issue for exceptions
-        exception_details=$(echo "$exceptions" | jq -r '.[] | "- \(.type): \(.severityLevel) (\(.count_) occurrences)" | join("\n")')
-        ISSUES+=("{\"title\":\"Function App '$FUNCTION_APP_NAME' has exceptions in Application Insights\",\"severity\":2,\"next_step\":\"Review exceptions in Application Insights\",\"details\":\"Exceptions found in Application Insights: $app_insights_name\\n\\n$exception_details\"}")
+    # Validate JSON response
+    if [[ "$exceptions" != "[]" && "$exceptions" != "" ]]; then
+        if echo "$exceptions" | jq empty >/dev/null 2>&1; then
+            echo "⚠️  Found exceptions in Application Insights:"
+            echo "$exceptions" | jq -r '.[] | "  - \(.type): \(.severityLevel) (\(.count_) occurrences)"' 2>/dev/null || echo "  - Unable to parse exception details"
+            
+            # Create issue for exceptions
+            exception_details=$(echo "$exceptions" | jq -r '.[] | "- \(.type): \(.severityLevel) (\(.count_) occurrences)" | join("\n")' 2>/dev/null || echo "Unable to parse exception details")
+            ISSUES+=("{\"title\":\"Function App \`$FUNCTION_APP_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has exceptions in Application Insights\",\"severity\":2,\"next_step\":\"Review exceptions in Application Insights\",\"details\":\"Exceptions found in Application Insights: $app_insights_name for Function App '$FUNCTION_APP_NAME' in subscription '$SUBSCRIPTION_NAME'\\n\\n$exception_details\"}")
+        else
+            echo "⚠️  Found exceptions in Application Insights (unable to parse details)"
+            ISSUES+=("{\"title\":\"Function App \`$FUNCTION_APP_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has exceptions in Application Insights\",\"severity\":2,\"next_step\":\"Review exceptions in Application Insights\",\"details\":\"Exceptions found in Application Insights: $app_insights_name for Function App '$FUNCTION_APP_NAME' in subscription '$SUBSCRIPTION_NAME' (unable to parse details)\"}")
+        fi
     else
         echo "✅ No recent exceptions found in Application Insights"
     fi
     
-    # Query for failed requests
+    # Query for failed requests with timeout
     echo "🔍 Querying Application Insights for failed requests..."
     
-    failed_requests_query="requests | where timestamp >= datetime(\"$START_TIME\") and timestamp <= datetime(\"$END_TIME\") | where success == false | summarize count() by name, resultCode"
+    # Simplified query for failed requests
+    failed_requests_query="requests | where timestamp >= datetime(\"$START_TIME\") and timestamp <= datetime(\"$END_TIME\") | where success == false | summarize count() by name, resultCode | limit 5"
     
-    failed_requests=$(az monitor app-insights query --app "$app_insights_name" --analytics-query "$failed_requests_query" -o json 2>/dev/null || echo "[]")
+    failed_requests=$(timeout 45 az monitor app-insights query --app "$app_insights_name" --analytics-query "$failed_requests_query" -o json 2>/dev/null || echo "[]")
     
-    if [[ "$failed_requests" != "[]" ]]; then
-        echo "⚠️  Found failed requests in Application Insights:"
-        echo "$failed_requests" | jq -r '.[] | "  - \(.name): HTTP \(.resultCode) (\(.count_) failures)"'
-        
-        # Create issue for failed requests
-        failed_details=$(echo "$failed_requests" | jq -r '.[] | "- \(.name): HTTP \(.resultCode) (\(.count_) failures)" | join("\n")')
-        ISSUES+=("{\"title\":\"Function App '$FUNCTION_APP_NAME' has failed requests in Application Insights\",\"severity\":2,\"next_step\":\"Review failed requests in Application Insights\",\"details\":\"Failed requests found in Application Insights: $app_insights_name\\n\\n$failed_details\"}")
+    # Validate JSON response
+    if [[ "$failed_requests" != "[]" && "$failed_requests" != "" ]]; then
+        if echo "$failed_requests" | jq empty >/dev/null 2>&1; then
+            echo "⚠️  Found failed requests in Application Insights:"
+            echo "$failed_requests" | jq -r '.[] | "  - \(.name): HTTP \(.resultCode) (\(.count_) failures)"' 2>/dev/null || echo "  - Unable to parse failed request details"
+            
+            # Create issue for failed requests
+            failed_details=$(echo "$failed_requests" | jq -r '.[] | "- \(.name): HTTP \(.resultCode) (\(.count_) failures)" | join("\n")' 2>/dev/null || echo "Unable to parse failed request details")
+            ISSUES+=("{\"title\":\"Function App \`$FUNCTION_APP_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has failed requests in Application Insights\",\"severity\":2,\"next_step\":\"Review failed requests in Application Insights\",\"details\":\"Failed requests found in Application Insights: $app_insights_name for Function App '$FUNCTION_APP_NAME' in subscription '$SUBSCRIPTION_NAME'\\n\\n$failed_details\"}")
+        else
+            echo "⚠️  Found failed requests in Application Insights (unable to parse details)"
+            ISSUES+=("{\"title\":\"Function App \`$FUNCTION_APP_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has failed requests in Application Insights\",\"severity\":2,\"next_step\":\"Review failed requests in Application Insights\",\"details\":\"Failed requests found in Application Insights: $app_insights_name for Function App '$FUNCTION_APP_NAME' in subscription '$SUBSCRIPTION_NAME' (unable to parse details)\"}")
+        fi
     else
         echo "✅ No recent failed requests found in Application Insights"
     fi

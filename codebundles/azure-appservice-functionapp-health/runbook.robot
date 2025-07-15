@@ -171,7 +171,7 @@ Check Individual Function Invocations Health for Function App `${FUNCTION_APP_NA
     ${function_invocation_health}=    RW.CLI.Run Bash File
     ...    bash_file=function_invocation_health.sh
     ...    env=${env}
-    ...    timeout_seconds=180
+    ...    timeout_seconds=60
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${function_invocation_health.stdout}
     
@@ -185,7 +185,7 @@ Check Individual Function Invocations Health for Function App `${FUNCTION_APP_NA
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat function_invocation_health.json
     ...    env=${env}
-    ...    timeout_seconds=180
+    ...    timeout_seconds=30
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list["issues"]}) > 0
@@ -416,13 +416,13 @@ Check Recent Activities for Function App `${FUNCTION_APP_NAME}` In Resource Grou
     ${activities}=    RW.CLI.Run Bash File
     ...    bash_file=functionapp_activities.sh
     ...    env=${env}
-    ...    timeout_seconds=180
+    ...    timeout_seconds=60
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${activities.stdout}
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat function_app_activities_issues.json
     ...    env=${env}
-    ...    timeout_seconds=180
+    ...    timeout_seconds=30
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list["issues"]}) > 0
@@ -444,7 +444,7 @@ Check Diagnostic Logs for Function App `${FUNCTION_APP_NAME}` In Resource Group 
     ${diagnostic_logs}=    RW.CLI.Run Bash File
     ...    bash_file=functionapp_diagnostic_logs.sh
     ...    env=${env}
-    ...    timeout_seconds=120
+    ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${diagnostic_logs.stdout}
     ${issues}=    RW.CLI.Run Cli
@@ -551,6 +551,11 @@ Suite Initialization
     ...    description=The threshold of function execution duration (ms) in which to generate an issue. Higher than this value indicates slow function execution.
     ...    pattern=\w*
     ...    default=5000
+    ${AZURE_SUBSCRIPTION_NAME}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_NAME
+    ...    type=string
+    ...    description=The friendly name of the subscription ID. 
+    ...    pattern=\w*
+    ...    default="subscription-01"
     Set Suite Variable    ${FUNCTION_APP_NAME}    ${FUNCTION_APP_NAME}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
@@ -567,10 +572,10 @@ Suite Initialization
     Set Suite Variable    ${FUNCTION_ERROR_RATE_THRESHOLD}    ${FUNCTION_ERROR_RATE_THRESHOLD}
     Set Suite Variable    ${FUNCTION_MEMORY_THRESHOLD}    ${FUNCTION_MEMORY_THRESHOLD}
     Set Suite Variable    ${FUNCTION_DURATION_THRESHOLD}    ${FUNCTION_DURATION_THRESHOLD}
-
+    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}        ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable
     ...    ${env}
-    ...    {"FUNCTION_APP_NAME":"${FUNCTION_APP_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "TIME_PERIOD_MINUTES":"${TIME_PERIOD_MINUTES}", "TIME_PERIOD_DAYS":"${TIME_PERIOD_DAYS}", "CPU_THRESHOLD":"${CPU_THRESHOLD}", "REQUESTS_THRESHOLD":"${REQUESTS_THRESHOLD}", "BYTES_RECEIVED_THRESHOLD":"${BYTES_RECEIVED_THRESHOLD}", "HTTP5XX_THRESHOLD":"${HTTP5XX_THRESHOLD}", "HTTP2XX_THRESHOLD":"${HTTP2XX_THRESHOLD}", "HTTP4XX_THRESHOLD":"${HTTP4XX_THRESHOLD}", "DISK_USAGE_THRESHOLD":"${DISK_USAGE_THRESHOLD}", "AVG_RSP_TIME":"${AVG_RSP_TIME}", "FUNCTION_ERROR_RATE_THRESHOLD":"${FUNCTION_ERROR_RATE_THRESHOLD}", "FUNCTION_MEMORY_THRESHOLD":"${FUNCTION_MEMORY_THRESHOLD}", "FUNCTION_DURATION_THRESHOLD":"${FUNCTION_DURATION_THRESHOLD}"}
+    ...    {"AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}", "FUNCTION_APP_NAME":"${FUNCTION_APP_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "TIME_PERIOD_MINUTES":"${TIME_PERIOD_MINUTES}", "TIME_PERIOD_DAYS":"${TIME_PERIOD_DAYS}", "CPU_THRESHOLD":"${CPU_THRESHOLD}", "REQUESTS_THRESHOLD":"${REQUESTS_THRESHOLD}", "BYTES_RECEIVED_THRESHOLD":"${BYTES_RECEIVED_THRESHOLD}", "HTTP5XX_THRESHOLD":"${HTTP5XX_THRESHOLD}", "HTTP2XX_THRESHOLD":"${HTTP2XX_THRESHOLD}", "HTTP4XX_THRESHOLD":"${HTTP4XX_THRESHOLD}", "DISK_USAGE_THRESHOLD":"${DISK_USAGE_THRESHOLD}", "AVG_RSP_TIME":"${AVG_RSP_TIME}", "FUNCTION_ERROR_RATE_THRESHOLD":"${FUNCTION_ERROR_RATE_THRESHOLD}", "FUNCTION_MEMORY_THRESHOLD":"${FUNCTION_MEMORY_THRESHOLD}", "FUNCTION_DURATION_THRESHOLD":"${FUNCTION_DURATION_THRESHOLD}"}
     # Set Azure subscription context
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}

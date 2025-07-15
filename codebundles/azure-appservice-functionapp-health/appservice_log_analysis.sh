@@ -7,6 +7,9 @@
 
 LOG_DIR="${LOG_DIR:-"function_app_logs"}"
 
+# Get subscription name from environment variable
+subscription_name="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
+
 # Ensure required variables are set
 if [[ -z "$FUNCTION_APP_NAME" || -z "$AZ_RESOURCE_GROUP" ]]; then
     echo "Error: FUNCTION_APP_NAME and AZ_RESOURCE_GROUP environment variables must be set."
@@ -36,8 +39,8 @@ if az functionapp log download \
     else
         echo "Warning: Failed to download logs."
         # Add a warning issue
-        title="Unable to Download Logs for Function App $FUNCTION_APP_NAME"
-        details="Unable to download logs for Function App $FUNCTION_APP_NAME. This may be due to the app being stopped or no logs being available."
+        title="Unable to Download Logs for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`"
+        details="Unable to download logs for Function App $FUNCTION_APP_NAME in subscription $subscription_name. This may be due to the app being stopped or no logs being available."
         nextStep="Check if Function App $FUNCTION_APP_NAME is running and has logging enabled."
         issues_json=$(echo "$issues_json" | jq \
             --arg title "$title" \
@@ -55,8 +58,8 @@ if az functionapp log download \
 else
     echo "Warning: Failed to download logs."
     # Add a warning issue
-    title="Unable to Download Logs for Function App $FUNCTION_APP_NAME"
-    details="Unable to download logs for Function App $FUNCTION_APP_NAME. This may be due to the app being stopped or no logs being available."
+    title="Unable to Download Logs for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`"
+    details="Unable to download logs for Function App $FUNCTION_APP_NAME in subscription $subscription_name. This may be due to the app being stopped or no logs being available."
     nextStep="Check if Function App $FUNCTION_APP_NAME is running and has logging enabled."
     issues_json=$(echo "$issues_json" | jq \
         --arg title "$title" \
@@ -78,8 +81,8 @@ log_files=$(find "$LOG_DIR" -type f -name "*.log" 2>/dev/null)
 if [[ -z "$log_files" ]]; then
     echo "No log files found."
     # Add an informational issue
-    title="No Log Files Found for Function App $FUNCTION_APP_NAME"
-    details="No log files found for Function App $FUNCTION_APP_NAME. This may be normal if the app is not actively running or logging is disabled."
+    title="No Log Files Found for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`"
+    details="No log files found for Function App $FUNCTION_APP_NAME in subscription $subscription_name. This may be normal if the app is not actively running or logging is disabled."
     nextStep="Check if Function App $FUNCTION_APP_NAME is running and has logging enabled."
     issues_json=$(echo "$issues_json" | jq \
         --arg title "$title" \
@@ -119,8 +122,8 @@ else
             all_errors="${all_errors}${all_errors:+$'\n\n'}... (showing first 50 lines, $error_count total errors found)"
         fi
         
-        title="Log Errors Found in Function App $FUNCTION_APP_NAME"
-        nextStep="Review log files to address $error_count errors found in Function App $FUNCTION_APP_NAME"
+        title="Log Errors Found in Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`"
+        nextStep="Review log files to address $error_count errors found in Function App $FUNCTION_APP_NAME in subscription $subscription_name"
         issues_json=$(echo "$issues_json" | jq \
             --arg title "$title" \
             --arg details "$all_errors" \
