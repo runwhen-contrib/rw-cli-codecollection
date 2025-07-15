@@ -22,6 +22,9 @@ else
     echo "Using specified subscription ID: $subscription"
 fi
 
+# Get subscription name from environment variable
+subscription_name="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
+
 # Set the subscription to the determined ID
 echo "Switching to subscription ID: $subscription"
 az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
@@ -66,7 +69,7 @@ if [[ "$function_app_state" != "Running" ]]; then
     
     # Add critical issue for stopped service
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Function App \`$FUNCTION_APP_NAME\` is $function_app_state (Not Running)" \
+        --arg title "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` is $function_app_state (Not Running)" \
         --arg nextStep "Function App \`$FUNCTION_APP_NAME\` is currently $function_app_state. Check the service status and recent activities to determine why it stopped." \
         --arg severity "1" \
         --arg details "Function App state: $function_app_state. Resource ID: $resource_id. Portal URL: $portal_url | Activity Log: $event_log_url" \
@@ -125,7 +128,7 @@ for level in "${!log_levels[@]}"; do
     # If we found logs for this level, add them as an "issue" in the JSON
     if [[ $(echo "$details" | jq length) -gt 0 ]]; then
         issues_json=$(echo "$issues_json" | jq \
-            --arg title "$level level issues detected for Azure Function App \`$FUNCTION_APP_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\`" \
+            --arg title "$level level issues detected for Azure Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
             --arg nextStep "Review the $level-level activity logs for Azure Function App \`$FUNCTION_APP_NAME\`." \
             --arg severity "${log_levels[$level]}" \
             --arg eventLogUrl "$event_log_url" \
@@ -248,7 +251,7 @@ for operation in "${critical_operations[@]}"; do
         fi
         
         issues_json=$(echo "$issues_json" | jq \
-            --arg title "Critical '$operation' Operation on Function App \`$FUNCTION_APP_NAME\` by $user_details" \
+            --arg title "Critical '$operation' Operation on Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` by $user_details" \
             --arg nextStep "Review the '$operation' operation performed on Function App \`$FUNCTION_APP_NAME\` by $user_details. Check if this was intentional and if the service should be restored.$correlation_note" \
             --arg severity "$severity" \
             --arg eventLogUrl "$event_log_url" \
@@ -286,7 +289,7 @@ if [[ "$function_app_state" != "Running" ]]; then
         
         # Add informational issue about long-term stopped state
         issues_json=$(echo "$issues_json" | jq \
-            --arg title "Function App \`$FUNCTION_APP_NAME\` Has Been Stopped for Extended Period" \
+            --arg title "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` Has Been Stopped for Extended Period" \
             --arg nextStep "Function App \`$FUNCTION_APP_NAME\` appears to have been stopped for more than 7 days. No recent stop operations found in activity logs. This may indicate a forgotten manual stop, automated process, or the Function App was created in a stopped state." \
             --arg severity "2" \
             --arg details "No operational activity (excluding publish profile requests) found in the last 7 days. This suggests the Function App was stopped more than 7 days ago. Portal URL: $portal_url" \

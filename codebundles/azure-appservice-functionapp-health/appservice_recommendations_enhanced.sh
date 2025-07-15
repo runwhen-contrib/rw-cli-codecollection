@@ -44,6 +44,9 @@ else
     echo "Using specified subscription ID: $subscription_id"
 fi
 
+# Get subscription name from environment variable
+subscription_name="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
+
 echo "Switching to subscription ID: $subscription_id"
 if ! az account set --subscription "$subscription_id"; then
     echo "Failed to set subscription."
@@ -72,7 +75,7 @@ echo "=============================================================="
 if ! resource_id=$(az functionapp show --name "$FUNCTION_APP_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "id" -o tsv 2>/dev/null); then
     echo "Error: Function App $FUNCTION_APP_NAME not found in resource group $AZ_RESOURCE_GROUP."
     recommendations_json=$(echo "$recommendations_json" | jq \
-        --arg title "Function App \`$FUNCTION_APP_NAME\` Not Found" \
+        --arg title "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` Not Found" \
         --arg details "Could not find Function App $FUNCTION_APP_NAME in resource group $AZ_RESOURCE_GROUP" \
         --arg severity "1" \
         '.recommendations += [{"title": $title, "details": $details, "severity": ($severity | tonumber)}]')
@@ -225,7 +228,7 @@ app_insights_check=$(az functionapp show --name "$FUNCTION_APP_NAME" --resource-
 
 if [[ -z "$app_insights_check" ]]; then
     recommendations_json=$(echo "$recommendations_json" | jq \
-        --arg title "Application Insights Not Configured for Function App \`$FUNCTION_APP_NAME\`" \
+        --arg title "Application Insights Not Configured for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
         --arg details "Function App \`$FUNCTION_APP_NAME\` does not have Application Insights configured. This limits monitoring and troubleshooting capabilities." \
         --arg severity "4" \
         '.recommendations += [{"title": $title, "details": $details, "severity": ($severity | tonumber)}]')
@@ -235,7 +238,7 @@ fi
 # Only raise cost-savings recommendation if the Function App is stopped
 if [[ "$function_app_state" != "Running" ]]; then
     recommendations_json=$(echo "$recommendations_json" | jq \
-        --arg title "Function App \`$FUNCTION_APP_NAME\` is Stopped - Potential Cost Savings" \
+        --arg title "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` is Stopped - Potential Cost Savings" \
         --arg details "Stopped Function Apps may still incur costs for associated resources like storage accounts and hosting plans. | Portal URLs: Function App Portal: $resource_portal_url/overview | Advisor Dashboard: $advisor_url | Security Center: $security_center_url" \
         --arg severity "4" \
         '.recommendations += [{"title": $title, "details": $details, "severity": ($severity | tonumber)}]')

@@ -128,7 +128,7 @@ else
             issues_json=$(echo "$issues_json" | jq \
                 --arg slot "$slot" \
                 --arg state "$SLOT_STATE" \
-                --arg title "Deployment Slot Issue with Function App \`$FUNCTION_APP_NAME\`" \
+                --arg title "Deployment Slot Issue with Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
                 --arg nextStep "Investigate the issue with slot \`$slot\` in the Azure Portal." \
                 --arg severity "2" \
                 --arg config "$SLOT_DETAILS" \

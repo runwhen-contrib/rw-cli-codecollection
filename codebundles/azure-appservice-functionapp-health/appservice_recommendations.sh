@@ -17,6 +17,9 @@ end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
 echo "Using subscription ID: $subscription"
 
+# Get subscription name from environment variable
+subscription_name="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
+
 # Set the subscription
 echo "Switching to subscription ID: $subscription"
 az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
@@ -94,7 +97,7 @@ if [[ $(echo "$advisor_recommendations" | jq length) -gt 0 ]]; then
     
     if [[ $(echo "$performance_recs" | jq length) -gt 0 ]]; then
         perf_summary=$(echo "$performance_recs" | jq -r '.[] | "\(.shortDescription.problem) - \(.shortDescription.solution)"' | head -3)
-        add_issue "Performance Recommendations for Function App \`$FUNCTION_APP_NAME\`" \
+        add_issue "Performance Recommendations for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
                   "Review Azure Advisor performance recommendations for Function App \`$FUNCTION_APP_NAME\`. These recommendations can help optimize application performance and user experience." \
                   "4" \
                   "$perf_summary"
@@ -102,7 +105,7 @@ if [[ $(echo "$advisor_recommendations" | jq length) -gt 0 ]]; then
     
     if [[ $(echo "$cost_recs" | jq length) -gt 0 ]]; then
         cost_summary=$(echo "$cost_recs" | jq -r '.[] | "\(.shortDescription.problem) - \(.shortDescription.solution)"' | head -3)
-        add_issue "Cost Optimization Recommendations for Function App \`$FUNCTION_APP_NAME\`" \
+        add_issue "Cost Optimization Recommendations for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
                   "Review Azure Advisor cost recommendations for Function App \`$FUNCTION_APP_NAME\`. These recommendations can help reduce operational costs." \
                   "4" \
                   "$cost_summary"
@@ -110,7 +113,7 @@ if [[ $(echo "$advisor_recommendations" | jq length) -gt 0 ]]; then
     
     if [[ $(echo "$security_recs" | jq length) -gt 0 ]]; then
         security_summary=$(echo "$security_recs" | jq -r '.[] | "\(.shortDescription.problem) - \(.shortDescription.solution)"' | head -3)
-        add_issue "Security Recommendations for Function App \`$FUNCTION_APP_NAME\`" \
+        add_issue "Security Recommendations for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
                   "Review Azure Advisor security recommendations for Function App \`$FUNCTION_APP_NAME\`. These recommendations help improve security posture." \
                   "4" \
                   "$security_summary"
@@ -118,7 +121,7 @@ if [[ $(echo "$advisor_recommendations" | jq length) -gt 0 ]]; then
     
     if [[ $(echo "$reliability_recs" | jq length) -gt 0 ]]; then
         reliability_summary=$(echo "$reliability_recs" | jq -r '.[] | "\(.shortDescription.problem) - \(.shortDescription.solution)"' | head -3)
-        add_issue "Reliability Recommendations for Function App \`$FUNCTION_APP_NAME\`" \
+        add_issue "Reliability Recommendations for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
                   "Review Azure Advisor reliability recommendations for Function App \`$FUNCTION_APP_NAME\`. These recommendations help improve application reliability." \
                   "4" \
                   "$reliability_summary"
@@ -154,7 +157,7 @@ if [[ $(echo "$service_health" | jq length) -gt 0 ]]; then
         fi
         
         add_issue "Service Health Alert: $event_title" \
-                  "Azure Service Health has reported an issue that may affect Function App \`$FUNCTION_APP_NAME\`. Status: $event_status. Review the service health dashboard for more details." \
+                  "Azure Service Health has reported an issue that may affect Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`. Status: $event_status. Review the service health dashboard for more details." \
                   "$severity" \
                   "$event_summary"
     done < <(echo "$service_health" | jq -c '.[]')
@@ -175,7 +178,7 @@ if [[ $(echo "$security_assessments" | jq length) -gt 0 ]]; then
     echo "Found $(echo "$security_assessments" | jq length) Security Center assessments"
     
     security_summary=$(echo "$security_assessments" | jq -r '.[] | "\(.properties.displayName) - \(.properties.status.code)"' | head -5)
-    add_issue "Security Center Assessments for Function App \`$FUNCTION_APP_NAME\`" \
+    add_issue "Security Center Assessments for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
               "Azure Security Center has identified security recommendations for Function App \`$FUNCTION_APP_NAME\`. Review these assessments to improve security posture." \
               "3" \
               "$security_summary"
@@ -190,7 +193,7 @@ echo "Checking Function App specific recommendations..."
 app_insights_check=$(az functionapp show --name "$FUNCTION_APP_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "siteConfig.appSettings[?name=='APPINSIGHTS_INSTRUMENTATIONKEY'].value" -o tsv 2>/dev/null)
 
 if [[ -z "$app_insights_check" ]]; then
-    add_issue "Application Insights Not Configured for Function App \`$FUNCTION_APP_NAME\`" \
+    add_issue "Application Insights Not Configured for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
               "Function App \`$FUNCTION_APP_NAME\` does not have Application Insights configured. This limits monitoring and troubleshooting capabilities." \
               "4" \
               "Application Insights provides performance monitoring, dependency tracking, and error analysis for Function Apps."
@@ -200,7 +203,7 @@ fi
 https_only=$(az functionapp show --name "$FUNCTION_APP_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "httpsOnly" -o tsv 2>/dev/null)
 
 if [[ "$https_only" != "true" ]]; then
-    add_issue "HTTPS Not Enforced for Function App \`$FUNCTION_APP_NAME\`" \
+    add_issue "HTTPS Not Enforced for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
               "Function App \`$FUNCTION_APP_NAME\` is not configured to enforce HTTPS only. This may expose data to security risks." \
               "4" \
               "Enable HTTPS only to ensure all traffic is encrypted in transit."
@@ -210,7 +213,7 @@ fi
 managed_identity=$(az functionapp identity show --name "$FUNCTION_APP_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "type" -o tsv 2>/dev/null)
 
 if [[ "$managed_identity" == "None" || -z "$managed_identity" ]]; then
-    add_issue "Managed Identity Not Configured for Function App \`$FUNCTION_APP_NAME\`" \
+    add_issue "Managed Identity Not Configured for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
               "Function App \`$FUNCTION_APP_NAME\` does not have Managed Identity enabled. This limits secure access to Azure resources without storing credentials." \
               "4" \
               "Enable Managed Identity to securely access Azure resources without managing credentials."
@@ -222,7 +225,7 @@ hosting_plan=$(az functionapp show --name "$FUNCTION_APP_NAME" --resource-group 
 if [[ -n "$hosting_plan" ]]; then
     plan_sku=$(az appservice plan show --ids "$hosting_plan" --query "sku.name" -o tsv 2>/dev/null)
     if [[ "$plan_sku" == "Y1" || "$plan_sku" == "Dynamic" ]]; then
-        add_issue "Function App \`$FUNCTION_APP_NAME\` Using Consumption Plan" \
+        add_issue "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` Using Consumption Plan" \
                   "Function App \`$FUNCTION_APP_NAME\` is using a Consumption plan. Consider Premium or Dedicated plans for better performance and features if needed." \
                   "4" \
                   "Consumption plan has cold start delays and limited features compared to Premium plans."
@@ -235,7 +238,7 @@ echo "Checking cost optimization opportunities..."
 # Check for unused or underutilized resources
 # Only raise cost-savings recommendation if the Function App is actually stopped
 if [[ "$function_app_state" != "Running" ]]; then
-    add_issue "Function App \`$FUNCTION_APP_NAME\` is Stopped - Potential Cost Savings" \
+    add_issue "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` is Stopped - Potential Cost Savings" \
               "Function App \`$FUNCTION_APP_NAME\` is currently stopped. If this is intentional and long-term, consider deleting unused resources to reduce costs." \
               "4" \
               "Stopped Function Apps may still incur costs for associated resources like storage accounts and hosting plans."
