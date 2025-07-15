@@ -35,10 +35,10 @@ while IFS= read -r line; do
                 add_issue \
                     "High Memory Usage on VM ${VM_NAME}" \
                     2 \
-                    "Memory usage should be below ${THRESHOLD}% on VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_ID})" \
-                    "Memory usage is at ${percent}% on VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_ID})" \
-                    "Memory usage is ${used}MB out of ${total}MB (${percent}%).\nResource Group: ${AZ_RESOURCE_GROUP}\nSubscription: ${AZURE_SUBSCRIPTION_ID}" \
-                    "1. Investigate memory-intensive processes on VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_ID})\n2. Consider scaling up memory\n3. Check for memory leaks\n4. Restart services if needed"
+                    "Memory usage should be below ${THRESHOLD}% on VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_NAME})" \
+                    "Memory usage is at ${percent}% on VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_NAME})" \
+                    "Memory usage is ${used}MB out of ${total}MB (${percent}%).\nResource Group: ${AZ_RESOURCE_GROUP}\nSubscription: ${AZURE_SUBSCRIPTION_NAME}" \
+                    "Investigate memory-intensive processes on VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_NAME})\nConsider scaling up memory\nCheck for memory leaks\nRestart services if needed"
             fi
         fi
     fi

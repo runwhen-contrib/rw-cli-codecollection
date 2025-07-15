@@ -321,6 +321,10 @@ Suite Initialization
     ...    type=string
     ...    description=The Azure Subscription ID.
     ...    pattern=\w*
+    ${AZURE_SUBSCRIPTION_NAME}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_NAME
+    ...    type=string
+    ...    description=The Azure Subscription Name.
+    ...    pattern=\w*
     ${azure_credentials}=    RW.Core.Import Secret
     ...    azure_credentials
     ...    type=string
@@ -333,7 +337,7 @@ Suite Initialization
     Set Suite Variable    ${MEMORY_THRESHOLD}    ${MEMORY_THRESHOLD}
     Set Suite Variable
     ...    ${env}
-    ...    {"VM_NAME":"${VM_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "DISK_THRESHOLD": "${DISK_THRESHOLD}", "UPTIME_THRESHOLD": "${UPTIME_THRESHOLD}", "MEMORY_THRESHOLD": "${MEMORY_THRESHOLD}", "AZURE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}
+    ...    {"VM_NAME":"${VM_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "DISK_THRESHOLD": "${DISK_THRESHOLD}", "UPTIME_THRESHOLD": "${UPTIME_THRESHOLD}", "MEMORY_THRESHOLD": "${MEMORY_THRESHOLD}", "AZURE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}"}
     # Set Azure subscription context
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}

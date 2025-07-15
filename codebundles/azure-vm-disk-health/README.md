@@ -1,43 +1,70 @@
-# Azure VM Disk Health Check
+# Azure VM Disk Health Bundle
 
-This codebundle provides tools to monitor and check disk utilization on Azure Virtual Machines. It helps identify VMs with high disk usage that might need attention.
+This bundle provides comprehensive health checks for Azure Virtual Machines, including disk utilization, memory usage, uptime, and patch status. It uses Robot Framework tasks and Bash scripts to collect, parse, and score VM health.
 
-## Features
+## Included Health Checks
 
-- Checks disk utilization on Azure VMs
-- Generates health scores based on disk usage
-- Provides detailed information about VMs and their attached disks
-- Raises issues when disk usage exceeds defined thresholds
+- **Disk Utilization**: Checks if any disk is above the configured threshold.
+- **Memory Utilization**: Checks if memory usage is above the configured threshold.
+- **Uptime**: Checks if system uptime exceeds the configured threshold.
+- **Patch Status**: Checks if there are pending OS patches.
 
-## Tasks
+## Main Tasks
 
-- `Check Disk Utilization for VM`: Checks disk utilization and reports issues if usage exceeds threshold
+- `Check Disk Utilization for VMs in Resource Group`
+- `Check Memory Utilization for VMs in Resource Group`
+- `Check Uptime for VMs in Resource Group`
+- `Check Last Patch Status for VMs in Resource Group`
+- `Score Disk Utilization for VMs in Resource Group`
+- `Score Memory Utilization for VMs in Resource Group`
+- `Score Uptime for VMs in Resource Group`
+- `Score Last Patch Status for VMs in Resource Group`
+- `Generate Comprehensive VM Health Score`
 
-## Configuration
+## How It Works
 
-The TaskSet requires initialization to import necessary secrets, services, and user variables. The following variables should be set:
-
-- `AZ_RESOURCE_GROUP`: The resource group containing the VM(s)
-- `VM_NAME`: (Optional) The Azure Virtual Machine to check. Leave empty to check all VMs in the resource group
-- `DISK_THRESHOLD`: The threshold percentage for disk usage warnings (default: 80)
-- `AZURE_SUBSCRIPTION_ID`: The Azure Subscription ID
-
-## SLI
-
-The SLI generates a health score based on disk utilization:
-- 1.0 = All disks are healthy (below threshold)
-- 0.0 = All disks are unhealthy (above threshold)
-- Values between 0 and 1 represent the proportion of healthy disks
-
-## Prerequisites
-
-- Azure CLI must be installed and configured
-- Appropriate permissions to access and run commands on Azure VMs
-- Service principal with appropriate permissions
+1. **Bash scripts** (e.g., `vm_disk_utilization.sh`, `vm_memory_check.sh`, etc.) collect raw data from Azure VMs.
+2. **Robot Framework tasks** run these scripts, parse the output, and (for SLI) calculate a health score.
+3. **Next steps scripts** (e.g., `next_steps_disk_utilization.sh`) analyze the parsed output and generate JSON issues or recommendations.
+4. **SLI tasks** aggregate the results and push a health score metric.
 
 ## Usage
 
-This codebundle can be used to:
-1. Monitor disk utilization across all VMs in a resource group
-2. Focus on a specific VM by providing its name
-3. Adjust the threshold for disk usage warnings
+- Configure your environment variables (resource group, subscription, thresholds, etc.).
+- Run the desired Robot Framework task (e.g., from `runbook.robot` or `sli.robot`).
+- Review the output and health scores.
+
+## Directory Structure
+
+- `runbook.robot` - Main runbook for health checks and issue creation.
+- `sli.robot` - SLI/score-only version for health scoring.
+- `vm_disk_utilization.sh`, `vm_memory_check.sh`, `vm_uptime_check.sh`, `vm_last_patch_check.sh` - Data collection scripts.
+- `next_steps_disk_utilization.sh`, `next_steps_memory_check.sh`, `next_steps_uptime.sh`, `next_steps_patch_time.sh` - Next steps/issue analysis scripts.
+- `.test/` - Example and test cases (see below for Terraform usage).
+
+
+### How to Use the Terraform Code
+
+1. Prepare your secrets file (tf.secret)
+Create a file named tf.secret in your Terraform directory with the following structure:
+
+tf.secret (example)
+```
+ARM_SUBSCRIPTION_ID="your-azure-subscription-id"
+AZURE_SUBSCRIPTION_ID=$ARM_SUBSCRIPTION_ID
+AZURE_RESOURCE_GROUP="your-azure-resource-group"
+VM_NAME="your-vm-name"
+AZ_TENANT_ID="your-tenant-id"
+AZ_CLIENT_SECRET="your-client-secret"
+AZ_CLIENT_ID="your-client-id"
+TF_VAR_service_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)
+TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
+TF_VAR_tenant_id=$AZ_TENANT_ID
+TF_VAR_client_id=$AZ_CLIENT_ID
+TF_VAR_client_secret=$AZ_CLIENT_SECRET
+```
+
+2. Build Infra
+```
+task build-infra
+```

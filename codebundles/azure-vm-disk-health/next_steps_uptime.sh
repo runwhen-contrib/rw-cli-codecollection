@@ -32,10 +32,10 @@ while IFS= read -r line; do
             add_issue \
                 "High Uptime on VM ${VM_NAME}" \
                 2 \
-                "Uptime should be less than ${THRESHOLD} days on VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_ID})" \
-                "Uptime is ${uptime_days} days on VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_ID})" \
-                "System uptime is ${uptime_days} days (${uptime_sec} seconds).\nResource Group: ${AZ_RESOURCE_GROUP}\nSubscription: ${AZURE_SUBSCRIPTION_ID}" \
-                "1. Consider scheduling a reboot for VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_ID})\n2. Check for pending updates\n3. Review system logs for issues"
+                "Uptime should be less than ${THRESHOLD} days on VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_NAME})" \
+                "Uptime is ${uptime_days} days on VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_NAME})" \
+                "System uptime is ${uptime_days} days (${uptime_sec} seconds).\nResource Group: ${AZ_RESOURCE_GROUP}\nSubscription: ${AZURE_SUBSCRIPTION_NAME}" \
+                "Consider scheduling a reboot for VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_NAME})\nCheck for pending updates\nReview system logs for issues"
         fi
     fi
 done < "$STDOUT_FILE"

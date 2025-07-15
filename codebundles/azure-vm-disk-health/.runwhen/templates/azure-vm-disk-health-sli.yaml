@@ -35,3 +35,5 @@ spec:
       value: "70"
     - name: AZURE_SUBSCRIPTION_ID
       value: {{subscription_id}}
+    - name: AZURE_SUBSCRIPTION_NAME
+      value: {{subscription_name}}
