@@ -50,7 +50,7 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
         # check if parsed_out.stderr is empty, if its empty then run next steps script and then generate issue else generate issue with stderr value
         IF    $parsed_out['stderr'] != ""
             RW.Core.Add Issue    
-                ...    title=Error detected during disk check
+                ...    title=Error detected during disk check for VM ${VM_NAME} in Resource Group ${AZ_RESOURCE_GROUP}
                 ...    severity=1
                 ...    next_steps=Investigate the error: $parsed_out['stderr']
                 ...    expected=No errors should occur during disk health check
@@ -119,7 +119,7 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
 
         IF    $parsed_out['stderr'] != ""
             RW.Core.Add Issue    
-                ...    title=Error detected during memory check
+                ...    title=Error detected during memory check for VM ${VM_NAME} in Resource Group ${AZ_RESOURCE_GROUP}
                 ...    severity=1
                 ...    next_steps=Investigate the error: $parsed_out['stderr']
                 ...    expected=No errors should occur during memory check
@@ -186,7 +186,7 @@ Check Uptime for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
 
         IF    $parsed_out['stderr'] != ""
             RW.Core.Add Issue    
-                ...    title=Error detected during uptime check
+                ...    title=Error detected during uptime check for VM ${VM_NAME} in Resource Group ${AZ_RESOURCE_GROUP}
                 ...    severity=1
                 ...    next_steps=Investigate the error: $parsed_out['stderr']
                 ...    expected=No errors should occur during uptime check
@@ -253,7 +253,7 @@ Check Last Patch Status for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
 
         IF    $parsed_out['stderr'] != ""
             RW.Core.Add Issue    
-                ...    title=Error detected during patch check
+                ...    title=Error detected during patch check for VM ${VM_NAME} in Resource Group ${AZ_RESOURCE_GROUP}
                 ...    severity=1
                 ...    next_steps=Investigate the error: $parsed_out['stderr']
                 ...    expected=No errors should occur during patch check
@@ -334,3 +334,7 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"VM_NAME":"${VM_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "DISK_THRESHOLD": "${DISK_THRESHOLD}", "UPTIME_THRESHOLD": "${UPTIME_THRESHOLD}", "MEMORY_THRESHOLD": "${MEMORY_THRESHOLD}", "AZURE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}
+    # Set Azure subscription context
+    RW.CLI.Run Cli
+    ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
+    ...    include_in_history=false

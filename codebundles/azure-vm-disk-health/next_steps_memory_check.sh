@@ -22,6 +22,9 @@ add_issue() {
     jq ". += [$issue]" "${ISSUES_FILE}" > temp.json && mv temp.json "${ISSUES_FILE}"
 }
 
+RESOURCE_GROUP=${AZ_RESOURCE_GROUP:-"unknown"}
+SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID:-"unknown"}
+
 while IFS= read -r line; do
     if [[ "$line" =~ ^Mem: ]]; then
         total=$(echo "$line" | awk '{print $2}')
@@ -32,10 +35,10 @@ while IFS= read -r line; do
                 add_issue \
                     "High Memory Usage on VM ${VM_NAME}" \
                     2 \
-                    "Memory usage should be below ${THRESHOLD}% on VM ${VM_NAME}" \
-                    "Memory usage is at ${percent}% on VM ${VM_NAME}" \
-                    "Memory usage is ${used}MB out of ${total}MB (${percent}%)." \
-                    "1. Investigate memory-intensive processes\n2. Consider scaling up memory\n3. Check for memory leaks\n4. Restart services if needed"
+                    "Memory usage should be below ${THRESHOLD}% on VM ${VM_NAME} in resource group ${RESOURCE_GROUP} (subscription: ${SUBSCRIPTION_ID})" \
+                    "Memory usage is at ${percent}% on VM ${VM_NAME} in resource group ${RESOURCE_GROUP} (subscription: ${SUBSCRIPTION_ID})" \
+                    "Memory usage is ${used}MB out of ${total}MB (${percent}%).\nResource Group: ${RESOURCE_GROUP}\nSubscription: ${SUBSCRIPTION_ID}" \
+                    "1. Investigate memory-intensive processes on VM ${VM_NAME} in resource group ${RESOURCE_GROUP} (subscription: ${SUBSCRIPTION_ID})\n2. Consider scaling up memory\n3. Check for memory leaks\n4. Restart services if needed"
             fi
         fi
     fi

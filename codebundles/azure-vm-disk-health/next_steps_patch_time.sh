@@ -28,10 +28,10 @@ if [ "$patch_lines" -gt 0 ]; then
     add_issue \
         "Pending OS Patches on VM ${VM_NAME}" \
         2 \
-        "All security patches should be applied on VM ${VM_NAME}" \
-        "Pending patches detected on VM ${VM_NAME}" \
-        "$details" \
-        "1. Review and apply pending updates\n2. Reboot if required\n3. Ensure regular patching schedule"
+        "All security patches should be applied on VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_ID})" \
+        "Pending patches detected on VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_ID})" \
+        "$details\nResource Group: ${AZ_RESOURCE_GROUP}\nSubscription: ${AZURE_SUBSCRIPTION_ID}" \
+        "1. Review and apply pending updates on VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_ID})\n2. Reboot if required\n3. Ensure regular patching schedule"
 fi
 
 issues_count=$(jq '. | length' "${ISSUES_FILE}")

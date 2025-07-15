@@ -1,6 +1,6 @@
 #!/bin/bash
 
-THRESHOLD=${DISK_THRESHOLD:-70}  # Default threshold of 80%
+THRESHOLD=${DISK_THRESHOLD:-70}  # Default threshold of 70%
 VM_NAME=${VM_NAME:-"unknown"}
 STDOUT_FILE="/tmp/vm_disk_stdout.txt"
 
@@ -48,12 +48,12 @@ while IFS= read -r line; do
 
     # Check if disk usage exceeds threshold
     if [ "$use_percent" -ge "$THRESHOLD" ]; then
-        issue_title="High Disk Usage on VM `${VM_NAME}`"
+        issue_title="High Disk Usage on VM `${VM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`"
         issue_severity=2
-        issue_expected="Disk usage should be below ${THRESHOLD}% on VM `${VM_NAME}`"
-        issue_actual="Disk usage is at ${use_percent}% on filesystem ${filesystem} (${mount_point}) on VM `${VM_NAME}`"
-        issue_details="Filesystem ${filesystem} mounted at ${mount_point} is at ${use_percent}% capacity (${used} used out of ${size}).\nThis exceeds the threshold of ${THRESHOLD}%."
-        issue_next_steps="1. Clean up unnecessary files on the filesystem\n2. Consider expanding the disk\n3. Implement disk usage monitoring\n4. Review application logs for disk-intensive operations"
+        issue_expected="Disk usage should be below ${THRESHOLD}% on VM `${VM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`"
+        issue_actual="Disk usage is at ${use_percent}% on filesystem ${filesystem} (${mount_point}) on VM `${VM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`"
+        issue_details="Filesystem ${filesystem} mounted at ${mount_point} is at ${use_percent}% capacity (${used} used out of ${size}).\nThis exceeds the threshold of ${THRESHOLD}%.\nResource Group: ${RESOURCE_GROUP}\nSubscription: ${SUBSCRIPTION_ID}"
+        issue_next_steps="1. Investigate disk usage on VM ${VM_NAME} in resource group ${RESOURCE_GROUP} (subscription: ${SUBSCRIPTION_ID})\n2. Clean up unnecessary files on the filesystem\n3. Consider expanding the disk\n4. Implement disk usage monitoring\n5. Review application logs for disk-intensive operations"
         
         add_issue "$issue_title" "$issue_severity" "$issue_expected" "$issue_actual" "$issue_details" "$issue_next_steps"
     fi
