@@ -124,6 +124,17 @@ def execute_local_command(
             capture_output=True,
             timeout=timeout_seconds
         )
+        # Set restrictive permissions on secret files to prevent unauthorized access
+        for s in ds_secrets:
+            if s["file"]:
+                secret_file_path = os.path.join(final_cwd, s["key"])
+                subprocess.run(
+                    ["chmod", "600", secret_file_path],
+                    check=False,
+                    text=True,
+                    capture_output=True,
+                    timeout=timeout_seconds
+                )
     except Exception as e:
         logger.debug(f"Ignoring error while adjusting permissions in {final_cwd}: {e}")
 

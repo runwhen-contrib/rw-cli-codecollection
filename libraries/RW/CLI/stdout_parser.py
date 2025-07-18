@@ -293,7 +293,7 @@ def parse_cli_output_by_line(
                 elif query == "raise_issue_if_contains" and query_value in capture_group_value:
                     severity = set_severity_level
                     title = (
-                        f"Value of {prefix} ({variable_value}) Contained {query_value}"
+                        f"Value of {prefix} ({capture_group_value}) Contained {query_value}"
                         if not set_issue_title
                         else set_issue_title
                     )
@@ -318,7 +318,7 @@ def parse_cli_output_by_line(
                 elif query == "raise_issue_if_ncontains" and query_value not in capture_group_value:
                     severity = set_severity_level
                     title = (
-                        f"Value of {prefix} ({variable_value}) Did Not Contain {query_value}"
+                        f"Value of {prefix} ({capture_group_value}) Did Not Contain {query_value}"
                         if not set_issue_title
                         else set_issue_title
                     )

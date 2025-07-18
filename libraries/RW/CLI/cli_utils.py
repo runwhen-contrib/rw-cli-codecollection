@@ -103,7 +103,7 @@ def to_json(json_data: any):
     Returns:
         str: the str representation of the json blob
     """
-    return json.dumps(json_str)
+    return json.dumps(json_data)
 
 
 def filter_by_time(
