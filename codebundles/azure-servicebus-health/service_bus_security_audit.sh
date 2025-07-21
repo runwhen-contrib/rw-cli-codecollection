@@ -147,7 +147,7 @@ add_issue() {
 # Check for RootManageSharedAccessKey
 has_root_key=$(jq '.namespace_rules[] | select(.name == "RootManageSharedAccessKey") | length > 0' <<< "$security_data")
 if [[ "$has_root_key" == "true" ]]; then
-  add_issue 2 \
+  add_issue 4 \
     "Default RootManageSharedAccessKey is present on Service Bus namespace $SB_NAMESPACE_NAME" \
     "Consider using more granular authorization rules or RBAC instead of the root key" \
     "Default root key should be rotated or removed for security best practices"
@@ -156,7 +156,7 @@ fi
 # Check for overly permissive rules (Manage rights)
 namespace_manage_keys=$(jq '.namespace_rules[] | select(.rights | contains(["Manage"])) | .name' <<< "$security_data" | jq -s 'join(", ")')
 if [[ "$namespace_manage_keys" != '""' ]]; then
-  add_issue 2 \
+  add_issue 4 \
     "Namespace-level authorization rules with Manage rights found: $namespace_manage_keys" \
     "Review if Manage rights are necessary or if more restrictive rights can be used" \
     "Manage rights grant full control over the namespace"
@@ -165,7 +165,7 @@ fi
 # Check if RBAC is being used
 rbac_count=$(jq '.rbac_assignments | length' <<< "$security_data")
 if [[ "$rbac_count" -eq 0 ]]; then
-  add_issue 3 \
+  add_issue 4 \
     "No RBAC assignments found for Service Bus namespace $SB_NAMESPACE_NAME" \
     "Consider using Azure RBAC for more granular and auditable access control" \
     "RBAC provides better security controls than SAS keys"
@@ -175,7 +175,7 @@ fi
 queue_rule_count=$(jq '.queue_rules | keys | length' <<< "$security_data")
 topic_rule_count=$(jq '.topic_rules | keys | length' <<< "$security_data")
 if [[ "$queue_rule_count" -eq 0 && "$topic_rule_count" -eq 0 ]]; then
-  add_issue 3 \
+  add_issue 4 \
     "No queue or topic level authorization rules found for Service Bus namespace $SB_NAMESPACE_NAME" \
     "Consider using entity-specific authorization rules for better security isolation" \
     "Entity-specific rules provide better security isolation than namespace-level rules"
@@ -184,7 +184,7 @@ fi
 # Check for overly permissive RBAC roles
 owner_roles=$(jq '.rbac_assignments[] | select(.roleDefinitionName == "Owner") | .principalName' <<< "$security_data" | jq -s 'join(", ")')
 if [[ "$owner_roles" != '""' ]]; then
-  add_issue 2 \
+  add_issue 4 \
     "Owner role assignments found for Service Bus namespace: $owner_roles" \
     "Review if Owner role is necessary or if more restrictive roles can be used" \
     "Owner role grants full control over the namespace"
@@ -197,7 +197,7 @@ identity_type=$(az servicebus namespace show \
   --query "identity.type" -o tsv 2>/dev/null || echo "None")
 
 if [[ "$identity_type" == "None" ]]; then
-  add_issue 3 \
+  add_issue 4 \
     "No managed identity configured for Service Bus namespace $SB_NAMESPACE_NAME" \
     "Consider assigning a managed identity for secure authentication with other Azure services" \
     "Managed identities eliminate the need to store credentials in code"

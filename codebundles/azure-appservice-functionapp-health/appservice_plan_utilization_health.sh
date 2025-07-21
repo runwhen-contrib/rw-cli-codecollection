@@ -13,14 +13,12 @@
 
 set -e
 
-# Get or set subscription ID
-if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
-    subscription=$(az account show --query "id" -o tsv)
-    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
-else
-    subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
-    echo "Using specified subscription ID: $subscription"
-fi
+# Use subscription ID from environment variable
+subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
+echo "Using subscription ID: $subscription"
+
+# Get subscription name from environment variable
+subscription_name="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
 
 # Set the subscription to the determined ID
 echo "Switching to subscription ID: $subscription"
@@ -50,7 +48,7 @@ if [[ -z "$function_app_details" || "$function_app_details" == "null" ]]; then
 fi
 
 app_state=$(echo "$function_app_details" | jq -r '.state')
-plan_id=$(echo "$function_app_details" | jq -r '.serverFarmId // empty')
+plan_id=$(echo "$function_app_details" | jq -r '.serverFarmId // .appServicePlanId // empty')
 kind=$(echo "$function_app_details" | jq -r '.kind // empty')
 
 echo "Function App State: $app_state"
@@ -61,10 +59,10 @@ echo ""
 # If function app is not running, note an issue (optional).
 if [[ "$app_state" != "Running" ]]; then
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Function App \`$FUNCTION_APP_NAME\` Not Running" \
+        --arg title "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` Not Running" \
         --arg nextStep "Ensure Function App \`$FUNCTION_APP_NAME\` is started before analyzing usage." \
         --arg severity "2" \
-        --arg details "State: $app_state" \
+        --arg details "State: $app_state for Function App '$FUNCTION_APP_NAME' in subscription '$subscription_name'" \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
     )
 fi
@@ -101,7 +99,7 @@ echo ""
 
 if [[ -n "$plan_id" ]]; then
   # plan-level metrics
-  declare -a metrics_list=( "CpuPercentage" "MemoryWorkingSet" )
+  declare -a metrics_list=( "CpuPercentage" "MemoryPercentage" )
 else
   # function-level fallback
   declare -a metrics_list=( "CpuTime" "MemoryWorkingSet" )
@@ -132,6 +130,15 @@ for metric in "${metrics_list[@]}"; do
 
     # Flatten timeseries
     mapfile -t data_points < <(echo "$metric_data" | jq -c '.value[].timeseries[].data[]')
+    
+    # Track threshold violations for aggregation
+    cpu_violations=0
+    memory_violations=0
+    cpu_time_violations=0
+    cpu_max_violation=0
+    memory_max_violation=0
+    cpu_time_max_violation=0
+    
     for dp in "${data_points[@]}"; do
         # plan-level metrics often use .average
         # function-level "CpuTime" might use .total or .average
@@ -147,43 +154,59 @@ for metric in "${metrics_list[@]}"; do
             min=$val
         fi
 
-        # Example thresholds:
-        #   If plan-level CPU% is > 80
-        #   If function-level CPUTime is > threshold
-        #   If memory usage > threshold
-        # etc.
+        # Track threshold violations for aggregation
         if [[ "$metric" == "CpuPercentage" && $(echo "$val > 80" | bc -l) -eq 1 ]]; then
-            issues_json=$(echo "$issues_json" | jq \
-                --arg title "High CPU Usage for Function App \`$FUNCTION_APP_NAME\`" \
-                --arg nextStep "Investigate or scale your plan if CPU usage is persistently above 80% for Function App \`$FUNCTION_APP_NAME\`" \
-                --arg severity "2" \
-                --arg details "CPU: $val%" \
-                '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
-            )
+            cpu_violations=$((cpu_violations + 1))
+            if (( $(echo "$val > $cpu_max_violation" | bc -l) )); then
+                cpu_max_violation=$val
+            fi
         fi
 
-        if [[ "$metric" == "MemoryWorkingSet" && $(echo "$val > 1073741824" | bc -l) -eq 1 ]]; then
-            # 1 GB threshold example
-            issues_json=$(echo "$issues_json" | jq \
-                --arg title "High Memory Usage for Function App \`$FUNCTION_APP_NAME\`" \
-                --arg nextStep "Investigate or scale out your plan if memory usage is frequently above 1GB for Function App \`$FUNCTION_APP_NAME\`" \
-                --arg severity "2" \
-                --arg details "Memory usage: $val bytes" \
-                '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
-            )
+        if [[ "$metric" == "MemoryPercentage" && $(echo "$val > 80" | bc -l) -eq 1 ]]; then
+            memory_violations=$((memory_violations + 1))
+            if (( $(echo "$val > $memory_max_violation" | bc -l) )); then
+                memory_max_violation=$val
+            fi
         fi
 
         if [[ "$metric" == "CpuTime" && $(echo "$val > 100" | bc -l) -eq 1 ]]; then
-            # Arbitrary CPU time threshold example
-            issues_json=$(echo "$issues_json" | jq \
-                --arg title "High CPU Time (Function-level) for Function App \`$FUNCTION_APP_NAME\`" \
-                --arg nextStep "Investigate function usage or optimize code if CPUTime is excessively high for Function App \`$FUNCTION_APP_NAME\`" \
-                --arg severity "3" \
-                --arg details "CpuTime: $val (seconds?), metric depends on plan." \
-                '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
-            )
+            cpu_time_violations=$((cpu_time_violations + 1))
+            if (( $(echo "$val > $cpu_time_max_violation" | bc -l) )); then
+                cpu_time_max_violation=$val
+            fi
         fi
     done
+
+    # Create aggregated issues after processing all data points
+    if [[ "$metric" == "CpuPercentage" && $cpu_violations -gt 0 ]]; then
+        issues_json=$(echo "$issues_json" | jq \
+            --arg title "High CPU Usage for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
+            --arg nextStep "Investigate or scale your plan if CPU usage is persistently above 80% for Function App \`$FUNCTION_APP_NAME\`" \
+            --arg severity "3" \
+            --arg details "CPU exceeded 80% threshold in $cpu_violations out of $count data points. Max: ${cpu_max_violation}%, Average: $(echo "$total / $count" | bc -l)% for Function App '$FUNCTION_APP_NAME' in subscription '$subscription_name'" \
+            '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
+        )
+    fi
+
+    if [[ "$metric" == "MemoryPercentage" && $memory_violations -gt 0 ]]; then
+        issues_json=$(echo "$issues_json" | jq \
+            --arg title "High Memory Usage for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
+            --arg nextStep "Investigate or scale out your plan if memory usage is frequently above 80% for Function App \`$FUNCTION_APP_NAME\`" \
+            --arg severity "3" \
+            --arg details "Memory exceeded 80% threshold in $memory_violations out of $count data points. Max: ${memory_max_violation}%, Average: $(echo "$total / $count" | bc -l)% for Function App '$FUNCTION_APP_NAME' in subscription '$subscription_name'" \
+            '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
+        )
+    fi
+
+    if [[ "$metric" == "CpuTime" && $cpu_time_violations -gt 0 ]]; then
+        issues_json=$(echo "$issues_json" | jq \
+            --arg title "High CPU Time (Function-level) for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
+            --arg nextStep "Investigate function usage or optimize code if CPUTime is excessively high for Function App \`$FUNCTION_APP_NAME\`" \
+            --arg severity "3" \
+            --arg details "CpuTime exceeded 100 threshold in $cpu_time_violations out of $count data points. Max: ${cpu_time_max_violation}, Average: $(echo "$total / $count" | bc -l) for Function App '$FUNCTION_APP_NAME' in subscription '$subscription_name'" \
+            '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
+        )
+    fi
 
     # Summaries
     if (( count > 0 )); then
@@ -227,6 +250,7 @@ issue_count=$(echo "$issues_json" | jq '.issues | length')
     echo "================================"
     echo "Function App:   $FUNCTION_APP_NAME"
     echo "Resource Group: $AZ_RESOURCE_GROUP"
+    echo "Subscription:   $subscription_name"
     echo "Kind:           $kind"
     echo "Plan ID:        ${plan_id:-<none>}"
     echo "Time Range:     $start_time to $end_time"

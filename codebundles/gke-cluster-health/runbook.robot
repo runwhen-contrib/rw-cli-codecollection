@@ -58,11 +58,17 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=2
     ...    example=2    
+    ${NODE_HEALTH_LOOKBACK_HOURS}=    RW.Core.Import User Variable    NODE_HEALTH_LOOKBACK_HOURS
+    ...    type=string
+    ...    description=The time (in hours) to look back for node pool events and compute operations when checking node health. 
+    ...    pattern=\w*
+    ...    default=24
+    ...    example=24
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
     Set Suite Variable
     ...    ${env}
-    ...    {"CRITICAL_NAMESPACES":"${CRITICAL_NAMESPACES}","PATH": "$PATH:${OS_PATH}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}", "GCP_PROJECT_ID":"${GCP_PROJECT_ID}", "KUBECONFIG":"${KUBECONFIG}", "MAX_CPU_LIMIT_OVERCOMMIT":"${MAX_CPU_LIMIT_OVERCOMMIT}", "MAX_MEM_LIMIT_OVERCOMMIT":"${MAX_MEM_LIMIT_OVERCOMMIT}","OP_LOOKBACK_HOURS":"${OPERATIONS_LOOKBACK_HOURS}", "STUCK_HOURS":"${OPERATIONS_STUCK_HOURS}"}
+    ...    {"CRITICAL_NAMESPACES":"${CRITICAL_NAMESPACES}","PATH": "$PATH:${OS_PATH}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}", "GCP_PROJECT_ID":"${GCP_PROJECT_ID}", "KUBECONFIG":"${KUBECONFIG}", "MAX_CPU_LIMIT_OVERCOMMIT":"${MAX_CPU_LIMIT_OVERCOMMIT}", "MAX_MEM_LIMIT_OVERCOMMIT":"${MAX_MEM_LIMIT_OVERCOMMIT}","OP_LOOKBACK_HOURS":"${OPERATIONS_LOOKBACK_HOURS}", "STUCK_HOURS":"${OPERATIONS_STUCK_HOURS}", "NODE_HEALTH_LOOKBACK_HOURS":"${NODE_HEALTH_LOOKBACK_HOURS}"}
     RW.CLI.Run CLI
     ...    cmd=gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" || true
     ...    env=${env}
@@ -246,3 +252,33 @@ Fetch GKE Cluster Operations for GCP Project `${GCP_PROJECT_ID}`
         END
     END
     RW.Core.Add Pre To Report    Operations:\n${ops_list.stdout}
+
+Check Node Pool Health for GCP Project `${GCP_PROJECT_ID}`
+    [Documentation]    Performs comprehensive node pool health checking including instance group logs, compute operations, and Kubernetes events to surface hard-to-find issues like region exhaustion and quota blocking.
+    [Tags]    nodepool    health    events    quota    exhaustion    gcloud    gke    gcp    access:read-only
+
+    ${node_pool_health}=    RW.CLI.Run Bash File
+    ...    bash_file=node_pool_health.sh
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    timeout_seconds=300
+    ${report}=     RW.CLI.Run Cli
+    ...    cmd=cat node_pool_health_report.txt
+    RW.Core.Add Pre To Report    Node Pool Health Output:\n${report.stdout}
+
+    ${issues}=     RW.CLI.Run Cli
+    ...    cmd=cat node_pool_health_issues.json
+    
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list}) > 0
+        FOR    ${issue}    IN    @{issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    expected=Node pools should be healthy without quota or resource exhaustion issues
+            ...    actual=Node pools have critical issues including potential quota exhaustion or regional capacity problems
+            ...    title= ${issue["title"]}
+            ...    reproduce_hint=${node_pool_health.cmd}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["next_steps"]}
+        END
+    END

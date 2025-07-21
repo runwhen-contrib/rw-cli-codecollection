@@ -6,14 +6,12 @@
 #   AZURE_RESOURCE_SUBSCRIPTION_ID - (Optional) Subscription ID (defaults to current subscription)
 #   TIME_PERIOD_MINUTES - (Optional) How many minutes of data to fetch (default 5)
 
-# Get or set subscription ID
-if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
-    subscription=$(az account show --query "id" -o tsv)
-    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
-else
-    subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
-    echo "Using specified subscription ID: $subscription"
-fi
+# Use subscription ID from environment variable
+subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
+echo "Using subscription ID: $subscription"
+
+# Get subscription name from environment variable
+subscription_name="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
 
 # Set the subscription to the determined ID
 echo "Switching to subscription ID: $subscription"
@@ -48,10 +46,10 @@ function_app_state=$(az functionapp show \
 if [[ "$function_app_state" != "Running" ]]; then
     echo "Function App '$FUNCTION_APP_NAME' is not running. Metrics may be inaccurate."
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Function App \`$FUNCTION_APP_NAME\` Not Running" \
+        --arg title "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` Not Running" \
         --arg nextStep "Ensure the Function App \`$FUNCTION_APP_NAME\` is running before collecting metrics" \
         --arg severity "2" \
-        --arg details "Current state: $function_app_state" \
+        --arg details "Current state: $function_app_state for Function App '$FUNCTION_APP_NAME' in subscription '$subscription_name'" \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
     )
 fi
@@ -159,10 +157,10 @@ echo ""
 # If we have 0 executions in the entire time range, might be an issue
 if (( $(echo "$execution_count_total == 0" | bc -l) )); then
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "No Function Executions for Funcation App \`$FUNCTION_APP_NAME\`" \
+        --arg title "No Function Executions for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
         --arg nextStep "Verify that triggers are set up for Function App \`$FUNCTION_APP_NAME\` and that the function is invoked" \
-        --arg severity "3" \
-        --arg details "No executions recorded for '$FUNCTION_APP_NAME' over the last $TIME_PERIOD_MINUTES minute(s)." \
+        --arg severity "4" \
+        --arg details "No executions recorded for '$FUNCTION_APP_NAME' in subscription '$subscription_name' over the last $TIME_PERIOD_MINUTES minute(s)." \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
     )
 fi
@@ -170,10 +168,10 @@ fi
 # If there were errors recorded
 if (( $(echo "$errors_total > 0" | bc -l) )); then
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Function Errors Detected for Function App \`$FUNCTION_APP_NAME\`" \
+        --arg title "Function Errors Detected for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
         --arg nextStep "Investigate error logs or Application Insights traces for '$FUNCTION_APP_NAME'" \
         --arg severity "2" \
-        --arg details "Total errors: $errors_total" \
+        --arg details "Total errors: $errors_total for Function App '$FUNCTION_APP_NAME' in subscription '$subscription_name'" \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
     )
 fi
@@ -181,10 +179,10 @@ fi
 # Optionally, if you want to warn about high execution units (representing cost/usage):
 if (( $(echo "$execution_units_total > 100" | bc -l) )); then
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "High Function Execution Units for Function App \`$FUNCTION_APP_NAME\`" \
+        --arg title "High Function Execution Units for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
         --arg nextStep "Review cost and scaling settings for \`$FUNCTION_APP_NAME\`" \
         --arg severity "3" \
-        --arg details "Execution units exceeded 100 in the last $TIME_PERIOD_MINUTES minute(s)." \
+        --arg details "Execution units exceeded 100 in the last $TIME_PERIOD_MINUTES minute(s) for Function App '$FUNCTION_APP_NAME' in subscription '$subscription_name'." \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
     )
 fi
@@ -202,6 +200,7 @@ echo "----- Creating summary file: $summary_file -----"
     echo "Function App Metrics Check"
     echo "Function App: $FUNCTION_APP_NAME"
     echo "Resource Group: $AZ_RESOURCE_GROUP"
+    echo "Subscription: $subscription_name"
     echo "Time Range: $start_time to $end_time"
     echo "State: $function_app_state"
     echo ""

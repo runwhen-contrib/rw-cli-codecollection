@@ -20,10 +20,12 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/azure-kv-health/runbook.robot
+    pathToRobot: codebundles/azure-servicebus-health/runbook.robot
   configProvided:
-    - name: AZURE_RESOURCE_GROUP
+    - name: AZ_RESOURCE_GROUP
       value: "{{resource_group.name}}"
+    - name: SB_NAMESPACE_NAME
+      value: "{{match_resource.name}}"
     - name: AZURE_RESOURCE_SUBSCRIPTION_ID
       value: "{{ subscription_id }}"
     - name: AZURE_SUBSCRIPTION_NAME
@@ -33,5 +35,5 @@ spec:
     {% include "azure-auth.yaml" ignore missing %}
   {% else %}
     - name: azure_credentials
-      workspaceKey: AUTH DETAILS NOT FOUND
+      workspaceKey: {{custom.azure_credentials_secret_name}}
   {% endif %}

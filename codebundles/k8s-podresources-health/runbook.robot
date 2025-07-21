@@ -104,7 +104,10 @@ Identify VPA Pod Resource Recommendations in Namespace `${NAMESPACE}`
     ...    cmd=echo '${vpa_usage.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
     ...    env=${env}
     ...    include_in_history=false
-    ${recommendation_list}=    Evaluate    json.loads(r'''${recommendations.stdout}''')    json
+    ${recommendation_list}=    Set Variable    []
+    IF    """${recommendations.stdout}""" != ""
+        ${recommendation_list}=    Evaluate    json.loads(r'''${recommendations.stdout}''')    json
+    END
     IF    len(@{recommendation_list}) > 0
         FOR    ${item}    IN    @{recommendation_list}
             RW.Core.Add Issue
@@ -130,9 +133,12 @@ Identify Overutilized Pods in Namespace `${NAMESPACE}`
     ${overutilized_pods}=    RW.CLI.Run Cli
     ...    cmd=cat overutilized_pods.json | jq .
     ...    env=${env}
-    ${overutilized_pods_list}=    Evaluate
-    ...    json.loads(r'''${overutilized_pods.stdout}''')
-    ...    json
+    ${overutilized_pods_list}=    Set Variable    []
+    IF    """${overutilized_pods.stdout}""" != ""
+        ${overutilized_pods_list}=    Evaluate
+        ...    json.loads(r'''${overutilized_pods.stdout}''')
+        ...    json
+    END
     FOR    ${item}    IN    @{overutilized_pods_list}
         ${item_owner}=    RW.CLI.Run Bash File
         ...    bash_file=find_resource_owners.sh

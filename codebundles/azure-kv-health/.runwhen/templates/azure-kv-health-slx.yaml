@@ -9,7 +9,7 @@ metadata:
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/security/10245-icon-service-Key-Vaults.svg
   alias: >-
-    {{ match_resource.resource_group.name }} Key Vault Health Health
+    {{ match_resource.resource_group.name }} Key Vault Health
   asMeasuredBy: Composite health score of resources & activities.
   configProvided:
     - name: SLX_PLACEHOLDER

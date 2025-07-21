@@ -321,7 +321,8 @@ Check GitHub API Rate Limits
     END
     ${core_remaining}=    Set Variable    ${rate_data.get('core', {}).get('remaining', 0)}
     ${core_limit}=    Set Variable    ${rate_data.get('core', {}).get('limit', 5000)}
-    ${usage_percentage}=    Evaluate    (${core_limit} - ${core_remaining}) / ${core_limit} * 100 if ${core_limit} > 0 else 0
+    ${core_used}=    Set Variable    ${rate_data.get('core', {}).get('used', 0)}
+    ${usage_percentage}=    Set Variable    ${rate_data.get('core', {}).get('usage_percentage', 0)}
     IF    $usage_percentage > ${RATE_LIMIT_WARNING_THRESHOLD}
         RW.Core.Add Issue
         ...    severity=3

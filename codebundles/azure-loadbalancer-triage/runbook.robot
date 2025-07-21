@@ -78,3 +78,7 @@ Suite Initialization
     Set Suite Variable    ${AZ_HISTORY_RANGE}    ${AZ_HISTORY_RANGE}
     Set Suite Variable    ${AZ_LB_NAME}    ${AZ_LB_NAME}
     Set Suite Variable    ${AZ_LB_ID}    ${AZ_LB_ID}
+    # Set Azure subscription context
+    RW.CLI.Run Cli
+    ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
+    ...    include_in_history=false

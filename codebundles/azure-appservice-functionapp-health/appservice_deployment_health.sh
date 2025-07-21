@@ -10,14 +10,12 @@
 # PERIOD in hours to check for recent deployments (if you track them)
 CHECK_PERIOD="${CHECK_PERIOD:-24}"
 
-# Get or set subscription ID
-if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
-    subscription=$(az account show --query "id" -o tsv)
-    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
-else
-    subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
-    echo "Using specified subscription ID: $subscription"
-fi
+# Use subscription ID from environment variable
+subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
+echo "Using subscription ID: $subscription"
+
+# Get subscription name from environment variable
+subscription_name="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
 
 # Set the subscription to the determined ID
 echo "Switching to subscription ID: $subscription"
@@ -61,10 +59,10 @@ if [[ -z "$DEPLOYMENTS" || "$DEPLOYMENTS" == "[]" ]]; then
     if [[ -z "$PROD_STATE" ]]; then
         echo "Warning: Production state could not be determined."
         issues_json=$(echo "$issues_json" | jq \
-            --arg title "Production State Missing" \
+            --arg title "Production State Missing for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
             --arg nextStep "Check the Function App state in the Azure Portal." \
             --arg severity "3" \
-            --arg details "Unable to fetch the state for the production deployment." \
+            --arg details "Unable to fetch the state for the production deployment of Function App '$FUNCTION_APP_NAME' in subscription '$subscription_name'." \
             '.issues += [{
                 "title": $title, 
                 "details": $details, 
@@ -76,7 +74,7 @@ if [[ -z "$DEPLOYMENTS" || "$DEPLOYMENTS" == "[]" ]]; then
         echo "Production is in state: $PROD_STATE"
         issues_json=$(echo "$issues_json" | jq \
             --arg state "$PROD_STATE" \
-            --arg title "Production Deployment Issue with Function App \`$FUNCTION_APP_NAME\` " \
+            --arg title "Production Deployment Issue with Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
             --arg nextStep "Investigate the production Function App \`$FUNCTION_APP_NAME\` in the Azure Portal." \
             --arg severity "1" \
             --arg config "$DEPLOYMENT_CONFIG" \
@@ -112,7 +110,7 @@ else
             echo "Warning: State missing for slot '$slot'."
             issues_json=$(echo "$issues_json" | jq \
                 --arg slot "$slot" \
-                --arg title "Slot State Missing for Function App \`$FUNCTION_APP_NAME\`" \
+                --arg title "Slot State Missing for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
                 --arg nextStep "Check the slot \`$slot\` in the Azure Portal." \
                 --arg severity "3" \
                 --arg config "$SLOT_DETAILS" \
@@ -130,7 +128,7 @@ else
             issues_json=$(echo "$issues_json" | jq \
                 --arg slot "$slot" \
                 --arg state "$SLOT_STATE" \
-                --arg title "Deployment Slot Issue with Function App \`$FUNCTION_APP_NAME\`" \
+                --arg title "Deployment Slot Issue with Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
                 --arg nextStep "Investigate the issue with slot \`$slot\` in the Azure Portal." \
                 --arg severity "2" \
                 --arg config "$SLOT_DETAILS" \
@@ -163,4 +161,5 @@ echo "No deployment logs to analyze. Skipping deployment log checks..."
 # 3. Output results
 #-----------------------------------------------------------------------------
 echo "$issues_json" | jq '.' > "deployment_health.json"
-echo "Deployment health check completed. Results saved to deployment_health.json"
+echo "Deployment health check completed."
+cat deployment_health.json

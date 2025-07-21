@@ -18,8 +18,6 @@ spec:
     qualified_name: "{{ match_resource.qualified_name }}"
   tags: 
     {% include "azure-tags.yaml" ignore missing %}
-    - name: platform
-      value: azure
     - name: service
       value: aks
     - name: access

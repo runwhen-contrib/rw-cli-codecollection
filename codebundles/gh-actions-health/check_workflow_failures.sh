@@ -29,45 +29,188 @@ function perform_curl {
     echo "$response"
 }
 
-# Function to get failure details from workflow logs
+# Configuration for log extraction
+MAX_LOG_LINES_PER_STEP=${MAX_LOG_LINES_PER_STEP:-50}
+LOG_CONTEXT_LINES=${LOG_CONTEXT_LINES:-10}
+
+# Function to extract relevant log lines around failures
+function extract_failure_logs {
+    local logs="$1"
+    local max_lines="$2"
+    
+    # Look for common failure patterns and extract context around them
+    local failure_context=""
+    
+    # Save logs to temp file for processing
+    local temp_file=$(mktemp)
+    echo "$logs" > "$temp_file"
+    
+    # Extract lines around error patterns (case insensitive)
+    local error_patterns=(
+        "error"
+        "failed"
+        "failure"
+        "exception"
+        "fatal"
+        "panic"
+        "abort"
+        "timeout"
+        "killed"
+        "exit code [1-9]"
+        "command not found"
+        "permission denied"
+        "no such file"
+        "connection refused"
+        "network unreachable"
+    )
+    
+    local found_errors=""
+    for pattern in "${error_patterns[@]}"; do
+        # Use grep to find lines with context
+        if matches=$(grep -i -n -A"$LOG_CONTEXT_LINES" -B"$LOG_CONTEXT_LINES" "$pattern" "$temp_file" 2>/dev/null | head -n "$max_lines"); then
+            if [ -n "$matches" ]; then
+                found_errors="$found_errors\n\n=== Error Pattern: $pattern ===\n$matches"
+            fi
+        fi
+    done
+    
+    # If no specific error patterns found, get the last N lines (likely contains the failure)
+    if [ -z "$found_errors" ]; then
+        found_errors="\n=== Last $max_lines lines of log ===\n$(tail -n "$max_lines" "$temp_file")"
+    fi
+    
+    # Clean up
+    rm -f "$temp_file"
+    
+    echo "$found_errors"
+}
+
+# Function to get detailed failure information including logs
 function get_failure_details {
     local repo_name="$1"
     local run_id="$2"
     local workflow_name="$3"
     
-    echo "Fetching failure details for $workflow_name (run $run_id) in $repo_name..." >&2
+    echo "Fetching detailed failure info for $workflow_name (run $run_id) in $repo_name..." >&2
     
     # Get workflow run jobs
     jobs_json=$(perform_curl "https://api.github.com/repos/$repo_name/actions/runs/$run_id/jobs" || echo '{"jobs":[]}')
     
-    # Extract failed job details
-    local failure_details=""
+    local detailed_info=""
     if echo "$jobs_json" | jq -e '.jobs' >/dev/null 2>&1; then
-        failed_jobs=$(echo "$jobs_json" | jq -r '[.jobs[] | select(.conclusion == "failure" or .conclusion == "cancelled")] | .[0:3]')
+        failed_jobs=$(echo "$jobs_json" | jq -r '[.jobs[] | select(.conclusion == "failure" or .conclusion == "cancelled")] | .[0:2]')
         
         if [ "$(echo "$failed_jobs" | jq 'length')" -gt 0 ]; then
-            # Get details from first few failed jobs
             while IFS= read -r job; do
                 job_name=$(echo "$job" | jq -r '.name')
                 job_conclusion=$(echo "$job" | jq -r '.conclusion')
-                job_steps=$(echo "$job" | jq -r '[.steps[] | select(.conclusion == "failure")] | .[0:2]')
+                job_id=$(echo "$job" | jq -r '.id')
+                
+                detailed_info="$detailed_info\n\n=== JOB: $job_name (Status: $job_conclusion) ==="
+                
+                # Get failed steps
+                job_steps=$(echo "$job" | jq -r '[.steps[] | select(.conclusion == "failure")] | .[0:3]')
                 
                 if [ "$(echo "$job_steps" | jq 'length')" -gt 0 ]; then
-                    step_names=$(echo "$job_steps" | jq -r '.[].name' | tr '\n' ', ' | sed 's/,$//')
-                    failure_details="$failure_details\nJob: $job_name ($job_conclusion)\nFailed steps: $step_names"
+                    while IFS= read -r step; do
+                        step_name=$(echo "$step" | jq -r '.name')
+                        step_number=$(echo "$step" | jq -r '.number')
+                        step_conclusion=$(echo "$step" | jq -r '.conclusion')
+                        
+                        detailed_info="$detailed_info\n\n--- FAILED STEP: $step_name (Step #$step_number) ---"
+                        
+                        # Try to get logs for this specific job with enhanced debugging
+                        echo "Fetching logs for job $job_id (step: $step_name)..." >&2
+                        
+                        # First check if logs exist with HEAD request
+                        log_status=$(curl -sS -o /dev/null -w "%{http_code}" "${HEADERS[@]}" \
+                            -H "Accept: application/vnd.github.v3.raw" \
+                            "https://api.github.com/repos/$repo_name/actions/jobs/$job_id/logs" 2>/dev/null || echo "000")
+                        
+                        echo "Log access status: HTTP $log_status" >&2
+                        
+                        case $log_status in
+                            200)
+                                # Logs are accessible, try to fetch them
+                                if job_logs=$(curl -sS "${HEADERS[@]}" \
+                                    -H "Accept: application/vnd.github.v3.raw" \
+                                    "https://api.github.com/repos/$repo_name/actions/jobs/$job_id/logs" 2>/dev/null); then
+                                    
+                                    log_size=${#job_logs}
+                                    echo "Retrieved $log_size bytes of log data" >&2
+                                    
+                                    if [ $log_size -gt 20 ]; then
+                                        failure_logs=$(extract_failure_logs "$job_logs" "$MAX_LOG_LINES_PER_STEP")
+                                        detailed_info="$detailed_info\n$failure_logs"
+                                    else
+                                        detailed_info="$detailed_info\nJob logs are empty or very small ($log_size bytes)."
+                                        detailed_info="$detailed_info\nThis usually indicates the job failed during setup/initialization."
+                                        if [ $log_size -gt 0 ]; then
+                                            detailed_info="$detailed_info\nRaw log content: '$job_logs'"
+                                        fi
+                                    fi
+                                else
+                                    detailed_info="$detailed_info\nFailed to download logs despite 200 response."
+                                fi
+                                ;;
+                            404)
+                                detailed_info="$detailed_info\nLogs not found (404) - logs may have expired."
+                                detailed_info="$detailed_info\nGitHub typically retains logs for 90 days."
+                                ;;
+                            403)
+                                detailed_info="$detailed_info\nLog access forbidden (403) - check token permissions."
+                                ;;
+                            410)
+                                detailed_info="$detailed_info\nLogs have been archived or expired (410)."
+                                ;;
+                            *)
+                                detailed_info="$detailed_info\nLog access failed with HTTP $log_status."
+                                detailed_info="$detailed_info\nThis may indicate network issues or API problems."
+                                ;;
+                        esac
+                        
+                        # Rate limit protection
+                        sleep 0.3
+                        
+                    done <<< $(echo "$job_steps" | jq -c '.[]')
                 else
-                    failure_details="$failure_details\nJob: $job_name ($job_conclusion)"
+                    # Job failed but no specific step failure - get job logs anyway
+                    detailed_info="$detailed_info\nJob failed without specific step failures."
+                    echo "Job failed without specific step failure, fetching job logs..." >&2
+                    
+                    # Check log availability for job-level failure
+                    log_status=$(curl -sS -o /dev/null -w "%{http_code}" "${HEADERS[@]}" \
+                        -H "Accept: application/vnd.github.v3.raw" \
+                        "https://api.github.com/repos/$repo_name/actions/jobs/$job_id/logs" 2>/dev/null || echo "000")
+                    
+                    if [ "$log_status" = "200" ]; then
+                        if job_logs=$(curl -sS "${HEADERS[@]}" \
+                            -H "Accept: application/vnd.github.v3.raw" \
+                            "https://api.github.com/repos/$repo_name/actions/jobs/$job_id/logs" 2>/dev/null); then
+                            
+                            log_size=${#job_logs}
+                            if [ $log_size -gt 20 ]; then
+                                failure_logs=$(extract_failure_logs "$job_logs" "$MAX_LOG_LINES_PER_STEP")
+                                detailed_info="$detailed_info\n$failure_logs"
+                            else
+                                detailed_info="$detailed_info\nJob-level logs are empty ($log_size bytes) - likely workflow setup failure."
+                            fi
+                        fi
+                    else
+                        detailed_info="$detailed_info\nJob-level logs unavailable (HTTP $log_status)."
+                    fi
                 fi
+                
             done <<< $(echo "$failed_jobs" | jq -c '.[]')
         fi
     fi
     
-    # If no detailed failure info, provide generic details
-    if [ -z "$failure_details" ]; then
-        failure_details="No detailed failure information available. Check the workflow logs manually."
+    # If no detailed info found, provide generic details
+    if [ -z "$detailed_info" ]; then
+        detailed_info="No detailed failure information available. The workflow may have failed at the workflow level or logs may not be accessible."
     fi
     
-    echo "$failure_details"
+    echo "$detailed_info"
 }
 
 # Function to get repositories to analyze
@@ -130,7 +273,8 @@ LOOKBACK_DAYS=${FAILURE_LOOKBACK_DAYS:-7}
 # Calculate the date threshold
 date_threshold=$(date -d "$LOOKBACK_DAYS days ago" -u +%Y-%m-%dT%H:%M:%SZ)
 
-echo "Checking workflow failures across specified repositories since $date_threshold..." >&2
+echo "Checking workflow failures with detailed logs across specified repositories since $date_threshold..." >&2
+echo "Log extraction settings: MAX_LOG_LINES_PER_STEP=$MAX_LOG_LINES_PER_STEP, LOG_CONTEXT_LINES=$LOG_CONTEXT_LINES" >&2
 
 # Get repositories to analyze
 repositories=$(get_repositories_to_analyze)
@@ -167,18 +311,20 @@ while IFS= read -r repo_name; do
                 }
             ]')
             
-            # Enhance with failure details for each failed workflow (limit to avoid too many API calls)
+            # Enhance with detailed failure information including logs (limit to avoid too many API calls)
             enhanced_failures="[]"
             failure_count=0
             while IFS= read -r failure; do
-                if [ -n "$failure" ] && [ "$failure" != "null" ] && [ $failure_count -lt 5 ]; then
+                if [ -n "$failure" ] && [ "$failure" != "null" ] && [ $failure_count -lt 3 ]; then
                     run_id=$(echo "$failure" | jq -r '.run_id')
                     workflow_name=$(echo "$failure" | jq -r '.workflow_name')
                     
-                    # Get failure details
+                    echo "Getting detailed logs for workflow: $workflow_name (run $run_id)..." >&2
+                    
+                    # Get detailed failure information including logs
                     failure_details=$(get_failure_details "$repo_name" "$run_id" "$workflow_name")
                     
-                    # Update the failure object with details (safely handle newlines and special chars)
+                    # Update the failure object with detailed info (safely handle newlines and special chars)
                     enhanced_failure=$(echo "$failure" | jq --arg details "$failure_details" '.failure_details = $details')
                     # Safely add to array by combining arrays
                     enhanced_failures=$(echo "$enhanced_failures [$enhanced_failure]" | jq -s '.[0] + .[1]')
@@ -186,7 +332,8 @@ while IFS= read -r repo_name; do
                     failure_count=$((failure_count + 1))
                 else
                     # Add without enhanced details to avoid too many API calls
-                    enhanced_failures=$(echo "$enhanced_failures [$failure]" | jq -s '.[0] + .[1]')
+                    basic_failure=$(echo "$failure" | jq '.failure_details = "Log analysis skipped - too many failures"')
+                    enhanced_failures=$(echo "$enhanced_failures [$basic_failure]" | jq -s '.[0] + .[1]')
                 fi
             done <<< $(echo "$repo_failures" | jq -c '.[]')
             
@@ -196,8 +343,8 @@ while IFS= read -r repo_name; do
             echo "No workflow runs found or access denied for repository: $repo_name" >&2
         fi
         
-        # Rate limiting protection
-        sleep 0.2
+        # Rate limiting protection (increased due to log fetching)
+        sleep 0.5
     fi
 done <<< "$repositories"
 
