@@ -1,6 +1,6 @@
 #!/bin/bash
 
-THRESHOLD=${DISK_THRESHOLD:-70}  # Default threshold of 70%
+THRESHOLD=${DISK_THRESHOLD:-85}  # Default threshold of 85% to match template configuration
 VM_NAME=${VM_NAME:-"unknown"}
 # Accept file path as first argument, or use default relative path
 STDOUT_FILE="${1:-vm_disk_stdout.txt}"

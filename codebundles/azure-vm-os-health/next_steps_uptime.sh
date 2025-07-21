@@ -1,7 +1,7 @@
 #!/bin/bash
 # next_steps_uptime.sh
 
-THRESHOLD=${UPTIME_THRESHOLD:-7}
+THRESHOLD=${UPTIME_THRESHOLD:-30}  # Default threshold of 30 days to match template configuration
 VM_NAME=${VM_NAME:-"unknown"}
 # Accept file path as first argument, or use default relative path
 STDOUT_FILE="${1:-vm_uptime_stdout.txt}"

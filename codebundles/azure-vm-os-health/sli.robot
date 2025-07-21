@@ -241,7 +241,7 @@ Suite Initialization
     ...    type=string
     ...    description=The threshold percentage for disk usage warnings.
     ...    pattern=\d*
-    ...    default=70
+    ...    default=85
     ${UPTIME_THRESHOLD}=    RW.Core.Import User Variable    UPTIME_THRESHOLD
     ...    type=string
     ...    description=The threshold in days for system uptime warnings.
@@ -251,7 +251,7 @@ Suite Initialization
     ...    type=string
     ...    description=The threshold percentage for memory usage warnings.
     ...    pattern=\d*
-    ...    default=80
+    ...    default=90
     ${MAX_PARALLEL_JOBS}=    RW.Core.Import User Variable    MAX_PARALLEL_JOBS
     ...    type=string
     ...    description=Maximum number of parallel VM checks to run simultaneously.

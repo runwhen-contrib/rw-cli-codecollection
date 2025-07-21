@@ -59,7 +59,7 @@ check_vm_memory() {
     local temp_file="$3"
 
     # Check VM power state first with timeout
-    vm_status=$(timeout 60 az vm get-instance-view -g "$resource_group" -n "$vm_name" \
+    vm_status=$(timeout $TIMEOUT_SECONDS az vm get-instance-view -g "$resource_group" -n "$vm_name" \
         --query "instanceView.statuses[?starts_with(code,'PowerState/')].displayStatus" -o tsv 2>/dev/null)
 
     if [ $? -ne 0 ] || [[ "$vm_status" != *"running"* ]]; then

@@ -1,7 +1,7 @@
 #!/bin/bash
 # next_steps_memory_check.sh
 
-THRESHOLD=${MEMORY_THRESHOLD:-80}
+THRESHOLD=${MEMORY_THRESHOLD:-90}  # Default threshold of 90% to match template configuration
 VM_NAME=${VM_NAME:-"unknown"}
 # Accept file path as first argument, or use default relative path
 STDOUT_FILE="${1:-vm_mem_stdout.txt}"
