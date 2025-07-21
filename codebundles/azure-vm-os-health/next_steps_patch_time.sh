@@ -2,7 +2,8 @@
 # next_steps_patch_time.sh
 
 VM_NAME=${VM_NAME:-"unknown"}
-STDOUT_FILE="/tmp/vm_patch_stdout.txt"
+# Accept file path as first argument, or use default relative path
+STDOUT_FILE="${1:-vm_patch_stdout.txt}"
 ISSUES_FILE="patch_issues.json"
 
 echo '[]' > "${ISSUES_FILE}"

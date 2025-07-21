@@ -3,7 +3,8 @@
 
 THRESHOLD=${MEMORY_THRESHOLD:-80}
 VM_NAME=${VM_NAME:-"unknown"}
-STDOUT_FILE="/tmp/vm_mem_stdout.txt"
+# Accept file path as first argument, or use default relative path
+STDOUT_FILE="${1:-vm_mem_stdout.txt}"
 ISSUES_FILE="memory_utilization_issues.json"
 
 echo '[]' > "${ISSUES_FILE}"

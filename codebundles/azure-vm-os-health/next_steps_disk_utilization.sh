@@ -2,9 +2,8 @@
 
 THRESHOLD=${DISK_THRESHOLD:-70}  # Default threshold of 70%
 VM_NAME=${VM_NAME:-"unknown"}
-STDOUT_FILE="/tmp/vm_disk_stdout.txt"
-
-cat /tmp/vm_disk_stdout.txt
+# Accept file path as first argument, or use default relative path
+STDOUT_FILE="${1:-vm_disk_stdout.txt}"
 
 ISSUES_FILE="disk_utilization_issues.json"
 

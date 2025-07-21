@@ -51,7 +51,7 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
 
         # Write stdout to temp file for next steps analysis
         ${tmpfile}=    Generate Random String    8
-        ${tmpfile_path}=    Set Variable    /tmp/vm_disk_stdout.txt
+        ${tmpfile_path}=    Set Variable    vm_disk_stdout_${tmpfile}.txt
         Create File    ${tmpfile_path}    ${stdout}
         ${next_steps}=    RW.CLI.Run Bash File
         ...    bash_file=next_steps_disk_utilization.sh
@@ -102,7 +102,7 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
         END
 
         ${tmpfile}=    Generate Random String    8
-        ${tmpfile_path}=    Set Variable    /tmp/vm_mem_stdout.txt
+        ${tmpfile_path}=    Set Variable    vm_mem_stdout_${tmpfile}.txt
         Create File    ${tmpfile_path}    ${stdout}
         ${next_steps}=    RW.CLI.Run Bash File
         ...    bash_file=next_steps_memory_check.sh
@@ -153,7 +153,7 @@ Check Uptime for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
         END
 
         ${tmpfile}=    Generate Random String    8
-        ${tmpfile_path}=    Set Variable    /tmp/vm_uptime_stdout.txt
+        ${tmpfile_path}=    Set Variable    vm_uptime_stdout_${tmpfile}.txt
         Create File    ${tmpfile_path}    ${stdout}
         ${next_steps}=    RW.CLI.Run Bash File
         ...    bash_file=next_steps_uptime.sh
@@ -204,7 +204,7 @@ Check Last Patch Status for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
         END
 
         ${tmpfile}=    Generate Random String    8
-        ${tmpfile_path}=    Set Variable    /tmp/vm_patch_stdout.txt
+        ${tmpfile_path}=    Set Variable    vm_patch_stdout_${tmpfile}.txt
         Create File    ${tmpfile_path}    ${stdout}
         ${next_steps}=    RW.CLI.Run Bash File
         ...    bash_file=next_steps_patch_time.sh
