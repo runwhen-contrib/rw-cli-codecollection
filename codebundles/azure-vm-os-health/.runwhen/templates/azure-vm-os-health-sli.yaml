@@ -32,9 +32,9 @@ spec:
     - name: VM_NAME
       value: {{match_resource.resource.name}}
     - name: DISK_THRESHOLD
-      value: "70"
+      value: "85"
     - name: MEMORY_THRESHOLD
-      value: "80"
+      value: "90"
     - name: UPTIME_THRESHOLD
       value: "30"
     - name: MAX_PARALLEL_JOBS

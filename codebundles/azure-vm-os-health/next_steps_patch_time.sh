@@ -43,11 +43,11 @@ elif echo "$patch_content" | grep -q "packages available for upgrade"; then
     
     # Determine severity based on package count
     if [ "$package_count" -gt 50 ]; then
-        severity=2
+        severity=4
     elif [ "$package_count" -gt 20 ]; then
-        severity=2  
+        severity=4  
     else
-        severity=2
+        severity=4
     fi
     
     add_issue \
