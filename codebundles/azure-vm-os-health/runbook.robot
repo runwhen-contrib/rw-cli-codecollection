@@ -434,7 +434,7 @@ Suite Initialization
     ...    type=string
     ...    description=Timeout in seconds for Azure VM run-command operations.
     ...    pattern=\d*
-    ...    default=60
+    ...    default=90
     ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_ID
     ...    type=string
     ...    description=The Azure Subscription ID.

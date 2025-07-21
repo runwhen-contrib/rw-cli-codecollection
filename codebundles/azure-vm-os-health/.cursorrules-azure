@@ -157,7 +157,7 @@ VM_OUTPUT=$(az vm run-command invoke \
 - **Disk Usage**: Default 70%, configurable via DISK_THRESHOLD
 - **Memory Usage**: Default 80%, configurable via MEMORY_THRESHOLD
 - **Uptime**: Default 30 days, configurable via UPTIME_THRESHOLD
-- **Connection Timeout**: Default 60s, configurable via TIMEOUT_SECONDS
+- **Connection Timeout**: Default 90s, configurable via TIMEOUT_SECONDS
 
 ### Parallel Processing
 - **Concurrent VMs**: Default 5, configurable via MAX_PARALLEL_JOBS

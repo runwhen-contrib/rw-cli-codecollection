@@ -40,7 +40,7 @@ spec:
     - name: MAX_PARALLEL_JOBS
       value: "5"
     - name: TIMEOUT_SECONDS
-      value: "60"
+      value: "90"
     - name: AZURE_SUBSCRIPTION_ID
       value: {{subscription_id}}
     - name: AZURE_SUBSCRIPTION_NAME

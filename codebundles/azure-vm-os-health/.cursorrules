@@ -64,7 +64,7 @@ This codebundle provides comprehensive health monitoring for Azure Virtual Machi
 - `MEMORY_THRESHOLD`: Memory usage threshold % (default: 90)
 - `UPTIME_THRESHOLD`: Uptime threshold days (default: 30)
 - `MAX_PARALLEL_JOBS`: Concurrent VM checks (default: 5)
-- `TIMEOUT_SECONDS`: Azure command timeout (default: 60)
+- `TIMEOUT_SECONDS`: Azure command timeout (default: 90)
 
 ### VM Filtering Variables
 - `VM_INCLUDE_LIST`: Comma-separated shell-style wildcards for inclusion
