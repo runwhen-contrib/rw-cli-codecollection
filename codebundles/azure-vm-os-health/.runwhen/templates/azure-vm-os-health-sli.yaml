@@ -25,7 +25,7 @@ spec:
     {% endif %}
     pathToRobot: codebundles/azure-vm-os-health/sli.robot
   intervalStrategy: intermezzo
-  intervalSeconds: 300
+  intervalSeconds: 900
   configProvided:
     - name: AZ_RESOURCE_GROUP
       value: {{resource_group.name}}
@@ -37,3 +37,23 @@ spec:
       value: {{subscription_id}}
     - name: AZURE_SUBSCRIPTION_NAME
       value: {{subscription_name}}
+  secretsProvided:
+  {% if wb_version %}
+    {% include "azure-auth.yaml" ignore missing %}
+  {% else %}
+    - name: azure_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}
+  alerts:
+    warning:
+      operator: <
+      threshold: '1'
+      for: '20m'
+    ticket:
+      operator: <
+      threshold: '1'
+      for: '40m'
+    page:
+      operator: '=='
+      threshold: '0'
+      for: ''
