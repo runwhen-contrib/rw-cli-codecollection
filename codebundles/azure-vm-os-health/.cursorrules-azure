@@ -1,0 +1,261 @@
+# Azure VM OS Health Codebundle - Azure Cursor Rules
+
+## Azure-Specific Patterns
+
+### Resource Management
+- **Resource IDs**: Always construct proper Azure resource IDs
+- **Resource Groups**: Include resource group context in all operations
+- **Subscriptions**: Validate and use subscription context
+- **Regions**: Consider regional dependencies and failover scenarios
+
+### Azure CLI Usage
+- **Authentication**: Use service principal authentication with proper scopes
+- **Queries**: Use JMESPath queries for efficient data extraction
+- **Output Format**: Use `-o tsv` for single values, `-o json` for complex data
+- **Error Handling**: Handle Azure CLI errors and rate limits gracefully
+
+### VM Health Monitoring
+- **VM Status**: Monitor VM power state and health status
+- **Resource Utilization**: Monitor CPU, memory, disk, and network metrics
+- **OS Metrics**: Collect OS-level metrics via run-command
+- **Patch Management**: Track OS patch status and security updates
+
+## Issue Reporting for Azure VMs
+
+### Issue Titles
+- **Format**: `"[Entity] '[name]' in [Resource Type] '[resource_name]' (RG: [resource_group]) has [issue_description] (Subscription: [subscription_name])"`
+- **Examples**:
+  - `"Virtual Machine 'web-server-01' (RG: production-rg) has high disk usage of 85% (Subscription: Production-Sub)"`
+  - `"Virtual Machine 'db-server-02' (RG: production-rg) has high memory usage of 90% (Subscription: Production-Sub)"`
+  - `"Virtual Machine 'app-server-03' (RG: production-rg) has been running for 45 days (Subscription: Production-Sub)"`
+
+### Issue Details Structure
+```
+Resource Details:
+- VM Name: [name]
+- Resource Group: [resource_group]
+- Subscription: [subscription_name]
+- Resource Type: Virtual Machine
+- Location: [region]
+
+Time Period:
+- Analysis Window: [start_time] to [end_time]
+- Duration: [duration]
+
+Metrics:
+- [metric_name]: [value] [unit]
+- [metric_name]: [value] [unit]
+
+Detected Issues:
+- [specific_issue_description]
+- [specific_issue_description]
+
+Possible Causes:
+- [cause_1]
+- [cause_2]
+
+Next Steps:
+1. [action_1]
+2. [action_2]
+3. [action_3]
+```
+
+### Portal Links
+- **Format**: `https://portal.azure.com/#@/resource[resource_id]/[section]`
+- **Common Sections**: overview, metrics, logs, configuration, monitoring
+- **VM-Specific**: insights, networking, disks, extensions, runCommand
+
+## Azure VM Patterns
+
+### Virtual Machines
+- **Metrics**: CPU Percentage, Memory Percentage, Disk Usage, Network I/O
+- **Health Checks**: VM status, extension health, boot diagnostics
+- **Performance**: Resource utilization, bottlenecks, load averages
+- **Security**: Security center recommendations, compliance, patch status
+- **OS Monitoring**: Disk space, memory usage, uptime, system processes
+
+### VM Run Commands
+- **Execution**: Use `az vm run-command invoke` for OS-level data collection
+- **Timeouts**: Set appropriate timeouts for long-running commands
+- **Error Handling**: Handle command failures and partial results
+- **Output Parsing**: Parse stdout/stderr from Azure response format
+
+### Resource Groups
+- **Context**: Always include resource group in operations
+- **Filtering**: Support VM filtering within resource groups
+- **Batch Operations**: Process multiple VMs efficiently
+- **Parallel Processing**: Use parallel execution for performance
+
+## Azure CLI Best Practices for VMs
+
+### Authentication
+```bash
+# Validate authentication
+az account show --query "id" -o tsv || exit 1
+
+# Set subscription context
+az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+
+# Validate VM access
+az vm show --name "$VM_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "id" -o tsv || exit 1
+```
+
+### VM Queries
+```bash
+# Get VM resource ID
+VM_RESOURCE_ID=$(az vm show \
+    --name "$VM_NAME" \
+    --resource-group "$AZ_RESOURCE_GROUP" \
+    --query "id" -o tsv)
+
+# Check VM power state
+VM_STATUS=$(az vm get-instance-view \
+    --name "$VM_NAME" \
+    --resource-group "$AZ_RESOURCE_GROUP" \
+    --query "instanceView.statuses[?starts_with(code,'PowerState/')].displayStatus" -o tsv)
+
+# Execute run command
+VM_OUTPUT=$(az vm run-command invoke \
+    --resource-group "$AZ_RESOURCE_GROUP" \
+    --name "$VM_NAME" \
+    --command-id RunShellScript \
+    --scripts "$COMMAND")
+```
+
+### Error Handling
+```bash
+# Handle missing VMs
+if [[ -z "$VM_RESOURCE_ID" ]]; then
+    echo "ERROR: VM not found or access denied"
+    exit 1
+fi
+
+# Handle VM not running
+if [[ "$VM_STATUS" != *"running"* ]]; then
+    echo "SKIP: VM is not running (status: $VM_STATUS)"
+    continue
+fi
+
+# Handle run command failures
+VM_OUTPUT=$(az vm run-command invoke \
+    --resource-group "$AZ_RESOURCE_GROUP" \
+    --name "$VM_NAME" \
+    --command-id RunShellScript \
+    --scripts "$COMMAND" 2>/dev/null || echo '{"error": "command failed"}')
+```
+
+## VM Health Monitoring
+
+### OS-Level Metrics
+- **Disk Usage**: Use `df -h` for filesystem utilization
+- **Memory Usage**: Use `free -m` for memory statistics
+- **System Uptime**: Use `/proc/uptime` for uptime information
+- **Load Average**: Use `/proc/loadavg` for system load
+- **Patch Status**: Use package manager commands for update status
+
+### Performance Thresholds
+- **Disk Usage**: Default 70%, configurable via DISK_THRESHOLD
+- **Memory Usage**: Default 80%, configurable via MEMORY_THRESHOLD
+- **Uptime**: Default 30 days, configurable via UPTIME_THRESHOLD
+- **Connection Timeout**: Default 90s, configurable via TIMEOUT_SECONDS
+
+### Parallel Processing
+- **Concurrent VMs**: Default 5, configurable via MAX_PARALLEL_JOBS
+- **Timeout Management**: Individual VM timeouts to prevent blocking
+- **Resource Limits**: Respect Azure API rate limits
+- **Error Isolation**: VM failures don't affect other VMs
+
+## Security and Compliance
+
+### Authentication
+- **Service Principals**: Use managed identities when possible
+- **Role-Based Access**: Use least privilege access (VM Contributor)
+- **Key Vault**: Store secrets in Azure Key Vault
+- **Audit Logs**: Monitor access and changes
+
+### Data Protection
+- **Command Output**: Sanitize sensitive data from outputs
+- **Compliance**: Follow industry compliance standards
+- **Privacy**: Handle system information appropriately
+- **Audit**: Log all VM operations for compliance
+
+## Performance Optimization
+
+### API Usage
+- **Rate Limits**: Respect Azure API rate limits
+- **Batching**: Process multiple VMs in parallel
+- **Caching**: Cache VM status checks
+- **Retries**: Implement exponential backoff for failures
+
+### Resource Efficiency
+- **Query Optimization**: Use efficient JMESPath queries
+- **Data Filtering**: Filter VMs at source using include/omit lists
+- **Parallel Processing**: Use background processes for VM checks
+- **Memory Management**: Handle large VM lists efficiently
+
+## VM Filtering and Selection
+
+### Include/Omit Lists
+- **Shell Wildcards**: Support shell-style pattern matching
+- **Comma Separation**: Use comma-separated pattern lists
+- **Pattern Examples**: `web-*,db-*` for inclusion, `*-test` for exclusion
+- **Default Behavior**: Process all VMs if no filters specified
+
+### Pattern Matching
+```bash
+# Enable extended globbing
+shopt -s extglob
+
+# Filter VM function
+filter_vm() {
+    local vm_name="$1"
+    # Include list logic
+    if [ -n "$VM_INCLUDE_LIST" ]; then
+        local match=0
+        for pat in "${INCLUDE_PATTERNS[@]}"; do
+            if [[ "$vm_name" == $pat ]]; then
+                match=1
+                break
+            fi
+        done
+        [ $match -eq 0 ] && return 1
+    fi
+    # Omit list logic
+    if [ -n "$VM_OMIT_LIST" ]; then
+        for pat in "${OMIT_PATTERNS[@]}"; do
+            if [[ "$vm_name" == $pat ]]; then
+                return 1
+            fi
+        done
+    fi
+    return 0
+}
+```
+
+## Troubleshooting
+
+### Common Issues
+- **Authentication**: Service principal expiration, insufficient permissions
+- **VM Access**: VM not running, network connectivity issues
+- **API Limits**: Rate limiting, throttling
+- **Command Failures**: OS command failures, timeout issues
+
+### Debugging
+- **Logging**: Enable detailed logging with timestamps
+- **Validation**: Validate inputs and outputs at each step
+- **Testing**: Test with mock data and real VMs
+- **Documentation**: Document troubleshooting procedures
+
+## Best Practices
+
+### Issue Aggregation
+- **Single Issues**: Create one issue per VM per metric type
+- **Comprehensive Details**: Include all relevant context
+- **Actionable Steps**: Provide specific remediation steps
+- **Portal Links**: Include direct links to Azure portal
+
+### Human-Readable Output
+- **Units**: Always include appropriate units (GB, MB, days, hours)
+- **Context**: Provide meaningful context for metrics
+- **Formatting**: Use consistent formatting and structure
+- **Progress**: Show progress indicators for long operations 
