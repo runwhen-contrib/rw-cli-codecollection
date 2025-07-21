@@ -20,3 +20,4 @@ spec:
         - type: sli
         - type: runbook
           templateName: azure-vm-os-health-taskset.yaml
+        - type: workflow
