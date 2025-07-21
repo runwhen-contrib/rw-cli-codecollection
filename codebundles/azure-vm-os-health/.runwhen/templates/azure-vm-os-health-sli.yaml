@@ -1,5 +1,5 @@
 apiVersion: runwhen.com/v1
-kind: Runbook
+kind: ServiceLevelIndicator
 metadata:
   name: {{slx_name}}
   labels:
@@ -7,7 +7,11 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  location: {{default_location}}
+  displayUnitsLong: OK
+  displayUnitsShort: ok
+  locations:
+    - {{default_location}}
+  description: Measures the health of Azure VM.
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -19,18 +23,17 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/azure-vm-disk-health/runbook.robot
+    pathToRobot: codebundles/azure-vm-os-health/sli.robot
+  intervalStrategy: intermezzo
+  intervalSeconds: 300
   configProvided:
     - name: AZ_RESOURCE_GROUP
       value: {{resource_group.name}}
     - name: VM_NAME
       value: {{match_resource.resource.name}}
-    - name: DISK_THRESHOLD
+    - name: OS_THRESHOLD
       value: "70"
     - name: AZURE_SUBSCRIPTION_ID
       value: {{subscription_id}}
     - name: AZURE_SUBSCRIPTION_NAME
       value: {{subscription_name}}
-  secretsProvided:
-    - name: azure_credentials
-      workspaceName: azure_credentials

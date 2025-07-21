@@ -56,3 +56,4 @@ build
 **gcp_credentials_json
 **bashfile-**
 **db.sqlite3**
+**generated_id_rsa

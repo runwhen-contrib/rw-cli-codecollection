@@ -1,7 +1,23 @@
 # Configure Azure provider
-provider "azurerm" {
-  features {}
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "4.18.0"
+    }
+  }
 }
+
+provider "azurerm" {
+  features {
+    key_vault {
+      purge_soft_delete_on_destroy    = true
+      recover_soft_deleted_key_vaults = true
+    }
+  }
+}
+
+provider "azuread" {}
 
 # Create a resource group
 resource "azurerm_resource_group" "test_rg" {

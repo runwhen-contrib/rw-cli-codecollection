@@ -10,7 +10,7 @@ spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure-vm.svg
   alias: >-
     {{match_resource.resource.name}} VM Health
-  asMeasuredBy: Disk utilization on the Azure VM.
+  asMeasuredBy: OS utilization on the Azure VM.
   configProvided:
   - name: VM_NAME
     value: {{match_resource.resource.name}}

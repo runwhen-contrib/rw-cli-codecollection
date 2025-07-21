@@ -1,4 +1,4 @@
-# Azure VM Disk Health Bundle
+# Azure VM OS Health Bundle
 
 This bundle provides comprehensive health checks for Azure Virtual Machines, including disk utilization, memory usage, uptime, and patch status. It uses Robot Framework tasks and Bash scripts to collect, parse, and score VM health.
 

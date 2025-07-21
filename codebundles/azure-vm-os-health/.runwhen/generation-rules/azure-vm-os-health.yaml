@@ -11,12 +11,12 @@ spec:
       properties: [name]
       mode: substring
     slxs:
-    - baseName: vm-disk-health
-      levelOfDetail: basic
+    - baseName: vm-os-health
+      levelOfDetail: detailed
       qualifiers: ["resource_group"]
-      baseTemplateName: azure-vm-disk-health
+      baseTemplateName: azure-vm-os-health
       outputItems:
         - type: slx
         - type: sli
         - type: runbook
-          templateName: azure-vm-disk-health-taskset.yaml
+          templateName: azure-vm-os-health-taskset.yaml
