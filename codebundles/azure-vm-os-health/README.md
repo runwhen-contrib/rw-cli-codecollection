@@ -31,8 +31,22 @@ This bundle provides comprehensive health checks for Azure Virtual Machines, inc
 ## Usage
 
 - Configure your environment variables (resource group, subscription, thresholds, etc.).
+- Optionally set `VM_INCLUDE_LIST` and/or `VM_OMIT_LIST` to control which VMs are checked:
+    - `VM_INCLUDE_LIST`: Comma-separated shell-style wildcards (e.g., `web-*,db-*`). Only VMs matching any pattern are included.
+    - `VM_OMIT_LIST`: Comma-separated shell-style wildcards. Any VM matching a pattern is excluded.
+    - If both are empty, all VMs in the resource group are checked.
 - Run the desired Robot Framework task (e.g., from `runbook.robot` or `sli.robot`).
 - Review the output and health scores.
+
+### Example
+
+To check only VMs starting with `web-` or `db-`, but omit any ending with `-test`:
+
+```
+export VM_INCLUDE_LIST="web-*,db-*"
+export VM_OMIT_LIST="*-test"
+robot runbook.robot
+```
 
 ## Directory Structure
 

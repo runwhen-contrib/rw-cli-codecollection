@@ -25,6 +25,7 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
+    ...    extra_env=VM_INCLUDE_LIST,VM_OMIT_LIST
     RW.Core.Add Pre To Report    ${disk_usage.stdout}
 
     ${disk_usg_out}=    Evaluate    json.loads(r'''${disk_usage.stdout}''')    json
@@ -98,6 +99,7 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
+    ...    extra_env=VM_INCLUDE_LIST,VM_OMIT_LIST
     RW.Core.Add Pre To Report    ${memory_usage.stdout}
 
     ${mem_usg_out}=    Evaluate    json.loads(r'''${memory_usage.stdout}''')    json
@@ -165,6 +167,7 @@ Check Uptime for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
+    ...    extra_env=VM_INCLUDE_LIST,VM_OMIT_LIST
     RW.Core.Add Pre To Report    ${uptime_usage.stdout}
 
     ${uptime_usg_out}=    Evaluate    json.loads(r'''${uptime_usage.stdout}''')    json
@@ -232,6 +235,7 @@ Check Last Patch Status for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
+    ...    extra_env=VM_INCLUDE_LIST,VM_OMIT_LIST
     RW.Core.Add Pre To Report    ${patch_usage.stdout}
 
     ${patch_usg_out}=    Evaluate    json.loads(r'''${patch_usage.stdout}''')    json

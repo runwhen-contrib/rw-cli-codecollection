@@ -24,6 +24,7 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
+    ...    extra_env=VM_INCLUDE_LIST,VM_OMIT_LIST
 
     ${disk_usg_out}=    Evaluate    json.loads(r'''${disk_usage.stdout}''')    json
     ${vm_names}=    Get Dictionary Keys    ${disk_usg_out}
@@ -73,6 +74,7 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
+    ...    extra_env=VM_INCLUDE_LIST,VM_OMIT_LIST
 
     ${mem_usg_out}=    Evaluate    json.loads(r'''${memory_usage.stdout}''')    json
     ${vm_names}=    Get Dictionary Keys    ${mem_usg_out}
@@ -118,6 +120,7 @@ Check Uptime for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
+    ...    extra_env=VM_INCLUDE_LIST,VM_OMIT_LIST
 
     ${uptime_usg_out}=    Evaluate    json.loads(r'''${uptime_usage.stdout}''')    json
     ${vm_names}=    Get Dictionary Keys    ${uptime_usg_out}
@@ -163,6 +166,7 @@ Check Last Patch Status for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
+    ...    extra_env=VM_INCLUDE_LIST,VM_OMIT_LIST
 
     ${patch_usg_out}=    Evaluate    json.loads(r'''${patch_usage.stdout}''')    json
     ${vm_names}=    Get Dictionary Keys    ${patch_usg_out}

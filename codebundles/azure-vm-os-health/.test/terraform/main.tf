@@ -51,51 +51,51 @@ resource "azurerm_public_ip" "test_pip" {
   sku                 = "Standard"
 }
 
-# # Create a network interface
-# resource "azurerm_network_interface" "test_nic" {
-#   name                = "test-nic"
-#   location            = azurerm_resource_group.test_rg.location
-#   resource_group_name = azurerm_resource_group.test_rg.name
+# Create a network interface
+resource "azurerm_network_interface" "test_nic" {
+  name                = "test-nic"
+  location            = azurerm_resource_group.test_rg.location
+  resource_group_name = azurerm_resource_group.test_rg.name
 
-#   ip_configuration {
-#     name                          = "internal"
-#     subnet_id                     = azurerm_subnet.test_subnet.id
-#     private_ip_address_allocation = "Dynamic"
-#     public_ip_address_id          = azurerm_public_ip.test_pip.id
-#   }
-# }
+  ip_configuration {
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.test_subnet.id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = azurerm_public_ip.test_pip.id
+  }
+}
 
-# # Create a virtual machine
-# resource "azurerm_linux_virtual_machine" "test_vm" {
-#   name                = "test-vm"
-#   resource_group_name = azurerm_resource_group.test_rg.name
-#   location            = azurerm_resource_group.test_rg.location
-#   size                = "Standard_B1s"
-#   admin_username      = "adminuser"
-#   network_interface_ids = [
-#     azurerm_network_interface.test_nic.id,
-#   ]
+# Create a virtual machine
+resource "azurerm_linux_virtual_machine" "test_vm" {
+  name                = "test-vm"
+  resource_group_name = azurerm_resource_group.test_rg.name
+  location            = azurerm_resource_group.test_rg.location
+  size                = "Standard_B1s"
+  admin_username      = "adminuser"
+  network_interface_ids = [
+    azurerm_network_interface.test_nic.id,
+  ]
 
-#   admin_ssh_key {
-#     username   = "adminuser"
-#     public_key = file("~/.ssh/id_rsa.pub")
-#   }
+  admin_ssh_key {
+    username   = "adminuser"
+    public_key = tls_private_key.vm_key.public_key_openssh
+  }
 
-#   os_disk {
-#     caching              = "ReadWrite"
-#     storage_account_type = "Standard_LRS"
-#     disk_size_gb         = 30
-#   }
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Standard_LRS"
+    disk_size_gb         = 30
+  }
 
-#   source_image_reference {
-#     publisher = "Canonical"
-#     offer     = "UbuntuServer"
-#     sku       = "18.04-LTS"
-#     version   = "latest"
-#   }
+  source_image_reference {
+    publisher = "Canonical"
+    offer     = "UbuntuServer"
+    sku       = "18.04-LTS"
+    version   = "latest"
+  }
 
-#   tags = var.tags
-# }
+  tags = var.tags
+}
 
 # # Create a data disk
 # resource "azurerm_managed_disk" "test_data_disk" {
@@ -188,7 +188,7 @@ output "resource_group_name" {
 # Output the VM names
 output "vm_names" {
   value = [
-    #azurerm_linux_virtual_machine.test_vm.name,
+    azurerm_linux_virtual_machine.test_vm.name,
     azurerm_linux_virtual_machine.high_usage_vm.name
   ]
 }
