@@ -22,35 +22,37 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     ${disk_usage}=    RW.CLI.Run Bash File
     ...    bash_file=vm_disk_utilization.sh
     ...    env=${env}
-    ...    timeout_seconds=180
+    ...    timeout_seconds=300
     ...    include_in_history=false
-    ...    extra_env=VM_INCLUDE_LIST,VM_OMIT_LIST
+    ...    extra_env=VM_INCLUDE_LIST,VM_OMIT_LIST,MAX_PARALLEL_JOBS,TIMEOUT_SECONDS
+
+    # Check if Azure authentication failed completely
+    ${auth_failed}=    Run Keyword And Return Status    Should Contain    ${disk_usage.stdout}    Azure authentication failed
+    IF    ${auth_failed}
+        ${disk_score}=    Set Variable    0
+        Set Global Variable    ${disk_score}
+        RETURN
+    END
 
     ${disk_usg_out}=    Evaluate    json.loads(r'''${disk_usage.stdout}''')    json
     ${vm_names}=    Get Dictionary Keys    ${disk_usg_out}
     ${issue_count}=    Set Variable    0
     FOR    ${vm_name}    IN    @{vm_names}
-        ${output}=    Get From Dictionary    ${disk_usg_out}    ${vm_name}
-        # output is a dict, e.g. {'output': {...}}
-        ${disk_output}=    Get From Dictionary    ${output}    output
-        ${value_list}=    Get From Dictionary    ${disk_output}    value
-        ${result}=    Get From List    ${value_list}    0
-        ${message}=    Get From Dictionary    ${result}    message
+        ${vm_data}=    Get From Dictionary    ${disk_usg_out}    ${vm_name}
+        ${stdout}=    Get From Dictionary    ${vm_data}    stdout
+        ${stderr}=    Get From Dictionary    ${vm_data}    stderr
+        ${code}=    Get From Dictionary    ${vm_data}    code
 
-        # Write message to a temp file
+        # Skip if there are errors or connection issues
+        IF    "${stderr}" != "" or "${code}" in ["ConnectionError", "CommandTimeout", "InvalidResponse", "VMNotRunning"]
+            ${issue_count}=    Evaluate    ${issue_count} + 1
+            Continue For Loop
+        END
+
+        # Write stdout to temp file for next steps analysis
         ${tmpfile}=    Generate Random String    8
-        ${tmpfile_path}=    Set Variable    /tmp/vm_disk_${tmpfile}.txt
-        Create File    ${tmpfile_path}    ${message}
-
-        # Parse the output using our invoke cmd parser
-        ${parsed_out}=  Azure.Run Invoke Cmd Parser
-        ...     input_file=${tmpfile_path}
-        ...     timeout_seconds=60
-
-        # Run next steps script and check for issues
-        ${tmpfile2}=    Generate Random String    8
-        ${tmpfile_path2}=    Set Variable    /tmp/vm_disk_stdout.txt
-        Create File    ${tmpfile_path2}    ${parsed_out['stdout']}
+        ${tmpfile_path}=    Set Variable    /tmp/vm_disk_stdout.txt
+        Create File    ${tmpfile_path}    ${stdout}
         ${next_steps}=    RW.CLI.Run Bash File
         ...    bash_file=next_steps_disk_utilization.sh
         ...    env=${env}
@@ -72,31 +74,36 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     ${memory_usage}=    RW.CLI.Run Bash File
     ...    bash_file=vm_memory_check.sh
     ...    env=${env}
-    ...    timeout_seconds=180
+    ...    timeout_seconds=300
     ...    include_in_history=false
-    ...    extra_env=VM_INCLUDE_LIST,VM_OMIT_LIST
+    ...    extra_env=VM_INCLUDE_LIST,VM_OMIT_LIST,MAX_PARALLEL_JOBS,TIMEOUT_SECONDS
+
+    # Check if Azure authentication failed completely
+    ${auth_failed}=    Run Keyword And Return Status    Should Contain    ${memory_usage.stdout}    Azure authentication failed
+    IF    ${auth_failed}
+        ${memory_score}=    Set Variable    0
+        Set Global Variable    ${memory_score}
+        RETURN
+    END
 
     ${mem_usg_out}=    Evaluate    json.loads(r'''${memory_usage.stdout}''')    json
     ${vm_names}=    Get Dictionary Keys    ${mem_usg_out}
     ${issue_count}=    Set Variable    0
     FOR    ${vm_name}    IN    @{vm_names}
-        ${output}=    Get From Dictionary    ${mem_usg_out}    ${vm_name}
-        ${mem_output}=    Get From Dictionary    ${output}    output
-        ${value_list}=    Get From Dictionary    ${mem_output}    value
-        ${result}=    Get From List    ${value_list}    0
-        ${message}=    Get From Dictionary    ${result}    message
+        ${vm_data}=    Get From Dictionary    ${mem_usg_out}    ${vm_name}
+        ${stdout}=    Get From Dictionary    ${vm_data}    stdout
+        ${stderr}=    Get From Dictionary    ${vm_data}    stderr
+        ${code}=    Get From Dictionary    ${vm_data}    code
+
+        # Skip if there are errors or connection issues
+        IF    "${stderr}" != "" or "${code}" in ["ConnectionError", "CommandTimeout", "InvalidResponse", "VMNotRunning"]
+            ${issue_count}=    Evaluate    ${issue_count} + 1
+            Continue For Loop
+        END
 
         ${tmpfile}=    Generate Random String    8
-        ${tmpfile_path}=    Set Variable    /tmp/vm_mem_${tmpfile}.txt
-        Create File    ${tmpfile_path}    ${message}
-
-        ${parsed_out}=  Azure.Run Invoke Cmd Parser
-        ...     input_file=${tmpfile_path}
-        ...     timeout_seconds=60
-
-        ${tmpfile2}=    Generate Random String    8
-        ${tmpfile_path2}=    Set Variable    /tmp/vm_mem_stdout.txt
-        Create File    ${tmpfile_path2}    ${parsed_out['stdout']}
+        ${tmpfile_path}=    Set Variable    /tmp/vm_mem_stdout.txt
+        Create File    ${tmpfile_path}    ${stdout}
         ${next_steps}=    RW.CLI.Run Bash File
         ...    bash_file=next_steps_memory_check.sh
         ...    env=${env}
@@ -118,31 +125,36 @@ Check Uptime for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     ${uptime_usage}=    RW.CLI.Run Bash File
     ...    bash_file=vm_uptime_check.sh
     ...    env=${env}
-    ...    timeout_seconds=180
+    ...    timeout_seconds=300
     ...    include_in_history=false
-    ...    extra_env=VM_INCLUDE_LIST,VM_OMIT_LIST
+    ...    extra_env=VM_INCLUDE_LIST,VM_OMIT_LIST,MAX_PARALLEL_JOBS,TIMEOUT_SECONDS
+
+    # Check if Azure authentication failed completely
+    ${auth_failed}=    Run Keyword And Return Status    Should Contain    ${uptime_usage.stdout}    Azure authentication failed
+    IF    ${auth_failed}
+        ${uptime_score}=    Set Variable    0
+        Set Global Variable    ${uptime_score}
+        RETURN
+    END
 
     ${uptime_usg_out}=    Evaluate    json.loads(r'''${uptime_usage.stdout}''')    json
     ${vm_names}=    Get Dictionary Keys    ${uptime_usg_out}
     ${issue_count}=    Set Variable    0
     FOR    ${vm_name}    IN    @{vm_names}
-        ${output}=    Get From Dictionary    ${uptime_usg_out}    ${vm_name}
-        ${uptime_output}=    Get From Dictionary    ${output}    output
-        ${value_list}=    Get From Dictionary    ${uptime_output}    value
-        ${result}=    Get From List    ${value_list}    0
-        ${message}=    Get From Dictionary    ${result}    message
+        ${vm_data}=    Get From Dictionary    ${uptime_usg_out}    ${vm_name}
+        ${stdout}=    Get From Dictionary    ${vm_data}    stdout
+        ${stderr}=    Get From Dictionary    ${vm_data}    stderr
+        ${code}=    Get From Dictionary    ${vm_data}    code
+
+        # Skip if there are errors or connection issues
+        IF    "${stderr}" != "" or "${code}" in ["ConnectionError", "CommandTimeout", "InvalidResponse", "VMNotRunning"]
+            ${issue_count}=    Evaluate    ${issue_count} + 1
+            Continue For Loop
+        END
 
         ${tmpfile}=    Generate Random String    8
-        ${tmpfile_path}=    Set Variable    /tmp/vm_uptime_${tmpfile}.txt
-        Create File    ${tmpfile_path}    ${message}
-
-        ${parsed_out}=  Azure.Run Invoke Cmd Parser
-        ...     input_file=${tmpfile_path}
-        ...     timeout_seconds=60
-
-        ${tmpfile2}=    Generate Random String    8
-        ${tmpfile_path2}=    Set Variable    /tmp/vm_uptime_stdout.txt
-        Create File    ${tmpfile_path2}    ${parsed_out['stdout']}
+        ${tmpfile_path}=    Set Variable    /tmp/vm_uptime_stdout.txt
+        Create File    ${tmpfile_path}    ${stdout}
         ${next_steps}=    RW.CLI.Run Bash File
         ...    bash_file=next_steps_uptime.sh
         ...    env=${env}
@@ -164,31 +176,36 @@ Check Last Patch Status for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     ${patch_usage}=    RW.CLI.Run Bash File
     ...    bash_file=vm_last_patch_check.sh
     ...    env=${env}
-    ...    timeout_seconds=180
+    ...    timeout_seconds=300
     ...    include_in_history=false
-    ...    extra_env=VM_INCLUDE_LIST,VM_OMIT_LIST
+    ...    extra_env=VM_INCLUDE_LIST,VM_OMIT_LIST,MAX_PARALLEL_JOBS,TIMEOUT_SECONDS
+
+    # Check if Azure authentication failed completely
+    ${auth_failed}=    Run Keyword And Return Status    Should Contain    ${patch_usage.stdout}    Azure authentication failed
+    IF    ${auth_failed}
+        ${patch_score}=    Set Variable    0
+        Set Global Variable    ${patch_score}
+        RETURN
+    END
 
     ${patch_usg_out}=    Evaluate    json.loads(r'''${patch_usage.stdout}''')    json
     ${vm_names}=    Get Dictionary Keys    ${patch_usg_out}
     ${issue_count}=    Set Variable    0
     FOR    ${vm_name}    IN    @{vm_names}
-        ${output}=    Get From Dictionary    ${patch_usg_out}    ${vm_name}
-        ${patch_output}=    Get From Dictionary    ${output}    output
-        ${value_list}=    Get From Dictionary    ${patch_output}    value
-        ${result}=    Get From List    ${value_list}    0
-        ${message}=    Get From Dictionary    ${result}    message
+        ${vm_data}=    Get From Dictionary    ${patch_usg_out}    ${vm_name}
+        ${stdout}=    Get From Dictionary    ${vm_data}    stdout
+        ${stderr}=    Get From Dictionary    ${vm_data}    stderr
+        ${code}=    Get From Dictionary    ${vm_data}    code
+
+        # Skip if there are errors or connection issues
+        IF    "${stderr}" != "" or "${code}" in ["ConnectionError", "CommandTimeout", "InvalidResponse", "VMNotRunning"]
+            ${issue_count}=    Evaluate    ${issue_count} + 1
+            Continue For Loop
+        END
 
         ${tmpfile}=    Generate Random String    8
-        ${tmpfile_path}=    Set Variable    /tmp/vm_patch_${tmpfile}.txt
-        Create File    ${tmpfile_path}    ${message}
-
-        ${parsed_out}=  Azure.Run Invoke Cmd Parser
-        ...     input_file=${tmpfile_path}
-        ...     timeout_seconds=60
-
-        ${tmpfile2}=    Generate Random String    8
-        ${tmpfile_path2}=    Set Variable    /tmp/vm_patch_stdout.txt
-        Create File    ${tmpfile_path2}    ${parsed_out['stdout']}
+        ${tmpfile_path}=    Set Variable    /tmp/vm_patch_stdout.txt
+        Create File    ${tmpfile_path}    ${stdout}
         ${next_steps}=    RW.CLI.Run Bash File
         ...    bash_file=next_steps_patch_time.sh
         ...    env=${env}
@@ -235,9 +252,23 @@ Suite Initialization
     ...    description=The threshold percentage for memory usage warnings.
     ...    pattern=\d*
     ...    default=80
+    ${MAX_PARALLEL_JOBS}=    RW.Core.Import User Variable    MAX_PARALLEL_JOBS
+    ...    type=string
+    ...    description=Maximum number of parallel VM checks to run simultaneously.
+    ...    pattern=\d*
+    ...    default=5
+    ${TIMEOUT_SECONDS}=    RW.Core.Import User Variable    TIMEOUT_SECONDS
+    ...    type=string
+    ...    description=Timeout in seconds for Azure VM run-command operations.
+    ...    pattern=\d*
+    ...    default=60
     ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_ID
     ...    type=string
     ...    description=The Azure Subscription ID.
+    ...    pattern=\w*
+    ${AZURE_SUBSCRIPTION_NAME}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_NAME
+    ...    type=string
+    ...    description=The Azure Subscription Name.
     ...    pattern=\w*
     ${azure_credentials}=    RW.Core.Import Secret
     ...    azure_credentials
@@ -249,9 +280,11 @@ Suite Initialization
     Set Suite Variable    ${DISK_THRESHOLD}    ${DISK_THRESHOLD}
     Set Suite Variable    ${UPTIME_THRESHOLD}    ${UPTIME_THRESHOLD}
     Set Suite Variable    ${MEMORY_THRESHOLD}    ${MEMORY_THRESHOLD}
+    Set Suite Variable    ${MAX_PARALLEL_JOBS}    ${MAX_PARALLEL_JOBS}
+    Set Suite Variable    ${TIMEOUT_SECONDS}    ${TIMEOUT_SECONDS}
     Set Suite Variable
     ...    ${env}
-    ...    {"VM_NAME":"${VM_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "DISK_THRESHOLD": "${DISK_THRESHOLD}", "UPTIME_THRESHOLD": "${UPTIME_THRESHOLD}", "MEMORY_THRESHOLD": "${MEMORY_THRESHOLD}", "AZURE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}
+    ...    {"VM_NAME":"${VM_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "DISK_THRESHOLD": "${DISK_THRESHOLD}", "UPTIME_THRESHOLD": "${UPTIME_THRESHOLD}", "MEMORY_THRESHOLD": "${MEMORY_THRESHOLD}", "MAX_PARALLEL_JOBS": "${MAX_PARALLEL_JOBS}", "TIMEOUT_SECONDS": "${TIMEOUT_SECONDS}", "AZURE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}"}
     # Set Azure subscription context
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}

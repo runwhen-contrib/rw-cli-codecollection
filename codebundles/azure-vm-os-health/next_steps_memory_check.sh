@@ -27,18 +27,32 @@ SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID:-"unknown"}
 
 while IFS= read -r line; do
     if [[ "$line" =~ ^Mem: ]]; then
-        total=$(echo "$line" | awk '{print $2}')
-        used=$(echo "$line" | awk '{print $3}')
-        if [[ -n "$total" && -n "$used" && "$total" -gt 0 ]]; then
-            percent=$(awk "BEGIN {printf \"%.0f\", ($used/$total)*100}")
-            if [ "$percent" -ge "$THRESHOLD" ]; then
+        total_mem=$(echo "$line" | awk '{print $2}')
+        used_mem=$(echo "$line" | awk '{print $3}')
+        
+        if [[ "$total_mem" =~ ^[0-9]+$ ]] && [[ "$used_mem" =~ ^[0-9]+$ ]] && [ "$total_mem" -gt 0 ]; then
+            mem_percent=$(( (used_mem * 100) / total_mem ))
+            
+            # Convert to GB for better readability if > 1024 MB
+            if [ "$total_mem" -gt 1024 ]; then
+                total_gb=$(awk "BEGIN {printf \"%.1f\", $total_mem/1024}")
+                used_gb=$(awk "BEGIN {printf \"%.1f\", $used_mem/1024}")
+                free_mem=$(( total_mem - used_mem ))
+                free_gb=$(awk "BEGIN {printf \"%.1f\", $free_mem/1024}")
+                mem_display="${used_gb}GB used out of ${total_gb}GB total (${free_gb}GB free)"
+            else
+                free_mem=$(( total_mem - used_mem ))
+                mem_display="${used_mem}MB used out of ${total_mem}MB total (${free_mem}MB free)"
+            fi
+            
+            if [ "$mem_percent" -ge "$THRESHOLD" ]; then
                 add_issue \
-                    "High Memory Usage on VM ${VM_NAME}" \
+                    "High Memory Usage on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\` (Subscription: \`${AZURE_SUBSCRIPTION_NAME}\`)" \
                     2 \
-                    "Memory usage should be below ${THRESHOLD}% on VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_NAME})" \
-                    "Memory usage is at ${percent}% on VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_NAME})" \
-                    "Memory usage is ${used}MB out of ${total}MB (${percent}%).\nResource Group: ${AZ_RESOURCE_GROUP}\nSubscription: ${AZURE_SUBSCRIPTION_NAME}" \
-                    "Investigate memory-intensive processes on VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_NAME})\nConsider scaling up memory\nCheck for memory leaks\nRestart services if needed"
+                    "Memory usage should be below ${THRESHOLD}% on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`" \
+                    "Memory usage is at ${mem_percent}% (${mem_display}) on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`" \
+                    "Memory usage is ${mem_percent}% - ${mem_display}.\nThis exceeds the threshold of ${THRESHOLD}%.\nResource Group: \`${AZ_RESOURCE_GROUP}\`\nSubscription: \`${AZURE_SUBSCRIPTION_NAME}\`" \
+                    "Investigate memory usage on VM \`${VM_NAME}\` in resource group \`${AZ_RESOURCE_GROUP}\` (subscription: \`${AZURE_SUBSCRIPTION_NAME}\`)\nIdentify memory-intensive processes\nConsider increasing VM memory\nReview application memory usage patterns\nImplement memory monitoring"
             fi
         fi
     fi

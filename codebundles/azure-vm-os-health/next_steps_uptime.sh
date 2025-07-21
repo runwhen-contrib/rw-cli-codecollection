@@ -23,20 +23,24 @@ add_issue() {
 }
 
 while IFS= read -r line; do
-    # /proc/uptime gives seconds as first value
-    if [[ "$line" =~ ^[0-9]+\.[0-9]+ ]]; then
-        uptime_sec=$(echo "$line" | awk '{print $1}')
-        uptime_days=$(awk "BEGIN {printf \"%.2f\", $uptime_sec/86400}")
-        uptime_days_int=$(awk "BEGIN {printf \"%d\", $uptime_sec/86400}")
+    # Look for the decimal days line
+    if [[ "$line" =~ "Uptime (decimal days):" ]]; then
+        uptime_days=$(echo "$line" | sed 's/.*: \([0-9]*\.[0-9]*\).*/\1/')
+        uptime_days_int=$(echo "$uptime_days" | cut -d'.' -f1)
+        
+        # Get the human-readable uptime from the previous lines stored in temp
+        uptime_human=$(grep "System Uptime:" "$STDOUT_FILE" | sed 's/System Uptime: //')
+        
         if (( $(echo "$uptime_days >= $THRESHOLD" | bc -l) )); then
             add_issue \
-                "High Uptime on VM ${VM_NAME}" \
+                "High Uptime on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\` (Subscription: \`${AZURE_SUBSCRIPTION_NAME}\`)" \
                 2 \
-                "Uptime should be less than ${THRESHOLD} days on VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_NAME})" \
-                "Uptime is ${uptime_days} days on VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_NAME})" \
-                "System uptime is ${uptime_days} days (${uptime_sec} seconds).\nResource Group: ${AZ_RESOURCE_GROUP}\nSubscription: ${AZURE_SUBSCRIPTION_NAME}" \
-                "Consider scheduling a reboot for VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_NAME})\nCheck for pending updates\nReview system logs for issues"
+                "Uptime should be less than ${THRESHOLD} days on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`" \
+                "Uptime is ${uptime_days} days (${uptime_human}) on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`" \
+                "System uptime is ${uptime_human} (${uptime_days} days total).\nThis exceeds the threshold of ${THRESHOLD} days.\nResource Group: \`${AZ_RESOURCE_GROUP}\`\nSubscription: \`${AZURE_SUBSCRIPTION_NAME}\`" \
+                "Consider scheduling a reboot for VM \`${VM_NAME}\` in resource group \`${AZ_RESOURCE_GROUP}\` (subscription: \`${AZURE_SUBSCRIPTION_NAME}\`)\nCheck for pending updates\nReview system logs for issues"
         fi
+        break
     fi
 done < "$STDOUT_FILE"
 

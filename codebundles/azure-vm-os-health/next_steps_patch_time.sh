@@ -21,17 +21,42 @@ add_issue() {
     jq ". += [$issue]" "${ISSUES_FILE}" > temp.json && mv temp.json "${ISSUES_FILE}"
 }
 
-patch_lines=$(grep -v -e '^$' -e 'Unknown OS' "$STDOUT_FILE" | wc -l)
+# Parse the patch output
+patch_content=$(cat "$STDOUT_FILE")
 
-if [ "$patch_lines" -gt 0 ]; then
-    details=$(cat "$STDOUT_FILE")
+# Check if system is up to date
+if echo "$patch_content" | grep -q "System is up to date"; then
+    echo "No patch issues found for VM ${VM_NAME} - system is up to date."
+elif echo "$patch_content" | grep -q "Unable to determine patch status"; then
+    # Unknown/unsupported OS
     add_issue \
-        "Pending OS Patches on VM ${VM_NAME}" \
-        2 \
-        "All security patches should be applied on VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_NAME})" \
-        "Pending patches detected on VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_NAME})" \
-        "$details\nResource Group: ${AZ_RESOURCE_GROUP}\nSubscription: ${AZURE_SUBSCRIPTION_NAME}" \
-        "Review and apply pending updates on VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_NAME})\nReboot if required\nEnsure regular patching schedule"
+        "Unable to Determine Patch Status on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\` (Subscription: \`${AZURE_SUBSCRIPTION_NAME}\`)" \
+        3 \
+        "Patch status should be determinable on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`" \
+        "Unable to determine patch status - unsupported or unknown OS on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`" \
+        "$patch_content\nResource Group: \`${AZ_RESOURCE_GROUP}\`\nSubscription: \`${AZURE_SUBSCRIPTION_NAME}\`" \
+        "Verify the operating system type on VM \`${VM_NAME}\` in resource group \`${AZ_RESOURCE_GROUP}\` (subscription: \`${AZURE_SUBSCRIPTION_NAME}\`)\nEnsure package manager is properly configured\nConsider manual patch management"
+elif echo "$patch_content" | grep -q "packages available for upgrade"; then
+    # Extract package count
+    package_count=$(echo "$patch_content" | grep "Pending Updates:" | sed 's/.*: \([0-9]*\) packages.*/\1/')
+    package_manager=$(echo "$patch_content" | grep "Package Manager:" | cut -d':' -f2 | xargs)
+    
+    # Determine severity based on package count
+    if [ "$package_count" -gt 50 ]; then
+        severity=2
+    elif [ "$package_count" -gt 20 ]; then
+        severity=2  
+    else
+        severity=2
+    fi
+    
+    add_issue \
+        "Pending OS Patches on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\` (Subscription: \`${AZURE_SUBSCRIPTION_NAME}\`)" \
+        $severity \
+        "All security patches should be applied on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`" \
+        "${package_count} pending package updates detected on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\` using ${package_manager}" \
+        "Package Manager: ${package_manager}\nPending Updates: ${package_count} packages\n\n${patch_content}\n\nResource Group: \`${AZ_RESOURCE_GROUP}\`\nSubscription: \`${AZURE_SUBSCRIPTION_NAME}\`" \
+        "Review and apply ${package_count} pending updates on VM \`${VM_NAME}\` in resource group \`${AZ_RESOURCE_GROUP}\` (subscription: \`${AZURE_SUBSCRIPTION_NAME}\`)\nSchedule maintenance window for updates\nReboot if required after patching\nEnsure regular patching schedule\nPrioritize security updates"
 fi
 
 issues_count=$(jq '. | length' "${ISSUES_FILE}")

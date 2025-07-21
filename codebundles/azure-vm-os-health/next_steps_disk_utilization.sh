@@ -48,12 +48,17 @@ while IFS= read -r line; do
 
     # Check if disk usage exceeds threshold
     if [ "$use_percent" -ge "$THRESHOLD" ]; then
-        issue_title="High Disk Usage on VM `${VM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`"
+        # Calculate available space for better context
+        avail_clean=$(echo "$avail" | sed 's/[^0-9.]*//g')
+        size_clean=$(echo "$size" | sed 's/[^0-9.]*//g')
+        used_clean=$(echo "$used" | sed 's/[^0-9.]*//g')
+        
+        issue_title="High Disk Usage on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\` (Subscription: \`${AZURE_SUBSCRIPTION_NAME}\`)"
         issue_severity=2
-        issue_expected="Disk usage should be below ${THRESHOLD}% on VM `${VM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`"
-        issue_actual="Disk usage is at ${use_percent}% on filesystem ${filesystem} (${mount_point}) on VM `${VM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`"
-        issue_details="Filesystem ${filesystem} mounted at ${mount_point} is at ${use_percent}% capacity (${used} used out of ${size}).\nThis exceeds the threshold of ${THRESHOLD}%.\nResource Group: ${AZ_RESOURCE_GROUP}\nSubscription: ${AZURE_SUBSCRIPTION_NAME}"
-        issue_next_steps="Investigate disk usage on VM ${VM_NAME} in resource group ${AZ_RESOURCE_GROUP} (subscription: ${AZURE_SUBSCRIPTION_NAME})\nClean up unnecessary files on the filesystem\nConsider expanding the disk\nImplement disk usage monitoring\nReview application logs for disk-intensive operations"
+        issue_expected="Disk usage should be below ${THRESHOLD}% on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`"
+        issue_actual="Disk usage is at ${use_percent}% on filesystem ${filesystem} (${mount_point}) - ${used} used out of ${size} total (${avail} available) on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`"
+        issue_details="Filesystem: ${filesystem}\nMount Point: ${mount_point}\nDisk Usage: ${use_percent}%\nUsed Space: ${used}\nTotal Space: ${size}\nAvailable Space: ${avail}\nThis exceeds the threshold of ${THRESHOLD}%.\nResource Group: \`${AZ_RESOURCE_GROUP}\`\nSubscription: \`${AZURE_SUBSCRIPTION_NAME}\`"
+        issue_next_steps="Investigate disk usage on VM \`${VM_NAME}\` in resource group \`${AZ_RESOURCE_GROUP}\` (subscription: \`${AZURE_SUBSCRIPTION_NAME}\`)\nClean up unnecessary files on the filesystem\nConsider expanding the disk\nImplement disk usage monitoring\nReview application logs for disk-intensive operations"
         
         add_issue "$issue_title" "$issue_severity" "$issue_expected" "$issue_actual" "$issue_details" "$issue_next_steps"
     fi
