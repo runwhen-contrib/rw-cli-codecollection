@@ -17,7 +17,12 @@ spec:
   owners:
   - {{workspace.owner_email}}
   statement: VM utilization should be below threshold. 
-  additionalContext:  
-    resourceGroup: "{{resource_group.name}}"
-    location: "{{match_resource.resource.location}}"
-    subscription: "{{subscription_id}}"
+  additionalContext:
+    {% include "azure-hierarchy.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name }}"
+  tags: 
+    {% include "azure-tags.yaml" ignore missing %}
+    - name: service
+      value: compute
+    - name: access
+      value: read-only
