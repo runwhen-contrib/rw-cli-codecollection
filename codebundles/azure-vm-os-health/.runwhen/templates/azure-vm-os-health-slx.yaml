@@ -7,9 +7,9 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure-vm.svg
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/compute/10021-icon-service-Virtual-Machine.svg
   alias: >-
-    {{match_resource.resource.name}} VM Health
+    {{resource_group.name}} Virtual Machine OS Health
   asMeasuredBy: OS utilization on the Azure VM.
   configProvided:
   - name: VM_NAME

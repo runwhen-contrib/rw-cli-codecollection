@@ -47,7 +47,7 @@ while IFS= read -r line; do
             
             if [ "$mem_percent" -ge "$THRESHOLD" ]; then
                 add_issue \
-                    "High Memory Usage on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\` (Subscription: \`${AZURE_SUBSCRIPTION_NAME}\`)" \
+                    "Virtual Machine \`${VM_NAME}\` (RG: \`${AZ_RESOURCE_GROUP}\`) has high memory usage of ${mem_percent}% (Subscription: \`${AZURE_SUBSCRIPTION_NAME}\`)" \
                     2 \
                     "Memory usage should be below ${THRESHOLD}% on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`" \
                     "Memory usage is at ${mem_percent}% (${mem_display}) on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`" \

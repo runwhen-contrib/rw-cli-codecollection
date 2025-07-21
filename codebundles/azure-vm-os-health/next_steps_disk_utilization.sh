@@ -53,7 +53,7 @@ while IFS= read -r line; do
         size_clean=$(echo "$size" | sed 's/[^0-9.]*//g')
         used_clean=$(echo "$used" | sed 's/[^0-9.]*//g')
         
-        issue_title="High Disk Usage on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\` (Subscription: \`${AZURE_SUBSCRIPTION_NAME}\`)"
+        issue_title="Virtual Machine \`${VM_NAME}\` (RG: \`${AZ_RESOURCE_GROUP}\`) has high disk usage of ${use_percent}% (Subscription: \`${AZURE_SUBSCRIPTION_NAME}\`)"
         issue_severity=2
         issue_expected="Disk usage should be below ${THRESHOLD}% on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`"
         issue_actual="Disk usage is at ${use_percent}% on filesystem ${filesystem} (${mount_point}) - ${used} used out of ${size} total (${avail} available) on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`"

@@ -55,8 +55,8 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
         IF    "${code}" in ["ConnectionError", "CommandTimeout", "InvalidResponse", "VMNotRunning"]
             ${severity}=    Set Variable If    "${code}" == "VMNotRunning"    3    4
             ${issue_title}=    Set Variable If    "${code}" == "VMNotRunning"    
-            ...    VM `${vm_name}` Not Running in Resource Group `${AZ_RESOURCE_GROUP}` (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
-            ...    Connection Issue with VM `${vm_name}` in Resource Group `${AZ_RESOURCE_GROUP}` (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+            ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) is not running (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+            ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) has connection issues (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
             ${next_steps}=    Set Variable If    "${code}" == "VMNotRunning"
             ...    Start VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}` or investigate why it's not running
             ...    Check network connectivity and Azure credentials for VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}` (subscription: `${AZURE_SUBSCRIPTION_NAME}`)
@@ -72,7 +72,7 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - ${stderr}
         ELSE IF    "${stderr}" != ""
             RW.Core.Add Issue    
-                ...    title=Error detected during disk check for VM `${vm_name}` in Resource Group `${AZ_RESOURCE_GROUP}` (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+                ...    title=Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) has disk check errors (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
                 ...    severity=1
                 ...    next_steps=Investigate the error: ${stderr}
                 ...    expected=No errors should occur during disk health check
@@ -152,8 +152,8 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
         IF    "${code}" in ["ConnectionError", "CommandTimeout", "InvalidResponse", "VMNotRunning"]
             ${severity}=    Set Variable If    "${code}" == "VMNotRunning"    3    4
             ${issue_title}=    Set Variable If    "${code}" == "VMNotRunning"    
-            ...    VM `${vm_name}` Not Running in Resource Group `${AZ_RESOURCE_GROUP}` (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
-            ...    Connection Issue with VM `${vm_name}` in Resource Group `${AZ_RESOURCE_GROUP}` (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+            ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) is not running (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+            ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) has connection issues (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
             ${next_steps}=    Set Variable If    "${code}" == "VMNotRunning"
             ...    Start VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}` or investigate why it's not running
             ...    Check network connectivity and Azure credentials for VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}` (subscription: `${AZURE_SUBSCRIPTION_NAME}`)
@@ -169,7 +169,7 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - ${stderr}
         ELSE IF    "${stderr}" != ""
             RW.Core.Add Issue    
-                ...    title=Error detected during memory check for VM `${vm_name}` in Resource Group `${AZ_RESOURCE_GROUP}` (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+                ...    title=Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) has memory check errors (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
                 ...    severity=1
                 ...    next_steps=Investigate the error: ${stderr}
                 ...    expected=No errors should occur during memory check
@@ -247,8 +247,8 @@ Check Uptime for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
         IF    "${code}" in ["ConnectionError", "CommandTimeout", "InvalidResponse", "VMNotRunning"]
             ${severity}=    Set Variable If    "${code}" == "VMNotRunning"    3    4
             ${issue_title}=    Set Variable If    "${code}" == "VMNotRunning"    
-            ...    VM `${vm_name}` Not Running in Resource Group `${AZ_RESOURCE_GROUP}` (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
-            ...    Connection Issue with VM `${vm_name}` in Resource Group `${AZ_RESOURCE_GROUP}` (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+            ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) is not running (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+            ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) has connection issues (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
             ${next_steps}=    Set Variable If    "${code}" == "VMNotRunning"
             ...    Start VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}` or investigate why it's not running
             ...    Check network connectivity and Azure credentials for VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}` (subscription: `${AZURE_SUBSCRIPTION_NAME}`)
@@ -264,7 +264,7 @@ Check Uptime for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - ${stderr}
         ELSE IF    "${stderr}" != ""
             RW.Core.Add Issue    
-                ...    title=Error detected during uptime check for VM `${vm_name}` in Resource Group `${AZ_RESOURCE_GROUP}` (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+                ...    title=Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) has uptime check errors (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
                 ...    severity=1
                 ...    next_steps=Investigate the error: ${stderr}
                 ...    expected=No errors should occur during uptime check
@@ -342,8 +342,8 @@ Check Last Patch Status for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
         IF    "${code}" in ["ConnectionError", "CommandTimeout", "InvalidResponse", "VMNotRunning"]
             ${severity}=    Set Variable If    "${code}" == "VMNotRunning"    3    4
             ${issue_title}=    Set Variable If    "${code}" == "VMNotRunning"    
-            ...    VM `${vm_name}` Not Running in Resource Group `${AZ_RESOURCE_GROUP}` (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
-            ...    Connection Issue with VM `${vm_name}` in Resource Group `${AZ_RESOURCE_GROUP}` (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+            ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) is not running (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+            ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) has connection issues (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
             ${next_steps}=    Set Variable If    "${code}" == "VMNotRunning"
             ...    Start VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}` or investigate why it's not running
             ...    Check network connectivity and Azure credentials for VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}` (subscription: `${AZURE_SUBSCRIPTION_NAME}`)
@@ -359,7 +359,7 @@ Check Last Patch Status for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - ${stderr}
         ELSE IF    "${stderr}" != ""
             RW.Core.Add Issue    
-                ...    title=Error detected during patch check for VM `${vm_name}` in Resource Group `${AZ_RESOURCE_GROUP}` (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+                ...    title=Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) has patch check errors (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
                 ...    severity=1
                 ...    next_steps=Investigate the error: ${stderr}
                 ...    expected=No errors should occur during patch check

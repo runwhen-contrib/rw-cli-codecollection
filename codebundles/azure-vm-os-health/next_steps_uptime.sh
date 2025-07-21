@@ -33,7 +33,7 @@ while IFS= read -r line; do
         
         if (( $(echo "$uptime_days >= $THRESHOLD" | bc -l) )); then
             add_issue \
-                "High Uptime on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\` (Subscription: \`${AZURE_SUBSCRIPTION_NAME}\`)" \
+                "Virtual Machine \`${VM_NAME}\` (RG: \`${AZ_RESOURCE_GROUP}\`) has been running for ${uptime_days} days (Subscription: \`${AZURE_SUBSCRIPTION_NAME}\`)" \
                 2 \
                 "Uptime should be less than ${THRESHOLD} days on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`" \
                 "Uptime is ${uptime_days} days (${uptime_human}) on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`" \
