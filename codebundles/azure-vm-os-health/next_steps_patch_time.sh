@@ -35,7 +35,7 @@ elif echo "$patch_content" | grep -q "Unable to determine patch status"; then
         "Patch status should be determinable on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`" \
         "Unable to determine patch status - unsupported or unknown OS on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`" \
         "$patch_content\nResource Group: \`${AZ_RESOURCE_GROUP}\`\nSubscription: \`${AZURE_SUBSCRIPTION_NAME}\`" \
-        "Verify the operating system type on VM \`${VM_NAME}\` in resource group \`${AZ_RESOURCE_GROUP}\` (subscription: \`${AZURE_SUBSCRIPTION_NAME}\`)\nEnsure package manager is properly configured\nConsider manual patch management"
+        "Check OS type and package manager on VM \`${VM_NAME}\` in resource group \`${AZ_RESOURCE_GROUP}\`"
 elif echo "$patch_content" | grep -q "packages available for upgrade"; then
     # Extract package count
     package_count=$(echo "$patch_content" | grep "Pending Updates:" | sed 's/.*: \([0-9]*\) packages.*/\1/')
@@ -50,7 +50,7 @@ elif echo "$patch_content" | grep -q "packages available for upgrade"; then
         "All security patches should be applied on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`" \
         "${package_count} pending package updates detected on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\` using ${package_manager}" \
         "Package Manager: ${package_manager}\nPending Updates: ${package_count} packages\n\n${patch_content}\n\nResource Group: \`${AZ_RESOURCE_GROUP}\`\nSubscription: \`${AZURE_SUBSCRIPTION_NAME}\`" \
-        "Review and apply ${package_count} pending updates on VM \`${VM_NAME}\` in resource group \`${AZ_RESOURCE_GROUP}\` (subscription: \`${AZURE_SUBSCRIPTION_NAME}\`)\nSchedule maintenance window for updates\nReboot if required after patching\nEnsure regular patching schedule\nPrioritize security updates"
+        "Apply ${package_count} pending updates on VM \`${VM_NAME}\` in resource group \`${AZ_RESOURCE_GROUP}\`"
 fi
 
 issues_count=$(jq '. | length' "${ISSUES_FILE}")

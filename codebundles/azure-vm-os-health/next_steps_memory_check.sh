@@ -52,7 +52,7 @@ while IFS= read -r line; do
                     "Memory usage should be below ${THRESHOLD}% on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`" \
                     "Memory usage is at ${mem_percent}% (${mem_display}) on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`" \
                     "Memory usage is ${mem_percent}% - ${mem_display}.\nThis exceeds the threshold of ${THRESHOLD}%.\nResource Group: \`${AZ_RESOURCE_GROUP}\`\nSubscription: \`${AZURE_SUBSCRIPTION_NAME}\`" \
-                    "Investigate memory usage on VM \`${VM_NAME}\` in resource group \`${AZ_RESOURCE_GROUP}\` (subscription: \`${AZURE_SUBSCRIPTION_NAME}\`)\nIdentify memory-intensive processes\nConsider increasing VM memory\nReview application memory usage patterns\nImplement memory monitoring"
+                    "Investigate high memory usage on VM \`${VM_NAME}\` in resource group \`${AZ_RESOURCE_GROUP}\`"
             fi
         fi
     fi

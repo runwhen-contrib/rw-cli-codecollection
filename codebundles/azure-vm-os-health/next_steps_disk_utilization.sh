@@ -58,7 +58,7 @@ while IFS= read -r line; do
         issue_expected="Disk usage should be below ${THRESHOLD}% on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`"
         issue_actual="Disk usage is at ${use_percent}% on filesystem ${filesystem} (${mount_point}) - ${used} used out of ${size} total (${avail} available) on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`"
         issue_details="Filesystem: ${filesystem}\nMount Point: ${mount_point}\nDisk Usage: ${use_percent}%\nUsed Space: ${used}\nTotal Space: ${size}\nAvailable Space: ${avail}\nThis exceeds the threshold of ${THRESHOLD}%.\nResource Group: \`${AZ_RESOURCE_GROUP}\`\nSubscription: \`${AZURE_SUBSCRIPTION_NAME}\`"
-        issue_next_steps="Investigate disk usage on VM \`${VM_NAME}\` in resource group \`${AZ_RESOURCE_GROUP}\` (subscription: \`${AZURE_SUBSCRIPTION_NAME}\`)\nClean up unnecessary files on the filesystem\nConsider expanding the disk\nImplement disk usage monitoring\nReview application logs for disk-intensive operations"
+        issue_next_steps="Clean up disk space on VM \`${VM_NAME}\` filesystem ${filesystem} (${mount_point}) in resource group \`${AZ_RESOURCE_GROUP}\`"
         
         add_issue "$issue_title" "$issue_severity" "$issue_expected" "$issue_actual" "$issue_details" "$issue_next_steps"
     fi

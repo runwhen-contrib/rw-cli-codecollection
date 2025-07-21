@@ -33,7 +33,7 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
         RW.Core.Add Issue    
             ...    title=Azure Authentication Failed for Resource Group `${AZ_RESOURCE_GROUP}` (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
             ...    severity=4
-            ...    next_steps=Check Azure credentials and subscription access for Resource Group `${AZ_RESOURCE_GROUP}`
+            ...    next_steps=Check Azure credentials for Resource Group `${AZ_RESOURCE_GROUP}`
             ...    expected=Azure CLI should authenticate successfully
             ...    actual=Azure authentication failed for subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
             ...    reproduce_hint=Run: az account show --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
@@ -58,8 +58,8 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
             ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) is not running (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
             ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) has connection issues (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
             ${next_steps}=    Set Variable If    "${code}" == "VMNotRunning"
-            ...    Start VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}` or investigate why it's not running
-            ...    Check network connectivity and Azure credentials for VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}` (subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+            ...    Start VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}`
+            ...    Check Azure connectivity for VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}`
             
             RW.Core.Add Issue    
                 ...    title=${issue_title}
@@ -130,7 +130,7 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
         RW.Core.Add Issue    
             ...    title=Azure Authentication Failed for Resource Group `${AZ_RESOURCE_GROUP}` (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
             ...    severity=4
-            ...    next_steps=Check Azure credentials and subscription access for Resource Group `${AZ_RESOURCE_GROUP}`
+            ...    next_steps=Check Azure credentials for Resource Group `${AZ_RESOURCE_GROUP}`
             ...    expected=Azure CLI should authenticate successfully
             ...    actual=Azure authentication failed for subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
             ...    reproduce_hint=Run: az account show --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
@@ -155,8 +155,8 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
             ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) is not running (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
             ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) has connection issues (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
             ${next_steps}=    Set Variable If    "${code}" == "VMNotRunning"
-            ...    Start VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}` or investigate why it's not running
-            ...    Check network connectivity and Azure credentials for VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}` (subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+            ...    Start VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}`
+            ...    Check Azure connectivity for VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}`
             
             RW.Core.Add Issue    
                 ...    title=${issue_title}
@@ -225,7 +225,7 @@ Check Uptime for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
         RW.Core.Add Issue    
             ...    title=Azure Authentication Failed for Resource Group `${AZ_RESOURCE_GROUP}` (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
             ...    severity=4
-            ...    next_steps=Check Azure credentials and subscription access for Resource Group `${AZ_RESOURCE_GROUP}`
+            ...    next_steps=Check Azure credentials for Resource Group `${AZ_RESOURCE_GROUP}`
             ...    expected=Azure CLI should authenticate successfully
             ...    actual=Azure authentication failed for subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
             ...    reproduce_hint=Run: az account show --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
@@ -250,8 +250,8 @@ Check Uptime for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
             ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) is not running (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
             ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) has connection issues (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
             ${next_steps}=    Set Variable If    "${code}" == "VMNotRunning"
-            ...    Start VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}` or investigate why it's not running
-            ...    Check network connectivity and Azure credentials for VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}` (subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+            ...    Start VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}`
+            ...    Check Azure connectivity for VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}`
             
             RW.Core.Add Issue    
                 ...    title=${issue_title}
@@ -320,7 +320,7 @@ Check Last Patch Status for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
         RW.Core.Add Issue    
             ...    title=Azure Authentication Failed for Resource Group `${AZ_RESOURCE_GROUP}` (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
             ...    severity=4
-            ...    next_steps=Check Azure credentials and subscription access for Resource Group `${AZ_RESOURCE_GROUP}`
+            ...    next_steps=Check Azure credentials for Resource Group `${AZ_RESOURCE_GROUP}`
             ...    expected=Azure CLI should authenticate successfully
             ...    actual=Azure authentication failed for subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
             ...    reproduce_hint=Run: az account show --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
@@ -345,8 +345,8 @@ Check Last Patch Status for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
             ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) is not running (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
             ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) has connection issues (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
             ${next_steps}=    Set Variable If    "${code}" == "VMNotRunning"
-            ...    Start VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}` or investigate why it's not running
-            ...    Check network connectivity and Azure credentials for VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}` (subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+            ...    Start VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}`
+            ...    Check Azure connectivity for VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}`
             
             RW.Core.Add Issue    
                 ...    title=${issue_title}

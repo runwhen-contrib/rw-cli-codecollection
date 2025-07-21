@@ -38,7 +38,7 @@ while IFS= read -r line; do
                 "Uptime should be less than ${THRESHOLD} days on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`" \
                 "Uptime is ${uptime_days} days (${uptime_human}) on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`" \
                 "System uptime is ${uptime_human} (${uptime_days} days total).\nThis exceeds the threshold of ${THRESHOLD} days.\nResource Group: \`${AZ_RESOURCE_GROUP}\`\nSubscription: \`${AZURE_SUBSCRIPTION_NAME}\`" \
-                "Consider scheduling a reboot for VM \`${VM_NAME}\` in resource group \`${AZ_RESOURCE_GROUP}\` (subscription: \`${AZURE_SUBSCRIPTION_NAME}\`)\nCheck for pending updates\nReview system logs for issues"
+                "Schedule reboot for VM \`${VM_NAME}\` in resource group \`${AZ_RESOURCE_GROUP}\`"
         fi
         break
     fi
