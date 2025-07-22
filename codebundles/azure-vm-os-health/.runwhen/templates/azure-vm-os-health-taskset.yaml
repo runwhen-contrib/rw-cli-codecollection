@@ -40,5 +40,9 @@ spec:
     - name: AZURE_SUBSCRIPTION_NAME
       value: {{subscription_name}}
   secretsProvided:
+  {% if wb_version %}
+    {% include "azure-auth.yaml" ignore missing %}
+  {% else %}
     - name: azure_credentials
-      workspaceName: azure_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}
