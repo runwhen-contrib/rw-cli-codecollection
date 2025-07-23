@@ -260,20 +260,30 @@ class K8sLog:
         """
         if not scan_results:
             return "No scan results available"
+        
+        # Handle string input (in case scan_results was already serialized)
+        if isinstance(scan_results, str):
+            try:
+                scan_results = json.loads(scan_results)
+            except json.JSONDecodeError:
+                return f"Unable to parse scan results: {scan_results[:200]}..."
             
         issues = scan_results.get('issues', [])
         if not issues:
-            return "✅ No issues found in logs"
+            summary = scan_results.get('summary', [])
+            summary_text = "\n".join(summary) if summary else "No issues found in logs"
+            return f"✅ No log issues detected.\n{summary_text}"
         
         output_parts = []
         output_parts.append("📋 **Log Issues Found:**")
         output_parts.append("=" * 40)
         
         for i, issue in enumerate(issues, 1):
-            title = issue.get('title', 'Unknown Issue')
-            severity_label = issue.get('severity_label', 'Unknown')
-            occurrences = issue.get('occurrences', 1)
-            category = issue.get('category', 'Unknown')
+            # Safely extract issue data
+            title = self._safe_get(issue, 'title', 'Unknown Issue')
+            severity_label = self._safe_get(issue, 'severity_label', 'Unknown')
+            occurrences = self._safe_get(issue, 'occurrences', 1)
+            category = self._safe_get(issue, 'category', 'Unknown')
             
             output_parts.append(f"\n**Issue {i}: {title}**")
             output_parts.append(f"  • Severity: {severity_label}")
@@ -281,21 +291,129 @@ class K8sLog:
             output_parts.append(f"  • Occurrences: {occurrences}")
             
             # Add sample details (truncated for readability)
-            details = issue.get('details', '')
+            details = self._safe_get(issue, 'details', '')
             if details:
                 # Extract first meaningful line as sample
-                lines = details.split('\n')
-                sample_line = None
-                for line in lines:
-                    line = line.strip()
-                    if line and not line.startswith('Pod:') and not line.startswith('**'):
-                        sample_line = line[:100] + "..." if len(line) > 100 else line
-                        break
-                
+                sample_line = self._extract_sample_line(details)
                 if sample_line:
                     output_parts.append(f"  • Sample: {sample_line}")
+            
+            # Add service-specific next steps if available
+            next_steps = self._safe_get(issue, 'next_steps', '')
+            if next_steps:
+                # Extract service-specific guidance
+                service_steps = self._extract_service_steps(next_steps)
+                if service_steps:
+                    output_parts.append(f"  • Key Actions: {service_steps}")
         
         return "\n".join(output_parts)
+    
+    def _safe_get(self, obj: Any, key: str, default: Any = None) -> Any:
+        """Safely get a value from an object, handling various data types."""
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        elif hasattr(obj, key):
+            return getattr(obj, key, default)
+        else:
+            return default
+    
+    def _extract_sample_line(self, details: str) -> str:
+        """Extract a meaningful sample line from issue details."""
+        if not details:
+            return None
+            
+        lines = details.split('\n')
+        
+        # Look for lines that contain actual log content
+        for line in lines:
+            line = line.strip()
+            # Skip metadata lines
+            if (line and 
+                not line.startswith('Pod:') and 
+                not line.startswith('**') and
+                not line.startswith('Container:') and
+                len(line) > 10):
+                
+                # Look for structured log data or error messages
+                if ('"error"' in line or 
+                    'rpc error' in line or 
+                    'failed to' in line or
+                    'could not' in line or
+                    'exception' in line.lower()):
+                    
+                    # Truncate very long lines but preserve important content
+                    if len(line) > 120:
+                        # Find a good truncation point around service names or error messages
+                        truncate_at = 120
+                        if '"error"' in line:
+                            error_pos = line.find('"error"')
+                            if error_pos < 100:
+                                truncate_at = min(error_pos + 80, len(line))
+                        return line[:truncate_at] + "..."
+                    return line
+        
+        # Fallback: get first non-empty line
+        for line in lines:
+            line = line.strip()
+            if line and not line.startswith('Pod:') and not line.startswith('**'):
+                return line[:100] + "..." if len(line) > 100 else line
+        
+        return None
+    
+    def _extract_service_steps(self, next_steps: str) -> str:
+        """Extract the most important service-specific action from next steps."""
+        if not next_steps:
+            return None
+            
+        lines = next_steps.split('\n')
+        
+        # Prioritize service-specific guidance and wrap entities in backticks
+        priority_patterns = [
+            r'Check.*?services?:\s*([^.]+)',
+            r'Investigate\s+([^.]+service[^.]*)',
+            r'Verify.*?connectivity.*?to\s+([^.]+)',
+            r'Review\s+([^.]+service[^.]*)',
+        ]
+        
+        for line in lines:
+            for pattern in priority_patterns:
+                match = re.search(pattern, line, re.IGNORECASE)
+                if match:
+                    service_info = match.group(1).strip()
+                    # Wrap suspected entity names in backticks if they aren't already
+                    service_info = self._wrap_entities_in_backticks(service_info)
+                    return f"Focus on {service_info}"
+        
+        # Fallback: return first meaningful action with entity formatting
+        for line in lines:
+            line = line.strip()
+            if line and len(line) > 10 and not line.startswith('Review logs'):
+                # Apply entity formatting to the fallback line
+                formatted_line = self._wrap_entities_in_backticks(line)
+                return formatted_line[:80] + "..." if len(formatted_line) > 80 else formatted_line
+        
+        return None
+    
+    def _wrap_entities_in_backticks(self, text: str) -> str:
+        """Wrap suspected entity names in backticks if not already wrapped."""
+        if not text:
+            return text
+            
+        # Don't double-wrap already wrapped entities
+        if '`' in text:
+            return text
+            
+        # Patterns for entity names to wrap
+        entity_patterns = [
+            (r'\b([a-zA-Z][a-zA-Z0-9\-]*service)\b', r'`\1`'),  # service names
+            (r'\b(port[s]?)\s+([0-9]{4,5})\b', r'\1 `\2`'),   # port numbers
+            (r'\b([a-zA-Z][a-zA-Z0-9\-]{3,})\s+service\b', r'`\1` service'),  # service references
+        ]
+        
+        for pattern, replacement in entity_patterns:
+            text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+            
+        return text
 
     @keyword
     def calculate_log_health_score(self, scan_results: Dict[str, Any]) -> float:

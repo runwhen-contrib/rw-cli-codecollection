@@ -1,7 +1,7 @@
 # Kubernetes Log Analysis Improvements
 
 ## Overview
-This document outlines the improvements made to the Kubernetes log analysis system to address false positives, improve report formatting, and provide better grouping of issues.
+This document outlines the improvements made to the Kubernetes log analysis system to address false positives, improve report formatting, provide better grouping of issues, and generate service-specific next steps.
 
 ## Issues Addressed
 
@@ -46,6 +46,25 @@ This document outlines the improvements made to the Kubernetes log analysis syst
   - Affected pods with occurrence counts
   - Sample log lines for context
 
+### 5. ❌ Generic Next Steps
+**Problem:** Next steps were generic and didn't point to specific failing services.
+
+**Solution:**
+- **Service Name Extraction:** Added intelligent parsing of RPC errors to extract service names:
+  - Parses DNS lookup failures: `lookup cartservice.otel-demo.svc.cluster.local`
+  - Extracts services from error messages: `could not retrieve cart`, `failed to add to cart`
+  - Identifies connection targets: `connection refused to userservice:8080`
+
+- **Error Code Analysis:** Detects specific RPC error codes and provides targeted guidance:
+  - `code = Unavailable` → "Service unavailable errors detected - check if target services are running"
+  - `code = DeadlineExceeded` → "Deadline exceeded errors detected - review service response times"
+  - `connection refused` → "Connection refused errors detected - verify target service ports"
+
+- **Service-Specific Next Steps:** Generates targeted actions:
+  - "Check the health and availability of downstream services: cartservice, payment"
+  - "Investigate cartservice - read operations are failing"
+  - "Verify network connectivity to services: cartservice, userservice"
+
 ## Key Improvements Made
 
 ### Pattern Matching Enhancements
@@ -66,27 +85,42 @@ grouped_lines = group_similar_lines(matched_lines, similarity_threshold=0.8)
 # "Pod: app-123 (container) - 5x occurrences of pattern: Connection timeout"
 ```
 
+### Service-Specific Insights
+```python
+# Extract service names from RPC errors
+rpc_patterns = [
+    r'lookup\s+([a-zA-Z][a-zA-Z0-9\-\.]*service[a-zA-Z0-9\-\.]*)',  # DNS lookups
+    r'could not (retrieve|get|fetch|connect to) ([^:]+):',  # Action + service
+    r'connection refused to ([^:]+)',  # Direct connection refusal
+]
+
+# Generate targeted next steps
+insights.append(f"Check the health and availability of downstream services: {service_list}")
+insights.append(f"Investigate {service} service - read operations are failing")
+```
+
 ### Report Formatting
 ```markdown
 📋 **Log Issues Found:**
 ========================================
 
-**Issue 1: Timeout pattern detected in deployment `myapp` (3 occurrences)**
-  • Severity: Minor
-  • Category: Timeout  
-  • Occurrences: 3
-  • Sample: request timeout occurred after 30 seconds...
+**Issue 1: Connection pattern detected in deployment `frontend` (268 occurrences)**
+  • Severity: Major
+  • Category: Connection  
+  • Occurrences: 268
+  • Sample: {"error":"could not retrieve cart: rpc error: code = Unavailable...
+  • Key Actions: Focus on cartservice, payment
 ```
 
 ## Files Modified
 
 ### Core Analysis Files
 - `codebundles/k8s-application-log-health/error_patterns.json` - Updated patterns
-- `codebundles/k8s-application-log-health/scan_logs.py` - Added grouping and filtering
+- `codebundles/k8s-application-log-health/scan_logs.py` - Added grouping, filtering, and service extraction
 - `codebundles/k8s-application-log-health/summarize.py` - Improved report generation
 
 ### Library Extensions  
-- `libraries/RW/K8sLog/k8s_log.py` - Added formatting methods
+- `libraries/RW/K8sLog/k8s_log.py` - Added formatting methods and service extraction
 
 ### Robot Framework Tasks
 - `codebundles/k8s-deployment-healthcheck/runbook.robot` - Updated report display
@@ -100,6 +134,8 @@ grouped_lines = group_similar_lines(matched_lines, similarity_threshold=0.8)
 ✅ **Grouping:** Similar log lines are clustered with occurrence counts
 ✅ **Formatting:** Reports are readable and highlight actual issues
 ✅ **Filtering:** Empty error arrays and whitespace-only content is excluded
+✅ **Service Extraction:** Successfully identifies failing services from RPC errors
+✅ **Targeted Next Steps:** Provides specific actions for identified services
 
 ## Usage Example
 
@@ -115,14 +151,28 @@ grouped_lines = group_similar_lines(matched_lines, similarity_threshold=0.8)
 
 ### After  
 ```
-📋 **Log Analysis Summary for Deployment `messagerecoverylb`**
-**Health Score:** 1.0
+📋 **Log Analysis Summary for Deployment `frontend`**
+**Health Score:** 0.0
 **Analysis Depth:** standard
 **Categories Analyzed:** GenericError,AppFailure,StackTrace,Connection,Timeout,Auth,Exceptions,Resource
-**Issues Found:** 0
+**Issues Found:** 2
 
-✅ No log issues detected.
-Found 0 issue patterns in deployment 'messagerecoverylb' (ns: default).
+📋 **Log Issues Found:**
+========================================
+
+**Issue 1: Connection pattern detected in deployment `frontend` (268 occurrences)**
+  • Severity: Major
+  • Category: Connection
+  • Occurrences: 268
+  • Sample: {"error":"could not retrieve cart: rpc error: code = Unavailable desc...
+  • Key Actions: Focus on cartservice, payment
+
+**Issue 2: GenericError pattern detected in deployment `frontend` (28 occurrences)**
+  • Severity: Minor
+  • Category: GenericError  
+  • Occurrences: 28
+  • Sample: {"error":"failed to add to cart: rpc error: code = Unavailable desc...
+  • Key Actions: Check the health and availability of downstream services: cartservice
 ```
 
 ## Benefits
@@ -132,10 +182,14 @@ Found 0 issue patterns in deployment 'messagerecoverylb' (ns: default).
 3. **Grouped Reporting:** Similar issues are consolidated with occurrence counts  
 4. **Readable Output:** Clear, structured reports instead of serialization artifacts
 5. **Faster Analysis:** Less noise means faster identification of real problems
+6. **Service-Specific Guidance:** Next steps point directly to failing services and suggest concrete actions
+7. **Network Troubleshooting:** Identifies specific ports, DNS issues, and connectivity problems
 
 ## Future Enhancements
 
 - Add more sophisticated pattern matching for application-specific errors
 - Implement trend analysis for recurring issues
 - Add severity weighting based on frequency and impact
-- Create alert thresholds based on issue categories 
+- Create alert thresholds based on issue categories
+- Integrate with service topology maps to suggest related services to check
+- Add automated service health verification based on extracted service names 

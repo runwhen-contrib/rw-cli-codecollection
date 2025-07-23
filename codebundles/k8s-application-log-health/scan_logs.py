@@ -43,7 +43,7 @@ def main():
         print(f"ERROR reading error JSON: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # Pattern aggregators - group by category and pattern
+    # Pattern aggregators - use more specific keys to avoid duplicates
     category_issues = defaultdict(list)
     all_next_steps = []
     max_severity = 5
@@ -106,7 +106,8 @@ def main():
                     # Group similar lines to avoid repetition
                     grouped_lines = group_similar_lines(matched_lines)
                     
-                    pattern_key = f"{category}:{pattern}"
+                    # Create more specific pattern key to avoid duplicates - include pattern info
+                    pattern_key = f"{category}:{pattern[:50]}:{severity}"
                     category_issues[pattern_key].append({
                         "pod": pod,
                         "container": container,
@@ -141,6 +142,7 @@ def main():
             # Create consolidated details
             details_parts = []
             total_occurrences = 0
+            sample_lines = []
             
             for match in pattern_matches:
                 pod = match["pod"]
@@ -151,14 +153,21 @@ def main():
                     sample_line = group["sample"]
                     count = group["count"]
                     total_occurrences += count
+                    sample_lines.append(sample_line)
                     
                     if count > 1:
                         details_parts.append(f"Pod: {pod} ({container}) - {count}x occurrences of pattern:\n{sample_line}")
                     else:
                         details_parts.append(f"Pod: {pod} ({container}):\n{sample_line}")
 
-            # Deduplicate next steps
+            # Analyze sample lines for service-specific insights
+            service_insights = extract_service_insights(sample_lines)
+            
+            # Deduplicate next steps and add service-specific guidance
             unique_next_steps = list(set(all_next_steps))
+            if service_insights:
+                unique_next_steps.extend(service_insights)
+            
             severity_label = severity_label_map.get(severity, f"Unknown({severity})")
 
             title = f"{category} pattern detected in {workload_type} `{workload_name}` ({total_occurrences} occurrences)"
@@ -179,7 +188,7 @@ def main():
             })
 
         # Generate summary
-        total_issues = sum(len(matches) for matches in category_issues.values())
+        total_issues = len(category_issues)
         categories_found = set(match["category"] for matches in category_issues.values() for match in matches)
         
         severity_label = severity_label_map.get(max_severity, f"Unknown({max_severity})")
@@ -196,6 +205,114 @@ def main():
 
     with open(issues_output_path, "w", encoding="utf-8") as f:
         json.dump(issues_json, f, indent=2)
+
+def extract_service_insights(sample_lines):
+    """Extract service-specific insights from error messages to generate targeted next steps."""
+    insights = []
+    
+    # Combine all sample lines for analysis
+    combined_text = "\n".join(sample_lines)
+    
+    # Extract RPC service errors with improved patterns
+    rpc_services = set()
+    rpc_patterns = [
+        r'lookup\s+([a-zA-Z][a-zA-Z0-9\-\.]*service[a-zA-Z0-9\-\.]*)',  # DNS lookups to services
+        r'([a-zA-Z][a-zA-Z0-9\-]*service)[:\s]',  # Service names with service suffix  
+        r'could not (retrieve|get|fetch|connect to) ([^:]+):',  # Action + service
+        r'failed to (retrieve|get|fetch|connect to|add to) ([^:]+):',  # Failed actions
+        r'unable to (connect|reach|access) ([^:]+)',  # Connection issues
+        r'connection refused to ([^:]+)',  # Direct connection refusal
+        r'([a-zA-Z][a-zA-Z0-9\-]*)\s*service',  # Generic service references
+    ]
+    
+    for pattern in rpc_patterns:
+        matches = re.findall(pattern, combined_text, re.IGNORECASE)
+        for match in matches:
+            if isinstance(match, tuple):
+                # Extract the service name from tuple matches
+                service_candidates = [m for m in match if m and not m.isdigit() and len(m) > 2]
+                for candidate in service_candidates:
+                    # Clean up the service name
+                    clean_service = candidate.strip().strip('"').strip("'").strip()
+                    if clean_service and clean_service.lower() not in ['retrieve', 'get', 'fetch', 'connect', 'add', 'desc', 'code', 'error', 'rpc', 'tcp']:
+                        rpc_services.add(clean_service)
+            else:
+                clean_service = match.strip().strip('"').strip("'").strip()
+                if clean_service and len(clean_service) > 2:
+                    rpc_services.add(clean_service)
+    
+    # Extract common service operation patterns
+    service_operations = {}
+    operation_patterns = [
+        (r'could not retrieve (\w+)', 'read operations'),
+        (r'failed to add to (\w+)', 'write operations'),  
+        (r'failed to (save|create|update|delete) ([^:]+)', 'CRUD operations'),
+        (r'timeout.*?([a-zA-Z][a-zA-Z0-9\-]*service)', 'timeout issues'),
+        (r'connection refused.*?([a-zA-Z][a-zA-Z0-9\-]+)', 'connection issues'),
+    ]
+    
+    for pattern, operation_type in operation_patterns:
+        matches = re.findall(pattern, combined_text, re.IGNORECASE)
+        for match in matches:
+            service_name = match if isinstance(match, str) else match[1] if len(match) > 1 else match[0]
+            clean_service = service_name.strip().strip('"').strip("'")
+            if clean_service and len(clean_service) > 2:
+                if clean_service not in service_operations:
+                    service_operations[clean_service] = []
+                service_operations[clean_service].append(operation_type)
+
+    # Generate targeted next steps with backticks around entity names
+    if rpc_services:
+        # Clean up service names and remove noise
+        clean_services = []
+        for service in rpc_services:
+            # Remove common kubernetes suffixes for cleaner display
+            clean_service = re.sub(r'\.otel-demo\.svc\.cluster\.local.*$', '', service)
+            clean_service = re.sub(r'\.svc\.cluster\.local.*$', '', clean_service)
+            clean_service = clean_service.strip()
+            
+            if (len(clean_service) > 2 and 
+                clean_service.lower() not in ['desc', 'code', 'error', 'rpc', 'tcp', 'transport', 'dialing', 'lookup', 'while', 'dial'] and
+                not clean_service.isdigit()):
+                clean_services.append(clean_service)
+        
+        if clean_services:
+            # Limit to most relevant services and format nicely with backticks
+            unique_services = list(set(clean_services))[:4]
+            service_list = ', '.join([f"`{service}`" for service in unique_services])
+            insights.append(f"Check the health and availability of downstream services: {service_list}")
+            insights.append(f"Verify network connectivity to services: {service_list}")
+            insights.append(f"Review service discovery and DNS resolution for: {service_list}")
+    
+    # Add specific operation-based guidance with backticks
+    if service_operations:
+        for service, operations in service_operations.items():
+            clean_service = re.sub(r'\.otel-demo\.svc\.cluster\.local.*$', '', service)
+            clean_service = re.sub(r'\.svc\.cluster\.local.*$', '', clean_service)
+            clean_service = clean_service.strip()
+            
+            if 'read operations' in operations:
+                insights.append(f"Investigate `{clean_service}` service - read operations are failing") 
+            if 'write operations' in operations:
+                insights.append(f"Check `{clean_service}` service capacity and write permissions")
+            if 'timeout issues' in operations:
+                insights.append(f"Review `{clean_service}` service performance and timeout configurations")
+    
+    # Extract specific error codes and provide guidance
+    if 'code = Unavailable' in combined_text:
+        insights.append("Service unavailable errors detected - check if target services are running and accessible")
+    if 'code = DeadlineExceeded' in combined_text:
+        insights.append("Deadline exceeded errors detected - review service response times and timeout settings")
+    if 'connection refused' in combined_text.lower():
+        insights.append("Connection refused errors detected - verify target service ports and firewall rules")
+        
+    # Extract port numbers for network troubleshooting with backticks
+    ports = set(re.findall(r':(\d{4,5})', combined_text))
+    if ports:
+        port_list = ', '.join([f"`{port}`" for port in sorted(ports)[:3]])  # Limit to 3 ports
+        insights.append(f"Check network connectivity to ports: {port_list}")
+    
+    return insights[:6]  # Limit to 6 most relevant insights
 
 def group_similar_lines(lines, similarity_threshold=0.8):
     """Group similar log lines together to reduce repetition."""
