@@ -200,11 +200,9 @@ get_capacity_recommendations() {
     if [ ${#reasons[@]} -gt 0 ]; then
         local suggested_capacity=$((current_capacity + 1))
         recommendations+=("Consider increasing capacity from $current_capacity to $suggested_capacity instances")
-        recommendations+=("This will provide better performance and handle increased load")
     elif [ ${#scale_down_reasons[@]} -gt 0 ] && [ $current_capacity -gt 1 ]; then
         local suggested_capacity=$((current_capacity - 1))
         recommendations+=("Consider decreasing capacity from $current_capacity to $suggested_capacity instances")
-        recommendations+=("This will reduce costs while maintaining adequate performance")
     else
         recommendations+=("Current capacity appears optimal for the usage patterns")
     fi
