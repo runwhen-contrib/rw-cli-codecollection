@@ -49,26 +49,27 @@ Analyze Application Log Patterns for DaemonSet `${DAEMONSET_NAME}` in Namespace 
     
     # Process each issue found in the logs
     ${issues}=    Evaluate    $scan_results.get('issues', [])
-    IF    len($issues) > 0
-        FOR    ${issue}    IN    @{issues}
+    FOR    ${issue}    IN    @{issues}
+        ${severity}=    Evaluate    $issue.get('severity', ${LOG_SEVERITY_THRESHOLD})
+        IF    ${severity} <= ${LOG_SEVERITY_THRESHOLD}
             ${summarized_details}=    RW.K8sLog.Summarize Log Issues    issue_details=${issue["details"]}
-            ${next_steps_text}=    Catenate    SEPARATOR=\n    @{issue["next_steps"]}
-            
             RW.Core.Add Issue
-            ...    severity=${issue["severity"]}
-            ...    expected=No application errors should be present in DaemonSet `${DAEMONSET_NAME}` logs in namespace `${NAMESPACE}`
-            ...    actual=Application errors detected in DaemonSet `${DAEMONSET_NAME}` logs in namespace `${NAMESPACE}`
-            ...    title=${issue["title"]}
-            ...    reproduce_hint=Use RW.K8sLog.Fetch Workload Logs and RW.K8sLog.Scan Logs For Issues keywords to reproduce this analysis
+            ...    severity=${severity}
+            ...    expected=Application logs should be free of critical errors for daemonset `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
+            ...    actual=${issue.get('title', 'Log pattern issue detected')} in daemonset `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
+            ...    title=${issue.get('title', 'Log Pattern Issue')} in DaemonSet `${DAEMONSET_NAME}`
+            ...    reproduce_hint=Check application logs for daemonset `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
             ...    details=${summarized_details}
-            ...    next_steps=${next_steps_text}
+            ...    next_steps=${issue.get('next_steps', 'Review application logs and resolve underlying issues')}
         END
     END
+
+    ${issues_count}=    Get Length    ${issues}
     
-    # Add summary to report
-    ${summary_text}=    Catenate    SEPARATOR=\n    @{scan_results["summary"]}
-    RW.Core.Add Pre To Report    Application Log Analysis Summary for DaemonSet ${DAEMONSET_NAME}:\n${summary_text}
-    RW.Core.Add Pre To Report    Log Health Score: ${log_health_score} (1.0 = healthy, 0.0 = unhealthy)
+    # Format scan results for better display
+    ${formatted_results}=    RW.K8sLog.Format Scan Results For Display    scan_results=${scan_results}
+    
+    RW.Core.Add Pre To Report    **Log Analysis Summary for DaemonSet `${DAEMONSET_NAME}`**\n**Health Score:** ${log_health_score}\n**Analysis Depth:** ${LOG_ANALYSIS_DEPTH}\n**Categories Analyzed:** ${LOG_PATTERN_CATEGORIES_STR}\n**Issues Found:** ${issues_count}\n\n${formatted_results}
     
     RW.K8sLog.Cleanup Temp Files
 

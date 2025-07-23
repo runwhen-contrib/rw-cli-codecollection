@@ -223,19 +223,35 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
         FOR    ${issue}    IN    @{issues}
             ${severity}=    Evaluate    $issue.get('severity', ${LOG_SEVERITY_THRESHOLD})
             IF    ${severity} <= ${LOG_SEVERITY_THRESHOLD}
+                # Convert issue details to string to avoid serialization issues
+                ${issue_details_raw}=    Evaluate    $issue.get("details", "")
+                ${issue_details_str}=    Convert To String    ${issue_details_raw}
+                ${summarized_details}=    RW.K8sLog.Summarize Log Issues    issue_details=${issue_details_str}
+                
+                # Safely extract title and next_steps as strings
+                ${issue_title_raw}=    Evaluate    $issue.get('title', 'Log pattern issue detected')
+                ${issue_title}=    Convert To String    ${issue_title_raw}
+                ${next_steps_raw}=    Evaluate    $issue.get('next_steps', 'Review application logs and resolve underlying issues')
+                ${next_steps}=    Convert To String    ${next_steps_raw}
+                
                 RW.Core.Add Issue
                 ...    severity=${severity}
                 ...    expected=Application logs should be free of critical errors for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                ...    actual=${issue.get('title', 'Log pattern issue detected')} in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                ...    title=${issue.get('title', 'Log Pattern Issue')} in Deployment `${DEPLOYMENT_NAME}`
+                ...    actual=${issue_title} in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                ...    title=${issue_title} in Deployment `${DEPLOYMENT_NAME}`
                 ...    reproduce_hint=Check application logs for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                ...    details=${issue.get('details', 'Application log analysis detected potential issues')}
-                ...    next_steps=${issue.get('next_steps', 'Review application logs and resolve underlying issues')}
+                ...    details=${summarized_details}
+                ...    next_steps=${next_steps}
             END
         END
-        
+
         ${issues_count}=    Get Length    ${issues}
-        RW.Core.Add Pre To Report    **Log Analysis Summary for Deployment `${DEPLOYMENT_NAME}`**\n**Health Score:** ${log_health_score}\n**Analysis Depth:** ${LOG_ANALYSIS_DEPTH}\n**Categories Analyzed:** ${LOG_PATTERN_CATEGORIES_STR}\n**Issues Found:** ${issues_count}
+        
+        # Convert scan_results to string to avoid serialization issues, then format for display
+        ${scan_results_str}=    Evaluate    json.dumps($scan_results, indent=2)    json
+        ${formatted_results}=    RW.K8sLog.Format Scan Results For Display    scan_results=${scan_results_str}
+        
+        RW.Core.Add Pre To Report    **Log Analysis Summary for Deployment `${DEPLOYMENT_NAME}`**\n**Health Score:** ${log_health_score}\n**Analysis Depth:** ${LOG_ANALYSIS_DEPTH}\n**Categories Analyzed:** ${LOG_PATTERN_CATEGORIES_STR}\n**Issues Found:** ${issues_count}\n\n${formatted_results}
         
         RW.K8sLog.Cleanup Temp Files
     END

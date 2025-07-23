@@ -247,6 +247,210 @@ class K8sLog:
         except Exception as e:
             logger.warn(f"Summary generation error: {str(e)}")
             return str(issue_details)[:1000] + "..." if len(str(issue_details)) > 1000 else str(issue_details)
+    
+    @keyword
+    def format_scan_results_for_display(self, scan_results: Dict[str, Any]) -> str:
+        """Format scan results into a readable display string to avoid serialization issues.
+        
+        Args:
+            scan_results: Dictionary containing scan results
+            
+        Returns:
+            Formatted string representation of the results
+        """
+        if not scan_results:
+            return "No scan results available"
+        
+        # Handle string input (in case scan_results was already serialized)
+        if isinstance(scan_results, str):
+            try:
+                scan_results = json.loads(scan_results)
+            except json.JSONDecodeError:
+                return f"Unable to parse scan results: {scan_results[:200]}..."
+            
+        issues = scan_results.get('issues', [])
+        if not issues:
+            summary = scan_results.get('summary', [])
+            summary_text = "\n".join(summary) if summary else "No issues found in logs"
+            return f"✅ No log issues detected.\n{summary_text}"
+        
+        output_parts = []
+        output_parts.append("📋 **Log Issues Found:**")
+        output_parts.append("=" * 40)
+        
+        for i, issue in enumerate(issues, 1):
+            # Safely extract issue data
+            title = self._safe_get(issue, 'title', 'Unknown Issue')
+            severity_label = self._safe_get(issue, 'severity_label', 'Unknown')
+            occurrences = self._safe_get(issue, 'occurrences', 1)
+            category = self._safe_get(issue, 'category', 'Unknown')
+            
+            output_parts.append(f"\n**Issue {i}: {title}**")
+            output_parts.append(f"  • Severity: {severity_label}")
+            output_parts.append(f"  • Category: {category}")
+            output_parts.append(f"  • Occurrences: {occurrences}")
+            
+            # Add sample details (truncated for readability)
+            details = self._safe_get(issue, 'details', '')
+            if details:
+                # Extract first meaningful line as sample
+                sample_line = self._extract_sample_line(details)
+                if sample_line:
+                    output_parts.append(f"  • Sample: {sample_line}")
+            
+            # Add service-specific next steps if available
+            next_steps = self._safe_get(issue, 'next_steps', '')
+            if next_steps:
+                # Extract service-specific guidance
+                service_steps = self._extract_service_steps(next_steps)
+                if service_steps:
+                    output_parts.append(f"  • Key Actions: {service_steps}")
+        
+        return "\n".join(output_parts)
+    
+    def _safe_get(self, obj: Any, key: str, default: Any = None) -> Any:
+        """Safely get a value from an object, handling various data types."""
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        elif hasattr(obj, key):
+            return getattr(obj, key, default)
+        else:
+            return default
+    
+    def _extract_sample_line(self, details: str) -> str:
+        """Extract a meaningful sample line from issue details."""
+        if not details:
+            return None
+            
+        lines = details.split('\n')
+        
+        # Look for lines that contain actual log content
+        for line in lines:
+            line = line.strip()
+            # Skip metadata lines
+            if (line and 
+                not line.startswith('Pod:') and 
+                not line.startswith('**') and
+                not line.startswith('Container:') and
+                len(line) > 10):
+                
+                # Look for structured log data or error messages
+                if ('"error"' in line or 
+                    'rpc error' in line or 
+                    'failed to' in line or
+                    'could not' in line or
+                    'exception' in line.lower()):
+                    
+                    # Much more generous truncation - show most of the error message
+                    if len(line) > 250:
+                        # Find a good truncation point around complete error descriptions
+                        truncate_at = 250
+                        if '"error"' in line:
+                            error_pos = line.find('"error"')
+                            if error_pos < 150:
+                                # Try to show complete error message if possible
+                                truncate_at = min(error_pos + 180, len(line))
+                        return line[:truncate_at] + "..."
+                    return line
+        
+        # Fallback: get first non-empty line with generous truncation
+        for line in lines:
+            line = line.strip()
+            if line and not line.startswith('Pod:') and not line.startswith('**'):
+                return line[:200] + "..." if len(line) > 200 else line
+        
+        return None
+    
+    def _extract_service_steps(self, next_steps: str) -> str:
+        """Extract the most important service-specific action from next steps."""
+        if not next_steps:
+            return None
+            
+        lines = next_steps.split('\n')
+        
+        # Prioritize service-specific guidance and wrap entities in backticks
+        priority_patterns = [
+            r'Check.*?(?:health.*?of|availability.*?of).*?services?:\s*([^.]+)',
+            r'Investigate\s+([`]?[a-zA-Z][a-zA-Z0-9\-]*[`]?)\s+service',
+            r'Verify.*?connectivity.*?to\s+services?:\s*([^.]+)',
+            r'Review.*?service discovery.*?for:\s*([^.]+)',
+        ]
+        
+        for line in lines:
+            for pattern in priority_patterns:
+                match = re.search(pattern, line, re.IGNORECASE)
+                if match:
+                    service_info = match.group(1).strip()
+                    # Clean up service info to remove action phrases and non-services
+                    service_info = self._clean_service_info(service_info)
+                    if service_info:  # Only proceed if we have clean service info
+                        # Ensure proper backtick wrapping
+                        if not service_info.startswith('`'):
+                            service_info = self._wrap_entities_in_backticks(service_info)
+                        return f"Focus on {service_info}"
+        
+        # Fallback: return first meaningful action with entity formatting
+        for line in lines:
+            line = line.strip()
+            if line and len(line) > 10 and not line.startswith('Review logs'):
+                # Apply entity formatting to the fallback line
+                formatted_line = self._wrap_entities_in_backticks(line)
+                return formatted_line[:150] + "..." if len(formatted_line) > 150 else formatted_line
+        
+        return None
+    
+    def _clean_service_info(self, service_info: str) -> str:
+        """Clean service info to remove action phrases and non-service entities."""
+        if not service_info:
+            return ""
+            
+        # Split by common separators and filter out action phrases and non-services
+        parts = [part.strip().strip('`').strip() for part in re.split(r'[,;]', service_info)]
+        clean_parts = []
+        
+        # Extended list of things to filter out
+        noise_patterns = [
+            'add to', 'connect to', 'retrieve', 'get', 'fetch', 'connect', 'add',
+            'user.*during', 'during.*checkout', 'checkout', 'user.*cart.*during',
+            'error', 'desc', 'code', 'rpc', 'tcp', 'transport', 'dialing'
+        ]
+        
+        for part in parts:
+            part = part.strip()
+            if (part and 
+                len(part) > 1 and
+                len(part) < 30 and  # Service names shouldn't be too long
+                not part.lower().startswith('user ') and  # Filter user-related phrases
+                not any(re.search(pattern, part, re.IGNORECASE) for pattern in noise_patterns) and
+                # Service names typically contain 'service' or are short descriptive names
+                (('service' in part.lower() and len(part) < 20) or 
+                 (len(part) <= 15 and re.match(r'^[a-zA-Z][a-zA-Z0-9\-]*$', part)))):
+                clean_parts.append(part)
+        
+        if clean_parts:
+            return ', '.join(clean_parts[:3])  # Limit to 3 services max
+        return ""
+    
+    def _wrap_entities_in_backticks(self, text: str) -> str:
+        """Wrap suspected entity names in backticks if not already wrapped."""
+        if not text:
+            return text
+            
+        # Don't double-wrap already wrapped entities
+        if '`' in text:
+            return text
+            
+        # Patterns for entity names to wrap
+        entity_patterns = [
+            (r'\b([a-zA-Z][a-zA-Z0-9\-]*service)\b', r'`\1`'),  # service names
+            (r'\b(port[s]?)\s+([0-9]{4,5})\b', r'\1 `\2`'),   # port numbers
+            (r'\b([a-zA-Z][a-zA-Z0-9\-]{3,})\s+service\b', r'`\1` service'),  # service references
+        ]
+        
+        for pattern, replacement in entity_patterns:
+            text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+            
+        return text
 
     @keyword
     def calculate_log_health_score(self, scan_results: Dict[str, Any]) -> float:

@@ -189,16 +189,7 @@
       ]
     },
     {
-      "match": "timeout",
-      "category": "Timeout",
-      "severity": 3,
-      "next_steps": [
-        "Investigate slow responses in ${WORKLOAD_TYPE} ${WORKLOAD_NAME} in namespace ${NAMESPACE}",
-        "Check backend latency and optimize timeouts"
-      ]
-    },
-    {
-      "match": "request timeout",
+      "match": "(?i)request\\s+(timeout|timed\\s+out)",
       "category": "Timeout",
       "severity": 3,
       "next_steps": [
@@ -207,7 +198,7 @@
       ]
     },
     {
-      "match": "operation timed out",
+      "match": "(?i)operation\\s+(timeout|timed\\s+out)",
       "category": "Timeout",
       "severity": 3,
       "next_steps": [
@@ -216,7 +207,7 @@
       ]
     },
     {
-      "match": "execution expired",
+      "match": "(?i)execution\\s+(expired|timed\\s+out)",
       "category": "Timeout",
       "severity": 3,
       "next_steps": [
@@ -225,7 +216,7 @@
       ]
     },
     {
-      "match": "deadline exceeded",
+      "match": "(?i)deadline\\s+exceeded",
       "category": "Timeout",
       "severity": 3,
       "next_steps": [
@@ -234,7 +225,7 @@
       ]
     },
     {
-      "match": "response took too long",
+      "match": "(?i)response\\s+took\\s+too\\s+long",
       "category": "Timeout",
       "severity": 3,
       "next_steps": [
@@ -243,7 +234,7 @@
       ]
     },
     {
-      "match": "gateway timeout",
+      "match": "(?i)gateway\\s+timeout",
       "category": "Timeout",
       "severity": 3,
       "next_steps": [
@@ -252,7 +243,7 @@
       ]
     },
     {
-      "match": "operation exceeded time limit",
+      "match": "(?i)operation\\s+exceeded\\s+time\\s+limit",
       "category": "Timeout",
       "severity": 3,
       "next_steps": [
@@ -261,7 +252,7 @@
       ]
     },
     {
-      "match": "script timed out",
+      "match": "(?i)script\\s+timed\\s+out",
       "category": "Timeout",
       "severity": 3,
       "next_steps": [
@@ -270,7 +261,7 @@
       ]
     },
     {
-      "match": "query took too long",
+      "match": "(?i)query\\s+took\\s+too\\s+long",
       "category": "Timeout",
       "severity": 3,
       "next_steps": [
@@ -554,12 +545,12 @@
       ]
     },
     {
-      "match": "shutting down",
+      "match": "(?i)shutting\\s+down.*(?:due\\s+to|because\\s+of|error|exception|failure)",
       "category": "AppFailure",
-      "severity": 3,
+      "severity": 2,
       "next_steps": [
-        "Investigate why ${WORKLOAD_TYPE} ${WORKLOAD_NAME} in namespace ${NAMESPACE} is shutting down",
-        "Look for termination signals or resource exhaustion"
+        "Investigate abnormal shutdown of ${WORKLOAD_TYPE} ${WORKLOAD_NAME} in namespace ${NAMESPACE}",
+        "Check for unhandled exceptions or resource issues causing unexpected shutdown"
       ]
     },
     {
