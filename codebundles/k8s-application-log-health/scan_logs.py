@@ -5,6 +5,8 @@ import json
 import re
 from pathlib import Path
 import sys
+from collections import defaultdict
+from difflib import SequenceMatcher
 
 def main():
     namespace = os.getenv("NAMESPACE")
@@ -41,15 +43,15 @@ def main():
         print(f"ERROR reading error JSON: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # Aggregators
-    aggregator = {}
+    # Pattern aggregators - group by category and pattern
+    category_issues = defaultdict(list)
     all_next_steps = []
     max_severity = 5
 
     # Map of numeric severity to text label
     severity_label_map = {
         1: "Critical",
-        2: "Major",
+        2: "Major", 
         3: "Minor",
         4: "Informational",
     }
@@ -77,6 +79,10 @@ def main():
             with open(log_file, "r", encoding="utf-8") as lf:
                 log_content = lf.read()
 
+            # Skip if log content is empty or only contains "errors": []
+            if not log_content.strip() or re.match(r'^\s*"errors":\s*\[\s*\]\s*$', log_content.strip()):
+                continue
+
             # Check each pattern
             for pattern_def in error_data.get("patterns", []):
                 category = pattern_def.get("category", "")
@@ -89,16 +95,27 @@ def main():
 
                 matched_lines = []
                 for line in log_content.splitlines():
+                    # Skip empty lines and lines that look like empty error arrays
+                    if not line.strip() or re.match(r'^\s*"errors":\s*\[\s*\]\s*$', line.strip()):
+                        continue
+                    
                     if re.search(pattern, line, re.IGNORECASE):
-                        matched_lines.append(line)
+                        matched_lines.append(line.strip())
 
                 if matched_lines:
-                    # Collect logs in aggregator
-                    aggregator.setdefault(container, "")
-                    aggregator[container] += (
-                        f"\n--- Pod: {pod} (pattern: {pattern}) ---\n"
-                        + "\n".join(matched_lines) + "\n"
-                    )
+                    # Group similar lines to avoid repetition
+                    grouped_lines = group_similar_lines(matched_lines)
+                    
+                    pattern_key = f"{category}:{pattern}"
+                    category_issues[pattern_key].append({
+                        "pod": pod,
+                        "container": container,
+                        "pattern": pattern,
+                        "category": category,
+                        "severity": severity,
+                        "next_steps": next_steps,
+                        "grouped_lines": grouped_lines
+                    })
 
                     # Handle next_steps
                     if isinstance(next_steps, str):
@@ -112,52 +129,107 @@ def main():
                     if severity < max_severity:
                         max_severity = severity
 
-    # Prepare final JSON output
-    # Includes both 'issues' and 'summary' top-level keys
+    # Prepare final JSON output with grouped issues
     issues_json = {"issues": [], "summary": []}
 
-    if aggregator:
-        # We found at least one matching pattern
-        details_json = {}
-        for container_name, matched_text in aggregator.items():
-            details_json[container_name] = matched_text
+    if category_issues:
+        for pattern_key, pattern_matches in category_issues.items():
+            category = pattern_matches[0]["category"]
+            pattern = pattern_matches[0]["pattern"]
+            severity = min(match["severity"] for match in pattern_matches)
+            
+            # Create consolidated details
+            details_parts = []
+            total_occurrences = 0
+            
+            for match in pattern_matches:
+                pod = match["pod"]
+                container = match["container"]
+                grouped_lines = match["grouped_lines"]
+                
+                for group in grouped_lines:
+                    sample_line = group["sample"]
+                    count = group["count"]
+                    total_occurrences += count
+                    
+                    if count > 1:
+                        details_parts.append(f"Pod: {pod} ({container}) - {count}x occurrences of pattern:\n{sample_line}")
+                    else:
+                        details_parts.append(f"Pod: {pod} ({container}):\n{sample_line}")
 
-        # Deduplicate next steps
-        unique_next_steps = list(set(all_next_steps))
+            # Deduplicate next steps
+            unique_next_steps = list(set(all_next_steps))
+            severity_label = severity_label_map.get(severity, f"Unknown({severity})")
 
-        # Figure out the severity label for the "worst" severity
-        severity_label = severity_label_map.get(
-            max_severity, f"Unknown({max_severity})"
-        )
+            title = f"{category} pattern detected in {workload_type} `{workload_name}` ({total_occurrences} occurrences)"
+            
+            # Create properly formatted details string instead of complex object
+            details_str = "\n\n".join(details_parts)
 
-        categories_joined = ", ".join(categories_to_match)
-        title = (f"{categories_joined} errors detected in logs for {workload_type} `{workload_name}` "
-                 f"(namespace `{namespace}`)")
+            # Add the issues entry
+            issues_json["issues"].append({
+                "title": title,
+                "details": details_str,  # Use string instead of dict to avoid serialization issues
+                "next_steps": "\n".join(unique_next_steps),
+                "severity": severity, 
+                "severity_label": severity_label,
+                "occurrences": total_occurrences,
+                "pattern": pattern,
+                "category": category
+            })
 
-        # Add the issues entry
-        issues_json["issues"].append({
-            "title": title,
-            "details": details_json,
-            "next_steps": "\n".join(unique_next_steps),
-            "severity": max_severity, 
-            "severity_label": severity_label
-        })
-
-        # Add a corresponding summary line
+        # Generate summary
+        total_issues = sum(len(matches) for matches in category_issues.values())
+        categories_found = set(match["category"] for matches in category_issues.values() for match in matches)
+        
+        severity_label = severity_label_map.get(max_severity, f"Unknown({max_severity})")
         issues_json["summary"].append(
-            f"Found errors in {workload_type} '{workload_name}' (ns: {namespace})."
-            f" Max severity: {severity_label}. Categories: {categories_joined}."
+            f"Found {total_issues} issue patterns in {workload_type} '{workload_name}' (ns: {namespace}). "
+            f"Max severity: {severity_label}. Categories: {', '.join(sorted(categories_found))}."
         )
 
     else:
         # No patterns matched => no entries in 'issues'
-        # But we add a summary line so it's visible that no issues were found
         issues_json["summary"].append(
             f"No issues found in {workload_type} '{workload_name}' (namespace '{namespace}')."
         )
 
     with open(issues_output_path, "w", encoding="utf-8") as f:
         json.dump(issues_json, f, indent=2)
+
+def group_similar_lines(lines, similarity_threshold=0.8):
+    """Group similar log lines together to reduce repetition."""
+    if not lines:
+        return []
+    
+    groups = []
+    used_indices = set()
+    
+    for i, line in enumerate(lines):
+        if i in used_indices:
+            continue
+            
+        # Start a new group with this line
+        group = {"sample": line, "count": 1, "similar": [line]}
+        used_indices.add(i)
+        
+        # Find similar lines
+        for j, other_line in enumerate(lines):
+            if j <= i or j in used_indices:
+                continue
+                
+            # Calculate similarity
+            similarity = SequenceMatcher(None, line, other_line).ratio()
+            if similarity >= similarity_threshold:
+                group["count"] += 1
+                group["similar"].append(other_line)
+                used_indices.add(j)
+        
+        groups.append(group)
+    
+    # Sort groups by count (most frequent first)
+    groups.sort(key=lambda x: x["count"], reverse=True)
+    return groups
 
 def _replace_placeholders(text: str, workload_type: str, workload_name: str, namespace: str) -> str:
     """Helper to replace placeholders in a single step string."""

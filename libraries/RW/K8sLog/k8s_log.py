@@ -247,6 +247,55 @@ class K8sLog:
         except Exception as e:
             logger.warn(f"Summary generation error: {str(e)}")
             return str(issue_details)[:1000] + "..." if len(str(issue_details)) > 1000 else str(issue_details)
+    
+    @keyword
+    def format_scan_results_for_display(self, scan_results: Dict[str, Any]) -> str:
+        """Format scan results into a readable display string to avoid serialization issues.
+        
+        Args:
+            scan_results: Dictionary containing scan results
+            
+        Returns:
+            Formatted string representation of the results
+        """
+        if not scan_results:
+            return "No scan results available"
+            
+        issues = scan_results.get('issues', [])
+        if not issues:
+            return "✅ No issues found in logs"
+        
+        output_parts = []
+        output_parts.append("📋 **Log Issues Found:**")
+        output_parts.append("=" * 40)
+        
+        for i, issue in enumerate(issues, 1):
+            title = issue.get('title', 'Unknown Issue')
+            severity_label = issue.get('severity_label', 'Unknown')
+            occurrences = issue.get('occurrences', 1)
+            category = issue.get('category', 'Unknown')
+            
+            output_parts.append(f"\n**Issue {i}: {title}**")
+            output_parts.append(f"  • Severity: {severity_label}")
+            output_parts.append(f"  • Category: {category}")
+            output_parts.append(f"  • Occurrences: {occurrences}")
+            
+            # Add sample details (truncated for readability)
+            details = issue.get('details', '')
+            if details:
+                # Extract first meaningful line as sample
+                lines = details.split('\n')
+                sample_line = None
+                for line in lines:
+                    line = line.strip()
+                    if line and not line.startswith('Pod:') and not line.startswith('**'):
+                        sample_line = line[:100] + "..." if len(line) > 100 else line
+                        break
+                
+                if sample_line:
+                    output_parts.append(f"  • Sample: {sample_line}")
+        
+        return "\n".join(output_parts)
 
     @keyword
     def calculate_log_health_score(self, scan_results: Dict[str, Any]) -> float:

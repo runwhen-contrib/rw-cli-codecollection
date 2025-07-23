@@ -223,19 +223,24 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
         FOR    ${issue}    IN    @{issues}
             ${severity}=    Evaluate    $issue.get('severity', ${LOG_SEVERITY_THRESHOLD})
             IF    ${severity} <= ${LOG_SEVERITY_THRESHOLD}
+                ${summarized_details}=    RW.K8sLog.Summarize Log Issues    issue_details=${issue["details"]}
                 RW.Core.Add Issue
                 ...    severity=${severity}
                 ...    expected=Application logs should be free of critical errors for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
                 ...    actual=${issue.get('title', 'Log pattern issue detected')} in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
                 ...    title=${issue.get('title', 'Log Pattern Issue')} in Deployment `${DEPLOYMENT_NAME}`
                 ...    reproduce_hint=Check application logs for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                ...    details=${issue.get('details', 'Application log analysis detected potential issues')}
+                ...    details=${summarized_details}
                 ...    next_steps=${issue.get('next_steps', 'Review application logs and resolve underlying issues')}
             END
         END
-        
+
         ${issues_count}=    Get Length    ${issues}
-        RW.Core.Add Pre To Report    **Log Analysis Summary for Deployment `${DEPLOYMENT_NAME}`**\n**Health Score:** ${log_health_score}\n**Analysis Depth:** ${LOG_ANALYSIS_DEPTH}\n**Categories Analyzed:** ${LOG_PATTERN_CATEGORIES_STR}\n**Issues Found:** ${issues_count}
+        
+        # Format scan results for better display
+        ${formatted_results}=    RW.K8sLog.Format Scan Results For Display    scan_results=${scan_results}
+        
+        RW.Core.Add Pre To Report    **Log Analysis Summary for Deployment `${DEPLOYMENT_NAME}`**\n**Health Score:** ${log_health_score}\n**Analysis Depth:** ${LOG_ANALYSIS_DEPTH}\n**Categories Analyzed:** ${LOG_PATTERN_CATEGORIES_STR}\n**Issues Found:** ${issues_count}\n\n${formatted_results}
         
         RW.K8sLog.Cleanup Temp Files
     END
