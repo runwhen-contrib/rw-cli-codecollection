@@ -213,16 +213,16 @@ def extract_service_insights(sample_lines):
     # Combine all sample lines for analysis
     combined_text = "\n".join(sample_lines)
     
-    # Extract RPC service errors with improved patterns
+    # Extract RPC service errors with more precise patterns
     rpc_services = set()
     rpc_patterns = [
         r'lookup\s+([a-zA-Z][a-zA-Z0-9\-\.]*service[a-zA-Z0-9\-\.]*)',  # DNS lookups to services
         r'([a-zA-Z][a-zA-Z0-9\-]*service)[:\s]',  # Service names with service suffix  
-        r'could not (?:retrieve|get|fetch|connect to) ([^:]+):',  # Action + service (non-capturing group for action)
-        r'failed to (?:retrieve|get|fetch|connect to|add to) ([^:]+):',  # Failed actions (non-capturing group for action)
-        r'unable to (?:connect|reach|access) ([^:]+)',  # Connection issues (non-capturing group for action)
-        r'connection refused to ([^:]+)',  # Direct connection refusal
-        r'([a-zA-Z][a-zA-Z0-9\-]*)\s*service',  # Generic service references
+        r'could not (?:retrieve|get|fetch|connect to) ([a-zA-Z][a-zA-Z0-9\-]{2,15}):',  # Action + simple service name
+        r'failed to (?:retrieve|get|fetch|connect to|add to) ([a-zA-Z][a-zA-Z0-9\-]{2,15}):',  # Failed actions with simple service name
+        r'unable to (?:connect|reach|access) ([a-zA-Z][a-zA-Z0-9\-]{2,15})',  # Connection issues with simple service name
+        r'connection refused to ([a-zA-Z][a-zA-Z0-9\-]{2,15})',  # Direct connection refusal to simple service name
+        r'([a-zA-Z][a-zA-Z0-9\-]*)\s*service(?:\s|$|:)',  # Generic service references
     ]
     
     for pattern in rpc_patterns:
@@ -237,29 +237,24 @@ def extract_service_insights(sample_lines):
                         break
                 
                 if service_name:
-                    # Clean up the service name and check exclusions
+                    # Clean up the service name and validate it's actually a service
                     clean_service = service_name.strip().strip('"').strip("'").strip()
-                    if (clean_service and 
-                        clean_service.lower() not in ['retrieve', 'get', 'fetch', 'connect', 'add', 'connect to', 'add to', 'desc', 'code', 'error', 'rpc', 'tcp'] and
-                        not any(action in clean_service.lower() for action in ['retrieve', 'get', 'fetch', 'connect to', 'add to'])):
+                    if _is_valid_service_name(clean_service):
                         rpc_services.add(clean_service)
             else:
                 # Single match - clean and validate
                 clean_service = match.strip().strip('"').strip("'").strip()
-                if (clean_service and 
-                    len(clean_service) > 2 and
-                    clean_service.lower() not in ['retrieve', 'get', 'fetch', 'connect', 'add', 'connect to', 'add to', 'desc', 'code', 'error', 'rpc', 'tcp'] and
-                    not any(action in clean_service.lower() for action in ['retrieve', 'get', 'fetch', 'connect to', 'add to'])):
+                if _is_valid_service_name(clean_service):
                     rpc_services.add(clean_service)
     
-    # Extract common service operation patterns - using non-capturing groups for actions
+    # Extract common service operation patterns - using more precise patterns
     service_operations = {}
     operation_patterns = [
-        (r'could not retrieve ([^:]+)', 'read operations'),
-        (r'failed to add to ([^:]+)', 'write operations'),  
-        (r'failed to (?:save|create|update|delete) ([^:]+)', 'CRUD operations'),
+        (r'could not retrieve ([a-zA-Z][a-zA-Z0-9\-]{2,15})', 'read operations'),
+        (r'failed to add to ([a-zA-Z][a-zA-Z0-9\-]{2,15})', 'write operations'),  
+        (r'failed to (?:save|create|update|delete) ([a-zA-Z][a-zA-Z0-9\-]{2,15})', 'CRUD operations'),
         (r'timeout.*?([a-zA-Z][a-zA-Z0-9\-]*service)', 'timeout issues'),
-        (r'connection refused.*?([a-zA-Z][a-zA-Z0-9\-]+)', 'connection issues'),
+        (r'connection refused.*?([a-zA-Z][a-zA-Z0-9\-]{2,15})', 'connection issues'),
     ]
     
     for pattern, operation_type in operation_patterns:
@@ -267,9 +262,7 @@ def extract_service_insights(sample_lines):
         for match in matches:
             service_name = match if isinstance(match, str) else match[0] if isinstance(match, tuple) else str(match)
             clean_service = service_name.strip().strip('"').strip("'")
-            if (clean_service and 
-                len(clean_service) > 2 and
-                clean_service.lower() not in ['retrieve', 'get', 'fetch', 'connect', 'add', 'connect to', 'add to', 'desc', 'code', 'error', 'rpc', 'tcp']):
+            if _is_valid_service_name(clean_service):
                 if clean_service not in service_operations:
                     service_operations[clean_service] = []
                 service_operations[clean_service].append(operation_type)
@@ -284,15 +277,12 @@ def extract_service_insights(sample_lines):
             clean_service = re.sub(r'\.svc\.cluster\.local.*$', '', clean_service)
             clean_service = clean_service.strip()
             
-            if (len(clean_service) > 2 and 
-                clean_service.lower() not in ['desc', 'code', 'error', 'rpc', 'tcp', 'transport', 'dialing', 'lookup', 'while', 'dial', 'retrieve', 'get', 'fetch', 'connect', 'add', 'connect to', 'add to'] and
-                not clean_service.isdigit() and
-                not any(action in clean_service.lower() for action in ['retrieve', 'get', 'fetch', 'connect to', 'add to'])):
+            if _is_valid_service_name(clean_service):
                 clean_services.append(clean_service)
         
         if clean_services:
             # Limit to most relevant services and format nicely with backticks
-            unique_services = list(set(clean_services))[:4]
+            unique_services = list(set(clean_services))[:3]  # Limit to 3 services
             service_list = ', '.join([f"`{service}`" for service in unique_services])
             insights.append(f"Check the health and availability of downstream services: {service_list}")
             insights.append(f"Verify network connectivity to services: {service_list}")
@@ -327,6 +317,36 @@ def extract_service_insights(sample_lines):
         insights.append(f"Check network connectivity to ports: {port_list}")
     
     return insights[:6]  # Limit to 6 most relevant insights
+
+def _is_valid_service_name(service_name):
+    """Check if a string is likely a valid service name."""
+    if not service_name or len(service_name) < 2 or len(service_name) > 25:
+        return False
+    
+    # Exclude common non-service words and phrases (but not if they're part of valid service names)
+    exclusions = [
+        'retrieve', 'get', 'fetch', 'connect', 'add', 'connect to', 'add to',
+        'desc', 'code', 'error', 'rpc', 'tcp', 'transport', 'dialing', 'lookup', 
+        'while', 'dial', 'during', 'checkout', 'cart during', 'user cart',
+        'user cart during', 'user cart during checkout'
+    ]
+    
+    # Special case: exclude standalone "user" but allow "userservice"
+    if service_name.lower() == 'user':
+        return False
+    
+    # Check exact matches and partial matches for exclusions
+    service_lower = service_name.lower()
+    for exclusion in exclusions:
+        if service_lower == exclusion or (exclusion in service_lower and not service_name.endswith('service')):
+            return False
+    
+    # Service names should be simple identifiers or end with 'service'
+    if (re.match(r'^[a-zA-Z][a-zA-Z0-9\-]*$', service_name) and 
+        (service_name.endswith('service') or len(service_name) <= 15)):
+        return True
+    
+    return False
 
 def group_similar_lines(lines, similarity_threshold=0.8):
     """Group similar log lines together to reduce repetition."""
