@@ -218,9 +218,9 @@ def extract_service_insights(sample_lines):
     rpc_patterns = [
         r'lookup\s+([a-zA-Z][a-zA-Z0-9\-\.]*service[a-zA-Z0-9\-\.]*)',  # DNS lookups to services
         r'([a-zA-Z][a-zA-Z0-9\-]*service)[:\s]',  # Service names with service suffix  
-        r'could not (retrieve|get|fetch|connect to) ([^:]+):',  # Action + service
-        r'failed to (retrieve|get|fetch|connect to|add to) ([^:]+):',  # Failed actions
-        r'unable to (connect|reach|access) ([^:]+)',  # Connection issues
+        r'could not (?:retrieve|get|fetch|connect to) ([^:]+):',  # Action + service (non-capturing group for action)
+        r'failed to (?:retrieve|get|fetch|connect to|add to) ([^:]+):',  # Failed actions (non-capturing group for action)
+        r'unable to (?:connect|reach|access) ([^:]+)',  # Connection issues (non-capturing group for action)
         r'connection refused to ([^:]+)',  # Direct connection refusal
         r'([a-zA-Z][a-zA-Z0-9\-]*)\s*service',  # Generic service references
     ]
@@ -229,24 +229,35 @@ def extract_service_insights(sample_lines):
         matches = re.findall(pattern, combined_text, re.IGNORECASE)
         for match in matches:
             if isinstance(match, tuple):
-                # Extract the service name from tuple matches
-                service_candidates = [m for m in match if m and not m.isdigit() and len(m) > 2]
-                for candidate in service_candidates:
-                    # Clean up the service name
-                    clean_service = candidate.strip().strip('"').strip("'").strip()
-                    if clean_service and clean_service.lower() not in ['retrieve', 'get', 'fetch', 'connect', 'add', 'desc', 'code', 'error', 'rpc', 'tcp']:
+                # For tuple matches, take the last non-empty element (should be the service name)
+                service_name = None
+                for m in reversed(match):
+                    if m and not m.isdigit() and len(m.strip()) > 2:
+                        service_name = m.strip()
+                        break
+                
+                if service_name:
+                    # Clean up the service name and check exclusions
+                    clean_service = service_name.strip().strip('"').strip("'").strip()
+                    if (clean_service and 
+                        clean_service.lower() not in ['retrieve', 'get', 'fetch', 'connect', 'add', 'connect to', 'add to', 'desc', 'code', 'error', 'rpc', 'tcp'] and
+                        not any(action in clean_service.lower() for action in ['retrieve', 'get', 'fetch', 'connect to', 'add to'])):
                         rpc_services.add(clean_service)
             else:
+                # Single match - clean and validate
                 clean_service = match.strip().strip('"').strip("'").strip()
-                if clean_service and len(clean_service) > 2:
+                if (clean_service and 
+                    len(clean_service) > 2 and
+                    clean_service.lower() not in ['retrieve', 'get', 'fetch', 'connect', 'add', 'connect to', 'add to', 'desc', 'code', 'error', 'rpc', 'tcp'] and
+                    not any(action in clean_service.lower() for action in ['retrieve', 'get', 'fetch', 'connect to', 'add to'])):
                     rpc_services.add(clean_service)
     
-    # Extract common service operation patterns
+    # Extract common service operation patterns - using non-capturing groups for actions
     service_operations = {}
     operation_patterns = [
-        (r'could not retrieve (\w+)', 'read operations'),
-        (r'failed to add to (\w+)', 'write operations'),  
-        (r'failed to (save|create|update|delete) ([^:]+)', 'CRUD operations'),
+        (r'could not retrieve ([^:]+)', 'read operations'),
+        (r'failed to add to ([^:]+)', 'write operations'),  
+        (r'failed to (?:save|create|update|delete) ([^:]+)', 'CRUD operations'),
         (r'timeout.*?([a-zA-Z][a-zA-Z0-9\-]*service)', 'timeout issues'),
         (r'connection refused.*?([a-zA-Z][a-zA-Z0-9\-]+)', 'connection issues'),
     ]
@@ -254,9 +265,11 @@ def extract_service_insights(sample_lines):
     for pattern, operation_type in operation_patterns:
         matches = re.findall(pattern, combined_text, re.IGNORECASE)
         for match in matches:
-            service_name = match if isinstance(match, str) else match[1] if len(match) > 1 else match[0]
+            service_name = match if isinstance(match, str) else match[0] if isinstance(match, tuple) else str(match)
             clean_service = service_name.strip().strip('"').strip("'")
-            if clean_service and len(clean_service) > 2:
+            if (clean_service and 
+                len(clean_service) > 2 and
+                clean_service.lower() not in ['retrieve', 'get', 'fetch', 'connect', 'add', 'connect to', 'add to', 'desc', 'code', 'error', 'rpc', 'tcp']):
                 if clean_service not in service_operations:
                     service_operations[clean_service] = []
                 service_operations[clean_service].append(operation_type)
@@ -272,8 +285,9 @@ def extract_service_insights(sample_lines):
             clean_service = clean_service.strip()
             
             if (len(clean_service) > 2 and 
-                clean_service.lower() not in ['desc', 'code', 'error', 'rpc', 'tcp', 'transport', 'dialing', 'lookup', 'while', 'dial'] and
-                not clean_service.isdigit()):
+                clean_service.lower() not in ['desc', 'code', 'error', 'rpc', 'tcp', 'transport', 'dialing', 'lookup', 'while', 'dial', 'retrieve', 'get', 'fetch', 'connect', 'add', 'connect to', 'add to'] and
+                not clean_service.isdigit() and
+                not any(action in clean_service.lower() for action in ['retrieve', 'get', 'fetch', 'connect to', 'add to'])):
                 clean_services.append(clean_service)
         
         if clean_services:

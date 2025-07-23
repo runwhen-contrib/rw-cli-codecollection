@@ -341,22 +341,23 @@ class K8sLog:
                     'could not' in line or
                     'exception' in line.lower()):
                     
-                    # Truncate very long lines but preserve important content
-                    if len(line) > 120:
+                    # More generous truncation - show more content
+                    if len(line) > 180:
                         # Find a good truncation point around service names or error messages
-                        truncate_at = 120
+                        truncate_at = 180
                         if '"error"' in line:
                             error_pos = line.find('"error"')
-                            if error_pos < 100:
-                                truncate_at = min(error_pos + 80, len(line))
+                            if error_pos < 120:
+                                # Try to show more of the error message
+                                truncate_at = min(error_pos + 120, len(line))
                         return line[:truncate_at] + "..."
                     return line
         
-        # Fallback: get first non-empty line
+        # Fallback: get first non-empty line with more generous truncation
         for line in lines:
             line = line.strip()
             if line and not line.startswith('Pod:') and not line.startswith('**'):
-                return line[:100] + "..." if len(line) > 100 else line
+                return line[:150] + "..." if len(line) > 150 else line
         
         return None
     
@@ -371,8 +372,8 @@ class K8sLog:
         priority_patterns = [
             r'Check.*?services?:\s*([^.]+)',
             r'Investigate\s+([^.]+service[^.]*)',
-            r'Verify.*?connectivity.*?to\s+([^.]+)',
-            r'Review\s+([^.]+service[^.]*)',
+            r'Verify.*?connectivity.*?to\s+services?:\s*([^.]+)',
+            r'Review.*?service discovery.*?for:\s*([^.]+)',
         ]
         
         for line in lines:
@@ -380,9 +381,12 @@ class K8sLog:
                 match = re.search(pattern, line, re.IGNORECASE)
                 if match:
                     service_info = match.group(1).strip()
-                    # Wrap suspected entity names in backticks if they aren't already
-                    service_info = self._wrap_entities_in_backticks(service_info)
-                    return f"Focus on {service_info}"
+                    # Clean up service info to remove action phrases
+                    service_info = self._clean_service_info(service_info)
+                    if service_info:  # Only proceed if we have clean service info
+                        # Wrap suspected entity names in backticks if they aren't already
+                        service_info = self._wrap_entities_in_backticks(service_info)
+                        return f"Focus on {service_info}"
         
         # Fallback: return first meaningful action with entity formatting
         for line in lines:
@@ -390,9 +394,32 @@ class K8sLog:
             if line and len(line) > 10 and not line.startswith('Review logs'):
                 # Apply entity formatting to the fallback line
                 formatted_line = self._wrap_entities_in_backticks(line)
-                return formatted_line[:80] + "..." if len(formatted_line) > 80 else formatted_line
+                return formatted_line[:120] + "..." if len(formatted_line) > 120 else formatted_line
         
         return None
+    
+    def _clean_service_info(self, service_info: str) -> str:
+        """Clean service info to remove action phrases and noise."""
+        if not service_info:
+            return ""
+            
+        # Split by common separators and filter out action phrases
+        parts = [part.strip().strip('`') for part in re.split(r'[,;]', service_info)]
+        clean_parts = []
+        
+        action_phrases = ['add to', 'connect to', 'retrieve', 'get', 'fetch', 'connect', 'add']
+        
+        for part in parts:
+            part = part.strip()
+            if (part and 
+                len(part) > 2 and
+                part.lower() not in action_phrases and
+                not any(phrase in part.lower() for phrase in action_phrases)):
+                clean_parts.append(part)
+        
+        if clean_parts:
+            return ', '.join(clean_parts[:4])  # Limit to 4 services
+        return ""
     
     def _wrap_entities_in_backticks(self, text: str) -> str:
         """Wrap suspected entity names in backticks if not already wrapped."""
