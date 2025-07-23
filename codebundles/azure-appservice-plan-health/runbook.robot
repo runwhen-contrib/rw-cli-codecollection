@@ -42,9 +42,9 @@ Check Azure App Service Plan Resource Health in resource group `${AZURE_RESOURCE
                 ...    severity=3
                 ...    expected=Azure App Service Plan `${plan_name}` should have health status of `Available` in resource group `${AZURE_RESOURCE_GROUP}` 
                 ...    actual=Azure App Service Plan `${plan_name}` has health status of `${health_status}` in resource group `${AZURE_RESOURCE_GROUP}` 
-                ...    title=Azure App Service Plan `${plan_name}` with Health Status of `${health_status}` found in Resource Group `${AZURE_RESOURCE_GROUP}` 
-                ...    reproduce_hint=${output.cmd}
-                ...    details=${pretty_health}
+                ...    title=Azure App Service Plan `${plan_name}` with Health Status of `${health_status}` found in Resource Group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    reproduce_hint=${output.cmd}"subscription_name": "${AZURE_SUBSCRIPTION_NAME}"
+                ...    details={"health": ${pretty_health}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    next_steps=Investigate the health status of the Azure App Service Plan in resource group `${AZURE_RESOURCE_GROUP}` 
             END
         END
@@ -53,9 +53,9 @@ Check Azure App Service Plan Resource Health in resource group `${AZURE_RESOURCE
         ...    severity=4
         ...    expected=Azure App Service Plan health should be enabled in resource group `${AZURE_RESOURCE_GROUP}`
         ...    actual=Azure App Service Plan health appears unavailable in resource group `${AZURE_RESOURCE_GROUP}`
-        ...    title=Azure resource health is unavailable for App Service Plan in resource group `${AZURE_RESOURCE_GROUP}`
+        ...    title=Azure resource health is unavailable for App Service Plan in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
         ...    reproduce_hint=${output.cmd}
-        ...    details=${health_list}
+        ...    details={"health_list": ${health_list}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
     END
 
@@ -89,9 +89,9 @@ Check App Service Plan Capacity and Recommendations in resource group `${AZURE_R
             RW.Core.Add Issue
             ...    severity=3
             ...    expected=App Service Plan should not have high resource usage
-            ...    actual=High resource usage detected in App Service Plan ${plan['name']} in resource group ${plan['resourceGroup']}
-            ...    title=High Resource Usage in App Service Plan ${plan['name']} in resource group ${plan['resourceGroup']}
-            ...    details=${plan}
+            ...    actual=High resource usage detected in App Service Plan `${plan['name']}` in resource group `${plan['resourceGroup']}`
+            ...    title=High Resource Usage in App Service Plan `${plan['name']}` in resource group `${plan['resourceGroup']}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    details={"plan": ${plan}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=Consider scaling up the App Service Plan or optimizing the application code.
             ...    reproduce_hint=${script_output.cmd}
         END
@@ -125,9 +125,9 @@ Check App Service Plan Capacity and Recommendations in resource group `${AZURE_R
             RW.Core.Add Issue
             ...    severity=4
             ...    expected=App Service Plan should be optimally configured for current usage
-            ...    actual=Scaling recommendations available for App Service Plan ${plan['name']} in resource group ${plan['resourceGroup']}
-            ...    title=Scaling Recommendations for App Service Plan ${plan['name']} in resource group ${plan['resourceGroup']}
-            ...    details=${plan}
+            ...    actual=Scaling recommendations available for App Service Plan `${plan['name']}` in resource group `${plan['resourceGroup']}`
+            ...    title=Scaling Recommendations for App Service Plan `${plan['name']}` in resource group `${plan['resourceGroup']}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    details={"plan": ${plan}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=${joined_recommendations}
             ...    reproduce_hint=${script_output.cmd}
         END
@@ -199,9 +199,9 @@ Check App Service Plan Changes in resource group `${AZURE_RESOURCE_GROUP}`
                 RW.Core.Add Issue
                 ...    severity=${severity}
                 ...    expected=App Service Plan operations should be reviewed for security implications in resource group `${AZURE_RESOURCE_GROUP}`
-                ...    actual=${security_level.lower()} security operation detected: ${operation} by ${caller} at ${timestamp} on App Service Plan `${asp_name}`
-                ...    title=App Service Plan Change - ${security_level} Security: ${operation} on `${asp_name}` in Resource Group `${AZURE_RESOURCE_GROUP}`
-                ...    details=${enhanced_details}
+                ...    actual=${security_level.lower()} security operation detected: `${operation}` by `${caller}` at `${timestamp}` on App Service Plan `${asp_name}`
+                ...    title=App Service Plan Change `${security_level}` Security: `${operation}` on `${asp_name}` in Resource Group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    details={"changes": ${change}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    reproduce_hint=${audit_cmd.cmd}
                 ...    next_steps=Review the operation for security implications.
             END
@@ -235,9 +235,9 @@ Check App Service Plan Changes in resource group `${AZURE_RESOURCE_GROUP}`
                 RW.Core.Add Issue
                 ...    severity=4
                 ...    expected=App Service Plan operations should complete successfully in resource group `${AZURE_RESOURCE_GROUP}`
-                ...    actual=Failed operation detected: ${operation} by ${caller} at ${timestamp} on App Service Plan `${asp_name}`
-                ...    title=App Service Plan Failed Operation: ${operation} on `${asp_name}` in Resource Group `${AZURE_RESOURCE_GROUP}`
-                ...    details=${enhanced_details}
+                ...    actual=Failed operation detected: `${operation}` by `${caller}` at `${timestamp}` on App Service Plan `${asp_name}`
+                ...    title=App Service Plan Failed Operation: `${operation}` on `${asp_name}` in Resource Group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    details={"details": ${enhanced_details}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    reproduce_hint=${audit_cmd.cmd}
                 ...    next_steps=Investigate the failed operation.
             END
@@ -263,6 +263,11 @@ Suite Initialization
     ${AZURE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_ID
     ...    type=string
     ...    description=The Azure Subscription ID for the resource.  
+    ...    pattern=\w*
+    ...    default=""
+    ${AZURE_SUBSCRIPTION_NAME}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_NAME
+    ...    type=string
+    ...    description=Azure subscription name.
     ...    pattern=\w*
     ...    default=""
     ${AZURE_ACTIVITY_LOG_OFFSET}=    RW.Core.Import User Variable    AZURE_ACTIVITY_LOG_OFFSET
@@ -327,6 +332,7 @@ Suite Initialization
     Set Suite Variable    ${SCALE_DOWN_MEMORY_THRESHOLD}    ${SCALE_DOWN_MEMORY_THRESHOLD}
     Set Suite Variable    ${METRICS_OFFSET}    ${METRICS_OFFSET}
     Set Suite Variable    ${METRICS_INTERVAL}    ${METRICS_INTERVAL}
+    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable
     ...    ${env}
     ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "CPU_THRESHOLD":"${CPU_THRESHOLD}", "MEMORY_THRESHOLD":"${MEMORY_THRESHOLD}", "DISK_QUEUE_THRESHOLD":"${DISK_QUEUE_THRESHOLD}", "SCALE_UP_CPU_THRESHOLD":"${SCALE_UP_CPU_THRESHOLD}", "SCALE_UP_MEMORY_THRESHOLD":"${SCALE_UP_MEMORY_THRESHOLD}", "SCALE_DOWN_CPU_THRESHOLD":"${SCALE_DOWN_CPU_THRESHOLD}", "SCALE_DOWN_MEMORY_THRESHOLD":"${SCALE_DOWN_MEMORY_THRESHOLD}", "METRICS_OFFSET":"${METRICS_OFFSET}", "METRICS_INTERVAL":"${METRICS_INTERVAL}", "AZURE_ACTIVITY_LOG_OFFSET": "${AZURE_ACTIVITY_LOG_OFFSET}"}
