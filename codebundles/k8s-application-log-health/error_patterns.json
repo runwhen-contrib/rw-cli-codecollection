@@ -1,4 +1,66 @@
 {
+  "infrastructure_filters": [
+    {
+      "name": "calico_typha_normal",
+      "pattern": "(?i)(sync_server\\.go|typha|felix|calico).*(?:Accepted from|New connection|Per-connection goroutine|Received Hello|Received ACK|Restarting encoding|Starting to write snapshot|Finished writing snapshot|Sent compressed binary snapshot|Waiting for messages|Calculated end of client|Status update to send|in-sync)",
+      "description": "Normal Calico Typha operational logs showing healthy synchronization",
+      "exclude": true
+    },
+    {
+      "name": "calico_felix_normal", 
+      "pattern": "(?i)(felix|calico).*(?:Starting|Started|Connected|Synced|Ready|Healthy|Running)",
+      "description": "Normal Calico Felix agent operational logs",
+      "exclude": true
+    },
+    {
+      "name": "kube_proxy_normal",
+      "pattern": "(?i)(kube-proxy).*(?:Starting|Started|Connected|Synced|Ready|Healthy|Running|Iptables|Rules|Endpoints)",
+      "description": "Normal kube-proxy operational logs",
+      "exclude": true
+    },
+    {
+      "name": "coredns_normal",
+      "pattern": "(?i)(coredns).*(?:Starting|Started|Ready|Healthy|Running|Query|Response|Cache)",
+      "description": "Normal CoreDNS operational logs",
+      "exclude": true
+    },
+    {
+      "name": "metrics_server_normal",
+      "pattern": "(?i)(metrics-server).*(?:Starting|Started|Ready|Healthy|Running|Scraping|Metrics)",
+      "description": "Normal metrics-server operational logs",
+      "exclude": true
+    },
+    {
+      "name": "ingress_controller_normal",
+      "pattern": "(?i)(ingress|nginx|traefik).*(?:Starting|Started|Ready|Healthy|Running|Reload|Configuration)",
+      "description": "Normal ingress controller operational logs",
+      "exclude": true
+    },
+    {
+      "name": "storage_provisioner_normal",
+      "pattern": "(?i)(storage|provisioner|csi).*(?:Starting|Started|Ready|Healthy|Running|Provisioning|Attaching)",
+      "description": "Normal storage provisioner operational logs",
+      "exclude": true
+    },
+    {
+      "name": "node_exporter_normal",
+      "pattern": "(?i)(node-exporter|prometheus).*(?:Starting|Started|Ready|Healthy|Running|Scraping|Metrics)",
+      "description": "Normal monitoring agent operational logs",
+      "exclude": true
+    },
+    {
+      "name": "fluentd_normal",
+      "pattern": "(?i)(fluentd|fluent-bit).*(?:Starting|Started|Ready|Healthy|Running|Forwarding|Buffering)",
+      "description": "Normal logging agent operational logs",
+      "exclude": true
+    },
+    {
+      "name": "istio_normal",
+      "pattern": "(?i)(istio|pilot|mixer|citadel).*(?:Starting|Started|Ready|Healthy|Running|Configuration|Policy)",
+      "description": "Normal Istio service mesh operational logs",
+      "exclude": true
+    }
+  ],
   "patterns": [
     {
       "match": "error=connection closed before message completed",

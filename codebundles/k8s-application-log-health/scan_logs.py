@@ -83,6 +83,21 @@ def main():
             if not log_content.strip() or re.match(r'^\s*"errors":\s*\[\s*\]\s*$', log_content.strip()):
                 continue
 
+            # Apply infrastructure filters to exclude normal operational logs
+            infrastructure_filters = error_data.get("infrastructure_filters", [])
+            should_exclude = False
+            
+            for infra_filter in infrastructure_filters:
+                if infra_filter.get("exclude", False):
+                    pattern = infra_filter.get("pattern", "")
+                    if pattern and re.search(pattern, log_content, re.IGNORECASE):
+                        print(f"  Skipping infrastructure log (filter: {infra_filter.get('name', 'unknown')})")
+                        should_exclude = True
+                        break
+            
+            if should_exclude:
+                continue
+
             # Check each pattern
             for pattern_def in error_data.get("patterns", []):
                 category = pattern_def.get("category", "")
