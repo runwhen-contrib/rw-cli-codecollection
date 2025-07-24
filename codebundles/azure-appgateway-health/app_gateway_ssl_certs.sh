@@ -170,7 +170,7 @@ if ! appgw_json=$(az network application-gateway show \
   error_msg=$(cat "$OUTPUT_ERR")
   rm -f "$OUTPUT_ERR"
   log_issue \
-    "Failed to Fetch AppGw \`$APP_GATEWAY_NAME\`" \
+    "Failed to Fetch Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\` in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\`" \
     "$error_msg" \
     "1" \
     "Check CLI permissions or resource name correctness."
@@ -195,7 +195,7 @@ if [[ "$http_listeners_json" == "[]" ]]; then
   if [[ "$http_listeners_json" == "[]" ]]; then
     echo "No .listeners either. Exiting."
     log_issue \
-      "No Listeners Found" \
+      "No Listeners Found for Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\` in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\`" \
       "No .httpListeners or .listeners in AppGw JSON. Possibly a different API version." \
       "3" \
       "Check the raw JSON in Azure Portal or use a different approach."
@@ -301,7 +301,7 @@ all_used_certs=( $(printf "%s\n" "${all_used_certs[@]}" | sort -u) )
 if [[ "${#all_used_certs[@]}" -eq 0 ]]; then
   echo "No SSL cert references found in .sslCertificate or .sslProfile."
   log_issue \
-    "No SSL Certificates in Use" \
+    "No SSL Certificates in Use for Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\` in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\`" \
     "Listeners do not reference any sslCertificate or sslProfile." \
     "3" \
     "If using Key Vault or plain HTTP, this may be expected."
@@ -340,7 +340,7 @@ ssl_certs_json=$(echo "$appgw_json" | jq -c '.sslCertificates[]?')
 if [[ -z "$ssl_certs_json" ]]; then
   echo "No .sslCertificates[] in AppGw. Possibly Key Vault only?"
   log_issue \
-    "No sslCertificates[] in AppGw" \
+    "No sslCertificates[] in Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\` in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\`" \
     "The AppGw has no sslCertificates[] array in its config." \
     "3" \
     "If Key Vault references are used, parse from Key Vault or fallback to live check."
@@ -485,7 +485,7 @@ while IFS= read -r cert_json; do
 
     if [[ "$success" -eq 0 ]]; then
       log_issue \
-        "Cannot Determine Cert Expiry for \`$c_name\`" \
+        "Cannot Determine Cert Expiry for \`$c_name\` in Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\` in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\`" \
         "No .expiry, no parseable publicCertData, and live checks to hostnames/IP failed." \
         "4" \
         "If using Key Vault or a passworded PFX, query Key Vault or re-upload a parseable cert."
@@ -500,13 +500,13 @@ while IFS= read -r cert_json; do
 
   if (( diff_days < 0 )); then
     log_issue \
-      "SSL Certificate \`$c_name\` Expired" \
+      "SSL Certificate \`$c_name\` Expired in Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\` in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\`" \
       "Expired on $(date -d "@$expiry_epoch" +'%Y-%m-%d %H:%M:%S %Z') ($((-diff_days)) days ago)." \
       "2" \
       "Renew or replace immediately."
   elif (( diff_days < warn_days )); then
     log_issue \
-      "SSL Certificate \`$c_name\` Near Expiry" \
+      "SSL Certificate \`$c_name\` Near Expiry in Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\` in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\`" \
       "Expires in $diff_days days ($(date -d "@$expiry_epoch" +'%Y-%m-%d %H:%M:%S %Z'))." \
       "3" \
       "Initiate renewal process for SSL Certificates In App Gateway \`$APP_GATEWAY_NAME\` in \`$AZ_RESOURCE_GROUP\`"
@@ -517,7 +517,110 @@ while IFS= read -r cert_json; do
 done <<< "$ssl_certs_json"
 
 ##################################
-# 6) Output final JSON
+# 6) Additional SSL Configuration Diagnostics for Storage Account Backends
+##################################
+echo "Running additional SSL configuration diagnostics for storage account backends..."
+
+# Get backend health status for SSL hostname mismatch detection
+BACKEND_HEALTH=$(az network application-gateway show-backend-health \
+  --name "$APP_GATEWAY_NAME" \
+  --resource-group "$AZ_RESOURCE_GROUP" \
+  -o json 2>/dev/null)
+
+if [[ -n "$BACKEND_HEALTH" ]]; then
+  # Extract backend pools
+  BACKEND_POOLS=$(echo "$appgw_json" | jq -r '.backendAddressPools[]? | @base64')
+  
+  if [[ -n "$BACKEND_POOLS" ]]; then
+    for pool_data in $BACKEND_POOLS; do
+      pool=$(echo "$pool_data" | base64 --decode)
+      pool_name=$(echo "$pool" | jq -r '.name')
+      
+      # Check if this pool has storage account backends
+      STORAGE_ADDRESSES=$(echo "$pool" | jq -r '.backendAddresses[]? | select(.fqdn | contains(".blob.core.windows.net") or contains(".file.core.windows.net") or contains(".queue.core.windows.net") or contains(".table.core.windows.net")) | .fqdn')
+      
+      if [[ -n "$STORAGE_ADDRESSES" ]]; then
+        echo "  Checking storage account backends in pool: $pool_name"
+        
+        # Extract storage account names
+        for address in $STORAGE_ADDRESSES; do
+          storage_account_name=""
+          if [[ "$address" == *.blob.core.windows.net ]]; then
+            storage_account_name=$(echo "$address" | sed 's/.blob.core.windows.net//')
+            service_type="Blob"
+          elif [[ "$address" == *.file.core.windows.net ]]; then
+            storage_account_name=$(echo "$address" | sed 's/.file.core.windows.net//')
+            service_type="File"
+          elif [[ "$address" == *.queue.core.windows.net ]]; then
+            storage_account_name=$(echo "$address" | sed 's/.queue.core.windows.net//')
+            service_type="Queue"
+          elif [[ "$address" == *.table.core.windows.net ]]; then
+            storage_account_name=$(echo "$address" | sed 's/.table.core.windows.net//')
+            service_type="Table"
+          fi
+          
+          if [[ -n "$storage_account_name" ]]; then
+            echo "    Storage Account: $storage_account_name ($service_type)"
+            
+            # Check if this backend is unhealthy due to SSL certificate hostname mismatch
+            UNHEALTHY_BACKEND=$(echo "$BACKEND_HEALTH" | jq -r --arg pool_name "$pool_name" --arg address "$address" '.backendAddressPools[] | select(.backendAddressPool.name == $pool_name) | .backendHttpSettingsCollection[].servers[] | select(.address == $address and .health != "Healthy") | .healthProbeLog')
+            
+            if [[ -n "$UNHEALTHY_BACKEND" ]] && [[ "$UNHEALTHY_BACKEND" == *"Common Name of the leaf certificate"* ]]; then
+              echo "    ⚠️  SSL Certificate hostname mismatch detected!"
+              
+              # Find the HTTP settings and probe used by this pool
+              HTTP_SETTINGS_NAMES=$(echo "$appgw_json" | jq -r --arg pool_name "$pool_name" '.requestRoutingRules[] | select(.backendAddressPool.name == $pool_name) | .httpSettings.name')
+              
+              for http_settings_name in $HTTP_SETTINGS_NAMES; do
+                if [[ -n "$http_settings_name" ]]; then
+                  echo "      Checking HTTP settings: $http_settings_name"
+                  
+                  # Get HTTP settings configuration
+                  HTTP_SETTINGS=$(echo "$appgw_json" | jq -r --arg name "$http_settings_name" '.backendHttpSettingsCollection[] | select(.name == $name)')
+                  HOSTNAME=$(echo "$HTTP_SETTINGS" | jq -r '.hostName // "NOT_SET"')
+                  
+                  # Check if hostname is incorrect
+                  if [[ "$HOSTNAME" == "NOT_SET" ]] || [[ "$HOSTNAME" == "$address" ]] || [[ "$HOSTNAME" == *".blob.core.windows.net"* ]] || [[ "$HOSTNAME" == *".file.core.windows.net"* ]] || [[ "$HOSTNAME" == *".queue.core.windows.net"* ]] || [[ "$HOSTNAME" == *".table.core.windows.net"* ]]; then
+                    echo "      ❌ Incorrect hostname configuration detected!"
+                    
+                    log_issue \
+                      "SSL Certificate Hostname Mismatch - HTTP Settings for Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\` in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\`" \
+                      "Backend pool '$pool_name' with storage account '$storage_account_name' in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\` has incorrect hostname configuration in HTTP settings '$http_settings_name'. Current hostname: '$HOSTNAME', Expected: '$storage_account_name'" \
+                      "2" \
+                      "Fix HTTP settings hostname: az network application-gateway http-settings update --gateway-name '$APP_GATEWAY_NAME' --resource-group '$AZ_RESOURCE_GROUP' --name '$http_settings_name' --host-name '$storage_account_name'"
+                  fi
+                  
+                  # Check probe configuration
+                  PROBE_NAME=$(echo "$HTTP_SETTINGS" | jq -r '.probe.name // "NOT_SET"')
+                  if [[ "$PROBE_NAME" != "NOT_SET" ]]; then
+                    echo "      Checking probe: $PROBE_NAME"
+                    
+                    PROBE_CONFIG=$(echo "$appgw_json" | jq -r --arg name "$PROBE_NAME" '.probes[] | select(.name == $name)')
+                    PROBE_HOST=$(echo "$PROBE_CONFIG" | jq -r '.host // "NOT_SET"')
+                    
+                    # Check if probe hostname is incorrect
+                    if [[ "$PROBE_HOST" == "NOT_SET" ]] || [[ "$PROBE_HOST" == "$address" ]] || [[ "$PROBE_HOST" == *".blob.core.windows.net"* ]] || [[ "$PROBE_HOST" == *".file.core.windows.net"* ]] || [[ "$PROBE_HOST" == *".queue.core.windows.net"* ]] || [[ "$PROBE_HOST" == *".table.core.windows.net"* ]]; then
+                      echo "        ❌ Incorrect probe hostname configuration detected!"
+                      
+                      log_issue \
+                        "SSL Certificate Hostname Mismatch - Health Probe for Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\` in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\`" \
+                        "Backend pool '$pool_name' with storage account '$storage_account_name' in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\` has incorrect hostname configuration in health probe '$PROBE_NAME'. Current hostname: '$PROBE_HOST', Expected: '$storage_account_name'" \
+                        "2" \
+                        "Fix health probe hostname: az network application-gateway probe update --gateway-name '$APP_GATEWAY_NAME' --resource-group '$AZ_RESOURCE_GROUP' --name '$PROBE_NAME' --host '$storage_account_name'"
+                    fi
+                  fi
+                fi
+              done
+            fi
+          fi
+        done
+      fi
+    done
+  fi
+fi
+
+##################################
+# 7) Output final JSON
 ##################################
 echo "SSL certificate check completed. Saving results to $OUTPUT_FILE"
 echo "$issues_json" > "$OUTPUT_FILE"

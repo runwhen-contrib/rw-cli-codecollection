@@ -183,8 +183,8 @@ else
                 # If the health is not "Healthy", create an issue
                 if [ "$health" != "Healthy" ]; then
                     # Title: "Unhealthy App Service Backend in Resource Group `myRG`"
-                    issue_title="Unhealthy $resource_type Backend in Resource Group \`$resource_group_from_lookup\`"
-                    issue_details="The backend pool '$pool_name' with address '$address' is failing health checks.${newline}Health Probe Log: $log"
+                    issue_title="Unhealthy $resource_type Backend in Resource Group \`$resource_group_from_lookup\` in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\`"
+                    issue_details="The backend pool '$pool_name' with address '$address' is failing health checks in Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\` in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\`.${newline}Health Probe Log: $log"
                     issues_json=$(echo "$issues_json" | jq \
                         --arg title "$issue_title" \
                         --arg details "$issue_details" \
