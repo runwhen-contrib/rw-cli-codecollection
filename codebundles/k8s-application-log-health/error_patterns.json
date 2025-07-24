@@ -10,12 +10,30 @@
       ]
     },
     {
-      "match": "(?i)error", 
+      "match": "(?i)error(?!\"\\s*:\\s*\\[\\s*\\])", 
       "category": "GenericError",
       "severity": 3,
       "next_steps": [
         "Review logs for generic error messages in ${WORKLOAD_TYPE} ${WORKLOAD_NAME} in namespace ${NAMESPACE}",
         "Identify if they indicate operational issues or known warnings"
+      ]
+    },
+    {
+      "match": "(?i)Request failed", 
+      "category": "GenericError",
+      "severity": 3,
+      "next_steps": [
+        "Review logs for request failures in ${WORKLOAD_TYPE} ${WORKLOAD_NAME} in namespace ${NAMESPACE}",
+        "Check HTTP status codes and response details"
+      ]
+    },
+    {
+      "match": "(?i)RethrownError", 
+      "category": "GenericError",
+      "severity": 3,
+      "next_steps": [
+        "Review logs for rethrown errors in ${WORKLOAD_TYPE} ${WORKLOAD_NAME} in namespace ${NAMESPACE}",
+        "Check the original error that was rethrown"
       ]
     },
     {

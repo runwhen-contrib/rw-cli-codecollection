@@ -99,8 +99,17 @@ def main():
                     if not line.strip() or re.match(r'^\s*"errors":\s*\[\s*\]\s*$', line.strip()):
                         continue
                     
+                    # Additional filtering for "errors":[] patterns in JSON
+                    if re.search(r'"errors"\s*:\s*\[\s*\]', line.strip()):
+                        continue
+                    
                     if re.search(pattern, line, re.IGNORECASE):
-                        matched_lines.append(line.strip())
+                        # Get context around this line (5 lines before and after)
+                        context_lines = get_context_around_line(log_content.splitlines(), line.strip())
+                        matched_lines.append({
+                            'line': line.strip(),
+                            'context': context_lines
+                        })
 
                 if matched_lines:
                     # Group similar lines to avoid repetition
@@ -152,13 +161,24 @@ def main():
                 for group in grouped_lines:
                     sample_line = group["sample"]
                     count = group["count"]
+                    context_lines = group.get("context", [])
                     total_occurrences += count
                     sample_lines.append(sample_line)
                     
                     if count > 1:
-                        details_parts.append(f"Pod: {pod} ({container}) - {count}x occurrences of pattern:\n{sample_line}")
+                        details_parts.append(f"Pod: {pod} ({container}) - {count}x occurrences of pattern:")
                     else:
-                        details_parts.append(f"Pod: {pod} ({container}):\n{sample_line}")
+                        details_parts.append(f"Pod: {pod} ({container}):")
+                    
+                    # Add the sample line
+                    details_parts.append(f"{sample_line}")
+                    
+                    # Add context if available
+                    if context_lines:
+                        details_parts.append("Context (5 lines before/after):")
+                        details_parts.extend(context_lines)
+                    
+                    details_parts.append("")  # Add spacing between groups
 
             # Analyze sample lines for service-specific insights
             service_insights = extract_service_insights(sample_lines)
@@ -284,9 +304,11 @@ def extract_service_insights(sample_lines):
             # Limit to most relevant services and format nicely with backticks
             unique_services = list(set(clean_services))[:3]  # Limit to 3 services
             service_list = ', '.join([f"`{service}`" for service in unique_services])
-            insights.append(f"Check the health and availability of downstream services: {service_list}")
-            insights.append(f"Verify network connectivity to services: {service_list}")
-            insights.append(f"Review service discovery and DNS resolution for: {service_list}")
+            
+            # Provide meaningful guidance without specific commands
+            insights.append(f"Check if {service_list} service pods are running and healthy")
+            insights.append(f"Review recent logs from {service_list} for error patterns")
+            insights.append(f"Verify {service_list} service endpoints are properly configured")
     
     # Add specific operation-based guidance with backticks
     if service_operations:
@@ -296,25 +318,25 @@ def extract_service_insights(sample_lines):
             clean_service = clean_service.strip()
             
             if 'read operations' in operations:
-                insights.append(f"Investigate `{clean_service}` service - read operations are failing") 
+                insights.append(f"Check {clean_service} service health endpoints and response times") 
             if 'write operations' in operations:
-                insights.append(f"Check `{clean_service}` service capacity and write permissions")
+                insights.append(f"Verify {clean_service} service has proper storage and write permissions")
             if 'timeout issues' in operations:
-                insights.append(f"Review `{clean_service}` service performance and timeout configurations")
+                insights.append(f"Review {clean_service} service resource usage and performance")
     
     # Extract specific error codes and provide guidance
     if 'code = Unavailable' in combined_text:
-        insights.append("Service unavailable errors detected - check if target services are running and accessible")
+        insights.append("Verify all service endpoints are populated and target services are running")
     if 'code = DeadlineExceeded' in combined_text:
-        insights.append("Deadline exceeded errors detected - review service response times and timeout settings")
+        insights.append("Check if pods are resource-constrained or experiencing high load")
     if 'connection refused' in combined_text.lower():
-        insights.append("Connection refused errors detected - verify target service ports and firewall rules")
+        insights.append("Verify service ports and network policies allow proper connectivity")
         
     # Extract port numbers for network troubleshooting with backticks
     ports = set(re.findall(r':(\d{4,5})', combined_text))
     if ports:
         port_list = ', '.join([f"`{port}`" for port in sorted(ports)[:3]])  # Limit to 3 ports
-        insights.append(f"Check network connectivity to ports: {port_list}")
+        insights.append(f"Test connectivity to ports {port_list} from affected pods")
     
     return insights[:6]  # Limit to 6 most relevant insights
 
@@ -348,6 +370,25 @@ def _is_valid_service_name(service_name):
     
     return False
 
+def get_context_around_line(all_lines, target_line, context_size=5):
+    """Get context lines around a target line."""
+    try:
+        target_index = all_lines.index(target_line)
+        start_index = max(0, target_index - context_size)
+        end_index = min(len(all_lines), target_index + context_size + 1)
+        
+        context_lines = []
+        for i in range(start_index, end_index):
+            if i == target_index:
+                context_lines.append(f">>> {all_lines[i]} <<<")  # Highlight the matched line
+            else:
+                context_lines.append(f"    {all_lines[i]}")
+        
+        return context_lines
+    except ValueError:
+        # If target line not found, return just the line itself
+        return [f">>> {target_line} <<<"]
+
 def group_similar_lines(lines, similarity_threshold=0.8):
     """Group similar log lines together to reduce repetition."""
     if not lines:
@@ -356,25 +397,52 @@ def group_similar_lines(lines, similarity_threshold=0.8):
     groups = []
     used_indices = set()
     
-    for i, line in enumerate(lines):
+    for i, line_data in enumerate(lines):
         if i in used_indices:
             continue
             
+        # Extract the actual line content for similarity comparison
+        if isinstance(line_data, dict):
+            line_content = line_data['line']
+        else:
+            line_content = line_data
+            
         # Start a new group with this line
-        group = {"sample": line, "count": 1, "similar": [line]}
+        group = {"sample": line_content, "count": 1, "similar": [line_data], "context": []}
         used_indices.add(i)
         
         # Find similar lines
-        for j, other_line in enumerate(lines):
+        for j, other_line_data in enumerate(lines):
             if j <= i or j in used_indices:
                 continue
                 
+            # Extract the actual line content for similarity comparison
+            if isinstance(other_line_data, dict):
+                other_line_content = other_line_data['line']
+            else:
+                other_line_content = other_line_data
+                
             # Calculate similarity
-            similarity = SequenceMatcher(None, line, other_line).ratio()
+            similarity = SequenceMatcher(None, line_content, other_line_content).ratio()
             if similarity >= similarity_threshold:
                 group["count"] += 1
-                group["similar"].append(other_line)
+                group["similar"].append(other_line_data)
                 used_indices.add(j)
+        
+        # Collect context from all similar lines
+        for similar_line_data in group["similar"]:
+            if isinstance(similar_line_data, dict) and 'context' in similar_line_data:
+                group["context"].extend(similar_line_data['context'])
+        
+        # Remove duplicates from context while preserving order
+        seen_context = set()
+        unique_context = []
+        for ctx_line in group["context"]:
+            if ctx_line not in seen_context:
+                unique_context.append(ctx_line)
+                seen_context.add(ctx_line)
+        
+        group["context"] = unique_context[:20]  # Limit context to 20 lines max
         
         groups.append(group)
     
