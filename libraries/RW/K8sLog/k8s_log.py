@@ -216,7 +216,7 @@ class K8sLog:
             issue_details: Raw issue details to summarize
             
         Returns:
-            Summarized and formatted issue details
+            Summarized and formatted issue details with full log content
         """
         if not self.temp_dir:
             self.temp_dir = tempfile.mkdtemp(prefix="k8s_log_analysis_")
@@ -239,14 +239,17 @@ class K8sLog:
                                   capture_output=True, text=True, timeout=60)
             
             if result.returncode == 0:
+                # Return the full summarized content without truncation
                 return result.stdout
             else:
                 logger.warn(f"Summary generation failed: {result.stderr}")
-                return str(issue_details)[:1000] + "..." if len(str(issue_details)) > 1000 else str(issue_details)
+                # Return the full issue details without truncation
+                return str(issue_details)
                 
         except Exception as e:
             logger.warn(f"Summary generation error: {str(e)}")
-            return str(issue_details)[:1000] + "..." if len(str(issue_details)) > 1000 else str(issue_details)
+            # Return the full issue details without truncation
+            return str(issue_details)
     
     @keyword
     def format_scan_results_for_display(self, scan_results: Dict[str, Any]) -> str:
@@ -298,6 +301,13 @@ class K8sLog:
                 if sample_line:
                     output_parts.append(f"  • Sample: {sample_line}")
             
+            # Add context sample
+            context_sample = self._extract_context_sample(details)
+            if context_sample:
+                output_parts.append("  • Context:")
+                for line in context_sample:
+                    output_parts.append(f"    {line}")
+            
             # Add service-specific next steps if available
             next_steps = self._safe_get(issue, 'next_steps', '')
             if next_steps:
@@ -332,6 +342,7 @@ class K8sLog:
                 not line.startswith('Pod:') and 
                 not line.startswith('**') and
                 not line.startswith('Container:') and
+                not line.startswith('Context') and
                 len(line) > 10):
                 
                 # Look for structured log data or error messages
@@ -339,27 +350,45 @@ class K8sLog:
                     'rpc error' in line or 
                     'failed to' in line or
                     'could not' in line or
-                    'exception' in line.lower()):
+                    'exception' in line.lower() or
+                    'Request failed' in line or
+                    'RethrownError' in line):
                     
-                    # Much more generous truncation - show most of the error message
-                    if len(line) > 250:
-                        # Find a good truncation point around complete error descriptions
-                        truncate_at = 250
-                        if '"error"' in line:
-                            error_pos = line.find('"error"')
-                            if error_pos < 150:
-                                # Try to show complete error message if possible
-                                truncate_at = min(error_pos + 180, len(line))
-                        return line[:truncate_at] + "..."
+                    # Return the complete line without any truncation
                     return line
         
-        # Fallback: get first non-empty line with generous truncation
+        # Fallback: get first non-empty line without truncation
         for line in lines:
             line = line.strip()
-            if line and not line.startswith('Pod:') and not line.startswith('**'):
-                return line[:200] + "..." if len(line) > 200 else line
+            if line and not line.startswith('Pod:') and not line.startswith('**') and not line.startswith('Context'):
+                return line
         
         return None
+    
+    def _extract_context_sample(self, details: str) -> list:
+        """Extract context lines from issue details."""
+        if not details:
+            return []
+            
+        lines = details.split('\n')
+        context_lines = []
+        in_context = False
+        
+        for line in lines:
+            line = line.strip()
+            if line.startswith("Context (5 lines before/after):"):
+                in_context = True
+                continue
+            elif in_context and line == "":
+                in_context = False
+                break
+            elif in_context and line:
+                context_lines.append(line)
+        
+        # Return first few context lines if available
+        if context_lines:
+            return context_lines[:6]  # Show up to 6 context lines
+        return []
     
     def _extract_service_steps(self, next_steps: str) -> str:
         """Extract the most important service-specific action from next steps."""
@@ -387,7 +416,7 @@ class K8sLog:
                         # Ensure proper backtick wrapping
                         if not service_info.startswith('`'):
                             service_info = self._wrap_entities_in_backticks(service_info)
-                        return f"Focus on {service_info}"
+                        return f"Check {service_info} service status"
         
         # Fallback: return first meaningful action with entity formatting
         for line in lines:

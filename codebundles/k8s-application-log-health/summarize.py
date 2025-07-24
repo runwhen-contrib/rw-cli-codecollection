@@ -117,6 +117,13 @@ def format_issue_summary(issue):
     if sample_line:
         summary_parts.append(f"  Sample: {sample_line}")
     
+    # Add context information if available
+    context_lines = extract_context_sample(details)
+    if context_lines:
+        summary_parts.append("  Context:")
+        for ctx_line in context_lines:
+            summary_parts.append(f"    {ctx_line}")
+    
     summary_parts.append("")  # Add spacing
     return "\n".join(summary_parts)
 
@@ -143,13 +150,33 @@ def extract_sample_line(details_text):
     # Look for lines that don't start with "Pod:" - these are likely log content
     for line in lines:
         line = line.strip()
-        if line and not line.startswith("Pod:") and not line.startswith("**"):
-            # Truncate very long lines
-            if len(line) > 100:
-                return line[:97] + "..."
+        if line and not line.startswith("Pod:") and not line.startswith("**") and not line.startswith("Context"):
+            # Return the complete line without truncation
             return line
     
     return None
+
+def extract_context_sample(details_text):
+    """Extract a sample of context lines from the details."""
+    lines = details_text.split('\n')
+    context_lines = []
+    in_context = False
+    
+    for line in lines:
+        line = line.strip()
+        if line.startswith("Context (5 lines before/after):"):
+            in_context = True
+            continue
+        elif in_context and line == "":
+            in_context = False
+            break
+        elif in_context and line:
+            context_lines.append(line)
+    
+    # Return first few context lines if available
+    if context_lines:
+        return context_lines[:8]  # Show up to 8 context lines
+    return []
 
 
 def decode_top_level(text):

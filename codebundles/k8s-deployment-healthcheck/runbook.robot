@@ -223,10 +223,9 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
         FOR    ${issue}    IN    @{issues}
             ${severity}=    Evaluate    $issue.get('severity', ${LOG_SEVERITY_THRESHOLD})
             IF    ${severity} <= ${LOG_SEVERITY_THRESHOLD}
-                # Convert issue details to string to avoid serialization issues
+                # Use the full issue details directly without summarization to preserve all log content
                 ${issue_details_raw}=    Evaluate    $issue.get("details", "")
                 ${issue_details_str}=    Convert To String    ${issue_details_raw}
-                ${summarized_details}=    RW.K8sLog.Summarize Log Issues    issue_details=${issue_details_str}
                 
                 # Safely extract title and next_steps as strings
                 ${issue_title_raw}=    Evaluate    $issue.get('title', 'Log pattern issue detected')
@@ -240,7 +239,7 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
                 ...    actual=${issue_title} in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
                 ...    title=${issue_title} in Deployment `${DEPLOYMENT_NAME}`
                 ...    reproduce_hint=Check application logs for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                ...    details=${summarized_details}
+                ...    details=${issue_details_str}
                 ...    next_steps=${next_steps}
             END
         END
@@ -547,7 +546,7 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
     [Documentation]    Fetches warning events related to the deployment workload in the namespace and triages any issues found in the events.
     [Tags]    access:read-only  events    workloads    errors    warnings    get    deployment    ${DEPLOYMENT_NAME}
     ${events}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '(now - (60*60*3)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind == "Deployment" or .involvedObject.kind == "Pod" or .involvedObject.kind == "ReplicaSet") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}")) and (.lastTimestamp // empty | if . then fromdateiso8601 else 0 end) >= $time_limit) | {kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, count: .count} ] | group_by([.kind, .name]) | map(if length > 0 then {kind: .[0].kind, name: .[0].name, total_count: (map(.count // 1) | add), reasons: (map(.reason) | unique), messages: (map(.message) | unique), firstTimestamp: (map(.firstTimestamp // empty | if . then fromdateiso8601 else 0 end) | sort | .[0] | if . > 0 then todateiso8601 else null end), lastTimestamp: (map(.lastTimestamp // empty | if . then fromdateiso8601 else 0 end) | sort | reverse | .[0] | if . > 0 then todateiso8601 else null end)} else empty end) | map(. + {summary: "\(.kind) \(.name): \(.total_count) events (\(.reasons | join(", ")))"}) | {events_summary: map(.summary), total_objects: length, events: .}'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '(now - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind == "Deployment" or .involvedObject.kind == "Pod" or .involvedObject.kind == "ReplicaSet") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}")) and (.lastTimestamp // empty | if . then fromdateiso8601 else 0 end) >= $time_limit and .involvedObject.name != null and .involvedObject.name != "" and .involvedObject.name != "Unknown" and .involvedObject.kind != null and .involvedObject.kind != "") | {kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, count: .count} ] | group_by([.kind, .name]) | map(if length > 0 then {kind: .[0].kind, name: .[0].name, total_count: (map(.count // 1) | add), reasons: (map(.reason) | unique), messages: (map(.message) | unique), firstTimestamp: (map(.firstTimestamp // empty | if . then fromdateiso8601 else 0 end) | sort | .[0] | if . > 0 then todateiso8601 else null end), lastTimestamp: (map(.lastTimestamp // empty | if . then fromdateiso8601 else 0 end) | sort | reverse | .[0] | if . > 0 then todateiso8601 else null end)} else empty end) | map(. + {summary: "\(.kind) \(.name): \(.total_count) events (\(.reasons | join(", ")))"}) | {events_summary: map(.summary), total_objects: length, events: .}'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
@@ -566,9 +565,9 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    **Event Retrieval Failed for Deployment `${DEPLOYMENT_NAME}`**\n\nFailed to retrieve events:\n\n${events.stderr}\n\n**Commands Used:** ${history}
     ELSE
-        # Collect ALL events (Normal + Warning) for last 3 hours including Deployment, ReplicaSet, and Pod levels
+        # Collect ALL events (Normal + Warning) for last 1 hour including Deployment, ReplicaSet, and Pod levels
         ${all_events}=    RW.CLI.Run Cli
-        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq --argjson hours 3 '(now - ($hours * 3600)) as $time_limit | [.items[] | select((.involvedObject.kind == "Deployment" or .involvedObject.kind == "Pod" or .involvedObject.kind == "ReplicaSet") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}")) and (.lastTimestamp // empty | if . then fromdateiso8601 else now end) >= $time_limit)] | sort_by(.lastTimestamp // .firstTimestamp) | {total_events: length, normal_events: (map(select(.type == "Normal")) | length), warning_events: (map(select(.type == "Warning")) | length), deployment_events: (map(select(.involvedObject.kind == "Deployment")) | length), replicaset_events: (map(select(.involvedObject.kind == "ReplicaSet")) | length), pod_events: (map(select(.involvedObject.kind == "Pod")) | length), events_by_type: (group_by(.type) | map({type: .[0].type, count: length, reasons: (map(.reason) | group_by(.) | map({reason: .[0], count: length}))})), chronological_events: (map({timestamp: (.lastTimestamp // .firstTimestamp), type: .type, kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message}) | sort_by(.timestamp)), recent_warnings: (map(select(.type == "Warning")) | map({timestamp: (.lastTimestamp // .firstTimestamp), kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message}) | sort_by(.timestamp) | reverse | .[0:10])}'
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq --argjson hours 1 '(now - ($hours * 3600)) as $time_limit | [.items[] | select((.involvedObject.kind == "Deployment" or .involvedObject.kind == "Pod" or .involvedObject.kind == "ReplicaSet") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}")) and (.lastTimestamp // empty | if . then fromdateiso8601 else now end) >= $time_limit and .involvedObject.name != null and .involvedObject.name != "" and .involvedObject.name != "Unknown" and .involvedObject.kind != null and .involvedObject.kind != "")] | sort_by(.lastTimestamp // .firstTimestamp) | {total_events: length, normal_events: (map(select(.type == "Normal")) | length), warning_events: (map(select(.type == "Warning")) | length), deployment_events: (map(select(.involvedObject.kind == "Deployment")) | length), replicaset_events: (map(select(.involvedObject.kind == "ReplicaSet")) | length), pod_events: (map(select(.involvedObject.kind == "Pod")) | length), events_by_type: (group_by(.type) | map({type: .[0].type, count: length, reasons: (map(.reason) | group_by(.) | map({reason: .[0], count: length}))})), chronological_events: (map({timestamp: (.lastTimestamp // .firstTimestamp), type: .type, kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message}) | sort_by(.timestamp)), recent_warnings: (map(select(.type == "Warning")) | map({timestamp: (.lastTimestamp // .firstTimestamp), kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message}) | sort_by(.timestamp) | reverse | .[0:10])}'
         ...    env=${env}
         ...    secret_file__kubeconfig=${kubeconfig}
         ...    include_in_history=false
@@ -579,7 +578,7 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
             ${total_count}=    Evaluate    $event_data.get('total_events', 0)
             
             # Build comprehensive event report
-            RW.Core.Add Pre To Report    **📊 Complete Event Summary for Deployment `${DEPLOYMENT_NAME}` (Last 3 Hours)**\n**Total Events:** ${total_count} (${event_data.get('normal_events', 0)} Normal, ${event_data.get('warning_events', 0)} Warning)\n**Event Distribution:** ${event_data.get('deployment_events', 0)} Deployment, ${event_data.get('replicaset_events', 0)} ReplicaSet, ${event_data.get('pod_events', 0)} Pod
+            RW.Core.Add Pre To Report    **📊 Complete Event Summary for Deployment `${DEPLOYMENT_NAME}` (Last 1 Hour)**\n**Total Events:** ${total_count} (${event_data.get('normal_events', 0)} Normal, ${event_data.get('warning_events', 0)} Warning)\n**Event Distribution:** ${event_data.get('deployment_events', 0)} Deployment, ${event_data.get('replicaset_events', 0)} ReplicaSet, ${event_data.get('pod_events', 0)} Pod
             
             IF    ${warning_count} > 0
                 ${event_object_data}=    Evaluate    json.loads(r'''${events.stdout}''') if r'''${events.stdout}'''.strip() else {}    json
