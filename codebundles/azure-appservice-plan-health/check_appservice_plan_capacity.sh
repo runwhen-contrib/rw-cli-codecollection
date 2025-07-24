@@ -7,7 +7,7 @@ DEFAULT_OFFSET="24h"  # Default to 24 hour lookback
 CPU_THRESHOLD=${CPU_THRESHOLD:-80}
 MEMORY_THRESHOLD=${MEMORY_THRESHOLD:-80}
 DISK_QUEUE_THRESHOLD=${DISK_QUEUE_THRESHOLD:-10}
-
+AZURE_SUBSCRIPTION_NAME=${AZURE_SUBSCRIPTION_NAME:-$(az account show --query name -o tsv)}
 # Recommendation thresholds
 SCALE_UP_CPU_THRESHOLD=${SCALE_UP_CPU_THRESHOLD:-70}
 SCALE_UP_MEMORY_THRESHOLD=${SCALE_UP_MEMORY_THRESHOLD:-70}
@@ -80,13 +80,16 @@ add_to_json() {
 
 # Function to get tier recommendations
 get_tier_recommendations() {
-    local current_tier=$1
-    local cpu_usage=$2
-    local memory_usage=$3
-    local disk_queue=$4
+    local asp_name=$1
+    local resource_group=$2
+    local current_tier=$3
+    local cpu_usage=$4
+    local memory_usage=$5
+    local disk_queue=$6
     
     local recommendations=()
     local reasons=()
+    local postfix=" in resource group $resource_group in Subscription ${AZURE_SUBSCRIPTION_NAME}"
     
     # Check if we need to scale up
     if [ ! -z "$cpu_usage" ] && (( $(echo "$cpu_usage > $SCALE_UP_CPU_THRESHOLD" | bc -l) )); then
@@ -115,35 +118,35 @@ get_tier_recommendations() {
     case $current_tier in
         "Free"|"Shared"|"Basic")
             if [ ${#reasons[@]} -gt 0 ]; then
-                recommendations+=("Consider upgrading to Standard tier for better performance and features")
-                recommendations+=("Standard tier provides dedicated instances and better scaling capabilities")
+                recommendations+=("Upgrade App Service Plan $asp_name to Standard tier for better performance and features$postfix")
+                # recommendations+=("Standard tier provides dedicated instances and better scaling capabilities$postfix")
             fi
             ;;
         "Standard")
             if [ ${#reasons[@]} -gt 0 ]; then
-                recommendations+=("Consider upgrading to Premium tier for enhanced performance")
-                recommendations+=("Premium tier offers better CPU and memory allocation")
+                recommendations+=("Upgrade App Service Plan $asp_name to Premium tier for enhanced performance$postfix")
+                # recommendations+=("Premium tier offers better CPU and memory allocation$postfix")
             elif [ ${#scale_down_reasons[@]} -gt 0 ]; then
-                recommendations+=("Consider downgrading to Basic tier to reduce costs")
-                recommendations+=("Current usage suggests Basic tier may be sufficient")
+                recommendations+=("Downgrade App Service Plan $asp_name to Basic tier to reduce costs$postfix")
+                # recommendations+=("Current usage suggests Basic tier may be sufficient$postfix")
             fi
             ;;
         "Premium")
             if [ ${#reasons[@]} -gt 0 ]; then
-                recommendations+=("Consider increasing instance count (capacity) for better performance")
-                recommendations+=("Premium tier is already optimal, focus on capacity scaling")
+                recommendations+=("Increase App Service Plan instance count (capacity) for better performance$postfix")
+                # recommendations+=("Premium tier is already optimal, focus on capacity scaling$postfix")
             elif [ ${#scale_down_reasons[@]} -gt 0 ]; then
-                recommendations+=("Consider downgrading to Standard tier to reduce costs")
-                recommendations+=("Current usage suggests Standard tier may be sufficient")
+                recommendations+=("Downgrade App Service Plan $asp_name to Standard tier to reduce costs$postfix")
+                # recommendations+=("Current usage suggests Standard tier may be sufficient$postfix")
             fi
             ;;
         "Isolated")
             if [ ${#reasons[@]} -gt 0 ]; then
-                recommendations+=("Consider increasing instance count (capacity) for better performance")
-                recommendations+=("Isolated tier is already optimal, focus on capacity scaling")
+                recommendations+=("Increase App Service Plan instance count (capacity) for better performance$postfix")
+                # recommendations+=("Isolated tier is already optimal, focus on capacity scaling$postfix")
             elif [ ${#scale_down_reasons[@]} -gt 0 ]; then
-                recommendations+=("Consider downgrading to Premium tier to reduce costs")
-                recommendations+=("Current usage suggests Premium tier may be sufficient")
+                recommendations+=("Downgrade App Service Plan $asp_name to Premium tier to reduce costs$postfix")
+                # recommendations+=("Current usage suggests Premium tier may be sufficient$postfix")
             fi
             ;;
     esac
@@ -151,11 +154,11 @@ get_tier_recommendations() {
     # If no specific recommendations, provide general guidance
     if [ ${#recommendations[@]} -eq 0 ]; then
         if [ ${#reasons[@]} -gt 0 ]; then
-            recommendations+=("Monitor usage patterns and consider scaling up if high usage persists")
+            recommendations+=("Monitor usage patterns and consider scaling up App Service Plan $asp_name if high usage persists$postfix")
         elif [ ${#scale_down_reasons[@]} -gt 0 ]; then
-            recommendations+=("Consider cost optimization by scaling down if low usage continues")
+            recommendations+=("Optimize cost by scaling down App Service Plan $asp_name if low usage continues$postfix")
         else
-            recommendations+=("Current usage is within optimal range")
+            recommendations+=("Current usage for App Service Plan $asp_name is within optimal range$postfix")
         fi
     fi
     
@@ -165,10 +168,15 @@ get_tier_recommendations() {
 
 # Function to get capacity recommendations
 get_capacity_recommendations() {
-    local current_capacity=$1
-    local cpu_usage=$2
-    local memory_usage=$3
-    local disk_queue=$4
+    local asp_name=$1
+    local resource_group=$2
+    local current_capacity=$3
+    local cpu_usage=$4
+    local memory_usage=$5
+    local disk_queue=$6
+    
+    local subscription_name=$(az account show --query name -o tsv)
+    local postfix=" in resource group $resource_group in Subscription ${subscription_name}"
     
     local recommendations=()
     local reasons=()
@@ -199,12 +207,12 @@ get_capacity_recommendations() {
     # Generate capacity recommendations
     if [ ${#reasons[@]} -gt 0 ]; then
         local suggested_capacity=$((current_capacity + 1))
-        recommendations+=("Consider increasing capacity from $current_capacity to $suggested_capacity instances")
+        recommendations+=("Increase capacity of App Service Plan $asp_name from $current_capacity to $suggested_capacity instances$postfix")
     elif [ ${#scale_down_reasons[@]} -gt 0 ] && [ $current_capacity -gt 1 ]; then
         local suggested_capacity=$((current_capacity - 1))
-        recommendations+=("Consider decreasing capacity from $current_capacity to $suggested_capacity instances")
+        recommendations+=("Decrease capacity of App Service Plan $asp_name from $current_capacity to $suggested_capacity instances$postfix")
     else
-        recommendations+=("Current capacity appears optimal for the usage patterns")
+        recommendations+=("Current capacity of App Service Plan $asp_name appears optimal for the usage patterns$postfix")
     fi
     
     # Return recommendations as a single string with newlines
@@ -277,8 +285,8 @@ echo "$app_service_plans" | jq -c '.[]' | while read -r plan; do
     echo "Disk Queue Length: ${disk_queue:-N/A}"
     
     # Get recommendations
-    tier_recommendations=$(get_tier_recommendations "$tier" "$cpu_usage" "$memory_usage" "$disk_queue")
-    capacity_recommendations=$(get_capacity_recommendations "$capacity" "$cpu_usage" "$memory_usage" "$disk_queue")
+    tier_recommendations=$(get_tier_recommendations "$name" "$rg" "$tier" "$cpu_usage" "$memory_usage" "$disk_queue")
+    capacity_recommendations=$(get_capacity_recommendations "$name" "$rg" "$capacity" "$cpu_usage" "$memory_usage" "$disk_queue")
     
     # Print recommendations
     echo ""
