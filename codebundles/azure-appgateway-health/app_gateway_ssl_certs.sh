@@ -563,13 +563,56 @@ if [[ -n "$BACKEND_HEALTH" ]]; then
             echo "    Storage Account: $storage_account_name ($service_type)"
             
             # Check if this backend is unhealthy due to SSL certificate hostname mismatch
+            # Try multiple approaches to find the backend health data
+            UNHEALTHY_BACKEND=""
+            
+            # First try: match by pool name
             UNHEALTHY_BACKEND=$(echo "$BACKEND_HEALTH" | jq -r --arg pool_name "$pool_name" --arg address "$address" '.backendAddressPools[] | select(.backendAddressPool.name == $pool_name) | .backendHttpSettingsCollection[].servers[] | select(.address == $address and .health != "Healthy") | .healthProbeLog')
             
-            if [[ -n "$UNHEALTHY_BACKEND" ]] && [[ "$UNHEALTHY_BACKEND" == *"Common Name of the leaf certificate"* ]]; then
+            # Second try: match by pool ID if name match fails
+            if [[ -z "$UNHEALTHY_BACKEND" ]]; then
+                pool_id=$(echo "$pool" | jq -r '.id')
+                UNHEALTHY_BACKEND=$(echo "$BACKEND_HEALTH" | jq -r --arg pool_id "$pool_id" --arg address "$address" '.backendAddressPools[] | select(.backendAddressPool.id == $pool_id) | .backendHttpSettingsCollection[].servers[] | select(.address == $address and .health != "Healthy") | .healthProbeLog')
+            fi
+            
+            # Third try: match by address only if both name and ID matches fail
+            if [[ -z "$UNHEALTHY_BACKEND" ]]; then
+                UNHEALTHY_BACKEND=$(echo "$BACKEND_HEALTH" | jq -r --arg address "$address" '.backendAddressPools[] | .backendHttpSettingsCollection[].servers[] | select(.address == $address and .health != "Healthy") | .healthProbeLog')
+            fi
+            
+            # Check for SSL-related issues with more flexible pattern matching
+            SSL_ISSUE_DETECTED=false
+            if [[ -n "$UNHEALTHY_BACKEND" ]]; then
+                # Check for various SSL certificate hostname mismatch patterns
+                if [[ "$UNHEALTHY_BACKEND" == *"Common Name of the leaf certificate"* ]] || \
+                   [[ "$UNHEALTHY_BACKEND" == *"certificate"* ]] && [[ "$UNHEALTHY_BACKEND" == *"hostname"* ]] || \
+                   [[ "$UNHEALTHY_BACKEND" == *"SSL"* ]] || \
+                   [[ "$UNHEALTHY_BACKEND" == *"TLS"* ]] || \
+                   [[ "$UNHEALTHY_BACKEND" == *"name"* ]] && [[ "$UNHEALTHY_BACKEND" == *"mismatch"* ]]; then
+                    SSL_ISSUE_DETECTED=true
+                fi
+            fi
+            
+            if [[ "$SSL_ISSUE_DETECTED" == "true" ]]; then
               echo "    ⚠️  SSL Certificate hostname mismatch detected!"
               
               # Find the HTTP settings and probe used by this pool
+              # Try multiple approaches to find HTTP settings
+              HTTP_SETTINGS_NAMES=""
+              
+              # First try: match by pool name
               HTTP_SETTINGS_NAMES=$(echo "$appgw_json" | jq -r --arg pool_name "$pool_name" '.requestRoutingRules[] | select(.backendAddressPool.name == $pool_name) | .httpSettings.name')
+              
+              # Second try: match by pool ID if name match fails
+              if [[ -z "$HTTP_SETTINGS_NAMES" ]]; then
+                  pool_id=$(echo "$pool" | jq -r '.id')
+                  HTTP_SETTINGS_NAMES=$(echo "$appgw_json" | jq -r --arg pool_id "$pool_id" '.requestRoutingRules[] | select(.backendAddressPool.id == $pool_id) | .httpSettings.name')
+              fi
+              
+              # Third try: match by pool name in different field structure
+              if [[ -z "$HTTP_SETTINGS_NAMES" ]]; then
+                  HTTP_SETTINGS_NAMES=$(echo "$appgw_json" | jq -r --arg pool_name "$pool_name" '.requestRoutingRules[] | select(.backendAddressPool.name == $pool_name) | .httpSettings.name // empty')
+              fi
               
               for http_settings_name in $HTTP_SETTINGS_NAMES; do
                 if [[ -n "$http_settings_name" ]]; then
