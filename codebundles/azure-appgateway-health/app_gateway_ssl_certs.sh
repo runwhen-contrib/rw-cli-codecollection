@@ -580,7 +580,7 @@ if [[ -n "$BACKEND_HEALTH" ]]; then
                   HOSTNAME=$(echo "$HTTP_SETTINGS" | jq -r '.hostName // "NOT_SET"')
                   
                   # Check if hostname is incorrect
-                  if [[ "$HOSTNAME" == "NOT_SET" ]] || [[ "$HOSTNAME" == "$address" ]] || [[ "$HOSTNAME" == *".blob.core.windows.net"* ]] || [[ "$HOSTNAME" == *".file.core.windows.net"* ]] || [[ "$HOSTNAME" == *".queue.core.windows.net"* ]] || [[ "$HOSTNAME" == *".table.core.windows.net"* ]]; then
+                  if [[ "$HOSTNAME" == "NOT_SET" ]] || [[ "$HOSTNAME" == "$address" ]]; then
                     echo "      ❌ Incorrect hostname configuration detected!"
                     
                     log_issue \
@@ -599,7 +599,7 @@ if [[ -n "$BACKEND_HEALTH" ]]; then
                     PROBE_HOST=$(echo "$PROBE_CONFIG" | jq -r '.host // "NOT_SET"')
                     
                     # Check if probe hostname is incorrect
-                    if [[ "$PROBE_HOST" == "NOT_SET" ]] || [[ "$PROBE_HOST" == "$address" ]] || [[ "$PROBE_HOST" == *".blob.core.windows.net"* ]] || [[ "$PROBE_HOST" == *".file.core.windows.net"* ]] || [[ "$PROBE_HOST" == *".queue.core.windows.net"* ]] || [[ "$PROBE_HOST" == *".table.core.windows.net"* ]]; then
+                    if [[ "$PROBE_HOST" == "NOT_SET" ]] || [[ "$PROBE_HOST" == "$address" ]]; then
                       echo "        ❌ Incorrect probe hostname configuration detected!"
                       
                       log_issue \
