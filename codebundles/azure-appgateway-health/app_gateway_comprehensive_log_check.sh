@@ -7,32 +7,38 @@ set -euo pipefail
 #   AZ_RESOURCE_GROUP
 #
 # OPTIONAL ENV VARS:
-#   WARNINGS_THRESHOLD: Integer threshold for HTTP error count (default=1)
-#   TIME_RANGE:         Kusto time window to look back (default=PT1H)
+#   HTTP_ERROR_THRESHOLD: Integer threshold for HTTP error count (default=10)
+#   FIREWALL_BLOCK_THRESHOLD: Integer threshold for firewall blocks (default=5)
+#   TIME_RANGE:         Kusto time window to look back (default=1h)
 #
 # This script:
 #   1) Retrieves the Application Gateway Resource ID by name/RG
 #   2) Checks if there's a Diagnostic Setting that sends logs to a Log Analytics workspace
 #   3) If so, retrieves that workspace's GUID
-#   4) Queries HTTP error responses (4xx/5xx status codes) in the specified time range
-#   5) Raises an issue if error count exceeds threshold
-#   6) Saves final JSON to appgw_diagnostic_log_issues.json
+#   4) Queries multiple types of issues:
+#      - HTTP error responses (4xx/5xx status codes)
+#      - Firewall blocks (if WAF is enabled)
+#      - Performance issues (if performance logs are enabled)
+#   5) Raises issues if any thresholds are exceeded
+#   6) Saves final JSON to appgw_comprehensive_issues.json
 # -----------------------------------------------------------------------------
 
 : "${APP_GATEWAY_NAME:?Must set APP_GATEWAY_NAME}"
 : "${AZ_RESOURCE_GROUP:?Must set AZ_RESOURCE_GROUP}"
 
-WARNINGS_THRESHOLD="${WARNINGS_THRESHOLD:-1}"
+HTTP_ERROR_THRESHOLD="${HTTP_ERROR_THRESHOLD:-10}"
+FIREWALL_BLOCK_THRESHOLD="${FIREWALL_BLOCK_THRESHOLD:-5}"
 TIME_RANGE="${TIME_RANGE:-1h}"
-OUTPUT_FILE="appgw_diagnostic_log_issues.json"
+OUTPUT_FILE="appgw_comprehensive_issues.json"
 
 issues_json='{"issues": []}'
 
-echo "Analyzing App Gateway HTTP Error Rates..."
+echo "Comprehensive App Gateway Log Analysis..."
 echo "App Gateway Name: $APP_GATEWAY_NAME"
 echo "Resource Group:   $AZ_RESOURCE_GROUP"
 echo "Time Range:       $TIME_RANGE"
-echo "Error Threshold:  $WARNINGS_THRESHOLD"
+echo "HTTP Error Threshold: $HTTP_ERROR_THRESHOLD"
+echo "Firewall Block Threshold: $FIREWALL_BLOCK_THRESHOLD"
 
 # -----------------------------------------------------------------------------
 # 1) Derive the AGW resource ID from name + resource group
@@ -97,7 +103,7 @@ if [[ -z "$diag_settings_json" || "$diag_settings_json" == "[]" ]]; then
     --arg title "No Diagnostic Settings Found" \
     --arg details "No diagnostic settings send logs to Log Analytics. $err_msg" \
     --arg severity "4" \
-    --arg nextStep "Configure a diagnostic setting to forward for Application Gateway \`$APP_GATEWAY_NAME\` logs to Log Analytics in in Resource Group \`$AZ_RESOURCE_GROUP\`" \
+    --arg nextStep "Configure a diagnostic setting to forward Application Gateway \`$APP_GATEWAY_NAME\` logs to Log Analytics in Resource Group \`$AZ_RESOURCE_GROUP\`" \
     '.issues += [{
        "title": $title,
        "details": $details,
@@ -159,62 +165,43 @@ rm -f la_guid_err.log
 
 echo "Using Workspace GUID: $WORKSPACE_ID"
 
+# Helper function to safely run a query and return "0" if there's an error/no data
+function run_query() {
+  local query="$1"
+  local result
+
+  if ! result=$(az monitor log-analytics query \
+      --workspace "$WORKSPACE_ID" \
+      --analytics-query "$query" \
+      -o json 2>/dev/null); then
+    echo "0"
+    return
+  fi
+
+  echo "$result" | jq -r '.tables[0].rows[0][0] // 0' 2>/dev/null || echo "0"
+}
+
 # -----------------------------------------------------------------------------
-# 4) Construct the Kusto query for known warnings
+# 4) Check HTTP Error Rates
 # -----------------------------------------------------------------------------
-KUSTO_QUERY=$(cat <<EOF
+echo "Checking HTTP error rates..."
+HTTP_ERROR_QUERY=$(cat <<EOF
 AzureDiagnostics
 | where TimeGenerated >= ago(${TIME_RANGE})
 | where Category == "ApplicationGatewayAccessLog"
 | where ResourceId == "${AGW_RESOURCE_ID}"
 | where toint(httpStatus_d) >= 400 and toint(httpStatus_d) < 600
-| summarize CountOfMatches = count()
+| summarize CountOfErrors = count()
 EOF
 )
 
-echo "Kusto Query:"
-echo "$KUSTO_QUERY"
+http_error_count=$(run_query "$HTTP_ERROR_QUERY")
+echo "HTTP error count in last $TIME_RANGE: $http_error_count"
 
-# -----------------------------------------------------------------------------
-# 5) Run the log query
-# -----------------------------------------------------------------------------
-if ! query_output=$(az monitor log-analytics query \
-      --workspace "$WORKSPACE_ID" \
-      --analytics-query "$KUSTO_QUERY" \
-      -o json 2>la_query_err.log); then
-  err_msg=$(cat la_query_err.log)
-  rm -f la_query_err.log
-  echo "ERROR: 'az monitor log-analytics query' command failed."
+if (( $(echo "$http_error_count > $HTTP_ERROR_THRESHOLD" | bc -l) )); then
   issues_json=$(echo "$issues_json" | jq \
-    --arg title "Failed Log Analytics Query" \
-    --arg details "$err_msg" \
-    --arg severity "1" \
-    --arg nextStep "Verify query syntax, aggregator, or ensure the workspace has logs." \
-    '.issues += [{
-       "title": $title,
-       "details": $details,
-       "next_step": $nextStep,
-       "severity": ($severity | tonumber)
-     }]')
-  echo "$issues_json" > "$OUTPUT_FILE"
-  exit 1
-fi
-rm -f la_query_err.log
-
-echo "Raw query output:"
-echo "$query_output"
-
-# Parse the summarized count
-count_of_matches=$(echo "$query_output" | jq -r '.tables[0].rows[0][0] // 0' 2>/dev/null || echo "0")
-echo "Count of HTTP errors (4xx/5xx) in last $TIME_RANGE: $count_of_matches"
-
-# -----------------------------------------------------------------------------
-# 6) Compare with threshold
-# -----------------------------------------------------------------------------
-if (( $(echo "$count_of_matches > $WARNINGS_THRESHOLD" | bc -l) )); then
-  issues_json=$(echo "$issues_json" | jq \
-    --arg title "High HTTP Error Rate Detected in Application Gateway" \
-    --arg details "Found $count_of_matches HTTP error responses (4xx/5xx status codes) in $TIME_RANGE for Application Gateway $APP_GATEWAY_NAME." \
+    --arg title "High HTTP Error Rate Detected" \
+    --arg details "Found $http_error_count HTTP error responses (4xx/5xx status codes) in $TIME_RANGE, exceeding threshold of $HTTP_ERROR_THRESHOLD." \
     --arg severity "2" \
     --arg nextStep "Investigate the cause of HTTP errors for Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\`. Check backend health, SSL certificates, and routing rules." \
     '.issues += [{
@@ -223,12 +210,82 @@ if (( $(echo "$count_of_matches > $WARNINGS_THRESHOLD" | bc -l) )); then
        "next_step": $nextStep,
        "severity": ($severity | tonumber)
      }]')
-else
-  echo "No excessive HTTP errors found above threshold ($WARNINGS_THRESHOLD)."
+fi
+
+# -----------------------------------------------------------------------------
+# 5) Check Firewall Blocks (if WAF is enabled)
+# -----------------------------------------------------------------------------
+echo "Checking firewall blocks..."
+FIREWALL_QUERY=$(cat <<EOF
+AzureDiagnostics
+| where TimeGenerated >= ago(${TIME_RANGE})
+| where Category == "ApplicationGatewayFirewallLog"
+| where ResourceId == "${AGW_RESOURCE_ID}"
+| where action_s == "Blocked"
+| summarize CountOfBlocks = count()
+EOF
+)
+
+firewall_block_count=$(run_query "$FIREWALL_QUERY")
+echo "Firewall block count in last $TIME_RANGE: $firewall_block_count"
+
+if (( $(echo "$firewall_block_count > $FIREWALL_BLOCK_THRESHOLD" | bc -l) )); then
+  issues_json=$(echo "$issues_json" | jq \
+    --arg title "High Firewall Block Rate Detected" \
+    --arg details "Found $firewall_block_count firewall blocks in $TIME_RANGE, exceeding threshold of $FIREWALL_BLOCK_THRESHOLD." \
+    --arg severity "3" \
+    --arg nextStep "Review WAF rules and blocked requests for Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\`. Consider adjusting WAF policies if legitimate traffic is being blocked." \
+    '.issues += [{
+       "title": $title,
+       "details": $details,
+       "next_step": $nextStep,
+       "severity": ($severity | tonumber)
+     }]')
+fi
+
+# -----------------------------------------------------------------------------
+# 6) Check for any critical errors in performance logs
+# -----------------------------------------------------------------------------
+echo "Checking performance logs for errors..."
+PERFORMANCE_ERROR_QUERY=$(cat <<EOF
+AzureDiagnostics
+| where TimeGenerated >= ago(${TIME_RANGE})
+| where Category == "ApplicationGatewayPerformanceLog"
+| where ResourceId == "${AGW_RESOURCE_ID}"
+| summarize CountOfErrors = count()
+EOF
+)
+
+performance_error_count=$(run_query "$PERFORMANCE_ERROR_QUERY")
+echo "Performance log entries in last $TIME_RANGE: $performance_error_count"
+
+# Note: Performance logs don't have standardized error fields, so we just count entries
+# This can be used to verify that performance logging is working
+if (( $(echo "$performance_error_count == 0" | bc -l) )); then
+  issues_json=$(echo "$issues_json" | jq \
+    --arg title "No Performance Logs Found" \
+    --arg details "No performance log entries found in $TIME_RANGE. This may indicate that performance logging is not properly configured or there are no requests." \
+    --arg severity "4" \
+    --arg nextStep "Verify that ApplicationGatewayPerformanceLog is enabled in diagnostic settings for Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\`." \
+    '.issues += [{
+       "title": $title,
+       "details": $details,
+       "next_step": $nextStep,
+       "severity": ($severity | tonumber)
+     }]')
 fi
 
 # -----------------------------------------------------------------------------
 # 7) Write final JSON
 # -----------------------------------------------------------------------------
 echo "$issues_json" > "$OUTPUT_FILE"
-echo "HTTP error rate check completed. Saved results to $OUTPUT_FILE"
+echo "Comprehensive log analysis completed. Saved results to $OUTPUT_FILE"
+
+# Print summary
+echo "-------------------------------------------------"
+echo "Summary:"
+echo "HTTP Errors: $http_error_count (threshold: $HTTP_ERROR_THRESHOLD)"
+echo "Firewall Blocks: $firewall_block_count (threshold: $FIREWALL_BLOCK_THRESHOLD)"
+echo "Performance Log Entries: $performance_error_count"
+echo "Total Issues Found: $(echo "$issues_json" | jq '.issues | length')"
+echo "-------------------------------------------------" 
