@@ -410,48 +410,58 @@ def _is_valid_service_name(service_name):
 def get_context_around_line(all_lines, target_line, context_size=5):
     """Get context lines around a target line, removing duplicates."""
     try:
+        # Try exact match first
         target_index = all_lines.index(target_line)
-        start_index = max(0, target_index - context_size)
-        end_index = min(len(all_lines), target_index + context_size + 1)
-        
-        # Collect all context lines
-        context_lines = []
-        for i in range(start_index, end_index):
-            if i == target_index:
-                context_lines.append(f">>> {all_lines[i]} <<<")  # Highlight the matched line
-            else:
-                context_lines.append(f"    {all_lines[i]}")
-        
-        # Remove duplicate context lines while preserving order
-        seen_context = set()
-        unique_context = []
-        for ctx_line in context_lines:
-            # Skip the highlighted target line from deduplication
-            if ctx_line.startswith(">>> "):
-                unique_context.append(ctx_line)
-            elif ctx_line not in seen_context:
-                unique_context.append(ctx_line)
-                seen_context.add(ctx_line)
-        
-        # Limit context to reasonable size (max 10 unique context lines + target line)
-        if len(unique_context) > 11:
-            # Keep the target line and a few context lines before and after
-            target_line_index = None
-            for i, line in enumerate(unique_context):
-                if line.startswith(">>> "):
-                    target_line_index = i
-                    break
-            
-            if target_line_index is not None:
-                # Keep 3 lines before and 3 lines after the target line
-                start_keep = max(0, target_line_index - 3)
-                end_keep = min(len(unique_context), target_line_index + 4)
-                unique_context = unique_context[start_keep:end_keep]
-        
-        return unique_context
     except ValueError:
-        # If target line not found, return just the line itself
-        return [f">>> {target_line} <<<"]
+        # If exact match fails, try to find a line that matches when stripped
+        target_index = None
+        for i, line in enumerate(all_lines):
+            if line.strip() == target_line:
+                target_index = i
+                break
+        
+        if target_index is None:
+            # If still not found, return just the line itself
+            return [f">>> {target_line} <<<"]
+    
+    start_index = max(0, target_index - context_size)
+    end_index = min(len(all_lines), target_index + context_size + 1)
+    
+    # Collect all context lines
+    context_lines = []
+    for i in range(start_index, end_index):
+        if i == target_index:
+            context_lines.append(f">>> {all_lines[i]} <<<")  # Highlight the matched line
+        else:
+            context_lines.append(f"    {all_lines[i]}")
+    
+    # Remove duplicate context lines while preserving order
+    seen_context = set()
+    unique_context = []
+    for ctx_line in context_lines:
+        # Skip the highlighted target line from deduplication
+        if ctx_line.startswith(">>> "):
+            unique_context.append(ctx_line)
+        elif ctx_line not in seen_context:
+            unique_context.append(ctx_line)
+            seen_context.add(ctx_line)
+    
+    # Limit context to reasonable size (max 10 unique context lines + target line)
+    if len(unique_context) > 11:
+        # Keep the target line and a few context lines before and after
+        target_line_index = None
+        for i, line in enumerate(unique_context):
+            if line.startswith(">>> "):
+                target_line_index = i
+                break
+        
+        if target_line_index is not None:
+            # Keep 3 lines before and 3 lines after the target line
+            start_keep = max(0, target_line_index - 3)
+            end_keep = min(len(unique_context), target_line_index + 4)
+            unique_context = unique_context[start_keep:end_keep]
+    
+    return unique_context
 
 def group_similar_lines(lines, similarity_threshold=0.8):
     """Group similar log lines together to reduce repetition."""
