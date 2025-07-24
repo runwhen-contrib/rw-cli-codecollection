@@ -167,6 +167,7 @@ def main():
             details_parts = []
             total_occurrences = 0
             sample_lines = []
+            all_context_lines = []  # Collect all context lines for deduplication
             
             for match in pattern_matches:
                 pod = match["pod"]
@@ -180,20 +181,41 @@ def main():
                     total_occurrences += count
                     sample_lines.append(sample_line)
                     
+                    # Collect context lines for deduplication
+                    all_context_lines.extend(context_lines)
+                    
                     if count > 1:
                         details_parts.append(f"Pod: {pod} ({container}) - {count}x occurrences of pattern:")
                     else:
                         details_parts.append(f"Pod: {pod} ({container}):")
                     
-                    # Add the sample line
+                    # Add the sample line (full error log line)
                     details_parts.append(f"{sample_line}")
                     
-                    # Add context if available
-                    if context_lines:
-                        details_parts.append("Context (5 lines before/after):")
-                        details_parts.extend(context_lines)
-                    
                     details_parts.append("")  # Add spacing between groups
+            
+            # Add deduplicated context at the end
+            if all_context_lines:
+                # Remove duplicates from context while preserving order
+                seen_context = set()
+                unique_context = []
+                for ctx_line in all_context_lines:
+                    # Skip the highlighted target lines from deduplication
+                    if ctx_line.startswith(">>> "):
+                        unique_context.append(ctx_line)
+                    elif ctx_line not in seen_context:
+                        unique_context.append(ctx_line)
+                        seen_context.add(ctx_line)
+                
+                # Limit context to reasonable size (max 15 unique context lines)
+                if len(unique_context) > 15:
+                    # Keep a representative sample of context
+                    unique_context = unique_context[:15]
+                    unique_context.append("    ... (additional context lines omitted)")
+                
+                if unique_context:
+                    details_parts.append("Context (deduplicated):")
+                    details_parts.extend(unique_context)
 
             # Analyze sample lines for service-specific insights
             service_insights = extract_service_insights(sample_lines)
@@ -386,12 +408,13 @@ def _is_valid_service_name(service_name):
     return False
 
 def get_context_around_line(all_lines, target_line, context_size=5):
-    """Get context lines around a target line."""
+    """Get context lines around a target line, removing duplicates."""
     try:
         target_index = all_lines.index(target_line)
         start_index = max(0, target_index - context_size)
         end_index = min(len(all_lines), target_index + context_size + 1)
         
+        # Collect all context lines
         context_lines = []
         for i in range(start_index, end_index):
             if i == target_index:
@@ -399,7 +422,33 @@ def get_context_around_line(all_lines, target_line, context_size=5):
             else:
                 context_lines.append(f"    {all_lines[i]}")
         
-        return context_lines
+        # Remove duplicate context lines while preserving order
+        seen_context = set()
+        unique_context = []
+        for ctx_line in context_lines:
+            # Skip the highlighted target line from deduplication
+            if ctx_line.startswith(">>> "):
+                unique_context.append(ctx_line)
+            elif ctx_line not in seen_context:
+                unique_context.append(ctx_line)
+                seen_context.add(ctx_line)
+        
+        # Limit context to reasonable size (max 10 unique context lines + target line)
+        if len(unique_context) > 11:
+            # Keep the target line and a few context lines before and after
+            target_line_index = None
+            for i, line in enumerate(unique_context):
+                if line.startswith(">>> "):
+                    target_line_index = i
+                    break
+            
+            if target_line_index is not None:
+                # Keep 3 lines before and 3 lines after the target line
+                start_keep = max(0, target_line_index - 3)
+                end_keep = min(len(unique_context), target_line_index + 4)
+                unique_context = unique_context[start_keep:end_keep]
+        
+        return unique_context
     except ValueError:
         # If target line not found, return just the line itself
         return [f">>> {target_line} <<<"]
@@ -457,7 +506,7 @@ def group_similar_lines(lines, similarity_threshold=0.8):
                 unique_context.append(ctx_line)
                 seen_context.add(ctx_line)
         
-        group["context"] = unique_context[:20]  # Limit context to 20 lines max
+        group["context"] = unique_context[:10]  # Limit context to 10 lines max per group
         
         groups.append(group)
     
