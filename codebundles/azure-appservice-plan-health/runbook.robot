@@ -43,9 +43,9 @@ Check Azure App Service Plan Resource Health in resource group `${AZURE_RESOURCE
                 ...    expected=Azure App Service Plan `${plan_name}` should have health status of `Available` in resource group `${AZURE_RESOURCE_GROUP}` 
                 ...    actual=Azure App Service Plan `${plan_name}` has health status of `${health_status}` in resource group `${AZURE_RESOURCE_GROUP}` 
                 ...    title=Azure App Service Plan `${plan_name}` with Health Status of `${health_status}` found in Resource Group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
-                ...    reproduce_hint=${output.cmd}"subscription_name": "${AZURE_SUBSCRIPTION_NAME}"
+                ...    reproduce_hint=${output.cmd}
                 ...    details={"health": ${pretty_health}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
-                ...    next_steps=Investigate the health status of the Azure App Service Plan in resource group `${AZURE_RESOURCE_GROUP}` 
+                ...    next_steps=Investigate the health status of the Azure App Service Plan in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
             END
         END
     ELSE
@@ -56,7 +56,7 @@ Check Azure App Service Plan Resource Health in resource group `${AZURE_RESOURCE
         ...    title=Azure resource health is unavailable for App Service Plan in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
         ...    reproduce_hint=${output.cmd}
         ...    details={"health_list": ${health_list}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
-        ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
+        ...    next_steps=Enable App Service Plan `${plan_name}` health provider Microsoft.ResourceHealth in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     END
 
 
@@ -92,7 +92,7 @@ Check App Service Plan Capacity and Recommendations in resource group `${AZURE_R
             ...    actual=High resource usage detected in App Service Plan `${plan['name']}` in resource group `${plan['resourceGroup']}`
             ...    title=High Resource Usage in App Service Plan `${plan['name']}` in resource group `${plan['resourceGroup']}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    details={"plan": ${plan}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
-            ...    next_steps=Consider scaling up the App Service Plan or optimizing the application code.
+            ...    next_steps=Scale up the App Service Plan `${plan['name']}` in resource group `${plan['resourceGroup']}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`.\nOptimize the application code in App service plan `${plan['name']}` in resource group `${plan['resourceGroup']}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${script_output.cmd}
         END
     ELSE
@@ -203,7 +203,7 @@ Check App Service Plan Changes in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    title=App Service Plan Change `${security_level}` Security: `${operation}` on `${asp_name}` in Resource Group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
                 ...    details={"changes": ${change}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    reproduce_hint=${audit_cmd.cmd}
-                ...    next_steps=Review the operation for security implications.
+                ...    next_steps=Check App Service Plan `${asp_name}` logs for security implications in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
             END
         END
     ELSE
@@ -236,10 +236,10 @@ Check App Service Plan Changes in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    severity=4
                 ...    expected=App Service Plan operations should complete successfully in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    actual=Failed operation detected: `${operation}` by `${caller}` at `${timestamp}` on App Service Plan `${asp_name}`
-                ...    title=App Service Plan Failed Operation: `${operation}` on `${asp_name}` in Resource Group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    title=App Service Plan Failed Operation `${operation}` on `${asp_name}` in Resource Group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
                 ...    details={"details": ${enhanced_details}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    reproduce_hint=${audit_cmd.cmd}
-                ...    next_steps=Investigate the failed operation.
+                ...    next_steps=Check errors logs in App Service Plan `${asp_name}` in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`.
             END
         END
     ELSE
