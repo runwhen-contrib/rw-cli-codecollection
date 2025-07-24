@@ -216,7 +216,7 @@ class K8sLog:
             issue_details: Raw issue details to summarize
             
         Returns:
-            Summarized and formatted issue details
+            Summarized and formatted issue details with full log content
         """
         if not self.temp_dir:
             self.temp_dir = tempfile.mkdtemp(prefix="k8s_log_analysis_")
@@ -239,14 +239,17 @@ class K8sLog:
                                   capture_output=True, text=True, timeout=60)
             
             if result.returncode == 0:
+                # Return the full summarized content without truncation
                 return result.stdout
             else:
                 logger.warn(f"Summary generation failed: {result.stderr}")
-                return str(issue_details)[:1000] + "..." if len(str(issue_details)) > 1000 else str(issue_details)
+                # Return the full issue details without truncation
+                return str(issue_details)
                 
         except Exception as e:
             logger.warn(f"Summary generation error: {str(e)}")
-            return str(issue_details)[:1000] + "..." if len(str(issue_details)) > 1000 else str(issue_details)
+            # Return the full issue details without truncation
+            return str(issue_details)
     
     @keyword
     def format_scan_results_for_display(self, scan_results: Dict[str, Any]) -> str:

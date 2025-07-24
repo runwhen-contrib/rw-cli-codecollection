@@ -3,7 +3,7 @@ commands:
     - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind
     == "StatefulSet" or .involvedObject.kind == "Pod") and (.involvedObject.name |
     tostring | contains("${STATEFULSET_NAME}")) and (.lastTimestamp | fromdateiso8601)
-    >= $time_limit) | {kind: .involvedObject.kind, name: .involvedObject.name, reason:
+    >= $time_limit and .involvedObject.name != null and .involvedObject.name != "" and .involvedObject.name != "Unknown" and .involvedObject.kind != null and .involvedObject.kind != "") | {kind: .involvedObject.kind, name: .involvedObject.name, reason:
     .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp}
     ] | group_by([.kind, .name]) | map({kind: .[0].kind, name: .[0].name, count: length,
     reasons: map(.reason) | unique, messages: map(.message) | unique, firstTimestamp:
@@ -57,7 +57,7 @@ commands:
     - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind
     == "StatefulSet" or .involvedObject.kind == "Pod") and (.involvedObject.name |
     tostring | contains("${STATEFULSET_NAME}")) and (.lastTimestamp | fromdateiso8601)
-    >= $time_limit) | {kind: .involvedObject.kind, name: .involvedObject.name, reason:
+    >= $time_limit and .involvedObject.name != null and .involvedObject.name != "" and .involvedObject.name != "Unknown" and .involvedObject.kind != null and .involvedObject.kind != "") | {kind: .involvedObject.kind, name: .involvedObject.name, reason:
     .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp}
     ] | group_by([.kind, .name]) | map({kind: .[0].kind, name: .[0].name, count: length,
     reasons: map(.reason) | unique, messages: map(.message) | unique, firstTimestamp:

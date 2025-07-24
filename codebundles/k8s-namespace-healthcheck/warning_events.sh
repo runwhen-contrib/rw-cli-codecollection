@@ -71,7 +71,15 @@ fi
 
 # Process events with jq
 jq -r --argjson event_age_minutes "$EVENT_AGE_MINUTES" '
-[.items[] | {
+[.items[] | 
+  # Filter out events with unknown or missing object names
+  select(
+    .involvedObject.name != null and 
+    .involvedObject.name != "" and 
+    .involvedObject.name != "Unknown" and
+    .involvedObject.kind != null and 
+    .involvedObject.kind != ""
+  ) | {
     namespace: .involvedObject.namespace,
     kind: .involvedObject.kind,
     baseName: (
