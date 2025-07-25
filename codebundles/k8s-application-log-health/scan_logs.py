@@ -173,6 +173,9 @@ def main():
     issues_json = {"issues": [], "summary": []}
 
     if category_issues:
+        # Consolidate issues by actual error content to avoid duplicates
+        consolidated_issues = {}
+        
         for pattern_key, pattern_matches in category_issues.items():
             category = pattern_matches[0]["category"]
             pattern = pattern_matches[0]["pattern"]
@@ -184,42 +187,42 @@ def main():
             sample_lines = []
             all_context_lines = []  # Collect all context lines for deduplication
 
-            # --- Start: Cross-pod aggregation ---
-            all_lines_from_all_pods = []
+            # --- Start: Cross-container aggregation (not pod-level) ---
+            all_lines_from_all_containers = []
             for match in pattern_matches:
                 for group in match["grouped_lines"]:
                     for similar_line in group["similar"]:
                         line_with_meta = similar_line.copy()
                         line_with_meta['pod'] = match['pod']
                         line_with_meta['container'] = match['container']
-                        all_lines_from_all_pods.append(line_with_meta)
+                        all_lines_from_all_containers.append(line_with_meta)
             
-            # Group these lines across all pods to collapse similar messages
-            cross_pod_groups = group_similar_lines(all_lines_from_all_pods)
-            total_occurrences = sum(g['count'] for g in cross_pod_groups)
-            # --- End: Cross-pod aggregation ---
+            # Group these lines across all containers to collapse similar messages
+            cross_container_groups = group_similar_lines(all_lines_from_all_containers)
+            total_occurrences = sum(g['count'] for g in cross_container_groups)
+            # --- End: Cross-container aggregation ---
 
             # Limit the number of groups shown in the report for conciseness
             max_groups_to_show = 5
-            groups_to_show = cross_pod_groups[:max_groups_to_show]
+            groups_to_show = cross_container_groups[:max_groups_to_show]
 
             # Build the summary of log groups
             for group in groups_to_show:
                 sample_line = group["sample"]
                 count = group["count"]
                 
-                # Identify unique pods in this group
-                pods_in_group = sorted(list(set([f"`{line['pod']}`" for line in group['similar']])))
+                # Group by container name instead of pod name for cleaner reporting
+                containers_in_group = sorted(list(set([f"`{line['container']}`" for line in group['similar']])))
                 
-                details_parts.append(f"• **{count}x occurrences** across {len(pods_in_group)} pod(s): {', '.join(pods_in_group)}")
+                details_parts.append(f"• **{count}x occurrences** in container(s): {', '.join(containers_in_group)}")
                 details_parts.append(f"  Sample: `{sample_line}`")
                 details_parts.append("") # Spacer
                 
                 sample_lines.append(sample_line)
                 all_context_lines.extend(group.get("context", []))
 
-            if len(cross_pod_groups) > max_groups_to_show:
-                details_parts.append(f"... and {len(cross_pod_groups) - max_groups_to_show} more similar log groups.")
+            if len(cross_container_groups) > max_groups_to_show:
+                details_parts.append(f"... and {len(cross_container_groups) - max_groups_to_show} more similar log groups.")
                 details_parts.append("")
             
             # Add deduplicated context at the end
@@ -255,26 +258,97 @@ def main():
             
             severity_label = severity_label_map.get(severity, f"Unknown({severity})")
 
-            title = f"{category} pattern detected in {workload_type} `{workload_name}` ({total_occurrences} occurrences)"
+            # Create a content-based key to consolidate similar issues
+            # Use the first sample line as the key to group similar errors
+            if sample_lines:
+                # Create a more robust content key that considers the actual error message
+                first_sample = sample_lines[0]
+                # Extract the error message part for better grouping
+                error_match = re.search(r'"error"\s*:\s*"([^"]+)"', first_sample)
+                if error_match:
+                    error_msg = error_match.group(1)
+                    # Clean the error message for grouping
+                    cleaned_error = cleanup_log_line_for_grouping(error_msg)
+                    content_key = f"error:{cleaned_error[:100]}"
+                else:
+                    # Fallback to the original method
+                    content_key = cleanup_log_line_for_grouping(first_sample)
+            else:
+                content_key = f"{category}:{pattern[:50]}"
             
-            # Create properly formatted details string instead of complex object
-            details_str = "\n\n".join(details_parts)
+            # Consolidate issues with the same content
+            if content_key in consolidated_issues:
+                # Merge with existing issue
+                existing = consolidated_issues[content_key]
+                existing["total_occurrences"] += total_occurrences
+                existing["severity"] = min(existing["severity"], severity)
+                existing["details_parts"].extend(details_parts)
+                existing["sample_lines"].extend(sample_lines)
+                existing["unique_next_steps"].extend(unique_next_steps)
+                # Use the most descriptive category name
+                if len(category) > len(existing["category"]):
+                    existing["category"] = category
+            else:
+                # Create new consolidated issue
+                consolidated_issues[content_key] = {
+                    "category": category,
+                    "severity": severity,
+                    "total_occurrences": total_occurrences,
+                    "details_parts": details_parts,
+                    "sample_lines": sample_lines,
+                    "unique_next_steps": unique_next_steps
+                }
 
-            # Add the issues entry
+        # Create final issues from consolidated data
+        for content_key, issue_data in consolidated_issues.items():
+            # Deduplicate and clean up the merged data
+            unique_details = []
+            seen_details = set()
+            context_section = []
+            
+            for detail in issue_data["details_parts"]:
+                if detail.startswith("Context (deduplicated):"):
+                    # Collect all context lines
+                    context_section = [detail]
+                elif context_section and not detail.startswith("• **"):
+                    # Continue collecting context lines
+                    context_section.append(detail)
+                elif detail not in seen_details:
+                    unique_details.append(detail)
+                    seen_details.add(detail)
+            
+            # Add context section at the end if we have it
+            if context_section:
+                unique_details.extend(context_section)
+            
+            # Take unique sample lines (up to 3)
+            unique_samples = list(dict.fromkeys(issue_data["sample_lines"]))[:3]
+            
+            # Deduplicate next steps
+            unique_next_steps = list(dict.fromkeys(issue_data["unique_next_steps"]))
+            
+            severity_label = severity_label_map.get(issue_data["severity"], f"Unknown({issue_data['severity']})")
+            
+            # Create a more generic title that doesn't duplicate
+            title = f"Error pattern detected in {workload_type} `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+            
+            # Create properly formatted details string
+            details_str = "\n\n".join(unique_details)
+
+            # Add the consolidated issues entry
             issues_json["issues"].append({
                 "title": title,
-                "details": details_str,  # Use string instead of dict to avoid serialization issues
+                "details": details_str,
                 "next_steps": "\n".join(unique_next_steps),
-                "severity": severity, 
+                "severity": issue_data["severity"], 
                 "severity_label": severity_label,
-                "occurrences": total_occurrences,
-                "pattern": pattern,
-                "category": category
+                "occurrences": issue_data["total_occurrences"],
+                "category": issue_data["category"]
             })
 
         # Generate summary
-        total_issues = len(category_issues)
-        categories_found = set(match["category"] for matches in category_issues.values() for match in matches)
+        total_issues = len(consolidated_issues)
+        categories_found = set(issue_data["category"] for issue_data in consolidated_issues.values())
         
         severity_label = severity_label_map.get(max_severity, f"Unknown({max_severity})")
         issues_json["summary"].append(

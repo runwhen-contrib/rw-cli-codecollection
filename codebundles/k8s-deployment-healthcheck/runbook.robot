@@ -326,41 +326,6 @@ Detect Log Anomalies for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
         END
     END
 
-Perform Comprehensive Log Analysis for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
-    [Documentation]    Performs in-depth log analysis including security events, resource warnings, connectivity issues, and application lifecycle problems.
-    [Tags]
-    ...    logs
-    ...    comprehensive
-    ...    security
-    ...    resources
-    ...    connectivity
-    ...    deployment
-    ...    access:read-only
-    # Skip pod-related checks if deployment is scaled to 0
-    IF    not ${SKIP_POD_CHECKS}
-        # Only run comprehensive analysis if depth is set to comprehensive
-        IF    '${LOG_ANALYSIS_DEPTH}' == 'comprehensive'
-            ${comprehensive_results}=    RW.CLI.Run Bash File
-            ...    bash_file=deployment_logs.sh
-            ...    env=${env}
-            ...    secret_file__kubeconfig=${kubeconfig}
-            ...    include_in_history=false
-            
-            IF    ${comprehensive_results.returncode} != 0
-                RW.Core.Add Issue
-                ...    severity=3
-                ...    expected=Comprehensive log analysis should complete successfully for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                ...    actual=Failed to perform comprehensive log analysis for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                ...    title=Comprehensive Log Analysis Failed for Deployment `${DEPLOYMENT_NAME}`
-                ...    reproduce_hint=${comprehensive_results.cmd}
-                ...    details=Comprehensive analysis failed with exit code ${comprehensive_results.returncode}:\n\nSTDOUT:\n${comprehensive_results.stdout}\n\nSTDERR:\n${comprehensive_results.stderr}
-                ...    next_steps=Verify log collection is working properly\nCheck if pods are accessible and generating logs\nReview comprehensive analysis script configuration
-            ELSE
-                RW.Core.Add Pre To Report    **Comprehensive Log Analysis Results for Deployment `${DEPLOYMENT_NAME}`**\n\n${comprehensive_results.stdout}
-            END
-        END
-    END
-
 Fetch Deployment Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Collects logs from all pods in the deployment for manual review and troubleshooting.
     [Tags]
