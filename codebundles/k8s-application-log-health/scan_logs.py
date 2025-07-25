@@ -304,22 +304,11 @@ def main():
             # Deduplicate and clean up the merged data
             unique_details = []
             seen_details = set()
-            context_section = []
             
             for detail in issue_data["details_parts"]:
-                if detail.startswith("Context (deduplicated):"):
-                    # Collect all context lines
-                    context_section = [detail]
-                elif context_section and not detail.startswith("• **"):
-                    # Continue collecting context lines
-                    context_section.append(detail)
-                elif detail not in seen_details:
+                if detail not in seen_details:
                     unique_details.append(detail)
                     seen_details.add(detail)
-            
-            # Add context section at the end if we have it
-            if context_section:
-                unique_details.extend(context_section)
             
             # Take unique sample lines (up to 3)
             unique_samples = list(dict.fromkeys(issue_data["sample_lines"]))[:3]
@@ -329,8 +318,53 @@ def main():
             
             severity_label = severity_label_map.get(issue_data["severity"], f"Unknown({issue_data['severity']})")
             
-            # Create a more generic title that doesn't duplicate
+            # Create a more descriptive title based on the actual error content
             title = f"Error pattern detected in {workload_type} `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+            
+            # Try to extract more specific information for the title
+            if sample_lines:
+                first_sample = sample_lines[0]
+                
+                # Extract error message for more specific title
+                error_match = re.search(r'"error"\s*:\s*"([^"]+)"', first_sample)
+                if error_match:
+                    error_msg = error_match.group(1)
+                    
+                    # Extract service name if present
+                    service_match = re.search(r'(?:could not|failed to|unable to)\s+(?:retrieve|get|fetch|connect to|add to)\s+([a-zA-Z][a-zA-Z0-9\-]{2,15})', error_msg, re.IGNORECASE)
+                    if service_match:
+                        service_name = service_match.group(1)
+                        # Create service-specific title
+                        title = f"`{service_name}` service connection failures in {workload_type} `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+                    else:
+                        # Extract error type for more specific title
+                        if 'connection refused' in error_msg.lower():
+                            title = f"Connection refused errors in {workload_type} `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+                        elif 'timeout' in error_msg.lower():
+                            title = f"Timeout errors in {workload_type} `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+                        elif 'rpc error' in error_msg.lower():
+                            title = f"RPC communication errors in {workload_type} `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+                        elif 'authentication' in error_msg.lower() or 'auth' in error_msg.lower():
+                            title = f"Authentication errors in {workload_type} `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+                        elif 'permission' in error_msg.lower() or 'forbidden' in error_msg.lower():
+                            title = f"Permission/authorization errors in {workload_type} `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+                        elif 'not found' in error_msg.lower() or '404' in error_msg:
+                            title = f"Resource not found errors in {workload_type} `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+                        elif 'database' in error_msg.lower() or 'db' in error_msg.lower():
+                            title = f"Database connection errors in {workload_type} `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+                        elif 'memory' in error_msg.lower() or 'out of memory' in error_msg.lower():
+                            title = f"Memory/resource exhaustion in {workload_type} `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+                        else:
+                            # Use first part of error message for context
+                            error_preview = error_msg[:50].strip()
+                            if error_preview:
+                                title = f"\"{error_preview}...\" errors in {workload_type} `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+                else:
+                    # Fallback title with entity names in backticks
+                    title = f"Error pattern detected in `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+            else:
+                # Fallback title with entity names in backticks
+                title = f"Error pattern detected in `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
             
             # Create properly formatted details string
             details_str = "\n\n".join(unique_details)
@@ -377,7 +411,7 @@ def extract_service_insights(sample_lines):
     rpc_patterns = [
         r'lookup\s+([a-zA-Z][a-zA-Z0-9\-\.]*service[a-zA-Z0-9\-\.]*)',  # DNS lookups to services
         r'([a-zA-Z][a-zA-Z0-9\-]*service)[:\s]',  # Service names with service suffix  
-        r'could not (?:retrieve|get|fetch|connect to) ([a-zA-Z][a-zA-Z0-9\-]{2,15}):',  # Action + simple service name
+        r'could not (?:retrieve|get|fetch|connect to|add to) ([a-zA-Z][a-zA-Z0-9\-]{2,15}):',  # Action + simple service name
         r'failed to (?:retrieve|get|fetch|connect to|add to) ([a-zA-Z][a-zA-Z0-9\-]{2,15}):',  # Failed actions with simple service name
         r'unable to (?:connect|reach|access) ([a-zA-Z][a-zA-Z0-9\-]{2,15})',  # Connection issues with simple service name
         r'connection refused to ([a-zA-Z][a-zA-Z0-9\-]{2,15})',  # Direct connection refusal to simple service name

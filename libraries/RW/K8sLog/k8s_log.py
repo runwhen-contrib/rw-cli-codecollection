@@ -345,19 +345,34 @@ class K8sLog:
         
         for line in lines:
             line = line.strip()
-            if line.startswith("Context (5 lines before/after):"):
+            if line.startswith("Context (5 lines before/after):") or line.startswith("Context (deduplicated):"):
                 in_context = True
                 continue
             elif in_context and line == "":
                 in_context = False
                 break
-            elif in_context and line:
+            elif in_context:
                 context_lines.append(line)
         
-        # Return first few context lines if available
-        if context_lines:
-            return context_lines[:6]  # Show up to 6 context lines
-        return []
+        return context_lines
+
+    def _extract_key_actions(self, next_steps: str) -> str:
+        """Extract key actions from next steps for display."""
+        if not next_steps:
+            return ""
+        
+        # Split by newlines and take the first few meaningful steps
+        steps = next_steps.split('\n')
+        key_steps = []
+        
+        for step in steps:
+            step = step.strip()
+            if step and len(step) > 10:  # Only include substantial steps
+                key_steps.append(step)
+                if len(key_steps) >= 3:  # Limit to 3 key actions
+                    break
+        
+        return " | ".join(key_steps) if key_steps else ""
     
     def _extract_service_steps(self, next_steps: str) -> str:
         """Extract the most important service-specific action from next steps."""
