@@ -93,38 +93,34 @@ def build_grouped_report(data):
 
 
 def format_issue_summary(issue):
-    """Format a single issue for the summary report."""
-    title = issue.get("title", "Unknown Issue")
-    occurrences = issue.get("occurrences", 1)
-    category = issue.get("category", "Unknown")
-    severity_label = issue.get("severity_label", "Unknown")
-    
-    # Extract key details from the details string
-    details = issue.get("details", "")
-    affected_pods = extract_pod_info(details)
+    """Formats a single issue into a human-readable summary, extracting key info from details."""
+    title = issue.get('title', 'Unknown Issue')
+    severity = issue.get('severity_label', 'Unknown')
+    category = issue.get('category', 'N/A')
+    occurrences = issue.get('occurrences', 'N/A')
     
     summary_parts = [
-        f"**{title}**",
-        f"  Category: {category} | Severity: {severity_label} | Occurrences: {occurrences}"
+        f"**Issue: {title}**",
+        f"  • Severity: {severity} | Category: {category} | Occurrences: {occurrences}"
     ]
     
-    if affected_pods:
-        pod_summary = ", ".join(f"{pod} ({count}x)" for pod, count in affected_pods.items())
-        summary_parts.append(f"  Affected Pods: {pod_summary}")
+    # The 'details' field contains pre-formatted log groups
+    details_text = issue.get('details', '')
     
-    # Add a sample log line if available
-    sample_line = extract_sample_line(details)
-    if sample_line:
-        summary_parts.append(f"  Sample: {sample_line}")
+    # Extract the top 3-4 log groups from the details to keep the summary concise
+    log_groups = details_text.split('... and ')[0] # Get text before the "... and more"
+    log_group_lines = log_groups.strip().split('\n')
     
-    # Add context information if available
-    context_lines = extract_context_sample(details)
-    if context_lines:
-        summary_parts.append("  Context:")
-        for ctx_line in context_lines:
-            summary_parts.append(f"    {ctx_line}")
-    
-    summary_parts.append("")  # Add spacing
+    # Limit to a reasonable number of lines for the summary
+    max_lines_in_summary = 15
+    if len(log_group_lines) > max_lines_in_summary:
+        log_group_lines = log_group_lines[:max_lines_in_summary]
+        log_group_lines.append("    ... (details truncated for summary)")
+
+    if log_group_lines:
+        summary_parts.append("  • **Sample Log Groups:**")
+        summary_parts.extend([f"    {line}" for line in log_group_lines])
+
     return "\n".join(summary_parts)
 
 
@@ -222,7 +218,7 @@ def summarize_lines(log_text, fuzzy_threshold=85):
     pattern_summaries = []
     for group in grouped[:5]:  # Show top 5 patterns
         sample = group["sample"]
-        count = group["count"]
+            count = group["count"]
         if len(sample) > 80:
             sample = sample[:77] + "..."
         pattern_summaries.append(f"{count}x: {sample}")

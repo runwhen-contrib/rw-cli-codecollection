@@ -8,6 +8,21 @@ import sys
 from collections import defaultdict
 from difflib import SequenceMatcher
 
+def cleanup_log_line_for_grouping(line):
+    """Remove variable parts of a log line for better grouping."""
+    # Remove timestamps (ISO format or custom 'dd-mm-yyyy hh:mm:ss.ms')
+    line = re.sub(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z?', '', line)
+    line = re.sub(r'\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}\.\d{3}', '', line)
+    # Remove thread names in brackets
+    line = re.sub(r'\[[^\][]*\]', '', line)
+    # Remove UUIDs and similar trace/transaction IDs (hex or alphanumeric)
+    line = re.sub(r'[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}', '', line, flags=re.IGNORECASE)
+    line = re.sub(r'\b[a-f0-9]{10,}\b', '', line, flags=re.IGNORECASE) # long hex strings (trace ids)
+    line = re.sub(r'\b[a-zA-Z0-9]*unknown[a-zA-Z0-9]*\b', '', line, flags=re.IGNORECASE) # IDs like '11989unknown...'
+    # Remove any remaining numbers that look like IDs or counters
+    line = re.sub(r'\b\d{5,}\b', '', line)
+    return line
+
 def main():
     namespace = os.getenv("NAMESPACE")
     workload_type = os.getenv("WORKLOAD_TYPE")
@@ -168,31 +183,44 @@ def main():
             total_occurrences = 0
             sample_lines = []
             all_context_lines = []  # Collect all context lines for deduplication
-            
+
+            # --- Start: Cross-pod aggregation ---
+            all_lines_from_all_pods = []
             for match in pattern_matches:
-                pod = match["pod"]
-                container = match["container"]
-                grouped_lines = match["grouped_lines"]
+                for group in match["grouped_lines"]:
+                    for similar_line in group["similar"]:
+                        line_with_meta = similar_line.copy()
+                        line_with_meta['pod'] = match['pod']
+                        line_with_meta['container'] = match['container']
+                        all_lines_from_all_pods.append(line_with_meta)
+            
+            # Group these lines across all pods to collapse similar messages
+            cross_pod_groups = group_similar_lines(all_lines_from_all_pods)
+            total_occurrences = sum(g['count'] for g in cross_pod_groups)
+            # --- End: Cross-pod aggregation ---
+
+            # Limit the number of groups shown in the report for conciseness
+            max_groups_to_show = 5
+            groups_to_show = cross_pod_groups[:max_groups_to_show]
+
+            # Build the summary of log groups
+            for group in groups_to_show:
+                sample_line = group["sample"]
+                count = group["count"]
                 
-                for group in grouped_lines:
-                    sample_line = group["sample"]
-                    count = group["count"]
-                    context_lines = group.get("context", [])
-                    total_occurrences += count
-                    sample_lines.append(sample_line)
-                    
-                    # Collect context lines for deduplication
-                    all_context_lines.extend(context_lines)
-                    
-                    if count > 1:
-                        details_parts.append(f"Pod: {pod} ({container}) - {count}x occurrences of pattern:")
-                    else:
-                        details_parts.append(f"Pod: {pod} ({container}):")
-                    
-                    # Add the sample line (full error log line)
-                    details_parts.append(f"{sample_line}")
-                    
-                    details_parts.append("")  # Add spacing between groups
+                # Identify unique pods in this group
+                pods_in_group = sorted(list(set([f"`{line['pod']}`" for line in group['similar']])))
+                
+                details_parts.append(f"• **{count}x occurrences** across {len(pods_in_group)} pod(s): {', '.join(pods_in_group)}")
+                details_parts.append(f"  Sample: `{sample_line}`")
+                details_parts.append("") # Spacer
+                
+                sample_lines.append(sample_line)
+                all_context_lines.extend(group.get("context", []))
+
+            if len(cross_pod_groups) > max_groups_to_show:
+                details_parts.append(f"... and {len(cross_pod_groups) - max_groups_to_show} more similar log groups.")
+                details_parts.append("")
             
             # Add deduplicated context at the end
             if all_context_lines:
@@ -496,8 +524,12 @@ def group_similar_lines(lines, similarity_threshold=0.8):
             else:
                 other_line_content = other_line_data
                 
+            # Clean lines before comparing to ignore timestamps, uuids, etc.
+            cleaned_line1 = cleanup_log_line_for_grouping(line_content)
+            cleaned_line2 = cleanup_log_line_for_grouping(other_line_content)
+            
             # Calculate similarity
-            similarity = SequenceMatcher(None, line_content, other_line_content).ratio()
+            similarity = SequenceMatcher(None, cleaned_line1, cleaned_line2).ratio()
             if similarity >= similarity_threshold:
                 group["count"] += 1
                 group["similar"].append(other_line_data)
