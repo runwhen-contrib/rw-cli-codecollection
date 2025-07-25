@@ -415,8 +415,8 @@ Fetch Deployment Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
             ...    include_in_history=false
             
             # Handle empty output from wc -l by providing default values
-            ${total_lines_clean}=    Set Variable If    "${total_lines.stdout}" == ""    0    ${total_lines.stdout}
-            ${health_check_lines_clean}=    Set Variable If    "${health_check_lines.stdout}" == ""    0    ${health_check_lines.stdout}
+            ${total_lines_clean}=    Set Variable If    "${total_lines.stdout.strip()}" == ""    0    ${total_lines.stdout.strip()}
+            ${health_check_lines_clean}=    Set Variable If    "${health_check_lines.stdout.strip()}" == ""    0    ${health_check_lines.stdout.strip()}
             
             ${total_count}=    Convert To Integer    ${total_lines_clean}
             ${health_count}=    Convert To Integer    ${health_check_lines_clean}
