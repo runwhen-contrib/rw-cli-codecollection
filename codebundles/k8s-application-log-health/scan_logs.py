@@ -334,31 +334,40 @@ def main():
                     service_match = re.search(r'(?:could not|failed to|unable to)\s+(?:retrieve|get|fetch|connect to|add to)\s+([a-zA-Z][a-zA-Z0-9\-]{2,15})', error_msg, re.IGNORECASE)
                     if service_match:
                         service_name = service_match.group(1)
-                        # Create service-specific title
-                        title = f"`{service_name}` service connection failures in {workload_type} `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+                        # Create service-specific title with error snippet
+                        error_snippet = error_msg[:40].strip()
+                        title = f"`{service_name}` service errors in {workload_type} `{workload_name}` - \"{error_snippet}...\" ({issue_data['total_occurrences']} occurrences)"
                     else:
                         # Extract error type for more specific title
                         if 'connection refused' in error_msg.lower():
-                            title = f"Connection refused errors in {workload_type} `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+                            error_snippet = error_msg[:40].strip()
+                            title = f"Connection refused errors in {workload_type} `{workload_name}` - \"{error_snippet}...\" ({issue_data['total_occurrences']} occurrences)"
                         elif 'timeout' in error_msg.lower():
-                            title = f"Timeout errors in {workload_type} `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+                            error_snippet = error_msg[:40].strip()
+                            title = f"Timeout errors in {workload_type} `{workload_name}` - \"{error_snippet}...\" ({issue_data['total_occurrences']} occurrences)"
                         elif 'rpc error' in error_msg.lower():
-                            title = f"RPC communication errors in {workload_type} `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+                            error_snippet = error_msg[:40].strip()
+                            title = f"RPC communication errors in {workload_type} `{workload_name}` - \"{error_snippet}...\" ({issue_data['total_occurrences']} occurrences)"
                         elif 'authentication' in error_msg.lower() or 'auth' in error_msg.lower():
-                            title = f"Authentication errors in {workload_type} `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+                            error_snippet = error_msg[:40].strip()
+                            title = f"Authentication errors in {workload_type} `{workload_name}` - \"{error_snippet}...\" ({issue_data['total_occurrences']} occurrences)"
                         elif 'permission' in error_msg.lower() or 'forbidden' in error_msg.lower():
-                            title = f"Permission/authorization errors in {workload_type} `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+                            error_snippet = error_msg[:40].strip()
+                            title = f"Permission/authorization errors in {workload_type} `{workload_name}` - \"{error_snippet}...\" ({issue_data['total_occurrences']} occurrences)"
                         elif 'not found' in error_msg.lower() or '404' in error_msg:
-                            title = f"Resource not found errors in {workload_type} `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+                            error_snippet = error_msg[:40].strip()
+                            title = f"Resource not found errors in {workload_type} `{workload_name}` - \"{error_snippet}...\" ({issue_data['total_occurrences']} occurrences)"
                         elif 'database' in error_msg.lower() or 'db' in error_msg.lower():
-                            title = f"Database connection errors in {workload_type} `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+                            error_snippet = error_msg[:40].strip()
+                            title = f"Database connection errors in {workload_type} `{workload_name}` - \"{error_snippet}...\" ({issue_data['total_occurrences']} occurrences)"
                         elif 'memory' in error_msg.lower() or 'out of memory' in error_msg.lower():
-                            title = f"Memory/resource exhaustion in {workload_type} `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+                            error_snippet = error_msg[:40].strip()
+                            title = f"Memory/resource exhaustion in {workload_type} `{workload_name}` - \"{error_snippet}...\" ({issue_data['total_occurrences']} occurrences)"
                         else:
                             # Use first part of error message for context
-                            error_preview = error_msg[:50].strip()
+                            error_preview = error_msg[:40].strip()
                             if error_preview:
-                                title = f"\"{error_preview}...\" errors in {workload_type} `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+                                title = f"Error pattern in {workload_type} `{workload_name}` - \"{error_preview}...\" ({issue_data['total_occurrences']} occurrences)"
                 else:
                     # Fallback title with entity names in backticks
                     title = f"Error pattern detected in `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
