@@ -8,6 +8,21 @@ import sys
 from collections import defaultdict
 from difflib import SequenceMatcher
 
+def cleanup_log_line_for_grouping(line):
+    """Remove variable parts of a log line for better grouping."""
+    # Remove timestamps (ISO format or custom 'dd-mm-yyyy hh:mm:ss.ms')
+    line = re.sub(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z?', '', line)
+    line = re.sub(r'\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}\.\d{3}', '', line)
+    # Remove thread names in brackets
+    line = re.sub(r'\[[^\][]*\]', '', line)
+    # Remove UUIDs and similar trace/transaction IDs (hex or alphanumeric)
+    line = re.sub(r'[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}', '', line, flags=re.IGNORECASE)
+    line = re.sub(r'\b[a-f0-9]{10,}\b', '', line, flags=re.IGNORECASE) # long hex strings (trace ids)
+    line = re.sub(r'\b[a-zA-Z0-9]*unknown[a-zA-Z0-9]*\b', '', line, flags=re.IGNORECASE) # IDs like '11989unknown...'
+    # Remove any remaining numbers that look like IDs or counters
+    line = re.sub(r'\b\d{5,}\b', '', line)
+    return line
+
 def main():
     namespace = os.getenv("NAMESPACE")
     workload_type = os.getenv("WORKLOAD_TYPE")
@@ -158,6 +173,9 @@ def main():
     issues_json = {"issues": [], "summary": []}
 
     if category_issues:
+        # Consolidate issues by actual error content to avoid duplicates
+        consolidated_issues = {}
+        
         for pattern_key, pattern_matches in category_issues.items():
             category = pattern_matches[0]["category"]
             pattern = pattern_matches[0]["pattern"]
@@ -168,31 +186,44 @@ def main():
             total_occurrences = 0
             sample_lines = []
             all_context_lines = []  # Collect all context lines for deduplication
-            
+
+            # --- Start: Cross-container aggregation (not pod-level) ---
+            all_lines_from_all_containers = []
             for match in pattern_matches:
-                pod = match["pod"]
-                container = match["container"]
-                grouped_lines = match["grouped_lines"]
+                for group in match["grouped_lines"]:
+                    for similar_line in group["similar"]:
+                        line_with_meta = similar_line.copy()
+                        line_with_meta['pod'] = match['pod']
+                        line_with_meta['container'] = match['container']
+                        all_lines_from_all_containers.append(line_with_meta)
+            
+            # Group these lines across all containers to collapse similar messages
+            cross_container_groups = group_similar_lines(all_lines_from_all_containers)
+            total_occurrences = sum(g['count'] for g in cross_container_groups)
+            # --- End: Cross-container aggregation ---
+
+            # Limit the number of groups shown in the report for conciseness
+            max_groups_to_show = 5
+            groups_to_show = cross_container_groups[:max_groups_to_show]
+
+            # Build the summary of log groups
+            for group in groups_to_show:
+                sample_line = group["sample"]
+                count = group["count"]
                 
-                for group in grouped_lines:
-                    sample_line = group["sample"]
-                    count = group["count"]
-                    context_lines = group.get("context", [])
-                    total_occurrences += count
-                    sample_lines.append(sample_line)
-                    
-                    # Collect context lines for deduplication
-                    all_context_lines.extend(context_lines)
-                    
-                    if count > 1:
-                        details_parts.append(f"Pod: {pod} ({container}) - {count}x occurrences of pattern:")
-                    else:
-                        details_parts.append(f"Pod: {pod} ({container}):")
-                    
-                    # Add the sample line (full error log line)
-                    details_parts.append(f"{sample_line}")
-                    
-                    details_parts.append("")  # Add spacing between groups
+                # Group by container name instead of pod name for cleaner reporting
+                containers_in_group = sorted(list(set([f"`{line['container']}`" for line in group['similar']])))
+                
+                details_parts.append(f"• **{count}x occurrences** in container(s): {', '.join(containers_in_group)}")
+                details_parts.append(f"  Sample: `{sample_line}`")
+                details_parts.append("") # Spacer
+                
+                sample_lines.append(sample_line)
+                all_context_lines.extend(group.get("context", []))
+
+            if len(cross_container_groups) > max_groups_to_show:
+                details_parts.append(f"... and {len(cross_container_groups) - max_groups_to_show} more similar log groups.")
+                details_parts.append("")
             
             # Add deduplicated context at the end
             if all_context_lines:
@@ -227,26 +258,140 @@ def main():
             
             severity_label = severity_label_map.get(severity, f"Unknown({severity})")
 
-            title = f"{category} pattern detected in {workload_type} `{workload_name}` ({total_occurrences} occurrences)"
+            # Create a content-based key to consolidate similar issues
+            # Use the first sample line as the key to group similar errors
+            if sample_lines:
+                # Create a more robust content key that considers the actual error message
+                first_sample = sample_lines[0]
+                # Extract the error message part for better grouping
+                error_match = re.search(r'"error"\s*:\s*"([^"]+)"', first_sample)
+                if error_match:
+                    error_msg = error_match.group(1)
+                    # Clean the error message for grouping
+                    cleaned_error = cleanup_log_line_for_grouping(error_msg)
+                    content_key = f"error:{cleaned_error[:100]}"
+                else:
+                    # Fallback to the original method
+                    content_key = cleanup_log_line_for_grouping(first_sample)
+            else:
+                content_key = f"{category}:{pattern[:50]}"
             
-            # Create properly formatted details string instead of complex object
-            details_str = "\n\n".join(details_parts)
+            # Consolidate issues with the same content
+            if content_key in consolidated_issues:
+                # Merge with existing issue
+                existing = consolidated_issues[content_key]
+                existing["total_occurrences"] += total_occurrences
+                existing["severity"] = min(existing["severity"], severity)
+                existing["details_parts"].extend(details_parts)
+                existing["sample_lines"].extend(sample_lines)
+                existing["unique_next_steps"].extend(unique_next_steps)
+                # Use the most descriptive category name
+                if len(category) > len(existing["category"]):
+                    existing["category"] = category
+            else:
+                # Create new consolidated issue
+                consolidated_issues[content_key] = {
+                    "category": category,
+                    "severity": severity,
+                    "total_occurrences": total_occurrences,
+                    "details_parts": details_parts,
+                    "sample_lines": sample_lines,
+                    "unique_next_steps": unique_next_steps
+                }
 
-            # Add the issues entry
+        # Create final issues from consolidated data
+        for content_key, issue_data in consolidated_issues.items():
+            # Deduplicate and clean up the merged data
+            unique_details = []
+            seen_details = set()
+            
+            for detail in issue_data["details_parts"]:
+                if detail not in seen_details:
+                    unique_details.append(detail)
+                    seen_details.add(detail)
+            
+            # Take unique sample lines (up to 3)
+            unique_samples = list(dict.fromkeys(issue_data["sample_lines"]))[:3]
+            
+            # Deduplicate next steps
+            unique_next_steps = list(dict.fromkeys(issue_data["unique_next_steps"]))
+            
+            severity_label = severity_label_map.get(issue_data["severity"], f"Unknown({issue_data['severity']})")
+            
+            # Create a more descriptive title based on the actual error content
+            title = f"Error pattern detected in {workload_type} `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+            
+            # Try to extract more specific information for the title
+            if sample_lines:
+                first_sample = sample_lines[0]
+                
+                # Extract error message for more specific title
+                error_match = re.search(r'"error"\s*:\s*"([^"]+)"', first_sample)
+                if error_match:
+                    error_msg = error_match.group(1)
+                    
+                    # Extract service name if present
+                    service_match = re.search(r'(?:could not|failed to|unable to)\s+(?:retrieve|get|fetch|connect to|add to)\s+([a-zA-Z][a-zA-Z0-9\-]{2,15})', error_msg, re.IGNORECASE)
+                    if service_match:
+                        service_name = service_match.group(1)
+                        # Create service-specific title with error snippet
+                        error_snippet = error_msg[:40].strip()
+                        title = f"`{service_name}` service errors in {workload_type} `{workload_name}` - \"{error_snippet}...\" ({issue_data['total_occurrences']} occurrences)"
+                    else:
+                        # Extract error type for more specific title
+                        if 'connection refused' in error_msg.lower():
+                            error_snippet = error_msg[:40].strip()
+                            title = f"Connection refused errors in {workload_type} `{workload_name}` - \"{error_snippet}...\" ({issue_data['total_occurrences']} occurrences)"
+                        elif 'timeout' in error_msg.lower():
+                            error_snippet = error_msg[:40].strip()
+                            title = f"Timeout errors in {workload_type} `{workload_name}` - \"{error_snippet}...\" ({issue_data['total_occurrences']} occurrences)"
+                        elif 'rpc error' in error_msg.lower():
+                            error_snippet = error_msg[:40].strip()
+                            title = f"RPC communication errors in {workload_type} `{workload_name}` - \"{error_snippet}...\" ({issue_data['total_occurrences']} occurrences)"
+                        elif 'authentication' in error_msg.lower() or 'auth' in error_msg.lower():
+                            error_snippet = error_msg[:40].strip()
+                            title = f"Authentication errors in {workload_type} `{workload_name}` - \"{error_snippet}...\" ({issue_data['total_occurrences']} occurrences)"
+                        elif 'permission' in error_msg.lower() or 'forbidden' in error_msg.lower():
+                            error_snippet = error_msg[:40].strip()
+                            title = f"Permission/authorization errors in {workload_type} `{workload_name}` - \"{error_snippet}...\" ({issue_data['total_occurrences']} occurrences)"
+                        elif 'not found' in error_msg.lower() or '404' in error_msg:
+                            error_snippet = error_msg[:40].strip()
+                            title = f"Resource not found errors in {workload_type} `{workload_name}` - \"{error_snippet}...\" ({issue_data['total_occurrences']} occurrences)"
+                        elif 'database' in error_msg.lower() or 'db' in error_msg.lower():
+                            error_snippet = error_msg[:40].strip()
+                            title = f"Database connection errors in {workload_type} `{workload_name}` - \"{error_snippet}...\" ({issue_data['total_occurrences']} occurrences)"
+                        elif 'memory' in error_msg.lower() or 'out of memory' in error_msg.lower():
+                            error_snippet = error_msg[:40].strip()
+                            title = f"Memory/resource exhaustion in {workload_type} `{workload_name}` - \"{error_snippet}...\" ({issue_data['total_occurrences']} occurrences)"
+                        else:
+                            # Use first part of error message for context
+                            error_preview = error_msg[:40].strip()
+                            if error_preview:
+                                title = f"Error pattern in {workload_type} `{workload_name}` - \"{error_preview}...\" ({issue_data['total_occurrences']} occurrences)"
+                else:
+                    # Fallback title with entity names in backticks
+                    title = f"Error pattern detected in `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+            else:
+                # Fallback title with entity names in backticks
+                title = f"Error pattern detected in `{workload_name}` ({issue_data['total_occurrences']} occurrences)"
+            
+            # Create properly formatted details string
+            details_str = "\n\n".join(unique_details)
+
+            # Add the consolidated issues entry
             issues_json["issues"].append({
                 "title": title,
-                "details": details_str,  # Use string instead of dict to avoid serialization issues
+                "details": details_str,
                 "next_steps": "\n".join(unique_next_steps),
-                "severity": severity, 
+                "severity": issue_data["severity"], 
                 "severity_label": severity_label,
-                "occurrences": total_occurrences,
-                "pattern": pattern,
-                "category": category
+                "occurrences": issue_data["total_occurrences"],
+                "category": issue_data["category"]
             })
 
         # Generate summary
-        total_issues = len(category_issues)
-        categories_found = set(match["category"] for matches in category_issues.values() for match in matches)
+        total_issues = len(consolidated_issues)
+        categories_found = set(issue_data["category"] for issue_data in consolidated_issues.values())
         
         severity_label = severity_label_map.get(max_severity, f"Unknown({max_severity})")
         issues_json["summary"].append(
@@ -275,7 +420,7 @@ def extract_service_insights(sample_lines):
     rpc_patterns = [
         r'lookup\s+([a-zA-Z][a-zA-Z0-9\-\.]*service[a-zA-Z0-9\-\.]*)',  # DNS lookups to services
         r'([a-zA-Z][a-zA-Z0-9\-]*service)[:\s]',  # Service names with service suffix  
-        r'could not (?:retrieve|get|fetch|connect to) ([a-zA-Z][a-zA-Z0-9\-]{2,15}):',  # Action + simple service name
+        r'could not (?:retrieve|get|fetch|connect to|add to) ([a-zA-Z][a-zA-Z0-9\-]{2,15}):',  # Action + simple service name
         r'failed to (?:retrieve|get|fetch|connect to|add to) ([a-zA-Z][a-zA-Z0-9\-]{2,15}):',  # Failed actions with simple service name
         r'unable to (?:connect|reach|access) ([a-zA-Z][a-zA-Z0-9\-]{2,15})',  # Connection issues with simple service name
         r'connection refused to ([a-zA-Z][a-zA-Z0-9\-]{2,15})',  # Direct connection refusal to simple service name
@@ -496,8 +641,12 @@ def group_similar_lines(lines, similarity_threshold=0.8):
             else:
                 other_line_content = other_line_data
                 
+            # Clean lines before comparing to ignore timestamps, uuids, etc.
+            cleaned_line1 = cleanup_log_line_for_grouping(line_content)
+            cleaned_line2 = cleanup_log_line_for_grouping(other_line_content)
+            
             # Calculate similarity
-            similarity = SequenceMatcher(None, line_content, other_line_content).ratio()
+            similarity = SequenceMatcher(None, cleaned_line1, cleaned_line2).ratio()
             if similarity >= similarity_threshold:
                 group["count"] += 1
                 group["similar"].append(other_line_data)

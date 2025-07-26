@@ -8,7 +8,7 @@ import subprocess
 import tempfile
 from robot.api.deco import keyword, library
 from robot.api import logger
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional, Tuple, Union
 from RW import platform
 
 
@@ -252,71 +252,40 @@ class K8sLog:
             return str(issue_details)
     
     @keyword
-    def format_scan_results_for_display(self, scan_results: Dict[str, Any]) -> str:
-        """Format scan results into a readable display string to avoid serialization issues.
-        
-        Args:
-            scan_results: Dictionary containing scan results
-            
-        Returns:
-            Formatted string representation of the results
-        """
-        if not scan_results:
-            return "No scan results available"
-        
-        # Handle string input (in case scan_results was already serialized)
+    def format_scan_results_for_display(self, scan_results: Union[str, Dict[str, Any]]) -> str:
+        """Formats log scan results into a human-readable string for display in reports."""
         if isinstance(scan_results, str):
             try:
                 scan_results = json.loads(scan_results)
             except json.JSONDecodeError:
-                return f"Unable to parse scan results: {scan_results[:200]}..."
-            
-        issues = scan_results.get('issues', [])
+                return "Error: Could not decode scan results."
+
+        issues = scan_results.get("issues", [])
         if not issues:
-            summary = scan_results.get('summary', [])
-            summary_text = "\n".join(summary) if summary else "No issues found in logs"
-            return f"✅ No log issues detected.\n{summary_text}"
+            return "✅ No significant issues found in logs."
+
+        report_parts = ["📋 **Log Issues Found:**", "========================================"]
         
-        output_parts = []
-        output_parts.append("📋 **Log Issues Found:**")
-        output_parts.append("=" * 40)
-        
-        for i, issue in enumerate(issues, 1):
-            # Safely extract issue data
+        for issue in issues:
             title = self._safe_get(issue, 'title', 'Unknown Issue')
-            severity_label = self._safe_get(issue, 'severity_label', 'Unknown')
-            occurrences = self._safe_get(issue, 'occurrences', 1)
-            category = self._safe_get(issue, 'category', 'Unknown')
-            
-            output_parts.append(f"\n**Issue {i}: {title}**")
-            output_parts.append(f"  • Severity: {severity_label}")
-            output_parts.append(f"  • Category: {category}")
-            output_parts.append(f"  • Occurrences: {occurrences}")
-            
-            # Add sample details (truncated for readability)
+            severity = self._safe_get(issue, 'severity_label', 'Unknown')
+            category = self._safe_get(issue, 'category', 'N/A')
+            occurrences = self._safe_get(issue, 'occurrences', 'N/A')
+            # The 'details' field is now pre-formatted by scan_logs.py with grouped samples and context
             details = self._safe_get(issue, 'details', '')
-            if details:
-                # Extract first meaningful line as sample
-                sample_line = self._extract_sample_line(details)
-                if sample_line:
-                    output_parts.append(f"  • Sample: {sample_line}")
-            
-            # Add context sample
-            context_sample = self._extract_context_sample(details)
-            if context_sample:
-                output_parts.append("  • Context:")
-                for line in context_sample:
-                    output_parts.append(f"    {line}")
-            
-            # Add service-specific next steps if available
-            next_steps = self._safe_get(issue, 'next_steps', '')
-            if next_steps:
-                # Extract service-specific guidance
-                service_steps = self._extract_service_steps(next_steps)
-                if service_steps:
-                    output_parts.append(f"  • Key Actions: {service_steps}")
+            key_actions = self._extract_key_actions(self._safe_get(issue, 'next_steps', ''))
+
+            report_parts.append(f"**Issue: {title}**")
+            report_parts.append(f"  • Severity: {severity} | Category: {category} | Occurrences: {occurrences}")
+            if key_actions:
+                report_parts.append(f"  • Key Actions: {key_actions}")
         
-        return "\n".join(output_parts)
+            # Add a separator before the detailed log groups
+            report_parts.append("---")
+            report_parts.append(details) # Use the pre-formatted details directly
+            report_parts.append("----------------------------------------")
+
+        return "\n".join(report_parts)
     
     def _safe_get(self, obj: Any, key: str, default: Any = None) -> Any:
         """Safely get a value from an object, handling various data types."""
@@ -376,19 +345,34 @@ class K8sLog:
         
         for line in lines:
             line = line.strip()
-            if line.startswith("Context (5 lines before/after):"):
+            if line.startswith("Context (5 lines before/after):") or line.startswith("Context (deduplicated):"):
                 in_context = True
                 continue
             elif in_context and line == "":
                 in_context = False
                 break
-            elif in_context and line:
+            elif in_context:
                 context_lines.append(line)
         
-        # Return first few context lines if available
-        if context_lines:
-            return context_lines[:6]  # Show up to 6 context lines
-        return []
+        return context_lines
+
+    def _extract_key_actions(self, next_steps: str) -> str:
+        """Extract key actions from next steps for display."""
+        if not next_steps:
+            return ""
+        
+        # Split by newlines and take the first few meaningful steps
+        steps = next_steps.split('\n')
+        key_steps = []
+        
+        for step in steps:
+            step = step.strip()
+            if step and len(step) > 10:  # Only include substantial steps
+                key_steps.append(step)
+                if len(key_steps) >= 3:  # Limit to 3 key actions
+                    break
+        
+        return " | ".join(key_steps) if key_steps else ""
     
     def _extract_service_steps(self, next_steps: str) -> str:
         """Extract the most important service-specific action from next steps."""

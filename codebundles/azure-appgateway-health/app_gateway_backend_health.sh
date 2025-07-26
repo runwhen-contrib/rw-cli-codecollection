@@ -169,6 +169,86 @@ else
                         next_step="Check the AKS Cluster hosting \`$address\` in Resource Group \`$resource_group_from_lookup\`${newline}(e.g., check Pod logs, cluster health, k8s events) [Portal link]($portal_url)"
                     fi
 
+                elif [[ "$address" == *.blob.core.windows.net ]]; then
+                    resource_type="Azure Storage Account"
+                    storage_account_name=$(echo "$address" | sed 's/.blob.core.windows.net//')
+                    storage_account_details=$(az storage account list \
+                        --query "[?primaryEndpoints.blob=='https://$address/'] | [0]" -o json 2>/dev/null)
+                    resource_id=$(echo "$storage_account_details" | jq -r '.id // empty')
+                    resource_group_from_lookup=$(echo "$storage_account_details" | jq -r '.resourceGroup // empty')
+
+                    if [ -n "$resource_id" ]; then
+                        portal_url="https://portal.azure.com/#@/resource${resource_id}"
+                        next_step="Check Azure Storage Account \`$storage_account_name\` Health in Resource Group \`$resource_group_from_lookup\`${newline}(e.g., check storage account status, blob service availability, network rules) [Portal link]($portal_url)"
+                    fi
+
+                elif [[ "$address" == *.file.core.windows.net ]] || [[ "$address" == *.queue.core.windows.net ]] || [[ "$address" == *.table.core.windows.net ]]; then
+                    resource_type="Azure Storage Account"
+                    storage_account_name=$(echo "$address" | sed 's/\.\(file\|queue\|table\)\.core\.windows\.net//')
+                    storage_account_details=$(az storage account list \
+                        --query "[?name=='$storage_account_name'] | [0]" -o json 2>/dev/null)
+                    resource_id=$(echo "$storage_account_details" | jq -r '.id // empty')
+                    resource_group_from_lookup=$(echo "$storage_account_details" | jq -r '.resourceGroup // empty')
+
+                    if [ -n "$resource_id" ]; then
+                        portal_url="https://portal.azure.com/#@/resource${resource_id}"
+                        next_step="Check Azure Storage Account \`$storage_account_name\` Health in Resource Group \`$resource_group_from_lookup\`${newline}(e.g., check storage account status, service availability, network rules) [Portal link]($portal_url)"
+                    fi
+
+                elif [[ "$address" == *.azure-api.net ]]; then
+                    resource_type="Azure API Management"
+                    apim_name=$(echo "$address" | sed 's/.azure-api.net//')
+                    apim_details=$(az apim list \
+                        --query "[?gatewayUrl=='https://$address'] | [0]" -o json 2>/dev/null)
+                    resource_id=$(echo "$apim_details" | jq -r '.id // empty')
+                    resource_group_from_lookup=$(echo "$apim_details" | jq -r '.resourceGroup // empty')
+
+                    if [ -n "$resource_id" ]; then
+                        portal_url="https://portal.azure.com/#@/resource${resource_id}"
+                        next_step="Check Azure API Management \`$apim_name\` Health in Resource Group \`$resource_group_from_lookup\`${newline}(e.g., check API status, gateway health, backend services) [Portal link]($portal_url)"
+                    fi
+
+                elif [[ "$address" == *.azureedge.net ]]; then
+                    resource_type="Azure CDN"
+                    cdn_name=$(echo "$address" | sed 's/.azureedge.net//')
+                    cdn_details=$(az cdn profile list \
+                        --query "[?contains(endpointNames, '$cdn_name')] | [0]" -o json 2>/dev/null)
+                    resource_id=$(echo "$cdn_details" | jq -r '.id // empty')
+                    resource_group_from_lookup=$(echo "$cdn_details" | jq -r '.resourceGroup // empty')
+
+                    if [ -n "$resource_id" ]; then
+                        portal_url="https://portal.azure.com/#@/resource${resource_id}"
+                        next_step="Check Azure CDN Profile hosting \`$cdn_name\` in Resource Group \`$resource_group_from_lookup\`${newline}(e.g., check CDN endpoint status, origin health, cache performance) [Portal link]($portal_url)"
+                    fi
+
+                elif [[ "$address" == *.database.windows.net ]]; then
+                    resource_type="Azure SQL Database"
+                    sql_server_name=$(echo "$address" | sed 's/.database.windows.net//')
+                    sql_server_details=$(az sql server list \
+                        --query "[?fullyQualifiedDomainName=='$address'] | [0]" -o json 2>/dev/null)
+                    resource_id=$(echo "$sql_server_details" | jq -r '.id // empty')
+                    resource_group_from_lookup=$(echo "$sql_server_details" | jq -r '.resourceGroup // empty')
+
+                    if [ -n "$resource_id" ]; then
+                        portal_url="https://portal.azure.com/#@/resource${resource_id}"
+                        next_step="Check Azure SQL Server \`$sql_server_name\` Health in Resource Group \`$resource_group_from_lookup\`${newline}(e.g., check database connectivity, firewall rules, performance metrics) [Portal link]($portal_url)"
+                    fi
+
+                elif [[ "$address" == *.postgres.database.azure.com ]] || [[ "$address" == *.mysql.database.azure.com ]]; then
+                    resource_type="Azure Database"
+                    db_server_name=$(echo "$address" | sed 's/\.\(postgres\|mysql\)\.database\.azure\.com//')
+                    db_server_details=$(az postgres flexible-server list --query "[?fullyQualifiedDomainName=='$address'] | [0]" -o json 2>/dev/null)
+                    if [ -z "$(echo "$db_server_details" | jq -r '.id // empty')" ]; then
+                        db_server_details=$(az mysql flexible-server list --query "[?fullyQualifiedDomainName=='$address'] | [0]" -o json 2>/dev/null)
+                    fi
+                    resource_id=$(echo "$db_server_details" | jq -r '.id // empty')
+                    resource_group_from_lookup=$(echo "$db_server_details" | jq -r '.resourceGroup // empty')
+
+                    if [ -n "$resource_id" ]; then
+                        portal_url="https://portal.azure.com/#@/resource${resource_id}"
+                        next_step="Check Azure Database Server \`$db_server_name\` Health in Resource Group \`$resource_group_from_lookup\`${newline}(e.g., check database connectivity, firewall rules, performance metrics) [Portal link]($portal_url)"
+                    fi
+
                 elif [[ "$address" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
                     resource_type="Virtual Machine / IP-based Pool"
                     resource_id=$(az vm list-ip-addresses \
