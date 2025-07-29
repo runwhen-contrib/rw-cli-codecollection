@@ -362,7 +362,7 @@ Inspect DaemonSet Warning Events for `${DAEMONSET_NAME}` in Namespace `${NAMESPA
                     ...    severity=${sample_pod_issue["severity"]}
                     ...    expected=Pod readiness and health should be maintained for DaemonSet `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
                     ...    actual=${pod_count} pods are experiencing issues for DaemonSet `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
-                    ...    title=Multiple Pod Issues for DaemonSet `${DAEMONSET_NAME}` (${pod_count} pods affected)
+                    ...    title=Multiple Pod Issues for DaemonSet `${DAEMONSET_NAME}`
                     ...    reproduce_hint=${events.cmd}
                     ...    details=**Affected Pods:** ${pod_count}\n\n${consolidated_pod_details}
                     ...    next_steps=${sample_pod_issue["next_steps"]}\n${related_resource_recommendations}

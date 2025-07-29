@@ -624,7 +624,7 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
                         ${affected_objects}=    Evaluate    $issue.get('affected_objects', '').rstrip(', ')
                         
                         IF    ${count} > 1
-                            ${title_suffix}=    Set Variable    (${count} objects affected)
+                            ${title_suffix}=    Set Variable    ${EMPTY}
                             ${details_prefix}=    Set Variable    **Affected Objects (${count}):** ${affected_objects}\n\n
                         ELSE
                             ${title_suffix}=    Set Variable    ${EMPTY}
