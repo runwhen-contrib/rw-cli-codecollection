@@ -356,7 +356,7 @@ def main():
                             title = f"Permission/authorization errors in {workload_type} `{workload_name}` - \"{error_snippet}...\""
                         elif 'not found' in error_msg.lower() or '404' in error_msg:
                             error_snippet = error_msg[:40].strip()
-                            title = f"Resource not found errors in {workload_name}` - \"{error_snippet}...\""
+                            title = f"Resource not found errors in {workload_type} `{workload_name}` - \"{error_snippet}...\""
                         elif 'database' in error_msg.lower() or 'db' in error_msg.lower():
                             error_snippet = error_msg[:40].strip()
                             title = f"Database connection errors in {workload_type} `{workload_name}` - \"{error_snippet}...\""
