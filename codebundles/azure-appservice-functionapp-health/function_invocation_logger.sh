@@ -78,6 +78,8 @@ declare -A SUCCESS_COUNTS
 declare -A FAILURE_COUNTS
 declare -A DURATION_PATTERNS
 declare -A MEMORY_PATTERNS
+declare -A AVG_DURATION
+declare -A AVG_MEMORY
 
 # Function to get detailed metrics with time series data
 get_detailed_invocation_data() {
@@ -114,6 +116,16 @@ get_detailed_invocation_data() {
         --filter "FunctionName eq '$function_name'" \
         --query "data[0].timeseries[0].data[].{timestamp: timeStamp, value: average}" -o json 2>/dev/null || echo "[]")
     
+    # Get memory data (if available)
+    local memory_timeseries=$(az monitor metrics list \
+        --resource "$FUNCTION_APP_ID" \
+        --metric "MemoryWorkingSet" \
+        --start-time "$START_TIME" \
+        --end-time "$END_TIME" \
+        --interval PT5M \
+        --filter "FunctionName eq '$function_name'" \
+        --query "data[0].timeseries[0].data[].{timestamp: timeStamp, value: average}" -o json 2>/dev/null || echo "[]")
+    
     # Calculate success/failure from time series
     local total_executions=$(echo "$execution_timeseries" | jq '[.[].value // 0] | add // 0')
     local total_errors=$(echo "$error_timeseries" | jq '[.[].value // 0] | add // 0')
@@ -132,10 +144,23 @@ get_detailed_invocation_data() {
     local max_duration=$(echo "$duration_timeseries" | jq '[.[].value // 0] | max // 0')
     local min_duration=$(echo "$duration_timeseries" | jq '[.[].value // 0] | min // 0')
     
+    # Store individual values for easy access
+    AVG_DURATION["$function_name"]=$(printf "%.0f" "$avg_duration")
+    
+    # Keep formatted string for backwards compatibility
     DURATION_PATTERNS["$function_name"]=$(printf "avg:%.0f,max:%.0f,min:%.0f" "$avg_duration" "$max_duration" "$min_duration")
+    
+    # Analyze memory patterns (convert from bytes to MB)
+    local avg_memory_bytes=$(echo "$memory_timeseries" | jq '[.[].value // 0] | add / length // 0')
+    local avg_memory_mb=$(echo "scale=1; $avg_memory_bytes / 1048576" | bc -l 2>/dev/null || echo "0.0")
+    
+    # Store individual values for easy access
+    AVG_MEMORY["$function_name"]=$(printf "%.1f" "$avg_memory_mb")
+    MEMORY_PATTERNS["$function_name"]=$(printf "%.1f" "$avg_memory_mb")
     
     echo "    ✅ Successes: $total_successes, ❌ Failures: $total_errors"
     echo "    ⏱️  Duration - Avg: ${avg_duration}ms, Max: ${max_duration}ms, Min: ${min_duration}ms"
+    echo "    💾 Memory - Avg: ${avg_memory_mb}MB"
 }
 
 # Function to create detailed invocation summary
@@ -234,8 +259,8 @@ if [[ "$TOTAL_INVOCATIONS" -gt 0 ]]; then
             details="$details\n- $func: IDLE (0 invocations)"
         else
             success_rate=$(echo "scale=1; $successes * 100 / $total" | bc -l 2>/dev/null || echo "0.0")
-            avg_duration="${DURATION_PATTERNS["$func"]:-0}"
-            avg_memory="${MEMORY_PATTERNS["$func"]:-0}"
+            avg_duration="${AVG_DURATION["$func"]:-0}"
+            avg_memory="${AVG_MEMORY["$func"]:-0.0}"
             details="$details\n- $func: $total invocations, ${success_rate}% success rate, ${avg_duration}ms avg duration, ${avg_memory}MB avg memory"
         fi
     done
