@@ -166,19 +166,38 @@ class K8sLog:
         error_codes = set()
         operations = set()
         
-        # Extract service names
+        # Extract service names - be more selective to avoid action words
         service_patterns = [
-            r'(?:could not|failed to|unable to)\s+(?:retrieve|get|fetch|connect to|add to)\s+([a-zA-Z][a-zA-Z0-9\-]{2,15})',
-            r'([a-zA-Z][a-zA-Z0-9\-]+)(?:service|svc)',
-            r'rpc error.*?service["\s]*([a-zA-Z][a-zA-Z0-9\-]+)',
-            r'dial tcp.*?([a-zA-Z][a-zA-Z0-9\-]+):'
+            # Pattern for "failed to retrieve cart" -> "cart"
+            r'(?:could not|failed to|unable to)\s+(?:retrieve|get|fetch|add to)\s+([a-zA-Z][a-zA-Z0-9\-]{3,15})(?:\s|:|$)',
+            # Pattern for "cartservice" or "cart-service"  
+            r'([a-zA-Z][a-zA-Z0-9\-]{3,15})(?:service|svc)(?:\s|:|$)',
+            # Pattern for RPC errors with service names
+            r'rpc error.*?service["\s]+([a-zA-Z][a-zA-Z0-9\-]{3,15})(?:\s|"|$)',
+            # Pattern for dial tcp errors
+            r'dial tcp.*?([a-zA-Z][a-zA-Z0-9\-]{3,15})(?:\.|:)'
         ]
+        
+        # Words that are definitely not service names
+        excluded_words = {
+            'connect', 'connection', 'retrieve', 'get', 'fetch', 'add', 'to', 'from', 'with',
+            'http', 'https', 'tcp', 'grpc', 'error', 'code', 'desc', 'rpc', 'dial', 'failed',
+            'could', 'not', 'unable', 'service', 'server', 'client', 'request', 'response',
+            'timeout', 'refused', 'closed', 'reset', 'abort', 'cancel', 'retry', 'attempt'
+        }
         
         for pattern in service_patterns:
             matches = re.findall(pattern, first_sample, re.IGNORECASE)
             for match in matches:
-                if match.lower() not in ['http', 'https', 'tcp', 'grpc', 'error', 'code', 'desc']:
-                    service_names.add(match.lower())
+                match_lower = match.lower().strip()
+                # Only add if it's not an excluded word and looks like a service name
+                if (match_lower not in excluded_words and 
+                    len(match_lower) >= 3 and 
+                    len(match_lower) <= 15 and
+                    not match_lower.isdigit() and
+                    # Must contain letters (not just numbers/symbols)
+                    re.search(r'[a-zA-Z]{2,}', match_lower)):
+                    service_names.add(match_lower)
         
         # Extract ports
         port_matches = re.findall(r':(\d{4,5})', first_sample)
@@ -188,9 +207,15 @@ class K8sLog:
         error_code_matches = re.findall(r'code\s*=\s*([A-Z_]+)', first_sample, re.IGNORECASE)
         error_codes.update(error_code_matches)
         
-        # Extract operations
-        op_matches = re.findall(r'(?:could not|failed to|unable to)\s+([\w\s]+?)(?:\s*:|$)', first_sample, re.IGNORECASE)
-        operations.update([op.strip() for op in op_matches if len(op.strip()) < 30])
+        # Extract operations - be more selective
+        op_matches = re.findall(r'(?:could not|failed to|unable to)\s+([\w\s]+?)(?:\s*:|from|with|to\s+\w+|$)', first_sample, re.IGNORECASE)
+        for op in op_matches:
+            op_clean = op.strip()
+            # Only include meaningful operations, exclude single words that are likely service names
+            if (len(op_clean) > 3 and len(op_clean) < 25 and 
+                ' ' in op_clean and  # Must be multi-word to be an operation
+                not op_clean.lower().startswith(('connect', 'connection'))):
+                operations.add(op_clean)
         
                  # Generate specific steps based on pattern type and extracted entities
         if 'connection' in pattern_name.lower():
