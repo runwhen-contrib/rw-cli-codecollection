@@ -752,7 +752,7 @@ Check Deployment Replica Status for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
                 ...    severity=2
                 ...    expected=${desired_replicas} ready replicas for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
                 ...    actual=${ready_replicas} ready replicas for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                ...    title=Deployment `${DEPLOYMENT_NAME}` is Missing ${missing_replicas} Ready Replicas
+                ...    title=Deployment `${DEPLOYMENT_NAME}` is Missing Ready Replicas
                 ...    reproduce_hint=${replica_status.cmd}
                 ...    details=Deployment needs ${missing_replicas} more ready replicas to meet desired state of ${desired_replicas}.\n\nStatus: Ready=${ready_replicas}, Available=${available_replicas}, Unavailable=${unavailable_replicas}
                 ...    next_steps=Check pod status and events for scaling issues\nInvestigate resource constraints or scheduling problems\nReview deployment rollout status
