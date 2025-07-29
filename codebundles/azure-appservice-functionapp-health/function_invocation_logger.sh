@@ -58,13 +58,13 @@ if [[ -z "$FUNCTIONS" ]]; then
     echo "⚠️  No functions found in Function App $FUNCTION_APP_NAME"
     
     # Create issue_details format for no functions case
-    details="Function App: $FUNCTION_APP_NAME\nResource Group: $AZ_RESOURCE_GROUP\nSubscription: $SUBSCRIPTION_NAME\nTime Period: Last $TIME_PERIOD_MINUTES minutes\n\nIssue: No functions found for invocation logging\n\nSummary:\nTotal Functions: 0\nTotal Invocations: 0\nIdle Functions: 0\n\nPossible Causes:\n- Function app is empty or newly created\n- Functions not deployed yet\n- Function app is stopped or disabled\n\nNext Steps:\nVerify function app is running and check if functions have been deployed"
+    details="Function App: $FUNCTION_APP_NAME\nResource Group: $AZ_RESOURCE_GROUP\nSubscription: $SUBSCRIPTION_NAME\nTime Period: Last $TIME_PERIOD_MINUTES minutes\n\nIssue: No functions found for invocation logging\n\nSummary:\nTotal Functions: 0\nTotal Invocations: 0\nIdle Functions: 0\n\nPossible Causes:\n- Function app \`$FUNCTION_APP_NAME\` is empty or newly created\n- Functions not deployed to \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`\n- Function app \`$FUNCTION_APP_NAME\` is stopped or disabled\n- Deployment issues preventing function registration\n\nNext Steps:\n1. Check if \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\` is running\n2. Verify functions have been deployed to \`$FUNCTION_APP_NAME\`\n3. Review deployment logs for \`$FUNCTION_APP_NAME\`\n4. Check service endpoints and application configuration"
     
     ESCAPED_DETAILS=$(echo "$details" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
     ESCAPED_FUNCTION_APP_NAME=$(echo "$FUNCTION_APP_NAME" | sed 's/"/\\"/g')
     ESCAPED_SUBSCRIPTION_NAME=$(echo "$SUBSCRIPTION_NAME" | sed 's/"/\\"/g')
     
-    JSON_OUTPUT="{\"issues\": [{\"title\":\"Function App \`$ESCAPED_FUNCTION_APP_NAME\` in subscription \`$ESCAPED_SUBSCRIPTION_NAME\` has no functions for invocation logging\",\"severity\":4,\"next_step\":\"Verify function app is running and check if functions have been deployed\",\"details\":\"$ESCAPED_DETAILS\"}]}"
+    JSON_OUTPUT="{\"issues\": [{\"title\":\"Function App \`$ESCAPED_FUNCTION_APP_NAME\` in subscription \`$ESCAPED_SUBSCRIPTION_NAME\` has no functions for invocation logging\",\"severity\":4,\"next_step\":\"Check if \`$ESCAPED_FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\` is running and verify functions have been deployed\",\"details\":\"$ESCAPED_DETAILS\"}]}"
     
     echo "$JSON_OUTPUT" > invocation_log.json
     exit 0
@@ -267,36 +267,62 @@ if [[ "$TOTAL_INVOCATIONS" -gt 0 ]]; then
     
     details="$details\n\nSummary:\nTotal Functions: $(echo "$FUNCTIONS" | wc -w)\nTotal Invocations: $TOTAL_INVOCATIONS\nSuccessful Invocations: $TOTAL_SUCCESSES\nFailed Invocations: $TOTAL_FAILURES\nOverall Success Rate: ${overall_success_rate}%\nOverall Failure Rate: ${overall_failure_rate}%\nHealthy Functions: $(for func in $FUNCTIONS; do if [[ $(echo "${SUCCESS_COUNTS["$func"]:-0} + ${FAILURE_COUNTS["$func"]:-0}" | bc) -gt 0 ]] && [[ $(echo "scale=2; ${FAILURE_COUNTS["$func"]:-0} * 100 / (${SUCCESS_COUNTS["$func"]:-0} + ${FAILURE_COUNTS["$func"]:-0} + 0.01)" | bc -l) < 5 ]]; then echo "1"; fi; done | wc -l)\nWarning Functions: $(for func in $FUNCTIONS; do if [[ $(echo "${SUCCESS_COUNTS["$func"]:-0} + ${FAILURE_COUNTS["$func"]:-0}" | bc) -gt 0 ]] && [[ $(echo "scale=2; ${FAILURE_COUNTS["$func"]:-0} * 100 / (${SUCCESS_COUNTS["$func"]:-0} + ${FAILURE_COUNTS["$func"]:-0} + 0.01)" | bc -l) > 5 ]] && [[ $(echo "scale=2; ${FAILURE_COUNTS["$func"]:-0} * 100 / (${SUCCESS_COUNTS["$func"]:-0} + ${FAILURE_COUNTS["$func"]:-0} + 0.01)" | bc -l) < 10 ]]; then echo "1"; fi; done | wc -l)\nUnhealthy Functions: $(for func in $FUNCTIONS; do if [[ $(echo "${SUCCESS_COUNTS["$func"]:-0} + ${FAILURE_COUNTS["$func"]:-0}" | bc) -gt 0 ]] && [[ $(echo "scale=2; ${FAILURE_COUNTS["$func"]:-0} * 100 / (${SUCCESS_COUNTS["$func"]:-0} + ${FAILURE_COUNTS["$func"]:-0} + 0.01)" | bc -l) > 10 ]]; then echo "1"; fi; done | wc -l)\nIdle Functions: $(for func in $FUNCTIONS; do if [[ $(echo "${SUCCESS_COUNTS["$func"]:-0} + ${FAILURE_COUNTS["$func"]:-0}" | bc) -eq 0 ]]; then echo "1"; fi; done | wc -l)"
     
-    # Add insights and recommendations
-    details="$details\n\nPossible Causes:\n- External API failures\n- Code bugs in recent deployments\n- Resource constraints\n- Cold starts\n- Network connectivity issues\n\nNext Steps:\nReview Application Insights logs for detailed error traces and check for recent deployments"
+    # Add insights and recommendations with specific entity data
+    details="$details\n\nPossible Causes:\n- External API failures affecting \`$FUNCTION_APP_NAME\` functions\n- Code bugs in recent deployments to resource group \`$AZ_RESOURCE_GROUP\`\n- Resource constraints on \`$FUNCTION_APP_NAME\` compute instances\n- Cold starts impacting function performance\n- Network connectivity issues from \`$AZ_RESOURCE_GROUP\` to external services\n\nNext Steps:\n1. Check Application Insights logs for \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`\n2. Review recent deployments to \`$FUNCTION_APP_NAME\`\n3. Verify application configuration for functions in \`$FUNCTION_APP_NAME\`\n4. Check service endpoints and network connectivity\n5. Review error message details in Application Insights"
     
     # Escape for JSON
     ESCAPED_DETAILS=$(echo "$details" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
     ESCAPED_FUNCTION_APP_NAME=$(echo "$FUNCTION_APP_NAME" | sed 's/"/\\"/g')
     ESCAPED_SUBSCRIPTION_NAME=$(echo "$SUBSCRIPTION_NAME" | sed 's/"/\\"/g')
     
+    # Identify failing functions for more specific next steps
+    failing_functions=""
+    for func in $FUNCTIONS; do
+        failures="${FAILURE_COUNTS["$func"]:-0}"
+        successes="${SUCCESS_COUNTS["$func"]:-0}"
+        total=$((successes + failures))
+        if [[ "$total" -gt 0 ]]; then
+            failure_rate=$(echo "scale=1; $failures * 100 / $total" | bc -l 2>/dev/null || echo "0.0")
+            if [[ $(echo "$failure_rate > 10" | bc -l 2>/dev/null) -eq 1 ]]; then
+                if [[ -n "$failing_functions" ]]; then
+                    failing_functions="$failing_functions, \`$func\`"
+                else
+                    failing_functions="\`$func\`"
+                fi
+            fi
+        fi
+    done
+
     # Create title based on health status
     if [[ $(echo "$overall_failure_rate > 10" | bc -l 2>/dev/null) -eq 1 ]]; then
         title="Function App \`$ESCAPED_FUNCTION_APP_NAME\` in subscription \`$ESCAPED_SUBSCRIPTION_NAME\` has high error rate (${overall_failure_rate}%)"
-        next_step="Review Application Insights logs for detailed error traces and check for recent deployments"
+        if [[ -n "$failing_functions" ]]; then
+            next_step="Check Application Insights logs for failing functions ($failing_functions) in \`$ESCAPED_FUNCTION_APP_NAME\` resource group \`$AZ_RESOURCE_GROUP\` and review recent deployments"
+        else
+            next_step="Check Application Insights logs for \`$ESCAPED_FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\` and review recent deployments to identify root cause of failures"
+        fi
     elif [[ $(echo "$overall_failure_rate > 5" | bc -l 2>/dev/null) -eq 1 ]]; then
         title="Function App \`$ESCAPED_FUNCTION_APP_NAME\` in subscription \`$ESCAPED_SUBSCRIPTION_NAME\` has elevated error rate (${overall_failure_rate}%)"
-        next_step="Monitor function performance and review logs for potential issues"
+        if [[ -n "$failing_functions" ]]; then
+            next_step="Review error message details for functions ($failing_functions) in Application Insights for \`$ESCAPED_FUNCTION_APP_NAME\` resource group \`$AZ_RESOURCE_GROUP\`"
+        else
+            next_step="Review error message details in Application Insights for \`$ESCAPED_FUNCTION_APP_NAME\` and verify application configuration in resource group \`$AZ_RESOURCE_GROUP\`"
+        fi
     else
         title="Function App \`$ESCAPED_FUNCTION_APP_NAME\` in subscription \`$ESCAPED_SUBSCRIPTION_NAME\` invocation health summary"
-        next_step="Continue monitoring function performance"
+        next_step="Check service endpoints for \`$ESCAPED_FUNCTION_APP_NAME\` and verify network connectivity from resource group \`$AZ_RESOURCE_GROUP\`"
     fi
     
     ISSUES+=("{\"title\":\"$title\",\"severity\":$severity,\"next_step\":\"$next_step\",\"details\":\"$ESCAPED_DETAILS\"}")
 else
     # No invocations case
-    details="Function App: $FUNCTION_APP_NAME\nResource Group: $AZ_RESOURCE_GROUP\nSubscription: $SUBSCRIPTION_NAME\nTime Period: Last $TIME_PERIOD_MINUTES minutes\n\nIssue: No function invocations detected\n\nSummary:\nTotal Functions: $(echo "$FUNCTIONS" | wc -w)\nTotal Invocations: 0\nIdle Functions: $(echo "$FUNCTIONS" | wc -w)\n\nPossible Causes:\n- Functions not triggered during monitoring period\n- Function app is stopped or disabled\n- No active triggers configured\n\nNext Steps:\nVerify function app is running and check trigger configurations"
+    details="Function App: $FUNCTION_APP_NAME\nResource Group: $AZ_RESOURCE_GROUP\nSubscription: $SUBSCRIPTION_NAME\nTime Period: Last $TIME_PERIOD_MINUTES minutes\n\nIssue: No function invocations detected\n\nSummary:\nTotal Functions: $(echo "$FUNCTIONS" | wc -w)\nTotal Invocations: 0\nIdle Functions: $(echo "$FUNCTIONS" | wc -w)\n\nPossible Causes:\n- Functions in \`$FUNCTION_APP_NAME\` not triggered during monitoring period\n- Function app \`$FUNCTION_APP_NAME\` is stopped or disabled\n- No active triggers configured for functions in resource group \`$AZ_RESOURCE_GROUP\`\n- Network connectivity issues preventing triggers\n\nNext Steps:\n1. Check if \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\` is running\n2. Verify trigger configurations for all functions\n3. Check service endpoints and network connectivity\n4. Review Application Insights for \`$FUNCTION_APP_NAME\` to identify trigger issues"
     
     ESCAPED_DETAILS=$(echo "$details" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
     ESCAPED_FUNCTION_APP_NAME=$(echo "$FUNCTION_APP_NAME" | sed 's/"/\\"/g')
     ESCAPED_SUBSCRIPTION_NAME=$(echo "$SUBSCRIPTION_NAME" | sed 's/"/\\"/g')
     
-    ISSUES+=("{\"title\":\"Function App \`$ESCAPED_FUNCTION_APP_NAME\` in subscription \`$ESCAPED_SUBSCRIPTION_NAME\` has no invocations in the last $TIME_PERIOD_MINUTES minutes\",\"severity\":4,\"next_step\":\"Verify function app is running and check trigger configurations\",\"details\":\"$ESCAPED_DETAILS\"}")
+    ISSUES+=("{\"title\":\"Function App \`$ESCAPED_FUNCTION_APP_NAME\` in subscription \`$ESCAPED_SUBSCRIPTION_NAME\` has no invocations in the last $TIME_PERIOD_MINUTES minutes\",\"severity\":4,\"next_step\":\"Check if \`$ESCAPED_FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\` is running and verify trigger configurations for all functions\",\"details\":\"$ESCAPED_DETAILS\"}")
 fi
 
 # Create JSON output

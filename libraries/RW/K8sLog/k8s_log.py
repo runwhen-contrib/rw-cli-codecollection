@@ -49,7 +49,7 @@ class K8sLog:
                         "name": "generic_error",
                         "pattern": r"(?i)\b(error|err|exception|fail|fatal|panic|crash|abort)\b",
                         "severity": 2,
-                        "next_steps": ["Review the error message details", "Check application logs for root cause", "Verify application configuration"]
+                        "next_steps": ["Extract specific error details from logs", "Identify the failing component or service", "Check for related errors in the same time window"]
                     }
                 ],
                 "Connection": [
@@ -57,13 +57,13 @@ class K8sLog:
                         "name": "connection_refused",
                         "pattern": r"(?i)(connection\s+refused|connect.*refused|refused.*connection)",
                         "severity": 2,
-                        "next_steps": ["Check if target service is running", "Verify network connectivity", "Check service endpoints"]
+                        "next_steps": ["Verify target service is running and healthy", "Check if service ports are accessible", "Validate network policies and firewall rules", "Inspect service discovery configuration"]
                     },
                     {
                         "name": "connection_timeout",
                         "pattern": r"(?i)(connection\s+timeout|timeout.*connection|connect.*timeout)",
                         "severity": 2,
-                        "next_steps": ["Check network latency", "Verify service availability", "Review timeout configurations"]
+                        "next_steps": ["Check target service response times and load", "Verify network connectivity between services", "Review timeout configuration for calling service", "Inspect service mesh or proxy settings"]
                     }
                 ],
                 "Auth": [
@@ -71,7 +71,7 @@ class K8sLog:
                         "name": "authentication_failed",
                         "pattern": r"(?i)(auth.*fail|authentication.*fail|unauthorized|401|403|forbidden)",
                         "severity": 2,
-                        "next_steps": ["Check authentication credentials", "Verify service account permissions", "Review RBAC configuration"]
+                        "next_steps": ["Verify service account tokens and certificates", "Check RBAC permissions for the service", "Validate authentication provider configuration", "Review API key or credential expiration"]
                     }
                 ],
                 "Timeout": [
@@ -79,7 +79,7 @@ class K8sLog:
                         "name": "timeout_error",
                         "pattern": r"(?i)(timeout|timed\s+out|deadline\s+exceeded)",
                         "severity": 2,
-                        "next_steps": ["Check service response times", "Review timeout configurations", "Verify resource availability"]
+                        "next_steps": ["Identify which operation is timing out", "Check downstream service performance", "Review timeout values in configuration", "Monitor resource utilization during timeouts"]
                     }
                 ],
                 "Resource": [
@@ -87,7 +87,7 @@ class K8sLog:
                         "name": "out_of_memory",
                         "pattern": r"(?i)(out\s+of\s+memory|oom|memory.*exhausted|killed.*memory)",
                         "severity": 1,
-                        "next_steps": ["Check memory limits", "Review memory usage patterns", "Consider increasing memory allocation"]
+                        "next_steps": ["Increase memory limits for the container", "Analyze memory usage patterns and leaks", "Review garbage collection settings", "Consider horizontal scaling if memory usage is consistently high"]
                     }
                 ],
                 "AppFailure": [
@@ -95,7 +95,7 @@ class K8sLog:
                         "name": "application_startup_failure",
                         "pattern": r"(?i)(startup.*fail|failed.*start|application.*fail|service.*fail)",
                         "severity": 2,
-                        "next_steps": ["Check application configuration", "Review startup dependencies", "Verify environment variables"]
+                        "next_steps": ["Check environment variables and configuration files", "Verify required dependencies are available", "Review container image and startup command", "Check for missing secrets or configmaps"]
                     }
                 ],
                 "StackTrace": [
@@ -103,7 +103,7 @@ class K8sLog:
                         "name": "stack_trace",
                         "pattern": r"(?i)(stack\s+trace|stacktrace|traceback|at\s+.*\.java:|at\s+.*\.py:|at\s+.*\.js:)",
                         "severity": 3,
-                        "next_steps": ["Review stack trace for root cause", "Check application code", "Verify input validation"]
+                        "next_steps": ["Identify the root cause from the stack trace", "Check the specific line of code that failed", "Verify input data and request parameters", "Review recent code changes that might have introduced the issue"]
                     }
                 ],
                 "Exceptions": [
@@ -111,7 +111,7 @@ class K8sLog:
                         "name": "null_pointer_exception",
                         "pattern": r"(?i)(nullpointerexception|null\s+pointer|nullptr|segmentation\s+fault)",
                         "severity": 2,
-                        "next_steps": ["Review code for null pointer handling", "Check input validation", "Verify object initialization"]
+                        "next_steps": ["Add null checks in the failing code path", "Verify object initialization order", "Check for race conditions in concurrent code", "Review request data validation"]
                     }
                 ]
             }
@@ -150,6 +150,115 @@ class K8sLog:
             'patterns': patterns,
             'infrastructure_filters': self.error_patterns.get('infrastructure_filters', [])
         }
+
+    def _generate_context_aware_next_steps(self, pattern_name: str, base_next_steps: List[str], 
+                                          sample_lines: List[str], workload_name: str, namespace: str) -> List[str]:
+        """Generate context-aware next steps based on log content and extracted entities."""
+        if not sample_lines:
+            return base_next_steps
+            
+        context_steps = []
+        first_sample = sample_lines[0]
+        
+        # Extract specific entities from the log line
+        service_names = set()
+        ports = set()
+        error_codes = set()
+        operations = set()
+        
+        # Extract service names
+        service_patterns = [
+            r'(?:could not|failed to|unable to)\s+(?:retrieve|get|fetch|connect to|add to)\s+([a-zA-Z][a-zA-Z0-9\-]{2,15})',
+            r'([a-zA-Z][a-zA-Z0-9\-]+)(?:service|svc)',
+            r'rpc error.*?service["\s]*([a-zA-Z][a-zA-Z0-9\-]+)',
+            r'dial tcp.*?([a-zA-Z][a-zA-Z0-9\-]+):'
+        ]
+        
+        for pattern in service_patterns:
+            matches = re.findall(pattern, first_sample, re.IGNORECASE)
+            for match in matches:
+                if match.lower() not in ['http', 'https', 'tcp', 'grpc', 'error', 'code', 'desc']:
+                    service_names.add(match.lower())
+        
+        # Extract ports
+        port_matches = re.findall(r':(\d{4,5})', first_sample)
+        ports.update(port_matches)
+        
+        # Extract error codes
+        error_code_matches = re.findall(r'code\s*=\s*([A-Z_]+)', first_sample, re.IGNORECASE)
+        error_codes.update(error_code_matches)
+        
+        # Extract operations
+        op_matches = re.findall(r'(?:could not|failed to|unable to)\s+([\w\s]+?)(?:\s*:|$)', first_sample, re.IGNORECASE)
+        operations.update([op.strip() for op in op_matches if len(op.strip()) < 30])
+        
+                 # Generate specific steps based on pattern type and extracted entities
+        if 'connection' in pattern_name.lower():
+            if service_names:
+                for service in list(service_names)[:2]:  # Limit to 2 services
+                    context_steps.append(f"Verify `{service}` service is running and healthy")
+                    context_steps.append(f"Check `{service}` service endpoints and port availability")
+                    if ports:
+                        port = list(ports)[0]
+                        context_steps.append(f"Test network connectivity to `{service}` service on port `{port}`")
+            
+            if error_codes:
+                for code in list(error_codes)[:2]:
+                    if code.upper() == 'UNAVAILABLE':
+                        context_steps.append(f"Service unavailable - check deployment status and replica count")
+                    elif code.upper() == 'DEADLINE_EXCEEDED':
+                        context_steps.append(f"Request timeout - review service performance and timeout configurations")
+                        
+        elif 'auth' in pattern_name.lower():
+            context_steps.append(f"Verify service account permissions for `{workload_name}` deployment")
+            context_steps.append(f"Check RBAC configuration for service account in `{namespace}` namespace")
+            if '401' in first_sample or '403' in first_sample:
+                context_steps.append(f"Review authentication tokens and certificates for `{workload_name}` pods")
+                
+        elif 'timeout' in pattern_name.lower():
+            if operations:
+                op = list(operations)[0]
+                context_steps.append(f"Investigate timeout for operation: '{op}'")
+            if service_names:
+                service = list(service_names)[0]
+                context_steps.append(f"Check `{service}` service response times and performance metrics")
+                context_steps.append(f"Review `{service}` service logs for performance bottlenecks")
+                
+        elif 'memory' in pattern_name.lower() or 'oom' in pattern_name.lower():
+            context_steps.append(f"Check current memory usage for `{workload_name}` pods")
+            context_steps.append(f"Review memory limits and requests for `{workload_name}` deployment")
+            context_steps.append(f"Consider increasing memory allocation for `{workload_name}` containers")
+            
+        elif 'stack' in pattern_name.lower() or 'exception' in pattern_name.lower():
+            # Extract file/line info from stack traces
+            stack_matches = re.findall(r'at\s+.*?\.(?:java|py|js):(\d+)', first_sample)
+            if stack_matches:
+                line_num = stack_matches[0]
+                context_steps.append(f"Review application code at line `{line_num}` for the root cause")
+            
+            # Extract method names
+            method_matches = re.findall(r'at\s+[\w.]+\.(\w+)\(', first_sample)
+            if method_matches:
+                method = method_matches[0]
+                context_steps.append(f"Investigate `{method}()` method for null pointer or logic errors")
+        
+        # Add generic context-aware steps
+        if service_names:
+            services_list = "`, `".join(list(service_names)[:3])
+            context_steps.append(f"Monitor health and availability of related services: `{services_list}`")
+            
+        # Combine context-aware steps with base steps (context-aware first)
+        final_steps = context_steps + base_next_steps
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_steps = []
+        for step in final_steps:
+            if step not in seen:
+                seen.add(step)
+                unique_steps.append(step)
+                
+        return unique_steps[:6]  # Limit to 6 steps to avoid overwhelming output
 
     def _generate_issue_title(self, workload_type: str, workload_name: str, sample_lines: List[str]) -> str:
         """Generate a descriptive title based on the error content."""
@@ -553,15 +662,21 @@ class K8sLog:
                         if matches:
                             max_severity = min(max_severity, severity)
                             
+                            # Generate context-aware next steps
+                            sample_lines = [m["line"] for m in matches[:3]]
+                            context_aware_steps = self._generate_context_aware_next_steps(
+                                pattern_config["name"], next_steps, sample_lines, workload_name, namespace
+                            )
+                            
                             # Create issue for this pattern
                             issue = {
                                 "category": category,
                                 "pattern_name": pattern_config["name"],
                                 "severity": severity,
-                                "next_steps": next_steps,
+                                "next_steps": context_aware_steps,
                                 "matches": matches,
                                 "total_occurrences": len(matches),
-                                "sample_lines": [m["line"] for m in matches[:3]]  # First 3 matches as samples
+                                "sample_lines": sample_lines
                             }
                             
                             category_issues[category].append(issue)
@@ -721,20 +836,46 @@ class K8sLog:
                 for cleaned_line, count in line_counts.items():
                     if count > 1:
                         severity = 3  # Default to informational
-                        next_step = f"Review logs in {workload_type} `{workload_name}` to determine if frequent messages indicate an issue."
-
+                        
+                        # Generate context-aware next steps for anomalies
+                        context_steps = []
+                        
+                        # Analyze the repeated message for specific guidance
+                        if 'connection' in cleaned_line.lower() and ('refused' in cleaned_line.lower() or 'timeout' in cleaned_line.lower()):
+                            context_steps.append(f"Connection issues detected - verify network connectivity to target services")
+                            context_steps.append(f"Check health status of downstream services")
+                        elif 'error' in cleaned_line.lower() and 'rpc' in cleaned_line.lower():
+                            context_steps.append(f"RPC communication failures - investigate service mesh or proxy configuration")
+                            context_steps.append(f"Verify service discovery and endpoint configuration")
+                        elif 'memory' in cleaned_line.lower() or 'oom' in cleaned_line.lower():
+                            context_steps.append(f"Memory pressure detected - review resource limits for `{pod}` pod")
+                            context_steps.append(f"Analyze memory usage patterns for `{container}` container")
+                        elif 'auth' in cleaned_line.lower() or '401' in cleaned_line or '403' in cleaned_line:
+                            context_steps.append(f"Authentication failures - verify service account permissions for `{pod}` pod")
+                            context_steps.append(f"Check RBAC configuration in `{namespace}` namespace")
+                        else:
+                            context_steps.append(f"Analyze the repeated message pattern in `{container}` container")
+                            context_steps.append(f"Determine if this behavior is expected or indicates a system problem")
+                        
+                        # Add severity-specific steps
                         if count >= 10:
                             severity = 1
-                            next_step = f"Critical: High volume of repeated log messages detected. Immediate investigation recommended."
+                            context_steps.insert(0, f"CRITICAL: {count} identical messages - immediate investigation required")
+                            context_steps.append(f"Consider restarting `{pod}` pod if issue persists")
                         elif count >= 5:
                             severity = 2
-                            next_step = f"Warning: Repeated log messages detected. Investigate potential issues."
+                            context_steps.insert(0, f"WARNING: {count} repeated messages detected")
+                            context_steps.append(f"Monitor `{pod}` pod behavior and resource usage")
+                        else:
+                            context_steps.insert(0, f"INFO: {count} repeated messages - monitor for escalation")
+                        
+                        next_steps_str = "\n".join(context_steps[:5])  # Limit to 5 steps
 
                         # Create issue for this anomaly
                         issues_json["issues"].append({
                             "title": f"Application Log: Frequent Log Anomaly Detected in {pod} ({container})",
                             "details": f"**Repeated Message:** {cleaned_line}\n**Occurrences:** {count}\n**Pod:** {pod}\n**Container:** {container}",
-                            "next_steps": next_step,
+                            "next_steps": next_steps_str,
                             "severity": severity,
                             "occurrences": count
                         })
