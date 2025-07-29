@@ -263,6 +263,30 @@ for func in $FUNCTIONS; do
 done
 
 echo ""
+echo "📊 Calculating Summary Statistics"
+echo "================================="
+
+# Calculate summary statistics
+error_functions=0
+unhealthy_count=0
+
+for func in $FUNCTIONS; do
+    # Count functions with errors
+    if [[ "${ERROR_PATTERNS["$func"]:-"None"}" != "None" ]]; then
+        ((error_functions++))
+    fi
+    
+    # Count functions with health score < 80
+    health_score=${FUNCTION_HEALTH_SCORES["$func"]:-100}
+    if [[ "$health_score" -lt 80 ]]; then
+        ((unhealthy_count++))
+    fi
+done
+
+echo "Functions with errors: $error_functions"
+echo "Functions with health score < 80: $unhealthy_count"
+
+echo ""
 echo "📋 Generating Issue Details Output"
 echo "=================================="
 
