@@ -259,6 +259,7 @@ Get Critical Log Errors and Score for Deployment `${DEPLOYMENT_NAME}`
     ...    workload_name=${DEPLOYMENT_NAME}
     ...    namespace=${NAMESPACE}
     ...    categories=${critical_categories}
+    ...    custom_patterns_file=sli_critical_patterns.json
     
     # Post-process results to filter out patterns matching LOGS_EXCLUDE_PATTERN
     TRY

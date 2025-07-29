@@ -365,7 +365,7 @@ Inspect StatefulSet Warning Events for `${STATEFULSET_NAME}` in Namespace `${NAM
                     ...    severity=${sample_pod_issue["severity"]}
                     ...    expected=Pod readiness and health should be maintained for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
                     ...    actual=${pod_count} pods are experiencing issues for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
-                    ...    title=Multiple Pod Issues for StatefulSet `${STATEFULSET_NAME}` (${pod_count} pods affected)
+                    ...    title=Multiple Pod Issues for StatefulSet `${STATEFULSET_NAME}`
                     ...    reproduce_hint=${events.cmd}
                     ...    details=**Affected Pods:** ${pod_count}\n\n${consolidated_pod_details}
                     ...    next_steps=${sample_pod_issue["next_steps"]}\n${related_resource_recommendations}
@@ -388,7 +388,7 @@ Inspect StatefulSet Warning Events for `${STATEFULSET_NAME}` in Namespace `${NAM
                     ...    severity=${sample_pvc_issue["severity"]}
                     ...    expected=Persistent Volume Claims should be healthy for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
                     ...    actual=${pvc_count} PVCs are experiencing issues for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
-                    ...    title=Persistent Volume Issues for StatefulSet `${STATEFULSET_NAME}` (${pvc_count} PVCs affected)
+                    ...    title=Persistent Volume Issues for StatefulSet `${STATEFULSET_NAME}`
                     ...    reproduce_hint=${events.cmd}
                     ...    details=**Affected PVCs:** ${pvc_count}\n\n${consolidated_pvc_details}
                     ...    next_steps=${sample_pvc_issue["next_steps"]}\nCheck PV status and storage class configuration\n${related_resource_recommendations}
