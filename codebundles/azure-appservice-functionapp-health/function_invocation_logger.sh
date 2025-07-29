@@ -81,86 +81,96 @@ declare -A MEMORY_PATTERNS
 declare -A AVG_DURATION
 declare -A AVG_MEMORY
 
-# Function to get detailed metrics with time series data
-get_detailed_invocation_data() {
-    local function_name="$1"
-    echo "  📊 Collecting detailed data for $function_name..."
+# Function to get detailed metrics with time series data - OPTIMIZED VERSION
+get_batch_invocation_data() {
+    echo "📊 Collecting metrics efficiently for all functions..."
     
-    # Get time series data for executions (5-minute intervals)
-    local execution_timeseries=$(az monitor metrics list \
+    # OPTIMIZATION 1: Get all execution data in a single call
+    echo "  Getting execution counts for all functions..."
+    local execution_data=$(az monitor metrics list \
         --resource "$FUNCTION_APP_ID" \
         --metric "FunctionExecutionCount" \
         --start-time "$START_TIME" \
         --end-time "$END_TIME" \
         --interval PT5M \
-        --filter "FunctionName eq '$function_name'" \
-        --query "data[0].timeseries[0].data[].{timestamp: timeStamp, value: total}" -o json 2>/dev/null || echo "[]")
+        --query "data[0].timeseries[].{function: metadata.FunctionName, data: data[].total}" -o json 2>/dev/null || echo "[]")
     
-    # Get time series data for errors  
-    local error_timeseries=$(az monitor metrics list \
+    # OPTIMIZATION 2: Get all error data in a single call
+    echo "  Getting error counts for all functions..."
+    local error_data=$(az monitor metrics list \
         --resource "$FUNCTION_APP_ID" \
         --metric "FunctionErrors" \
         --start-time "$START_TIME" \
         --end-time "$END_TIME" \
         --interval PT5M \
-        --filter "FunctionName eq '$function_name'" \
-        --query "data[0].timeseries[0].data[].{timestamp: timeStamp, value: total}" -o json 2>/dev/null || echo "[]")
+        --query "data[0].timeseries[].{function: metadata.FunctionName, data: data[].total}" -o json 2>/dev/null || echo "[]")
     
-    # Get duration data
-    local duration_timeseries=$(az monitor metrics list \
+    # OPTIMIZATION 3: Get all duration data in a single call
+    echo "  Getting duration data for all functions..."
+    local duration_data=$(az monitor metrics list \
         --resource "$FUNCTION_APP_ID" \
         --metric "FunctionExecutionDuration" \
         --start-time "$START_TIME" \
         --end-time "$END_TIME" \
         --interval PT5M \
-        --filter "FunctionName eq '$function_name'" \
-        --query "data[0].timeseries[0].data[].{timestamp: timeStamp, value: average}" -o json 2>/dev/null || echo "[]")
+        --query "data[0].timeseries[].{function: metadata.FunctionName, data: data[].average}" -o json 2>/dev/null || echo "[]")
     
-    # Get memory data (if available)
-    local memory_timeseries=$(az monitor metrics list \
+    # OPTIMIZATION 4: Get all memory data in a single call
+    echo "  Getting memory data for all functions..."
+    local memory_data=$(az monitor metrics list \
         --resource "$FUNCTION_APP_ID" \
         --metric "MemoryWorkingSet" \
         --start-time "$START_TIME" \
         --end-time "$END_TIME" \
         --interval PT5M \
-        --filter "FunctionName eq '$function_name'" \
-        --query "data[0].timeseries[0].data[].{timestamp: timeStamp, value: average}" -o json 2>/dev/null || echo "[]")
+        --query "data[0].timeseries[].{function: metadata.FunctionName, data: data[].average}" -o json 2>/dev/null || echo "[]")
     
-    # Calculate success/failure from time series
-    local total_executions=$(echo "$execution_timeseries" | jq '[.[].value // 0] | add // 0')
-    local total_errors=$(echo "$error_timeseries" | jq '[.[].value // 0] | add // 0')
-    local total_successes=$((total_executions - total_errors))
+    echo "  Processing data efficiently..."
     
-    # Ensure non-negative success count
-    if [[ "$total_successes" -lt 0 ]]; then
-        total_successes=0
-    fi
-    
-    SUCCESS_COUNTS["$function_name"]="$total_successes"
-    FAILURE_COUNTS["$function_name"]="$total_errors"
-    
-    # Analyze duration patterns
-    local avg_duration=$(echo "$duration_timeseries" | jq '[.[].value // 0] | add / length // 0')
-    local max_duration=$(echo "$duration_timeseries" | jq '[.[].value // 0] | max // 0')
-    local min_duration=$(echo "$duration_timeseries" | jq '[.[].value // 0] | min // 0')
-    
-    # Store individual values for easy access
-    AVG_DURATION["$function_name"]=$(printf "%.0f" "$avg_duration")
-    
-    # Keep formatted string for backwards compatibility
-    DURATION_PATTERNS["$function_name"]=$(printf "avg:%.0f,max:%.0f,min:%.0f" "$avg_duration" "$max_duration" "$min_duration")
-    
-    # Analyze memory patterns (convert from bytes to MB)
-    local avg_memory_bytes=$(echo "$memory_timeseries" | jq '[.[].value // 0] | add / length // 0')
-    local avg_memory_mb=$(echo "scale=1; $avg_memory_bytes / 1048576" | bc -l 2>/dev/null || echo "0.0")
-    
-    # Store individual values for easy access
-    AVG_MEMORY["$function_name"]=$(printf "%.1f" "$avg_memory_mb")
-    MEMORY_PATTERNS["$function_name"]=$(printf "%.1f" "$avg_memory_mb")
-    
-    echo "    ✅ Successes: $total_successes, ❌ Failures: $total_errors"
-    echo "    ⏱️  Duration - Avg: ${avg_duration}ms, Max: ${max_duration}ms, Min: ${min_duration}ms"
-    echo "    💾 Memory - Avg: ${avg_memory_mb}MB"
+    # Process each function's data from the batch results
+    for func in $FUNCTIONS; do
+        echo "  📊 Processing data for $func..."
+        
+        # Extract execution data for this function
+        local total_executions=$(echo "$execution_data" | jq -r ".[] | select(.function == \"$func\") | .data | map(select(. != null)) | add // 0")
+        
+        # Extract error data for this function  
+        local total_errors=$(echo "$error_data" | jq -r ".[] | select(.function == \"$func\") | .data | map(select(. != null)) | add // 0")
+        
+        # Calculate successes
+        local total_successes=$((total_executions - total_errors))
+        if [[ "$total_successes" -lt 0 ]]; then
+            total_successes=0
+        fi
+        
+        SUCCESS_COUNTS["$func"]="$total_successes"
+        FAILURE_COUNTS["$func"]="$total_errors"
+        
+        # Extract duration data for this function
+        local duration_values=$(echo "$duration_data" | jq -r ".[] | select(.function == \"$func\") | .data | map(select(. != null))")
+        local avg_duration=$(echo "$duration_values" | jq 'add / length // 0')
+        local max_duration=$(echo "$duration_values" | jq 'max // 0')
+        local min_duration=$(echo "$duration_values" | jq 'min // 0')
+        
+        # Store individual values for easy access
+        AVG_DURATION["$func"]=$(printf "%.0f" "$avg_duration")
+        
+        # Keep formatted string for backwards compatibility
+        DURATION_PATTERNS["$func"]=$(printf "avg:%.0f,max:%.0f,min:%.0f" "$avg_duration" "$max_duration" "$min_duration")
+        
+        # Extract memory data for this function
+        local memory_values=$(echo "$memory_data" | jq -r ".[] | select(.function == \"$func\") | .data | map(select(. != null))")
+        local avg_memory_bytes=$(echo "$memory_values" | jq 'add / length // 0')
+        local avg_memory_mb=$(echo "scale=1; $avg_memory_bytes / 1048576" | bc -l 2>/dev/null || echo "0.0")
+        
+        # Store individual values for easy access
+        AVG_MEMORY["$func"]=$(printf "%.1f" "$avg_memory_mb")
+        MEMORY_PATTERNS["$func"]=$(printf "%.1f" "$avg_memory_mb")
+        
+        echo "    ✅ Successes: $total_successes, ❌ Failures: $total_errors"
+        echo "    ⏱️  Duration - Avg: ${avg_duration}ms, Max: ${max_duration}ms, Min: ${min_duration}ms"
+        echo "    💾 Memory - Avg: ${avg_memory_mb}MB"
+    done
 }
 
 # Function to create detailed invocation summary
@@ -204,19 +214,22 @@ create_invocation_summary() {
    🚀 Min Duration: ${min_duration}ms"
 }
 
-# Log each function's invocations
+# Log each function's invocations - OPTIMIZED VERSION
 echo ""
-echo "📊 Detailed Invocation Analysis"
-echo "==============================="
+echo "📊 Fast Invocation Analysis"
+echo "============================"
 
 TOTAL_INVOCATIONS=0
 TOTAL_SUCCESSES=0
 TOTAL_FAILURES=0
 
+# OPTIMIZATION: Get all data in batch instead of per-function calls
+get_batch_invocation_data
+
+# Create summaries for each function
 for func in $FUNCTIONS; do
     echo ""
-    echo "🔍 Processing function: $func"
-    get_detailed_invocation_data "$func"
+    echo "🔍 Summary for function: $func"
     create_invocation_summary "$func"
     
     # Add to totals
