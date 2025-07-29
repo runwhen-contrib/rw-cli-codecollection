@@ -278,7 +278,7 @@ To minimize false alerts and reduce noise:
 - **Adjust CONTAINER_RESTART_AGE**: Use 15-30m for more stable environments
 
 #### 3. Log Analysis
-- **Review Error Patterns**: Customize `sli_critical_patterns.json` for your application
+- **Review Error Patterns**: Customize `sli_critical_patterns.json` for your application (now properly integrated with RW.K8sLog library)
 - **Adjust LOG_AGE**: Balance between recent issues and noise
 
 #### 4. Alert Timing

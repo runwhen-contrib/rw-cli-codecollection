@@ -132,6 +132,25 @@ class K8sLog:
         line = re.sub(r'\b\d{5,}\b', '', line)
         return line
 
+    def _convert_sli_patterns_format(self, sli_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert sli_critical_patterns.json format to internal format."""
+        patterns = {}
+        
+        for category, category_data in sli_data.get('critical_patterns', {}).items():
+            patterns[category] = []
+            for pattern_str in category_data.get('patterns', []):
+                patterns[category].append({
+                    'name': f"{category.lower()}_pattern",
+                    'pattern': pattern_str,
+                    'severity': category_data.get('severity', 2),
+                    'next_steps': [f"Investigate {category.lower()} issue", "Review application logs", "Check application configuration"]
+                })
+        
+        return {
+            'patterns': patterns,
+            'infrastructure_filters': self.error_patterns.get('infrastructure_filters', [])
+        }
+
     def _generate_issue_title(self, workload_type: str, workload_name: str, sample_lines: List[str]) -> str:
         """Generate a descriptive title based on the error content."""
         title = f"Error pattern detected in {workload_type} `{workload_name}`"
@@ -190,6 +209,163 @@ class K8sLog:
             
         return title
 
+    def _get_ignore_patterns(self):
+        """Get built-in ignore patterns for log filtering."""
+        return [
+            "connection closed before message completed",
+            "server idle timeout"
+        ]
+
+    def _get_pods_for_workload(self, workload_type: str, workload_name: str, 
+                              namespace: str, context: str, kubeconfig_path: str) -> List[Dict]:
+        """Get pods associated with a workload."""
+        env = os.environ.copy()
+        env['KUBECONFIG'] = kubeconfig_path
+        
+        # First, get the workload and extract its UID
+        cmd = ['kubectl', 'get', workload_type, workload_name, 
+               '-n', namespace, '--context', context, '-o', 'json']
+        
+        try:
+            result = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=30)
+            if result.returncode != 0:
+                raise RuntimeError(f"Failed to get {workload_type}/{workload_name}: {result.stderr}")
+                
+            workload_data = json.loads(result.stdout)
+            workload_uid = workload_data['metadata']['uid']
+            
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"Failed to parse workload JSON: {e}")
+        except Exception as e:
+            raise RuntimeError(f"Error getting workload: {e}")
+        
+        # Get pods based on workload type
+        if workload_type.lower() == 'deployment':
+            # For deployments, get ReplicaSets first, then pods
+            cmd = ['kubectl', 'get', 'replicaset', '-n', namespace, 
+                   '--context', context, '-o', 'json']
+            
+            try:
+                result = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=30)
+                if result.returncode != 0:
+                    raise RuntimeError(f"Failed to get ReplicaSets: {result.stderr}")
+                    
+                rs_data = json.loads(result.stdout)
+                rs_uids = []
+                
+                # Find ReplicaSets owned by this deployment
+                for rs in rs_data.get('items', []):
+                    owner_refs = rs.get('metadata', {}).get('ownerReferences', [])
+                    for owner in owner_refs:
+                        if owner.get('uid') == workload_uid:
+                            rs_uids.append(rs['metadata']['uid'])
+                            break
+                
+                if not rs_uids:
+                    return []
+                
+                # Get pods owned by these ReplicaSets
+                cmd = ['kubectl', 'get', 'pods', '-n', namespace, 
+                       '--context', context, '-o', 'json']
+                       
+                result = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=30)
+                if result.returncode != 0:
+                    raise RuntimeError(f"Failed to get pods: {result.stderr}")
+                    
+                pods_data = json.loads(result.stdout)
+                matching_pods = []
+                
+                for pod in pods_data.get('items', []):
+                    owner_refs = pod.get('metadata', {}).get('ownerReferences', [])
+                    for owner in owner_refs:
+                        if owner.get('uid') in rs_uids:
+                            matching_pods.append(pod)
+                            break
+                            
+                return matching_pods
+                
+            except json.JSONDecodeError as e:
+                raise RuntimeError(f"Failed to parse JSON: {e}")
+                
+        else:
+            # For StatefulSet/DaemonSet, pods are directly owned
+            cmd = ['kubectl', 'get', 'pods', '-n', namespace, 
+                   '--context', context, '-o', 'json']
+                   
+            try:
+                result = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=30)
+                if result.returncode != 0:
+                    raise RuntimeError(f"Failed to get pods: {result.stderr}")
+                    
+                pods_data = json.loads(result.stdout)
+                matching_pods = []
+                
+                for pod in pods_data.get('items', []):
+                    owner_refs = pod.get('metadata', {}).get('ownerReferences', [])
+                    for owner in owner_refs:
+                        if owner.get('uid') == workload_uid:
+                            matching_pods.append(pod)
+                            break
+                            
+                return matching_pods
+                
+            except json.JSONDecodeError as e:
+                raise RuntimeError(f"Failed to parse JSON: {e}")
+
+    def _fetch_container_logs(self, pod_name: str, container_name: str, namespace: str, 
+                            context: str, kubeconfig_path: str, log_age: str, 
+                            max_log_lines: str, max_log_bytes: str, ignore_patterns: List[str]) -> str:
+        """Fetch logs for a specific container and apply ignore patterns."""
+        env = os.environ.copy()
+        env['KUBECONFIG'] = kubeconfig_path
+        
+        logs_content = ""
+        
+        # Fetch current logs
+        cmd = ['kubectl', 'logs', pod_name, '-c', container_name, '-n', namespace, 
+               '--context', context, f'--since={log_age}', '--timestamps', 
+               f'--tail={max_log_lines}', f'--limit-bytes={max_log_bytes}']
+        
+        try:
+            result = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=60)
+            if result.returncode == 0:
+                logs_content += result.stdout
+        except subprocess.TimeoutExpired:
+            logger.warning(f"Timeout fetching current logs for {pod_name}/{container_name}")
+        except Exception as e:
+            logger.warning(f"Error fetching current logs for {pod_name}/{container_name}: {e}")
+        
+        # Fetch previous logs (if any)
+        cmd_prev = cmd + ['--previous']
+        try:
+            result = subprocess.run(cmd_prev, env=env, capture_output=True, text=True, timeout=60)
+            if result.returncode == 0:
+                logs_content += result.stdout
+        except subprocess.TimeoutExpired:
+            logger.warning(f"Timeout fetching previous logs for {pod_name}/{container_name}")
+        except Exception as e:
+            # Previous logs might not exist, which is normal
+            pass
+        
+        # Apply ignore patterns
+        if ignore_patterns and logs_content:
+            lines = logs_content.split('\n')
+            filtered_lines = []
+            
+            for line in lines:
+                should_ignore = False
+                for pattern in ignore_patterns:
+                    if pattern in line:
+                        should_ignore = True
+                        break
+                
+                if not should_ignore:
+                    filtered_lines.append(line)
+            
+            logs_content = '\n'.join(filtered_lines)
+        
+        return logs_content
+
     @keyword
     def fetch_workload_logs(self, workload_type: str, workload_name: str, namespace: str, 
                            context: str, kubeconfig: platform.Secret, log_age: str = "10m",
@@ -218,50 +394,54 @@ class K8sLog:
         with open(kubeconfig_path, 'w') as f:
             f.write(kubeconfig.value)
         
-        # Set environment variables including volume controls
-        env = os.environ.copy()
-        env.update({
-            'KUBECONFIG': kubeconfig_path,
-            'WORKLOAD_TYPE': workload_type,
-            'WORKLOAD_NAME': workload_name,
-            'NAMESPACE': namespace,
-            'CONTEXT': context,
-            'LOG_AGE': log_age,
-            'MAX_LOG_LINES': max_log_lines,
-            'MAX_LOG_BYTES': max_log_bytes
-        })
-        
-        # Copy necessary files to temp directory
-        source_dir = Path(__file__).parent.parent.parent.parent / "codebundles" / "k8s-application-log-health"
-        for file_name in ["get_pod_logs_for_workload.sh", "error_patterns.json", "ignore_patterns.json"]:
-            source_file = source_dir / file_name
-            if source_file.exists():
-                dest_file = Path(self.temp_dir) / file_name
-                dest_file.write_text(source_file.read_text())
-                if file_name.endswith('.sh'):
-                    os.chmod(dest_file, 0o755)
-        
-        # Execute log fetching script
-        script_path = os.path.join(self.temp_dir, "get_pod_logs_for_workload.sh")
-        cmd = [script_path, workload_type, workload_name, namespace, context]
-        
         try:
-            result = subprocess.run(cmd, cwd=self.temp_dir, env=env, 
-                                  capture_output=True, text=True, timeout=300)
-            if result.returncode != 0:
-                raise RuntimeError(f"Log fetching failed: {result.stderr}")
+            # Get pods for the workload
+            pods = self._get_pods_for_workload(workload_type, workload_name, namespace, context, kubeconfig_path)
+            
+            # Get ignore patterns
+            ignore_patterns = self._get_ignore_patterns()
+            
+            # Create logs directory
+            logs_dir = os.path.join(self.temp_dir, f"{workload_type}_{workload_name}_logs")
+            os.makedirs(logs_dir, exist_ok=True)
+            
+            # Save pod information for analysis
+            pods_file = os.path.join(self.temp_dir, "application_logs_pods.json")
+            with open(pods_file, 'w') as f:
+                json.dump(pods, f, indent=2)
+            
+            # Fetch logs for each pod/container
+            for pod in pods:
+                pod_name = pod['metadata']['name']
+                logger.info(f"Processing Pod: {pod_name}")
+                
+                containers = pod.get('spec', {}).get('containers', [])
+                for container in containers:
+                    container_name = container['name']
+                    logger.info(f"  Container: {container_name}")
+                    
+                    # Fetch logs for this container
+                    logs_content = self._fetch_container_logs(
+                        pod_name, container_name, namespace, context, kubeconfig_path,
+                        log_age, max_log_lines, max_log_bytes, ignore_patterns
+                    )
+                    
+                    # Save logs to file
+                    log_file = os.path.join(logs_dir, f"{pod_name}_{container_name}_logs.txt")
+                    with open(log_file, 'w') as f:
+                        f.write(logs_content)
             
             logger.info(f"Successfully fetched logs for {workload_type}/{workload_name}")
+            logger.info(f"Logs stored in: {logs_dir}")
             return self.temp_dir
             
-        except subprocess.TimeoutExpired:
-            raise RuntimeError("Log fetching timed out after 5 minutes")
         except Exception as e:
             raise RuntimeError(f"Error fetching logs: {str(e)}")
 
     @keyword
     def scan_logs_for_issues(self, log_dir: str, workload_type: str, workload_name: str, 
-                           namespace: str, categories: List[str] = None) -> Dict[str, Any]:
+                           namespace: str, categories: List[str] = None, 
+                           custom_patterns_file: str = None) -> Dict[str, Any]:
         """Scan fetched logs for various error patterns and issues.
         
         Args:
@@ -270,6 +450,7 @@ class K8sLog:
             workload_name: Name of the workload  
             namespace: Kubernetes namespace
             categories: List of categories to scan for (optional, defaults to all)
+            custom_patterns_file: Path to custom error patterns JSON file (optional)
             
         Returns:
             Dictionary containing scan results with issues and summary
@@ -279,6 +460,22 @@ class K8sLog:
                 "GenericError", "AppFailure", "StackTrace", "Connection", 
                 "Timeout", "Auth", "Exceptions", "Anomaly", "AppRestart", "Resource"
             ]
+        
+        # Use custom patterns if provided, otherwise use embedded patterns
+        patterns_data = self.error_patterns
+        if custom_patterns_file:
+            try:
+                with open(custom_patterns_file, 'r', encoding='utf-8') as f:
+                    custom_data = json.load(f)
+                    # Convert sli_critical_patterns.json format to internal format
+                    if 'critical_patterns' in custom_data:
+                        patterns_data = self._convert_sli_patterns_format(custom_data)
+                    else:
+                        patterns_data = custom_data
+                logger.info(f"Loaded custom patterns from {custom_patterns_file}")
+            except Exception as e:
+                logger.warning(f"Failed to load custom patterns from {custom_patterns_file}: {e}")
+                logger.info("Using embedded patterns as fallback")
         
         log_path = Path(log_dir)
         pods_json_path = log_path / "application_logs_pods.json"
@@ -333,10 +530,10 @@ class K8sLog:
                 
                 # Process each category
                 for category in categories:
-                    if category not in self.error_patterns["patterns"]:
+                    if category not in patterns_data["patterns"]:
                         continue
                         
-                    patterns = self.error_patterns["patterns"][category]
+                    patterns = patterns_data["patterns"][category]
                     
                     for pattern_config in patterns:
                         pattern = pattern_config["pattern"]
@@ -618,7 +815,7 @@ class K8sLog:
             severity = self._safe_get(issue, 'severity_label', 'Unknown')
             category = self._safe_get(issue, 'category', 'N/A')
             occurrences = self._safe_get(issue, 'occurrences', 'N/A')
-            # The 'details' field is now pre-formatted by scan_logs.py with grouped samples and context
+            # The 'details' field is now pre-formatted with grouped samples and context
             details = self._safe_get(issue, 'details', '')
             key_actions = self._extract_key_actions(self._safe_get(issue, 'next_steps', ''))
 
