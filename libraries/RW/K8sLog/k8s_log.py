@@ -153,7 +153,7 @@ class K8sLog:
 
     def _generate_issue_title(self, workload_type: str, workload_name: str, sample_lines: List[str]) -> str:
         """Generate a descriptive title based on the error content."""
-        title = f"Error pattern detected in {workload_type} `{workload_name}`"
+        title = f"Application Log: Error pattern detected in {workload_type} `{workload_name}`"
         
         if not sample_lines:
             return title
@@ -171,41 +171,41 @@ class K8sLog:
                 service_name = service_match.group(1)
                 # Create service-specific title with error snippet
                 error_snippet = error_msg[:40].strip()
-                title = f"`{service_name}` service errors in {workload_type} `{workload_name}` - \"{error_snippet}...\""
+                title = f"Application Log: `{service_name}` service errors in {workload_type} `{workload_name}` - \"{error_snippet}...\""
             else:
                 # Extract error type for more specific title
                 if 'connection refused' in error_msg.lower():
                     error_snippet = error_msg[:40].strip()
-                    title = f"Connection refused errors in {workload_type} `{workload_name}` - \"{error_snippet}...\""
+                    title = f"Application Log: Connection refused errors in {workload_type} `{workload_name}` - \"{error_snippet}...\""
                 elif 'timeout' in error_msg.lower():
                     error_snippet = error_msg[:40].strip()
-                    title = f"Timeout errors in {workload_type} `{workload_name}` - \"{error_snippet}...\""
+                    title = f"Application Log: Timeout errors in {workload_type} `{workload_name}` - \"{error_snippet}...\""
                 elif 'rpc error' in error_msg.lower():
                     error_snippet = error_msg[:40].strip()
-                    title = f"RPC communication errors in {workload_type} `{workload_name}` - \"{error_snippet}...\""
+                    title = f"Application Log: RPC communication errors in {workload_type} `{workload_name}` - \"{error_snippet}...\""
                 elif 'authentication' in error_msg.lower() or 'auth' in error_msg.lower():
                     error_snippet = error_msg[:40].strip()
-                    title = f"Authentication errors in {workload_type} `{workload_name}` - \"{error_snippet}...\""
+                    title = f"Application Log: Authentication errors in {workload_type} `{workload_name}` - \"{error_snippet}...\""
                 elif 'permission' in error_msg.lower() or 'forbidden' in error_msg.lower():
                     error_snippet = error_msg[:40].strip()
-                    title = f"Permission/authorization errors in {workload_type} `{workload_name}` - \"{error_snippet}...\""
+                    title = f"Application Log: Permission/authorization errors in {workload_type} `{workload_name}` - \"{error_snippet}...\""
                 elif 'not found' in error_msg.lower() or '404' in error_msg:
                     error_snippet = error_msg[:40].strip()
-                    title = f"Resource not found errors in {workload_type} `{workload_name}` - \"{error_snippet}...\""
+                    title = f"Application Log: Resource not found errors in {workload_type} `{workload_name}` - \"{error_snippet}...\""
                 elif 'database' in error_msg.lower() or 'db' in error_msg.lower():
                     error_snippet = error_msg[:40].strip()
-                    title = f"Database connection errors in {workload_type} `{workload_name}` - \"{error_snippet}...\""
+                    title = f"Application Log: Database connection errors in {workload_type} `{workload_name}` - \"{error_snippet}...\""
                 elif 'memory' in error_msg.lower() or 'out of memory' in error_msg.lower():
                     error_snippet = error_msg[:40].strip()
-                    title = f"Memory/resource exhaustion in {workload_type} `{workload_name}` - \"{error_snippet}...\""
+                    title = f"Application Log: Memory/resource exhaustion in {workload_type} `{workload_name}` - \"{error_snippet}...\""
                 else:
                     # Use first part of error message for context
                     error_preview = error_msg[:40].strip()
                     if error_preview:
-                        title = f"Error pattern in {workload_type} `{workload_name}` - \"{error_preview}...\""
+                        title = f"Application Log: Error pattern in {workload_type} `{workload_name}` - \"{error_preview}...\""
         else:
             # Fallback title with entity names in backticks
-            title = f"Error pattern detected in `{workload_name}`"
+            title = f"Application Log: Error pattern detected in `{workload_name}`"
             
         return title
 
@@ -732,7 +732,7 @@ class K8sLog:
 
                         # Create issue for this anomaly
                         issues_json["issues"].append({
-                            "title": f"Frequent Log Anomaly Detected in {pod} ({container})",
+                            "title": f"Application Log: Frequent Log Anomaly Detected in {pod} ({container})",
                             "details": f"**Repeated Message:** {cleaned_line}\n**Occurrences:** {count}\n**Pod:** {pod}\n**Container:** {container}",
                             "next_steps": next_step,
                             "severity": severity,
