@@ -393,7 +393,7 @@ class K8sLog:
             context_steps.append(f"Verify service account permissions for `{workload_name}` deployment")
             context_steps.append(f"Check RBAC configuration for service account in `{namespace}` namespace")
             if '401' in first_sample or '403' in first_sample:
-                context_steps.append(f"Review authentication tokens and certificates for `{workload_name}` pods")
+                context_steps.append(f"Review authentication tokens and certificates for `{workload_name}` deployment")
                 
         elif 'timeout' in pattern_name.lower():
             if operations:
@@ -405,7 +405,7 @@ class K8sLog:
                 context_steps.append(f"Review `{service}` service logs for performance bottlenecks")
                 
         elif 'memory' in pattern_name.lower() or 'oom' in pattern_name.lower():
-            context_steps.append(f"Check current memory usage for `{workload_name}` pods")
+            context_steps.append(f"Check current memory usage for `{workload_name}` deployment")
             context_steps.append(f"Review memory limits and requests for `{workload_name}` deployment")
             context_steps.append(f"Consider increasing memory allocation for `{workload_name}` containers")
             
@@ -986,11 +986,11 @@ class K8sLog:
                 consolidated_data["unique_next_steps"].update(issue["next_steps"])
                 
                 # Add details about where the issue was found
-                pod_container_info = defaultdict(int)
+                container_info = defaultdict(int)
                 for match in issue["matches"]:
-                    pod_container_info[f"{match['pod']}/{match['container']}"] += 1
+                    container_info[match['container']] += 1
                 
-                details_part = f"**Pod/Container:** {', '.join([f'{pc} ({count}x)' for pc, count in pod_container_info.items()])}"
+                details_part = f"**Container:** {', '.join([f'{container} ({count}x)' for container, count in container_info.items()])}"
                 consolidated_data["details_parts"].append(details_part)
 
         # Create final issues from consolidated data
@@ -1134,10 +1134,10 @@ class K8sLog:
                             context_steps.append(f"RPC communication failures - investigate service mesh or proxy configuration")
                             context_steps.append(f"Verify service discovery and endpoint configuration")
                         elif 'memory' in cleaned_line.lower() or 'oom' in cleaned_line.lower():
-                            context_steps.append(f"Memory pressure detected - review resource limits for `{pod}` pod")
+                            context_steps.append(f"Memory pressure detected - review resource limits for `{container}` container")
                             context_steps.append(f"Analyze memory usage patterns for `{container}` container")
                         elif 'auth' in cleaned_line.lower() or '401' in cleaned_line or '403' in cleaned_line:
-                            context_steps.append(f"Authentication failures - verify service account permissions for `{pod}` pod")
+                            context_steps.append(f"Authentication failures - verify service account permissions for `{container}` container")
                             context_steps.append(f"Check RBAC configuration in `{namespace}` namespace")
                         else:
                             context_steps.append(f"Analyze the repeated message pattern in `{container}` container")
@@ -1147,11 +1147,11 @@ class K8sLog:
                         if count >= 10:
                             severity = 1
                             context_steps.insert(0, f"CRITICAL: {count} identical messages - immediate investigation required")
-                            context_steps.append(f"Consider restarting `{pod}` pod if issue persists")
+                            context_steps.append(f"Consider restarting `{container}` container if issue persists")
                         elif count >= 5:
                             severity = 2
                             context_steps.insert(0, f"WARNING: {count} repeated messages detected")
-                            context_steps.append(f"Monitor `{pod}` pod behavior and resource usage")
+                            context_steps.append(f"Monitor `{container}` container behavior and resource usage")
                         else:
                             context_steps.insert(0, f"INFO: {count} repeated messages - monitor for escalation")
                         
@@ -1159,8 +1159,8 @@ class K8sLog:
 
                         # Create issue for this anomaly
                         issues_json["issues"].append({
-                            "title": f"Application Log: Frequent Log Anomaly Detected in {pod} ({container})",
-                            "details": f"**Repeated Message:** {cleaned_line}\n**Occurrences:** {count}\n**Pod:** {pod}\n**Container:** {container}",
+                            "title": f"Application Log: Frequent Log Anomaly Detected in {container}",
+                            "details": f"**Repeated Message:** {cleaned_line}\n**Occurrences:** {count}\n**Container:** {container}",
                             "next_steps": next_steps_str,
                             "severity": severity,
                             "occurrences": count
