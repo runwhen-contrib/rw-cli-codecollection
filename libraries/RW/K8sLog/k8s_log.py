@@ -52,6 +52,150 @@ class K8sLog:
                     "pattern": r"(?i)(health|ping|probe|liveness|readiness).*(?:ok|success|healthy|ready|200)",
                     "description": "Normal health check responses",
                     "exclude": True
+                },
+                {
+                    "name": "healthy_error_counts",
+                    "pattern": r"(?i)(?:[a-zA-Z_\-]*errors?|[a-zA-Z_\-]*warnings?|[a-zA-Z_\-]*issues?|[a-zA-Z_\-]*problems?|[a-zA-Z_\-]*failures?|[a-zA-Z_\-]*alerts?)\s*[:=]\s*(?:\[\]|0|""|''|null|none|false)\s*$",
+                    "description": "Healthy state indicators showing empty/zero error counts",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_error_counts_with_comma",
+                    "pattern": r"(?i)(?:[a-zA-Z_\-]*errors?|[a-zA-Z_\-]*warnings?|[a-zA-Z_\-]*issues?|[a-zA-Z_\-]*problems?|[a-zA-Z_\-]*failures?|[a-zA-Z_\-]*alerts?)\s*[:=]\s*(?:\[\]|0|""|''|null|none|false)\s*,",
+                    "description": "Healthy state indicators followed by comma",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_error_counts_with_brace",
+                    "pattern": r"(?i)(?:[a-zA-Z_\-]*errors?|[a-zA-Z_\-]*warnings?|[a-zA-Z_\-]*issues?|[a-zA-Z_\-]*problems?|[a-zA-Z_\-]*failures?|[a-zA-Z_\-]*alerts?)\s*[:=]\s*(?:\[\]|0|""|''|null|none|false)\s*[}\]]",
+                    "description": "Healthy state indicators followed by closing brace/bracket",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_error_counts_empty_string",
+                    "pattern": r"(?i)(?:[a-zA-Z_\-]*errors?|[a-zA-Z_\-]*warnings?|[a-zA-Z_\-]*issues?|[a-zA-Z_\-]*problems?|[a-zA-Z_\-]*failures?|[a-zA-Z_\-]*alerts?)\s*[:=]\s*""\s*$",
+                    "description": "Healthy state indicators with empty string at end of line",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_error_counts_empty_object",
+                    "pattern": r"(?i)(?:[a-zA-Z_\-]*errors?|[a-zA-Z_\-]*warnings?|[a-zA-Z_\-]*issues?|[a-zA-Z_\-]*problems?|[a-zA-Z_\-]*failures?|[a-zA-Z_\-]*alerts?)\s*[:=]\s*\{\}\s*$",
+                    "description": "Healthy state indicators with empty object at end of line",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_error_arrays",
+                    "pattern": r'(?i)"(?:[a-zA-Z_\-]*errors?|[a-zA-Z_\-]*warnings?|[a-zA-Z_\-]*issues?|[a-zA-Z_\-]*problems?|[a-zA-Z_\-]*failures?|[a-zA-Z_\-]*alerts?)"\s*:\s*(?:\[\]|0|""|''|null|none|false)(?!\\s*[^\\s,}\\]])',
+                    "description": "JSON-style healthy error arrays and counts",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_status_reports",
+                    "pattern": r"(?i)(?:status|state|condition).*[:=]\s*(?:ok|success|healthy|ready|normal|good|pass)",
+                    "description": "Healthy status reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_metric_reports",
+                    "pattern": r"(?i)(?:metric|count|total).*[:=]\s*(?:0|zero|none|empty)",
+                    "description": "Healthy metric reports showing zero counts",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_validation_results",
+                    "pattern": r"(?i)(?:validation|check|test).*[:=]\s*(?:passed|success|ok|valid|true)",
+                    "description": "Successful validation and test results",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_connection_reports",
+                    "pattern": r"(?i)(?:connection|connect).*[:=]\s*(?:established|connected|active|ok)",
+                    "description": "Successful connection reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_operation_results",
+                    "pattern": r"(?i)(?:operation|action|task).*[:=]\s*(?:completed|success|done|finished)",
+                    "description": "Successful operation completions",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_resource_reports",
+                    "pattern": r"(?i)(?:resource|memory|cpu|disk).*[:=]\s*(?:available|sufficient|ok|normal)",
+                    "description": "Healthy resource availability reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_service_reports",
+                    "pattern": r"(?i)(?:service|endpoint|api).*[:=]\s*(?:up|running|available|healthy|ok)",
+                    "description": "Healthy service status reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_database_reports",
+                    "pattern": r"(?i)(?:database|db|query).*[:=]\s*(?:connected|active|ok|success)",
+                    "description": "Healthy database connection reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_cache_reports",
+                    "pattern": r"(?i)(?:cache|redis|memcached).*[:=]\s*(?:hit|available|connected|ok)",
+                    "description": "Healthy cache operation reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_queue_reports",
+                    "pattern": r"(?i)(?:queue|message|job).*[:=]\s*(?:empty|processed|completed|ok)",
+                    "description": "Healthy queue and message processing reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_backup_reports",
+                    "pattern": r"(?i)(?:backup|snapshot|archive).*[:=]\s*(?:completed|success|ok|finished)",
+                    "description": "Successful backup and snapshot reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_deployment_reports",
+                    "pattern": r"(?i)(?:deployment|release|version).*[:=]\s*(?:success|completed|active|ok)",
+                    "description": "Successful deployment and release reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_monitoring_reports",
+                    "pattern": r"(?i)(?:monitor|watch|observe).*[:=]\s*(?:normal|ok|healthy|stable)",
+                    "description": "Normal monitoring and observation reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_cleanup_reports",
+                    "pattern": r"(?i)(?:cleanup|garbage|maintenance).*[:=]\s*(?:completed|success|ok|finished)",
+                    "description": "Successful cleanup and maintenance reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_sync_reports",
+                    "pattern": r"(?i)(?:sync|replication|copy).*[:=]\s*(?:completed|success|ok|finished)",
+                    "description": "Successful synchronization reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_auth_reports",
+                    "pattern": r"(?i)(?:auth|authentication|authorization).*[:=]\s*(?:success|valid|ok|granted)",
+                    "description": "Successful authentication reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_ssl_reports",
+                    "pattern": r"(?i)(?:ssl|tls|certificate).*[:=]\s*(?:valid|ok|success|verified)",
+                    "description": "Successful SSL/TLS certificate reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_timeout_reports",
+                    "pattern": r"(?i)(?:timeout|deadline).*[:=]\s*(?:none|0|disabled|false)",
+                    "description": "Disabled or zero timeout configurations",
+                    "exclude": True
                 }
             ],
             "patterns": {
@@ -356,10 +500,19 @@ class K8sLog:
 
     def _get_ignore_patterns(self):
         """Get built-in ignore patterns for log filtering."""
-        return [
+        # Extract patterns from infrastructure_filters
+        ignore_patterns = []
+        for filter_config in self.error_patterns.get("infrastructure_filters", []):
+            if filter_config.get("exclude", False):
+                ignore_patterns.append(filter_config["pattern"])
+        
+        # Add legacy patterns for backward compatibility
+        legacy_patterns = [
             "connection closed before message completed",
             "server idle timeout"
         ]
+        
+        return ignore_patterns + legacy_patterns
 
     def _get_pods_for_workload(self, workload_type: str, workload_name: str, 
                               namespace: str, context: str, kubeconfig_path: str) -> List[Dict]:
