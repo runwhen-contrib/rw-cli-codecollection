@@ -97,6 +97,12 @@ Suite Initialization
     ...    pattern=.*
     ...    example="errors":\s*\[\]|"warnings":\s*\[\]
     ...    default="errors":\s*\[\]
+    ${LOG_SCAN_TIMEOUT}=    RW.Core.Import User Variable    LOG_SCAN_TIMEOUT
+    ...    type=string
+    ...    description=Timeout in seconds for log scanning operations. Increase this value if log scanning times out on large log files.
+    ...    pattern=\d+
+    ...    example=300
+    ...    default=300
     ${CONTAINER_RESTART_AGE}=    RW.Core.Import User Variable    CONTAINER_RESTART_AGE
     ...    type=string
     ...    description=The time window (in (h) hours or (m) minutes) to search for container restarts. Only containers that restarted within this time period will be reported.
@@ -126,6 +132,7 @@ Suite Initialization
     Set Suite Variable    ${ANOMALY_THRESHOLD}
     Set Suite Variable    ${LOGS_ERROR_PATTERN}
     Set Suite Variable    ${LOGS_EXCLUDE_PATTERN}
+    Set Suite Variable    ${LOG_SCAN_TIMEOUT}
     Set Suite Variable    ${CONTAINER_RESTART_AGE}
     Set Suite Variable    ${CONTAINER_RESTART_THRESHOLD}
     # Construct environment dictionary safely to handle special characters in regex patterns
@@ -140,6 +147,7 @@ Suite Initialization
     ...    DEPLOYMENT_NAME=${DEPLOYMENT_NAME}
     ...    CONTAINER_RESTART_AGE=${CONTAINER_RESTART_AGE}
     ...    CONTAINER_RESTART_THRESHOLD=${CONTAINER_RESTART_THRESHOLD}
+    ...    LOG_SCAN_TIMEOUT=${LOG_SCAN_TIMEOUT}
     Set Suite Variable    ${env}    ${env_dict}
     
     # Check if deployment is scaled to 0 and handle appropriately
