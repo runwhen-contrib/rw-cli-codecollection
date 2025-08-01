@@ -196,6 +196,30 @@ class K8sLog:
                     "pattern": r"(?i)(?:timeout|deadline).*[:=]\s*(?:none|0|disabled|false)",
                     "description": "Disabled or zero timeout configurations",
                     "exclude": True
+                },
+                {
+                    "name": "azure_servicebus_connection_recovery",
+                    "pattern": r"(?i).*(?:onLinkRemoteOpen|onConnectionBound|Emitting new response channel).*(?:connectionId|linkName|entityPath)",
+                    "description": "Azure Service Bus normal connection establishment and recovery",
+                    "exclude": True
+                },
+                {
+                    "name": "azure_servicebus_idle_timeout_recovery",
+                    "pattern": r"(?i).*(?:IdleTimerExpired|Idle timeout|Transient error occurred).*(?:retryAfter|attempt)",
+                    "description": "Azure Service Bus normal idle timeout and automatic retry",
+                    "exclude": True
+                },
+                {
+                    "name": "azure_servicebus_link_lifecycle",
+                    "pattern": r"(?i).*(?:Freeing resources due to error|link.*is force detached)",
+                    "description": "Azure Service Bus normal link lifecycle and cleanup",
+                    "exclude": True
+                },
+                {
+                    "name": "azure_servicebus_reactor_disposal",
+                    "pattern": r"(?i).*Reactor selectable is being disposed.*connectionId",
+                    "description": "Azure Service Bus normal reactor cleanup",
+                    "exclude": True
                 }
             ],
             "patterns": {
@@ -224,7 +248,7 @@ class K8sLog:
                 "Auth": [
                     {
                         "name": "authentication_failed",
-                        "pattern": r"(?i)(auth.*fail|authentication.*fail|unauthorized|401|403|forbidden)",
+                        "pattern": r"(?i)(\bauth\w*\s+fail|\bauthentication\s+fail|\bunauthorized\b|\bforbidden\b|\b(?:http|status|response)\s+(?:401|403)\b|\b(?:401|403)\s+(?:unauthorized|forbidden|access.denied)\b)",
                         "severity": 2,
                         "next_steps": ["Verify service account tokens and certificates", "Check RBAC permissions for the service", "Validate authentication provider configuration", "Review API key or credential expiration"]
                     }
@@ -267,6 +291,32 @@ class K8sLog:
                         "pattern": r"(?i)(nullpointerexception|null\s+pointer|nullptr|segmentation\s+fault)",
                         "severity": 2,
                         "next_steps": ["Add null checks in the failing code path", "Verify object initialization order", "Check for race conditions in concurrent code", "Review request data validation"]
+                    }
+                ],
+                "HealthyRecovery": [
+                    {
+                        "name": "azure_servicebus_connection_recovery",
+                        "pattern": r"(?i).*(?:onLinkRemoteOpen|onConnectionBound|Emitting new response channel).*(?:connectionId|linkName|entityPath)",
+                        "severity": 5,
+                        "next_steps": ["This is normal Azure Service Bus connection recovery behavior", "No action required - connections are re-establishing automatically", "Monitor for excessive connection churn if this occurs very frequently"]
+                    },
+                    {
+                        "name": "azure_servicebus_idle_timeout_recovery",
+                        "pattern": r"(?i).*(?:IdleTimerExpired|Idle timeout|Transient error occurred).*(?:retryAfter|attempt)",
+                        "severity": 5,
+                        "next_steps": ["This is normal Azure Service Bus idle timeout recovery", "Connections idle for 10+ minutes are automatically cleaned up and recreated", "No action required - automatic retry is functioning correctly"]
+                    },
+                    {
+                        "name": "azure_servicebus_link_lifecycle",
+                        "pattern": r"(?i).*(?:Freeing resources due to error|link.*is force detached)",
+                        "severity": 5,
+                        "next_steps": ["This is normal Azure Service Bus link lifecycle management", "Links are cleaned up after idle timeout and recreated as needed", "No action required - this indicates healthy connection management"]
+                    },
+                    {
+                        "name": "azure_servicebus_reactor_disposal",
+                        "pattern": r"(?i).*Reactor selectable is being disposed.*connectionId",
+                        "severity": 5,
+                        "next_steps": ["This is normal Azure Service Bus reactor cleanup", "Old connections are being properly disposed", "No action required - this indicates proper resource cleanup"]
                     }
                 ]
             }
@@ -788,7 +838,7 @@ class K8sLog:
         if categories is None:
             categories = [
                 "GenericError", "AppFailure", "StackTrace", "Connection", 
-                "Timeout", "Auth", "Exceptions", "Anomaly", "AppRestart", "Resource"
+                "Timeout", "Auth", "Exceptions", "Anomaly", "AppRestart", "Resource", "HealthyRecovery"
             ]
         
         # Use custom patterns if provided, otherwise use embedded patterns
@@ -837,6 +887,7 @@ class K8sLog:
 
         # Pattern aggregators
         category_issues = defaultdict(list)
+        category_notes = defaultdict(list)  # Track severity 5 items separately
         max_severity = 5
 
         # Map of numeric severity to text label
@@ -845,6 +896,7 @@ class K8sLog:
             2: "Major", 
             3: "Minor",
             4: "Informational",
+            5: "Note",
         }
 
         pods = [pod["metadata"]["name"] for pod in pods_data]
@@ -907,6 +959,16 @@ class K8sLog:
                 
                 total_lines_processed += len(log_lines)
                 
+                # First pass: identify healthy lines using HealthyRecovery patterns
+                healthy_lines = set()  # Track line numbers that match healthy patterns
+                if 'HealthyRecovery' in compiled_patterns:
+                    patterns = compiled_patterns['HealthyRecovery']
+                    for pattern_data in patterns:
+                        pattern = pattern_data["pattern"]
+                        for line_num, line in enumerate(log_lines, 1):
+                            if pattern.search(line):
+                                healthy_lines.add(line_num)
+                
                 # Process each category with optimized pattern matching
                 for category in categories:
                     if category not in compiled_patterns:
@@ -923,6 +985,10 @@ class K8sLog:
                         matches = []
                         # Optimized: Use list comprehension for better performance
                         for line_num, line in enumerate(log_lines, 1):
+                            # Skip lines that were identified as healthy (unless this IS a HealthyRecovery pattern)
+                            if line_num in healthy_lines and category != 'HealthyRecovery':
+                                continue
+                                
                             if pattern.search(line):
                                 matches.append({
                                     "line_number": line_num,
@@ -935,26 +1001,40 @@ class K8sLog:
                                     break
                         
                         if matches:
-                            max_severity = min(max_severity, severity)
-                            
-                            # Generate context-aware next steps
-                            sample_lines = [m["line"] for m in matches[:3]]
-                            context_aware_steps = self._generate_context_aware_next_steps(
-                                pattern_config["name"], next_steps, sample_lines, workload_name, namespace
-                            )
-                            
-                            # Create issue for this pattern
-                            issue = {
-                                "category": category,
-                                "pattern_name": pattern_config["name"],
-                                "severity": severity,
-                                "next_steps": context_aware_steps,
-                                "matches": matches,
-                                "total_occurrences": len(matches),
-                                "sample_lines": sample_lines
-                            }
-                            
-                            category_issues[category].append(issue)
+                            # Only add to category_issues if severity is less than 5
+                            if severity < 5:
+                                max_severity = min(max_severity, severity)
+                                
+                                # Generate context-aware next steps
+                                sample_lines = [m["line"] for m in matches[:3]]
+                                context_aware_steps = self._generate_context_aware_next_steps(
+                                    pattern_config["name"], next_steps, sample_lines, workload_name, namespace
+                                )
+                                
+                                # Create issue for this pattern
+                                issue = {
+                                    "category": category,
+                                    "pattern_name": pattern_config["name"],
+                                    "severity": severity,
+                                    "next_steps": context_aware_steps,
+                                    "matches": matches,
+                                    "total_occurrences": len(matches),
+                                    "sample_lines": sample_lines
+                                }
+                                
+                                category_issues[category].append(issue)
+                            else:
+                                # If severity is 5, add to category_notes
+                                note = {
+                                    "category": category,
+                                    "pattern_name": pattern_config["name"],
+                                    "severity": severity,
+                                    "next_steps": next_steps,
+                                    "matches": matches,
+                                    "total_occurrences": len(matches),
+                                    "sample_lines": [m["line"] for m in matches[:3]]
+                                }
+                                category_notes[category].append(note)
             
             # Check if we've reached the total line limit
             if total_lines_processed >= max_total_lines:
@@ -992,6 +1072,24 @@ class K8sLog:
                 
                 details_part = f"**Container:** {', '.join([f'{container} ({count}x)' for container, count in container_info.items()])}"
                 consolidated_data["details_parts"].append(details_part)
+
+        # Consolidate notes by category and create final results
+        consolidated_notes_by_category = {}
+        for category, notes in category_notes.items():
+            consolidated_notes_by_category[category] = {
+                "total_occurrences": sum(n["total_occurrences"] for n in notes),
+                "sample_lines": list(dict.fromkeys([line for n in notes for line in n["sample_lines"]])),
+                "unique_next_steps": set(),
+                "details_parts": []
+            }
+            for note in notes:
+                consolidated_notes_by_category[category]["unique_next_steps"].update(note["next_steps"])
+                # Add details about where the note was found
+                container_info = defaultdict(int)
+                for match in note["matches"]:
+                    container_info[match['container']] += 1
+                details_part = f"**Container:** {', '.join([f'{container} ({count}x)' for container, count in container_info.items()])}"
+                consolidated_notes_by_category[category]["details_parts"].append(details_part)
 
         # Create final issues from consolidated data
         for content_key, issue_data in consolidated_issues.items():
@@ -1031,9 +1129,20 @@ class K8sLog:
                 "category": issue_data["category"]
             })
 
+        # Add notes to summary
+        for category, note_data in consolidated_notes_by_category.items():
+            if note_data["total_occurrences"] > 0:
+                severity_label = severity_label_map.get(5, "Note")
+                issues_json["summary"].append(
+                    f"📝 Informational Notes ({category} events): {note_data['total_occurrences']}x. "
+                    f"These are normal operational events that do not require action."
+                )
+
         # Generate summary
         total_issues = len(consolidated_issues)
+        total_notes = sum(len(notes) for notes in consolidated_notes_by_category.values())
         categories_found = set(issue_data["category"] for issue_data in consolidated_issues.values())
+        note_categories_found = set(category for category in consolidated_notes_by_category.keys())
         
         severity_label = severity_label_map.get(max_severity, f"Unknown({max_severity})")
         
