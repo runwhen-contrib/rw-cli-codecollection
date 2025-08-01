@@ -211,7 +211,7 @@ class K8sLog:
                 },
                 {
                     "name": "azure_servicebus_link_lifecycle",
-                    "pattern": r"(?i).*(?:Freeing resources due to error|link.*is force detached).*(?:IdleTimerExpired|Idle timeout)",
+                    "pattern": r"(?i).*(?:Freeing resources due to error|link.*is force detached)",
                     "description": "Azure Service Bus normal link lifecycle and cleanup",
                     "exclude": True
                 },
@@ -219,6 +219,12 @@ class K8sLog:
                     "name": "azure_servicebus_reactor_disposal",
                     "pattern": r"(?i).*Reactor selectable is being disposed.*connectionId",
                     "description": "Azure Service Bus normal reactor cleanup",
+                    "exclude": True
+                },
+                {
+                    "name": "azure_cosmosdb_connection_establishment",
+                    "pattern": r"(?i).*Getting database account endpoint from.*\.documents\.azure\.com",
+                    "description": "Azure Cosmos DB normal connection establishment",
                     "exclude": True
                 }
             ],
@@ -308,7 +314,7 @@ class K8sLog:
                     },
                     {
                         "name": "azure_servicebus_link_lifecycle",
-                        "pattern": r"(?i).*(?:Freeing resources due to error|link.*is force detached).*(?:IdleTimerExpired|Idle timeout)",
+                        "pattern": r"(?i).*(?:Freeing resources due to error|link.*is force detached)",
                         "severity": 5,
                         "next_steps": ["This is normal Azure Service Bus link lifecycle management", "Links are cleaned up after idle timeout and recreated as needed", "No action required - this indicates healthy connection management"]
                     },
