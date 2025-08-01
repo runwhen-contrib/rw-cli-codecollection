@@ -211,7 +211,7 @@ class K8sLog:
                 },
                 {
                     "name": "azure_servicebus_link_lifecycle",
-                    "pattern": r"(?i).*(?:Freeing resources due to error|link.*is force detached).*(?:IdleTimerExpired|Idle timeout)",
+                    "pattern": r"(?i).*(?:Freeing resources due to error|link.*is force detached)",
                     "description": "Azure Service Bus normal link lifecycle and cleanup",
                     "exclude": True
                 },
@@ -248,7 +248,7 @@ class K8sLog:
                 "Auth": [
                     {
                         "name": "authentication_failed",
-                        "pattern": r"(?i)(auth.*fail|authentication.*fail|unauthorized|401|403|forbidden)",
+                        "pattern": r"(?i)(\bauth\w*\s+fail|\bauthentication\s+fail|\bunauthorized\b|\bforbidden\b|\b(?:http|status|response)\s+(?:401|403)\b|\b(?:401|403)\s+(?:unauthorized|forbidden|access.denied)\b)",
                         "severity": 2,
                         "next_steps": ["Verify service account tokens and certificates", "Check RBAC permissions for the service", "Validate authentication provider configuration", "Review API key or credential expiration"]
                     }
@@ -308,7 +308,7 @@ class K8sLog:
                     },
                     {
                         "name": "azure_servicebus_link_lifecycle",
-                        "pattern": r"(?i).*(?:Freeing resources due to error|link.*is force detached).*(?:IdleTimerExpired|Idle timeout)",
+                        "pattern": r"(?i).*(?:Freeing resources due to error|link.*is force detached)",
                         "severity": 5,
                         "next_steps": ["This is normal Azure Service Bus link lifecycle management", "Links are cleaned up after idle timeout and recreated as needed", "No action required - this indicates healthy connection management"]
                     },
@@ -959,6 +959,16 @@ class K8sLog:
                 
                 total_lines_processed += len(log_lines)
                 
+                # First pass: identify healthy lines using HealthyRecovery patterns
+                healthy_lines = set()  # Track line numbers that match healthy patterns
+                if 'HealthyRecovery' in compiled_patterns:
+                    patterns = compiled_patterns['HealthyRecovery']
+                    for pattern_data in patterns:
+                        pattern = pattern_data["pattern"]
+                        for line_num, line in enumerate(log_lines, 1):
+                            if pattern.search(line):
+                                healthy_lines.add(line_num)
+                
                 # Process each category with optimized pattern matching
                 for category in categories:
                     if category not in compiled_patterns:
@@ -975,6 +985,10 @@ class K8sLog:
                         matches = []
                         # Optimized: Use list comprehension for better performance
                         for line_num, line in enumerate(log_lines, 1):
+                            # Skip lines that were identified as healthy (unless this IS a HealthyRecovery pattern)
+                            if line_num in healthy_lines and category != 'HealthyRecovery':
+                                continue
+                                
                             if pattern.search(line):
                                 matches.append({
                                     "line_number": line_num,
