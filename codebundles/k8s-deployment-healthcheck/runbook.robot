@@ -78,7 +78,7 @@ Suite Initialization
     ...    description=Comma-separated list of log pattern categories to scan for.
     ...    pattern=.*
     ...    example=GenericError,AppFailure,StackTrace,Connection
-    ...    default=GenericError,AppFailure,StackTrace,Connection,Timeout,Auth,Exceptions,Resource
+    ...    default=GenericError,AppFailure,StackTrace,Connection,Timeout,Auth,Exceptions,Resource,HealthyRecovery
     ${ANOMALY_THRESHOLD}=    RW.Core.Import User Variable    ANOMALY_THRESHOLD
     ...    type=string
     ...    description=The threshold for detecting event anomalies based on events per minute.
