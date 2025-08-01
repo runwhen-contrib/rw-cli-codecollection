@@ -3,6 +3,7 @@
 import os
 import json
 import re
+import signal
 from pathlib import Path
 import subprocess
 import tempfile
@@ -12,6 +13,16 @@ from typing import Dict, List, Any, Optional, Tuple, Union
 from collections import defaultdict
 from difflib import SequenceMatcher
 from RW import platform
+
+
+class TimeoutError(Exception):
+    """Custom timeout exception for log scanning operations."""
+    pass
+
+
+def timeout_handler(signum, frame):
+    """Signal handler for timeout operations."""
+    raise TimeoutError("Log scanning operation timed out")
 
 
 @library(scope='GLOBAL', auto_keywords=True, doc_format='reST')
@@ -40,6 +51,150 @@ class K8sLog:
                     "name": "health_check_normal",
                     "pattern": r"(?i)(health|ping|probe|liveness|readiness).*(?:ok|success|healthy|ready|200)",
                     "description": "Normal health check responses",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_error_counts",
+                    "pattern": r"(?i)(?:[a-zA-Z_\-]*errors?|[a-zA-Z_\-]*warnings?|[a-zA-Z_\-]*issues?|[a-zA-Z_\-]*problems?|[a-zA-Z_\-]*failures?|[a-zA-Z_\-]*alerts?)\s*[:=]\s*(?:\[\]|0|""|''|null|none|false)\s*$",
+                    "description": "Healthy state indicators showing empty/zero error counts",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_error_counts_with_comma",
+                    "pattern": r"(?i)(?:[a-zA-Z_\-]*errors?|[a-zA-Z_\-]*warnings?|[a-zA-Z_\-]*issues?|[a-zA-Z_\-]*problems?|[a-zA-Z_\-]*failures?|[a-zA-Z_\-]*alerts?)\s*[:=]\s*(?:\[\]|0|""|''|null|none|false)\s*,",
+                    "description": "Healthy state indicators followed by comma",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_error_counts_with_brace",
+                    "pattern": r"(?i)(?:[a-zA-Z_\-]*errors?|[a-zA-Z_\-]*warnings?|[a-zA-Z_\-]*issues?|[a-zA-Z_\-]*problems?|[a-zA-Z_\-]*failures?|[a-zA-Z_\-]*alerts?)\s*[:=]\s*(?:\[\]|0|""|''|null|none|false)\s*[}\]]",
+                    "description": "Healthy state indicators followed by closing brace/bracket",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_error_counts_empty_string",
+                    "pattern": r"(?i)(?:[a-zA-Z_\-]*errors?|[a-zA-Z_\-]*warnings?|[a-zA-Z_\-]*issues?|[a-zA-Z_\-]*problems?|[a-zA-Z_\-]*failures?|[a-zA-Z_\-]*alerts?)\s*[:=]\s*""\s*$",
+                    "description": "Healthy state indicators with empty string at end of line",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_error_counts_empty_object",
+                    "pattern": r"(?i)(?:[a-zA-Z_\-]*errors?|[a-zA-Z_\-]*warnings?|[a-zA-Z_\-]*issues?|[a-zA-Z_\-]*problems?|[a-zA-Z_\-]*failures?|[a-zA-Z_\-]*alerts?)\s*[:=]\s*\{\}\s*$",
+                    "description": "Healthy state indicators with empty object at end of line",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_error_arrays",
+                    "pattern": r'(?i)"(?:[a-zA-Z_\-]*errors?|[a-zA-Z_\-]*warnings?|[a-zA-Z_\-]*issues?|[a-zA-Z_\-]*problems?|[a-zA-Z_\-]*failures?|[a-zA-Z_\-]*alerts?)"\s*:\s*(?:\[\]|0|""|''|null|none|false)(?!\\s*[^\\s,}\\]])',
+                    "description": "JSON-style healthy error arrays and counts",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_status_reports",
+                    "pattern": r"(?i)(?:status|state|condition).*[:=]\s*(?:ok|success|healthy|ready|normal|good|pass)",
+                    "description": "Healthy status reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_metric_reports",
+                    "pattern": r"(?i)(?:metric|count|total).*[:=]\s*(?:0|zero|none|empty)",
+                    "description": "Healthy metric reports showing zero counts",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_validation_results",
+                    "pattern": r"(?i)(?:validation|check|test).*[:=]\s*(?:passed|success|ok|valid|true)",
+                    "description": "Successful validation and test results",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_connection_reports",
+                    "pattern": r"(?i)(?:connection|connect).*[:=]\s*(?:established|connected|active|ok)",
+                    "description": "Successful connection reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_operation_results",
+                    "pattern": r"(?i)(?:operation|action|task).*[:=]\s*(?:completed|success|done|finished)",
+                    "description": "Successful operation completions",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_resource_reports",
+                    "pattern": r"(?i)(?:resource|memory|cpu|disk).*[:=]\s*(?:available|sufficient|ok|normal)",
+                    "description": "Healthy resource availability reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_service_reports",
+                    "pattern": r"(?i)(?:service|endpoint|api).*[:=]\s*(?:up|running|available|healthy|ok)",
+                    "description": "Healthy service status reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_database_reports",
+                    "pattern": r"(?i)(?:database|db|query).*[:=]\s*(?:connected|active|ok|success)",
+                    "description": "Healthy database connection reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_cache_reports",
+                    "pattern": r"(?i)(?:cache|redis|memcached).*[:=]\s*(?:hit|available|connected|ok)",
+                    "description": "Healthy cache operation reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_queue_reports",
+                    "pattern": r"(?i)(?:queue|message|job).*[:=]\s*(?:empty|processed|completed|ok)",
+                    "description": "Healthy queue and message processing reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_backup_reports",
+                    "pattern": r"(?i)(?:backup|snapshot|archive).*[:=]\s*(?:completed|success|ok|finished)",
+                    "description": "Successful backup and snapshot reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_deployment_reports",
+                    "pattern": r"(?i)(?:deployment|release|version).*[:=]\s*(?:success|completed|active|ok)",
+                    "description": "Successful deployment and release reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_monitoring_reports",
+                    "pattern": r"(?i)(?:monitor|watch|observe).*[:=]\s*(?:normal|ok|healthy|stable)",
+                    "description": "Normal monitoring and observation reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_cleanup_reports",
+                    "pattern": r"(?i)(?:cleanup|garbage|maintenance).*[:=]\s*(?:completed|success|ok|finished)",
+                    "description": "Successful cleanup and maintenance reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_sync_reports",
+                    "pattern": r"(?i)(?:sync|replication|copy).*[:=]\s*(?:completed|success|ok|finished)",
+                    "description": "Successful synchronization reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_auth_reports",
+                    "pattern": r"(?i)(?:auth|authentication|authorization).*[:=]\s*(?:success|valid|ok|granted)",
+                    "description": "Successful authentication reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_ssl_reports",
+                    "pattern": r"(?i)(?:ssl|tls|certificate).*[:=]\s*(?:valid|ok|success|verified)",
+                    "description": "Successful SSL/TLS certificate reports",
+                    "exclude": True
+                },
+                {
+                    "name": "healthy_timeout_reports",
+                    "pattern": r"(?i)(?:timeout|deadline).*[:=]\s*(?:none|0|disabled|false)",
+                    "description": "Disabled or zero timeout configurations",
                     "exclude": True
                 }
             ],
@@ -238,7 +393,7 @@ class K8sLog:
             context_steps.append(f"Verify service account permissions for `{workload_name}` deployment")
             context_steps.append(f"Check RBAC configuration for service account in `{namespace}` namespace")
             if '401' in first_sample or '403' in first_sample:
-                context_steps.append(f"Review authentication tokens and certificates for `{workload_name}` pods")
+                context_steps.append(f"Review authentication tokens and certificates for `{workload_name}` deployment")
                 
         elif 'timeout' in pattern_name.lower():
             if operations:
@@ -250,7 +405,7 @@ class K8sLog:
                 context_steps.append(f"Review `{service}` service logs for performance bottlenecks")
                 
         elif 'memory' in pattern_name.lower() or 'oom' in pattern_name.lower():
-            context_steps.append(f"Check current memory usage for `{workload_name}` pods")
+            context_steps.append(f"Check current memory usage for `{workload_name}` deployment")
             context_steps.append(f"Review memory limits and requests for `{workload_name}` deployment")
             context_steps.append(f"Consider increasing memory allocation for `{workload_name}` containers")
             
@@ -345,10 +500,19 @@ class K8sLog:
 
     def _get_ignore_patterns(self):
         """Get built-in ignore patterns for log filtering."""
-        return [
+        # Extract patterns from infrastructure_filters
+        ignore_patterns = []
+        for filter_config in self.error_patterns.get("infrastructure_filters", []):
+            if filter_config.get("exclude", False):
+                ignore_patterns.append(filter_config["pattern"])
+        
+        # Add legacy patterns for backward compatibility
+        legacy_patterns = [
             "connection closed before message completed",
             "server idle timeout"
         ]
+        
+        return ignore_patterns + legacy_patterns
 
     def _get_pods_for_workload(self, workload_type: str, workload_name: str, 
                               namespace: str, context: str, kubeconfig_path: str) -> List[Dict]:
@@ -589,6 +753,38 @@ class K8sLog:
         Returns:
             Dictionary containing scan results with issues and summary
         """
+        # Set up timeout handling
+        timeout_seconds = int(os.environ.get('LOG_SCAN_TIMEOUT', '300'))  # Default 5 minutes
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(timeout_seconds)
+        
+        try:
+            return self._scan_logs_for_issues_impl(log_dir, workload_type, workload_name, 
+                                                 namespace, categories, custom_patterns_file)
+        except TimeoutError:
+            logger.warning(f"Log scanning timed out after {timeout_seconds} seconds")
+            return {
+                "issues": [],
+                "summary": [
+                    f"Log scanning timed out after {timeout_seconds} seconds. "
+                    f"Consider reducing LOG_AGE parameter or increasing LOG_SCAN_TIMEOUT. "
+                    f"Large log files may cause timeouts."
+                ]
+            }
+        except Exception as e:
+            logger.error(f"Error during log scanning: {e}")
+            return {
+                "issues": [],
+                "summary": [f"Error during log scanning: {str(e)}"]
+            }
+        finally:
+            # Cancel the alarm
+            signal.alarm(0)
+
+    def _scan_logs_for_issues_impl(self, log_dir: str, workload_type: str, workload_name: str, 
+                                 namespace: str, categories: List[str] = None, 
+                                 custom_patterns_file: str = None) -> Dict[str, Any]:
+        """Implementation of log scanning with timeout protection."""
         if categories is None:
             categories = [
                 "GenericError", "AppFailure", "StackTrace", "Connection", 
@@ -622,6 +818,23 @@ class K8sLog:
             logger.warn(f"Error reading pods JSON: {e}")
             return {"issues": [], "summary": ["No pods data found for analysis."]}
 
+        # Pre-compile all regex patterns for better performance
+        compiled_patterns = {}
+        for category in categories:
+            if category not in patterns_data["patterns"]:
+                continue
+            compiled_patterns[category] = []
+            for pattern_config in patterns_data["patterns"][category]:
+                try:
+                    compiled_pattern = re.compile(pattern_config["pattern"], re.IGNORECASE)
+                    compiled_patterns[category].append({
+                        "pattern": compiled_pattern,
+                        "config": pattern_config
+                    })
+                except re.error as e:
+                    logger.warning(f"Invalid regex pattern in {category}: {pattern_config['pattern']} - {e}")
+                    continue
+
         # Pattern aggregators
         category_issues = defaultdict(list)
         max_severity = 5
@@ -636,6 +849,11 @@ class K8sLog:
 
         pods = [pod["metadata"]["name"] for pod in pods_data]
         logger.info(f"Scanning logs for {workload_type}/{workload_name} in namespace {namespace}...")
+
+        # Performance optimization: Set limits for large log files
+        max_lines_per_file = 50000  # Limit to 50k lines per file to prevent timeouts
+        max_total_lines = 200000    # Limit total lines across all files
+        total_lines_processed = 0
 
         for pod in pods:
             logger.info(f"Processing Pod: {pod}")
@@ -653,6 +871,16 @@ class K8sLog:
                     logger.warn(f"  Warning: No log file found at {log_file}")
                     continue
 
+                # Check file size before processing
+                try:
+                    file_size = log_file.stat().st_size
+                    if file_size > 50 * 1024 * 1024:  # 50MB limit
+                        logger.warning(f"  Skipping large log file {log_file} ({file_size / 1024 / 1024:.1f}MB)")
+                        continue
+                except Exception as e:
+                    logger.warning(f"  Could not check file size for {log_file}: {e}")
+                    continue
+
                 with open(log_file, "r", encoding="utf-8") as lf:
                     log_content = lf.read()
 
@@ -662,27 +890,49 @@ class K8sLog:
 
                 log_lines = log_content.split('\n')
                 
-                # Process each category
+                # Limit lines per file to prevent timeouts
+                if len(log_lines) > max_lines_per_file:
+                    logger.info(f"  Truncating large log file from {len(log_lines)} to {max_lines_per_file} lines")
+                    log_lines = log_lines[:max_lines_per_file]
+                
+                # Check total lines limit
+                if total_lines_processed + len(log_lines) > max_total_lines:
+                    remaining_lines = max_total_lines - total_lines_processed
+                    if remaining_lines > 0:
+                        logger.info(f"  Reached total line limit, processing only {remaining_lines} more lines")
+                        log_lines = log_lines[:remaining_lines]
+                    else:
+                        logger.info(f"  Reached total line limit, skipping remaining files")
+                        break
+                
+                total_lines_processed += len(log_lines)
+                
+                # Process each category with optimized pattern matching
                 for category in categories:
-                    if category not in patterns_data["patterns"]:
+                    if category not in compiled_patterns:
                         continue
                         
-                    patterns = patterns_data["patterns"][category]
+                    patterns = compiled_patterns[category]
                     
-                    for pattern_config in patterns:
-                        pattern = pattern_config["pattern"]
+                    for pattern_data in patterns:
+                        pattern = pattern_data["pattern"]
+                        pattern_config = pattern_data["config"]
                         severity = pattern_config["severity"]
                         next_steps = pattern_config["next_steps"]
                         
                         matches = []
+                        # Optimized: Use list comprehension for better performance
                         for line_num, line in enumerate(log_lines, 1):
-                            if re.search(pattern, line):
+                            if pattern.search(line):
                                 matches.append({
                                     "line_number": line_num,
                                     "line": line.strip(),
                                     "pod": pod,
                                     "container": container
                                 })
+                                # Limit matches per pattern to prevent memory issues
+                                if len(matches) >= 100:
+                                    break
                         
                         if matches:
                             max_severity = min(max_severity, severity)
@@ -705,6 +955,11 @@ class K8sLog:
                             }
                             
                             category_issues[category].append(issue)
+            
+            # Check if we've reached the total line limit
+            if total_lines_processed >= max_total_lines:
+                logger.info(f"Reached total line limit ({max_total_lines}), stopping processing")
+                break
 
         # Consolidate issues by pattern and create final results
         consolidated_issues = {}
@@ -731,11 +986,11 @@ class K8sLog:
                 consolidated_data["unique_next_steps"].update(issue["next_steps"])
                 
                 # Add details about where the issue was found
-                pod_container_info = defaultdict(int)
+                container_info = defaultdict(int)
                 for match in issue["matches"]:
-                    pod_container_info[f"{match['pod']}/{match['container']}"] += 1
+                    container_info[match['container']] += 1
                 
-                details_part = f"**Pod/Container:** {', '.join([f'{pc} ({count}x)' for pc, count in pod_container_info.items()])}"
+                details_part = f"**Container:** {', '.join([f'{container} ({count}x)' for container, count in container_info.items()])}"
                 consolidated_data["details_parts"].append(details_part)
 
         # Create final issues from consolidated data
@@ -781,17 +1036,23 @@ class K8sLog:
         categories_found = set(issue_data["category"] for issue_data in consolidated_issues.values())
         
         severity_label = severity_label_map.get(max_severity, f"Unknown({max_severity})")
+        
+        # Add performance information to summary
+        performance_info = f"Processed {total_lines_processed:,} total log lines"
+        if total_lines_processed >= max_total_lines:
+            performance_info += f" (limited to {max_total_lines:,} lines for performance)"
+        
         issues_json["summary"].append(
             f"Found {total_issues} issue patterns in {workload_type} '{workload_name}' (ns: {namespace}). "
-            f"Max severity: {severity_label}. Categories: {', '.join(sorted(categories_found))}."
+            f"Max severity: {severity_label}. Categories: {', '.join(sorted(categories_found))}. {performance_info}."
         )
 
         if not consolidated_issues:
             issues_json["summary"].append(
-                f"No issues found in {workload_type} '{workload_name}' (namespace '{namespace}')."
+                f"No issues found in {workload_type} '{workload_name}' (namespace '{namespace}'). {performance_info}."
             )
 
-        logger.info(f"Completed log scanning for {workload_type}/{workload_name}. Found {len(issues_json.get('issues', []))} issues.")
+        logger.info(f"Completed log scanning for {workload_type}/{workload_name}. Found {len(issues_json.get('issues', []))} issues. {performance_info}")
         return issues_json
 
     @keyword
@@ -873,10 +1134,10 @@ class K8sLog:
                             context_steps.append(f"RPC communication failures - investigate service mesh or proxy configuration")
                             context_steps.append(f"Verify service discovery and endpoint configuration")
                         elif 'memory' in cleaned_line.lower() or 'oom' in cleaned_line.lower():
-                            context_steps.append(f"Memory pressure detected - review resource limits for `{pod}` pod")
+                            context_steps.append(f"Memory pressure detected - review resource limits for `{container}` container")
                             context_steps.append(f"Analyze memory usage patterns for `{container}` container")
                         elif 'auth' in cleaned_line.lower() or '401' in cleaned_line or '403' in cleaned_line:
-                            context_steps.append(f"Authentication failures - verify service account permissions for `{pod}` pod")
+                            context_steps.append(f"Authentication failures - verify service account permissions for `{container}` container")
                             context_steps.append(f"Check RBAC configuration in `{namespace}` namespace")
                         else:
                             context_steps.append(f"Analyze the repeated message pattern in `{container}` container")
@@ -886,11 +1147,11 @@ class K8sLog:
                         if count >= 10:
                             severity = 1
                             context_steps.insert(0, f"CRITICAL: {count} identical messages - immediate investigation required")
-                            context_steps.append(f"Consider restarting `{pod}` pod if issue persists")
+                            context_steps.append(f"Consider restarting `{container}` container if issue persists")
                         elif count >= 5:
                             severity = 2
                             context_steps.insert(0, f"WARNING: {count} repeated messages detected")
-                            context_steps.append(f"Monitor `{pod}` pod behavior and resource usage")
+                            context_steps.append(f"Monitor `{container}` container behavior and resource usage")
                         else:
                             context_steps.insert(0, f"INFO: {count} repeated messages - monitor for escalation")
                         
@@ -898,8 +1159,8 @@ class K8sLog:
 
                         # Create issue for this anomaly
                         issues_json["issues"].append({
-                            "title": f"Application Log: Frequent Log Anomaly Detected in {pod} ({container})",
-                            "details": f"**Repeated Message:** {cleaned_line}\n**Occurrences:** {count}\n**Pod:** {pod}\n**Container:** {container}",
+                            "title": f"Application Log: Frequent Log Anomaly Detected in {container}",
+                            "details": f"**Repeated Message:** {cleaned_line}\n**Occurrences:** {count}\n**Container:** {container}",
                             "next_steps": next_steps_str,
                             "severity": severity,
                             "occurrences": count
