@@ -2,16 +2,15 @@
 set -euo pipefail
 
 # -----------------------------------------------------------------------------
-# Script: get_maintenance_events.sh
+# Script: maintenance-event.sh
 # Purpose: Fetches planned maintenance events from Azure Service Health and 
 #          their impacted resources for the specified subscription.
 #
 # Inputs (Environment Variables):
 #   AZURE_SUBSCRIPTION_ID   (Required): Azure Subscription ID.
-#   OUTPUT_DIR              (Optional): Directory to save the output JSON file.
 #
 # Outputs:
-#   File: ${OUTPUT_DIR}/maintenance_events.json
+#   File: maintenance_events.json
 #         Contains an array of Azure Planned Maintenance events with parsed impact data.
 # -----------------------------------------------------------------------------
 
@@ -28,16 +27,11 @@ fi
 echo "Switching to subscription ID: $subscription"
 az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
 
-OUTPUT_DIR="${OUTPUT_DIR:-.}"
-output_file="${OUTPUT_DIR}/maintenance_events.json"
-temp_file="${OUTPUT_DIR}/temp_events.json"
-
-# Ensure output directory exists
-mkdir -p "$OUTPUT_DIR"
+output_file="maintenance_events.json"
+temp_file="temp_events.json"
 
 echo "--- Starting Azure Planned Maintenance Event Retrieval ---"
 echo "Subscription ID: $subscription"
-echo "Output Directory: $OUTPUT_DIR"
 echo "Output File: $output_file"
 
 # Check for required Azure CLI extensions
