@@ -96,7 +96,48 @@ List Azure Service Issue Events
     ELSE
         RW.Core.Add Pre To Report    "No service issue events found in the subscription `${AZURE_SUBSCRIPTION_NAME}`"
     END
-    
+
+List Azure Impacted Resources
+    [Documentation]    List Azure resources impacted by planned maintenance or other events
+    [Tags]    Maintenance    Azure    Impacted    access:read-only
+    # Run the script to fetch impacted resources
+    ${impacted_cmd}=    RW.CLI.Run Bash File
+    ...    bash_file=impacted-resource.sh
+    ...    env=${env}
+    ...    timeout_seconds=300
+    ...    include_in_history=false
+
+    # Read the output file
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat impacted_resources.json
+
+    TRY
+        ${impacted_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${impacted_list}=    Create List
+    END
+
+    IF    $impacted_list
+        # Format the results for the report
+        ${formatted_results}=    RW.CLI.Run Cli
+        ...    cmd=jq -r '["ResourceName", "ResourceGroup", "ResourceType", "TrackingId", "SubscriptionId", "ResourceLink"], (.[] | [ .resourceName, .resourceGroup, .resourceType, .TrackingId, .subscriptionId, ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' impacted_resources.json | column -t -s $'\t'
+        RW.Core.Add Pre To Report    Azure Impacted Resources Summary:\n========================================\n${formatted_results.stdout}
+
+        # Raise a single issue for all impacted resources
+        ${impacted_count}=    Get Length    ${impacted_list}
+        ${pretty_impacted}=    Evaluate    pprint.pformat(${impacted_list})    modules=pprint
+        RW.Core.Add Issue
+        ...    severity=3
+        ...    expected=No Azure resources should be impacted by planned maintenance or other events
+        ...    actual=Found ${impacted_count} impacted resource(s)
+        ...    title=Azure Impacted Resources detected in subscription `${AZURE_SUBSCRIPTION_NAME}`
+        ...    details={"impacted_resources": ${pretty_impacted}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
+        ...    next_steps=Review the impacted resources in subscription `${AZURE_SUBSCRIPTION_NAME}`
+    ELSE
+        RW.Core.Add Pre To Report    "No impacted resources found for the subscription."
+    END
+
 *** Keywords ***
 Suite Initialization
     ${azure_credentials}=    RW.Core.Import Secret
