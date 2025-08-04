@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # -----------------------------------------------------------------------------
-# Script: service-issue-events.sh
+# Script: service-issue-event.sh
 # Purpose: Fetches service issue events from Azure Service Health and 
 #          their impacted resources for the specified subscription.
 #
@@ -78,6 +78,7 @@ ServiceHealthResources
     impactStartTime = todatetime(properties.ImpactStartTime),
     impactMitigationTime = todatetime(properties.ImpactMitigationTime)
 | where eventType == 'ServiceIssue'
+| where status == 'Active'
 | project
     subscriptionId,
     trackingId,
