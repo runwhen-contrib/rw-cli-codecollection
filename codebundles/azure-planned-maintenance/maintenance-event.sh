@@ -77,6 +77,7 @@ ServiceHealthResources
     impactStartTime = todatetime(properties.ImpactStartTime),
     impactMitigationTime = todatetime(properties.ImpactMitigationTime)
 | where eventType == 'PlannedMaintenance'
+| where status == 'Active'
 | project
     subscriptionId,
     trackingId,
