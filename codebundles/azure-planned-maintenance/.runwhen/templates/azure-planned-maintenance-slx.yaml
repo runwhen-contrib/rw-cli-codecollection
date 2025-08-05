@@ -7,8 +7,8 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/storage/10086-icon-service-Storage-Accounts.svg
-  alias: {{ match_resource.resource_group.name }} Azure Planned Maintenance
+  imageURL: https://placeholder.svg
+  alias: {{ resource_group.name }} Azure Planned Maintenance
   asMeasuredBy: Composite health score of resources & activities. 
   configProvided:
   - name: SLX_PLACEHOLDER
