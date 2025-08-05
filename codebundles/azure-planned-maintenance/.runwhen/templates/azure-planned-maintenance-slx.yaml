@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://placeholder.svg
-  alias: Azure Planned Maintenance
+  alias: {{ match_resource.subscription_name }} Azure Planned Maintenance
   asMeasuredBy: Composite health score of resources & activities. 
   configProvided:
   - name: SLX_PLACEHOLDER
