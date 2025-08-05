@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       Check Azure planned maintenance events
+Documentation       List Azure planned maintenance events, service issue events, and impacted resources
 Metadata            Author    saurabh3460
 Metadata            Display Name    Azure    Planned Maintenance
 Metadata            Supports    Azure    Planned Maintenance
@@ -10,9 +10,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
-Library    OperatingSystem
-Library    Collections
-Library    DateTime
+
 Suite Setup         Suite Initialization
 
 
@@ -47,7 +45,7 @@ List Azure Planned Maintenance Events
         # Raise a single issue for all events
         ${event_count}=    Get Length    ${event_list}
         RW.Core.Add Issue
-        ...    severity=4
+        ...    severity=3
         ...    expected=No planned maintenance events should impact resources
         ...    actual=Found ${event_count} planned maintenance event(s)
         ...    title=Azure Planned Maintenance Events detected in subscription `${AZURE_SUBSCRIPTION_NAME}`
@@ -87,7 +85,7 @@ List Azure Service Issue Events
         # Raise a single issue for all events
         ${event_count}=    Get Length    ${event_list}
         RW.Core.Add Issue
-        ...    severity=4
+        ...    severity=3
         ...    expected=No service issue events should impact resources
         ...    actual=Found ${event_count} service issue event(s)    
         ...    title=Azure Service Issue Events detected in subscription `${AZURE_SUBSCRIPTION_NAME}`
