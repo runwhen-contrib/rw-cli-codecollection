@@ -570,14 +570,14 @@ Suite Initialization
     ...    description=Timeout in seconds for Azure VM run-command operations.
     ...    pattern=\d*
     ...    default=90
-    ${VM_INCLUDE_LIST}=    RW.Core.Import User Variable    VM_INCLUDE_LIST
-    ...    type=string
-    ...    description=Comma-separated list of VM name patterns to include (e.g., "web-*,app-*"). If empty, all VMs are processed.
-    ...    pattern=.*
-    ${VM_OMIT_LIST}=    RW.Core.Import User Variable    VM_OMIT_LIST
-    ...    type=string
-    ...    description=Comma-separated list of VM name patterns to exclude (e.g., "test-*,dev-*"). If empty, no VMs are excluded.
-    ...    pattern=.*
+#    ${VM_INCLUDE_LIST}=    RW.Core.Import User Variable    VM_INCLUDE_LIST
+#    ...    type=string
+#    ...    description=Comma-separated list of VM name patterns to include (e.g., "web-*,app-*"). If empty, all VMs are processed.
+#    ...    pattern=.*
+#    ${VM_OMIT_LIST}=    RW.Core.Import User Variable    VM_OMIT_LIST
+#    ...    type=string
+#    ...    description=Comma-separated list of VM name patterns to exclude (e.g., "test-*,dev-*"). If empty, no VMs are excluded.
+#    ...    pattern=.*
     ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_ID
     ...    type=string
     ...    description=The Azure Subscription ID.
@@ -598,8 +598,8 @@ Suite Initialization
     Set Suite Variable    ${MEMORY_THRESHOLD}    ${MEMORY_THRESHOLD}
     Set Suite Variable    ${MAX_PARALLEL_JOBS}    ${MAX_PARALLEL_JOBS}
     Set Suite Variable    ${TIMEOUT_SECONDS}    ${TIMEOUT_SECONDS}
-    Set Suite Variable    ${VM_INCLUDE_LIST}    ${VM_INCLUDE_LIST}
-    Set Suite Variable    ${VM_OMIT_LIST}    ${VM_OMIT_LIST}
+#    Set Suite Variable    ${VM_INCLUDE_LIST}    ${VM_INCLUDE_LIST}
+#    Set Suite Variable    ${VM_OMIT_LIST}    ${VM_OMIT_LIST}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     
