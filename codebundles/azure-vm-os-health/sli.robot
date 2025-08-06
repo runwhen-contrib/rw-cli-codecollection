@@ -49,6 +49,11 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
             Continue For Loop
         END
 
+        # Skip filtered VMs from SLI calculation (they shouldn't count as failures)
+        IF    "${code}" in ["WindowsVM", "NotIncluded", "Omitted"]
+            Continue For Loop
+        END
+
         # Write stdout to temp file for next steps analysis
         ${tmpfile}=    Generate Random String    8
         ${tmpfile_path}=    Set Variable    vm_disk_stdout_${tmpfile}.txt
@@ -98,6 +103,11 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
         # Skip if there are errors or connection issues
         IF    "${stderr}" != "" or "${code}" in ["ConnectionError", "CommandTimeout", "InvalidResponse", "VMNotRunning"]
             ${issue_count}=    Evaluate    ${issue_count} + 1
+            Continue For Loop
+        END
+
+        # Skip filtered VMs from SLI calculation (they shouldn't count as failures)
+        IF    "${code}" in ["WindowsVM", "NotIncluded", "Omitted"]
             Continue For Loop
         END
 
@@ -152,6 +162,11 @@ Check Uptime for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
             Continue For Loop
         END
 
+        # Skip filtered VMs from SLI calculation (they shouldn't count as failures)
+        IF    "${code}" in ["WindowsVM", "NotIncluded", "Omitted"]
+            Continue For Loop
+        END
+
         ${tmpfile}=    Generate Random String    8
         ${tmpfile_path}=    Set Variable    vm_uptime_stdout_${tmpfile}.txt
         Create File    ${tmpfile_path}    ${stdout}
@@ -203,6 +218,11 @@ Check Last Patch Status for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
             Continue For Loop
         END
 
+        # Skip filtered VMs from SLI calculation (they shouldn't count as failures)
+        IF    "${code}" in ["WindowsVM", "NotIncluded", "Omitted"]
+            Continue For Loop
+        END
+
         ${tmpfile}=    Generate Random String    8
         ${tmpfile_path}=    Set Variable    vm_patch_stdout_${tmpfile}.txt
         Create File    ${tmpfile_path}    ${stdout}
@@ -232,11 +252,6 @@ Suite Initialization
     ...    type=string
     ...    description=The resource group containing the VM(s).
     ...    pattern=\w*
-    ${VM_NAME}=    RW.Core.Import User Variable    VM_NAME
-    ...    type=string
-    ...    description=The Azure Virtual Machine to check. Leave empty to check all VMs in the resource group.
-    ...    pattern=\w*
-    ...    default=""
     ${DISK_THRESHOLD}=    RW.Core.Import User Variable    DISK_THRESHOLD
     ...    type=string
     ...    description=The threshold percentage for disk usage warnings.
@@ -262,6 +277,14 @@ Suite Initialization
     ...    description=Timeout in seconds for Azure VM run-command operations.
     ...    pattern=\d*
     ...    default=90
+    ${VM_INCLUDE_LIST}=    RW.Core.Import User Variable    VM_INCLUDE_LIST
+    ...    type=string
+    ...    description=Comma-separated list of VM name patterns to include (e.g., "web-*,app-*"). If empty, all VMs are processed.
+    ...    pattern=.*
+    ${VM_OMIT_LIST}=    RW.Core.Import User Variable    VM_OMIT_LIST
+    ...    type=string
+    ...    description=Comma-separated list of VM name patterns to exclude (e.g., "test-*,dev-*"). If empty, no VMs are excluded.
+    ...    pattern=.*
     ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_ID
     ...    type=string
     ...    description=The Azure Subscription ID.
@@ -275,18 +298,37 @@ Suite Initialization
     ...    type=string
     ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
     ...    pattern=\w*
-    Set Suite Variable    ${VM_NAME}    ${VM_NAME}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable    ${DISK_THRESHOLD}    ${DISK_THRESHOLD}
     Set Suite Variable    ${UPTIME_THRESHOLD}    ${UPTIME_THRESHOLD}
     Set Suite Variable    ${MEMORY_THRESHOLD}    ${MEMORY_THRESHOLD}
     Set Suite Variable    ${MAX_PARALLEL_JOBS}    ${MAX_PARALLEL_JOBS}
     Set Suite Variable    ${TIMEOUT_SECONDS}    ${TIMEOUT_SECONDS}
+    Set Suite Variable    ${VM_INCLUDE_LIST}    ${VM_INCLUDE_LIST}
+    Set Suite Variable    ${VM_OMIT_LIST}    ${VM_OMIT_LIST}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
-    Set Suite Variable
-    ...    ${env}
-    ...    {"VM_NAME":"${VM_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "DISK_THRESHOLD": "${DISK_THRESHOLD}", "UPTIME_THRESHOLD": "${UPTIME_THRESHOLD}", "MEMORY_THRESHOLD": "${MEMORY_THRESHOLD}", "MAX_PARALLEL_JOBS": "${MAX_PARALLEL_JOBS}", "TIMEOUT_SECONDS": "${TIMEOUT_SECONDS}", "AZURE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}"}
+    
+    # Create base environment dictionary
+    ${base_env}=    Create Dictionary
+    ...    AZ_RESOURCE_GROUP=${AZ_RESOURCE_GROUP}
+    ...    DISK_THRESHOLD=${DISK_THRESHOLD}
+    ...    UPTIME_THRESHOLD=${UPTIME_THRESHOLD}
+    ...    MEMORY_THRESHOLD=${MEMORY_THRESHOLD}
+    ...    MAX_PARALLEL_JOBS=${MAX_PARALLEL_JOBS}
+    ...    TIMEOUT_SECONDS=${TIMEOUT_SECONDS}
+    ...    AZURE_SUBSCRIPTION_ID=${AZURE_RESOURCE_SUBSCRIPTION_ID}
+    ...    AZURE_SUBSCRIPTION_NAME=${AZURE_SUBSCRIPTION_NAME}
+    
+    # Only add VM_INCLUDE_LIST and VM_OMIT_LIST if they have values
+    IF    "${VM_INCLUDE_LIST}" != ""
+        Set To Dictionary    ${base_env}    VM_INCLUDE_LIST=${VM_INCLUDE_LIST}
+    END
+    IF    "${VM_OMIT_LIST}" != ""
+        Set To Dictionary    ${base_env}    VM_OMIT_LIST=${VM_OMIT_LIST}
+    END
+    
+    Set Suite Variable    ${env}    ${base_env}
     # Set Azure subscription context
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
