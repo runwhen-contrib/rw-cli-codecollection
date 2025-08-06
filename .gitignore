@@ -57,3 +57,7 @@ build
 **bashfile-**
 **db.sqlite3**
 **generated_id_rsa
+**vm_uptime_stdout**
+**vm_patch_stdout**
+**vm_mem_stdout**
+**vm_disk_stdout**
