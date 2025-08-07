@@ -1,12 +1,11 @@
 #!/bin/bash
-# Check Azure Container Registry reachability and next steps
-
+set -x
 SUBSCRIPTION_ID="${AZURE_SUBSCRIPTION_ID:-}"
 RESOURCE_GROUP="${AZ_RESOURCE_GROUP:-}"
 ACR_NAME="${ACR_NAME:-}"
 ACR_PASSWORD="${ACR_PASSWORD:-}"
 
-ISSUES_FILE="reachability_issues.json"
+ISSUES_FILE="login_issues.json"
 echo '[]' > "$ISSUES_FILE"
 
 add_issue() {
@@ -52,7 +51,7 @@ if [ $? -ne 0 ] || [ -z "$acr_info" ]; then
   if grep -q "AuthorizationFailed" az_acr_show_err.log; then
     add_issue \
       "Insufficient permissions to access ACR '$ACR_NAME' (RG: '$RESOURCE_GROUP')" \
-      4 \
+      3 \
       "User/service principal should have 'AcrRegistryReader' or higher role on the registry" \
       "az acr show failed due to insufficient permissions" \
       "See az_acr_show_err.log for details" \
@@ -60,7 +59,7 @@ if [ $? -ne 0 ] || [ -z "$acr_info" ]; then
   else
     add_issue \
       "ACR '$ACR_NAME' (RG: '$RESOURCE_GROUP') is unreachable or not found (Subscription: $SUBSCRIPTION_ID)" \
-      4 \
+      3 \
       "ACR should be reachable and exist in the specified resource group and subscription" \
       "ACR '$ACR_NAME' is unreachable or not found" \
       "Tried: az acr show --name $ACR_NAME --resource-group $RESOURCE_GROUP --subscription $SUBSCRIPTION_ID" \
@@ -76,7 +75,7 @@ if [ $? -ne 0 ] || [ -z "$admin_creds" ]; then
   if grep -q "AuthorizationFailed" az_acr_cred_err.log; then
     add_issue \
       "Insufficient permissions to retrieve admin credentials for ACR '$ACR_NAME'" \
-      4 \
+      3 \
       "User/service principal should have 'AcrRegistryReader' or higher role on the registry" \
       "az acr credential show failed due to insufficient permissions" \
       "See az_acr_cred_err.log for details" \
@@ -84,7 +83,7 @@ if [ $? -ne 0 ] || [ -z "$admin_creds" ]; then
   else
     add_issue \
       "Failed to retrieve admin credentials for ACR '$ACR_NAME'" \
-      4 \
+      3 \
       "Should be able to retrieve admin credentials if admin is enabled" \
       "az acr credential show failed" \
       "Tried: az acr credential show --name $ACR_NAME --resource-group $RESOURCE_GROUP" \
@@ -102,7 +101,7 @@ admin_username=$(echo "$admin_creds" | jq -r '.username')
 if ! echo "$ACR_PASSWORD" | docker login "$login_server" -u "$admin_username" --password-stdin >docker_login.log 2>&1; then
   add_issue \
     "Docker login to ACR '$ACR_NAME' failed" \
-    4 \
+    2 \
     "Should be able to login to the registry using admin credentials" \
     "docker login failed" \
     "See docker_login.log for details" \

@@ -73,13 +73,22 @@ tasks:
         branch_name=$(git rev-parse --abbrev-ref HEAD)
         codebundle=$(basename "$(dirname "$PWD")")
         AZURE_SUBSCRIPTION_ID=$ARM_SUBSCRIPTION_ID
-        pushd terraform > /dev/null
-        resource_group=$(terraform show -json terraform.tfstate | jq -r '
-          .values.root_module.resources[] | 
-          select(.type == "azurerm_resource_group") | .values.name')
-        popd > /dev/null
+
+        # Check if AZ_RESOURCE_GROUP is set, otherwise get from Terraform state
+        if [ -z "${AZ_RESOURCE_GROUP}" ]; then
+          # Fetch individual cluster details from Terraform state
+          pushd terraform > /dev/null
+          resource_group=$(terraform show -json terraform.tfstate | jq -r '
+            .values.root_module.resources[] | 
+            select(.type == "azurerm_resource_group") | .values.name')
+          popd > /dev/null
+        else
+          resource_group="${AZ_RESOURCE_GROUP}"
+        fi
+
+        # Check if resource group is still empty after all checks
         if [ -z "$resource_group" ]; then
-          echo "Error: Missing resource_group details. Ensure Terraform plan has been applied."
+          echo "Error: Missing resource_group details. Either set AZ_RESOURCE_GROUP environment variable or ensure Terraform plan has been applied."
           exit 1
         fi
         source terraform/tf.secret
@@ -355,4 +364,3 @@ tasks:
         sudo rm -rf output
         rm workspaceInfo.yaml
     silent: true
-

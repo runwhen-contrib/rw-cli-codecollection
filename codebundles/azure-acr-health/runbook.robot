@@ -7,7 +7,6 @@ Metadata            Supports    Azure    Container Registry    ACR    Health    
 Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
-Library             Azure
 Library             RW.platform
 Library             String
 Library             OperatingSystem
@@ -21,7 +20,7 @@ Check DNS & TLS Reachability for Registry `${ACR_NAME}`
     [Documentation]    Verifies DNS resolution and HTTPS/TLS for ACR endpoint.
     [Tags]    access:read-only    ACR    Azure    DNS    TLS    Connectivity    Health
     ${dns_tls}=    RW.CLI.Run Bash File
-    ...    bash_file=acr_dns_tls_reachability.sh
+    ...    bash_file=acr_reachability.sh
     ...    env=${env}
     ...    timeout_seconds=60
     ...    include_in_history=false
@@ -31,13 +30,13 @@ Check DNS & TLS Reachability for Registry `${ACR_NAME}`
     IF    len(@{issues}) > 0
         FOR    ${issue}    IN    @{issues}
             RW.Core.Add Issue
-            ...    severity=${issue}["severity"]
-            ...    title=${issue}["title"]
-            ...    expected=${issue}["expected"]
-            ...    actual=${issue}["actual"]
-            ...    reproduce_hint=${issue}.get("reproduce_hint", "")
-            ...    details=${issue}["details"]
-            ...    next_steps=${issue}["next_steps"]
+            ...    severity=${issue["severity"]}
+            ...    title=${issue["title"]}
+            ...    expected=${issue["expected"]}
+            ...    actual=${issue["actual"]}
+            ...    reproduce_hint=${issue.get("reproduce_hint", "")}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["next_steps"]}
         END
     END
 
@@ -45,23 +44,24 @@ Check ACR Login & Authentication for Registry `${ACR_NAME}`
     [Documentation]    Attempts az acr login and docker login using intended workload identity.
     [Tags]    access:read-only    ACR    Azure    Login    Auth    Connectivity    Health
     ${login}=    RW.CLI.Run Bash File
-    ...    bash_file=acr_login_check.sh
+    ...    bash_file=acr_authentication.sh
     ...    env=${env}
+    ...    secret__ACR_PASSWORD=${ACR_PASSWORD}
     ...    timeout_seconds=90
     ...    include_in_history=false
     ${issues_list}=    RW.CLI.Run Cli
-    ...    cmd=cat acr_login_issues.json
+    ...    cmd=cat login_issues.json
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
     IF    len(@{issues}) > 0
         FOR    ${issue}    IN    @{issues}
             RW.Core.Add Issue
-            ...    severity=${issue}["severity"]
-            ...    title=${issue}["title"]
-            ...    expected=${issue}["expected"]
-            ...    actual=${issue}["actual"]
-            ...    reproduce_hint=${issue}.get("reproduce_hint", "")
-            ...    details=${issue}["details"]
-            ...    next_steps=${issue}["next_steps"]
+            ...    severity=${issue["severity"]}
+            ...    title=${issue["title"]}
+            ...    expected=${issue["expected"]}
+            ...    actual=${issue["actual"]}
+            ...    reproduce_hint=${issue.get("reproduce_hint", "")}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["next_steps"]}
         END
     END
 
@@ -79,13 +79,13 @@ Check ACR Storage Usage for Registry `${ACR_NAME}`
     IF    len(@{issues}) > 0
         FOR    ${issue}    IN    @{issues}
             RW.Core.Add Issue
-            ...    severity=${issue}["severity"]
-            ...    title=${issue}["title"]
-            ...    expected=${issue}["expected"]
-            ...    actual=${issue}["actual"]
-            ...    reproduce_hint=${issue}.get("reproduce_hint", "")
-            ...    details=${issue}["details"]
-            ...    next_steps=${issue}["next_steps"]
+            ...    severity=${issue["severity"]}
+            ...    title=${issue["title"]}
+            ...    expected=${issue["expected"]}
+            ...    actual=${issue["actual"]}
+            ...    reproduce_hint=${issue.get("reproduce_hint", "")}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["next_steps"]}
         END
     END
 
@@ -94,7 +94,7 @@ Check ACR Repository Event Failures for Registry `${ACR_NAME}`
     [Documentation]    Queries Log Analytics for recent failed pushes/pulls and repo errors.
     [Tags]    access:read-only    ACR    Azure    Events    Health
     ${repo_events}=    RW.CLI.Run Bash File
-    ...    bash_file=acr_repository_events.sh
+    ...    bash_file=acr_events.sh
     ...    env=${env}
     ...    timeout_seconds=90
     ...    include_in_history=false
@@ -104,13 +104,13 @@ Check ACR Repository Event Failures for Registry `${ACR_NAME}`
     IF    len(@{issues}) > 0
         FOR    ${issue}    IN    @{issues}
             RW.Core.Add Issue
-            ...    severity=${issue}["severity"]
-            ...    title=${issue}["title"]
-            ...    expected=${issue}["expected"]
-            ...    actual=${issue}["actual"]
-            ...    reproduce_hint=${issue}.get("reproduce_hint", "")
-            ...    details=${issue}["details"]
-            ...    next_steps=${issue}["next_steps"]
+            ...    severity=${issue["severity"]}
+            ...    title=${issue["title"]}
+            ...    expected=${issue["expected"]}
+            ...    actual=${issue["actual"]}
+            ...    reproduce_hint=${issue.get("reproduce_hint", "")}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["next_steps"]}
         END
     END
 
@@ -125,7 +125,7 @@ Suite Initialization
     ...    type=string
     ...    description=Azure Container Registry Name.
     ...    pattern=^[a-zA-Z0-9]*$
-    ${ACR_PASSWORD}=    RW.Core.Import Secret    acr_admin_password
+    ${ACR_PASSWORD}=    RW.Core.Import Secret    ACR_PASSWORD
     ...    type=string
     ...    description=Azure Container Registry password (admin or SP credential).
     ...    pattern=.*
@@ -141,6 +141,11 @@ Suite Initialization
     ...    type=string
     ...    description=Log Analytics Workspace ID for querying diagnostic events.
     ...    pattern=\w*
+    ${USAGE_THRESHOLD}=    RW.Core.Import User Variable    USAGE_THRESHOLD
+    ...     type=string
+    ...     description=Threshold for acr usage
+    ...    pattern=\d*
+    ...    default=80
     Set Suite Variable    ${ACR_NAME}    ${ACR_NAME}
     Set Suite Variable    ${ACR_PASSWORD}    ${ACR_PASSWORD}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
@@ -149,7 +154,7 @@ Suite Initialization
     Set Suite Variable    ${LOG_WORKSPACE_ID}    ${LOG_WORKSPACE_ID}
     Set Suite Variable
     ...    ${env}
-    ...    {"ACR_NAME": "${ACR_NAME}", "${ACR_PASSWORD}": "${ACR_PASSWORD}", "AZ_RESOURCE_GROUP": "${AZ_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID": "${AZURE_RESOURCE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME": "${AZURE_SUBSCRIPTION_NAME}", "LOG_WORKSPACE_ID": "${LOG_WORKSPACE_ID}"}
+    ...    {"ACR_NAME": "${ACR_NAME}", "AZ_RESOURCE_GROUP": "${AZ_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID": "${AZURE_RESOURCE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME": "${AZURE_SUBSCRIPTION_NAME}", "LOG_WORKSPACE_ID": "${LOG_WORKSPACE_ID}", "USAGE_THRESHOLD": "${USAGE_THRESHOLD}"}
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     ...    include_in_history=false
