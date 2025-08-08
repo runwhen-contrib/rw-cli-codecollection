@@ -6,7 +6,7 @@ on:
     branches: [ main ]
     paths:
       - VERSION
-      - .github/workflows/semver.yaml
+      - .github/workflows/release.yaml
 
 permissions:
   contents: write
