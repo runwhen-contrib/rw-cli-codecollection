@@ -1,69 +1,69 @@
-name: Semantic Versioning
+# name: Semantic Versioning
 
-on:
-  workflow_dispatch:
-  push:
-    branches: [ main ]
-    paths:
-      - VERSION
-      - .github/workflows/semver.yaml
+# on:
+#   workflow_dispatch:
+#   push:
+#     branches: [ main ]
+#     paths:
+#       - VERSION
+#       - .github/workflows/semver.yaml
 
-permissions:
-  contents: write  # needed to push tags / create releases
+# permissions:
+#   contents: write  # needed to push tags / create releases
 
-jobs:
-  semver-it:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0            # full history for tags
-          persist-credentials: true # allow git push back to origin
+# jobs:
+#   semver-it:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v4
+#         with:
+#           fetch-depth: 0            # full history for tags
+#           persist-credentials: true # allow git push back to origin
 
-      - name: Fetch all tags
-        run: |
-          git fetch --force --tags --prune
-          git tag -l
+#       - name: Fetch all tags
+#         run: |
+#           git fetch --force --tags --prune
+#           git tag -l
 
-      - name: Configure Git author
-        run: |
-          git config user.name "${GITHUB_ACTOR}"
-          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+#       - name: Configure Git author
+#         run: |
+#           git config user.name "${GITHUB_ACTOR}"
+#           git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
 
-      # Optional: create a baseline tag if none exist (prevents v-- issues on first run)
-      - name: Ensure base semver tag (first run only)
-        run: |
-          if ! git tag -l | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "No semver tags found. Creating v0.0.0 baseline."
-            git tag v0.0.0
-            git push origin v0.0.0
-          fi
+#       # Optional: create a baseline tag if none exist (prevents v-- issues on first run)
+#       - name: Ensure base semver tag (first run only)
+#         run: |
+#           if ! git tag -l | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+#             echo "No semver tags found. Creating v0.0.0 baseline."
+#             git tag v0.0.0
+#             git push origin v0.0.0
+#           fi
 
-      - name: Create Semver Tag and Changelog Entry
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
+#       - name: Create Semver Tag and Changelog Entry
+#         env:
+#           GH_TOKEN: ${{ github.token }}
+#         run: |
+#           set -euo pipefail
 
-          VERSION="$(cat VERSION)"
-          BRANCH="automatic-changelog-update-$VERSION"
-          git checkout -B "$BRANCH"
+#           VERSION="$(cat VERSION)"
+#           BRANCH="automatic-changelog-update-$VERSION"
+#           git checkout -B "$BRANCH"
 
-          ./.github/scripts/semver-it.sh VERSION CHANGELOG.md '(Feat|Add|Doc|Fix)'
+#           ./.github/scripts/semver-it.sh VERSION CHANGELOG.md '(Feat|Add|Doc|Fix)'
 
-          most_recent_tag="$(git describe --tags --abbrev=0 || true)"
-          if ! [[ "$most_recent_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Invalid/empty tag from semver-it: '${most_recent_tag:-<none>}'"
-            exit 1
-          fi
+#           most_recent_tag="$(git describe --tags --abbrev=0 || true)"
+#           if ! [[ "$most_recent_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+#             echo "Invalid/empty tag from semver-it: '${most_recent_tag:-<none>}'"
+#             exit 1
+#           fi
 
-          echo "Pushing tag: $most_recent_tag and branch: $BRANCH"
-          git push origin "refs/tags/$most_recent_tag"
-          git push -u origin "$BRANCH"
+#           echo "Pushing tag: $most_recent_tag and branch: $BRANCH"
+#           git push origin "refs/tags/$most_recent_tag"
+#           git push -u origin "$BRANCH"
 
-          if gh release view "$most_recent_tag" >/dev/null 2>&1; then
-            gh release edit "$most_recent_tag" --notes-from-tag
-          else
-            gh release create "$most_recent_tag" --generate-notes
-          fi
+#           if gh release view "$most_recent_tag" >/dev/null 2>&1; then
+#             gh release edit "$most_recent_tag" --notes-from-tag
+#           else
+#             gh release create "$most_recent_tag" --generate-notes
+#           fi
