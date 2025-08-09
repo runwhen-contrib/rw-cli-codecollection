@@ -1,0 +1,242 @@
+commands:
+- command: bash 'containerapp_resource_health.sh'
+  doc_links: '
+
+    - [Azure CLI Container Apps reference](https://docs.microsoft.com/en-us/cli/azure/containerapp){:target="_blank"}
+
+    - [Microsoft.ResourceHealth provider documentation](https://docs.microsoft.com/en-us/rest/api/resourcehealth/){:target="_blank"}
+
+    - [Azure Container Apps health monitoring](https://docs.microsoft.com/en-us/azure/container-apps/monitor){:target="_blank"}'
+  explanation: This script checks the Azure Resource Health status for a Container App using the Azure CLI. It registers the Microsoft.ResourceHealth provider if needed and retrieves health information to identify any platform-level issues affecting the Container App.
+  multi_line_details: |
+    This bash script performs health monitoring for Azure Container Apps by:
+    - Registering the Microsoft.ResourceHealth provider if not already registered
+    - Making REST API calls to retrieve the current health status of the Container App
+    - Checking for any Azure platform issues that might affect the Container App
+    - Outputting health status information in JSON format for further analysis
+  name: check_for_resource_health_issues_affecting_container_app_container_app_name_in_resource_group_az_resource_group
+  when_is_it_useful: '1. Troubleshooting Container App availability issues where you need to determine if the problem is at the Azure platform level.
+
+
+    2. Monitoring Container App health as part of automated health checks in CI/CD pipelines.
+
+
+    3. Investigating Container App performance degradation to rule out Azure infrastructure issues.
+
+
+    4. Setting up proactive monitoring to detect and alert on Azure platform issues affecting Container Apps.
+
+
+    5. Debugging deployment issues where Container Apps are not starting or responding correctly.'
+
+- command: bash 'containerapp_replica_health.sh'
+  doc_links: '
+
+    - [Azure Container Apps replicas](https://docs.microsoft.com/en-us/azure/container-apps/replicas){:target="_blank"}
+
+    - [Container Apps scaling](https://docs.microsoft.com/en-us/azure/container-apps/scale-app){:target="_blank"}'
+  explanation: This script analyzes the health and status of Container App replicas, checking for failed replicas, insufficient replica counts, and overall replica health to ensure proper application availability.
+  multi_line_details: |
+    This script provides detailed replica health monitoring by:
+    - Checking Container App provisioning state and overall health
+    - Listing and analyzing individual replica status and running state
+    - Validating minimum replica count requirements
+    - Identifying failed or terminated replicas
+    - Checking scaling configuration and replica distribution
+    - Generating detailed health reports with actionable recommendations
+  name: check_container_app_container_app_name_replica_health_in_resource_group_az_resource_group
+  when_is_it_useful: '1. Troubleshooting Container App scaling issues and replica distribution problems.
+
+
+    2. Monitoring Container App availability and ensuring sufficient replica count.
+
+
+    3. Investigating application performance issues related to replica health.
+
+
+    4. Validating Container App deployment success and replica startup.
+
+
+    5. Setting up automated monitoring for Container App replica health and scaling behavior.'
+
+- command: bash 'containerapp_metric_health.sh'
+  doc_links: '
+
+    - [Azure Container Apps metrics](https://docs.microsoft.com/en-us/azure/container-apps/monitor-app){:target="_blank"}
+
+    - [Azure Monitor metrics](https://docs.microsoft.com/en-us/azure/azure-monitor/platform/metrics-supported){:target="_blank"}'
+  explanation: This script fetches and analyzes key performance metrics for Container Apps including CPU usage, memory usage, request counts, and error rates to identify performance issues and resource constraints.
+  multi_line_details: |
+    This comprehensive metrics analysis script:
+    - Collects CPU and memory utilization metrics over a specified time period
+    - Monitors request volume and HTTP error rates (4xx, 5xx)
+    - Tracks restart counts and identifies stability issues
+    - Compares metrics against configurable thresholds
+    - Generates detailed performance reports with trend analysis
+    - Provides actionable recommendations for performance optimization
+  name: fetch_container_app_container_app_name_utilization_metrics_in_resource_group_az_resource_group
+  when_is_it_useful: '1. Performance monitoring and capacity planning for Container Apps.
+
+
+    2. Troubleshooting high CPU or memory usage issues.
+
+
+    3. Analyzing application error rates and request patterns.
+
+
+    4. Setting up automated alerting based on performance thresholds.
+
+
+    5. Optimizing resource allocation and scaling configuration.'
+
+- command: bash 'containerapp_logs.sh'
+  doc_links: '
+
+    - [Container Apps logging](https://docs.microsoft.com/en-us/azure/container-apps/logging){:target="_blank"}
+
+    - [Log Analytics queries](https://docs.microsoft.com/en-us/azure/azure-monitor/log-query/){:target="_blank"}'
+  explanation: This script retrieves and displays logs from Container Apps, including application logs from individual replicas and revisions, to help with troubleshooting and monitoring.
+  multi_line_details: |
+    This logging script provides comprehensive log collection by:
+    - Fetching recent logs from Container Apps using Azure CLI
+    - Attempting Log Analytics queries if direct log access fails
+    - Collecting logs from active revisions and running replicas
+    - Organizing logs by revision and replica for better debugging
+    - Supporting both console output and structured log analysis
+  name: get_container_app_container_app_name_logs_in_resource_group_az_resource_group
+  when_is_it_useful: '1. Troubleshooting application errors and debugging Container App issues.
+
+
+    2. Monitoring application behavior and identifying error patterns.
+
+
+    3. Investigating Container App startup or runtime failures.
+
+
+    4. Analyzing performance issues through application log analysis.
+
+
+    5. Collecting diagnostic information for support cases or incident response.'
+
+- command: bash 'containerapp_config_health.sh'
+  doc_links: '
+
+    - [Container Apps configuration](https://docs.microsoft.com/en-us/azure/container-apps/configuration){:target="_blank"}
+
+    - [Container Apps best practices](https://docs.microsoft.com/en-us/azure/container-apps/best-practices){:target="_blank"}'
+  explanation: This script analyzes Container App configuration including scaling rules, resource limits, health probes, ingress settings, and security configuration to identify potential issues and recommend best practices.
+  multi_line_details: |
+    This configuration health script performs comprehensive analysis of:
+    - Scaling configuration and auto-scaling rules
+    - Container resource limits (CPU, memory)
+    - Health probe configuration (liveness, readiness, startup)
+    - Ingress and networking configuration
+    - Secret and environment variable management
+    - Dapr configuration if enabled
+    - Volume mount and storage configuration
+    - Best practice recommendations and security assessments
+  name: check_configuration_health_of_container_app_container_app_name_in_resource_group_az_resource_group
+  when_is_it_useful: '1. Validating Container App configuration against best practices.
+
+
+    2. Troubleshooting deployment and scaling issues.
+
+
+    3. Security assessment and configuration review.
+
+
+    4. Optimizing Container App performance and reliability.
+
+
+    5. Preparing for production deployment and ensuring proper configuration.'
+
+- command: bash 'containerapp_revision_health.sh'
+  doc_links: '
+
+    - [Container Apps revisions](https://docs.microsoft.com/en-us/azure/container-apps/revisions){:target="_blank"}
+
+    - [Container Apps deployment](https://docs.microsoft.com/en-us/azure/container-apps/deploy){:target="_blank"}'
+  explanation: This script monitors Container App revision health, including active/inactive revisions, traffic distribution, provisioning status, and deployment health to ensure proper application versioning and rollout.
+  multi_line_details: |
+    This revision monitoring script provides:
+    - Analysis of all Container App revisions and their status
+    - Traffic distribution validation across revisions
+    - Provisioning state monitoring for deployments
+    - Health state tracking for revision stability
+    - Identification of failed or problematic revisions
+    - Recommendations for revision management and cleanup
+  name: check_revision_health_of_container_app_container_app_name_in_resource_group_az_resource_group
+  when_is_it_useful: '1. Monitoring Container App deployments and revision rollouts.
+
+
+    2. Troubleshooting blue-green deployments and traffic splitting.
+
+
+    3. Validating revision health after application updates.
+
+
+    4. Managing revision lifecycle and cleanup processes.
+
+
+    5. Investigating deployment failures and rollback scenarios.'
+
+- command: bash 'containerapp_environment_health.sh'
+  doc_links: '
+
+    - [Container Apps environments](https://docs.microsoft.com/en-us/azure/container-apps/environment){:target="_blank"}
+
+    - [Container Apps networking](https://docs.microsoft.com/en-us/azure/container-apps/networking){:target="_blank"}'
+  explanation: This script checks the health of the Container Apps Environment including networking configuration, logging setup, certificate management, and workload profiles to ensure proper infrastructure foundation.
+  multi_line_details: |
+    This environment health script monitors:
+    - Container Apps Environment provisioning and status
+    - VNET configuration and networking setup
+    - Log Analytics integration and logging configuration
+    - Certificate management and expiration monitoring
+    - Workload profile configuration and capacity
+    - Dapr configuration at the environment level
+    - Container Apps health within the environment
+  name: check_container_app_environment_container_app_env_name_health_in_resource_group_az_resource_group
+  when_is_it_useful: '1. Troubleshooting Container Apps Environment infrastructure issues.
+
+
+    2. Monitoring shared infrastructure health across multiple Container Apps.
+
+
+    3. Validating networking and security configuration.
+
+
+    4. Managing certificate lifecycle and renewal.
+
+
+    5. Ensuring proper logging and monitoring setup for Container Apps.'
+
+- command: bash 'containerapp_log_analysis.sh'
+  doc_links: '
+
+    - [Container Apps logging](https://docs.microsoft.com/en-us/azure/container-apps/logging){:target="_blank"}
+
+    - [Application troubleshooting](https://docs.microsoft.com/en-us/azure/container-apps/troubleshooting){:target="_blank"}'
+  explanation: This script performs intelligent analysis of Container App logs to detect errors, warnings, exceptions, and specific issue patterns like out-of-memory errors, connection failures, and authentication problems.
+  multi_line_details: |
+    This log analysis script provides:
+    - Pattern-based detection of errors, warnings, and exceptions in logs
+    - Identification of common issue patterns (OOM, network, auth failures)
+    - Quantitative analysis with configurable thresholds
+    - Integration with both direct Container App logs and Log Analytics
+    - Correlation with replica restart events and stability metrics
+    - Detailed issue categorization and remediation recommendations
+  name: check_logs_for_errors_in_container_app_container_app_name_in_resource_group_az_resource_group
+  when_is_it_useful: '1. Automated log analysis for error detection and alerting.
+
+
+    2. Troubleshooting application issues through intelligent log parsing.
+
+
+    3. Monitoring application health trends and error patterns.
+
+
+    4. Identifying common failure modes and performance bottlenecks.
+
+
+    5. Supporting incident response with automated log analysis and issue classification.' 
