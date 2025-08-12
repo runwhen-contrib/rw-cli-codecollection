@@ -205,6 +205,7 @@ Get Container Restarts and Score for Deployment `${DEPLOYMENT_NAME}`
         Log    ⏭️  Skipping container restart check - deployment is scaled to 0 replicas
         ${container_restart_score}=    Set Variable    1  # Perfect score for scaled deployment
         Set Suite Variable    ${container_restart_score}
+        RW.Core.Push Metric    ${container_restart_score}    sub_name=container_restarts
         RETURN
     END
     
@@ -227,6 +228,7 @@ Get Container Restarts and Score for Deployment `${DEPLOYMENT_NAME}`
     # Store details for final score calculation logging
     Set Suite Variable    ${container_restart_details}    ${restart_count} restarts (threshold: ${threshold})
     Set Suite Variable    ${container_restart_score}
+    RW.Core.Push Metric    ${container_restart_score}    sub_name=container_restarts
 
 Get Critical Log Errors and Score for Deployment `${DEPLOYMENT_NAME}`
     [Documentation]    Fetches logs and checks for critical error patterns that indicate application failures.
@@ -237,6 +239,7 @@ Get Critical Log Errors and Score for Deployment `${DEPLOYMENT_NAME}`
         Log    ⏭️  Skipping log analysis - deployment is scaled to 0 replicas
         ${log_health_score}=    Set Variable    1  # Perfect score for scaled deployment
         Set Suite Variable    ${log_health_score}
+        RW.Core.Push Metric    ${log_health_score}    sub_name=log_errors
         RETURN
     END
     
@@ -285,6 +288,7 @@ Get Critical Log Errors and Score for Deployment `${DEPLOYMENT_NAME}`
     
     Set Suite Variable    ${log_health_score}
     RW.K8sLog.Cleanup Temp Files
+    RW.Core.Push Metric    ${log_health_score}    sub_name=log_errors
 
 Get NotReady Pods Score for Deployment `${DEPLOYMENT_NAME}`
     [Documentation]    Fetches a count of unready pods for the specific deployment.
@@ -295,6 +299,7 @@ Get NotReady Pods Score for Deployment `${DEPLOYMENT_NAME}`
         Log    ⏭️  Skipping pod readiness check - deployment is scaled to 0 replicas  
         ${pods_notready_score}=    Set Variable    1  # Perfect score for scaled deployment
         Set Suite Variable    ${pods_notready_score}
+        RW.Core.Push Metric    ${pods_notready_score}    sub_name=pod_readiness
         RETURN
     END
     
@@ -309,6 +314,7 @@ Get NotReady Pods Score for Deployment `${DEPLOYMENT_NAME}`
     # Store details for final score calculation logging
     Set Suite Variable    ${pod_readiness_details}    ${unready_count} unready pods
     Set Suite Variable    ${pods_notready_score}
+    RW.Core.Push Metric    ${pods_notready_score}    sub_name=pod_readiness
 
 Get Deployment Replica Status and Score for `${DEPLOYMENT_NAME}`
     [Documentation]    Checks if deployment has the expected number of ready replicas and is available.
@@ -319,6 +325,7 @@ Get Deployment Replica Status and Score for `${DEPLOYMENT_NAME}`
         Log    ⏭️  Skipping replica status check - deployment is scaled to 0 replicas
         ${replica_score}=    Set Variable    1  # Perfect score for scaled deployment  
         Set Suite Variable    ${replica_score}
+        RW.Core.Push Metric    ${replica_score}    sub_name=replica_status
         RETURN
     END
     
@@ -344,6 +351,7 @@ Get Deployment Replica Status and Score for `${DEPLOYMENT_NAME}`
     END
     
     Set Suite Variable    ${replica_score}
+    RW.Core.Push Metric    ${replica_score}    sub_name=replica_status
 
 Get Recent Warning Events Score for `${DEPLOYMENT_NAME}`
     [Documentation]    Checks for recent warning events related to the deployment within a short time window, with filtering to reduce noise.
@@ -373,6 +381,7 @@ Get Recent Warning Events Score for `${DEPLOYMENT_NAME}`
     END
     
     Set Suite Variable    ${events_score}
+    RW.Core.Push Metric    ${events_score}    sub_name=warning_events
 
 Generate Deployment Health Score for `${DEPLOYMENT_NAME}`
     @{unhealthy_components}=    Create List

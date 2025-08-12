@@ -60,7 +60,9 @@
     "\\bSTART\\s*method\\b",
     "Calling\\s*BusinessService",
     "BusinessServiceImpl",
-    "ApiDelegateImpl"
+    "ApiDelegateImpl",
+    "linkerd.*INFO.*Connection closed.*error=read header from client timeout",
+    "linkerd_app_core::serve.*Connection closed.*error=read header from client timeout"
   ],
   "config": {
     "max_matches_per_pattern": 10,
