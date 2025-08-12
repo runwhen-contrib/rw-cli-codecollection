@@ -55,31 +55,31 @@ class K8sLog:
                 },
                 {
                     "name": "healthy_error_counts",
-                    "pattern": r"(?i)(?:[a-zA-Z_\-]*errors?|[a-zA-Z_\-]*warnings?|[a-zA-Z_\-]*issues?|[a-zA-Z_\-]*problems?|[a-zA-Z_\-]*failures?|[a-zA-Z_\-]*alerts?)\s*[:=]\s*(?:\[\]|0|""|''|null|none|false)\s*$",
+                    "pattern": r"(?i)(?:[a-zA-Z_\\-]*errors?|[a-zA-Z_\\-]*warnings?|[a-zA-Z_\\-]*issues?|[a-zA-Z_\\-]*problems?|[a-zA-Z_\\-]*failures?|[a-zA-Z_\\-]*alerts?)\\s*[:=]\\s*(?:\\[\\]|0|\"\"|''|null|none|false)\\s*$",
                     "description": "Healthy state indicators showing empty/zero error counts",
                     "exclude": True
                 },
                 {
                     "name": "healthy_error_counts_with_comma",
-                    "pattern": r"(?i)(?:[a-zA-Z_\-]*errors?|[a-zA-Z_\-]*warnings?|[a-zA-Z_\-]*issues?|[a-zA-Z_\-]*problems?|[a-zA-Z_\-]*failures?|[a-zA-Z_\-]*alerts?)\s*[:=]\s*(?:\[\]|0|""|''|null|none|false)\s*,",
+                    "pattern": r"(?i)(?:[a-zA-Z_\\-]*errors?|[a-zA-Z_\\-]*warnings?|[a-zA-Z_\\-]*issues?|[a-zA-Z_\\-]*problems?|[a-zA-Z_\\-]*failures?|[a-zA-Z_\\-]*alerts?)\\s*[:=]\\s*(?:\\[\\]|0|\"\"|''|null|none|false)\\s*,",
                     "description": "Healthy state indicators followed by comma",
                     "exclude": True
                 },
                 {
                     "name": "healthy_error_counts_with_brace",
-                    "pattern": r"(?i)(?:[a-zA-Z_\-]*errors?|[a-zA-Z_\-]*warnings?|[a-zA-Z_\-]*issues?|[a-zA-Z_\-]*problems?|[a-zA-Z_\-]*failures?|[a-zA-Z_\-]*alerts?)\s*[:=]\s*(?:\[\]|0|""|''|null|none|false)\s*[}\]]",
+                    "pattern": r"(?i)(?:[a-zA-Z_\\-]*errors?|[a-zA-Z_\\-]*warnings?|[a-zA-Z_\\-]*issues?|[a-zA-Z_\\-]*problems?|[a-zA-Z_\\-]*failures?|[a-zA-Z_\\-]*alerts?)\\s*[:=]\\s*(?:\\[\\]|0|\"\"|''|null|none|false)\\s*[}\\]]",
                     "description": "Healthy state indicators followed by closing brace/bracket",
                     "exclude": True
                 },
                 {
                     "name": "healthy_error_counts_empty_string",
-                    "pattern": r"(?i)(?:[a-zA-Z_\-]*errors?|[a-zA-Z_\-]*warnings?|[a-zA-Z_\-]*issues?|[a-zA-Z_\-]*problems?|[a-zA-Z_\-]*failures?|[a-zA-Z_\-]*alerts?)\s*[:=]\s*""\s*$",
+                    "pattern": r"(?i)(?:[a-zA-Z_\\-]*errors?|[a-zA-Z_\\-]*warnings?|[a-zA-Z_\\-]*issues?|[a-zA-Z_\\-]*problems?|[a-zA-Z_\\-]*failures?|[a-zA-Z_\\-]*alerts?)\\s*[:=]\\s*\"\"\\s*$",
                     "description": "Healthy state indicators with empty string at end of line",
                     "exclude": True
                 },
                 {
                     "name": "healthy_error_counts_empty_object",
-                    "pattern": r"(?i)(?:[a-zA-Z_\-]*errors?|[a-zA-Z_\-]*warnings?|[a-zA-Z_\-]*issues?|[a-zA-Z_\-]*problems?|[a-zA-Z_\-]*failures?|[a-zA-Z_\-]*alerts?)\s*[:=]\s*\{\}\s*$",
+                    "pattern": r"(?i)(?:[a-zA-Z_\\-]*errors?|[a-zA-Z_\\-]*warnings?|[a-zA-Z_\\-]*issues?|[a-zA-Z_\\-]*problems?|[a-zA-Z_\\-]*failures?|[a-zA-Z_\\-]*alerts?)\\s*[:=]\\s*\\{\\}\\s*$",
                     "description": "Healthy state indicators with empty object at end of line",
                     "exclude": True
                 },
