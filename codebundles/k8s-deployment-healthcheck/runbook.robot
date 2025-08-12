@@ -96,7 +96,7 @@ Suite Initialization
     ...    description=Pattern used to exclude entries from log analysis when searching for errors. Use regex patterns to filter out false positives like JSON structures.
     ...    pattern=.*
     ...    example="errors":\s*\[\]|"warnings":\s*\[\]
-    ...    default="errors":\s*\[\]|\\bINFO\\b|\\bDEBUG\\b|\\bTRACE\\b|BusinessService|ApiDelegateImpl|\\bSTART\\s*-\\s*|\\bSTART\\s*method\\b
+    ...    default="errors":\s*\[\]|\\bINFO\\b|\\bDEBUG\\b|\\bTRACE\\b|\\bSTART\\s*-\\s*|\\bSTART\\s*method\\b
     ${LOG_SCAN_TIMEOUT}=    RW.Core.Import User Variable    LOG_SCAN_TIMEOUT
     ...    type=string
     ...    description=Timeout in seconds for log scanning operations. Increase this value if log scanning times out on large log files.
