@@ -610,11 +610,19 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
                                         ${existing_issue}=    Evaluate    $consolidated_issues["${issue_key}"]
                                         ${updated_count}=    Evaluate    $existing_issue.get('count', 1) + 1
                                         ${updated_objects}=    Catenate    ${existing_issue.get('affected_objects', '')}    ${item["kind"]}/${item["name"]},${SPACE}
-                                        ${updated_issue}=    Evaluate    {**$existing_issue, 'count': ${updated_count}, 'affected_objects': "${updated_objects}"}
+                                        # Merge reasons from multiple items
+                                        ${existing_reasons}=    Evaluate    set($existing_issue.get('consolidated_reasons', []))
+                                        ${new_reasons}=    Evaluate    $existing_reasons.union(set($item.get('reasons', [])))
+                                        # Preserve event details for each resource
+                                        ${existing_events}=    Evaluate    $existing_issue.get('event_details', [])
+                                        ${new_event}=    Evaluate    {'resource': "${item["kind"]}/${item["name"]}", 'reasons': $item.get('reasons', []), 'messages': $item.get('messages', []), 'count': $item.get('total_count', 1)}
+                                        ${updated_events}=    Evaluate    $existing_events + [$new_event]
+                                        ${updated_issue}=    Evaluate    {**$existing_issue, 'count': ${updated_count}, 'affected_objects': "${updated_objects}", 'consolidated_reasons': list($new_reasons), 'event_details': $updated_events}
                                         ${updated_dict}=    Evaluate    {**$consolidated_issues, "${issue_key}": $updated_issue}
                                         Set Test Variable    ${consolidated_issues}    ${updated_dict}
                                     ELSE
-                                        ${new_issue}=    Evaluate    {**$issue, 'count': 1, 'affected_objects': "${item["kind"]}/${item["name"]}, "}
+                                        ${new_event}=    Evaluate    {'resource': "${item["kind"]}/${item["name"]}", 'reasons': $item.get('reasons', []), 'messages': $item.get('messages', []), 'count': $item.get('total_count', 1)}
+                                        ${new_issue}=    Evaluate    {**$issue, 'count': 1, 'affected_objects': "${item["kind"]}/${item["name"]}, ", 'consolidated_reasons': $item.get('reasons', []), 'event_details': [$new_event]}
                                         ${updated_dict}=    Evaluate    {**$consolidated_issues, "${issue_key}": $new_issue}
                                         Set Test Variable    ${consolidated_issues}    ${updated_dict}
                                     END
@@ -632,21 +640,66 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
                         ${count}=    Evaluate    $issue.get('count', 1)
                         ${affected_objects}=    Evaluate    $issue.get('affected_objects', '').rstrip(', ')
                         
-                        IF    ${count} > 1
-                            ${title_suffix}=    Set Variable    ${EMPTY}
-                            ${details_prefix}=    Set Variable    **Affected Objects (${count}):** ${affected_objects}\n\n
+                        # For consolidated issues, create appropriate title based on deployment context
+                        ${base_title}=    Set Variable    ${issue["title"]}
+                        ${consolidated_reasons}=    Evaluate    $issue.get('consolidated_reasons', [])
+                        ${reasons_count}=    Get Length    ${consolidated_reasons}
+                        
+                        # Always focus on the deployment since pod issues are usually deployment config problems
+                        IF    ${reasons_count} > 0 and ${reasons_count} <= 3
+                            ${reasons_str}=    Evaluate    ', '.join($consolidated_reasons)
+                            ${enhanced_title}=    Set Variable    ${base_title} in Deployment `${DEPLOYMENT_NAME}` (${reasons_str})
                         ELSE
-                            ${title_suffix}=    Set Variable    ${EMPTY}
-                            ${details_prefix}=    Set Variable    **Affected Object:** ${affected_objects}\n\n
+                            ${enhanced_title}=    Set Variable    ${base_title} in Deployment `${DEPLOYMENT_NAME}`
+                        END
+                        
+                        # Update details to show pod count rather than individual pod names for clarity
+                        IF    ${count} > 1
+                            # Count pods vs other resource types
+                            ${pod_count}=    Evaluate    len([obj for obj in "${affected_objects}".split(", ") if obj.strip().startswith("Pod/")])
+                            ${other_count}=    Evaluate    ${count} - ${pod_count}
+                            
+                            IF    ${pod_count} > 0 and ${other_count} == 0
+                                ${details_prefix}=    Set Variable    **Issue affects ${pod_count} pods in Deployment `${DEPLOYMENT_NAME}`**\n\n
+                            ELSE IF    ${pod_count} > 0 and ${other_count} > 0
+                                ${details_prefix}=    Set Variable    **Issue affects ${pod_count} pods and ${other_count} other resources in Deployment `${DEPLOYMENT_NAME}`**\n\n
+                            ELSE
+                                ${details_prefix}=    Set Variable    **Affected Resources:** ${affected_objects}\n\n
+                            END
+                        ELSE
+                            ${details_prefix}=    Set Variable    **Affected Resource:** ${affected_objects}\n\n
+                        END
+                        
+                        # Add event details section
+                        ${event_details_list}=    Evaluate    $issue.get('event_details', [])
+                        ${event_details_str}=    Set Variable    **Warning Events:**\n
+                        FOR    ${event_detail}    IN    @{event_details_list}
+                            ${resource}=    Evaluate    $event_detail.get('resource', 'Unknown')
+                            ${event_count}=    Evaluate    $event_detail.get('count', 1)
+                            ${event_messages}=    Evaluate    $event_detail.get('messages', [])
+                            ${event_reasons}=    Evaluate    $event_detail.get('reasons', [])
+                            
+                            ${event_details_str}=    Catenate    ${event_details_str}    • **${resource}** (${event_count} events)\n
+                            ${reasons_str}=    Evaluate    ', '.join($event_reasons)
+                            IF    "${reasons_str}" != ""
+                                ${event_details_str}=    Catenate    ${event_details_str}      **Reasons:** ${reasons_str}\n
+                            END
+                            
+                            # Show up to 3 unique messages per resource
+                            ${unique_messages}=    Evaluate    list(dict.fromkeys($event_messages))[:3]
+                            FOR    ${message}    IN    @{unique_messages}
+                                ${event_details_str}=    Catenate    ${event_details_str}      **Message:** ${message}\n
+                            END
+                            ${event_details_str}=    Catenate    ${event_details_str}    \n
                         END
                         
                         RW.Core.Add Issue
                         ...    severity=${issue["severity"]}
                         ...    expected=No warning events should be present for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                        ...    actual=${issue["title"]} detected for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                        ...    title=${issue["title"]} in Deployment `${DEPLOYMENT_NAME}` ${title_suffix}
+                        ...    actual=${enhanced_title} detected for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                        ...    title=${enhanced_title}
                         ...    reproduce_hint=${events.cmd}
-                        ...    details=${details_prefix}${issue["details"]}
+                        ...    details=${details_prefix}${event_details_str}${issue["details"]}
                         ...    next_steps=${issue["next_steps"]}
                     END
                     
