@@ -88,7 +88,7 @@ Suite Initialization
     ...    description=Pattern used to exclude entries from log analysis when searching for errors. Use regex patterns to filter out false positives like JSON structures.
     ...    pattern=.*
     ...    example="errors":\s*\[\]|"warnings":\s*\[\]
-    ...    default="errors":\s*\[\]
+    ...    default="errors":\s*\[\]|\\bINFO\\b|\\bDEBUG\\b|\\bTRACE\\b|BusinessService|ApiDelegateImpl|\\bSTART\\s*-\\s*|\\bSTART\\s*method\\b
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.

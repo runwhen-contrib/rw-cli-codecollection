@@ -96,7 +96,7 @@ Suite Initialization
     ...    description=Pattern used to exclude entries from log analysis when searching for errors. Use regex patterns to filter out false positives like JSON structures.
     ...    pattern=.*
     ...    example="errors":\s*\[\]|"warnings":\s*\[\]
-    ...    default="errors":\s*\[\]
+    ...    default="errors":\s*\[\]|\\bINFO\\b|\\bDEBUG\\b|\\bTRACE\\b|BusinessService|ApiDelegateImpl|\\bSTART\\s*-\\s*|\\bSTART\\s*method\\b
     ${LOG_SCAN_TIMEOUT}=    RW.Core.Import User Variable    LOG_SCAN_TIMEOUT
     ...    type=string
     ...    description=Timeout in seconds for log scanning operations. Increase this value if log scanning times out on large log files.
@@ -212,6 +212,7 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
         ...    workload_name=${DEPLOYMENT_NAME}
         ...    namespace=${NAMESPACE}
         ...    categories=@{LOG_PATTERN_CATEGORIES}
+        ...    custom_patterns_file=runbook_patterns.json
         
         # Post-process results to filter out patterns matching LOGS_EXCLUDE_PATTERN
         TRY
