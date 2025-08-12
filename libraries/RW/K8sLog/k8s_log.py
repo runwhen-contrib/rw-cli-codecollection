@@ -357,10 +357,16 @@ class K8sLog:
                     'next_steps': [f"Investigate {category.lower()} issue", "Review application logs", "Check application configuration"]
                 })
         
-        return {
+        converted_data = {
             'patterns': patterns,
             'infrastructure_filters': self.error_patterns.get('infrastructure_filters', [])
         }
+        
+        # Preserve exclude_patterns from the custom JSON if they exist
+        if 'exclude_patterns' in sli_data:
+            converted_data['exclude_patterns'] = sli_data['exclude_patterns']
+        
+        return converted_data
 
     def _generate_context_aware_next_steps(self, pattern_name: str, base_next_steps: List[str], 
                                           sample_lines: List[str], workload_name: str, namespace: str) -> List[str]:
@@ -863,6 +869,19 @@ class K8sLog:
                 logger.warning(f"Failed to load custom patterns from {custom_patterns_file}: {e}")
                 logger.info("Using embedded patterns as fallback")
         
+        # Pre-compile exclude patterns from JSON for better performance
+        exclude_patterns = []
+        if 'exclude_patterns' in patterns_data:
+            for exclude_pattern in patterns_data['exclude_patterns']:
+                try:
+                    exclude_patterns.append(re.compile(exclude_pattern, re.IGNORECASE))
+                    logger.debug(f"Compiled exclude pattern: {exclude_pattern}")
+                except re.error as e:
+                    logger.warning(f"Invalid exclude regex pattern: {exclude_pattern} - {e}")
+            logger.info(f"Loaded {len(exclude_patterns)} exclude patterns from JSON")
+        else:
+            logger.info("No exclude_patterns found in patterns data")
+        
         log_path = Path(log_dir)
         pods_json_path = log_path / "application_logs_pods.json"
         
@@ -982,15 +1001,24 @@ class K8sLog:
                         # Optimized: Use list comprehension for better performance
                         for line_num, line in enumerate(log_lines, 1):
                             if pattern.search(line):
-                                matches.append({
-                                    "line_number": line_num,
-                                    "line": line.strip(),
-                                    "pod": pod,
-                                    "container": container
-                                })
-                                # Limit matches per pattern to prevent memory issues
-                                if len(matches) >= 100:
-                                    break
+                                # Apply exclude patterns from JSON before collecting matches
+                                excluded = False
+                                for exclude_pattern in exclude_patterns:
+                                    if exclude_pattern.search(line):
+                                        excluded = True
+                                        logger.debug(f"Line excluded by pattern {exclude_pattern.pattern}: {line.strip()[:100]}...")
+                                        break
+                                
+                                if not excluded:
+                                    matches.append({
+                                        "line_number": line_num,
+                                        "line": line.strip(),
+                                        "pod": pod,
+                                        "container": container
+                                    })
+                                    # Limit matches per pattern to prevent memory issues
+                                    if len(matches) >= 100:
+                                        break
                         
                         if matches:
                             # Only add to category_issues if severity is less than 5

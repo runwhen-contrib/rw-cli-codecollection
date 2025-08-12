@@ -139,7 +139,9 @@
     "server.*started",
     "listening.*on.*port",
     "configuration.*loaded",
-    "database.*connection.*established"
+    "database.*connection.*established",
+    "linkerd.*INFO.*Connection closed.*error=read header from client timeout",
+    "linkerd_app_core::serve.*Connection closed.*error=read header from client timeout"
   ],
   "config": {
     "max_matches_per_pattern": 10,
