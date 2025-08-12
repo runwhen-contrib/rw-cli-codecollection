@@ -640,11 +640,23 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
                             ${details_prefix}=    Set Variable    **Affected Object:** ${affected_objects}\n\n
                         END
                         
+                        # Enhance title with specific resource information and event reasons
+                        ${reasons_list}=    Evaluate    ', '.join($item.get('reasons', []))
+                        ${resource_info}=    Set Variable    ${item["kind"]}/${item["name"]}
+                        
+                        # Create a more descriptive title that includes the specific resource
+                        ${base_title}=    Set Variable    ${issue["title"]}
+                        IF    "${reasons_list}" != "" and len($item.get('reasons', [])) <= 2
+                            ${enhanced_title}=    Set Variable    ${base_title} in ${resource_info} (${reasons_list})
+                        ELSE
+                            ${enhanced_title}=    Set Variable    ${base_title} in ${resource_info}
+                        END
+                        
                         RW.Core.Add Issue
                         ...    severity=${issue["severity"]}
                         ...    expected=No warning events should be present for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                        ...    actual=${issue["title"]} detected for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                        ...    title=${issue["title"]} in Deployment `${DEPLOYMENT_NAME}` ${title_suffix}
+                        ...    actual=${enhanced_title} detected for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                        ...    title=${enhanced_title} ${title_suffix}
                         ...    reproduce_hint=${events.cmd}
                         ...    details=${details_prefix}${issue["details"]}
                         ...    next_steps=${issue["next_steps"]}
