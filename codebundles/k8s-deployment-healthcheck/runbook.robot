@@ -217,7 +217,7 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
         # Post-process results to filter out patterns matching LOGS_EXCLUDE_PATTERN
         TRY
             IF    "${LOGS_EXCLUDE_PATTERN}" != ""
-                ${filtered_issues}=    Evaluate    [issue for issue in $scan_results.get('issues', []) if not __import__('re').search(r'${LOGS_EXCLUDE_PATTERN}', issue.get('details', ''), __import__('re').IGNORECASE)]    modules=re
+                ${filtered_issues}=    Evaluate    [issue for issue in $scan_results.get('issues', []) if not __import__('re').search('${LOGS_EXCLUDE_PATTERN}', issue.get('details', ''), __import__('re').IGNORECASE)]    modules=re
                 ${filtered_results}=    Evaluate    {**$scan_results, 'issues': $filtered_issues}
                 Set Test Variable    ${scan_results}    ${filtered_results}
             END
