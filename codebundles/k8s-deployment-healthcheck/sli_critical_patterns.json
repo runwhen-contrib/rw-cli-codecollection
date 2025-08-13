@@ -62,7 +62,9 @@
     "BusinessServiceImpl",
     "ApiDelegateImpl",
     "linkerd.*INFO.*Connection closed.*error=read header from client timeout",
-    "linkerd_app_core::serve.*Connection closed.*error=read header from client timeout"
+    "linkerd_app_core::serve.*Connection closed.*error=read header from client timeout",
+    "TelemetryPipeline.*In the last \\d+ minutes.*operation has failed.*Sending telemetry to the ingestion service",
+    "adjustmentReason=\\w*EXCEPTION\\w*"
   ],
   "config": {
     "max_matches_per_pattern": 10,
