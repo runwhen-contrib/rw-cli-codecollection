@@ -133,19 +133,19 @@ Suite Initialization
         ${scale_down_info}=    Get Deployment Scale Down Timestamp    ${spec_replicas}
         
         IF    ${spec_replicas} == 0
-            Log    ⚠️  Deployment ${DEPLOYMENT_NAME} is scaled to 0 replicas - returning special health score
-            Log    📊 Scale down detected at: ${scale_down_info}
+            Log    Deployment ${DEPLOYMENT_NAME} is scaled to 0 replicas - returning special health score
+            Log    Scale down detected at: ${scale_down_info}
             
             # For scaled-down deployments, return a score of 0.5 to indicate "intentionally down" vs "broken"
             Set Suite Variable    ${SKIP_HEALTH_CHECKS}    ${True}
             Set Suite Variable    ${SCALED_DOWN_INFO}    ${scale_down_info}
         ELSE
-            Log    ✅ Deployment ${DEPLOYMENT_NAME} has ${spec_replicas} desired replicas - proceeding with health checks
+            Log    Deployment ${DEPLOYMENT_NAME} has ${spec_replicas} desired replicas - proceeding with health checks
             Set Suite Variable    ${SKIP_HEALTH_CHECKS}    ${False}
         END
         
     EXCEPT
-        Log    ⚠️  Warning: Failed to check deployment scale, continuing with normal health checks
+        Log    Warning: Failed to check deployment scale, continuing with normal health checks
         Set Suite Variable    ${SKIP_HEALTH_CHECKS}    ${False}
     END
 
@@ -168,7 +168,7 @@ Get Deployment Scale Down Timestamp
                 ${timestamp}=    Evaluate    $event_data.get('timestamp', 'Unknown')
                 ${message}=    Evaluate    $event_data.get('message', 'Unknown')
                 ${scale_down_info}=    Set Variable    ${timestamp} (${message})
-                Log    📅 Found scale-down event: ${scale_down_info}
+                Log    Found scale-down event: ${scale_down_info}
             ELSE
                 # Try checking replicaset history as fallback
                 ${rs_history}=    RW.CLI.Run Cli
@@ -181,14 +181,14 @@ Get Deployment Scale Down Timestamp
                     ${rs_data}=    Evaluate    json.loads(r'''${rs_history.stdout}''') if r'''${rs_history.stdout}'''.strip() else {}    json
                     ${rs_time}=    Evaluate    $rs_data.get('creation_time', 'Unknown')
                     ${scale_down_info}=    Set Variable    Likely around ${rs_time} (based on ReplicaSet history)
-                    Log    📅 Estimated scale-down time from ReplicaSet: ${scale_down_info}
+                    Log    Estimated scale-down time from ReplicaSet: ${scale_down_info}
                 ELSE
                     ${scale_down_info}=    Set Variable    Unable to determine - no recent scaling events found
-                    Log    ❓ Could not determine when deployment was scaled down
+                    Log    Could not determine when deployment was scaled down
                 END
             END
         EXCEPT
-            Log    ⚠️  Warning: Failed to determine scale-down timestamp
+            Log    Warning: Failed to determine scale-down timestamp
             ${scale_down_info}=    Set Variable    Failed to determine scale-down time
         END
     END
@@ -202,7 +202,7 @@ Get Container Restarts and Score for Deployment `${DEPLOYMENT_NAME}`
     
     # Skip if deployment is scaled down
     IF    ${SKIP_HEALTH_CHECKS}
-        Log    ⏭️  Skipping container restart check - deployment is scaled to 0 replicas
+        Log    Skipping container restart check - deployment is scaled to 0 replicas
         ${container_restart_score}=    Set Variable    1  # Perfect score for scaled deployment
         Set Suite Variable    ${container_restart_score}
         RW.Core.Push Metric    ${container_restart_score}    sub_name=container_restarts
@@ -236,7 +236,7 @@ Get Critical Log Errors and Score for Deployment `${DEPLOYMENT_NAME}`
     
     # Skip if deployment is scaled down  
     IF    ${SKIP_HEALTH_CHECKS}
-        Log    ⏭️  Skipping log analysis - deployment is scaled to 0 replicas
+        Log    Skipping log analysis - deployment is scaled to 0 replicas
         ${log_health_score}=    Set Variable    1  # Perfect score for scaled deployment
         Set Suite Variable    ${log_health_score}
         RW.Core.Push Metric    ${log_health_score}    sub_name=log_errors
@@ -296,7 +296,7 @@ Get NotReady Pods Score for Deployment `${DEPLOYMENT_NAME}`
     
     # Skip if deployment is scaled down
     IF    ${SKIP_HEALTH_CHECKS}
-        Log    ⏭️  Skipping pod readiness check - deployment is scaled to 0 replicas  
+        Log    Skipping pod readiness check - deployment is scaled to 0 replicas
         ${pods_notready_score}=    Set Variable    1  # Perfect score for scaled deployment
         Set Suite Variable    ${pods_notready_score}
         RW.Core.Push Metric    ${pods_notready_score}    sub_name=pod_readiness
@@ -322,7 +322,7 @@ Get Deployment Replica Status and Score for `${DEPLOYMENT_NAME}`
     
     # Skip if deployment is scaled down
     IF    ${SKIP_HEALTH_CHECKS}
-        Log    ⏭️  Skipping replica status check - deployment is scaled to 0 replicas
+        Log    Skipping replica status check - deployment is scaled to 0 replicas
         ${replica_score}=    Set Variable    1  # Perfect score for scaled deployment  
         Set Suite Variable    ${replica_score}
         RW.Core.Push Metric    ${replica_score}    sub_name=replica_status
