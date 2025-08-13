@@ -20,8 +20,10 @@ Check Scale Set `${VMSCALESET}` Key Metrics In Resource Group `${AZ_RESOURCE_GRO
     ...    timeout_seconds=180
     ...    include_in_history=false
     IF    ${process.returncode} > 0
+        RW.Core.Push Metric    0    sub_name=vmss_health
         RW.Core.Push Metric    0
     ELSE
+        RW.Core.Push Metric    1    sub_name=vmss_health
         RW.Core.Push Metric    1
     END
 

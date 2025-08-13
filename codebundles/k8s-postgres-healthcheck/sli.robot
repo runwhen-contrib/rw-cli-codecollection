@@ -36,6 +36,7 @@ Check Patroni Database Lag in Namespace `${NAMESPACE}` on Host `${HOSTNAME}` usi
         END
     END
     Set Global Variable    ${database_lag_score}
+    RW.Core.Push Metric    ${database_lag_score}    sub_name=database_lag
 
 Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Ensure that backups are current and not stale.
@@ -56,6 +57,7 @@ Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESP
         ${database_backup_score}=    Set Variable    0
     END
     Set Global Variable    ${database_backup_score}
+    RW.Core.Push Metric    ${database_backup_score}    sub_name=backup_status
 
 Generate Namespace Score for Namespace `${NAMESPACE}`
     ${postgres_health_score}=    Evaluate    (${database_lag_score} + ${database_backup_score}) / 2

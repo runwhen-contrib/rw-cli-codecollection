@@ -72,6 +72,7 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     END
     ${disk_score}=    Evaluate    1 if ${issue_count} == 0 else 0
     Set Global Variable    ${disk_score}
+    RW.Core.Push Metric    ${disk_score}    sub_name=disk_utilization
 
 Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks memory utilization for VMs and parses each result.
@@ -128,6 +129,7 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     END
     ${memory_score}=    Evaluate    1 if ${issue_count} == 0 else 0
     Set Global Variable    ${memory_score}
+    RW.Core.Push Metric    ${memory_score}    sub_name=memory_utilization
 
 Check Uptime for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks uptime for VMs and parses each result.
@@ -184,6 +186,7 @@ Check Uptime for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     END
     ${uptime_score}=    Evaluate    1 if ${issue_count} == 0 else 0
     Set Global Variable    ${uptime_score}
+    RW.Core.Push Metric    ${uptime_score}    sub_name=vm_uptime
 
 Check Last Patch Status for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks last patch status for VMs and parses each result.
@@ -240,6 +243,7 @@ Check Last Patch Status for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     END
     ${patch_score}=    Evaluate    1 if ${issue_count} == 0 else 0
     Set Global Variable    ${patch_score}
+    RW.Core.Push Metric    ${patch_score}    sub_name=patch_status
 
 Generate Comprehensive VM Health Score
     ${vm_health_score}=    Evaluate    (${disk_score} + ${memory_score} + ${uptime_score} + ${patch_score}) / 4

@@ -45,4 +45,5 @@ Count the number of nodes in active preempt operation in project `${GCP_PROJECT_
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    timeout_seconds=180
     ${metric}=     Convert To Number    ${preempt_node_list.stdout}
+    RW.Core.Push Metric    ${metric}    sub_name=preemptible_nodes
     RW.Core.Push Metric    ${metric}

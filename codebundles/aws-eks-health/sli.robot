@@ -25,8 +25,10 @@ Check Amazon EKS Cluster Health Status in AWS Region `${AWS_REGION}`
     ...    secret__AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
     ...    secret__AWS_ROLE_ARN=${AWS_ROLE_ARN}
     IF    "Error" in """${process.stdout}"""
+        RW.Core.Push Metric    0    sub_name=cluster_health
         RW.Core.Push Metric    0
     ELSE
+        RW.Core.Push Metric    1    sub_name=cluster_health
         RW.Core.Push Metric    1
     END
 

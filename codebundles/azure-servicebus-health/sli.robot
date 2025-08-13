@@ -34,6 +34,7 @@ Check for Resource Health Issues Service Bus `${SB_NAMESPACE_NAME}` In Resource 
         ${sb_resource_score}=    Set Variable    0
     END
     Set Global Variable    ${sb_resource_score}
+    RW.Core.Push Metric    ${sb_resource_score}    sub_name=resource_health
 
 Check Basic Connectivity for Service Bus `${SB_NAMESPACE_NAME}`
     [Documentation]    Quick connectivity test to detect network issues
@@ -62,6 +63,7 @@ Check Basic Connectivity for Service Bus `${SB_NAMESPACE_NAME}`
         ${connectivity_score}=    Evaluate    ${connectivity_score} - 0.5
     END
     Set Global Variable    ${connectivity_score}
+    RW.Core.Push Metric    ${connectivity_score}    sub_name=connectivity
 
 Check Critical Metrics for Service Bus `${SB_NAMESPACE_NAME}`
     [Documentation]    Quick check of critical metrics that indicate immediate issues
@@ -90,6 +92,7 @@ Check Critical Metrics for Service Bus `${SB_NAMESPACE_NAME}`
         END
     END
     Set Global Variable    ${metrics_score}
+    RW.Core.Push Metric    ${metrics_score}    sub_name=critical_metrics
 
 Generate Enhanced Service Bus Health Score
     ${enhanced_health_score}=    Evaluate    (${sb_resource_score} + ${connectivity_score} + ${metrics_score}) / 3

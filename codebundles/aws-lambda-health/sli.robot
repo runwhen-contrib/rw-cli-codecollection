@@ -25,8 +25,10 @@ Analyze AWS Lambda Invocation Errors in Region `${AWS_REGION}`
     ...    secret__AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
     ...    secret__AWS_ROLE_ARN=${AWS_ROLE_ARN}
     IF    "ERROR" in """${process.stdout}"""
+        RW.Core.Push Metric    0    sub_name=invocation_errors
         RW.Core.Push Metric    0
     ELSE
+        RW.Core.Push Metric    1    sub_name=invocation_errors
         RW.Core.Push Metric    1
     END
 

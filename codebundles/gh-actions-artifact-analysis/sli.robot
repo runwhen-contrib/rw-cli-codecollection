@@ -26,6 +26,7 @@ Analyze artifact from GitHub Workflow `${WORKFLOW_NAME}` in repository `${GITHUB
     ...    env=${env}
     ${output}=    RW.CLI.Run CLI    cat report.txt
     ${metric}=    Convert to Number    ${output.stdout}    2
+    RW.Core.Push Metric    ${metric}    sub_name=artifact_analysis
     RW.Core.Push Metric    ${metric}
     RW.CLI.Run CLI    cmd=rm report.txt
 
