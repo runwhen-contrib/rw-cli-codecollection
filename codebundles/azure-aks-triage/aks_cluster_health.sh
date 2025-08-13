@@ -105,7 +105,7 @@ else
 fi
 
 # Check for individual agent pool provisioning failures (even if overall cluster state is Succeeded)
-FAILED_AGENT_POOLS=$(echo "$CLUSTER_DETAILS" | jq -c '[.agentPoolProfiles[] | select(.provisioningState != "Succeeded")]')
+FAILED_AGENT_POOLS=$(echo "$CLUSTER_DETAILS" | jq -c '[.agentPoolProfiles[] | select(.provisioningState == "Failed" or .provisioningState == "Canceled")]')
 
 FAILED_POOL_COUNT=$(echo "$FAILED_AGENT_POOLS" | jq 'length')
 if [ "$FAILED_POOL_COUNT" -gt 0 ]; then
@@ -121,7 +121,7 @@ $FAILED_AGENT_POOLS"
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
     )
 else
-    echo "All agent pools are in Succeeded provisioning state."
+    echo "All agent pools are in non-failure states (no Failed or Canceled pools detected)."
 fi
 
 # Dump the issues into a json list for processing
