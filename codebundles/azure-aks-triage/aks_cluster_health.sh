@@ -51,11 +51,24 @@ echo "Load Balancer SKU: $LOAD_BALANCER_SKU"
 
 # Add an issue if provisioning failed
 if [ "$PROVISIONING_STATE" != "Succeeded" ]; then
+    # Extract detailed error information from cluster status and agent pools
+    CLUSTER_ERROR_JSON=$(echo "$CLUSTER_DETAILS" | jq -c '.status // {}')
+    AGENT_POOL_ERRORS_JSON=$(echo "$CLUSTER_DETAILS" | jq -c '[.agentPoolProfiles[] | select(.status != null and .status != {})]')
+    
+    # Build comprehensive error details with raw JSON
+    ERROR_DETAILS="Provisioning state: $PROVISIONING_STATE
+
+Raw Cluster Status:
+$CLUSTER_ERROR_JSON
+
+Raw Agent Pool Status Details:
+$AGENT_POOL_ERRORS_JSON"
+    
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Provisioning Failure" \
-        --arg nextStep "Check the provisioning details and troubleshoot failures in the Azure Portal." \
+        --arg title "AKS Cluster \`$CLUSTER_NAME\` Provisioning Failure" \
+        --arg nextStep "Check the provisioning details and troubleshoot failures in the Azure Portal. Review the detailed error messages to identify specific issues with Pod Disruption Budgets (PDBs), node draining, or other cluster configuration problems." \
         --arg severity "1" \
-        --arg details "Provisioning state: $PROVISIONING_STATE" \
+        --arg details "$ERROR_DETAILS" \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
     )
     echo "Issue Detected: Provisioning has failed."
@@ -68,7 +81,7 @@ if [ "$DIAGNOSTIC_SETTINGS" -gt 0 ]; then
 else
     echo "Diagnostics settings are not enabled."
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Diagnostics Settings Missing" \
+        --arg title "AKS Cluster \`$CLUSTER_NAME\` Diagnostics Settings Missing" \
         --arg nextStep "Enable diagnostics settings in the Azure Portal to capture logs and metrics." \
         --arg severity "4" \
         --arg details "Diagnostics settings are not configured for this resource." \
@@ -81,7 +94,7 @@ AUTOSCALING_DISABLED_COUNT=$(echo "$CLUSTER_DETAILS" | jq '[.agentPoolProfiles[]
 if [ "$AUTOSCALING_DISABLED_COUNT" -gt 0 ]; then
     echo "$AUTOSCALING_DISABLED_COUNT node pools do not have autoscaling enabled."
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Autoscaling Disabled in Node Pools" \
+        --arg title "AKS Cluster \`$CLUSTER_NAME\` Autoscaling Disabled in Node Pools" \
         --arg nextStep "Enable autoscaling on all node pools for better resource management." \
         --arg severity "4" \
         --arg details "$AUTOSCALING_DISABLED_COUNT node pools have autoscaling disabled." \
@@ -89,6 +102,26 @@ if [ "$AUTOSCALING_DISABLED_COUNT" -gt 0 ]; then
     )
 else
     echo "All node pools have autoscaling enabled."
+fi
+
+# Check for individual agent pool provisioning failures (even if overall cluster state is Succeeded)
+FAILED_AGENT_POOLS=$(echo "$CLUSTER_DETAILS" | jq -c '[.agentPoolProfiles[] | select(.provisioningState != "Succeeded")]')
+
+FAILED_POOL_COUNT=$(echo "$FAILED_AGENT_POOLS" | jq 'length')
+if [ "$FAILED_POOL_COUNT" -gt 0 ]; then
+    FAILED_POOL_DETAILS="Raw Agent Pool Details:
+$FAILED_AGENT_POOLS"
+    
+    echo "$FAILED_POOL_COUNT agent pool(s) have provisioning failures."
+    issues_json=$(echo "$issues_json" | jq \
+        --arg title "AKS Cluster \`$CLUSTER_NAME\` Agent Pool Provisioning Failures" \
+        --arg nextStep "Review the specific agent pool errors and address the underlying issues such as Pod Disruption Budget (PDB) policies, node draining problems, or resource constraints. Check the Azure Portal for detailed troubleshooting guidance." \
+        --arg severity "2" \
+        --arg details "$FAILED_POOL_DETAILS" \
+        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
+    )
+else
+    echo "All agent pools are in Succeeded provisioning state."
 fi
 
 # Dump the issues into a json list for processing
