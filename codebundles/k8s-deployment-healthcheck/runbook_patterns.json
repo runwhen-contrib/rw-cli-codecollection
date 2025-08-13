@@ -141,7 +141,11 @@
     "configuration.*loaded",
     "database.*connection.*established",
     "linkerd.*INFO.*Connection closed.*error=read header from client timeout",
-    "linkerd_app_core::serve.*Connection closed.*error=read header from client timeout"
+    "linkerd_app_core::serve.*Connection closed.*error=read header from client timeout",
+    "TelemetryPipeline.*In the last \\d+ minutes.*operation has failed.*Sending telemetry to the ingestion service",
+    "=\\w*EXCEPTION\\w*",
+    "=\\w*FAILED\\w*",
+    "=\\w*FAILURE\\w*"
   ],
   "config": {
     "max_matches_per_pattern": 10,
