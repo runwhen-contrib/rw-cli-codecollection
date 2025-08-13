@@ -206,29 +206,28 @@ Get Container Restarts and Score for Deployment `${DEPLOYMENT_NAME}`
         ${container_restart_score}=    Set Variable    1  # Perfect score for scaled deployment
         Set Suite Variable    ${container_restart_score}
         RW.Core.Push Metric    ${container_restart_score}    sub_name=container_restarts
-        RETURN
+    ELSE
+        ${pods}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -l app=${DEPLOYMENT_NAME} -o json
+        ...    env=${env}
+        ...    secret_file__kubeconfig=${kubeconfig}
+        ${CONTAINER_RESTART_AGE}=    RW.CLI.String To Datetime    ${CONTAINER_RESTART_AGE}
+        ${container_restarts_sum}=    RW.CLI.Parse Cli Json Output
+        ...    rsp=${pods}
+        ...    extract_path_to_var__pod_restart_stats=items[].{name:metadata.name, containerRestarts:status.containerStatuses[].{restartCount:restartCount, terminated_at:lastState.terminated.finishedAt}|[?restartCount > `0` && terminated_at >= `${CONTAINER_RESTART_AGE}`]}
+        ...    from_var_with_path__pod_restart_stats__to__pods_with_recent_restarts=[].{name: name, restartSum:sum(containerRestarts[].restartCount || [`0`])}|[?restartSum > `0`]
+        ...    from_var_with_path__pods_with_recent_restarts__to__restart_sum=sum([].restartSum)
+        ...    assign_stdout_from_var=restart_sum
+        
+        ${restart_count}=    Convert To Integer    ${container_restarts_sum.stdout}
+        ${threshold}=    Convert To Integer    ${CONTAINER_RESTART_THRESHOLD}
+        ${container_restart_score}=    Evaluate    1 if ${restart_count} <= ${threshold} else 0
+        
+        # Store details for final score calculation logging
+        Set Suite Variable    ${container_restart_details}    ${restart_count} restarts (threshold: ${threshold})
+        Set Suite Variable    ${container_restart_score}
+        RW.Core.Push Metric    ${container_restart_score}    sub_name=container_restarts
     END
-    
-    ${pods}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -l app=${DEPLOYMENT_NAME} -o json
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ${CONTAINER_RESTART_AGE}=    RW.CLI.String To Datetime    ${CONTAINER_RESTART_AGE}
-    ${container_restarts_sum}=    RW.CLI.Parse Cli Json Output
-    ...    rsp=${pods}
-    ...    extract_path_to_var__pod_restart_stats=items[].{name:metadata.name, containerRestarts:status.containerStatuses[].{restartCount:restartCount, terminated_at:lastState.terminated.finishedAt}|[?restartCount > `0` && terminated_at >= `${CONTAINER_RESTART_AGE}`]}
-    ...    from_var_with_path__pod_restart_stats__to__pods_with_recent_restarts=[].{name: name, restartSum:sum(containerRestarts[].restartCount || [`0`])}|[?restartSum > `0`]
-    ...    from_var_with_path__pods_with_recent_restarts__to__restart_sum=sum([].restartSum)
-    ...    assign_stdout_from_var=restart_sum
-    
-    ${restart_count}=    Convert To Integer    ${container_restarts_sum.stdout}
-    ${threshold}=    Convert To Integer    ${CONTAINER_RESTART_THRESHOLD}
-    ${container_restart_score}=    Evaluate    1 if ${restart_count} <= ${threshold} else 0
-    
-    # Store details for final score calculation logging
-    Set Suite Variable    ${container_restart_details}    ${restart_count} restarts (threshold: ${threshold})
-    Set Suite Variable    ${container_restart_score}
-    RW.Core.Push Metric    ${container_restart_score}    sub_name=container_restarts
 
 Get Critical Log Errors and Score for Deployment `${DEPLOYMENT_NAME}`
     [Documentation]    Fetches logs and checks for critical error patterns that indicate application failures.
@@ -240,55 +239,54 @@ Get Critical Log Errors and Score for Deployment `${DEPLOYMENT_NAME}`
         ${log_health_score}=    Set Variable    1  # Perfect score for scaled deployment
         Set Suite Variable    ${log_health_score}
         RW.Core.Push Metric    ${log_health_score}    sub_name=log_errors
-        RETURN
-    END
-    
-    ${log_dir}=    RW.K8sLog.Fetch Workload Logs
-    ...    workload_type=deployment
-    ...    workload_name=${DEPLOYMENT_NAME}
-    ...    namespace=${NAMESPACE}
-    ...    context=${CONTEXT}
-    ...    kubeconfig=${kubeconfig}
-    ...    log_age=${LOG_AGE}
-    ...    max_log_lines=${MAX_LOG_LINES}
-    ...    max_log_bytes=${MAX_LOG_BYTES}
-    
-    # Use only critical error patterns for fast SLI checks
-    @{critical_categories}=    Create List    GenericError    AppFailure    StackTrace
-    
-    ${scan_results}=    RW.K8sLog.Scan Logs For Issues
-    ...    log_dir=${log_dir}
-    ...    workload_type=deployment
-    ...    workload_name=${DEPLOYMENT_NAME}
-    ...    namespace=${NAMESPACE}
-    ...    categories=${critical_categories}
-    ...    custom_patterns_file=sli_critical_patterns.json
-    
-    # Post-process results to filter out patterns matching LOGS_EXCLUDE_PATTERN
-    TRY
-        IF    "${LOGS_EXCLUDE_PATTERN}" != ""
-            ${filtered_issues}=    Evaluate    [issue for issue in $scan_results.get('issues', []) if not __import__('re').search('${LOGS_EXCLUDE_PATTERN}', issue.get('details', ''), __import__('re').IGNORECASE)]    modules=re
-            ${filtered_results}=    Evaluate    {**$scan_results, 'issues': $filtered_issues}
-            Set Test Variable    ${scan_results}    ${filtered_results}
+    ELSE
+        ${log_dir}=    RW.K8sLog.Fetch Workload Logs
+        ...    workload_type=deployment
+        ...    workload_name=${DEPLOYMENT_NAME}
+        ...    namespace=${NAMESPACE}
+        ...    context=${CONTEXT}
+        ...    kubeconfig=${kubeconfig}
+        ...    log_age=${LOG_AGE}
+        ...    max_log_lines=${MAX_LOG_LINES}
+        ...    max_log_bytes=${MAX_LOG_BYTES}
+        
+        # Use only critical error patterns for fast SLI checks
+        @{critical_categories}=    Create List    GenericError    AppFailure    StackTrace
+        
+        ${scan_results}=    RW.K8sLog.Scan Logs For Issues
+        ...    log_dir=${log_dir}
+        ...    workload_type=deployment
+        ...    workload_name=${DEPLOYMENT_NAME}
+        ...    namespace=${NAMESPACE}
+        ...    categories=${critical_categories}
+        ...    custom_patterns_file=sli_critical_patterns.json
+        
+        # Post-process results to filter out patterns matching LOGS_EXCLUDE_PATTERN
+        TRY
+            IF    "${LOGS_EXCLUDE_PATTERN}" != ""
+                ${filtered_issues}=    Evaluate    [issue for issue in $scan_results.get('issues', []) if not __import__('re').search('${LOGS_EXCLUDE_PATTERN}', issue.get('details', ''), __import__('re').IGNORECASE)]    modules=re
+                ${filtered_results}=    Evaluate    {**$scan_results, 'issues': $filtered_issues}
+                Set Test Variable    ${scan_results}    ${filtered_results}
+            END
+        EXCEPT
+            Log    Warning: Failed to apply LOGS_EXCLUDE_PATTERN filter, using unfiltered results
         END
-    EXCEPT
-        Log    Warning: Failed to apply LOGS_EXCLUDE_PATTERN filter, using unfiltered results
+        
+        ${log_health_score}=    RW.K8sLog.Calculate Log Health Score    scan_results=${scan_results}
+        
+        # Store details for final score calculation logging
+        TRY
+            ${issues}=    Evaluate    $scan_results.get('issues', [])
+            ${issue_count}=    Get Length    ${issues}
+            Set Suite Variable    ${log_health_details}    ${issue_count} issues found
+        EXCEPT
+            Set Suite Variable    ${log_health_details}    analysis completed
+        END
+        
+        Set Suite Variable    ${log_health_score}
+        RW.K8sLog.Cleanup Temp Files
+        RW.Core.Push Metric    ${log_health_score}    sub_name=log_errors
     END
-    
-    ${log_health_score}=    RW.K8sLog.Calculate Log Health Score    scan_results=${scan_results}
-    
-    # Store details for final score calculation logging
-    TRY
-        ${issues}=    Evaluate    $scan_results.get('issues', [])
-        ${issue_count}=    Get Length    ${issues}
-        Set Suite Variable    ${log_health_details}    ${issue_count} issues found
-    EXCEPT
-        Set Suite Variable    ${log_health_details}    analysis completed
-    END
-    
-    Set Suite Variable    ${log_health_score}
-    RW.K8sLog.Cleanup Temp Files
-    RW.Core.Push Metric    ${log_health_score}    sub_name=log_errors
 
 Get NotReady Pods Score for Deployment `${DEPLOYMENT_NAME}`
     [Documentation]    Fetches a count of unready pods for the specific deployment.
@@ -300,21 +298,20 @@ Get NotReady Pods Score for Deployment `${DEPLOYMENT_NAME}`
         ${pods_notready_score}=    Set Variable    1  # Perfect score for scaled deployment
         Set Suite Variable    ${pods_notready_score}
         RW.Core.Push Metric    ${pods_notready_score}    sub_name=pod_readiness
-        RETURN
+    ELSE
+        ${unreadypods_results}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -l app=${DEPLOYMENT_NAME} -o json | jq -r '.items[] | select(.status.conditions[]? | select(.type == "Ready" and .status == "False" and .reason != "PodCompleted")) | {kind: .kind, name: .metadata.name, conditions: .status.conditions}' | jq -s '. | length' | tr -d '\n'
+        ...    env=${env}
+        ...    secret_file__kubeconfig=${kubeconfig}
+        
+        ${unready_count}=    Convert To Integer    ${unreadypods_results.stdout}
+        ${pods_notready_score}=    Evaluate    1 if ${unready_count} == 0 else 0
+        
+        # Store details for final score calculation logging
+        Set Suite Variable    ${pod_readiness_details}    ${unready_count} unready pods
+        Set Suite Variable    ${pods_notready_score}
+        RW.Core.Push Metric    ${pods_notready_score}    sub_name=pod_readiness
     END
-    
-    ${unreadypods_results}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -l app=${DEPLOYMENT_NAME} -o json | jq -r '.items[] | select(.status.conditions[]? | select(.type == "Ready" and .status == "False" and .reason != "PodCompleted")) | {kind: .kind, name: .metadata.name, conditions: .status.conditions}' | jq -s '. | length' | tr -d '\n'
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    
-    ${unready_count}=    Convert To Integer    ${unreadypods_results.stdout}
-    ${pods_notready_score}=    Evaluate    1 if ${unready_count} == 0 else 0
-    
-    # Store details for final score calculation logging
-    Set Suite Variable    ${pod_readiness_details}    ${unready_count} unready pods
-    Set Suite Variable    ${pods_notready_score}
-    RW.Core.Push Metric    ${pods_notready_score}    sub_name=pod_readiness
 
 Get Deployment Replica Status and Score for `${DEPLOYMENT_NAME}`
     [Documentation]    Checks if deployment has the expected number of ready replicas and is available.
@@ -326,32 +323,31 @@ Get Deployment Replica Status and Score for `${DEPLOYMENT_NAME}`
         ${replica_score}=    Set Variable    1  # Perfect score for scaled deployment  
         Set Suite Variable    ${replica_score}
         RW.Core.Push Metric    ${replica_score}    sub_name=replica_status
-        RETURN
-    END
-    
-    ${deployment_status}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '.status | {ready_replicas: (.readyReplicas // 0), desired_replicas: .replicas, available_condition: (if any(.conditions[]; .type == "Available") then (.conditions[] | select(.type == "Available")) else {"status": "Unknown"} end)}'
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    
-    TRY
-        ${status_json}=    Evaluate    json.loads(r'''${deployment_status.stdout}''') if r'''${deployment_status.stdout}'''.strip() else {}    json
-        ${ready_replicas}=    Evaluate    $status_json.get('ready_replicas', 0)
-        ${desired_replicas}=    Evaluate    $status_json.get('desired_replicas', 0)
-        ${available_status}=    Evaluate    $status_json.get('available_condition', {}).get('status', 'Unknown')
+    ELSE
+        ${deployment_status}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '.status | {ready_replicas: (.readyReplicas // 0), desired_replicas: .replicas, available_condition: (if any(.conditions[]; .type == "Available") then (.conditions[] | select(.type == "Available")) else {"status": "Unknown"} end)}'
+        ...    env=${env}
+        ...    secret_file__kubeconfig=${kubeconfig}
         
-        # Score is 1 if we have at least 1 ready replica and deployment is available
-        ${replica_score}=    Evaluate    1 if ${ready_replicas} >= 1 and "${available_status}" == "True" else 0
+        TRY
+            ${status_json}=    Evaluate    json.loads(r'''${deployment_status.stdout}''') if r'''${deployment_status.stdout}'''.strip() else {}    json
+            ${ready_replicas}=    Evaluate    $status_json.get('ready_replicas', 0)
+            ${desired_replicas}=    Evaluate    $status_json.get('desired_replicas', 0)
+            ${available_status}=    Evaluate    $status_json.get('available_condition', {}).get('status', 'Unknown')
+            
+            # Score is 1 if we have at least 1 ready replica and deployment is available
+            ${replica_score}=    Evaluate    1 if ${ready_replicas} >= 1 and "${available_status}" == "True" else 0
+            
+            # Store details for final score calculation logging
+            Set Suite Variable    ${replica_details}    ${ready_replicas}/${desired_replicas} ready, available: ${available_status}
+        EXCEPT
+            ${replica_score}=    Set Variable    0
+            Set Suite Variable    ${replica_details}    status parse failed
+        END
         
-        # Store details for final score calculation logging
-        Set Suite Variable    ${replica_details}    ${ready_replicas}/${desired_replicas} ready, available: ${available_status}
-    EXCEPT
-        ${replica_score}=    Set Variable    0
-        Set Suite Variable    ${replica_details}    status parse failed
+        Set Suite Variable    ${replica_score}
+        RW.Core.Push Metric    ${replica_score}    sub_name=replica_status
     END
-    
-    Set Suite Variable    ${replica_score}
-    RW.Core.Push Metric    ${replica_score}    sub_name=replica_status
 
 Get Recent Warning Events Score for `${DEPLOYMENT_NAME}`
     [Documentation]    Checks for recent warning events related to the deployment within a short time window, with filtering to reduce noise.
@@ -385,9 +381,12 @@ Get Recent Warning Events Score for `${DEPLOYMENT_NAME}`
 
 Generate Deployment Health Score for `${DEPLOYMENT_NAME}`
     @{unhealthy_components}=    Create List
+    ${unhealthy_list}=    Set Variable    "None"  # Initialize to ensure it's always defined
+    
     IF    ${SKIP_HEALTH_CHECKS}
-        # For scaled-down deployments, return a specific score (0.5) to distinguish from "broken"
-        ${health_score}=    Set Variable    0.5
+        # For scaled-down deployments, all sub-metrics are 1 (perfect), so final score should also be 1
+        # We distinguish scaled-down vs broken deployments through the log message and report details
+        ${health_score}=    Set Variable    1.0
         Log    Deployment ${DEPLOYMENT_NAME} is intentionally scaled to 0 replicas (${SCALED_DOWN_INFO}) - Score: ${health_score}
     ELSE
         # Calculate the normal health score
@@ -411,4 +410,4 @@ Generate Deployment Health Score for `${DEPLOYMENT_NAME}`
         END
     END
     RW.Core.Add to Report    Health Score: ${health_score} - Unhealthy components: ${unhealthy_list}
-    RW.Core.Push Metric    ${health_score} 
+    RW.Core.Push Metric    ${health_score}
