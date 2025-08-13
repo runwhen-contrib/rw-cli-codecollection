@@ -69,4 +69,5 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
 Generate Namespace Score for Namespace `${NAMESPACE}`
     ${pvc_health_score}=      Evaluate  (${pvc_utilization_score}) / 1
     ${health_score}=      Convert to Number    ${pvc_health_score}  2
+    RW.Core.Push Metric    ${health_score}    sub_name=pvc_health
     RW.Core.Push Metric    ${health_score}

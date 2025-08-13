@@ -36,6 +36,7 @@ Check for Resource Health Issues Affecting App Service `${APP_SERVICE_NAME}` In 
         ${appservice_resource_score}=    Set Variable    0
     END
     Set Global Variable    ${appservice_resource_score}
+    RW.Core.Push Metric    ${appservice_resource_score}    sub_name=resource_health
 
 
 Check App Service `${APP_SERVICE_NAME}` Health Check Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
@@ -65,6 +66,8 @@ Check App Service `${APP_SERVICE_NAME}` Health Check Metrics In Resource Group `
             END
         END
     END
+    RW.Core.Push Metric    ${app_service_health_check_score}    sub_name=health_checks
+
 Check App Service `${APP_SERVICE_NAME}` Configuration Health In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks the configuration health of a appservice workload. 1 = healthy, 0 = unhealthy. 
     [Tags]    appservice    configuration    health
@@ -92,6 +95,8 @@ Check App Service `${APP_SERVICE_NAME}` Configuration Health In Resource Group `
             END
         END
     END
+    RW.Core.Push Metric    ${app_service_config_score}    sub_name=configuration
+
 Check Deployment Health of App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch deployment health of the App Service
     [Tags]    appservice    deployment
@@ -119,6 +124,7 @@ Check Deployment Health of App Service `${APP_SERVICE_NAME}` In Resource Group `
             END
         END
     END
+    RW.Core.Push Metric    ${app_service_deployment_score}    sub_name=deployment_health
 
 Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events of appservice and checks for errors
@@ -145,6 +151,7 @@ Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOU
             END
         END
     END
+    RW.Core.Push Metric    ${app_service_activities_score}    sub_name=activities
 
 Generate App Service Health Score for `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}`
     Skip If    not ${APP_SERVICE_RUNNING}    App Service is not running - metric already pushed as 0

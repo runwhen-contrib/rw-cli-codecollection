@@ -23,6 +23,7 @@ Identify High Utilization Nodes for Cluster `${CONTEXT}`
 
     ${high_node_usage_score}=    Evaluate    0 if ${metric} > 0 else 1
     Set Global Variable    ${high_node_usage_score}
+    RW.Core.Push Metric    ${high_node_usage_score}    sub_name=node_utilization
 
 Identify Pods with Resource Limits Exceeding Node Capacity in Cluster `${CONTEXT}`
     [Documentation]    Identify any Pods in the Cluster `${CONTEXT}` with resource limits (CPU or Memory) larger than the Node's allocatable capacity.
@@ -40,6 +41,7 @@ Identify Pods with Resource Limits Exceeding Node Capacity in Cluster `${CONTEXT
 
     ${resource_limit_health_score}=    Evaluate    0 if ${events} > 0 else 1
     Set Global Variable    ${resource_limit_health_score}
+    RW.Core.Push Metric    ${resource_limit_health_score}    sub_name=resource_limits
 
 Generate Cluster Resource Health Score
     ${cluster_resource_health_score}=      Evaluate  (${resource_limit_health_score} + ${high_node_usage_score} ) / 2

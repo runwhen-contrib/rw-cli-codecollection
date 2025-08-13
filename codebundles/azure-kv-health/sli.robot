@@ -42,6 +42,7 @@ Count Key Vault Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
 
     ${kv_resource_health_score}=    Evaluate    1 if ${issue_count} == 0 else 0
     Set Global Variable    ${kv_resource_health_score}
+    RW.Core.Push Metric    ${kv_resource_health_score}    sub_name=resource_health
 
 Count Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Counts number of Azure key vault vaults with availability below 100% 
@@ -68,6 +69,7 @@ Count Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}`
 
     ${kv_availability_score}=    Evaluate    1 if ${issue_count} == 0 else 0
     Set Global Variable    ${kv_availability_score}
+    RW.Core.Push Metric    ${kv_availability_score}    sub_name=availability
 
 Count Key Vault configuration in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count Key vault's miss-configuration
@@ -94,6 +96,7 @@ Count Key Vault configuration in resource group `${AZURE_RESOURCE_GROUP}`
 
     ${kv_config_score}=    Evaluate    1 if ${issue_count} == 0 else 0
     Set Global Variable    ${kv_config_score}
+    RW.Core.Push Metric    ${kv_config_score}    sub_name=configuration
 
 Count Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count expiring secrets, certificates, and keys in Key Vaults
@@ -120,6 +123,7 @@ Count Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}`
     ${issue_count}=    Set Variable    len(${expiry_data['issues']})
     ${kv_expiry_score}=    Evaluate    1 if ${issue_count} == 0 else 0
     Set Global Variable    ${kv_expiry_score}
+    RW.Core.Push Metric    ${kv_expiry_score}    sub_name=expiring_items
 
 Count Key Vault Log Issues in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count Key Vault log issues
@@ -143,6 +147,7 @@ Count Key Vault Log Issues in resource group `${AZURE_RESOURCE_GROUP}`
     ${issue_count}=    Set Variable    len(${log_data['issues']})
     ${kv_log_score}=    Evaluate    1 if ${issue_count} == 0 else 0
     Set Global Variable    ${kv_log_score}
+    RW.Core.Push Metric    ${kv_log_score}    sub_name=log_issues
 
 Count Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count Key Vault performance metrics issues
@@ -165,6 +170,7 @@ Count Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}`
     ${issue_count}=    Set Variable    len(${metrics_data['issues']})
     ${kv_perf_score}=    Evaluate    1 if ${issue_count} == 0 else 0
     Set Global Variable    ${kv_perf_score}
+    RW.Core.Push Metric    ${kv_perf_score}    sub_name=performance_metrics
 
 Generate Comprehensive Key Vault Health Score
     ${kv_health_score}=    Evaluate    (${kv_resource_health_score} + ${kv_availability_score} + ${kv_config_score} + ${kv_expiry_score} + ${kv_log_score} + ${kv_perf_score}) / 6

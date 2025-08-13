@@ -45,6 +45,7 @@ Identify Health Issues Affecting Data Factories in resource group `${AZURE_RESOU
     
     RW.CLI.Run Cli
     ...    cmd=rm -f ${json_file}
+    RW.Core.Push Metric    ${availability_score}    sub_name=resource_health
 
 Count Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count frequently occurring errors in Data Factory pipelines
@@ -73,6 +74,7 @@ Count Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESO
 
     RW.CLI.Run Cli
     ...    cmd=rm -f ${json_file}
+    RW.Core.Push Metric    ${pipeline_error_score}    sub_name=pipeline_errors
 
 Count Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count failed pipeline runs in Data Factory pipelines
@@ -102,6 +104,7 @@ Count Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GRO
 
     RW.CLI.Run Cli
     ...    cmd=rm -f ${json_file}
+    RW.Core.Push Metric    ${failed_pipeline_score}    sub_name=failed_pipelines
 
 Count Large Data Operations in Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count large data operations in Data Factory pipelines
@@ -130,6 +133,7 @@ Count Large Data Operations in Data Factories in resource group `${AZURE_RESOURC
 
     RW.CLI.Run Cli
     ...    cmd=rm -f ${json_file}
+    RW.Core.Push Metric    ${data_volume_score}    sub_name=data_operations
 
 Count Long Running Pipeline Runs in Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count long running pipeline runs in Data Factory pipelines
@@ -159,6 +163,7 @@ Count Long Running Pipeline Runs in Data Factories in resource group `${AZURE_RE
 
     RW.CLI.Run Cli
     ...    cmd=rm -f ${json_file}
+    RW.Core.Push Metric    ${long_pipeline_score}    sub_name=long_running_pipelines
 
 Generate Health Score
     [Documentation]    Calculate comprehensive health score with detailed reporting of each component

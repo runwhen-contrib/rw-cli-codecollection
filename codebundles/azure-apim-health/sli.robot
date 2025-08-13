@@ -37,6 +37,7 @@ Check for Resource Health Issues Affecting APIM `${APIM_NAME}` in Resource Group
         ${apim_resource_score}=    Set Variable    0
     END
     Set Global Variable    ${apim_resource_score}
+    RW.Core.Push Metric    ${apim_resource_score}    sub_name=resource_health
 
 Fetch Key Metrics for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gather APIM metrics from Azure Monitor. Raises issues if thresholds are violated.
@@ -56,6 +57,7 @@ Fetch Key Metrics for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP
     ${issues_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     ${apim_metric_score}=    Evaluate    1 if len(@{issues_list["issues"]}) == 0 else 0
     Set Global Variable    ${apim_metric_score}
+    RW.Core.Push Metric    ${apim_metric_score}    sub_name=metrics
 
 Check Logs for Errors with APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Run apim_diagnostic_logs.sh, parse results, raise issues if logs exceed thresholds.
@@ -76,6 +78,7 @@ Check Logs for Errors with APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     ${apim_log_score}=    Evaluate    1 if len(@{issue_list["issues"]}) == 0 else 0
     Set Global Variable    ${apim_log_score}
+    RW.Core.Push Metric    ${apim_log_score}    sub_name=diagnostic_logs
 
 
 Verify APIM Policy Configurations for `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
@@ -101,6 +104,7 @@ Verify APIM Policy Configurations for `${APIM_NAME}` in Resource Group `${AZ_RES
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     ${apim_config_score}=    Evaluate    1 if len(@{issue_list["issues"]}) == 0 else 0
     Set Global Variable    ${apim_config_score}
+    RW.Core.Push Metric    ${apim_config_score}    sub_name=policy_config
 
 Check APIM SSL Certificates for `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Verify certificate validity, expiration, thumbprint, and domain matches
@@ -121,6 +125,7 @@ Check APIM SSL Certificates for `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     ${apim_ssl_score}=    Evaluate    1 if len(@{issue_list["issues"]}) == 0 else 0
     Set Global Variable    ${apim_ssl_score}
+    RW.Core.Push Metric    ${apim_ssl_score}    sub_name=ssl_certificates
 
 Inspect Dependencies and Related Resources for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Runs inspect_apim_dependencies.sh to discover & validate Key Vault, backends, DNS, etc.
@@ -155,6 +160,7 @@ Inspect Dependencies and Related Resources for APIM `${APIM_NAME}` in Resource G
     ${issue_list}=    Set Variable    ${parsed["issues"]}
     ${apim_dep_score}=    Evaluate    1 if len(@{issue_list}) == 0 else 0
     Set Global Variable    ${apim_dep_score}
+    RW.Core.Push Metric    ${apim_dep_score}    sub_name=dependencies
 
 Generate APIM Health Score
     ${apim_health_score}=      Evaluate  (${apim_dep_score} + ${apim_ssl_score} + ${apim_config_score} + ${apim_log_score} + ${apim_metric_score} + ${apim_resource_score} ) / 6

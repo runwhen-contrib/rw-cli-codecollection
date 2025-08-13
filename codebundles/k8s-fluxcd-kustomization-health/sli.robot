@@ -31,6 +31,7 @@ List Suspended FluxCD Kustomization objects in Namespace `${NAMESPACE}` in Clust
         ${suspended_kustomization_score}=    Set Variable    1
     END
     Set Global Variable    ${suspended_kustomization_score}
+    RW.Core.Push Metric    ${suspended_kustomization_score}    sub_name=suspended_kustomizations
 
 
 
@@ -50,6 +51,7 @@ List Unready FluxCD Kustomizations in Namespace `${NAMESPACE}` in Cluster `${CON
         ${unready_kustomization_score}=    Set Variable    1
     END
     Set Global Variable    ${unready_kustomization_score}
+    RW.Core.Push Metric    ${unready_kustomization_score}    sub_name=unready_kustomizations
 
 Generate FluxCD Kustomization Health Score for Namespace `${NAMESPACE}` in Cluster `${CONTEXT}`
     ${kustomization_health_score}=      Evaluate  (${unready_kustomization_score} + ${suspended_kustomization_score}) / 2

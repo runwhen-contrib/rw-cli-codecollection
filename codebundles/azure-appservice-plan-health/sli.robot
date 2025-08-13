@@ -32,6 +32,7 @@ Count App Service Plans with Health Status of `Available` in resource group `${A
     ${count}=    Evaluate    len([health for health in ${health_list} if health['properties']['availabilityState'] == 'Available'])
     ${available_asp_score}=    Evaluate    1 if int(${count}) >= 1 else 0
     Set Global Variable    ${available_asp_score}
+    RW.Core.Push Metric    ${available_asp_score}    sub_name=availability
 
 
 Count App Service Plans with High Capacity Usage in resource group `${AZURE_RESOURCE_GROUP}`
@@ -53,6 +54,7 @@ Count App Service Plans with High Capacity Usage in resource group `${AZURE_RESO
     ${count}=    Evaluate    len(${high_usage_json})
     ${appservice_high_usage_score}=    Evaluate    1 if int(${count}) <= int(${MAX_HIGH_USAGE_APP_SERVICE_PLAN}) else 0
     Set Global Variable    ${appservice_high_usage_score}
+    RW.Core.Push Metric    ${appservice_high_usage_score}    sub_name=capacity_usage
 
 Generate Health Score
     ${health_score}=    Evaluate  (${appservice_high_usage_score} + ${available_asp_score}) / 2

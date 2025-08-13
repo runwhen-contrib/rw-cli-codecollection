@@ -26,6 +26,7 @@ Count unhealthy GCP Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
     ...    extract_path_to_var__unhealthy_function_count=length(@)
     ...    assign_stdout_from_var=unhealthy_function_count
     ${metric}=     Convert To Number    ${unhealthy_cloud_function_count.stdout}
+    RW.Core.Push Metric    ${metric}    sub_name=function_health
     RW.Core.Push Metric    ${metric}
 
 *** Keywords ***

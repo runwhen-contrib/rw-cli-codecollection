@@ -27,6 +27,7 @@ Fetch GCP Bucket Storage Utilization for `${PROJECT_IDS}`
     ...    env=${env}
     ${buckets_over_utilization}=    Evaluate    1 if int(${buckets_over_threshold.stdout}) == 0 else 0
     Set Global Variable    ${buckets_over_utilization}
+    RW.Core.Push Metric    ${buckets_over_utilization}    sub_name=storage_utilization
 
 Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
     [Documentation]    Fetches all GCP buckets in each project and checks for public buckets, risky IAM permissions, and encryption configuration.
@@ -43,6 +44,7 @@ Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
     ...    env=${env}
     ${public_bucket_score}=    Evaluate    1 if int(${total_public_access_buckets.stdout}) <= ${PUBLIC_ACCESS_BUCKET_THRESHOLD} else 0
     Set Global Variable    ${public_bucket_score}
+    RW.Core.Push Metric    ${public_bucket_score}    sub_name=security_config
 
 
 Fetch GCP Bucket Storage Operations Rate for `${PROJECT_IDS}`
@@ -59,6 +61,7 @@ Fetch GCP Bucket Storage Operations Rate for `${PROJECT_IDS}`
     ...    env=${env}
     ${bucket_ops_rate_score}=    Evaluate    1 if int(${buckets_over_ops_threshold.stdout}) == 0 else 0
     Set Global Variable    ${bucket_ops_rate_score}
+    RW.Core.Push Metric    ${bucket_ops_rate_score}    sub_name=operations_rate
 
 Generate Bucket Score in Project `${PROJECT_IDS}`
     ${bucket_health_score}=      Evaluate  (${buckets_over_utilization} + ${public_bucket_score} + ${bucket_ops_rate_score}) / 3

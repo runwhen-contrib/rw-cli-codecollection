@@ -59,4 +59,5 @@ Measure Number of Running Pods with Label in `${NAMESPACE}`
     ...    assign_stdout_from_var=running_pods_count
     Log    ${pod_count.stdout} total running pods with labels: ${LABELS}
     ${metric}=      Convert to Number    ${pod_count.stdout}
+    RW.Core.Push Metric    ${metric}    sub_name=labeled_pods_health
     RW.Core.Push Metric    ${metric}

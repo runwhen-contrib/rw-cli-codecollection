@@ -33,6 +33,7 @@ Measure Application Exceptions in `${NAMESPACE}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ${parsed_exceptions}=    RW.K8sApplications.Parse Stacktraces    ${logs.stdout}
     ${count}=    Evaluate    len($parsed_exceptions)
+    RW.Core.Push Metric    ${count}    sub_name=app_troubleshoot
     RW.Core.Push Metric    ${count}
 
 

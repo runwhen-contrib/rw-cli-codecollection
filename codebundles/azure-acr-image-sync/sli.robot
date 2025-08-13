@@ -84,4 +84,5 @@ Count Outdated Images in Azure Container Registry `${ACR_REGISTRY}`
     ...    timeout_seconds=1200
     ${total_outdated_images}=    RW.CLI.Run CLI
     ...    cmd=echo "${az_acr_image_check.stdout}" | grep "Total images requiring an update" | awk '{print $NF}'
+    RW.Core.Push Metric    ${total_outdated_images.stdout}    sub_name=outdated_images
     RW.Core.Push Metric    ${total_outdated_images.stdout}

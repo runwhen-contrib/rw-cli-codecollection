@@ -24,8 +24,10 @@ Health Check Flux Reconciliation
     ...    secret_file__kubeconfig=${kubeconfig}
     Log To Console    ${process.stdout}
     IF    ${process.returncode} != 0
+        RW.Core.Push Metric    0    sub_name=fluxcd_reconcile
         RW.Core.Push Metric    0
     ELSE
+        RW.Core.Push Metric    1    sub_name=fluxcd_reconcile
         RW.Core.Push Metric    1
     END
 

@@ -38,6 +38,7 @@ Verify Istio Sidecar Injection for Cluster `${CONTEXT}`
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
     ${sidecar_injection_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
     Set Global Variable    ${sidecar_injection_score}
+    RW.Core.Push Metric    ${sidecar_injection_score}    sub_name=sidecar_injection
 
 Check Istio Sidecar Resource Usage for Cluster `${CONTEXT}`
     [Documentation]    Checks all pods in specified namespaces for Istio sidecar resources usage
@@ -59,6 +60,7 @@ Check Istio Sidecar Resource Usage for Cluster `${CONTEXT}`
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
     ${sidecar_resources_usage_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
     Set Global Variable    ${sidecar_resources_usage_score}
+    RW.Core.Push Metric    ${sidecar_resources_usage_score}    sub_name=sidecar_resources
 
 
 Validate Istio Installation in Cluster `${CONTEXT}`
@@ -79,6 +81,7 @@ Validate Istio Installation in Cluster `${CONTEXT}`
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
     ${installation_verify_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
     Set Global Variable    ${installation_verify_score}
+    RW.Core.Push Metric    ${installation_verify_score}    sub_name=installation
 
 
 Check Istio Controlplane Logs For Errors in Cluster `${CONTEXT}`
@@ -99,6 +102,7 @@ Check Istio Controlplane Logs For Errors in Cluster `${CONTEXT}`
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
     ${controlplane_logs_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
     Set Global Variable    ${controlplane_logs_score}
+    RW.Core.Push Metric    ${controlplane_logs_score}    sub_name=controlplane_logs
 
 Fetch Istio Proxy Logs in Cluster `${CONTEXT}`
     [Documentation]    Check istio proxy logs for known errors and warnings in cluster
@@ -118,6 +122,7 @@ Fetch Istio Proxy Logs in Cluster `${CONTEXT}`
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
     ${proxy_logs_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
     Set Global Variable    ${proxy_logs_score}
+    RW.Core.Push Metric    ${proxy_logs_score}    sub_name=proxy_logs
 
 Verify Istio SSL Certificates in Cluster `${CONTEXT}`
     [Documentation]    Check Istio valid Root CA and mTLS Certificates in Cluster
@@ -137,6 +142,7 @@ Verify Istio SSL Certificates in Cluster `${CONTEXT}`
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
     ${istio_certificate_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
     Set Global Variable    ${istio_certificate_score}
+    RW.Core.Push Metric    ${istio_certificate_score}    sub_name=ssl_certificates
 
 Check Istio Configuration Health in Cluster `${CONTEXT}`
     [Documentation]    Check Istio configurations in Cluster
@@ -156,6 +162,7 @@ Check Istio Configuration Health in Cluster `${CONTEXT}`
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
     ${istio_configuration_score}=    Evaluate    1 if len(@{issues}) == 0 else 0
     Set Global Variable    ${istio_configuration_score}
+    RW.Core.Push Metric    ${istio_configuration_score}    sub_name=configuration
 
 Generate Health Score for Cluster ${CONTEXT}
     ${health_score}=    Evaluate  (${sidecar_injection_score} + ${sidecar_resources_usage_score} + ${installation_verify_score} + ${controlplane_logs_score} + ${proxy_logs_score} + ${istio_certificate_score} + ${istio_configuration_score}) / 7

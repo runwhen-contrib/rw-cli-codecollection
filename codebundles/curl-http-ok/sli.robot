@@ -44,4 +44,5 @@ Validate HTTP URL Availability and Timeliness for ${URL}
     ${status_code}=    Set Variable    ${json['http_code']}
     ${http_ok}=    Evaluate    1 if ${status_code} == ${DESIRED_RESPONSE_CODE} else 0
     ${score}=    Evaluate    int(${latency_within_target}*${http_ok})
+    RW.Core.Push Metric    ${score}    sub_name=http_health
     RW.Core.Push Metric    ${score}
