@@ -61,7 +61,7 @@ def execute_command(
     if env is None:
         env = {}
 
-    # Take base env and update it with the new env
+    # Merge custom environment variables with system environment to preserve existing variables
     base_env = os.environ.copy()
     base_env.update(env)
     env = base_env
