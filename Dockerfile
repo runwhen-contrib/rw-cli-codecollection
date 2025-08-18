@@ -1,4 +1,4 @@
-FROM us-docker.pkg.dev/runwhen-nonprod-shared/public-images/codecollection-devtools:latest
+FROM --platform=linux/amd64 us-docker.pkg.dev/runwhen-nonprod-shared/public-images/codecollection-devtools:latest
 USER root
 
 ENV RUNWHEN_HOME=/home/runwhen
