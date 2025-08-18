@@ -61,6 +61,11 @@ def execute_command(
     if env is None:
         env = {}
 
+    # Take base env and update it with the new env
+    base_env = os.environ.copy()
+    base_env.update(env)
+    env = base_env
+
     azure_config_dir = os.getenv("AZURE_CONFIG_DIR")
     if azure_config_dir and "AZURE_CONFIG_DIR" not in env:
         env["AZURE_CONFIG_DIR"] = azure_config_dir
