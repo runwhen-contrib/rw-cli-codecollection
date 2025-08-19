@@ -11,6 +11,7 @@ Library             RW.platform
 Library             RW.NextSteps
 Library             RW.K8sHelper
 Library             RW.K8sLog
+Library             RW.K8sTraceback
 Library             OperatingSystem
 Library             String
 Library             Collections
@@ -60,6 +61,12 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=1h
     ...    default=3h
+    ${LOG_SIZE}=    RW.Core.Import User Variable    LOG_SIZE
+    ...    type=string
+    ...    description=The maximum size of logs in bytes to fetch from pods, used for log analysis tasks. Defaults to 2MB.
+    ...    pattern=\d*
+    ...    example=1024
+    ...    default=2097152
     ${LOG_ANALYSIS_DEPTH}=    RW.Core.Import User Variable    LOG_ANALYSIS_DEPTH
     ...    type=string
     ...    description=The depth of log analysis to perform - basic, standard, or comprehensive.
@@ -125,6 +132,7 @@ Suite Initialization
     Set Suite Variable    ${DEPLOYMENT_NAME}
     Set Suite Variable    ${LOG_LINES}
     Set Suite Variable    ${LOG_AGE}
+    Set Suite Variable    ${LOG_SIZE}
     Set Suite Variable    ${LOG_ANALYSIS_DEPTH}
     Set Suite Variable    ${LOG_SEVERITY_THRESHOLD}
     Set Suite Variable    ${LOG_PATTERN_CATEGORIES_STR}
@@ -402,6 +410,101 @@ Fetch Deployment Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
             ELSE
                 RW.Core.Add Pre To Report    **📋 Log Analysis for Deployment `${DEPLOYMENT_NAME}`** (Last ${LOG_LINES} lines, ${LOG_AGE} age)\n**Total Log Lines:** ${total_count} | **Health Check Lines:** ${health_count}\n\n**📝 Recent Application Logs:**\n${deployment_logs.stdout}\n\n**Commands Used:** ${history}
             END
+        END
+    END
+
+Fetch Deployment Tracebacks for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
+    [Documentation]    Collects Traceback-containing logs from all pods in the deployment for manual review and troubleshooting.
+    [Tags]
+    ...    logs
+    ...    collection
+    ...    deployment
+    ...    troubleshooting
+    ...    tracebacks
+    ...    access:read-only
+    # Skip pod-related checks if deployment is scaled to 0
+    IF    not ${SKIP_POD_CHECKS}
+
+        # Step-1: Fetch all pods for the deployment
+        ${deployment_pod_names_lines}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -l app=${DEPLOYMENT_NAME} -o name
+        ...    env=${env}
+        ...    secret_file__kubeconfig=${kubeconfig}
+        ...    show_in_rwl_cheatsheet=true
+        ...    render_in_commandlist=true
+        
+        IF    ${deployment_pod_names_lines.returncode} == 0
+            # split lines to get the pods as a list of pod-names
+            ${deployment_pod_names_list}=    Split To Lines    ${deployment_pod_names_lines.stdout}
+            
+            # Step-2: iterate through each pod-name and fetch its logs
+            FOR    ${pod_name}    IN    @{deployment_pod_names_list}
+                # Step-3: Fetch container names of this pod
+                ${pod_container_names_lines}=    RW.CLI.Run Cli
+                ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${pod_name} --context ${CONTEXT} -n ${NAMESPACE} -o jsonpath='{range .spec.containers[*]}{.name}{"\\n"}{end}'
+                ...    env=${env}
+                ...    secret_file__kubeconfig=${kubeconfig}
+                ...    show_in_rwl_cheatsheet=true
+                ...    render_in_commandlist=true
+                
+                IF    ${pod_container_names_lines.returncode} == 0
+                    # split lines to get the list of container names 
+                    ${container_names_list}=    Split To Lines    ${pod_container_names_lines.stdout}
+        
+                    # Step-4: iterate through each container within each pod and fetch its logs
+                    FOR    ${container_name}    IN    @{container_names_list}
+                        TRY
+                            # Step-5: Fetch raw logs for this pod.container
+                            ${deployment_logs}=    RW.CLI.Run Cli
+                            ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs ${pod_name} --context ${CONTEXT} -n ${NAMESPACE} -c ${container_name} --tail=${LOG_LINES} --since=${LOG_AGE} --limit-bytes ${LOG_SIZE}
+                            ...    env=${env}
+                            ...    secret_file__kubeconfig=${kubeconfig}
+                            ...    show_in_rwl_cheatsheet=true
+                            ...    render_in_commandlist=true
+                            
+                            IF    ${deployment_logs.returncode} != 0
+                                RW.Core.Add Issue
+                                ...    severity=3
+                                ...    expected=Deployment logs to collect tracebacks should be accessible for POD `${pod_name}` in namespace `${NAMESPACE}`
+                                ...    actual=Failed to fetch deployment tracebacks for POD `${pod_name}` in namespace `${NAMESPACE}`
+                                ...    title=Unable to Fetch Deployment Tracebacks `${DEPLOYMENT_NAME}`
+                                ...    reproduce_hint=${deployment_logs.cmd}
+                                ...    details=Log collection failed with exit code ${deployment_logs.returncode}:\n\nSTDOUT:\n${deployment_logs.stdout}\n\nSTDERR:\n${deployment_logs.stderr}
+                                ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck if pod '${pod_name}' exists and is reachable\n
+                            ELSE
+                                # Step-6: Filter logs to extract tracebacks
+                                ${deployment_log_lines}=    Split To Lines    ${deployment_logs.stdout}
+                                @{tracebacks}=    RW.K8sTraceback.Extract Tracebacks    deployment_logs=${deployment_log_lines}
+                                
+                                # check total no. of tracebacks extracted
+                                ${total_tracebacks}=    Get Length     ${tracebacks}
+
+                                IF    ${total_tracebacks} == 0
+                                    # no tracebacks found for this container in this pod
+                                    RW.Core.Add Pre To Report    **📋 No Tracebacks for Container `${container_name}` in Pod `${pod_name}` for deployment ${DEPLOYMENT_NAME} Found in Last ${LOG_LINES} lines, ${LOG_AGE} age.
+                                ELSE
+                                    RW.Core.Add Issue
+                                    ...    severity=3
+                                    ...    expected=No Tracebacks for Container `${container_name}` in Pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}` Found.
+                                    ...    actual=Tracebacks are found for Container `${container_name}` in Pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}`
+                                    ...    title=Tracebacks detected in Container `${container_name}` in Pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}`
+                                    ...    reproduce_hint=${deployment_logs.cmd}
+                                    ...    details=${tracebacks}
+                                    ...    next_steps=Inspect container `${container_name}` inside pod `${pod_name}` managed by deployment `${DEPLOYMENT_NAME}`\n
+                                END
+                            END                  
+                        EXCEPT
+                            RW.Core.Add Pre To Report    Exception encoutered for container `${container_name}` in pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}`
+                        END
+                    END            
+                ELSE
+                    # TODO: create an issue out of this
+                    RW.Core.Add Pre To Report    While extracting containers for pod `${pod_name}`, got return code: ${pod_container_names_lines.returncode}, stderr: ${pod_container_names_lines.stderr}
+                END
+            END
+        ELSE
+            # TODO: create an issue out of this
+            RW.Core.Add Pre To Report    While extracting pod names for deployment ${DEPLOYMENT_NAME}, got return code: ${deployment_pod_names_lines.returncode}, stderr: ${deployment_pod_names_lines.stderr}
         END
     END
 
