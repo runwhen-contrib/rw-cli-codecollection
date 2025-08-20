@@ -454,47 +454,58 @@ Fetch Deployment Tracebacks for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
                     # Step-4: iterate through each container within each pod and fetch its logs
                     FOR    ${container_name}    IN    @{container_names_list}
                         TRY
-                            # Step-5: Fetch raw logs for this pod.container
-                            ${deployment_logs}=    RW.CLI.Run Cli
-                            ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs ${pod_name} --context ${CONTEXT} -n ${NAMESPACE} -c ${container_name} --tail=${LOG_LINES} --since=${LOG_AGE} --limit-bytes ${LOG_SIZE}
-                            ...    env=${env}
-                            ...    secret_file__kubeconfig=${kubeconfig}
-                            ...    show_in_rwl_cheatsheet=true
-                            ...    render_in_commandlist=true
-                            
-                            IF    ${deployment_logs.returncode} != 0
-                                RW.Core.Add Issue
-                                ...    severity=3
-                                ...    expected=Deployment logs to collect tracebacks should be accessible for POD `${pod_name}` in namespace `${NAMESPACE}`
-                                ...    actual=Failed to fetch deployment tracebacks for POD `${pod_name}` in namespace `${NAMESPACE}`
-                                ...    title=Unable to Fetch Deployment Tracebacks `${DEPLOYMENT_NAME}`
-                                ...    reproduce_hint=${deployment_logs.cmd}
-                                ...    details=Log collection failed with exit code ${deployment_logs.returncode}:\n\nSTDOUT:\n${deployment_logs.stdout}\n\nSTDERR:\n${deployment_logs.stderr}
-                                ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck if pod '${pod_name}' exists and is reachable\n
-                            ELSE
-                                # Step-6: Filter logs to extract tracebacks
-                                ${deployment_log_lines}=    Split To Lines    ${deployment_logs.stdout}
-                                @{tracebacks}=    RW.K8sTraceback.Extract Tracebacks    deployment_logs=${deployment_log_lines}
+                            IF    "linkerd" not in '${container_name}'
+                                # Step-5: Fetch raw logs for this pod.container
+                                ${deployment_logs}=    RW.CLI.Run Cli
+                                ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs ${pod_name} --context ${CONTEXT} -n ${NAMESPACE} -c ${container_name} --tail=${LOG_LINES} --since=${LOG_AGE} --limit-bytes ${LOG_SIZE}
+                                ...    env=${env}
+                                ...    secret_file__kubeconfig=${kubeconfig}
+                                ...    show_in_rwl_cheatsheet=true
+                                ...    render_in_commandlist=true
                                 
-                                # check total no. of tracebacks extracted
-                                ${total_tracebacks}=    Get Length     ${tracebacks}
-
-                                IF    ${total_tracebacks} == 0
-                                    # no tracebacks found for this container in this pod
-                                    RW.Core.Add Pre To Report    **📋 No Tracebacks for Container `${container_name}` in Pod `${pod_name}` for deployment ${DEPLOYMENT_NAME} Found in Last ${LOG_LINES} lines, ${LOG_AGE} age.
-                                ELSE
+                                IF    ${deployment_logs.returncode} != 0
                                     RW.Core.Add Issue
                                     ...    severity=3
-                                    ...    expected=No Tracebacks for Container `${container_name}` in Pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}` Found.
-                                    ...    actual=Tracebacks are found for Container `${container_name}` in Pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}`
-                                    ...    title=Tracebacks detected in Container `${container_name}` in Pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}`
+                                    ...    expected=Deployment logs to collect tracebacks should be accessible for POD `${pod_name}` in namespace `${NAMESPACE}`
+                                    ...    actual=Failed to fetch deployment tracebacks for POD `${pod_name}` in namespace `${NAMESPACE}`
+                                    ...    title=Unable to Fetch Deployment Tracebacks `${DEPLOYMENT_NAME}`
                                     ...    reproduce_hint=${deployment_logs.cmd}
-                                    ...    details=${tracebacks}
-                                    ...    next_steps=Inspect container `${container_name}` inside pod `${pod_name}` managed by deployment `${DEPLOYMENT_NAME}`\n
+                                    ...    details=Log collection failed with exit code ${deployment_logs.returncode}:\n\nSTDOUT:\n${deployment_logs.stdout}\n\nSTDERR:\n${deployment_logs.stderr}
+                                    ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck if pod '${pod_name}' exists and is reachable\n
+                                ELSE
+                                    # Step-6: Filter logs to extract tracebacks
+                                    ${deployment_log_lines}=    Split To Lines    ${deployment_logs.stdout}
+                                    
+                                    # TODO: shift the recent-most traceback logic to SLI
+                                    ${recentmost_traceback}=    RW.K8sTraceback.Extract Tracebacks
+                                    ...    deployment_logs=${deployment_log_lines}
+                                    ...    fetch_most_recent=${True}
+                                    
+                                    # check total no. of tracebacks extracted
+                                    # ${total_tracebacks}=    Get Length     ${tracebacks}
+
+                                    ${traceback_length}=    Get Length    ${recentmost_traceback}
+
+                                    IF    ${traceback_length} == 0
+                                        # no tracebacks found for this container in this pod
+                                        RW.Core.Add Pre To Report    **📋 No Tracebacks for Container `${container_name}` in Pod `${pod_name}` for deployment ${DEPLOYMENT_NAME} Found in Last ${LOG_LINES} lines, ${LOG_AGE} age.
+                                    ELSE
+                                        # TODO: remove this post testing
+                                        RW.Core.Add Pre To Report    Traceback Found for Container `${container_name}` in Pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}`:\n${recentmost_traceback}
+
+                                        # RW.Core.Add Issue
+                                        # ...    severity=3
+                                        # ...    expected=No Tracebacks for Container `${container_name}` in Pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}` Found.
+                                        # ...    actual=Tracebacks are found for Container `${container_name}` in Pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}`
+                                        # ...    title=Tracebacks detected in Container `${container_name}` in Pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}`
+                                        # ...    reproduce_hint=${deployment_logs.cmd}
+                                        # ...    details=${tracebacks}
+                                        # ...    next_steps=Inspect container `${container_name}` inside pod `${pod_name}` managed by deployment `${DEPLOYMENT_NAME}`\n
+                                    END
                                 END
-                            END                  
-                        EXCEPT
-                            RW.Core.Add Pre To Report    Exception encoutered for container `${container_name}` in pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}`
+                            END                
+                        EXCEPT    AS    ${error}
+                            RW.Core.Add Pre To Report    Exception encoutered for container `${container_name}` in pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}`\n:${error}
                         END
                     END            
                 ELSE
