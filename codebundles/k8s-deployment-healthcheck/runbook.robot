@@ -476,31 +476,27 @@ Fetch Deployment Tracebacks for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
                                     # Step-6: Filter logs to extract tracebacks
                                     ${deployment_log_lines}=    Split To Lines    ${deployment_logs.stdout}
                                     
-                                    # TODO: shift the recent-most traceback logic to SLI
-                                    ${recentmost_traceback}=    RW.K8sTraceback.Extract Tracebacks
+                                    ${tracebacks}=    RW.K8sTraceback.Extract Tracebacks
                                     ...    deployment_logs=${deployment_log_lines}
-                                    ...    fetch_most_recent=${True}
                                     
                                     # check total no. of tracebacks extracted
-                                    # ${total_tracebacks}=    Get Length     ${tracebacks}
+                                    ${total_tracebacks}=    Get Length     ${tracebacks}
 
-                                    ${traceback_length}=    Get Length    ${recentmost_traceback}
-
-                                    IF    ${traceback_length} == 0
+                                    IF    ${total_tracebacks} == 0
                                         # no tracebacks found for this container in this pod
                                         RW.Core.Add Pre To Report    **📋 No Tracebacks for Container `${container_name}` in Pod `${pod_name}` for deployment ${DEPLOYMENT_NAME} Found in Last ${LOG_LINES} lines, ${LOG_AGE} age.
                                     ELSE
-                                        # TODO: remove this post testing
-                                        RW.Core.Add Pre To Report    Traceback Found for Container `${container_name}` in Pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}`:\n${recentmost_traceback}
+                                        ${agg_tracebacks}=    Evaluate    "-----------------------------------------------------------\\n".join(${tracebacks})
+                                        RW.Core.Add Pre To Report    Traceback Found for Container `${container_name}` in Pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}`:\n${agg_tracebacks}
 
-                                        # RW.Core.Add Issue
-                                        # ...    severity=3
-                                        # ...    expected=No Tracebacks for Container `${container_name}` in Pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}` Found.
-                                        # ...    actual=Tracebacks are found for Container `${container_name}` in Pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}`
-                                        # ...    title=Tracebacks detected in Container `${container_name}` in Pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}`
-                                        # ...    reproduce_hint=${deployment_logs.cmd}
-                                        # ...    details=${tracebacks}
-                                        # ...    next_steps=Inspect container `${container_name}` inside pod `${pod_name}` managed by deployment `${DEPLOYMENT_NAME}`\n
+                                        RW.Core.Add Issue
+                                        ...    severity=3
+                                        ...    expected=No Tracebacks for Container `${container_name}` in Pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}` Found.
+                                        ...    actual=Tracebacks are found for Container `${container_name}` in Pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}`
+                                        ...    title=Tracebacks detected in Container `${container_name}` in Pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}`
+                                        ...    reproduce_hint=${deployment_logs.cmd}
+                                        ...    details=${tracebacks}
+                                        ...    next_steps=Inspect container `${container_name}` inside pod `${pod_name}` managed by deployment `${DEPLOYMENT_NAME}`\n
                                     END
                                 END
                             END                
