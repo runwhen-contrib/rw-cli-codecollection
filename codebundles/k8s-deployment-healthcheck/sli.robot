@@ -9,6 +9,7 @@ Library           RW.Core
 Library           RW.CLI
 Library           RW.platform
 Library           RW.K8sLog
+Library           RW.K8sTraceback
 Library           OperatingSystem
 Library           String
 Library           Collections
@@ -65,6 +66,12 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=256000
     ...    default=256000
+    ${TRACEBACK_THRESHOLD}=    RW.Core.Import User Variable    TRACEBACK_THRESHOLD
+    ...    type=string
+    ...    description=The maximum number of traceback occurences allowed before scoring is reduced.
+    ...    pattern=^\d+$
+    ...    example=5
+    ...    default=5
     ${EVENT_AGE}=    RW.Core.Import User Variable    EVENT_AGE
     ...    type=string
     ...    description=The time window to check for recent warning events.
@@ -102,6 +109,7 @@ Suite Initialization
     Set Suite Variable    ${LOG_AGE}    ${LOG_AGE}
     Set Suite Variable    ${MAX_LOG_LINES}    ${MAX_LOG_LINES}
     Set Suite Variable    ${MAX_LOG_BYTES}    ${MAX_LOG_BYTES}
+    Set Suite Variable    ${TRACEBACK_THRESHOLD}    ${TRACEBACK_THRESHOLD}
     Set Suite Variable    ${EVENT_AGE}    ${EVENT_AGE}
     Set Suite Variable    ${EVENT_THRESHOLD}    ${EVENT_THRESHOLD}
     Set Suite Variable    ${CHECK_SERVICE_ENDPOINTS}    ${CHECK_SERVICE_ENDPOINTS}
@@ -117,6 +125,7 @@ Suite Initialization
     Set Suite Variable    ${pods_notready_score}    0
     Set Suite Variable    ${replica_score}    0
     Set Suite Variable    ${events_score}    0
+    Set Suite Variable    ${traceback_score}    0
     
     # Check if deployment is scaled to 0 and handle appropriately
     ${scale_check}=    RW.CLI.Run Cli
@@ -378,6 +387,102 @@ Get Recent Warning Events Score for `${DEPLOYMENT_NAME}`
     
     Set Suite Variable    ${events_score}
     RW.Core.Push Metric    ${events_score}    sub_name=warning_events
+
+Get Recent Tracebacks Score for `${DEPLOYMENT_NAME}`
+    [Documentation]    Checks for recent tracebacks related to the deployment within a short time window, with filtering to reduce noise.
+    [Tags]    tracebacks    errors    recent    fast
+    
+    IF    ${SKIP_HEALTH_CHECKS}
+        # For scaled-down deployments, all sub-metrics are 1 (perfect), so final score should also be 1
+        # We distinguish scaled-down vs broken deployments through the log message and report details
+        ${traceback_score}=    Set Variable    1.0
+        Log    Deployment `${DEPLOYMENT_NAME}` is intentionally scaled to 0 replicas (${SCALED_DOWN_INFO}) - Score: ${traceback_score}
+        RW.Core.Add Pre To Report    Deployment `${DEPLOYMENT_NAME}` is intentionally scaled to 0 replicas (${SCALED_DOWN_INFO}) - Score: ${traceback_score}
+    ELSE
+        # default init of tb-score
+        ${traceback_score}=    Set Variable    1.0
+        ${traceback_count}=    Set Variable    0
+        ${tb_details_temp}=    Set Variable    ${EMPTY}
+
+        # Step-1: Fetch all pods for the deployment
+        ${deployment_pod_names_lines}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -l app=${DEPLOYMENT_NAME} -o name
+        ...    env=${env}
+        ...    secret_file__kubeconfig=${kubeconfig}
+        ...    show_in_rwl_cheatsheet=true
+        ...    render_in_commandlist=true
+        
+        IF    ${deployment_pod_names_lines.returncode} == 0
+            # split lines to get the pods as a list of pod-names
+            ${deployment_pod_names_list}=    Split To Lines    ${deployment_pod_names_lines.stdout}
+            
+            # Step-2: iterate through each pod-name and fetch its logs
+            FOR    ${pod_name}    IN    @{deployment_pod_names_list}
+                # Step-3: Fetch container names of this pod
+                ${pod_container_names_lines}=    RW.CLI.Run Cli
+                ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${pod_name} --context ${CONTEXT} -n ${NAMESPACE} -o jsonpath='{range .spec.containers[*]}{.name}{"\\n"}{end}'
+                ...    env=${env}
+                ...    secret_file__kubeconfig=${kubeconfig}
+                ...    show_in_rwl_cheatsheet=true
+                ...    render_in_commandlist=true
+                
+                IF    ${pod_container_names_lines.returncode} == 0
+                    # split lines to get the list of container names 
+                    ${container_names_list}=    Split To Lines    ${pod_container_names_lines.stdout}
+        
+                    # Step-4: iterate through each container within each pod and fetch its logs
+                    FOR    ${container_name}    IN    @{container_names_list}
+                        TRY
+                            IF    "linkerd" not in '${container_name}'
+                                # Step-5: Fetch raw logs for this pod.container
+                                ${deployment_logs}=    RW.CLI.Run Cli
+                                ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs ${pod_name} --context ${CONTEXT} -n ${NAMESPACE} -c ${container_name} --tail=${MAX_LOG_LINES} --since=${LOG_AGE} --limit-bytes ${MAX_LOG_BYTES}
+                                ...    env=${env}
+                                ...    secret_file__kubeconfig=${kubeconfig}
+                                ...    show_in_rwl_cheatsheet=true
+                                ...    render_in_commandlist=true
+                                
+                                IF    ${deployment_logs.returncode} == 0
+                                    # Step-6: Filter logs to extract tracebacks
+                                    ${deployment_log_lines}=    Split To Lines    ${deployment_logs.stdout}
+                                    
+                                    # fetch the recent-most traceback
+                                    ${recentmost_traceback}=    RW.K8sTraceback.Extract Tracebacks
+                                    ...    deployment_logs=${deployment_log_lines}
+                                    ...    fetch_most_recent=${True}
+
+
+                                    ${traceback_length}=    Get Length    ${recentmost_traceback}
+
+                                    IF    ${traceback_length} != 0
+                                        ${traceback_count}    Evaluate    ${traceback_count} + 1
+                                    END
+                                ELSE
+                                    ${tb_details_temp}=    Catenate    ${tb_details_temp}    Unable to fetch Deployment logs for container `${container_name}` in pod `${pod_name}`
+                                END
+                            END                
+                        EXCEPT
+                            ${tb_details_temp}=    Catenate    ${tb_details_temp}    Exception encoutered for container `${container_name}` in pod `${pod_name}`.
+                        END
+                    END            
+                ELSE
+                    ${tb_details_temp}=    Catenate    ${tb_details_temp}    Error while fetching containers for pod `${pod_name}`
+                END
+            END
+        ELSE
+            ${tb_details_temp}=    Catenate    ${tb_details_temp}   Error while fetching pod-names for DEPLOYMENT `${DEPLOYMENT_NAME}`
+        END
+        
+        ${threshold}=    Convert To Integer    ${TRACEBACK_THRESHOLD}
+        ${traceback_score}=    Evaluate    1 if ${traceback_count} <= ${threshold} else 0
+        
+        # Store details for final score calculation logging
+        Set Suite Variable    ${traceback_details}    ${traceback_count}-Tracebacks (threshold: ${threshold})\n${tb_details_temp}
+        RW.Core.Add Pre To Report    ${traceback_details}
+    END 
+    
+    Set Suite Variable    ${traceback_score}
+    RW.Core.Push Metric    ${traceback_score}    sub_name=traceback_logs
 
 Generate Deployment Health Score for `${DEPLOYMENT_NAME}`
     @{unhealthy_components}=    Create List
