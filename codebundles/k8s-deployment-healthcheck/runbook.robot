@@ -484,13 +484,13 @@ Fetch Deployment Tracebacks for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
 
                                     IF    ${total_tracebacks} == 0
                                         # no tracebacks found for this container in this pod
-                                        RW.Core.Add Pre To Report    **📋 No Tracebacks for Container `${container_name}` in Pod `${pod_name}` for deployment ${DEPLOYMENT_NAME} Found in Last ${LOG_LINES} lines, ${LOG_AGE} age.
+                                        RW.Core.Add Pre To Report    **📋 No Tracebacks for Container `${container_name}` in Pod `${pod_name}` for deployment ${DEPLOYMENT_NAME} Found in Last ${LOG_LINES} lines, ${LOG_AGE} age.**\n**Commands Used:** ${deployment_logs.cmd}\n\n
                                     ELSE
                                         ${agg_tracebacks}=    Evaluate    "-----------------------------------------------------------\\n".join(${tracebacks})
-                                        RW.Core.Add Pre To Report    Traceback Found for Container `${container_name}` in Pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}`:\n${agg_tracebacks}
+                                        RW.Core.Add Pre To Report    Traceback Found for Container `${container_name}` in Pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}`:\n${agg_tracebacks}\n\n
 
                                         RW.Core.Add Issue
-                                        ...    severity=3
+                                        ...    severity=2
                                         ...    expected=No Tracebacks for Container `${container_name}` in Pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}` Found.
                                         ...    actual=Tracebacks are found for Container `${container_name}` in Pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}`
                                         ...    title=Tracebacks detected in Container `${container_name}` in Pod `${pod_name}` for deployment `${DEPLOYMENT_NAME}`
