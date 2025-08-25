@@ -391,16 +391,16 @@ Get Recent Warning Events Score for `${DEPLOYMENT_NAME}`
 Get Recent Tracebacks Score for `${DEPLOYMENT_NAME}`
     [Documentation]    Checks for recent tracebacks related to the deployment within a short time window, with filtering to reduce noise.
     [Tags]    tracebacks    errors    recent    fast
-    
     IF    ${SKIP_HEALTH_CHECKS}
         # For scaled-down deployments, all sub-metrics are 1 (perfect), so final score should also be 1
         # We distinguish scaled-down vs broken deployments through the log message and report details
         ${traceback_score}=    Set Variable    1.0
-        Log    Deployment `${DEPLOYMENT_NAME}` is intentionally scaled to 0 replicas (${SCALED_DOWN_INFO}) - Score: ${traceback_score}
-        RW.Core.Add Pre To Report    Deployment `${DEPLOYMENT_NAME}` is intentionally scaled to 0 replicas (${SCALED_DOWN_INFO}) - Score: ${traceback_score}
+        Set Suite Variable    ${traceback_details}     Deployment `${DEPLOYMENT_NAME}` is intentionally scaled to 0 replicas (${SCALED_DOWN_INFO}) - Score: ${traceback_score}
     ELSE
         # default init of tb-score
         ${traceback_score}=    Set Variable    1.0
+
+        # empty string to store tracebacks/errors-from-commands
         ${tb_details_temp}=    Set Variable    ${EMPTY}
 
         # Step-1: Fetch all pods for the deployment
@@ -485,12 +485,10 @@ Get Recent Tracebacks Score for `${DEPLOYMENT_NAME}`
         ELSE
             ${tb_details_temp}=    Catenate    ${tb_details_temp}   Error while fetching pod-names for DEPLOYMENT `${DEPLOYMENT_NAME}`
         END
-        
-        # Store details for final score calculation logging
-        Set Suite Variable    ${traceback_details}   **Traceback(s) identified**:\n${tb_details_temp}\n\n
-        RW.Core.Add Pre To Report    ${traceback_details}
+        ${traceback_details_header}=    Set Variable If    ${break_outer}    **Traceback(s) identified**:\n    **No Tracebacks identified.**\n\nHere are the command logs:\n
+        Set Suite Variable    ${traceback_details}   ${traceback_details_header}\n${tb_details_temp}\n\n
     END 
-    
+
     Set Suite Variable    ${traceback_score}
     RW.Core.Push Metric    ${traceback_score}    sub_name=traceback_logs
 
@@ -505,8 +503,8 @@ Generate Deployment Health Score for `${DEPLOYMENT_NAME}`
         Log    Deployment ${DEPLOYMENT_NAME} is intentionally scaled to 0 replicas (${SCALED_DOWN_INFO}) - Score: ${health_score}
     ELSE
         # Calculate the normal health score
-        ${active_checks}=    Set Variable    5
-        ${deployment_health_score}=    Evaluate    (${container_restart_score} + ${log_health_score} + ${pods_notready_score} + ${replica_score} + ${events_score}) / ${active_checks}
+        ${active_checks}=    Set Variable    6
+        ${deployment_health_score}=    Evaluate    (${container_restart_score} + ${log_health_score} + ${pods_notready_score} + ${replica_score} + ${events_score} + ${traceback_score}) / ${active_checks}
         ${health_score}=    Convert to Number    ${deployment_health_score}    2
         
         # Create a single line showing unhealthy components
@@ -515,6 +513,7 @@ Generate Deployment Health Score for `${DEPLOYMENT_NAME}`
         IF    ${pods_notready_score} < 1    Append To List    ${unhealthy_components}    Pod Readiness (${pod_readiness_details})
         IF    ${replica_score} < 1    Append To List    ${unhealthy_components}    Replica Status (${replica_details})
         IF    ${events_score} < 1    Append To List    ${unhealthy_components}    Warning Events (${events_details})
+        IF    ${traceback_score} < 1    Append To List    ${unhealthy_components}    Tracebacks (${traceback_details})
         
         ${unhealthy_count}=    Get Length    ${unhealthy_components}
         IF    ${unhealthy_count} > 0

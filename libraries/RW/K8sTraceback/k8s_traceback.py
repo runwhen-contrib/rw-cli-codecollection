@@ -37,17 +37,14 @@ class K8sTraceback:
             list of tracebacks, otherwise
         """
         logger.info(f"Obtained {len(deployment_logs)} lines for traceback extraction.\n")
-        BuiltIn().log_to_console(f"Obtained {len(deployment_logs)} lines for traceback extraction.\n")
-        n_logs = len(deployment_logs)
-        n_dicts, n_non_dicts, n_exceptions = 0, 0, 0
+
         tracebacks: List[str] = []
         if isinstance(deployment_logs, list):
             for dp_log in deployment_logs:
-                if dp_log.startswith('{'):
+                if isinstance(dp_log, str) and dp_log.startswith('{'):
                     try:
                         dp_log_json_obj = json.loads(dp_log)
                         if isinstance(dp_log_json_obj, dict):
-                            n_dicts += 1
                             # log statement is of type {"event": "some message containing data {"exception": "exception message", "stacktrace": "full stacktrace"...}", ...}
                             event_msg = dp_log_json_obj.get("event", "")
                             if event_msg and all(tb_pattern in event_msg for tb_pattern in ["error handling", "with data {"]):
@@ -71,7 +68,6 @@ class K8sTraceback:
                                         # append this as a exception str
                                         # report this to the exception block of tracebacks
                                         logger.error(f"Exception while parsing tb_dict_str: \n{tb_dict_str}\n{tb_dict_parse_excp}")
-                                        BuiltIn().log_to_console(f"Exception while parsing tb_dict_str: \n{tb_dict_str}\n{tb_dict_parse_excp}")
                                         
                                         # TODO: if tracebacks are reported, runner-worker may start to have too many tracebacks leading to a traceback SLI alert.
                                         # logger.error(''.join(traceback.format_exception(type(tb_dict_parse_excp), tb_dict_parse_excp, tb_dict_parse_excp.__traceback__)))
@@ -96,28 +92,31 @@ class K8sTraceback:
                             if curr_log_tracebacks:
                                 tracebacks.extend(curr_log_tracebacks)
                     except Exception as excp:
-                        n_exceptions += 1
-                        BuiltIn().log_to_console(f"\n{''.join(traceback.format_exception(type(excp), excp, excp.__traceback__))}\n")
+                        logger.error(f"Using python fallback as Exception encountered while json-loading `dp_log`: \n{excp}")
+
                         # check if dp_log has traceback patterns and store'em
                         curr_log_tracebacks = self.traceback_extractor.extract_from_string(dp_log)
                         if curr_log_tracebacks:
                             tracebacks.extend(curr_log_tracebacks)
                 else:
-                    n_non_dicts += 1
-                    if 'trace' in dp_log:
-                        BuiltIn().log_to_console(f"\n{'-'*150}\n{dp_log}\n{'-'*150}\n")
-                    # log line not a dictionary, it mostly starts with a timestamp followed by the log line
-                    # check if dp_log has traceback patterns and store'em
-                    curr_log_tracebacks = self.traceback_extractor.extract_from_string(dp_log)
-                    if curr_log_tracebacks:
-                        tracebacks.extend(curr_log_tracebacks)
+                    str_dp_log = str(dp_log)
+                    
+                    if 'trace' in str_dp_log.lower():
+                        # log line not a dictionary, it mostly starts with a timestamp followed by the log line
+                        # check if dp_log has traceback patterns and store'em
+                        curr_log_tracebacks = self.traceback_extractor.extract_from_string(str_dp_log)
+                        if curr_log_tracebacks:
+                            tracebacks.extend(curr_log_tracebacks)
+                        else:
+                            # fallback itself failed, try to find stacktrace or traceback as keywords
+                            if "stacktrace" in dp_log.lower() or "traceback" in dp_log.lower():
+                                tracebacks.extend([dp_log])
         else:
             if isinstance(deployment_logs, str):
                 # check if deployment_logs has traceback patterns and store'em
                 curr_log_tracebacks = self.traceback_extractor.extract_from_string(deployment_logs)
                 if curr_log_tracebacks:
                     tracebacks.extend(curr_log_tracebacks)
-        BuiltIn().log_to_console(f"\nn_logs = {n_logs}, n_dicts = {n_dicts}, n_exceptions = {n_exceptions}, n_non_dicts = {n_non_dicts}\n")
 
         if fetch_most_recent:
             return "" if not tracebacks else tracebacks[-1]
