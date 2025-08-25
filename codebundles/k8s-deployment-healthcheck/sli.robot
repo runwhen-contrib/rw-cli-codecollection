@@ -401,7 +401,6 @@ Get Recent Tracebacks Score for `${DEPLOYMENT_NAME}`
     ELSE
         # default init of tb-score
         ${traceback_score}=    Set Variable    1.0
-        ${traceback_count}=    Set Variable    0
         ${tb_details_temp}=    Set Variable    ${EMPTY}
 
         # Step-1: Fetch all pods for the deployment
@@ -416,6 +415,9 @@ Get Recent Tracebacks Score for `${DEPLOYMENT_NAME}`
             # split lines to get the pods as a list of pod-names
             ${deployment_pod_names_list}=    Split To Lines    ${deployment_pod_names_lines.stdout}
             
+            # set to True if a traceback is found within any valid container of any pod of this deployment ==> fire SLI alert
+            ${break_outer}=    Set Variable    False
+
             # Step-2: iterate through each pod-name and fetch its logs
             FOR    ${pod_name}    IN    @{deployment_pod_names_list}
                 # Step-3: Fetch container names of this pod
@@ -455,7 +457,13 @@ Get Recent Tracebacks Score for `${DEPLOYMENT_NAME}`
                                     ${traceback_length}=    Get Length    ${recentmost_traceback}
 
                                     IF    ${traceback_length} != 0
-                                        ${traceback_count}    Evaluate    ${traceback_count} + 1
+                                        # traceback found                                        
+                                        # fast exit out of both loops to fire an alert now that a traceback has been found
+                                        ${break_outer}=    Set Variable    True
+                                        ${traceback_score}=    Set Variable    0
+                                        ${delimitter}=    Evaluate    '-' * 150
+                                        ${tb_details_temp}=    Catenate    ${tb_details_temp}    ${delimitter}\n${recentmost_traceback}\n${delimitter}
+                                        Exit For Loop
                                     END
                                 ELSE
                                     ${tb_details_temp}=    Catenate    ${tb_details_temp}    Unable to fetch Deployment logs for container `${container_name}` in pod `${pod_name}`
@@ -464,7 +472,12 @@ Get Recent Tracebacks Score for `${DEPLOYMENT_NAME}`
                         EXCEPT
                             ${tb_details_temp}=    Catenate    ${tb_details_temp}    Exception encoutered for container `${container_name}` in pod `${pod_name}`.
                         END
-                    END            
+                    END
+                    
+                    # fast exit since a traceback has been found ==> fire an SLI alert
+                    IF    ${break_outer}
+                        Exit For Loop
+                    END
                 ELSE
                     ${tb_details_temp}=    Catenate    ${tb_details_temp}    Error while fetching containers for pod `${pod_name}`
                 END
@@ -473,11 +486,8 @@ Get Recent Tracebacks Score for `${DEPLOYMENT_NAME}`
             ${tb_details_temp}=    Catenate    ${tb_details_temp}   Error while fetching pod-names for DEPLOYMENT `${DEPLOYMENT_NAME}`
         END
         
-        ${threshold}=    Convert To Integer    ${TRACEBACK_THRESHOLD}
-        ${traceback_score}=    Evaluate    1 if ${traceback_count} <= ${threshold} else 0
-        
         # Store details for final score calculation logging
-        Set Suite Variable    ${traceback_details}    ${traceback_count}-Tracebacks (threshold: ${threshold})\n${tb_details_temp}
+        Set Suite Variable    ${traceback_details}   **Traceback(s) identified**:\n${tb_details_temp}\n\n
         RW.Core.Add Pre To Report    ${traceback_details}
     END 
     
