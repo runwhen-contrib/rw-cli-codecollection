@@ -110,6 +110,12 @@ Suite Initialization
     ...    pattern=\d+
     ...    example=300
     ...    default=300
+    ${IGNORE_CONTAINERS_MATCHING}=    RW.Core.Import User Variable    IGNORE_CONTAINERS_MATCHING
+    ...    type=string
+    ...    description=comma-separated string of keywords used to identify and skip container names containing any of these substrings."
+    ...    pattern=\w*
+    ...    example=linkerd,initX
+    ...    default=linkerd
     ${CONTAINER_RESTART_AGE}=    RW.Core.Import User Variable    CONTAINER_RESTART_AGE
     ...    type=string
     ...    description=The time window (in (h) hours or (m) minutes) to search for container restarts. Only containers that restarted within this time period will be reported.
@@ -141,6 +147,7 @@ Suite Initialization
     Set Suite Variable    ${LOGS_ERROR_PATTERN}
     Set Suite Variable    ${LOGS_EXCLUDE_PATTERN}
     Set Suite Variable    ${LOG_SCAN_TIMEOUT}
+    Set Suite Variable    ${IGNORE_CONTAINERS_MATCHING}
     Set Suite Variable    ${CONTAINER_RESTART_AGE}
     Set Suite Variable    ${CONTAINER_RESTART_THRESHOLD}
     # Construct environment dictionary safely to handle special characters in regex patterns
@@ -454,11 +461,26 @@ Fetch Deployment Tracebacks for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
                     # split lines to get the list of container names 
                     # TODO: Check if init-containers should also be included here. use-case: RW-usecase to identify if pods are crashing 
                     ${container_names_list}=    Split To Lines    ${pod_container_names_lines.stdout}
+                    
+                    # separate the csv argument into a list of patterns to ignore.
+                    ${ignore_container_patterns}=    Split String    ${IGNORE_CONTAINERS_MATCHING}    ,
         
                     # Step-4: iterate through each container within each pod and fetch its logs
                     FOR    ${container_name}    IN    @{container_names_list}
-                        TRY
-                            IF    "linkerd" not in '${container_name}'
+                        
+                        # skip log-fetch for this container if its name is to be ignored
+                        ${skip_container}=    Set Variable    ${False}
+                        
+                        TRY                            
+                            # try matching patterns to the container name to determine if its to be ignored
+                            FOR    ${filter}    IN    @{ignore_container_patterns}
+                                IF    '${filter}' in '${container_name}'
+                                    ${skip_container}=    Set Variable    ${True}
+                                    Exit For Loop
+                                END
+                            END
+
+                            IF    not ${skip_container}
                                 # Step-5: Fetch raw logs for this pod.container
                                 ${deployment_logs}=    RW.CLI.Run Cli
                                 ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs ${pod_name} --context ${CONTEXT} -n ${NAMESPACE} -c ${container_name} --tail=${LOG_LINES} --since=${LOG_AGE} --limit-bytes ${LOG_SIZE}
@@ -498,6 +520,7 @@ Fetch Deployment Tracebacks for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
                                         ...    reproduce_hint=${deployment_logs.cmd}
                                         ...    details=${tracebacks}
                                         ...    next_steps=Inspect container `${container_name}` inside pod `${pod_name}` managed by deployment `${DEPLOYMENT_NAME}`\n
+                                        ...    next_action=analyseTraceback
                                     END
                                 END
                             END                

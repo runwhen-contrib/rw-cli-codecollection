@@ -90,6 +90,12 @@ Suite Initialization
     ...    pattern=.*
     ...    example="errors":\s*\[\]|"warnings":\s*\[\]
     ...    default="errors":\s*\[\]|\\bINFO\\b|\\bDEBUG\\b|\\bTRACE\\b|\\bSTART\\s*-\\s*|\\bSTART\\s*method\\b
+    ${IGNORE_CONTAINERS_MATCHING}=    RW.Core.Import User Variable    IGNORE_CONTAINERS_MATCHING
+    ...    type=string
+    ...    description=comma-separated string of keywords used to identify and skip container names containing any of these substrings."
+    ...    pattern=\w*
+    ...    example=linkerd,initX
+    ...    default=linkerd
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
@@ -107,6 +113,7 @@ Suite Initialization
     Set Suite Variable    ${EVENT_THRESHOLD}    ${EVENT_THRESHOLD}
     Set Suite Variable    ${CHECK_SERVICE_ENDPOINTS}    ${CHECK_SERVICE_ENDPOINTS}
     Set Suite Variable    ${LOGS_EXCLUDE_PATTERN}    ${LOGS_EXCLUDE_PATTERN}
+    Set Suite Variable    ${IGNORE_CONTAINERS_MATCHING}    ${IGNORE_CONTAINERS_MATCHING}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${DEPLOYMENT_NAME}    ${DEPLOYMENT_NAME}
@@ -424,11 +431,26 @@ Get Recent Tracebacks Score for `${DEPLOYMENT_NAME}`
                 IF    ${pod_container_names_lines.returncode} == 0
                     # split lines to get the list of container names 
                     ${container_names_list}=    Split To Lines    ${pod_container_names_lines.stdout}
+
+                    # separate the csv argument into a list of patterns to ignore.
+                    ${ignore_container_patterns}=    Split String    ${IGNORE_CONTAINERS_MATCHING}    ,
         
                     # Step-4: iterate through each container within each pod and fetch its logs
                     FOR    ${container_name}    IN    @{container_names_list}
+                        
+                        # skip log-fetch for this container if its name is to be ignored
+                        ${skip_container}=    Set Variable    ${False}
+
                         TRY
-                            IF    "linkerd" not in '${container_name}'
+                            # try matching patterns to the container name to determine if its to be ignored
+                            FOR    ${filter}    IN    @{ignore_container_patterns}
+                                IF    '${filter}' in '${container_name}'
+                                    ${skip_container}=    Set Variable    ${True}
+                                    Exit For Loop
+                                END
+                            END
+
+                            IF    not ${skip_container}
                                 # Step-5: Fetch raw logs for this pod.container
                                 ${deployment_logs}=    RW.CLI.Run Cli
                                 ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs ${pod_name} --context ${CONTEXT} -n ${NAMESPACE} -c ${container_name} --tail=${MAX_LOG_LINES} --since=${LOG_AGE} --limit-bytes ${MAX_LOG_BYTES}
