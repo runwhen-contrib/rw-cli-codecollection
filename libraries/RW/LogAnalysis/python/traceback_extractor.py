@@ -16,7 +16,7 @@ import re
 from typing import List, Tuple, Optional
 
 
-class TracebackExtractor:
+class TimestampedTracebackExtractor:
     """Extracts Python tracebacks from timestamped log files."""
     
     def __init__(self):

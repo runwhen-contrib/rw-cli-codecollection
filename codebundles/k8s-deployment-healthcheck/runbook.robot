@@ -11,7 +11,7 @@ Library             RW.platform
 Library             RW.NextSteps
 Library             RW.K8sHelper
 Library             RW.K8sLog
-Library             RW.K8sTraceback
+Library             RW.LogAnalysis.ExtractTraceback
 Library             OperatingSystem
 Library             String
 Library             Collections
@@ -440,6 +440,9 @@ Fetch Deployment Tracebacks for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
             # Step-2: iterate through each pod-name and fetch its logs
             FOR    ${pod_name}    IN    @{deployment_pod_names_list}
                 # Step-3: Fetch container names of this pod
+                # TODO: ask if init-containers should also be included.
+                # kubectl get pod <pod-name> -n <namespace> -o jsonpath='{.spec.initContainers[*].name}'
+                # both in one: kubectl get pod <pod-name> -n <namespace> -o jsonpath='{.spec.initContainers[*].name}{" "}{.spec.containers[*].name}'
                 ${pod_container_names_lines}=    RW.CLI.Run Cli
                 ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${pod_name} --context ${CONTEXT} -n ${NAMESPACE} -o jsonpath='{range .spec.containers[*]}{.name}{"\\n"}{end}'
                 ...    env=${env}
@@ -449,6 +452,7 @@ Fetch Deployment Tracebacks for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
                 
                 IF    ${pod_container_names_lines.returncode} == 0
                     # split lines to get the list of container names 
+                    # TODO: Check if init-containers should also be included here. use-case: RW-usecase to identify if pods are crashing 
                     ${container_names_list}=    Split To Lines    ${pod_container_names_lines.stdout}
         
                     # Step-4: iterate through each container within each pod and fetch its logs
@@ -473,11 +477,8 @@ Fetch Deployment Tracebacks for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
                                     ...    details=Log collection failed with exit code ${deployment_logs.returncode}:\n\nSTDOUT:\n${deployment_logs.stdout}\n\nSTDERR:\n${deployment_logs.stderr}
                                     ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck if pod '${pod_name}' exists and is reachable\n
                                 ELSE
-                                    # Step-6: Filter logs to extract tracebacks
-                                    ${deployment_log_lines}=    Split To Lines    ${deployment_logs.stdout}
-                                    
-                                    ${tracebacks}=    RW.K8sTraceback.Extract Tracebacks
-                                    ...    deployment_logs=${deployment_log_lines}
+                                    ${tracebacks}=    RW.LogAnalysis.ExtractTraceback.Extract Tracebacks
+                                    ...    logs=${deployment_logs.stdout}
                                     
                                     # check total no. of tracebacks extracted
                                     ${total_tracebacks}=    Get Length     ${tracebacks}

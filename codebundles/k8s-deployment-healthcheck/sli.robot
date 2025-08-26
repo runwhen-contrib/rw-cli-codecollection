@@ -9,7 +9,7 @@ Library           RW.Core
 Library           RW.CLI
 Library           RW.platform
 Library           RW.K8sLog
-Library           RW.K8sTraceback
+Library           RW.LogAnalysis.ExtractTraceback
 Library           OperatingSystem
 Library           String
 Library           Collections
@@ -66,12 +66,6 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=256000
     ...    default=256000
-    ${TRACEBACK_THRESHOLD}=    RW.Core.Import User Variable    TRACEBACK_THRESHOLD
-    ...    type=string
-    ...    description=The maximum number of traceback occurences allowed before scoring is reduced.
-    ...    pattern=^\d+$
-    ...    example=5
-    ...    default=5
     ${EVENT_AGE}=    RW.Core.Import User Variable    EVENT_AGE
     ...    type=string
     ...    description=The time window to check for recent warning events.
@@ -109,7 +103,6 @@ Suite Initialization
     Set Suite Variable    ${LOG_AGE}    ${LOG_AGE}
     Set Suite Variable    ${MAX_LOG_LINES}    ${MAX_LOG_LINES}
     Set Suite Variable    ${MAX_LOG_BYTES}    ${MAX_LOG_BYTES}
-    Set Suite Variable    ${TRACEBACK_THRESHOLD}    ${TRACEBACK_THRESHOLD}
     Set Suite Variable    ${EVENT_AGE}    ${EVENT_AGE}
     Set Suite Variable    ${EVENT_THRESHOLD}    ${EVENT_THRESHOLD}
     Set Suite Variable    ${CHECK_SERVICE_ENDPOINTS}    ${CHECK_SERVICE_ENDPOINTS}
@@ -444,13 +437,10 @@ Get Recent Tracebacks Score for `${DEPLOYMENT_NAME}`
                                 ...    show_in_rwl_cheatsheet=true
                                 ...    render_in_commandlist=true
                                 
-                                IF    ${deployment_logs.returncode} == 0
-                                    # Step-6: Filter logs to extract tracebacks
-                                    ${deployment_log_lines}=    Split To Lines    ${deployment_logs.stdout}
-                                    
+                                IF    ${deployment_logs.returncode} == 0                                    
                                     # fetch the recent-most traceback
-                                    ${recentmost_traceback}=    RW.K8sTraceback.Extract Tracebacks
-                                    ...    deployment_logs=${deployment_log_lines}
+                                    ${recentmost_traceback}=    RW.LogAnalysis.ExtractTraceback.Extract Tracebacks
+                                    ...    logs=${deployment_logs.stdout}
                                     ...    fetch_most_recent=${True}
 
 
@@ -468,7 +458,7 @@ Get Recent Tracebacks Score for `${DEPLOYMENT_NAME}`
                                 ELSE
                                     ${tb_details_temp}=    Catenate    ${tb_details_temp}    Unable to fetch Deployment logs for container `${container_name}` in pod `${pod_name}`
                                 END
-                            END                
+                            END
                         EXCEPT
                             ${tb_details_temp}=    Catenate    ${tb_details_temp}    Exception encoutered for container `${container_name}` in pod `${pod_name}`.
                         END
