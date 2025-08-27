@@ -24,11 +24,15 @@ Check ACR Reachability for Registry `${ACR_NAME}`
     ...    env=${env}
     ...    timeout_seconds=120
     ...    include_in_history=false
-    ${issues_list}=    RW.CLI.Run Cli
-    ...    cmd=cat reachability_issues.json
-    ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
-    ${score}=    Evaluate    0 if len(@{issues}) > 0 else 1
+    TRY
+        ${issues}=    Evaluate    json.loads(r'''${reachability.stdout}''')    json
+        ${score}=    Evaluate    0 if len(@{issues}) > 0 else 1
+    EXCEPT
+        Log    Failed to parse reachability issues JSON, defaulting to score 0
+        ${score}=    Set Variable    0
+    END
     Set Global Variable    ${reachability_score}    ${score}
+    RW.Core.Push Metric    ${score}    sub_name=reachability
 
 Check ACR Usage SKU Metric for Registry `${ACR_NAME}`
     [Documentation]    Checks the SKU and usage limits for the ACR.
@@ -38,11 +42,15 @@ Check ACR Usage SKU Metric for Registry `${ACR_NAME}`
     ...    env=${env}
     ...    timeout_seconds=120
     ...    include_in_history=false
-    ${issues_list}=    RW.CLI.Run Cli
-    ...    cmd=cat usage_sku_issues.json
-    ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
-    ${score}=    Evaluate    0 if len(@{issues}) > 0 else 1
+    TRY
+        ${issues}=    Evaluate    json.loads(r'''${sku.stdout}''')    json
+        ${score}=    Evaluate    0 if len(@{issues}) > 0 else 1
+    EXCEPT
+        Log    Failed to parse usage SKU issues JSON, defaulting to score 0
+        ${score}=    Set Variable    0
+    END
     Set Global Variable    ${sku_score}    ${score}
+    RW.Core.Push Metric    ${score}    sub_name=sku_usage
 
 Check ACR Pull/Push Success Ratio for Registry `${ACR_NAME}`
     [Documentation]    Checks the success rate of image pull and push operations.
@@ -52,11 +60,15 @@ Check ACR Pull/Push Success Ratio for Registry `${ACR_NAME}`
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
-    ${issues_list}=    RW.CLI.Run Cli
-    ...    cmd=cat pull_push_ratio_issues.json
-    ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
-    ${score}=    Evaluate    0 if len(@{issues}) > 0 else 1
+    TRY
+        ${issues}=    Evaluate    json.loads(r'''${ratio.stdout}''')    json
+        ${score}=    Evaluate    0 if len(@{issues}) > 0 else 1
+    EXCEPT
+        Log    Failed to parse pull/push ratio issues JSON, defaulting to score 0
+        ${score}=    Set Variable    0
+    END
     Set Global Variable    ${pull_push_score}    ${score}
+    RW.Core.Push Metric    ${score}    sub_name=pull_push_ratio
 
 Check ACR Storage Utilization for Registry `${ACR_NAME}`
     [Documentation]    Checks the storage usage of the ACR.
@@ -68,6 +80,146 @@ Check ACR Storage Utilization for Registry `${ACR_NAME}`
     ...    include_in_history=false
     ${issues_list}=    RW.CLI.Run Cli
     ...    cmd=cat storage_utilization_issues.json
-    ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
-    ${score}=    Evaluate    0 if len(@{issues}) > 0 else 1
-    Set Global Variable    ${storage_score}    ${score} 
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    TRY
+        ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
+        ${score}=    Evaluate    0 if len(@{issues}) > 0 else 1
+    EXCEPT
+        Log    Failed to parse storage utilization issues JSON, defaulting to score 0
+        ${score}=    Set Variable    0
+    END
+    Set Global Variable    ${storage_score}    ${score}
+    RW.Core.Push Metric    ${score}    sub_name=storage_utilization
+
+Check ACR Network Configuration for Registry `${ACR_NAME}`
+    [Documentation]    Checks network access rules, private endpoints, and connectivity.
+    [Tags]    ACR    Azure    Network    Health
+    ${network}=    RW.CLI.Run Bash File
+    ...    bash_file=acr_network_config.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${issues_list}=    RW.CLI.Run Cli
+    ...    cmd=cat network_config_issues.json
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    TRY
+        ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
+        ${score}=    Evaluate    0 if len(@{issues}) > 0 else 1
+    EXCEPT
+        Log    Failed to parse network config issues JSON, defaulting to score 0
+        ${score}=    Set Variable    0
+    END
+    Set Global Variable    ${network_score}    ${score}
+    RW.Core.Push Metric    ${score}    sub_name=network_config
+
+Check ACR Resource Health for Registry `${ACR_NAME}`
+    [Documentation]    Checks Azure Resource Health status for the ACR.
+    [Tags]    ACR    Azure    ResourceHealth    Health
+    ${resource_health}=    RW.CLI.Run Bash File
+    ...    bash_file=acr_resource_health.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${issues_list}=    RW.CLI.Run Cli
+    ...    cmd=cat resource_health_issues.json
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    TRY
+        ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
+        ${score}=    Evaluate    0 if len(@{issues}) > 0 else 1
+    EXCEPT
+        Log    Failed to parse resource health issues JSON, defaulting to score 0
+        ${score}=    Set Variable    0
+    END
+    Set Global Variable    ${resource_health_score}    ${score}
+    RW.Core.Push Metric    ${score}    sub_name=resource_health
+
+Generate Comprehensive ACR Health Score for Registry `${ACR_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Aggregates all health check scores into a comprehensive health score.
+    [Tags]    ACR    Azure    Health    Score    SLI
+    
+    # Calculate and push overall health score
+    ${comprehensive_health_score}=    Evaluate    (${reachability_score} + ${sku_score} + ${pull_push_score} + ${storage_score} + ${network_score} + ${resource_health_score}) / 6
+    ${health_score}=    Convert to Number    ${comprehensive_health_score}    2
+    RW.Core.Push Metric    ${health_score}
+
+*** Keywords ***
+Suite Initialization
+    ${AZ_RESOURCE_GROUP}=    RW.Core.Import User Variable    AZ_RESOURCE_GROUP
+    ...    type=string
+    ...    description=The resource group containing the ACR.
+    ...    pattern=\w*
+    ${ACR_NAME}=    RW.Core.Import User Variable    ACR_NAME
+    ...    type=string
+    ...    description=Azure Container Registry Name.
+    ...    pattern=^[a-zA-Z0-9]*$
+    ${ACR_PASSWORD}=    RW.Core.Import Secret    ACR_PASSWORD
+    ...    type=string
+    ...    description=Azure Container Registry password (admin or SP credential).
+    ...    pattern=.*
+    ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_ID
+    ...    type=string
+    ...    description=The Azure Subscription ID.
+    ...    pattern=\w*
+    ${AZURE_SUBSCRIPTION_NAME}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_NAME
+    ...    type=string
+    ...    description=The Azure Subscription Name.
+    ...    pattern=\w*
+    ${LOG_WORKSPACE_ID}=    RW.Core.Import User Variable    LOG_WORKSPACE_ID
+    ...    type=string
+    ...    description=Log Analytics Workspace ID for ACR monitoring.
+    ...    pattern=\w*
+    ...    default=
+    ${USAGE_THRESHOLD}=    RW.Core.Import User Variable    USAGE_THRESHOLD
+    ...    type=string
+    ...    description=Storage usage warning threshold percentage.
+    ...    pattern=\d+
+    ...    default=80
+    ${CRITICAL_THRESHOLD}=    RW.Core.Import User Variable    CRITICAL_THRESHOLD
+    ...    type=string
+    ...    description=Storage usage critical threshold percentage.
+    ...    pattern=\d+
+    ...    default=95
+    ${TIME_PERIOD_HOURS}=    RW.Core.Import User Variable    TIME_PERIOD_HOURS
+    ...    type=string
+    ...    description=Time period in hours for pull/push metrics analysis.
+    ...    pattern=\d+
+    ...    default=24
+    ${PULL_SUCCESS_THRESHOLD}=    RW.Core.Import User Variable    PULL_SUCCESS_THRESHOLD
+    ...    type=string
+    ...    description=Minimum pull success ratio percentage threshold.
+    ...    pattern=\d+
+    ...    default=95
+    ${PUSH_SUCCESS_THRESHOLD}=    RW.Core.Import User Variable    PUSH_SUCCESS_THRESHOLD
+    ...    type=string
+    ...    description=Minimum push success ratio percentage threshold.
+    ...    pattern=\d+
+    ...    default=98
+    Set Suite Variable    ${AZ_RESOURCE_GROUP}
+    Set Suite Variable    ${ACR_NAME}
+    Set Suite Variable    ${ACR_PASSWORD}
+    Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
+    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}
+    Set Suite Variable    ${LOG_WORKSPACE_ID}
+    Set Suite Variable    ${USAGE_THRESHOLD}
+    Set Suite Variable    ${CRITICAL_THRESHOLD}
+    Set Suite Variable    ${TIME_PERIOD_HOURS}
+    Set Suite Variable    ${PULL_SUCCESS_THRESHOLD}
+    Set Suite Variable    ${PUSH_SUCCESS_THRESHOLD}
+    
+    # Initialize all score variables to 0 to prevent undefined variable errors
+    Set Global Variable    ${reachability_score}    0
+    Set Global Variable    ${sku_score}    0
+    Set Global Variable    ${pull_push_score}    0
+    Set Global Variable    ${storage_score}    0
+    Set Global Variable    ${network_score}    0
+    Set Global Variable    ${resource_health_score}    0
+    
+    Set Suite Variable
+    ...    ${env}
+    ...    {"ACR_NAME":"${ACR_NAME}","AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}","ACR_PASSWORD":"${ACR_PASSWORD}","AZURE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}","AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}","LOG_WORKSPACE_ID":"${LOG_WORKSPACE_ID}","USAGE_THRESHOLD":"${USAGE_THRESHOLD}","CRITICAL_THRESHOLD":"${CRITICAL_THRESHOLD}","TIME_PERIOD_HOURS":"${TIME_PERIOD_HOURS}","PULL_SUCCESS_THRESHOLD":"${PULL_SUCCESS_THRESHOLD}","PUSH_SUCCESS_THRESHOLD":"${PUSH_SUCCESS_THRESHOLD}"}

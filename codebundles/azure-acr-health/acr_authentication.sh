@@ -38,9 +38,10 @@ if ! az account show --subscription "$SUBSCRIPTION_ID" >/dev/null 2>&1; then
     "Azure CLI should authenticate successfully" \
     "Azure authentication failed for subscription $SUBSCRIPTION_ID" \
     "SUBSCRIPTION_ID: $SUBSCRIPTION_ID" \
-    "Check Azure credentials and login with 'az login' or set the correct subscription."
-  echo '{"error": "Azure authentication failed"}'
-  exit 1
+    "Check Azure credentials and login with 'az login' or set the correct subscription \`$SUBSCRIPTION_ID\`."
+  echo '{"error": "Azure authentication failed"}' >&2
+  cat "$ISSUES_FILE"
+  exit 0
 fi
 
 az account set --subscription "$SUBSCRIPTION_ID"
@@ -55,7 +56,7 @@ if [ $? -ne 0 ] || [ -z "$acr_info" ]; then
       "User/service principal should have 'AcrRegistryReader' or higher role on the registry" \
       "az acr show failed due to insufficient permissions" \
       "See az_acr_show_err.log for details" \
-      "Assign 'AcrRegistryReader' or higher role to the user/service principal for the registry."
+      "Assign 'AcrRegistryReader' or higher role to the user/service principal for ACR \`$ACR_NAME\` in resource group \`$RESOURCE_GROUP\`."
   else
     add_issue \
       "ACR '$ACR_NAME' (RG: '$RESOURCE_GROUP') is unreachable or not found (Subscription: $SUBSCRIPTION_ID)" \
@@ -63,7 +64,7 @@ if [ $? -ne 0 ] || [ -z "$acr_info" ]; then
       "ACR should be reachable and exist in the specified resource group and subscription" \
       "ACR '$ACR_NAME' is unreachable or not found" \
       "Tried: az acr show --name $ACR_NAME --resource-group $RESOURCE_GROUP --subscription $SUBSCRIPTION_ID" \
-      "Check if the registry exists, is spelled correctly, and is accessible from your network."
+      "Check if ACR \`$ACR_NAME\` exists in resource group \`$RESOURCE_GROUP\`, is spelled correctly, and is accessible from your network."
   fi
   echo '{"status": "unreachable"}'
   exit 0
@@ -79,7 +80,7 @@ if [ $? -ne 0 ] || [ -z "$admin_creds" ]; then
       "User/service principal should have 'AcrRegistryReader' or higher role on the registry" \
       "az acr credential show failed due to insufficient permissions" \
       "See az_acr_cred_err.log for details" \
-      "Assign 'AcrRegistryReader' or higher role to the user/service principal for the registry."
+      "Assign 'AcrRegistryReader' or higher role to the user/service principal for ACR \`$ACR_NAME\` in resource group \`$RESOURCE_GROUP\`."
   else
     add_issue \
       "Failed to retrieve admin credentials for ACR '$ACR_NAME'" \
@@ -87,7 +88,7 @@ if [ $? -ne 0 ] || [ -z "$admin_creds" ]; then
       "Should be able to retrieve admin credentials if admin is enabled" \
       "az acr credential show failed" \
       "Tried: az acr credential show --name $ACR_NAME --resource-group $RESOURCE_GROUP" \
-      "Check if admin user is enabled and you have sufficient permissions."
+      "Check if admin user is enabled for ACR \`$ACR_NAME\` and you have sufficient permissions in resource group \`$RESOURCE_GROUP\`."
   fi
   echo '{"status": "no_admin_creds"}'
   exit 0
@@ -105,7 +106,7 @@ if ! echo "$ACR_PASSWORD" | docker login "$login_server" -u "$admin_username" --
     "Should be able to login to the registry using admin credentials" \
     "docker login failed" \
     "See docker_login.log for details" \
-    "Check if admin user is enabled, credentials are correct, and Docker is running."
+    "Check if admin user is enabled for ACR `$ACR_NAME`, credentials are correct, and Docker is running in resource group `$RESOURCE_GROUP`."
   echo '{"status": "docker_login_failed"}'
   exit 0
 fi
@@ -113,5 +114,8 @@ fi
 # If everything succeeded
 rm -f az_acr_show_err.log az_acr_cred_err.log docker_login.log
 
-echo '{"status": "reachable"}'
-echo '[]' > "$ISSUES_FILE" 
+echo '{"status": "reachable"}' >&2
+echo '[]' > "$ISSUES_FILE"
+
+# Output the JSON file content to stdout for Robot Framework
+cat "$ISSUES_FILE" 

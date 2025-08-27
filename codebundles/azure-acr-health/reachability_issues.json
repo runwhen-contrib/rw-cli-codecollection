@@ -1,0 +1,34 @@
+[
+  {
+    "title": "DNS Resolution Failed",
+    "severity": 1,
+    "expected": "DNS should resolve test.azurecr.io to IP addresses",
+    "actual": "DNS lookup failed with exit code 1",
+    "details": "DNS lookup error: Server:\t\t127.0.0.53\nAddress:\t127.0.0.53#53\n\n** server can't find test.azurecr.io: NXDOMAIN",
+    "next_steps": "Check network connectivity and DNS settings. Verify ACR name `test` is correct and registry exists in resource group `test-rg`"
+  },
+  {
+    "title": "HTTPS Connectivity Failed",
+    "severity": 1,
+    "expected": "HTTPS connection should succeed to test.azurecr.io",
+    "actual": "HTTPS connection failed with exit code 6",
+    "details": "Connection error: HTTP_CODE:000;TOTAL_TIME:0.014084;CONNECT_TIME:0.000000",
+    "next_steps": "Check network connectivity, firewall rules (port 443), and proxy settings. Verify ACR `test` service status in resource group `test-rg`"
+  },
+  {
+    "title": "TLS Certificate Validation Failed",
+    "severity": 2,
+    "expected": "TLS certificate should be valid and trusted",
+    "actual": "Certificate validation failed",
+    "details": "Unable to validate TLS certificate for test.azurecr.io",
+    "next_steps": "Check if ACR `test` is accessible and certificate is properly configured in resource group `test-rg`"
+  },
+  {
+    "title": "Docker Registry API Unreachable",
+    "severity": 2,
+    "expected": "Docker Registry API should be accessible",
+    "actual": "API test failed with exit code 6",
+    "details": "Unable to reach Docker Registry v2 API endpoint",
+    "next_steps": "Check ACR `test` service health and network connectivity to the registry API in resource group `test-rg`"
+  }
+]

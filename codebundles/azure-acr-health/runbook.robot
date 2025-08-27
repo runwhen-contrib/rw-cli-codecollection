@@ -1,8 +1,8 @@
 *** Settings ***
-Documentation       Runs diagnostic checks against Azure Container Registry (ACR), including DNS/TLS, authentication, SKU/usage, storage, pull/push, geo-replication, repository events, and retention health.
+Documentation       Comprehensive health checks for Azure Container Registry (ACR), including network configuration, resource health, authentication, storage utilization, pull/push metrics, and security analysis.
 Metadata            Author    Nbarola
 Metadata            Display Name    Azure ACR Health Check
-Metadata            Supports    Azure    Container Registry    ACR    Health    Push    Pull    Storage
+Metadata            Supports    Azure    Container Registry    ACR    Health    Network    Security    Storage
 
 Library             BuiltIn
 Library             RW.Core
@@ -16,6 +16,73 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
+Check for Resource Health Issues Affecting ACR `${ACR_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Check Azure Resource Health status for the ACR to identify platform-level issues.
+    [Tags]    access:read-only    ACR    Azure    ResourceHealth    Health
+    ${resource_health}=    RW.CLI.Run Bash File
+    ...    bash_file=acr_resource_health.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    RW.Core.Add Pre To Report    ${resource_health.stderr}
+    
+    # Add portal URL for Resource Health
+    ${acr_resource_id}=    RW.CLI.Run Cli
+    ...    cmd=az acr show --name "${ACR_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${resource_health_url}=    Set Variable    https://portal.azure.com/#@/resource${acr_resource_id.stdout.strip()}/resourceHealth
+    RW.Core.Add Pre To Report    🔗 View Resource Health in Azure Portal: ${resource_health_url}
+
+    ${issues}=    Evaluate    json.loads(r'''${resource_health.stdout}''')    json
+    IF    len(@{issues}) > 0
+        FOR    ${issue}    IN    @{issues}
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    title=${issue["title"]}
+            ...    expected=${issue["expected"]}
+            ...    actual=${issue["actual"]}
+            ...    reproduce_hint=${issue.get("reproduce_hint", "")}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["next_steps"]}
+        END
+    END
+
+Check Network Configuration for ACR `${ACR_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Analyze network access rules, private endpoints, firewall settings, and connectivity.
+    [Tags]    access:read-only    ACR    Azure    Network    Security    Connectivity
+    ${network_config}=    RW.CLI.Run Bash File
+    ...    bash_file=acr_network_config.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${network_config.stderr}
+    
+    # Add portal URL for Network configuration
+    ${acr_resource_id_network}=    RW.CLI.Run Cli
+    ...    cmd=az acr show --name "${ACR_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${network_url}=    Set Variable    https://portal.azure.com/#@/resource${acr_resource_id_network.stdout.strip()}/networking
+    RW.Core.Add Pre To Report    🔗 View Network Configuration in Azure Portal: ${network_url}
+
+    ${issues}=    Evaluate    json.loads(r'''${network_config.stdout}''')    json
+    IF    len(@{issues}) > 0
+        FOR    ${issue}    IN    @{issues}
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    title=${issue["title"]}
+            ...    expected=${issue["expected"]}
+            ...    actual=${issue["actual"]}
+            ...    reproduce_hint=${issue.get("reproduce_hint", "")}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["next_steps"]}
+        END
+    END
+
 Check DNS & TLS Reachability for Registry `${ACR_NAME}`
     [Documentation]    Verifies DNS resolution and HTTPS/TLS for ACR endpoint.
     [Tags]    access:read-only    ACR    Azure    DNS    TLS    Connectivity    Health
@@ -24,9 +91,9 @@ Check DNS & TLS Reachability for Registry `${ACR_NAME}`
     ...    env=${env}
     ...    timeout_seconds=60
     ...    include_in_history=false
-    ${issues_list}=    RW.CLI.Run Cli
-    ...    cmd=cat dns_tls_issues.json
-    ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
+    RW.Core.Add Pre To Report    ${dns_tls.stderr}
+    
+    ${issues}=    Evaluate    json.loads(r'''${dns_tls.stdout}''')    json
     IF    len(@{issues}) > 0
         FOR    ${issue}    IN    @{issues}
             RW.Core.Add Issue
@@ -49,9 +116,18 @@ Check ACR Login & Authentication for Registry `${ACR_NAME}`
     ...    secret__ACR_PASSWORD=${ACR_PASSWORD}
     ...    timeout_seconds=90
     ...    include_in_history=false
-    ${issues_list}=    RW.CLI.Run Cli
-    ...    cmd=cat login_issues.json
-    ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
+    RW.Core.Add Pre To Report    ${login.stderr}
+    
+    # Add portal URL for Access Keys
+    ${acr_resource_id_auth}=    RW.CLI.Run Cli
+    ...    cmd=az acr show --name "${ACR_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${auth_url}=    Set Variable    https://portal.azure.com/#@/resource${acr_resource_id_auth.stdout.strip()}/accessKey
+    RW.Core.Add Pre To Report    🔗 View Access Keys in Azure Portal: ${auth_url}
+
+    ${issues}=    Evaluate    json.loads(r'''${login.stdout}''')    json
     IF    len(@{issues}) > 0
         FOR    ${issue}    IN    @{issues}
             RW.Core.Add Issue
@@ -65,17 +141,96 @@ Check ACR Login & Authentication for Registry `${ACR_NAME}`
         END
     END
 
-Check ACR Storage Usage for Registry `${ACR_NAME}`
-    [Documentation]    Checks storage used vs quota using az acr show-usage.
-    [Tags]    access:read-only    ACR    Azure    Storage    Health
-    ${storage}=    RW.CLI.Run Bash File
-    ...    bash_file=acr_storage_usage.sh
+Check ACR SKU and Usage Metrics for Registry `${ACR_NAME}`
+    [Documentation]    Analyzes ACR SKU configuration, usage limits, and provides recommendations.
+    [Tags]    access:read-only    ACR    Azure    SKU    Usage    Health
+    ${sku_usage}=    RW.CLI.Run Bash File
+    ...    bash_file=acr_usage_sku.sh
     ...    env=${env}
-    ...    timeout_seconds=60
+    ...    timeout_seconds=120
     ...    include_in_history=false
-    ${issues_list}=    RW.CLI.Run Cli
-    ...    cmd=cat storage_usage_issues.json
-    ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
+    RW.Core.Add Pre To Report    ${sku_usage.stderr}
+    
+    # Add portal URL for Usage
+    ${acr_resource_id_usage}=    RW.CLI.Run Cli
+    ...    cmd=az acr show --name "${ACR_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${usage_url}=    Set Variable    https://portal.azure.com/#@/resource${acr_resource_id_usage.stdout.strip()}/usage
+    RW.Core.Add Pre To Report    🔗 View Usage in Azure Portal: ${usage_url}
+
+    ${issues}=    Evaluate    json.loads(r'''${sku_usage.stdout}''')    json
+    IF    len(@{issues}) > 0
+        FOR    ${issue}    IN    @{issues}
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    title=${issue["title"]}
+            ...    expected=${issue["expected"]}
+            ...    actual=${issue["actual"]}
+            ...    reproduce_hint=${issue.get("reproduce_hint", "")}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["next_steps"]}
+        END
+    END
+
+Check ACR Storage Utilization for Registry `${ACR_NAME}`
+    [Documentation]    Comprehensive analysis of ACR storage usage, repository sizes, and cleanup recommendations.
+    [Tags]    access:read-only    ACR    Azure    Storage    Utilization    Health
+    ${storage_util}=    RW.CLI.Run Bash File
+    ...    bash_file=acr_storage_utilization.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${storage_util.stderr}
+    
+    # Add portal URLs for Storage management
+    ${acr_resource_id_storage}=    RW.CLI.Run Cli
+    ...    cmd=az acr show --name "${ACR_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${repositories_url}=    Set Variable    https://portal.azure.com/#@/resource${acr_resource_id_storage.stdout.strip()}/repositories
+    ${retention_url}=    Set Variable    https://portal.azure.com/#@/resource${acr_resource_id_storage.stdout.strip()}/retentionPolicies
+    RW.Core.Add Pre To Report    🔗 View Repositories in Azure Portal: ${repositories_url}
+    RW.Core.Add Pre To Report    🔗 Configure Retention Policies: ${retention_url}
+
+    ${issues}=    Evaluate    json.loads(r'''${storage_util.stdout}''')    json
+    IF    len(@{issues}) > 0
+        FOR    ${issue}    IN    @{issues}
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    title=${issue["title"]}
+            ...    expected=${issue["expected"]}
+            ...    actual=${issue["actual"]}
+            ...    reproduce_hint=${issue.get("reproduce_hint", "")}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["next_steps"]}
+        END
+    END
+
+Analyze ACR Pull/Push Success Ratio for Registry `${ACR_NAME}`
+    [Documentation]    Analyzes pull and push operation success rates using Azure Monitor metrics and Log Analytics.
+    [Tags]    access:read-only    ACR    Azure    Pull    Push    Metrics    Health
+    ${pull_push_ratio}=    RW.CLI.Run Bash File
+    ...    bash_file=acr_pull_push_ratio.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    ${pull_push_ratio.stderr}
+    
+    # Add portal URLs for Metrics and Logs
+    ${acr_resource_id_metrics}=    RW.CLI.Run Cli
+    ...    cmd=az acr show --name "${ACR_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${metrics_url}=    Set Variable    https://portal.azure.com/#@/resource${acr_resource_id_metrics.stdout.strip()}/metrics
+    ${logs_url}=    Set Variable    https://portal.azure.com/#@/resource${acr_resource_id_metrics.stdout.strip()}/logs
+    RW.Core.Add Pre To Report    🔗 View Metrics in Azure Portal: ${metrics_url}
+    RW.Core.Add Pre To Report    🔗 View Logs in Azure Portal: ${logs_url}
+
+    ${issues}=    Evaluate    json.loads(r'''${pull_push_ratio.stdout}''')    json
     IF    len(@{issues}) > 0
         FOR    ${issue}    IN    @{issues}
             RW.Core.Add Issue
@@ -98,9 +253,9 @@ Check ACR Repository Event Failures for Registry `${ACR_NAME}`
     ...    env=${env}
     ...    timeout_seconds=90
     ...    include_in_history=false
-    ${issues_list}=    RW.CLI.Run Cli
-    ...    cmd=cat repository_events_issues.json
-    ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
+    RW.Core.Add Pre To Report    ${repo_events.stderr}
+    
+    ${issues}=    Evaluate    json.loads(r'''${repo_events.stdout}''')    json
     IF    len(@{issues}) > 0
         FOR    ${issue}    IN    @{issues}
             RW.Core.Add Issue

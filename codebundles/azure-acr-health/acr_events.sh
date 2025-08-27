@@ -21,12 +21,16 @@ add_issue() {
 }
 
 if [ -z "$LOG_WORKSPACE_ID" ]; then
-  add_issue "Log workspace ID missing" 4 "Log Analytics workspace ID should be set" "LOG_WORKSPACE_ID is not set" "No query run" "Provide LOG_WORKSPACE_ID to query repository events"
-  exit 1
+  add_issue "Log workspace ID missing" 4 "Log Analytics workspace ID should be set" "LOG_WORKSPACE_ID is not set" "No query run" "Provide LOG_WORKSPACE_ID to query repository events for ACR `$ACR_NAME` in resource group `$RESOURCE_GROUP`"
+  cat "$ISSUES_FILE"
+  exit 0
 fi
 
 query_result=$(az monitor log-analytics query --workspace "$LOG_WORKSPACE_ID" --query "ContainerRegistryRepositoryEvents | where ResultType != 0 | summarize count() by ResultType, bin(TimeGenerated, 5m) | top 5 by count_")
 
 if [ $? -ne 0 ]; then
-  add_issue "Failed to query repository events" 4 "Should be able to query repository events" "Command failed" "See CLI errors" "Check permissions and workspace ID"
+  add_issue "Failed to query repository events" 4 "Should be able to query repository events" "Command failed" "See CLI errors" "Check permissions and workspace ID for ACR `$ACR_NAME` in resource group `$RESOURCE_GROUP`"
 fi
+
+# Output the JSON file content to stdout for Robot Framework
+cat "$ISSUES_FILE"

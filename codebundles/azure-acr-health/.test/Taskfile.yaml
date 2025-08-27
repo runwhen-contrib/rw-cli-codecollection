@@ -20,6 +20,65 @@ tasks:
     cmds:
       - task: build-terraform-infra
 
+  cost-calculator:
+    desc: "Show estimated costs for different infrastructure configurations"
+    cmds:
+      - ./cost-calculator.sh
+
+  build-infra-basic:
+    desc: "Build ultra cost-conscious test infrastructure (Basic ACR, ~$16/month)"
+    cmds:
+      - |
+        source terraform/tf.secret
+        export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)
+        export TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
+        export TF_VAR_tenant_id=$AZ_TENANT_ID
+        export TF_VAR_primary_acr_sku=Basic
+        export TF_VAR_log_retention_days=30
+        export TF_VAR_enable_geo_replication=false
+        export TF_VAR_enable_private_endpoint=false
+        cd terraform
+        task format-and-init-terraform
+        echo "Building cost-conscious infrastructure (Basic ACR)..."
+        terraform apply -auto-approve
+        echo "Infrastructure deployed. Estimated monthly cost: ~$16"
+
+  build-infra-standard:
+    desc: "Build balanced test infrastructure (Standard ACR, ~$31/month)"
+    cmds:
+      - |
+        source terraform/tf.secret
+        export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)
+        export TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
+        export TF_VAR_tenant_id=$AZ_TENANT_ID
+        export TF_VAR_primary_acr_sku=Standard
+        export TF_VAR_log_retention_days=30
+        export TF_VAR_enable_geo_replication=false
+        export TF_VAR_enable_private_endpoint=false
+        cd terraform
+        task format-and-init-terraform
+        echo "Building balanced test infrastructure (Standard ACR)..."
+        terraform apply -auto-approve
+        echo "Infrastructure deployed. Estimated monthly cost: ~$31"
+
+  build-infra-premium:
+    desc: "Build full-featured test infrastructure (Premium ACR, ~$218/month)"
+    cmds:
+      - |
+        source terraform/tf.secret
+        export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)
+        export TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
+        export TF_VAR_tenant_id=$AZ_TENANT_ID
+        export TF_VAR_primary_acr_sku=Premium
+        export TF_VAR_log_retention_days=30
+        export TF_VAR_enable_geo_replication=true
+        export TF_VAR_enable_private_endpoint=true
+        cd terraform
+        task format-and-init-terraform
+        echo "Building premium test infrastructure (Premium ACR with all features)..."
+        terraform apply -auto-approve
+        echo "Infrastructure deployed. Estimated monthly cost: ~$218"
+
   check-unpushed-commits:
     desc: Check if outstanding commits or file updates need to be pushed before testing.
     vars:
