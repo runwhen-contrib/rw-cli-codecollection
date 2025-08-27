@@ -61,6 +61,74 @@ Check for Resource Health Issues Affecting Function App `${FUNCTION_APP_NAME}` I
         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
     END
 
+Log Every Function Invocation Result for Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Enhanced logging of every function invocation with detailed success/failure tracking and performance metrics.
+    [Tags]    access:read-only    functionapp    invocation-logging    monitoring    enhanced
+    ${invocation_logging}=    RW.CLI.Run Bash File
+    ...    bash_file=function_invocation_logger.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    RW.Core.Add Pre To Report    ${invocation_logging.stdout}
+    
+    # Check if invocation log data was generated and add to report
+    ${invocation_data_check}=    RW.CLI.Run Cli
+    ...    cmd=if [ -f "invocation_log.json" ]; then echo "Invocation log data available"; jq -r '.issues[0].title // "No title found"' invocation_log.json; jq -r '.issues[0].severity // "No severity found"' invocation_log.json | sed 's/^/Severity: /'; else echo "No invocation log data generated"; fi
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    📊 Invocation Log Summary:
+    RW.Core.Add Pre To Report    ${invocation_data_check.stdout}
+    
+    # Read and process invocation log issues
+    ${invocation_issues}=    RW.CLI.Run Cli
+    ...    cmd=if [ -f "invocation_log.json" ]; then cat invocation_log.json; else echo '{"issues": []}'; fi
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${invocation_issue_list}=    Evaluate    json.loads(r'''${invocation_issues.stdout}''')    json
+    IF    len(@{invocation_issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{invocation_issue_list["issues"]}
+            RW.Core.Add Issue    
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_step"]}
+            ...    expected=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` should have healthy function invocations
+            ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has invocation issues that need attention
+            ...    reproduce_hint=${invocation_logging.cmd}
+            ...    details=${item["details"]}        
+        END
+    END
+    
+    # Add portal URL for Function App monitoring
+    ${function_app_resource_id_monitor}=    RW.CLI.Run Cli
+    ...    cmd=az functionapp show --name "${FUNCTION_APP_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${monitor_url}=    Set Variable    https://portal.azure.com/#@/resource${function_app_resource_id_monitor.stdout.strip()}/monitoring
+    RW.Core.Add Pre To Report    🔗 View Function App Monitoring in Azure Portal: ${monitor_url}
+
+Analyze Function Failure Patterns for Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Enhanced failure pattern analysis with temporal correlation and structured data collection.
+    [Tags]    access:read-only    functionapp    failure-analysis    pattern-analysis    enhanced
+    ${failure_analysis}=    RW.CLI.Run Bash File
+    ...    bash_file=function_failure_analysis.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    RW.Core.Add Pre To Report    ${failure_analysis.stdout}
+    
+    # Check if analysis data was generated and add to report
+    ${analysis_data_check}=    RW.CLI.Run Cli
+    ...    cmd=if [ -f "failure_analysis.json" ]; then echo "Analysis data available"; jq -r '.issues[0].title // "No title found"' failure_analysis.json; jq -r '.issues[0].severity // "No severity found"' failure_analysis.json | sed 's/^/Severity: /'; else echo "No analysis data generated"; fi
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    📊 Failure Analysis Summary:
+    RW.Core.Add Pre To Report    ${analysis_data_check.stdout}
 
 Check Function App `${FUNCTION_APP_NAME}` Health in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks the health status of a appservice workload.
@@ -98,21 +166,21 @@ Check Function App `${FUNCTION_APP_NAME}` Health in Resource Group `${AZ_RESOURC
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
             ...    next_steps=${item["next_step"]}
-            ...    expected=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has is reported healthy
-            ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has health check metric issues
+            ...    expected=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` should have healthy metrics
+            ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has health metric issues
             ...    reproduce_hint=${health_check_metric.cmd}
             ...    details=${item["details"]}        
         END
     END
     
-    # Add portal URL for Health Check configuration
-    ${function_app_resource_id_health}=    RW.CLI.Run Cli
+    # Add portal URL for metrics
+    ${function_app_resource_id_metrics}=    RW.CLI.Run Cli
     ...    cmd=az functionapp show --name "${FUNCTION_APP_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
     ...    env=${env}
     ...    timeout_seconds=30
     ...    include_in_history=false
-    ${health_check_url}=    Set Variable    https://portal.azure.com/#@/resource${function_app_resource_id_health.stdout.strip()}/healthcheck
-    RW.Core.Add Pre To Report    🔗 Configure Health Check in Azure Portal: ${health_check_url}
+    ${metrics_url}=    Set Variable    https://portal.azure.com/#@/resource${function_app_resource_id_metrics.stdout.strip()}/metrics
+    RW.Core.Add Pre To Report    🔗 View Function App Metrics in Azure Portal: ${metrics_url}
 
 Fetch Function App `${FUNCTION_APP_NAME}` Plan Utilization Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Reviews key metrics for the Function App plan and generates a report
@@ -210,17 +278,36 @@ Check Individual Function Invocations Health for Function App `${FUNCTION_APP_NA
     ${functions_url}=    Set Variable    https://portal.azure.com/#@/resource${function_app_resource_id_functions.stdout.strip()}/functions
     RW.Core.Add Pre To Report    🔗 View Functions in Azure Portal: ${functions_url}
 
-Get Function App `${FUNCTION_APP_NAME}` Logs In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Fetch logs of appservice workload
-    [Tags]    appservice    logs    tail    access:read-only
+Get Function App `${FUNCTION_APP_NAME}` Logs and Analyze Errors In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Fetch logs of appservice workload and analyze for errors
+    [Tags]    appservice    logs    analysis    access:read-only
     ${logs}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_logs.sh
     ...    env=${env}
-    ...    timeout_seconds=120
+    ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${logs.stdout}
     
-    # Add portal URL for Logs
+    ${issues}=    RW.CLI.Run Cli    
+    ...    cmd=cat function_app_log_issues_report.json
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            RW.Core.Add Issue    
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_step"]}
+            ...    expected=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no Warning/Error/Critical logs
+            ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has log issues that need attention
+            ...    reproduce_hint=${logs.cmd}
+            ...    details=${item["details"]}        
+        END
+    END
+    
+    # Add portal URL for Log Stream
     ${function_app_resource_id_logs}=    RW.CLI.Run Cli
     ...    cmd=az functionapp show --name "${FUNCTION_APP_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
     ...    env=${env}
@@ -339,41 +426,6 @@ Fetch Function App `${FUNCTION_APP_NAME}` Activities In Resource Group `${AZ_RES
     ...    include_in_history=false
     ${activity_url}=    Set Variable    https://portal.azure.com/#@/resource${function_app_resource_id_activities.stdout.strip()}/activitylog
     RW.Core.Add Pre To Report    🔗 View Activity Log in Azure Portal: ${activity_url}
-
-Check Logs for Errors in Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Gets the events of appservice and checks for errors
-    [Tags]    appservice    logs    errors    access:read-only
-    ${log_errors}=    RW.CLI.Run Bash File
-    ...    bash_file=appservice_log_analysis.sh
-    ...    env=${env}
-    ...    timeout_seconds=120
-    ...    include_in_history=false
-    RW.Core.Add Pre To Report    ${log_errors.stdout}
-
-    ${issues}=    RW.CLI.Run Cli    
-    ...    cmd=cat function_app_log_issues_report.json
-    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    IF    len(@{issue_list["issues"]}) > 0
-        FOR    ${item}    IN    @{issue_list["issues"]}
-            RW.Core.Add Issue    
-            ...    title=${item["title"]}
-            ...    severity=${item["severity"]}
-            ...    next_steps=${item["next_step"]}
-            ...    expected=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no Warning/Error/Critical logs
-            ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has Warning/Error/Critical logs
-            ...    reproduce_hint=${log_errors.cmd}
-            ...    details=${item["details"]}        
-        END
-    END
-    
-    # Add portal URL for Log Stream
-    ${function_app_resource_id_logs}=    RW.CLI.Run Cli
-    ...    cmd=az functionapp show --name "${FUNCTION_APP_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
-    ...    env=${env}
-    ...    timeout_seconds=30
-    ...    include_in_history=false
-    ${log_stream_url}=    Set Variable    https://portal.azure.com/#@/resource${function_app_resource_id_logs.stdout.strip()}/logStream
-    RW.Core.Add Pre To Report    🔗 View Log Stream in Azure Portal: ${log_stream_url}
 
 Fetch Azure Recommendations and Notifications for Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch Azure Advisor recommendations, Service Health notifications, and security assessments for the Function App

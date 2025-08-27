@@ -31,6 +31,7 @@ Check for Node Restarts in Cluster `${CONTEXT}`
 Generate Namespace Score in Kubernetes Cluster `$${CONTEXT}`
     ${cluster_node_score}=    Evaluate    (${event_score} / 1)
     ${health_score}=    Convert to Number    ${cluster_node_score}    2
+    RW.Core.Push Metric    ${health_score}    sub_name=node_health
     RW.Core.Push Metric    ${health_score}
 
 

@@ -78,7 +78,7 @@ Suite Initialization
     ...    description=Comma-separated list of log pattern categories to scan for.
     ...    pattern=.*
     ...    example=GenericError,AppFailure,StackTrace,Connection
-    ...    default=GenericError,AppFailure,StackTrace,Connection,Timeout,Auth,Exceptions,Resource
+    ...    default=GenericError,AppFailure,StackTrace,Connection,Timeout,Auth,Exceptions,Resource,HealthyRecovery
     ${ANOMALY_THRESHOLD}=    RW.Core.Import User Variable    ANOMALY_THRESHOLD
     ...    type=string
     ...    description=The threshold for detecting event anomalies based on events per minute.
@@ -96,7 +96,13 @@ Suite Initialization
     ...    description=Pattern used to exclude entries from log analysis when searching for errors. Use regex patterns to filter out false positives like JSON structures.
     ...    pattern=.*
     ...    example="errors":\s*\[\]|"warnings":\s*\[\]
-    ...    default="errors":\s*\[\]
+    ...    default="errors":\s*\[\]|\\bINFO\\b|\\bDEBUG\\b|\\bTRACE\\b|\\bSTART\\s*-\\s*|\\bSTART\\s*method\\b
+    ${LOG_SCAN_TIMEOUT}=    RW.Core.Import User Variable    LOG_SCAN_TIMEOUT
+    ...    type=string
+    ...    description=Timeout in seconds for log scanning operations. Increase this value if log scanning times out on large log files.
+    ...    pattern=\d+
+    ...    example=300
+    ...    default=300
     ${CONTAINER_RESTART_AGE}=    RW.Core.Import User Variable    CONTAINER_RESTART_AGE
     ...    type=string
     ...    description=The time window (in (h) hours or (m) minutes) to search for container restarts. Only containers that restarted within this time period will be reported.
@@ -126,6 +132,7 @@ Suite Initialization
     Set Suite Variable    ${ANOMALY_THRESHOLD}
     Set Suite Variable    ${LOGS_ERROR_PATTERN}
     Set Suite Variable    ${LOGS_EXCLUDE_PATTERN}
+    Set Suite Variable    ${LOG_SCAN_TIMEOUT}
     Set Suite Variable    ${CONTAINER_RESTART_AGE}
     Set Suite Variable    ${CONTAINER_RESTART_THRESHOLD}
     # Construct environment dictionary safely to handle special characters in regex patterns
@@ -140,6 +147,7 @@ Suite Initialization
     ...    DEPLOYMENT_NAME=${DEPLOYMENT_NAME}
     ...    CONTAINER_RESTART_AGE=${CONTAINER_RESTART_AGE}
     ...    CONTAINER_RESTART_THRESHOLD=${CONTAINER_RESTART_THRESHOLD}
+    ...    LOG_SCAN_TIMEOUT=${LOG_SCAN_TIMEOUT}
     Set Suite Variable    ${env}    ${env_dict}
     
     # Check if deployment is scaled to 0 and handle appropriately
@@ -204,11 +212,12 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
         ...    workload_name=${DEPLOYMENT_NAME}
         ...    namespace=${NAMESPACE}
         ...    categories=@{LOG_PATTERN_CATEGORIES}
+        ...    custom_patterns_file=runbook_patterns.json
         
         # Post-process results to filter out patterns matching LOGS_EXCLUDE_PATTERN
         TRY
             IF    "${LOGS_EXCLUDE_PATTERN}" != ""
-                ${filtered_issues}=    Evaluate    [issue for issue in $scan_results.get('issues', []) if not __import__('re').search(r'${LOGS_EXCLUDE_PATTERN}', issue.get('details', ''), __import__('re').IGNORECASE)]    modules=re
+                ${filtered_issues}=    Evaluate    [issue for issue in $scan_results.get('issues', []) if not __import__('re').search('${LOGS_EXCLUDE_PATTERN}', issue.get('details', ''), __import__('re').IGNORECASE)]    modules=re
                 ${filtered_results}=    Evaluate    {**$scan_results, 'issues': $filtered_issues}
                 Set Test Variable    ${scan_results}    ${filtered_results}
             END
@@ -322,41 +331,6 @@ Detect Log Anomalies for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
                 
             EXCEPT
                 RW.Core.Add Pre To Report    **Log Anomaly Detection:** Completed but results parsing failed
-            END
-        END
-    END
-
-Perform Comprehensive Log Analysis for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
-    [Documentation]    Performs in-depth log analysis including security events, resource warnings, connectivity issues, and application lifecycle problems.
-    [Tags]
-    ...    logs
-    ...    comprehensive
-    ...    security
-    ...    resources
-    ...    connectivity
-    ...    deployment
-    ...    access:read-only
-    # Skip pod-related checks if deployment is scaled to 0
-    IF    not ${SKIP_POD_CHECKS}
-        # Only run comprehensive analysis if depth is set to comprehensive
-        IF    '${LOG_ANALYSIS_DEPTH}' == 'comprehensive'
-            ${comprehensive_results}=    RW.CLI.Run Bash File
-            ...    bash_file=deployment_logs.sh
-            ...    env=${env}
-            ...    secret_file__kubeconfig=${kubeconfig}
-            ...    include_in_history=false
-            
-            IF    ${comprehensive_results.returncode} != 0
-                RW.Core.Add Issue
-                ...    severity=3
-                ...    expected=Comprehensive log analysis should complete successfully for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                ...    actual=Failed to perform comprehensive log analysis for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                ...    title=Comprehensive Log Analysis Failed for Deployment `${DEPLOYMENT_NAME}`
-                ...    reproduce_hint=${comprehensive_results.cmd}
-                ...    details=Comprehensive analysis failed with exit code ${comprehensive_results.returncode}:\n\nSTDOUT:\n${comprehensive_results.stdout}\n\nSTDERR:\n${comprehensive_results.stderr}
-                ...    next_steps=Verify log collection is working properly\nCheck if pods are accessible and generating logs\nReview comprehensive analysis script configuration
-            ELSE
-                RW.Core.Add Pre To Report    **Comprehensive Log Analysis Results for Deployment `${DEPLOYMENT_NAME}`**\n\n${comprehensive_results.stdout}
             END
         END
     END
@@ -636,11 +610,19 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
                                         ${existing_issue}=    Evaluate    $consolidated_issues["${issue_key}"]
                                         ${updated_count}=    Evaluate    $existing_issue.get('count', 1) + 1
                                         ${updated_objects}=    Catenate    ${existing_issue.get('affected_objects', '')}    ${item["kind"]}/${item["name"]},${SPACE}
-                                        ${updated_issue}=    Evaluate    {**$existing_issue, 'count': ${updated_count}, 'affected_objects': "${updated_objects}"}
+                                        # Merge reasons from multiple items
+                                        ${existing_reasons}=    Evaluate    set($existing_issue.get('consolidated_reasons', []))
+                                        ${new_reasons}=    Evaluate    $existing_reasons.union(set($item.get('reasons', [])))
+                                        # Preserve event details for each resource
+                                        ${existing_events}=    Evaluate    $existing_issue.get('event_details', [])
+                                        ${new_event}=    Evaluate    {'resource': "${item["kind"]}/${item["name"]}", 'reasons': $item.get('reasons', []), 'messages': $item.get('messages', []), 'count': $item.get('total_count', 1)}
+                                        ${updated_events}=    Evaluate    $existing_events + [$new_event]
+                                        ${updated_issue}=    Evaluate    {**$existing_issue, 'count': ${updated_count}, 'affected_objects': "${updated_objects}", 'consolidated_reasons': list($new_reasons), 'event_details': $updated_events}
                                         ${updated_dict}=    Evaluate    {**$consolidated_issues, "${issue_key}": $updated_issue}
                                         Set Test Variable    ${consolidated_issues}    ${updated_dict}
                                     ELSE
-                                        ${new_issue}=    Evaluate    {**$issue, 'count': 1, 'affected_objects': "${item["kind"]}/${item["name"]}, "}
+                                        ${new_event}=    Evaluate    {'resource': "${item["kind"]}/${item["name"]}", 'reasons': $item.get('reasons', []), 'messages': $item.get('messages', []), 'count': $item.get('total_count', 1)}
+                                        ${new_issue}=    Evaluate    {**$issue, 'count': 1, 'affected_objects': "${item["kind"]}/${item["name"]}, ", 'consolidated_reasons': $item.get('reasons', []), 'event_details': [$new_event]}
                                         ${updated_dict}=    Evaluate    {**$consolidated_issues, "${issue_key}": $new_issue}
                                         Set Test Variable    ${consolidated_issues}    ${updated_dict}
                                     END
@@ -658,21 +640,66 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
                         ${count}=    Evaluate    $issue.get('count', 1)
                         ${affected_objects}=    Evaluate    $issue.get('affected_objects', '').rstrip(', ')
                         
-                        IF    ${count} > 1
-                            ${title_suffix}=    Set Variable    (${count} objects affected)
-                            ${details_prefix}=    Set Variable    **Affected Objects (${count}):** ${affected_objects}\n\n
+                        # For consolidated issues, create appropriate title based on deployment context
+                        ${base_title}=    Set Variable    ${issue["title"]}
+                        ${consolidated_reasons}=    Evaluate    $issue.get('consolidated_reasons', [])
+                        ${reasons_count}=    Get Length    ${consolidated_reasons}
+                        
+                        # Always focus on the deployment since pod issues are usually deployment config problems
+                        IF    ${reasons_count} > 0 and ${reasons_count} <= 3
+                            ${reasons_str}=    Evaluate    ', '.join($consolidated_reasons)
+                            ${enhanced_title}=    Set Variable    ${base_title} in Deployment `${DEPLOYMENT_NAME}` (${reasons_str})
                         ELSE
-                            ${title_suffix}=    Set Variable    ${EMPTY}
-                            ${details_prefix}=    Set Variable    **Affected Object:** ${affected_objects}\n\n
+                            ${enhanced_title}=    Set Variable    ${base_title} in Deployment `${DEPLOYMENT_NAME}`
+                        END
+                        
+                        # Update details to show pod count rather than individual pod names for clarity
+                        IF    ${count} > 1
+                            # Count pods vs other resource types
+                            ${pod_count}=    Evaluate    len([obj for obj in "${affected_objects}".split(", ") if obj.strip().startswith("Pod/")])
+                            ${other_count}=    Evaluate    ${count} - ${pod_count}
+                            
+                            IF    ${pod_count} > 0 and ${other_count} == 0
+                                ${details_prefix}=    Set Variable    **Issue affects ${pod_count} pods in Deployment `${DEPLOYMENT_NAME}`**\n\n
+                            ELSE IF    ${pod_count} > 0 and ${other_count} > 0
+                                ${details_prefix}=    Set Variable    **Issue affects ${pod_count} pods and ${other_count} other resources in Deployment `${DEPLOYMENT_NAME}`**\n\n
+                            ELSE
+                                ${details_prefix}=    Set Variable    **Affected Resources:** ${affected_objects}\n\n
+                            END
+                        ELSE
+                            ${details_prefix}=    Set Variable    **Affected Resource:** ${affected_objects}\n\n
+                        END
+                        
+                        # Add event details section
+                        ${event_details_list}=    Evaluate    $issue.get('event_details', [])
+                        ${event_details_str}=    Set Variable    **Warning Events:**\n
+                        FOR    ${event_detail}    IN    @{event_details_list}
+                            ${resource}=    Evaluate    $event_detail.get('resource', 'Unknown')
+                            ${event_count}=    Evaluate    $event_detail.get('count', 1)
+                            ${event_messages}=    Evaluate    $event_detail.get('messages', [])
+                            ${event_reasons}=    Evaluate    $event_detail.get('reasons', [])
+                            
+                            ${event_details_str}=    Catenate    ${event_details_str}    • **${resource}** (${event_count} events)\n
+                            ${reasons_str}=    Evaluate    ', '.join($event_reasons)
+                            IF    "${reasons_str}" != ""
+                                ${event_details_str}=    Catenate    ${event_details_str}      **Reasons:** ${reasons_str}\n
+                            END
+                            
+                            # Show up to 3 unique messages per resource
+                            ${unique_messages}=    Evaluate    list(dict.fromkeys($event_messages))[:3]
+                            FOR    ${message}    IN    @{unique_messages}
+                                ${event_details_str}=    Catenate    ${event_details_str}      **Message:** ${message}\n
+                            END
+                            ${event_details_str}=    Catenate    ${event_details_str}    \n
                         END
                         
                         RW.Core.Add Issue
                         ...    severity=${issue["severity"]}
                         ...    expected=No warning events should be present for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                        ...    actual=${issue["title"]} detected for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                        ...    title=${issue["title"]} in Deployment `${DEPLOYMENT_NAME}` ${title_suffix}
+                        ...    actual=${enhanced_title} detected for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                        ...    title=${enhanced_title}
                         ...    reproduce_hint=${events.cmd}
-                        ...    details=${details_prefix}${issue["details"]}
+                        ...    details=${details_prefix}${event_details_str}${issue["details"]}
                         ...    next_steps=${issue["next_steps"]}
                     END
                     
@@ -787,7 +814,7 @@ Check Deployment Replica Status for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
                 ...    severity=2
                 ...    expected=${desired_replicas} ready replicas for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
                 ...    actual=${ready_replicas} ready replicas for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                ...    title=Deployment `${DEPLOYMENT_NAME}` is Missing ${missing_replicas} Ready Replicas
+                ...    title=Deployment `${DEPLOYMENT_NAME}` is Missing Ready Replicas
                 ...    reproduce_hint=${replica_status.cmd}
                 ...    details=Deployment needs ${missing_replicas} more ready replicas to meet desired state of ${desired_replicas}.\n\nStatus: Ready=${ready_replicas}, Available=${available_replicas}, Unavailable=${unavailable_replicas}
                 ...    next_steps=Check pod status and events for scaling issues\nInvestigate resource constraints or scheduling problems\nReview deployment rollout status

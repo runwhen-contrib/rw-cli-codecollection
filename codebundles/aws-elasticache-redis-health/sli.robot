@@ -27,8 +27,10 @@ Scan ElastiCaches in AWS Region `${AWS_REGION}`
     Log    ${process.stdout}
     Log    ${process.stderr}
     IF    ${process.rc} != 0
+        RW.Core.Push Metric    0    sub_name=redis_health
         RW.Core.Push Metric    0
     ELSE
+        RW.Core.Push Metric    1    sub_name=redis_health
         RW.Core.Push Metric    1
     END
 

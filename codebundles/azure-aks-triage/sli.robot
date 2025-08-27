@@ -33,6 +33,7 @@ Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resou
         ${aks_resource_score}=    Set Variable    0
     END
     Set Global Variable    ${aks_resource_score}
+    RW.Core.Push Metric    ${aks_resource_score}    sub_name=resource_health
 
 
 Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
@@ -58,6 +59,7 @@ Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOUR
             END
         END
     END
+    RW.Core.Push Metric    ${aks_activities_score}    sub_name=activities
 
 Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the config of the AKS cluster in azure
@@ -77,6 +79,7 @@ Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     ${aks_config_score}=    Evaluate    1 if len(@{issue_list["issues"]}) == 0 else 0
     Set Global Variable    ${aks_config_score}
+    RW.Core.Push Metric    ${aks_config_score}    sub_name=configuration
 
 Generate AKS Cluster Health Score
     ${aks_cluster_health_score}=      Evaluate  (${aks_resource_score} + ${aks_activities_score} + ${aks_config_score}) / 3

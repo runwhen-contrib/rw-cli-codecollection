@@ -52,14 +52,17 @@ Analyze Application Log Patterns for StatefulSet `${STATEFULSET_NAME}` in Namesp
     FOR    ${issue}    IN    @{issues}
         ${severity}=    Evaluate    $issue.get('severity', ${LOG_SEVERITY_THRESHOLD})
         IF    ${severity} <= ${LOG_SEVERITY_THRESHOLD}
-            ${summarized_details}=    RW.K8sLog.Summarize Log Issues    issue_details=${issue["details"]}
+            # Use the full issue details directly without summarization to preserve all log content
+            ${issue_details_raw}=    Evaluate    $issue.get("details", "")
+            ${issue_details_str}=    Convert To String    ${issue_details_raw}
+            
             RW.Core.Add Issue
             ...    severity=${severity}
             ...    expected=Application logs should be free of critical errors for statefulset `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
             ...    actual=${issue.get('title', 'Log pattern issue detected')} in statefulset `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
             ...    title=${issue.get('title', 'Log Pattern Issue')} in StatefulSet `${STATEFULSET_NAME}`
             ...    reproduce_hint=Check application logs for statefulset `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
-            ...    details=${summarized_details}
+            ...    details=${issue_details_str}
             ...    next_steps=${issue.get('next_steps', 'Review application logs and resolve underlying issues')}
         END
     END
@@ -233,7 +236,7 @@ Inspect StatefulSet Warning Events for `${STATEFULSET_NAME}` in Namespace `${NAM
     [Documentation]    Fetches warning events related to the StatefulSet workload in the namespace and triages any issues found in the events.
     [Tags]    access:read-only  events    workloads    errors    warnings    get    statefulset    ${STATEFULSET_NAME}
     ${events}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '(now - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind == "StatefulSet" or .involvedObject.kind == "Pod" or .involvedObject.kind == "PersistentVolumeClaim") and (.involvedObject.name | tostring | contains("${STATEFULSET_NAME}")) and (.lastTimestamp // empty | if . then fromdateiso8601 else 0 end) >= $time_limit) | {kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp} ] | group_by([.kind, .name]) | map({kind: .[0].kind, name: .[0].name, count: length, reasons: map(.reason) | unique, messages: map(.message) | unique, firstTimestamp: (map(.firstTimestamp // empty | if . then fromdateiso8601 else 0 end) | sort | .[0] | if . > 0 then todateiso8601 else null end), lastTimestamp: (map(.lastTimestamp // empty | if . then fromdateiso8601 else 0 end) | sort | reverse | .[0] | if . > 0 then todateiso8601 else null end)})'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '(now - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind == "StatefulSet" or .involvedObject.kind == "Pod" or .involvedObject.kind == "PersistentVolumeClaim") and (.involvedObject.name | tostring | contains("${STATEFULSET_NAME}")) and (.lastTimestamp // empty | if . then fromdateiso8601 else 0 end) >= $time_limit and .involvedObject.name != null and .involvedObject.name != "" and .involvedObject.name != "Unknown" and .involvedObject.kind != null and .involvedObject.kind != "") | {kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp} ] | group_by([.kind, .name]) | map({kind: .[0].kind, name: .[0].name, count: length, reasons: map(.reason) | unique, messages: map(.message) | unique, firstTimestamp: (map(.firstTimestamp // empty | if . then fromdateiso8601 else 0 end) | sort | .[0] | if . > 0 then todateiso8601 else null end), lastTimestamp: (map(.lastTimestamp // empty | if . then fromdateiso8601 else 0 end) | sort | reverse | .[0] | if . > 0 then todateiso8601 else null end)})'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
@@ -362,7 +365,7 @@ Inspect StatefulSet Warning Events for `${STATEFULSET_NAME}` in Namespace `${NAM
                     ...    severity=${sample_pod_issue["severity"]}
                     ...    expected=Pod readiness and health should be maintained for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
                     ...    actual=${pod_count} pods are experiencing issues for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
-                    ...    title=Multiple Pod Issues for StatefulSet `${STATEFULSET_NAME}` (${pod_count} pods affected)
+                    ...    title=Multiple Pod Issues for StatefulSet `${STATEFULSET_NAME}`
                     ...    reproduce_hint=${events.cmd}
                     ...    details=**Affected Pods:** ${pod_count}\n\n${consolidated_pod_details}
                     ...    next_steps=${sample_pod_issue["next_steps"]}\n${related_resource_recommendations}
@@ -385,7 +388,7 @@ Inspect StatefulSet Warning Events for `${STATEFULSET_NAME}` in Namespace `${NAM
                     ...    severity=${sample_pvc_issue["severity"]}
                     ...    expected=Persistent Volume Claims should be healthy for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
                     ...    actual=${pvc_count} PVCs are experiencing issues for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
-                    ...    title=Persistent Volume Issues for StatefulSet `${STATEFULSET_NAME}` (${pvc_count} PVCs affected)
+                    ...    title=Persistent Volume Issues for StatefulSet `${STATEFULSET_NAME}`
                     ...    reproduce_hint=${events.cmd}
                     ...    details=**Affected PVCs:** ${pvc_count}\n\n${consolidated_pvc_details}
                     ...    next_steps=${sample_pvc_issue["next_steps"]}\nCheck PV status and storage class configuration\n${related_resource_recommendations}

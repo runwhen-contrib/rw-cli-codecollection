@@ -91,6 +91,7 @@ Get Error Event Count within ${EVENT_AGE} and calculate Score
     # Store details for final score calculation logging
     Set Suite Variable    ${event_details}    ${event_count} events (threshold: ${threshold})
     Set Suite Variable    ${event_score}
+    RW.Core.Push Metric    ${event_score}    sub_name=error_events
 
 Get Container Restarts and Score in Namespace `${NAMESPACE}`
     [Documentation]    Counts the total sum of container restarts within a timeframe and determines if they're beyond a threshold.
@@ -115,6 +116,7 @@ Get Container Restarts and Score in Namespace `${NAMESPACE}`
     # Store details for final score calculation logging
     Set Suite Variable    ${container_restart_details}    ${restart_count} restarts (threshold: ${threshold})
     Set Suite Variable    ${container_restart_score}
+    RW.Core.Push Metric    ${container_restart_score}    sub_name=container_restarts
 
 Get NotReady Pods in `${NAMESPACE}`
     [Documentation]    Fetches a count of unready pods.
@@ -131,6 +133,7 @@ Get NotReady Pods in `${NAMESPACE}`
     # Store details for final score calculation logging
     Set Suite Variable    ${pod_readiness_details}    ${unready_count} unready pods
     Set Suite Variable    ${pods_notready_score}
+    RW.Core.Push Metric    ${pods_notready_score}    sub_name=pod_readiness
 
 Generate Namespace Score in `${NAMESPACE}`
     @{unhealthy_components}=    Create List

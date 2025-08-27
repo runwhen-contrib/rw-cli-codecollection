@@ -29,8 +29,10 @@ spec:
   configProvided:
     - name: AZ_RESOURCE_GROUP
       value: {{resource_group.name}}
-    - name: VM_NAME
-      value: {{match_resource.resource.name}}
+    - name: VM_INCLUDE_LIST
+      value: ""
+    - name: VM_OMIT_LIST
+      value: ""
     - name: DISK_THRESHOLD
       value: "85"
     - name: MEMORY_THRESHOLD

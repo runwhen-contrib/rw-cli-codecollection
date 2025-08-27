@@ -32,6 +32,7 @@ Calculate Workflow Success Rate Across Specified Repositories
     ${success_rate}=    Set Variable    ${sli_data.get('success_rate', 1.0)}
     ${workflow_success_score}=    Evaluate    1 if float(${success_rate}) >= float(${MIN_WORKFLOW_SUCCESS_RATE}) else 0
     Set Global Variable    ${workflow_success_score}
+    RW.Core.Push Metric    ${workflow_success_score}    sub_name=workflow_success
 
 Calculate Organization Health Score Across Specified Organizations
     [Documentation]    Calculates overall organization health score across all specified organizations
@@ -51,6 +52,7 @@ Calculate Organization Health Score Across Specified Organizations
     ${org_health_score}=    Set Variable    ${org_data.get('health_score', 1.0)}
     ${org_health_score_normalized}=    Evaluate    1 if float(${org_health_score}) >= float(${MIN_ORG_HEALTH_SCORE}) else 0
     Set Global Variable    ${org_health_score_normalized}
+    RW.Core.Push Metric    ${org_health_score_normalized}    sub_name=org_health
 
 Calculate Runner Availability Score Across Specified Organizations
     [Documentation]    Calculates the availability score of GitHub Actions runners across the specified organizations
@@ -70,6 +72,7 @@ Calculate Runner Availability Score Across Specified Organizations
     ${availability_score}=    Set Variable    ${runner_data.get('availability_score', 1.0)}
     ${runner_availability_score}=    Evaluate    1 if float(${availability_score}) >= float(${MIN_RUNNER_AVAILABILITY}) else 0
     Set Global Variable    ${runner_availability_score}
+    RW.Core.Push Metric    ${runner_availability_score}    sub_name=runner_availability
 
 Calculate Security Workflow Score Across Specified Repositories
     [Documentation]    Calculates security workflow health score including vulnerability scanning across the specified repositories
@@ -90,6 +93,7 @@ Calculate Security Workflow Score Across Specified Repositories
     ${critical_vulnerabilities}=    Set Variable    ${security_data.get('critical_vulnerabilities', 0)}
     ${security_workflow_score}=    Evaluate    1 if float(${security_score}) >= float(${MIN_SECURITY_SCORE}) and int(${critical_vulnerabilities}) == 0 else 0
     Set Global Variable    ${security_workflow_score}
+    RW.Core.Push Metric    ${security_workflow_score}    sub_name=security_workflows
 
 Calculate Performance Score Across Specified Repositories
     [Documentation]    Calculates workflow performance score based on execution times across the specified repositories
@@ -110,6 +114,7 @@ Calculate Performance Score Across Specified Repositories
     ${long_running_count}=    Set Variable    ${performance_data.get('long_running_count', 0)}
     ${workflow_performance_score}=    Evaluate    1 if float(${performance_score}) >= float(${MIN_PERFORMANCE_SCORE}) and int(${long_running_count}) <= int(${MAX_LONG_RUNNING_WORKFLOWS}) else 0
     Set Global Variable    ${workflow_performance_score}
+    RW.Core.Push Metric    ${workflow_performance_score}    sub_name=workflow_performance
 
 Calculate API Rate Limit Health Score
     [Documentation]    Calculates GitHub API rate limit utilization health score
@@ -129,6 +134,7 @@ Calculate API Rate Limit Health Score
     ${usage_percentage}=    Set Variable    ${rate_data.get('usage_percentage', 0)}
     ${rate_limit_score}=    Evaluate    1 if float(${usage_percentage}) <= float(${MAX_RATE_LIMIT_USAGE}) else 0
     Set Global Variable    ${rate_limit_score}
+    RW.Core.Push Metric    ${rate_limit_score}    sub_name=api_rate_limit
 
 Generate Overall GitHub Actions Health Score
     [Documentation]    Generates a composite health score from all measured indicators

@@ -69,6 +69,7 @@ Identify GKE Service Account Issues in GCP Project `${GCP_PROJECT_ID}`
             END
         END
     END
+    RW.Core.Push Metric    ${gke_sa_score}    sub_name=service_accounts
 
 Fetch GKE Recommendations for GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Fetch and summarize GCP Recommendations for GKE Clusters
@@ -95,6 +96,7 @@ Fetch GKE Recommendations for GCP Project `${GCP_PROJECT_ID}`
             END
         END
     END
+    RW.Core.Push Metric    ${gke_recommendations_score}    sub_name=recommendations
 
 Fetch GKE Cluster Health for GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Using kubectl, fetch overall basic health of the cluster by checking unhealth pods and overutilized nodes. Useful when stackdriver is not available. Requires iam permissions to fetch cluster credentials with viewer rights. 
@@ -121,7 +123,7 @@ Fetch GKE Cluster Health for GCP Project `${GCP_PROJECT_ID}`
             END
         END
     END
-
+    RW.Core.Push Metric    ${gke_cluster_health_score}    sub_name=cluster_health
 
 Check for Quota Related GKE Autoscaling Issues in GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Ensure that GKE Autoscaling will not be blocked by Quota constraints
@@ -148,6 +150,7 @@ Check for Quota Related GKE Autoscaling Issues in GCP Project `${GCP_PROJECT_ID}
             END
         END
     END    
+    RW.Core.Push Metric    ${gke_quota_score}    sub_name=quota_limits
 
 Quick Node Instance Group Health Check for GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Fast detection of critical node instance group health issues like quota exhaustion and provisioning failures
@@ -174,6 +177,7 @@ Quick Node Instance Group Health Check for GCP Project `${GCP_PROJECT_ID}`
             END
         END
     END
+    RW.Core.Push Metric    ${gke_node_instance_score}    sub_name=node_instances
 
 Generate GKE Cluster Health Score
     ${gke_total_health_score}=      Evaluate  (${gke_sa_score} + ${gke_recommendations_score} + ${gke_cluster_health_score} +${gke_quota_score} + ${gke_node_instance_score}) / 5

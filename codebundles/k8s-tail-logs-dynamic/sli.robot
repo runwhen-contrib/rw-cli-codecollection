@@ -33,6 +33,7 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
     ...    parser_name=${STACKTRACE_PARSER}
     ...    parse_mode=${INPUT_MODE}
    ${count}=    Evaluate    len($parsed_stacktraces)
+    RW.Core.Push Metric    ${count}    sub_name=log_analysis
     RW.Core.Push Metric    ${count}
 
 

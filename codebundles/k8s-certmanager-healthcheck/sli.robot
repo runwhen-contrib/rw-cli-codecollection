@@ -32,6 +32,7 @@ Count Unready and Expired Certificates in Namespace `${NAMESPACE}`
     ${unready_count}=    Convert To Number    ${unready_certs.stdout}
 
     ${metric}=    Evaluate    ${expired_count} + ${unready_count}
+    RW.Core.Push Metric    ${metric}    sub_name=cert_manager_health
     RW.Core.Push Metric    ${metric}
 
 

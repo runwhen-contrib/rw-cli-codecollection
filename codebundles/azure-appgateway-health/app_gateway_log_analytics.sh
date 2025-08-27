@@ -103,6 +103,31 @@ fi
 echo "Using Log Analytics workspace GUID: $WORKSPACE_GUID"
 
 # ------------------------------------------------------------------
+# Test query to verify workspace accessibility and response structure
+# ------------------------------------------------------------------
+echo "Testing Log Analytics workspace connectivity..."
+TEST_QUERY="AzureDiagnostics | where TimeGenerated >= ago(1h) | take 1"
+test_result=$(run_query "$TEST_QUERY" "json")
+echo "DEBUG: Test query response structure:"
+echo "$test_result" | jq '.' 2>/dev/null || echo "Invalid JSON response from test query"
+
+# Check available fields in ApplicationGatewayAccessLog
+echo "Checking available fields in ApplicationGatewayAccessLog..."
+FIELDS_QUERY="AzureDiagnostics | where Category == 'ApplicationGatewayAccessLog' | where TimeGenerated >= ago(1h) | getschema"
+fields_result=$(run_query "$FIELDS_QUERY" "json")
+echo "DEBUG: Available fields in ApplicationGatewayAccessLog:"
+echo "$fields_result" | jq '.' 2>/dev/null || echo "Could not retrieve field schema"
+
+# Check what ResourceIds are present in ApplicationGatewayAccessLog
+echo "Checking ResourceIds in ApplicationGatewayAccessLog..."
+RESOURCE_IDS_QUERY="AzureDiagnostics | where Category == 'ApplicationGatewayAccessLog' | where TimeGenerated >= ago(1h) | distinct ResourceId"
+resource_ids_result=$(run_query "$RESOURCE_IDS_QUERY" "json")
+echo "DEBUG: ResourceIds in ApplicationGatewayAccessLog:"
+echo "$resource_ids_result" | jq '.' 2>/dev/null || echo "Could not retrieve ResourceIds"
+
+echo "DEBUG: Expected ResourceId: $AGW_RESOURCE_ID"
+
+# ------------------------------------------------------------------
 # Define Kusto queries, filtering by ResourceId == "$AGW_RESOURCE_ID"
 # ------------------------------------------------------------------
 REQ_COUNT_QUERY=$(cat <<EOF
@@ -119,7 +144,7 @@ AzureDiagnostics
 | where Category == "ApplicationGatewayAccessLog"
 | where ResourceId == "$AGW_RESOURCE_ID"
 | where TimeGenerated >= ago(1h)
-| where sslEnabled_s == "off"
+| where isnotempty(sslEnabled_s) and sslEnabled_s == "off"
 | summarize NonSSLRequests = count()
 EOF
 )
@@ -129,7 +154,7 @@ AzureDiagnostics
 | where Category == "ApplicationGatewayAccessLog"
 | where ResourceId == "$AGW_RESOURCE_ID"
 | where TimeGenerated >= ago(1h)
-| where toint(httpStatus_d) >= 400
+| where isnotempty(httpStatus_d) and toint(httpStatus_d) >= 400
 | summarize FailedRequests = count()
 EOF
 )
@@ -139,7 +164,8 @@ AzureDiagnostics
 | where Category == "ApplicationGatewayAccessLog"
 | where ResourceId == "$AGW_RESOURCE_ID"
 | where TimeGenerated >= ago(1h)
-| where toint(httpStatus_d) >= 400
+| where isnotempty(httpStatus_d) and toint(httpStatus_d) >= 400
+| where isnotempty(userAgent_s)
 | summarize ErrorCount = count() by userAgent_s
 | order by ErrorCount desc
 EOF
@@ -150,9 +176,37 @@ AzureDiagnostics
 | where Category == "ApplicationGatewayAccessLog"
 | where ResourceId == "$AGW_RESOURCE_ID"
 | where TimeGenerated >= ago(1h)
-| where toint(httpStatus_d) >= 400
+| where isnotempty(httpStatus_d) and toint(httpStatus_d) >= 400
+| where isnotempty(requestUri_s)
 | summarize ErrorCount = count() by requestUri_s
 | order by ErrorCount desc
+EOF
+)
+
+# Fallback queries without ResourceId filtering (in case ResourceId doesn't match)
+REQ_COUNT_FALLBACK_QUERY=$(cat <<EOF
+AzureDiagnostics
+| where Category == "ApplicationGatewayAccessLog"
+| where TimeGenerated >= ago(1h)
+| summarize TotalRequests = count()
+EOF
+)
+
+NON_SSL_FALLBACK_QUERY=$(cat <<EOF
+AzureDiagnostics
+| where Category == "ApplicationGatewayAccessLog"
+| where TimeGenerated >= ago(1h)
+| where isnotempty(sslEnabled_s) and sslEnabled_s == "off"
+| summarize NonSSLRequests = count()
+EOF
+)
+
+FAILED_FALLBACK_QUERY=$(cat <<EOF
+AzureDiagnostics
+| where Category == "ApplicationGatewayAccessLog"
+| where TimeGenerated >= ago(1h)
+| where isnotempty(httpStatus_d) and toint(httpStatus_d) >= 400
+| summarize FailedRequests = count()
 EOF
 )
 
@@ -161,18 +215,44 @@ function run_query() {
   local query="$1"
   local output_format="${2:-tsv}"   # 'tsv' or 'json'
   local result
+  local error_output
 
+  # Capture both stdout and stderr
   if ! result=$(az monitor log-analytics query \
       --workspace "$WORKSPACE_GUID" \
       --analytics-query "$query" \
-      -o "$output_format" 2>/dev/null); then
-    # If there's an error or no data, return empty
+      -o "$output_format" 2>&1); then
+    # If there's an error, log it and return empty
+    echo "DEBUG: Query failed with error: $result" >&2
     if [ "$output_format" == "json" ]; then
-      echo "{}"
+      echo '{"tables":[]}'
     else
       echo "0"
     fi
     return
+  fi
+
+  # For JSON output, ensure we have a valid structure
+  if [ "$output_format" == "json" ]; then
+    # Check if result is empty or invalid JSON
+    if [ -z "$result" ] || ! echo "$result" | jq '.' >/dev/null 2>&1; then
+      echo "DEBUG: Invalid or empty JSON result: $result" >&2
+      echo '{"tables":[]}'
+      return
+    fi
+    
+    # If result doesn't have tables structure, wrap it
+    if ! echo "$result" | jq -e '.tables' >/dev/null 2>&1; then
+      # Try to create a proper structure
+      if echo "$result" | jq -e '.rows' >/dev/null 2>&1; then
+        # If it has rows directly, wrap it in tables structure
+        echo "$result" | jq '{"tables": [{"rows": .rows}]}'
+      else
+        echo "DEBUG: Unexpected JSON structure: $result" >&2
+        echo '{"tables":[]}'
+      fi
+      return
+    fi
   fi
 
   echo "$result"
@@ -185,20 +265,45 @@ echo "Querying total requests in last hour..."
 requests_last_hour=$(run_query "$REQ_COUNT_QUERY" "tsv")
 requests_last_hour="${requests_last_hour:-0}"
 
+# If no results with ResourceId filter, try without it
+if [ "$requests_last_hour" == "0" ]; then
+  echo "No results with ResourceId filter, trying fallback query..."
+  requests_last_hour=$(run_query "$REQ_COUNT_FALLBACK_QUERY" "tsv")
+  requests_last_hour="${requests_last_hour:-0}"
+fi
+
 echo "Querying non-SSL requests in last hour..."
 non_ssl_requests_last_hour=$(run_query "$NON_SSL_QUERY" "tsv")
 non_ssl_requests_last_hour="${non_ssl_requests_last_hour:-0}"
+
+# If no results with ResourceId filter, try without it
+if [ "$non_ssl_requests_last_hour" == "0" ]; then
+  echo "No non-SSL results with ResourceId filter, trying fallback query..."
+  non_ssl_requests_last_hour=$(run_query "$NON_SSL_FALLBACK_QUERY" "tsv")
+  non_ssl_requests_last_hour="${non_ssl_requests_last_hour:-0}"
+fi
 
 echo "Querying failed requests in last hour..."
 failed_requests_last_hour=$(run_query "$FAILED_QUERY" "tsv")
 failed_requests_last_hour="${failed_requests_last_hour:-0}"
 
+# If no results with ResourceId filter, try without it
+if [ "$failed_requests_last_hour" == "0" ]; then
+  echo "No failed request results with ResourceId filter, trying fallback query..."
+  failed_requests_last_hour=$(run_query "$FAILED_FALLBACK_QUERY" "tsv")
+  failed_requests_last_hour="${failed_requests_last_hour:-0}"
+fi
+
 echo "Querying errors by user agent..."
 errors_by_user_agent_raw=$(run_query "$ERRORS_BY_UA_QUERY" "json")
 
+# Debug: Show the raw response structure
+echo "DEBUG: Raw errors_by_user_agent response structure:"
+echo "$errors_by_user_agent_raw" | jq '.' 2>/dev/null || echo "Invalid JSON response"
+
 errors_by_user_agent=$(
   echo "$errors_by_user_agent_raw" | jq -r '
-    if .tables[0].rows then
+    if .tables and (.tables | length) > 0 and .tables[0].rows then
       .tables[0].rows
       | map({ userAgent: .[0], count: (.[1] | tonumber) })
     else
@@ -210,9 +315,13 @@ errors_by_user_agent=$(
 echo "Querying errors by request URI..."
 errors_by_uri_raw=$(run_query "$ERRORS_BY_URI_QUERY" "json")
 
+# Debug: Show the raw response structure
+echo "DEBUG: Raw errors_by_uri response structure:"
+echo "$errors_by_uri_raw" | jq '.' 2>/dev/null || echo "Invalid JSON response"
+
 errors_by_uri=$(
   echo "$errors_by_uri_raw" | jq -r '
-    if .tables[0].rows then
+    if .tables and (.tables | length) > 0 and .tables[0].rows then
       .tables[0].rows
       | map({ uri: .[0], count: (.[1] | tonumber) })
     else
@@ -224,6 +333,17 @@ errors_by_uri=$(
 # ------------------------------------------------------------------
 # Build Final JSON
 # ------------------------------------------------------------------
+echo "Building final JSON output..."
+
+# Ensure we have valid JSON arrays for the error collections
+if [ -z "$errors_by_user_agent" ] || ! echo "$errors_by_user_agent" | jq '.' >/dev/null 2>&1; then
+  errors_by_user_agent="[]"
+fi
+
+if [ -z "$errors_by_uri" ] || ! echo "$errors_by_uri" | jq '.' >/dev/null 2>&1; then
+  errors_by_uri="[]"
+fi
+
 final_json=$(
   jq -n \
     --argjson requestsLastHour       "${requests_last_hour:-0}" \
@@ -239,13 +359,37 @@ final_json=$(
       "errorsByUserAgent":       $errorsByUserAgent,
       "errorsByUri":             $errorsByUri
     }
-    '
+    ' 2>/dev/null || echo '{
+      "requestsLastHour": 0,
+      "nonSslRequestsLastHour": 0,
+      "failedRequestsLastHour": 0,
+      "errorsByUserAgent": [],
+      "errorsByUri": []
+    }'
 )
 
 # Print and save
 echo "-------------------------------------------------"
 echo "Application Gateway Log-Based Metrics (Last Hour)"
-echo "$final_json" | jq .
+if echo "$final_json" | jq '.' >/dev/null 2>&1; then
+  echo "$final_json" | jq .
+else
+  echo "ERROR: Invalid JSON output generated. Using fallback structure."
+  echo '{
+    "requestsLastHour": 0,
+    "nonSslRequestsLastHour": 0,
+    "failedRequestsLastHour": 0,
+    "errorsByUserAgent": [],
+    "errorsByUri": []
+  }' | jq .
+  final_json='{
+    "requestsLastHour": 0,
+    "nonSslRequestsLastHour": 0,
+    "failedRequestsLastHour": 0,
+    "errorsByUserAgent": [],
+    "errorsByUri": []
+  }'
+fi
 echo "-------------------------------------------------"
 echo "$final_json" > "$OUTPUT_FILE"
 echo "Metrics have been saved to: $OUTPUT_FILE."

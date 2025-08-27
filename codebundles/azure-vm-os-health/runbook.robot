@@ -44,6 +44,41 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     ${disk_usg_out}=    Evaluate    json.loads(r'''${disk_usage.stdout}''')    json
     ${vm_names}=    Get Dictionary Keys    ${disk_usg_out}
     ${summary}=    Set Variable    Disk Utilization Results:\n
+
+    # Initialize detailed report at the beginning
+    ${detailed_report}=    Set Variable    ===== DISK UTILIZATION CHECK DETAILED REPORT =====\n
+    ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Resource Group: ${AZ_RESOURCE_GROUP}
+    ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Subscription: ${AZURE_SUBSCRIPTION_NAME} (${AZURE_RESOURCE_SUBSCRIPTION_ID})
+    ${current_time}=    Get Time
+    ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Check Timestamp: ${current_time}
+    ${vm_count}=    Get Length    ${vm_names}
+    ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Total VMs Scanned: ${vm_count}
+    ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Disk Usage Threshold: ${DISK_THRESHOLD}%
+    ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Parallel Jobs: ${MAX_PARALLEL_JOBS}
+    ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Timeout: ${TIMEOUT_SECONDS} seconds
+    ${vm_include_display}=    Set Variable If    "${VM_INCLUDE_LIST}" == ""    All VMs    ${VM_INCLUDE_LIST}
+    ${vm_omit_display}=    Set Variable If    "${VM_OMIT_LIST}" == ""    None    ${VM_OMIT_LIST}
+    ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    VM Include List: ${vm_include_display}
+    ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    VM Omit List: ${vm_omit_display}
+    ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    \n===== VMs IN RESOURCE GROUP =====\n
+
+    # List all VMs and their status
+    FOR    ${vm_name}    IN    @{vm_names}
+        ${vm_data}=    Get From Dictionary    ${disk_usg_out}    ${vm_name}
+        ${status}=    Get From Dictionary    ${vm_data}    status
+        ${code}=    Get From Dictionary    ${vm_data}    code
+        
+        IF    "${code}" in ["WindowsVM", "NotIncluded", "Omitted"]
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    ⏭️ ${vm_name} - SKIPPED (${code})
+        ELSE IF    "${code}" in ["ConnectionError", "CommandTimeout", "InvalidResponse", "VMNotRunning"]
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    ❌ ${vm_name} - FAILED (${code})
+        ELSE
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    ✅ ${vm_name} - PROCESSED (${status})
+        END
+    END
+
+    ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    \n===== INDIVIDUAL VM RESULTS =====\n
+
     FOR    ${vm_name}    IN    @{vm_names}
         ${vm_data}=    Get From Dictionary    ${disk_usg_out}    ${vm_name}
         ${stdout}=    Get From Dictionary    ${vm_data}    stdout
@@ -70,6 +105,36 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                 ...    reproduce_hint=Run vm_disk_utilization.sh or check VM status
                 ...    details=${vm_data}
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - ${stderr}
+            
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    \n--- VM: ${vm_name} ---
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Status: ${status}
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Code: ${code}
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Result: ❌ FAILED - ${stderr}
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Issue: VM is not accessible or not running
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Action Required: Check VM status and connectivity
+        ELSE IF    "${code}" in ["WindowsVM", "NotIncluded", "Omitted"]
+            ${issue_title}=    Set Variable If    "${code}" == "WindowsVM"    
+            ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) is a Windows VM and was skipped (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+            ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) was filtered out by VM filtering rules (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+            ${next_steps}=    Set Variable If    "${code}" == "WindowsVM"
+            ...    No action required - Windows VMs are not supported by Linux health checks
+            ...    Review VM_INCLUDE_LIST and VM_OMIT_LIST configuration if this VM should be included
+            
+            RW.Core.Add Issue    
+                ...    title=${issue_title}
+                ...    severity=4
+                ...    next_steps=${next_steps}
+                ...    expected=VM filtering working as configured
+                ...    actual=${stderr}
+                ...    reproduce_hint=Run vm_disk_utilization.sh or check VM filtering configuration
+                ...    details=${vm_data}
+            
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    \n--- VM: ${vm_name} ---
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Status: ${status}
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Code: ${code}
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Result: ⏭️ SKIPPED - ${stderr}
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Reason: VM was filtered out based on criteria
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Action Required: None - this is expected behavior
         ELSE IF    "${stderr}" != ""
             RW.Core.Add Issue    
                 ...    title=Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) has disk check errors (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
@@ -80,6 +145,13 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                 ...    reproduce_hint=Run vm_disk_utilization.sh
                 ...    details=${vm_data}
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - Error: ${stderr}
+            
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    \n--- VM: ${vm_name} ---
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Status: ${status}
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Code: ${code}
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Result: ⚠️ WARNING - ${stderr}
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Issue: Disk check completed with errors
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Action Required: Investigate the reported error
         ELSE
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status})\n${stdout}
             # Write stdout to temp file for next steps analysis
@@ -110,9 +182,26 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                     ...    details=${issue['details']}
                 END
             END
+            
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    \n--- VM: ${vm_name} ---
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Status: ${status}
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Code: ${code}
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Result: ✅ SUCCESS
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Disk Information:
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    ${stdout}
+            ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Analysis: Disk utilization check completed successfully
         END
     END
     RW.Core.Add Pre To Report    ${summary}
+
+    ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    \n===== SUMMARY =====
+    ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    This check examined disk utilization across all Linux VMs in the resource group.
+    ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Windows VMs were automatically filtered out as they are not supported by this check.
+    ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    The check looks for disk usage above ${DISK_THRESHOLD}% which may indicate storage issues.
+    ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Any VMs with connection issues or errors are reported for further investigation.
+    ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    ============================================\n
+
+    RW.Core.Add Pre To Report    ${detailed_report}
 
 Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks memory utilization for VMs and parses each result.
@@ -165,6 +254,23 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                 ...    expected=VM should be accessible and running
                 ...    actual=${stderr}
                 ...    reproduce_hint=Run vm_memory_check.sh or check VM status
+                ...    details=${vm_data}
+            ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - ${stderr}
+        ELSE IF    "${code}" in ["WindowsVM", "NotIncluded", "Omitted"]
+            ${issue_title}=    Set Variable If    "${code}" == "WindowsVM"    
+            ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) is a Windows VM and was skipped (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+            ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) was filtered out by VM filtering rules (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+            ${next_steps}=    Set Variable If    "${code}" == "WindowsVM"
+            ...    No action required - Windows VMs are not supported by Linux health checks
+            ...    Review VM_INCLUDE_LIST and VM_OMIT_LIST configuration if this VM should be included
+            
+            RW.Core.Add Issue    
+                ...    title=${issue_title}
+                ...    severity=4
+                ...    next_steps=${next_steps}
+                ...    expected=VM filtering working as configured
+                ...    actual=${stderr}
+                ...    reproduce_hint=Run vm_memory_check.sh or check VM filtering configuration
                 ...    details=${vm_data}
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - ${stderr}
         ELSE IF    "${stderr}" != ""
@@ -262,6 +368,23 @@ Check Uptime for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                 ...    reproduce_hint=Run vm_uptime_check.sh or check VM status
                 ...    details=${vm_data}
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - ${stderr}
+        ELSE IF    "${code}" in ["WindowsVM", "NotIncluded", "Omitted"]
+            ${issue_title}=    Set Variable If    "${code}" == "WindowsVM"    
+            ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) is a Windows VM and was skipped (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+            ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) was filtered out by VM filtering rules (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+            ${next_steps}=    Set Variable If    "${code}" == "WindowsVM"
+            ...    No action required - Windows VMs are not supported by Linux health checks
+            ...    Review VM_INCLUDE_LIST and VM_OMIT_LIST configuration if this VM should be included
+            
+            RW.Core.Add Issue    
+                ...    title=${issue_title}
+                ...    severity=4
+                ...    next_steps=${next_steps}
+                ...    expected=VM filtering working as configured
+                ...    actual=${stderr}
+                ...    reproduce_hint=Run vm_uptime_check.sh or check VM filtering configuration
+                ...    details=${vm_data}
+            ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - ${stderr}
         ELSE IF    "${stderr}" != ""
             RW.Core.Add Issue    
                 ...    title=Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) has uptime check errors (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
@@ -357,6 +480,23 @@ Check Last Patch Status for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                 ...    reproduce_hint=Run vm_last_patch_check.sh or check VM status
                 ...    details=${vm_data}
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - ${stderr}
+        ELSE IF    "${code}" in ["WindowsVM", "NotIncluded", "Omitted"]
+            ${issue_title}=    Set Variable If    "${code}" == "WindowsVM"    
+            ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) is a Windows VM and was skipped (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+            ...    Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) was filtered out by VM filtering rules (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
+            ${next_steps}=    Set Variable If    "${code}" == "WindowsVM"
+            ...    No action required - Windows VMs are not supported by Linux health checks
+            ...    Review VM_INCLUDE_LIST and VM_OMIT_LIST configuration if this VM should be included
+            
+            RW.Core.Add Issue    
+                ...    title=${issue_title}
+                ...    severity=4
+                ...    next_steps=${next_steps}
+                ...    expected=VM filtering working as configured
+                ...    actual=${stderr}
+                ...    reproduce_hint=Run vm_last_patch_check.sh or check VM filtering configuration
+                ...    details=${vm_data}
+            ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - ${stderr}
         ELSE IF    "${stderr}" != ""
             RW.Core.Add Issue    
                 ...    title=Virtual Machine `${vm_name}` (RG: `${AZ_RESOURCE_GROUP}`) has patch check errors (Subscription: `${AZURE_SUBSCRIPTION_NAME}`)
@@ -405,11 +545,6 @@ Suite Initialization
     ...    type=string
     ...    description=The resource group containing the VM(s).
     ...    pattern=\w*
-    ${VM_NAME}=    RW.Core.Import User Variable    VM_NAME
-    ...    type=string
-    ...    description=The Azure Virtual Machine to check. Leave empty to check all VMs in the resource group.
-    ...    pattern=\w*
-    ...    default=""
     ${DISK_THRESHOLD}=    RW.Core.Import User Variable    DISK_THRESHOLD
     ...    type=string
     ...    description=The threshold percentage for disk usage warnings.
@@ -435,6 +570,14 @@ Suite Initialization
     ...    description=Timeout in seconds for Azure VM run-command operations.
     ...    pattern=\d*
     ...    default=90
+    ${VM_INCLUDE_LIST}=    RW.Core.Import User Variable    VM_INCLUDE_LIST
+    ...    type=string
+    ...    description=Comma-separated list of VM name patterns to include (e.g., "web-*,app-*"). If empty, all VMs are processed.
+    ...    pattern=.*
+    ${VM_OMIT_LIST}=    RW.Core.Import User Variable    VM_OMIT_LIST
+    ...    type=string
+    ...    description=Comma-separated list of VM name patterns to exclude (e.g., "test-*,dev-*"). If empty, no VMs are excluded.
+    ...    pattern=.*
     ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_ID
     ...    type=string
     ...    description=The Azure Subscription ID.
@@ -443,23 +586,26 @@ Suite Initialization
     ...    type=string
     ...    description=The Azure Subscription Name.
     ...    pattern=\w*
+    ...    default=subscription-01
     ${azure_credentials}=    RW.Core.Import Secret
     ...    azure_credentials
     ...    type=string
     ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
     ...    pattern=\w*
-    Set Suite Variable    ${VM_NAME}    ${VM_NAME}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable    ${DISK_THRESHOLD}    ${DISK_THRESHOLD}
     Set Suite Variable    ${UPTIME_THRESHOLD}    ${UPTIME_THRESHOLD}
     Set Suite Variable    ${MEMORY_THRESHOLD}    ${MEMORY_THRESHOLD}
     Set Suite Variable    ${MAX_PARALLEL_JOBS}    ${MAX_PARALLEL_JOBS}
     Set Suite Variable    ${TIMEOUT_SECONDS}    ${TIMEOUT_SECONDS}
+    Set Suite Variable    ${VM_INCLUDE_LIST}    ${VM_INCLUDE_LIST}
+    Set Suite Variable    ${VM_OMIT_LIST}    ${VM_OMIT_LIST}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
+    
     Set Suite Variable
     ...    ${env}
-    ...    {"VM_NAME":"${VM_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "DISK_THRESHOLD": "${DISK_THRESHOLD}", "UPTIME_THRESHOLD": "${UPTIME_THRESHOLD}", "MEMORY_THRESHOLD": "${MEMORY_THRESHOLD}", "MAX_PARALLEL_JOBS": "${MAX_PARALLEL_JOBS}", "TIMEOUT_SECONDS": "${TIMEOUT_SECONDS}", "AZURE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}"}
+    ...    {"AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "DISK_THRESHOLD": "${DISK_THRESHOLD}", "UPTIME_THRESHOLD": "${UPTIME_THRESHOLD}", "MEMORY_THRESHOLD": "${MEMORY_THRESHOLD}", "MAX_PARALLEL_JOBS": "${MAX_PARALLEL_JOBS}", "TIMEOUT_SECONDS": "${TIMEOUT_SECONDS}", "AZURE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}"}
     # Set Azure subscription context
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}

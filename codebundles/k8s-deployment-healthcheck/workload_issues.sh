@@ -84,6 +84,34 @@ if echo "$messages" | grep -q "Deployment does not have minimum availability"; t
     add_issue "3" "Minimum availability not met" "$messages" "Inspect Deployment Warning Events"
 fi
 
+if echo "$messages" | grep -q "FailedScheduling"; then
+    add_issue "2" "Pod scheduling failures" "$messages" "Check node resources and availability\\nReview resource requests and limits\\nInspect node selectors and affinity rules\\nVerify PersistentVolume availability"
+fi
+
+if echo "$messages" | grep -q "FailedMount"; then
+    add_issue "2" "Volume mount failures" "$messages" "Check PersistentVolume and PersistentVolumeClaim status\\nVerify storage class configuration\\nInspect volume permissions and node access\\nReview ConfigMap and Secret availability"
+fi
+
+if echo "$messages" | grep -q "FailedPull\|ErrImagePull\|ImagePullBackOff"; then
+    add_issue "2" "Image pull failures" "$messages" "Verify container image exists in registry\\nCheck image pull secrets and registry authentication\\nReview image tag and repository configuration\\nInspect network connectivity to registry"
+fi
+
+if echo "$messages" | grep -q "CrashLoopBackOff"; then
+    add_issue "1" "Container crash loop" "$messages" "Check container logs for crash details\\nReview application startup configuration\\nVerify resource limits are sufficient\\nInspect health probe configuration"
+fi
+
+if echo "$messages" | grep -q "Evicted\|EvictionThresholdMet"; then
+    add_issue "3" "Pod eviction events" "$messages" "Check node resource pressure (memory, disk)\\nReview resource requests and limits\\nInspect node conditions and available resources\\nConsider adjusting resource allocation"
+fi
+
+if echo "$messages" | grep -q "BackOff\|Error syncing pod"; then
+    add_issue "3" "Pod sync/backoff issues" "$messages" "Check kubelet logs on affected nodes\\nReview pod specification for errors\\nInspect resource constraints and dependencies\\nVerify container runtime health"
+fi
+
+if echo "$messages" | grep -q "NetworkNotReady\|CNI"; then
+    add_issue "2" "Network configuration issues" "$messages" "Check CNI plugin status and configuration\\nVerify network policies and connectivity\\nInspect node network interface configuration\\nReview DNS and service discovery"
+fi
+
 if echo "$messages" | grep -q "Created container server\|no changes since last reconcilation\|Reconciliation finished\|successfully rotated K8s secret"; then
     # Don't generate any issue data, these are normal strings
     echo "[]" | jq .
@@ -99,5 +127,35 @@ if [ ${#issue_details_array[@]} -gt 0 ]; then
     issues_json="[${issues_json%,}]" # Remove the last comma and wrap in square brackets
     echo "$issues_json" | jq .
 else
-    echo "[{\"severity\":\"4\",\"title\":\"Requires investigation\",\"details\":\"$messages\",\"next_steps\":\"Escalate issues to service owner \"}]" | jq .
+    # Generate a more descriptive title based on the actual event messages
+    title="Warning events detected"
+    
+    # Try to extract specific error types from messages for better titles
+    if echo "$messages" | grep -qi "failed\|error\|timeout"; then
+        if echo "$messages" | grep -qi "pull\|image"; then
+            title="Image pull issues"
+        elif echo "$messages" | grep -qi "mount\|volume"; then
+            title="Volume mount issues"
+        elif echo "$messages" | grep -qi "network\|dns\|connection"; then
+            title="Network connectivity issues"
+        elif echo "$messages" | grep -qi "resource\|memory\|cpu"; then
+            title="Resource constraint issues"
+        elif echo "$messages" | grep -qi "permission\|rbac\|unauthorized"; then
+            title="Permission/authorization issues"
+        elif echo "$messages" | grep -qi "scheduling\|node"; then
+            title="Pod scheduling issues"
+        else
+            title="Application or configuration issues"
+        fi
+    elif echo "$messages" | grep -qi "backoff\|crashloop"; then
+        title="Pod crash/restart issues"
+    elif echo "$messages" | grep -qi "evict\|preempt"; then
+        title="Pod eviction issues"
+    elif echo "$messages" | grep -qi "scale\|replica"; then
+        title="Scaling issues"
+    elif echo "$messages" | grep -qi "unhealthy\|health"; then
+        title="Health check issues"
+    fi
+    
+    echo "[{\"severity\":\"3\",\"title\":\"$title\",\"details\":\"$messages\",\"next_steps\":\"Review event messages for specific error details\\nCheck pod status and logs\\nInvestigate underlying cause based on event type\\nEscalate to service owner if issue persists\"}]" | jq .
 fi

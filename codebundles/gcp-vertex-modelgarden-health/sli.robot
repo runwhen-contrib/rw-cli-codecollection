@@ -72,6 +72,7 @@ Quick Vertex AI Log Health Check for `${GCP_PROJECT_ID}`
     RW.Core.Add To Report    📊 Log Health Check: ${recent_error_count} errors (${SLI_LOG_LOOKBACK}) → Score: ${log_health_score}
     
     Set Global Variable    ${log_health_score}
+    RW.Core.Push Metric    ${log_health_score}    sub_name=log_health
 
 Calculate Error Rate Score for `${GCP_PROJECT_ID}`
     [Documentation]    Calculates error rate score based on Model Garden invocation errors
@@ -142,6 +143,7 @@ Calculate Error Rate Score for `${GCP_PROJECT_ID}`
     Log    Error Rate Score: ${error_rate_score} (${error_count} errors detected)
     RW.Core.Add To Report    📊 Error Rate Score: ${error_count} errors, ${error_rate_display} rate → Score: ${error_rate_score}
     Set Global Variable    ${error_rate_score}
+    RW.Core.Push Metric    ${error_rate_score}    sub_name=error_rate
 
 Calculate Latency Performance Score for `${GCP_PROJECT_ID}`
     [Documentation]    Calculates latency performance score based on model response times
@@ -211,6 +213,7 @@ Calculate Latency Performance Score for `${GCP_PROJECT_ID}`
     Log    Latency Performance Score: ${latency_performance_score} (${good_models}/${total_models} models performing well)
     RW.Core.Add To Report    📊 Latency Performance Score: ${good_models}/${total_models} models good → Score: ${latency_performance_score}
     Set Global Variable    ${latency_performance_score}
+    RW.Core.Push Metric    ${latency_performance_score}    sub_name=latency_performance
 
 Calculate Throughput Usage Score for `${GCP_PROJECT_ID}`
     [Documentation]    Calculates throughput usage score based on token consumption data
@@ -258,6 +261,7 @@ Calculate Throughput Usage Score for `${GCP_PROJECT_ID}`
     Log    Throughput Usage Score: ${throughput_usage_score} (Usage data available: ${has_usage}, Models discovered: ${models_discovered})
     RW.Core.Add To Report    📊 Throughput Usage Score: Usage data (${has_usage}), Models discovered (${models_discovered}) → Score: ${throughput_usage_score}
     Set Global Variable    ${throughput_usage_score}
+    RW.Core.Push Metric    ${throughput_usage_score}    sub_name=throughput_usage
 
 Discover All Deployed Models for `${GCP_PROJECT_ID}`
     [Documentation]    Proactively discovers all deployed Vertex AI models and endpoints
@@ -311,6 +315,7 @@ Discover All Deployed Models for `${GCP_PROJECT_ID}`
     Set Global Variable    ${discovery_score}
     Set Global Variable    ${models_discovered}
     Set Global Variable    ${endpoints_discovered}
+    RW.Core.Push Metric    ${discovery_score}    sub_name=model_discovery
 
 Check Service Availability Score for `${GCP_PROJECT_ID}`
     [Documentation]    Checks Vertex AI service availability and configuration
@@ -362,6 +367,7 @@ Check Service Availability Score for `${GCP_PROJECT_ID}`
     Log    Service Availability Score: ${service_availability_score} (API enabled: ${api_enabled}, Metrics available: ${metrics_available})
     RW.Core.Add To Report    📊 Service Availability Score: API enabled (${api_enabled}), Metrics (${metrics_available}) → Score: ${service_availability_score}
     Set Global Variable    ${service_availability_score}
+    RW.Core.Push Metric    ${service_availability_score}    sub_name=service_availability
 
 Generate Final Vertex AI Model Garden Health Score for `${GCP_PROJECT_ID}`
     [Documentation]    Generates final composite health score from all individual measurements

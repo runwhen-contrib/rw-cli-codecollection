@@ -43,13 +43,28 @@
     }
   },
   "exclude_patterns": [
-    "info|INFO",
-    "debug|DEBUG",
-    "trace|TRACE",
+    "\\bINFO\\b",
+    "\\bDEBUG\\b",
+    "\\bTRACE\\b",
     "health.*check",
     "heartbeat",
     "metrics",
-    "monitoring"
+    "monitoring",
+    "\\],INFO\\s*,",
+    "INFO\\s*,c\\.",
+    "START\\s*-\\s*.*Impl\\.",
+    "BusinessService.*\\(\\)",
+    "RestrictionsApiDelegateImpl",
+    "ReadBlockedResourceListBusinessServiceImpl",
+    "LocationReplicaStrategy",
+    "\\bSTART\\s*method\\b",
+    "Calling\\s*BusinessService",
+    "BusinessServiceImpl",
+    "ApiDelegateImpl",
+    "linkerd.*INFO.*Connection closed.*error=read header from client timeout",
+    "linkerd_app_core::serve.*Connection closed.*error=read header from client timeout",
+    "TelemetryPipeline.*In the last \\d+ minutes.*operation has failed.*Sending telemetry to the ingestion service",
+    "adjustmentReason=\\w*EXCEPTION\\w*"
   ],
   "config": {
     "max_matches_per_pattern": 10,

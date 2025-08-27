@@ -7,16 +7,16 @@ set -euo pipefail
 #   AZ_RESOURCE_GROUP
 #
 # OPTIONAL ENV VARS:
-#   WARNINGS_THRESHOLD: Integer threshold for matching warnings (default=1)
+#   WARNINGS_THRESHOLD: Integer threshold for HTTP error count (default=1)
 #   TIME_RANGE:         Kusto time window to look back (default=PT1H)
 #
 # This script:
 #   1) Retrieves the Application Gateway Resource ID by name/RG
 #   2) Checks if there's a Diagnostic Setting that sends logs to a Log Analytics workspace
 #   3) If so, retrieves that workspace's GUID
-#   4) Queries known warnings (like "IP configuration mismatch" / "Subnet not found")
-#   5) Raises an issue if warnings exceed threshold
-#   6) Saves final JSON to appgw_diagnostic_issues.json
+#   4) Queries HTTP error responses (4xx/5xx status codes) in the specified time range
+#   5) Raises an issue if error count exceeds threshold
+#   6) Saves final JSON to appgw_diagnostic_log_issues.json
 # -----------------------------------------------------------------------------
 
 : "${APP_GATEWAY_NAME:?Must set APP_GATEWAY_NAME}"
@@ -28,11 +28,11 @@ OUTPUT_FILE="appgw_diagnostic_log_issues.json"
 
 issues_json='{"issues": []}'
 
-echo "Analyzing App Gateway Diagnostic Logs..."
+echo "Analyzing App Gateway HTTP Error Rates..."
 echo "App Gateway Name: $APP_GATEWAY_NAME"
 echo "Resource Group:   $AZ_RESOURCE_GROUP"
 echo "Time Range:       $TIME_RANGE"
-echo "Warnings Threshold: $WARNINGS_THRESHOLD"
+echo "Error Threshold:  $WARNINGS_THRESHOLD"
 
 # -----------------------------------------------------------------------------
 # 1) Derive the AGW resource ID from name + resource group
@@ -165,9 +165,9 @@ echo "Using Workspace GUID: $WORKSPACE_ID"
 KUSTO_QUERY=$(cat <<EOF
 AzureDiagnostics
 | where TimeGenerated >= ago(${TIME_RANGE})
-| where Category == "ApplicationGatewayPlatformLogs"
+| where Category == "ApplicationGatewayAccessLog"
 | where ResourceId == "${AGW_RESOURCE_ID}"
-| where message has "IP configuration mismatch" or message has "Subnet not found"
+| where toint(httpStatus_d) >= 400 and toint(httpStatus_d) < 600
 | summarize CountOfMatches = count()
 EOF
 )
@@ -206,17 +206,17 @@ echo "$query_output"
 
 # Parse the summarized count
 count_of_matches=$(echo "$query_output" | jq -r '.tables[0].rows[0][0] // 0' 2>/dev/null || echo "0")
-echo "Count of matched warnings in last $TIME_RANGE: $count_of_matches"
+echo "Count of HTTP errors (4xx/5xx) in last $TIME_RANGE: $count_of_matches"
 
 # -----------------------------------------------------------------------------
 # 6) Compare with threshold
 # -----------------------------------------------------------------------------
 if (( $(echo "$count_of_matches > $WARNINGS_THRESHOLD" | bc -l) )); then
   issues_json=$(echo "$issues_json" | jq \
-    --arg title "Frequent App Gateway Diagnostic Warnings Found" \
-    --arg details "Found $count_of_matches log entries matching 'IP config mismatch' or 'Subnet not found' in $TIME_RANGE." \
+    --arg title "High HTTP Error Rate Detected in Application Gateway" \
+    --arg details "Found $count_of_matches HTTP error responses (4xx/5xx status codes) in $TIME_RANGE for Application Gateway $APP_GATEWAY_NAME." \
     --arg severity "2" \
-    --arg nextStep "Investigate network config or subnet issues for for Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\`" \
+    --arg nextStep "Investigate the cause of HTTP errors for Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\`. Check backend health, SSL certificates, and routing rules." \
     '.issues += [{
        "title": $title,
        "details": $details,
@@ -224,11 +224,11 @@ if (( $(echo "$count_of_matches > $WARNINGS_THRESHOLD" | bc -l) )); then
        "severity": ($severity | tonumber)
      }]')
 else
-  echo "No repeated warnings found above threshold ($WARNINGS_THRESHOLD)."
+  echo "No excessive HTTP errors found above threshold ($WARNINGS_THRESHOLD)."
 fi
 
 # -----------------------------------------------------------------------------
 # 7) Write final JSON
 # -----------------------------------------------------------------------------
 echo "$issues_json" > "$OUTPUT_FILE"
-echo "Diagnostic log check completed. Saved results to $OUTPUT_FILE"
+echo "HTTP error rate check completed. Saved results to $OUTPUT_FILE"
