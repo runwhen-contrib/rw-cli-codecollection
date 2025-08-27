@@ -12,7 +12,7 @@
     "severity": 1,
     "expected": "HTTPS connection should succeed to test.azurecr.io",
     "actual": "HTTPS connection failed with exit code 6",
-    "details": "Connection error: HTTP_CODE:000;TOTAL_TIME:0.014084;CONNECT_TIME:0.000000",
+    "details": "Connection error: HTTP_CODE:000;TOTAL_TIME:0.052140;CONNECT_TIME:0.000000",
     "next_steps": "Check network connectivity, firewall rules (port 443), and proxy settings. Verify ACR `test` service status in resource group `test-rg`"
   },
   {

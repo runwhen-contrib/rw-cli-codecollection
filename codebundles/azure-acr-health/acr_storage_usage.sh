@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -x
+# Debug mode removed
 SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID:-}
 RESOURCE_GROUP=${AZ_RESOURCE_GROUP:-}
 ACR_NAME=${ACR_NAME:-}
@@ -33,3 +33,6 @@ else
     add_issue "High storage usage" 3 "Usage below 80%" "Usage at $percent%" "Consider cleaning images in ACR `$ACR_NAME` or increase quota for resource group `$RESOURCE_GROUP`"
   fi
 fi
+
+# Output the JSON file content to stdout for Robot Framework
+cat "$ISSUES_FILE"

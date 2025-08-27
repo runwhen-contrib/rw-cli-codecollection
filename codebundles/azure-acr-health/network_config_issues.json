@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "title": "Failed to set Azure subscription context",
+    "severity": 3,
+    "expected": "Should be able to set subscription context",
+    "actual": "Failed to set subscription test-sub",
+    "details": "Subscription ID: test-sub",
+    "next_steps": "Verify subscription ID `test-sub` and Azure authentication for resource group `test-rg`",
+    "reproduce_hint": "az account set --subscription test-sub"
+  }
+]

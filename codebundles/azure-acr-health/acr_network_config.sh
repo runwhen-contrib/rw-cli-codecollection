@@ -83,7 +83,7 @@ if [ $? -ne 0 ] || [ -z "$acr_info" ]; then
         "Verify ACR name \`$ACR_NAME\`, resource group \`$RESOURCE_GROUP\`, and permissions" \
         "az acr show --name $ACR_NAME --resource-group $RESOURCE_GROUP"
     
-    echo "❌ Failed to retrieve ACR information"
+    echo "❌ Failed to retrieve ACR information" >&2
     rm -f acr_show_err.log
     exit 0
 fi
@@ -103,16 +103,16 @@ echo "🔄 Network Rule Bypass: $network_rule_bypass_options" >&2
 
 # Check public network access configuration
 if [ "$public_network_access" = "Disabled" ]; then
-    echo "🔒 Public access is disabled - checking private endpoint configuration"
+    echo "🔒 Public access is disabled - checking private endpoint configuration" >&2
     
     # Check for private endpoints
     private_endpoints=$(az network private-endpoint list --query "[?privateLinkServiceConnections[0].privateLinkServiceId==\`$(echo "$acr_info" | jq -r '.id')\`]" -o json 2>/dev/null)
     
     if [ -n "$private_endpoints" ] && [ "$private_endpoints" != "[]" ]; then
         pe_count=$(echo "$private_endpoints" | jq '. | length')
-        echo "✅ Found $pe_count private endpoint(s)"
+        echo "✅ Found $pe_count private endpoint(s)" >&2
         
-        echo "$private_endpoints" | jq -r '.[] | "   - \(.name) in \(.resourceGroup) (\(.location))"'
+        echo "$private_endpoints" | jq -r '.[] | "   - \(.name) in \(.resourceGroup) (\(.location))"' >&2
         
         # Check private endpoint status
         echo "$private_endpoints" | jq -c '.[]' | while read -r pe; do
@@ -154,11 +154,11 @@ if [ -n "$network_rule_set" ]; then
     ip_rules=$(echo "$network_rule_set" | jq '.ipRules // []')
     ip_rule_count=$(echo "$ip_rules" | jq '. | length')
     
-    echo "📍 IP Rules: $ip_rule_count configured"
+    echo "📍 IP Rules: $ip_rule_count configured" >&2
     
     if [ "$ip_rule_count" -gt 0 ]; then
-        echo "   Configured IP ranges:"
-        echo "$ip_rules" | jq -r '.[] | "   - \(.ipAddressOrRange) (Action: \(.action // "Allow"))"'
+        echo "   Configured IP ranges:" >&2
+        echo "$ip_rules" | jq -r '.[] | "   - \(.ipAddressOrRange) (Action: \(.action // "Allow"))"' >&2
         
         # Check for overly permissive rules
         overly_permissive=$(echo "$ip_rules" | jq -r '.[] | select(.ipAddressOrRange | test("0\\.0\\.0\\.0/0|::/0")) | .ipAddressOrRange')
@@ -211,7 +211,7 @@ if [ -n "$network_rule_set" ]; then
             "az acr update --name $ACR_NAME --default-action Deny"
     fi
 else
-    echo "⚠️ Unable to retrieve network rules"
+    echo "⚠️ Unable to retrieve network rules" >&2
 fi
 
 # Test DNS resolution
@@ -228,11 +228,11 @@ if command -v nslookup >/dev/null 2>&1; then
             "Check DNS configuration, network connectivity, and private DNS zones if using private endpoints for ACR \`$ACR_NAME\` in resource group \`$RESOURCE_GROUP\`" \
             "nslookup $login_server"
     else
-        echo "✅ DNS resolution successful for $login_server"
+        echo "✅ DNS resolution successful for $login_server" >&2
         # Extract and display IP addresses
         ips=$(echo "$dns_result" | grep -E "^Address: |^$login_server" | grep -v "#53" | awk '{print $2}' | tr '\n' ' ')
         if [ -n "$ips" ]; then
-            echo "   Resolved IPs: $ips"
+            echo "   Resolved IPs: $ips" >&2
         fi
     fi
 else
@@ -247,10 +247,10 @@ if command -v curl >/dev/null 2>&1; then
     curl_exit_code=$?
     
     if [ $curl_exit_code -eq 0 ]; then
-        echo "✅ HTTPS connectivity successful"
+        echo "✅ HTTPS connectivity successful" >&2
         # Check if we get expected response (should be 401 Unauthorized for unauthenticated request)
         if echo "$connectivity_test" | grep -q "401 Unauthorized\|401"; then
-            echo "✅ Expected authentication challenge received"
+            echo "✅ Expected authentication challenge received" >&2
         else
             echo "ℹ️ Unexpected response (may indicate network filtering):"
             echo "$connectivity_test" | head -3
@@ -320,7 +320,7 @@ if [ "$sku" = "Premium" ]; then
         echo "ℹ️ No geo-replications configured (Premium feature)"
     fi
 else
-    echo "ℹ️ Geo-replication not available (requires Premium SKU)"
+    echo "ℹ️ Geo-replication not available (requires Premium SKU)" >&2
 fi
 
 # Check webhook configuration
@@ -368,7 +368,7 @@ if [ -n "$webhooks" ] && [ "$webhooks" != "[]" ]; then
         fi
     done
 else
-    echo "ℹ️ No webhooks configured"
+    echo "ℹ️ No webhooks configured" >&2
 fi
 
 # Generate troubleshooting information
