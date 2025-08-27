@@ -27,10 +27,14 @@ spec:
   intervalStrategy: intermezzo
   intervalSeconds: 600
   configProvided:
-    - name: AZURE_RESOURCE_GROUP
+    - name: AZ_RESOURCE_GROUP
       value: "{{resource_group.name}}"
     - name: AZURE_SUBSCRIPTION_ID
       value: "{{ subscription_id }}"
+    - name: AZURE_SUBSCRIPTION_NAME
+      value: "{{ subscription_name }}"
+    - name: ACR_NAME
+      value: "{{match_resource.resource.name}}"
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}

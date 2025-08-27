@@ -179,11 +179,12 @@ Suite Initialization
     ...    type=string
     ...    description=Azure Container Registry Name.
     ...    pattern=^[a-zA-Z0-9]*$
-    ${ACR_PASSWORD}=    RW.Core.Import Secret    ACR_PASSWORD
+    ${azure_credentials}=    RW.Core.Import Secret
+    ...    azure_credentials
     ...    type=string
-    ...    description=Azure Container Registry password (admin or SP credential).
-    ...    pattern=.*
-    ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_ID
+    ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
+    ...    pattern=\w*
+    ${AZURE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_ID
     ...    type=string
     ...    description=The Azure Subscription ID.
     ...    pattern=\w*
@@ -223,8 +224,8 @@ Suite Initialization
     ...    default=98
     Set Suite Variable    ${AZ_RESOURCE_GROUP}
     Set Suite Variable    ${ACR_NAME}
-    Set Suite Variable    ${ACR_PASSWORD}
-    Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
+    Set Suite Variable    ${azure_credentials}
+    Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${LOG_WORKSPACE_ID}
     Set Suite Variable    ${USAGE_THRESHOLD}
@@ -244,4 +245,4 @@ Suite Initialization
     
     Set Suite Variable
     ...    ${env}
-    ...    {"ACR_NAME":"${ACR_NAME}","AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}","ACR_PASSWORD":"${ACR_PASSWORD}","AZURE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}","AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}","LOG_WORKSPACE_ID":"${LOG_WORKSPACE_ID}","USAGE_THRESHOLD":"${USAGE_THRESHOLD}","CRITICAL_THRESHOLD":"${CRITICAL_THRESHOLD}","TIME_PERIOD_HOURS":"${TIME_PERIOD_HOURS}","PULL_SUCCESS_THRESHOLD":"${PULL_SUCCESS_THRESHOLD}","PUSH_SUCCESS_THRESHOLD":"${PUSH_SUCCESS_THRESHOLD}"}
+    ...    {"ACR_NAME":"${ACR_NAME}","AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}","AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}","AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}","LOG_WORKSPACE_ID":"${LOG_WORKSPACE_ID}","USAGE_THRESHOLD":"${USAGE_THRESHOLD}","CRITICAL_THRESHOLD":"${CRITICAL_THRESHOLD}","TIME_PERIOD_HOURS":"${TIME_PERIOD_HOURS}","PULL_SUCCESS_THRESHOLD":"${PULL_SUCCESS_THRESHOLD}","PUSH_SUCCESS_THRESHOLD":"${PUSH_SUCCESS_THRESHOLD}"}

@@ -81,7 +81,7 @@ Check ACR Login & Authentication for Registry `${ACR_NAME}`
     ${login}=    RW.CLI.Run Bash File
     ...    bash_file=acr_authentication.sh
     ...    env=${env}
-    ...    secret__ACR_PASSWORD=${ACR_PASSWORD}
+    ...    secret_file__azure_credentials=${azure_credentials}
     ...    timeout_seconds=90
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${login.stderr}
@@ -290,11 +290,12 @@ Suite Initialization
     ...    type=string
     ...    description=Azure Container Registry Name.
     ...    pattern=^[a-zA-Z0-9]*$
-    ${ACR_PASSWORD}=    RW.Core.Import Secret    ACR_PASSWORD
+    ${azure_credentials}=    RW.Core.Import Secret
+    ...    azure_credentials
     ...    type=string
-    ...    description=Azure Container Registry password (admin or SP credential).
-    ...    pattern=.*
-    ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_ID
+    ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
+    ...    pattern=\w*
+    ${AZURE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_ID
     ...    type=string
     ...    description=The Azure Subscription ID.
     ...    pattern=\w*
@@ -312,14 +313,14 @@ Suite Initialization
     ...    pattern=\d*
     ...    default=80
     Set Suite Variable    ${ACR_NAME}    ${ACR_NAME}
-    Set Suite Variable    ${ACR_PASSWORD}    ${ACR_PASSWORD}
+    Set Suite Variable    ${azure_credentials}    ${azure_credentials}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
-    Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
+    Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${LOG_WORKSPACE_ID}    ${LOG_WORKSPACE_ID}
     Set Suite Variable
     ...    ${env}
-    ...    {"ACR_NAME": "${ACR_NAME}", "AZ_RESOURCE_GROUP": "${AZ_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID": "${AZURE_RESOURCE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME": "${AZURE_SUBSCRIPTION_NAME}", "LOG_WORKSPACE_ID": "${LOG_WORKSPACE_ID}", "USAGE_THRESHOLD": "${USAGE_THRESHOLD}"}
+    ...    {"ACR_NAME": "${ACR_NAME}", "AZ_RESOURCE_GROUP": "${AZ_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID": "${AZURE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME": "${AZURE_SUBSCRIPTION_NAME}", "LOG_WORKSPACE_ID": "${LOG_WORKSPACE_ID}", "USAGE_THRESHOLD": "${USAGE_THRESHOLD}"}
     RW.CLI.Run Cli
-    ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
+    ...    cmd=az account set --subscription ${AZURE_SUBSCRIPTION_ID}
     ...    include_in_history=false
