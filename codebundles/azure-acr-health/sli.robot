@@ -148,8 +148,9 @@ Check ACR Security Configuration
             END
         END
         
-        # Calculate final score (100 - penalty, minimum 0)
-        ${score}=    Evaluate    max(0, 100 - ${penalty})
+        # Calculate final score (100 - penalty, minimum 0), then normalize to 0-1 scale
+        ${raw_score}=    Evaluate    max(0, 100 - ${penalty})
+        ${score}=    Evaluate    ${raw_score} / 100.0
         
         Log    Security analysis completed. Issues found: ${issue_count}, Total penalty: ${penalty}, Score: ${score}
         
