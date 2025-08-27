@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       Calculates Azure ACR health by checking reachability, SKU, pull/push ratio, and storage utilization.
-Metadata            Author    Nbarola
+Metadata            Author    stewartshea
 Metadata            Display Name    Azure ACR Health SLI
 Metadata            Supports    Azure    Container Registry    ACR    Health
 
