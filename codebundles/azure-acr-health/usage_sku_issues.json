@@ -1,11 +1,20 @@
 [
   {
-    "title": "Failed to set Azure subscription context",
-    "severity": 3,
-    "expected": "Should be able to set subscription context",
-    "actual": "Failed to set subscription test-sub",
-    "details": "Subscription ID: test-sub",
-    "next_steps": "Verify subscription ID `test-sub` and Azure authentication for resource group `test-rg`",
-    "reproduce_hint": "az account set --subscription test-sub"
+    "title": "ACR is using Basic SKU with limited features",
+    "severity": 4,
+    "expected": "Consider upgrading to Standard or Premium for production workloads",
+    "actual": "Current SKU: Basic",
+    "details": "Basic SKU limitations: No geo-replication, no webhook support, limited storage",
+    "next_steps": "Consider upgrading ACR `acrhealthacrwwc38ioe` to Standard SKU for webhooks and better performance, or Premium for geo-replication and advanced features in resource group `test-acr-rg`",
+    "reproduce_hint": "az acr update --name acrhealthacrwwc38ioe --sku Standard"
+  },
+  {
+    "title": "ACR admin user is enabled",
+    "severity": 4,
+    "expected": "Admin user should be disabled for production environments",
+    "actual": "Admin user is currently enabled",
+    "details": "Admin user provides full access with username/password authentication",
+    "next_steps": "Disable admin user for ACR `acrhealthacrwwc38ioe` and use Azure AD authentication with service principals or managed identities in resource group `test-acr-rg`",
+    "reproduce_hint": "az acr update --name acrhealthacrwwc38ioe --admin-enabled false"
   }
 ]

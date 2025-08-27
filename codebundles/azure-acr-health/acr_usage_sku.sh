@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eo pipefail
+set -o pipefail
 
 # Environment variables
 SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID:-}
@@ -142,12 +142,12 @@ webhook_used=0
 webhook_quota=0
 
 echo "$usage_info" | jq -r '.value[]' | while read -r usage_item; do
-    name=$(echo "$usage_item" | jq -r '.name.value')
+    name=$(echo "$usage_item" | jq -r '.name')
     current=$(echo "$usage_item" | jq -r '.currentValue // 0')
     limit=$(echo "$usage_item" | jq -r '.limitValue // 0')
     
     case "$name" in
-        "StorageUsed")
+        "Size")
             storage_used=$current
             storage_quota=$limit
             ;;
@@ -159,10 +159,10 @@ echo "$usage_info" | jq -r '.value[]' | while read -r usage_item; do
 done
 
 # Re-extract values since while loop runs in subshell
-storage_used=$(echo "$usage_info" | jq -r '.value[] | select(.name.value=="StorageUsed") | .currentValue // 0')
-storage_quota=$(echo "$usage_info" | jq -r '.value[] | select(.name.value=="StorageUsed") | .limitValue // 0')
-webhook_used=$(echo "$usage_info" | jq -r '.value[] | select(.name.value=="Webhooks") | .currentValue // 0')
-webhook_quota=$(echo "$usage_info" | jq -r '.value[] | select(.name.value=="Webhooks") | .limitValue // 0')
+storage_used=$(echo "$usage_info" | jq -r '.value[] | select(.name=="Size") | .currentValue // 0')
+storage_quota=$(echo "$usage_info" | jq -r '.value[] | select(.name=="Size") | .limit // 0')
+webhook_used=$(echo "$usage_info" | jq -r '.value[] | select(.name=="Webhooks") | .currentValue // 0')
+webhook_quota=$(echo "$usage_info" | jq -r '.value[] | select(.name=="Webhooks") | .limit // 0')
 
 echo "💾 Storage Used: $storage_used bytes" >&2
 echo "📦 Storage Quota: $storage_quota bytes" >&2
@@ -172,7 +172,7 @@ echo "🔗 Webhook Quota: $webhook_quota" >&2
 # Calculate storage usage percentage
 if [ "$storage_quota" -gt 0 ]; then
     storage_percent=$(echo "scale=2; ($storage_used * 100) / $storage_quota" | bc -l 2>/dev/null || echo "0")
-    echo "📊 Storage Usage: ${storage_percent}%"
+    echo "📊 Storage Usage: ${storage_percent}%" >&2
     
     # Check if storage usage exceeds threshold
     if (( $(echo "$storage_percent > $USAGE_THRESHOLD" | bc -l) )); then
@@ -189,13 +189,13 @@ if [ "$storage_quota" -gt 0 ]; then
             "az acr show-usage --name $ACR_NAME"
     fi
 else
-    echo "⚠️ Storage quota information not available"
+    echo "⚠️ Storage quota information not available" >&2
 fi
 
 # Check webhook usage
 if [ "$webhook_quota" -gt 0 ]; then
     webhook_percent=$(echo "scale=2; ($webhook_used * 100) / $webhook_quota" | bc -l 2>/dev/null || echo "0")
-    echo "🔗 Webhook Usage: ${webhook_percent}%"
+    echo "🔗 Webhook Usage: ${webhook_percent}%" >&2
     
     if (( $(echo "$webhook_percent > 90" | bc -l) )); then
         add_issue \
@@ -212,7 +212,7 @@ fi
 # SKU-specific recommendations
 case "$sku" in
     "Basic")
-        echo "ℹ️ Basic SKU detected - limited features available"
+        echo "ℹ️ Basic SKU detected - limited features available" >&2
         add_issue \
             "ACR is using Basic SKU with limited features" \
             4 \

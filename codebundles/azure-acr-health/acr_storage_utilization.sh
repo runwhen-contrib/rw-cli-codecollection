@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eo pipefail
+set -o pipefail
 
 # Environment variables
 SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID:-}
@@ -142,8 +142,8 @@ if [ $? -ne 0 ] || [ -z "$usage_info" ]; then
 fi
 
 # Extract storage metrics
-storage_used=$(echo "$usage_info" | jq -r '.value[] | select(.name.value=="StorageUsed") | .currentValue // 0')
-storage_quota=$(echo "$usage_info" | jq -r '.value[] | select(.name.value=="StorageUsed") | .limitValue // 0')
+storage_used=$(echo "$usage_info" | jq -r '.value[] | select(.name=="Size") | .currentValue // 0')
+storage_quota=$(echo "$usage_info" | jq -r '.value[] | select(.name=="Size") | .limit // 0')
 
 # Convert to human readable format
 storage_used_human=$(bytes_to_human "$storage_used")
