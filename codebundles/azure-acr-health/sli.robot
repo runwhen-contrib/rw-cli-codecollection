@@ -139,12 +139,54 @@ Check ACR Resource Health for Registry `${ACR_NAME}`
     Set Global Variable    ${resource_health_score}    ${score}
     RW.Core.Push Metric    ${score}    sub_name=resource_health
 
+Check ACR Security Configuration
+    [Documentation]    Analyzes ACR security configuration including RBAC, admin user settings, network access, and authentication methods.
+    [Tags]    ACR    Azure    Security    RBAC    SLI
+    
+    TRY
+        ${security_result}=    RW.CLI.Run Bash File
+        ...    bash_file=acr_rbac_security.sh
+        ...    env=${env}
+        ...    timeout_seconds=60
+        ...    include_in_history=false
+        
+        ${issues}=    Evaluate    json.loads(r'''${security_result.stdout}''')    json
+        ${issue_count}=    Get Length    ${issues}
+        
+        # Calculate security score based on issues found
+        # Severity 1 (critical) = -30 points, Severity 2 (high) = -20, Severity 3 (medium) = -10, Severity 4 (low) = -5
+        ${penalty}=    Set Variable    0
+        FOR    ${issue}    IN    @{issues}
+            ${severity}=    Set Variable    ${issue["severity"]}
+            IF    ${severity} == 1
+                ${penalty}=    Evaluate    ${penalty} + 30
+            ELSE IF    ${severity} == 2
+                ${penalty}=    Evaluate    ${penalty} + 20
+            ELSE IF    ${severity} == 3
+                ${penalty}=    Evaluate    ${penalty} + 10
+            ELSE IF    ${severity} == 4
+                ${penalty}=    Evaluate    ${penalty} + 5
+            END
+        END
+        
+        # Calculate final score (100 - penalty, minimum 0)
+        ${score}=    Evaluate    max(0, 100 - ${penalty})
+        
+        Log    Security analysis completed. Issues found: ${issue_count}, Total penalty: ${penalty}, Score: ${score}
+        
+    EXCEPT
+        Log    Security analysis failed, setting score to 0
+        ${score}=    Set Variable    0
+    END
+    Set Global Variable    ${security_score}    ${score}
+    RW.Core.Push Metric    ${score}    sub_name=security
+
 Generate Comprehensive ACR Health Score for Registry `${ACR_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Aggregates all health check scores into a comprehensive health score.
     [Tags]    ACR    Azure    Health    Score    SLI
     
     # Calculate and push overall health score
-    ${comprehensive_health_score}=    Evaluate    (${reachability_score} + ${sku_score} + ${pull_push_score} + ${storage_score} + ${network_score} + ${resource_health_score}) / 6
+    ${comprehensive_health_score}=    Evaluate    (${reachability_score} + ${sku_score} + ${pull_push_score} + ${storage_score} + ${network_score} + ${resource_health_score} + ${security_score}) / 7
     ${health_score}=    Convert to Number    ${comprehensive_health_score}    2
     RW.Core.Push Metric    ${health_score}
 
@@ -219,6 +261,7 @@ Suite Initialization
     Set Global Variable    ${storage_score}    0
     Set Global Variable    ${network_score}    0
     Set Global Variable    ${resource_health_score}    0
+    Set Global Variable    ${security_score}    0
     
     Set Suite Variable
     ...    ${env}

@@ -26,6 +26,7 @@ This bundle provides comprehensive health checks for Azure Container Registries 
 - `Check ACR Storage Utilization`
 - `Analyze ACR Pull/Push Success Ratio`
 - `Check ACR Repository Event Failures`
+- `Check ACR Security Configuration and RBAC`
 
 ### SLI Tasks (Health Scoring)
 - `Check ACR Reachability`
@@ -34,6 +35,7 @@ This bundle provides comprehensive health checks for Azure Container Registries 
 - `Check ACR Storage Utilization`
 - `Check ACR Network Configuration`
 - `Check ACR Resource Health`
+- `Check ACR Security Configuration`
 - `Generate Comprehensive ACR Health Score`
 
 ## How It Works
@@ -94,6 +96,7 @@ robot sli.robot
 - `acr_storage_utilization.sh` - Comprehensive storage analysis with cleanup guidance
 - `acr_pull_push_ratio.sh` - Pull/push success rate analysis with Azure Monitor integration
 - `acr_events.sh` - Log Analytics event analysis
+- `acr_rbac_security.sh` - Security configuration and RBAC analysis
 
 ### Test Infrastructure
 - `.test/terraform/` - Comprehensive Terraform infrastructure for testing

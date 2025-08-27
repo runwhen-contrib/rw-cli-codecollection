@@ -158,8 +158,8 @@ if [ "$storage_quota" -gt 0 ]; then
     storage_available=$((storage_quota - storage_used))
     storage_available_human=$(bytes_to_human "$storage_available")
     
-    echo "📊 Storage utilization: ${storage_percent}%"
-    echo "🆓 Available space: $storage_available_human"
+    echo "📊 Storage utilization: ${storage_percent}%" >&2
+    echo "🆓 Available space: $storage_available_human" >&2
     
     # Check critical threshold first
     if (( $(echo "$storage_percent > $CRITICAL_THRESHOLD" | bc -l) )); then
@@ -199,7 +199,7 @@ if [ "$storage_quota" -gt 0 ]; then
             ;;
         "Standard"|"Premium")
             if (( $(echo "$storage_percent > 90" | bc -l) )); then
-                echo "💡 Consider implementing automated cleanup policies"
+                echo "💡 Consider implementing automated cleanup policies" >&2
             fi
             ;;
     esac
@@ -214,7 +214,7 @@ else
         "Verify ACR \`$ACR_NAME\` configuration and permissions in resource group \`$RESOURCE_GROUP\`, or contact Azure support" \
         "az acr show-usage --name $ACR_NAME --subscription $SUBSCRIPTION_ID"
     
-    echo "⚠️ Storage quota information not available"
+    echo "⚠️ Storage quota information not available" >&2
 fi
 
 # Get repository information for detailed analysis
@@ -222,16 +222,16 @@ echo "📦 Analyzing repositories..." >&2
 repo_list=$(az acr repository list --name "$ACR_NAME" -o json 2>/dev/null)
 if [ -n "$repo_list" ] && [ "$repo_list" != "[]" ]; then
     repo_count=$(echo "$repo_list" | jq '. | length')
-    echo "📚 Total repositories: $repo_count"
+    echo "📚 Total repositories: $repo_count" >&2
     
     if [ "$repo_count" -gt 0 ]; then
-        echo "🔍 Top repositories by tag count:"
+        echo "🔍 Top repositories by tag count:" >&2
         
         # Analyze top repositories (limit to first 5 for performance)
         echo "$repo_list" | jq -r '.[:5][]' | while read -r repo; do
             if [ -n "$repo" ]; then
                 tag_count=$(az acr repository show-tags --name "$ACR_NAME" --repository "$repo" --output json 2>/dev/null | jq '. | length' 2>/dev/null || echo "0")
-                echo "   $repo: $tag_count tags"
+                echo "   $repo: $tag_count tags" >&2
             fi
         done
         
@@ -261,7 +261,7 @@ if [ -n "$repo_list" ] && [ "$repo_list" != "[]" ]; then
         rm -f "$large_repos"
     fi
 else
-    echo "📦 No repositories found or unable to list repositories"
+    echo "📦 No repositories found or unable to list repositories" >&2
     if [ "$storage_used" -gt 0 ]; then
         add_issue \
             "Storage used but no repositories visible" \
@@ -281,9 +281,9 @@ if [ -n "$retention_policy" ]; then
     retention_enabled=$(echo "$retention_policy" | jq -r '.status // "disabled"')
     if [ "$retention_enabled" = "enabled" ]; then
         retention_days=$(echo "$retention_policy" | jq -r '.days // 0')
-        echo "✅ Retention policy enabled: $retention_days days"
+        echo "✅ Retention policy enabled: $retention_days days" >&2
     else
-        echo "⚠️ Retention policy disabled"
+        echo "⚠️ Retention policy disabled" >&2
         add_issue \
             "Retention policy not enabled" \
             4 \
@@ -294,7 +294,7 @@ if [ -n "$retention_policy" ]; then
             "az acr config retention update --registry $ACR_NAME --status enabled --days 30 --policy-type UntaggedManifests"
     fi
 else
-    echo "ℹ️ Retention policy information not available (may not be supported in current SKU)"
+    echo "ℹ️ Retention policy information not available (may not be supported in current SKU)" >&2
 fi
 
 # Generate recommendations based on current state
@@ -305,14 +305,14 @@ if [ "$storage_quota" -gt 0 ]; then
     storage_percent_int=$(echo "$storage_percent" | cut -d'.' -f1)
     
     if [ "$storage_percent_int" -gt 50 ]; then
-        echo "   1. Review and delete unused repositories: az acr repository delete --name $ACR_NAME --repository <repo-name>"
-        echo "   2. Clean up old tags: az acr repository untag --name $ACR_NAME --image <image:tag>"
-        echo "   3. Enable retention policies: az acr config retention update --registry $ACR_NAME --status enabled"
+        echo "   1. Review and delete unused repositories: az acr repository delete --name $ACR_NAME --repository <repo-name>" >&2
+        echo "   2. Clean up old tags: az acr repository untag --name $ACR_NAME --image <image:tag>" >&2
+        echo "   3. Enable retention policies: az acr config retention update --registry $ACR_NAME --status enabled" >&2
     fi
     
     if [ "$storage_percent_int" -gt 80 ]; then
-        echo "   4. Consider upgrading SKU for more storage: az acr update --name $ACR_NAME --sku Premium"
-        echo "   5. Implement automated cleanup in CI/CD pipelines"
+        echo "   4. Consider upgrading SKU for more storage: az acr update --name $ACR_NAME --sku Premium" >&2
+        echo "   5. Implement automated cleanup in CI/CD pipelines" >&2
     fi
 fi
 
@@ -342,10 +342,10 @@ cat "$ISSUES_FILE"
 
 # Display summary
 issue_count=$(jq '. | length' "$ISSUES_FILE")
-echo "📋 Issues found: $issue_count"
+echo "📋 Issues found: $issue_count" >&2
 
 if [ "$issue_count" -gt 0 ]; then
     echo "" >&2
     echo "Issues:" >&2
-    jq -r '.[] | "  - \(.title) (Severity: \(.severity))"' "$ISSUES_FILE"
+    jq -r '.[] | "  - \(.title) (Severity: \(.severity))"' "$ISSUES_FILE" >&2
 fi

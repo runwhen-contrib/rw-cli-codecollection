@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eo pipefail
+set -o pipefail
 
 # Environment variables
 SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID:-}
@@ -84,7 +84,8 @@ if [ -z "$acr_resource_id" ]; then
         "Registry: $ACR_NAME, Resource Group: $RESOURCE_GROUP" \
         "Verify ACR name \`$ACR_NAME\`, resource group \`$RESOURCE_GROUP\`, and permissions" \
         "az acr show --name $ACR_NAME --resource-group $RESOURCE_GROUP"
-    echo "❌ Failed to retrieve ACR resource ID"
+    echo "❌ Failed to retrieve ACR resource ID" >&2
+    cat "$ISSUES_FILE"
     exit 0
 fi
 
@@ -119,33 +120,33 @@ query_acr_metrics() {
 
 # Try to get pull metrics
 echo "🔽 Querying pull metrics..." >&2
-pull_metrics=$(query_acr_metrics "PullCount")
+pull_metrics=$(query_acr_metrics "PullCount" || echo "[]")
 if [ -n "$pull_metrics" ] && [ "$pull_metrics" != "[]" ]; then
     # Extract total pulls
     total_pulls=$(echo "$pull_metrics" | jq -r '
         [.value[].timeseries[]?.data[]?.total // 0] | add // 0
-    ')
-    echo "📥 Total pulls: $total_pulls"
+    ' 2>/dev/null || echo "0")
+    echo "📥 Total pulls: $total_pulls" >&2
 else
-    echo "⚠️ No pull metrics available for the specified time period"
+    echo "⚠️ No pull metrics available for the specified time period" >&2
 fi
 
 # Try to get push metrics  
 echo "🔼 Querying push metrics..." >&2
-push_metrics=$(query_acr_metrics "PushCount")
+push_metrics=$(query_acr_metrics "PushCount" || echo "[]")
 if [ -n "$push_metrics" ] && [ "$push_metrics" != "[]" ]; then
     # Extract total pushes
     total_pushes=$(echo "$push_metrics" | jq -r '
         [.value[].timeseries[]?.data[]?.total // 0] | add // 0
-    ')
-    echo "📤 Total pushes: $total_pushes"
+    ' 2>/dev/null || echo "0")
+    echo "📤 Total pushes: $total_pushes" >&2
 else
-    echo "⚠️ No push metrics available for the specified time period"
+    echo "⚠️ No push metrics available for the specified time period" >&2
 fi
 
 # If we have Log Analytics workspace, try to get more detailed information
 if [ -n "$LOG_WORKSPACE_ID" ]; then
-    echo "📋 Querying Log Analytics for detailed ACR events..."
+    echo "📋 Querying Log Analytics for detailed ACR events..." >&2
     
     # Query for container registry repository events
     log_query='ContainerRegistryRepositoryEvents
@@ -165,10 +166,10 @@ if [ -n "$LOG_WORKSPACE_ID" ]; then
     log_results=$(az monitor log-analytics query \
         --workspace "$LOG_WORKSPACE_ID" \
         --analytics-query "$log_query" \
-        --output json 2>/dev/null)
+        --output json 2>/dev/null || echo "[]")
     
     if [ -n "$log_results" ] && [ "$log_results" != "[]" ]; then
-        echo "📊 Log Analytics results available"
+        echo "📊 Log Analytics results available" >&2
         
         # Extract detailed metrics from Log Analytics
         la_total_pulls=$(echo "$log_results" | jq -r '.tables[0].rows[0][0] // 0')
@@ -191,20 +192,20 @@ if [ -n "$LOG_WORKSPACE_ID" ]; then
             successful_pushes=$la_successful_pushes
         fi
         
-        echo "📊 Detailed metrics from Log Analytics:"
-        echo "   Total pulls: $total_pulls (successful: $successful_pulls, failed: $la_failed_pulls)"
-        echo "   Total pushes: $total_pushes (successful: $successful_pushes, failed: $la_failed_pushes)"
-        echo "   Pull success rate: $la_pull_success_rate%"
-        echo "   Push success rate: $la_push_success_rate%"
+        echo "📊 Detailed metrics from Log Analytics:" >&2
+        echo "   Total pulls: $total_pulls (successful: $successful_pulls, failed: $la_failed_pulls)" >&2
+        echo "   Total pushes: $total_pushes (successful: $successful_pushes, failed: $la_failed_pushes)" >&2
+        echo "   Pull success rate: $la_pull_success_rate%" >&2
+        echo "   Push success rate: $la_push_success_rate%" >&2
     else
-        echo "⚠️ No detailed Log Analytics data available"
-        echo "   This could indicate:"
-        echo "   - No ACR activity in the specified time period"
-        echo "   - Log Analytics workspace not properly configured"
-        echo "   - Insufficient permissions to query logs"
+        echo "⚠️ No detailed Log Analytics data available" >&2
+        echo "   This could indicate:" >&2
+        echo "   - No ACR activity in the specified time period" >&2
+        echo "   - Log Analytics workspace not properly configured" >&2
+        echo "   - Insufficient permissions to query logs" >&2
     fi
 else
-    echo "ℹ️ LOG_WORKSPACE_ID not provided - using basic metrics only"
+    echo "ℹ️ LOG_WORKSPACE_ID not provided - using basic metrics only" >&2
     add_issue \
         "Log Analytics workspace not configured" \
         4 \
@@ -221,7 +222,7 @@ push_success_rate=0
 
 if [ "$total_pulls" -gt 0 ]; then
     pull_success_rate=$(echo "scale=2; ($successful_pulls * 100) / $total_pulls" | bc -l)
-    echo "📥 Pull success rate: $pull_success_rate%"
+    echo "📥 Pull success rate: $pull_success_rate%" >&2
     
     # Check pull success rate threshold
     if (( $(echo "$pull_success_rate < $PULL_SUCCESS_THRESHOLD" | bc -l) )); then
@@ -236,7 +237,7 @@ if [ "$total_pulls" -gt 0 ]; then
             "az monitor log-analytics query --workspace $LOG_WORKSPACE_ID --analytics-query \"ContainerRegistryRepositoryEvents | where OperationName == 'Pull' and ResultType != 0\""
     fi
 else
-    echo "ℹ️ No pull operations detected in the specified time period"
+    echo "ℹ️ No pull operations detected in the specified time period" >&2
     add_issue \
         "No pull operations detected" \
         4 \
@@ -249,7 +250,7 @@ fi
 
 if [ "$total_pushes" -gt 0 ]; then
     push_success_rate=$(echo "scale=2; ($successful_pushes * 100) / $total_pushes" | bc -l)
-    echo "📤 Push success rate: $push_success_rate%"
+    echo "📤 Push success rate: $push_success_rate%" >&2
     
     # Check push success rate threshold
     if (( $(echo "$push_success_rate < $PUSH_SUCCESS_THRESHOLD" | bc -l) )); then
@@ -264,7 +265,7 @@ if [ "$total_pushes" -gt 0 ]; then
             "az monitor log-analytics query --workspace $LOG_WORKSPACE_ID --analytics-query \"ContainerRegistryRepositoryEvents | where OperationName == 'Push' and ResultType != 0\""
     fi
 else
-    echo "ℹ️ No push operations detected in the specified time period"
+    echo "ℹ️ No push operations detected in the specified time period" >&2
     add_issue \
         "No push operations detected" \
         4 \
@@ -278,11 +279,11 @@ fi
 # Additional analysis if both operations are present
 if [ "$total_pulls" -gt 0 ] && [ "$total_pushes" -gt 0 ]; then
     pull_push_ratio=$(echo "scale=2; $total_pulls / $total_pushes" | bc -l)
-    echo "⚖️ Pull to Push ratio: $pull_push_ratio:1"
+    echo "⚖️ Pull to Push ratio: $pull_push_ratio:1" >&2
     
     # Analyze ratio patterns
     if (( $(echo "$pull_push_ratio > 100" | bc -l) )); then
-        echo "📈 High pull-to-push ratio detected - indicates good registry usage"
+        echo "📈 High pull-to-push ratio detected - indicates good registry usage" >&2
     elif (( $(echo "$pull_push_ratio < 1" | bc -l) )); then
         add_issue \
             "Unusual pull-to-push ratio: more pushes than pulls" \
@@ -299,9 +300,6 @@ fi
 resource_id="/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.ContainerRegistry/registries/$ACR_NAME"
 portal_url="https://portal.azure.com/#@/resource$resource_id"
 
-# Output the JSON file content to stdout for Robot Framework
-cat "$ISSUES_FILE"
-
 # Output portal URLs to stderr so they don't interfere with JSON parsing
 echo "" >&2
 echo "🔗 Portal URLs:" >&2
@@ -314,7 +312,7 @@ fi
 echo "" >&2
 echo "✅ Pull/Push ratio analysis complete" >&2
 
-# Display summary
+# Display summary to stderr
 issue_count=$(jq '. | length' "$ISSUES_FILE")
 echo "📋 Issues found: $issue_count" >&2
 
@@ -323,3 +321,6 @@ if [ "$issue_count" -gt 0 ]; then
     echo "Issues:" >&2
     jq -r '.[] | "  - \(.title) (Severity: \(.severity))"' "$ISSUES_FILE" >&2
 fi
+
+# Output the JSON file content to stdout for Robot Framework (this should be the ONLY stdout output)
+cat "$ISSUES_FILE"

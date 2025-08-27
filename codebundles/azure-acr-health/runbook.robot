@@ -269,6 +269,48 @@ Check ACR Repository Event Failures for Registry `${ACR_NAME}`
         END
     END
 
+Check ACR Security Configuration and RBAC for Registry `${ACR_NAME}`
+    [Documentation]    Comprehensive security analysis of ACR including RBAC assignments, admin user status,
+    ...    network access rules, private endpoints, and authentication methods. Identifies security
+    ...    misconfigurations and provides recommendations for hardening the registry.
+    [Tags]    acr    security    rbac    authentication    network
+    ${security_analysis}=    RW.CLI.Run Bash File
+    ...    bash_file=acr_rbac_security.sh
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+
+    # Add diagnostic information to the report
+    RW.Core.Add Pre To Report    ${security_analysis.stderr}
+    
+    # Generate portal URLs for security management
+    ${acr_resource_id_security}=    RW.CLI.Run Cli
+    ...    cmd=az acr show --name "${ACR_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    
+    ${security_url}=    Set Variable    https://portal.azure.com/#@/resource${acr_resource_id_security.stdout.strip()}/users
+    ${networking_url}=    Set Variable    https://portal.azure.com/#@/resource${acr_resource_id_security.stdout.strip()}/networking
+    ${webhooks_url}=    Set Variable    https://portal.azure.com/#@/resource${acr_resource_id_security.stdout.strip()}/webhooks
+    
+    RW.Core.Add Pre To Report    🔗 View Access Control (IAM): ${security_url}
+    RW.Core.Add Pre To Report    🔗 Configure Networking: ${networking_url}
+    RW.Core.Add Pre To Report    🔗 Manage Webhooks: ${webhooks_url}
+
+    # Parse and process security issues
+    ${issues}=    Evaluate    json.loads(r'''${security_analysis.stdout}''')    json
+    FOR    ${issue}    IN    @{issues}
+        RW.Core.Add Issue
+        ...    severity=${issue["severity"]}
+        ...    title=${issue["title"]}
+        ...    expected=${issue["expected"]}
+        ...    actual=${issue["actual"]}
+        ...    reproduce_hint=${issue["reproduce_hint"]}
+        ...    details=${issue["details"]}
+        ...    next_steps=${issue["next_steps"]}
+    END
+
 
 *** Keywords ***
 Suite Initialization
