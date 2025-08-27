@@ -24,14 +24,17 @@ add_issue() {
 
 usage=$(az acr show-usage --name "$ACR_NAME" --subscription "$SUBSCRIPTION_ID" -o json 2>usage_err.log)
 if [ $? -ne 0 ]; then
-  add_issue "Failed to get storage usage" 4 "Registry storage usage info should be retrievable" "Command failed" "See usage_err.log" "Check if ACR `$ACR_NAME` and subscription `$SUBSCRIPTION_ID` exist and you have access in resource group `$RESOURCE_GROUP`"
+  error_details=$(cat usage_err.log 2>/dev/null || echo "Unknown error occurred")
+  add_issue "Failed to get storage usage" 4 "Registry storage usage info should be retrievable" "Command failed" "Error retrieving storage usage: $error_details" "Check if ACR \`$ACR_NAME\` and subscription \`$SUBSCRIPTION_ID\` exist and you have access in resource group \`$RESOURCE_GROUP\`"
+  rm -f usage_err.log
 else
-  used=$(echo "$usage" | jq -r '.value[] | select(.name.value=="StorageUsed") | .currentValue')
-  quota=$(echo "$usage" | jq -r '.value[] | select(.name.value=="StorageUsed") | .limitValue')
+  used=$(echo "$usage" | jq -r '.value[] | select(.name=="Size") | .currentValue')
+  quota=$(echo "$usage" | jq -r '.value[] | select(.name=="Size") | .limit')
   percent=$(echo "scale=2; ($used/$quota)*100" | bc)
   if (( $(echo "$percent > $USAGE_THRESHOLD" | bc -l) )); then
-    add_issue "High storage usage" 3 "Usage below 80%" "Usage at $percent%" "Consider cleaning images in ACR `$ACR_NAME` or increase quota for resource group `$RESOURCE_GROUP`"
+    add_issue "High storage usage" 3 "Usage below ${USAGE_THRESHOLD}%" "Usage at $percent%" "Storage usage is at $percent% which exceeds the threshold of ${USAGE_THRESHOLD}%. Used: $used bytes, Quota: $quota bytes" "Consider cleaning unused images in ACR \`$ACR_NAME\` or increase storage quota for resource group \`$RESOURCE_GROUP\`"
   fi
+  rm -f usage_err.log
 fi
 
 # Output the JSON file content to stdout for Robot Framework
