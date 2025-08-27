@@ -1,0 +1,11 @@
+[
+  {
+    "title": "Failed to set Azure subscription context",
+    "severity": 3,
+    "expected": "Should be able to set subscription context",
+    "actual": "Failed to set subscription test-sub",
+    "details": "Attempted to set Azure subscription context for ACR health check. Command: 'az account set --subscription test-sub'. This failure prevents accessing Azure Resource Health API for ACR 'test' in resource group 'test-rg'. Common causes: invalid subscription ID, insufficient permissions, or Azure CLI not authenticated.",
+    "next_steps": "Verify subscription ID `test-sub` and Azure authentication for resource group `test-rg`",
+    "reproduce_hint": "az account set --subscription test-sub"
+  }
+]
