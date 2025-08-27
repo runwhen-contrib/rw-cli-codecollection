@@ -6,10 +6,98 @@ set -o pipefail
 SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID:-}
 RESOURCE_GROUP=${AZ_RESOURCE_GROUP:-}
 ACR_NAME=${ACR_NAME:-}
-LOG_WORKSPACE_ID=${LOG_WORKSPACE_ID:-}
 TIME_PERIOD_HOURS=${TIME_PERIOD_HOURS:-24}
 PULL_SUCCESS_THRESHOLD=${PULL_SUCCESS_THRESHOLD:-95}
 PUSH_SUCCESS_THRESHOLD=${PUSH_SUCCESS_THRESHOLD:-98}
+
+# Function to discover Log Analytics workspace for ACR
+discover_log_analytics_workspace() {
+    echo "🔍 Discovering Log Analytics workspace for ACR..." >&2
+    
+    # Method 1: Check ACR diagnostic settings
+    echo "   Checking ACR diagnostic settings..." >&2
+    diagnostic_settings=$(az monitor diagnostic-settings list --resource "$acr_resource_id" -o json 2>/dev/null)
+    
+    if [ -n "$diagnostic_settings" ] && [ "$diagnostic_settings" != "[]" ]; then
+        # Look for Log Analytics workspace in diagnostic settings
+        workspace_id=$(echo "$diagnostic_settings" | jq -r '.[].workspaceId // empty' | head -1)
+        if [ -n "$workspace_id" ]; then
+            echo "   ✅ Found workspace via diagnostic settings: $workspace_id" >&2
+            echo "$workspace_id"
+            return 0
+        fi
+    fi
+    
+    # Method 2: Search for Log Analytics workspaces in the same resource group
+    echo "   Searching for Log Analytics workspaces in resource group..." >&2
+    workspaces=$(az monitor log-analytics workspace list --resource-group "$RESOURCE_GROUP" -o json 2>/dev/null)
+    
+    if [ -n "$workspaces" ] && [ "$workspaces" != "[]" ]; then
+        workspace_count=$(echo "$workspaces" | jq '. | length')
+        echo "   Found $workspace_count Log Analytics workspace(s) in resource group" >&2
+        
+        if [ "$workspace_count" -eq 1 ]; then
+            # Only one workspace, use it
+            workspace_id=$(echo "$workspaces" | jq -r '.[0].id')
+            workspace_name=$(echo "$workspaces" | jq -r '.[0].name')
+            echo "   ✅ Using single workspace: $workspace_name ($workspace_id)" >&2
+            echo "$workspace_id"
+            return 0
+        else
+            # Multiple workspaces, try to find one with ACR-related name
+            acr_related_workspace=$(echo "$workspaces" | jq -r --arg acr_name "$ACR_NAME" '
+                .[] | select(.name | test($acr_name; "i")) | .id
+            ' | head -1)
+            
+            if [ -n "$acr_related_workspace" ]; then
+                workspace_name=$(echo "$workspaces" | jq -r --arg id "$acr_related_workspace" '.[] | select(.id == $id) | .name')
+                echo "   ✅ Found ACR-related workspace: $workspace_name ($acr_related_workspace)" >&2
+                echo "$acr_related_workspace"
+                return 0
+            else
+                # Use the first workspace as fallback
+                workspace_id=$(echo "$workspaces" | jq -r '.[0].id')
+                workspace_name=$(echo "$workspaces" | jq -r '.[0].name')
+                echo "   ⚠️ Multiple workspaces found, using first one: $workspace_name ($workspace_id)" >&2
+                echo "$workspace_id"
+                return 0
+            fi
+        fi
+    fi
+    
+    # Method 3: Search for Log Analytics workspaces in the subscription
+    echo "   Searching for Log Analytics workspaces in subscription..." >&2
+    subscription_workspaces=$(az monitor log-analytics workspace list -o json 2>/dev/null)
+    
+    if [ -n "$subscription_workspaces" ] && [ "$subscription_workspaces" != "[]" ]; then
+        # Try to find workspace with ACR or container-related naming
+        container_workspace=$(echo "$subscription_workspaces" | jq -r '
+            .[] | select(.name | test("container|acr|registry"; "i")) | .id
+        ' | head -1)
+        
+        if [ -n "$container_workspace" ]; then
+            workspace_name=$(echo "$subscription_workspaces" | jq -r --arg id "$container_workspace" '.[] | select(.id == $id) | .name')
+            echo "   ✅ Found container-related workspace: $workspace_name ($container_workspace)" >&2
+            echo "$container_workspace"
+            return 0
+        fi
+        
+        # Fallback to default workspace if exists
+        default_workspace=$(echo "$subscription_workspaces" | jq -r '
+            .[] | select(.name | test("defaultworkspace|default"; "i")) | .id
+        ' | head -1)
+        
+        if [ -n "$default_workspace" ]; then
+            workspace_name=$(echo "$subscription_workspaces" | jq -r --arg id "$default_workspace" '.[] | select(.id == $id) | .name')
+            echo "   ⚠️ Using default workspace: $workspace_name ($default_workspace)" >&2
+            echo "$default_workspace"
+            return 0
+        fi
+    fi
+    
+    echo "   ❌ No Log Analytics workspace found" >&2
+    return 1
+}
 
 ISSUES_FILE="pull_push_ratio_issues.json"
 echo '[]' > "$ISSUES_FILE"
@@ -118,6 +206,144 @@ query_acr_metrics() {
         --output json 2>/dev/null
 }
 
+# Function to check if an IP is in a CIDR range
+ip_in_cidr() {
+    local ip="$1"
+    local cidr="$2"
+    
+    # If it's not a CIDR range, do exact match
+    if [[ "$cidr" != *"/"* ]]; then
+        [[ "$ip" == "$cidr" ]]
+        return $?
+    fi
+    
+    # Use python for CIDR checking if available
+    if command -v python3 >/dev/null 2>&1; then
+        python3 -c "
+import ipaddress
+try:
+    ip = ipaddress.ip_address('$ip')
+    network = ipaddress.ip_network('$cidr', strict=False)
+    print('true' if ip in network else 'false')
+except:
+    print('false')
+" 2>/dev/null | grep -q "true"
+        return $?
+    fi
+    
+    # Fallback: return false for CIDR ranges if python not available
+    return 1
+}
+
+# Function to analyze failed pulls against ACR network whitelist
+analyze_failed_pulls_vs_whitelist() {
+    echo "🔍 Getting ACR network rules..." >&2
+    
+    # Get current ACR network rules
+    network_rules=$(az acr network-rule list --name "$ACR_NAME" -o json 2>/dev/null)
+    if [ -z "$network_rules" ]; then
+        echo "⚠️ Could not retrieve ACR network rules" >&2
+        return
+    fi
+    
+    # Extract IP rules
+    ip_rules=$(echo "$network_rules" | jq -r '.ipRules[]?.ipAddressOrRange // empty' 2>/dev/null)
+    default_action=$(echo "$network_rules" | jq -r '.defaultAction // "Allow"')
+    
+    echo "🌐 Current ACR network configuration:" >&2
+    echo "   Default action: $default_action" >&2
+    if [ -n "$ip_rules" ]; then
+        echo "   Whitelisted IP ranges:" >&2
+        echo "$ip_rules" | while read -r ip_range; do
+            echo "     - $ip_range" >&2
+        done
+    else
+        echo "   No IP rules configured" >&2
+    fi
+    
+    # Query for failed pull events with source IPs
+    failed_pulls_query='ContainerRegistryRepositoryEvents
+    | where TimeGenerated >= datetime('$start_time') and TimeGenerated <= datetime('$end_time')
+    | where OperationName == "Pull" and ResultType != 0
+    | where isnotempty(CallerIpAddress)
+    | summarize FailedCount = count() by CallerIpAddress, ResultDescription
+    | order by FailedCount desc
+    | limit 20'
+    
+    echo "🔍 Querying failed pull events with source IPs..." >&2
+    failed_pulls_result=$(az monitor log-analytics query \
+        --workspace "$LOG_WORKSPACE_ID" \
+        --analytics-query "$failed_pulls_query" \
+        --output json 2>/dev/null || echo "[]")
+    
+    if [ -n "$failed_pulls_result" ] && [ "$failed_pulls_result" != "[]" ]; then
+        # Check if we have any failed pulls with IP addresses
+        failed_pulls_count=$(echo "$failed_pulls_result" | jq '.tables[0].rows | length' 2>/dev/null || echo "0")
+        
+        if [ "$failed_pulls_count" -gt 0 ]; then
+            echo "📊 Found $failed_pulls_count unique IP addresses with failed pulls" >&2
+            
+            # Analyze each failed IP against whitelist
+            echo "$failed_pulls_result" | jq -r '.tables[0].rows[] | @tsv' | while IFS=$'\t' read -r caller_ip failed_count result_description; do
+                echo "🔍 Analyzing IP: $caller_ip ($failed_count failures)" >&2
+                
+                # Check if this IP is in the whitelist
+                ip_whitelisted=false
+                if [ -n "$ip_rules" ]; then
+                    while read -r ip_range; do
+                        if [ -n "$ip_range" ]; then
+                            # Use the improved IP matching function
+                            if ip_in_cidr "$caller_ip" "$ip_range"; then
+                                ip_whitelisted=true
+                                echo "   ✅ IP $caller_ip matches whitelist rule: $ip_range" >&2
+                                break
+                            fi
+                        fi
+                    done <<< "$ip_rules"
+                fi
+                
+                if [ "$ip_whitelisted" = false ]; then
+                    # This IP is not explicitly whitelisted and has failures
+                    if [ "$default_action" = "Deny" ]; then
+                        add_issue \
+                            "Failed pulls from non-whitelisted IP: $caller_ip" \
+                            2 \
+                            "Only whitelisted IPs should be able to pull from ACR when default action is Deny" \
+                            "$failed_count failed pull attempts from IP $caller_ip (not in whitelist)" \
+                            "Source IP: $caller_ip, Failed attempts: $failed_count, Error: $result_description, Default action: $default_action" \
+                            "Add IP address $caller_ip to ACR \`$ACR_NAME\` network rules if this is a legitimate source, or investigate potential security issue in resource group \`$RESOURCE_GROUP\`" \
+                            "az acr network-rule add --name $ACR_NAME --ip-address $caller_ip"
+                    else
+                        # Default action is Allow, but still having failures - might be other network issues
+                        add_issue \
+                            "Failed pulls from IP despite Allow default action: $caller_ip" \
+                            3 \
+                            "Pull operations should succeed when default action is Allow" \
+                            "$failed_count failed pull attempts from IP $caller_ip despite Allow default action" \
+                            "Source IP: $caller_ip, Failed attempts: $failed_count, Error: $result_description, Default action: $default_action" \
+                            "Investigate network connectivity issues for IP $caller_ip to ACR \`$ACR_NAME\`. Check for firewall rules, DNS issues, or authentication problems in resource group \`$RESOURCE_GROUP\`" \
+                            "Test connectivity: curl -I https://$ACR_NAME.azurecr.io/v2/"
+                    fi
+                else
+                    echo "   ✅ IP $caller_ip is whitelisted but still failing - investigating other causes" >&2
+                    add_issue \
+                        "Failed pulls from whitelisted IP: $caller_ip" \
+                        3 \
+                        "Whitelisted IPs should be able to pull successfully" \
+                        "$failed_count failed pull attempts from whitelisted IP $caller_ip" \
+                        "Source IP: $caller_ip, Failed attempts: $failed_count, Error: $result_description, Whitelisted: Yes" \
+                        "Investigate authentication, image availability, or other issues for whitelisted IP $caller_ip accessing ACR \`$ACR_NAME\` in resource group \`$RESOURCE_GROUP\`" \
+                        "Check authentication credentials and image repository availability"
+                fi
+            done
+        else
+            echo "ℹ️ No failed pulls with IP address information found" >&2
+        fi
+    else
+        echo "⚠️ Could not retrieve failed pull events from Log Analytics" >&2
+    fi
+}
+
 # Try to get pull metrics
 echo "🔽 Querying pull metrics..." >&2
 pull_metrics=$(query_acr_metrics "PullCount" || echo "[]")
@@ -144,7 +370,8 @@ else
     echo "⚠️ No push metrics available for the specified time period" >&2
 fi
 
-# If we have Log Analytics workspace, try to get more detailed information
+# Discover Log Analytics workspace and get detailed information
+LOG_WORKSPACE_ID=$(discover_log_analytics_workspace)
 if [ -n "$LOG_WORKSPACE_ID" ]; then
     echo "📋 Querying Log Analytics for detailed ACR events..." >&2
     
@@ -197,6 +424,12 @@ if [ -n "$LOG_WORKSPACE_ID" ]; then
         echo "   Total pushes: $total_pushes (successful: $successful_pushes, failed: $la_failed_pushes)" >&2
         echo "   Pull success rate: $la_pull_success_rate%" >&2
         echo "   Push success rate: $la_push_success_rate%" >&2
+        
+        # If there are failed pulls, analyze them against ACR whitelist
+        if [ "$la_failed_pulls" -gt 0 ]; then
+            echo "🔍 Analyzing failed pulls against ACR network whitelist..." >&2
+            analyze_failed_pulls_vs_whitelist
+        fi
     else
         echo "⚠️ No detailed Log Analytics data available" >&2
         echo "   This could indicate:" >&2
@@ -205,15 +438,15 @@ if [ -n "$LOG_WORKSPACE_ID" ]; then
         echo "   - Insufficient permissions to query logs" >&2
     fi
 else
-    echo "ℹ️ LOG_WORKSPACE_ID not provided - using basic metrics only" >&2
+    echo "ℹ️ No Log Analytics workspace found - using basic metrics only" >&2
     add_issue \
-        "Log Analytics workspace not configured" \
+        "Log Analytics workspace not found" \
         4 \
         "Log Analytics should be configured for detailed ACR monitoring" \
-        "LOG_WORKSPACE_ID environment variable not set" \
-        "Without Log Analytics, only basic metrics are available" \
-        "Configure Log Analytics workspace for ACR \`$ACR_NAME\` and set LOG_WORKSPACE_ID environment variable for detailed ACR event analysis in resource group \`$RESOURCE_GROUP\`" \
-        "Set LOG_WORKSPACE_ID environment variable"
+        "No Log Analytics workspace discovered for ACR monitoring" \
+        "Without Log Analytics, only basic metrics are available and failed pull IP analysis cannot be performed" \
+        "Configure Log Analytics workspace for ACR \`$ACR_NAME\` by setting up diagnostic settings to send logs to a Log Analytics workspace in resource group \`$RESOURCE_GROUP\`" \
+        "az monitor diagnostic-settings create --resource $acr_resource_id --workspace <workspace-id> --logs '[{\"category\":\"ContainerRegistryRepositoryEvents\",\"enabled\":true}]'"
 fi
 
 # Calculate success rates

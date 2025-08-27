@@ -192,11 +192,7 @@ Suite Initialization
     ...    type=string
     ...    description=The Azure Subscription Name.
     ...    pattern=\w*
-    ${LOG_WORKSPACE_ID}=    RW.Core.Import User Variable    LOG_WORKSPACE_ID
-    ...    type=string
-    ...    description=Log Analytics Workspace ID for ACR monitoring.
-    ...    pattern=\w*
-    ...    default=
+
     ${USAGE_THRESHOLD}=    RW.Core.Import User Variable    USAGE_THRESHOLD
     ...    type=string
     ...    description=Storage usage warning threshold percentage.
@@ -227,7 +223,6 @@ Suite Initialization
     Set Suite Variable    ${azure_credentials}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}
-    Set Suite Variable    ${LOG_WORKSPACE_ID}
     Set Suite Variable    ${USAGE_THRESHOLD}
     Set Suite Variable    ${CRITICAL_THRESHOLD}
     Set Suite Variable    ${TIME_PERIOD_HOURS}
@@ -245,4 +240,4 @@ Suite Initialization
     
     Set Suite Variable
     ...    ${env}
-    ...    {"ACR_NAME":"${ACR_NAME}","AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}","AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}","AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}","LOG_WORKSPACE_ID":"${LOG_WORKSPACE_ID}","USAGE_THRESHOLD":"${USAGE_THRESHOLD}","CRITICAL_THRESHOLD":"${CRITICAL_THRESHOLD}","TIME_PERIOD_HOURS":"${TIME_PERIOD_HOURS}","PULL_SUCCESS_THRESHOLD":"${PULL_SUCCESS_THRESHOLD}","PUSH_SUCCESS_THRESHOLD":"${PUSH_SUCCESS_THRESHOLD}"}
+    ...    {"ACR_NAME":"${ACR_NAME}","AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}","AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}","AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}","USAGE_THRESHOLD":"${USAGE_THRESHOLD}","CRITICAL_THRESHOLD":"${CRITICAL_THRESHOLD}","TIME_PERIOD_HOURS":"${TIME_PERIOD_HOURS}","PULL_SUCCESS_THRESHOLD":"${PULL_SUCCESS_THRESHOLD}","PUSH_SUCCESS_THRESHOLD":"${PUSH_SUCCESS_THRESHOLD}"}

@@ -135,34 +135,17 @@ if [ $? -ne 0 ] || [ -z "$usage_info" ]; then
     exit 0
 fi
 
-# Process usage information
-storage_used=0
-storage_quota=0
-webhook_used=0
-webhook_quota=0
+# Process usage information using jq directly
+storage_used=$(echo "$usage_info" | jq -r '.value[] | select(.name == "Size") | .currentValue // 0')
+storage_quota=$(echo "$usage_info" | jq -r '.value[] | select(.name == "Size") | .limitValue // 0')
+webhook_used=$(echo "$usage_info" | jq -r '.value[] | select(.name == "Webhooks") | .currentValue // 0')
+webhook_quota=$(echo "$usage_info" | jq -r '.value[] | select(.name == "Webhooks") | .limitValue // 0')
 
-echo "$usage_info" | jq -r '.value[]' | while read -r usage_item; do
-    name=$(echo "$usage_item" | jq -r '.name')
-    current=$(echo "$usage_item" | jq -r '.currentValue // 0')
-    limit=$(echo "$usage_item" | jq -r '.limitValue // 0')
-    
-    case "$name" in
-        "Size")
-            storage_used=$current
-            storage_quota=$limit
-            ;;
-        "Webhooks")
-            webhook_used=$current
-            webhook_quota=$limit
-            ;;
-    esac
-done
-
-# Re-extract values since while loop runs in subshell
-storage_used=$(echo "$usage_info" | jq -r '.value[] | select(.name=="Size") | .currentValue // 0')
-storage_quota=$(echo "$usage_info" | jq -r '.value[] | select(.name=="Size") | .limit // 0')
-webhook_used=$(echo "$usage_info" | jq -r '.value[] | select(.name=="Webhooks") | .currentValue // 0')
-webhook_quota=$(echo "$usage_info" | jq -r '.value[] | select(.name=="Webhooks") | .limit // 0')
+# Set defaults if values are empty or null
+storage_used=${storage_used:-0}
+storage_quota=${storage_quota:-0}
+webhook_used=${webhook_used:-0}
+webhook_quota=${webhook_quota:-0}
 
 echo "💾 Storage Used: $storage_used bytes" >&2
 echo "📦 Storage Quota: $storage_quota bytes" >&2

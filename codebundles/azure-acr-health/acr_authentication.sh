@@ -3,7 +3,6 @@
 SUBSCRIPTION_ID="${AZURE_SUBSCRIPTION_ID:-}"
 RESOURCE_GROUP="${AZ_RESOURCE_GROUP:-}"
 ACR_NAME="${ACR_NAME:-}"
-ACR_PASSWORD="${ACR_PASSWORD:-}"
 
 ISSUES_FILE="login_issues.json"
 echo '[]' > "$ISSUES_FILE"
@@ -98,21 +97,26 @@ login_server=$(echo "$acr_info" | jq -r '.loginServer')
 admin_username=$(echo "$admin_creds" | jq -r '.username')
 # admin_password=$(echo "$admin_creds" | jq -r '.passwords[0].value')
 
-# Attempt docker login
-if ! echo "$ACR_PASSWORD" | docker login "$login_server" -u "$admin_username" --password-stdin >docker_login.log 2>&1; then
+# Test ACR login using Azure CLI (this uses the current Azure authentication)
+echo "🔐 Testing ACR login using Azure CLI..." >&2
+if ! az acr login --name "$ACR_NAME" >acr_login.log 2>&1; then
+  login_error=$(cat acr_login.log 2>/dev/null || echo "Unknown error")
   add_issue \
-    "Docker login to ACR '$ACR_NAME' failed" \
+    "ACR login failed using Azure CLI" \
     2 \
-    "Should be able to login to the registry using admin credentials" \
-    "docker login failed" \
-    "See docker_login.log for details" \
-    "Check if admin user is enabled for ACR `$ACR_NAME`, credentials are correct, and Docker is running in resource group `$RESOURCE_GROUP`."
-  echo '{"status": "docker_login_failed"}'
+    "Should be able to login to ACR using current Azure authentication" \
+    "az acr login failed" \
+    "Login error: $login_error" \
+    "Check Azure authentication and permissions for ACR \`$ACR_NAME\`. Ensure you have AcrPush or AcrPull role in resource group \`$RESOURCE_GROUP\`."
+  echo '{"status": "acr_login_failed"}' >&2
+  cat "$ISSUES_FILE"
   exit 0
+else
+  echo "✅ ACR login successful" >&2
 fi
 
 # If everything succeeded
-rm -f az_acr_show_err.log az_acr_cred_err.log docker_login.log
+rm -f az_acr_show_err.log az_acr_cred_err.log acr_login.log
 
 echo '{"status": "reachable"}' >&2
 echo '[]' > "$ISSUES_FILE"

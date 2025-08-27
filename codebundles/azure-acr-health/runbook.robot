@@ -303,10 +303,7 @@ Suite Initialization
     ...    type=string
     ...    description=The Azure Subscription Name.
     ...    pattern=\w*
-    ${LOG_WORKSPACE_ID}=    RW.Core.Import User Variable    LOG_WORKSPACE_ID
-    ...    type=string
-    ...    description=Log Analytics Workspace ID for querying diagnostic events.
-    ...    pattern=\w*
+
     ${USAGE_THRESHOLD}=    RW.Core.Import User Variable    USAGE_THRESHOLD
     ...     type=string
     ...     description=Threshold for acr usage
@@ -317,10 +314,9 @@ Suite Initialization
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
-    Set Suite Variable    ${LOG_WORKSPACE_ID}    ${LOG_WORKSPACE_ID}
     Set Suite Variable
     ...    ${env}
-    ...    {"ACR_NAME": "${ACR_NAME}", "AZ_RESOURCE_GROUP": "${AZ_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID": "${AZURE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME": "${AZURE_SUBSCRIPTION_NAME}", "LOG_WORKSPACE_ID": "${LOG_WORKSPACE_ID}", "USAGE_THRESHOLD": "${USAGE_THRESHOLD}"}
+    ...    {"ACR_NAME": "${ACR_NAME}", "AZ_RESOURCE_GROUP": "${AZ_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID": "${AZURE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME": "${AZURE_SUBSCRIPTION_NAME}", "USAGE_THRESHOLD": "${USAGE_THRESHOLD}"}
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_SUBSCRIPTION_ID}
     ...    include_in_history=false
