@@ -81,7 +81,6 @@ Check ACR Login & Authentication for Registry `${ACR_NAME}`
     ${login}=    RW.CLI.Run Bash File
     ...    bash_file=acr_authentication.sh
     ...    env=${env}
-    ...    secret_file__azure_credentials=${azure_credentials}
     ...    timeout_seconds=90
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${login.stderr}

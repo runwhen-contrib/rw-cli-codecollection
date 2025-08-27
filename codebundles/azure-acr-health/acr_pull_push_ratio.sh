@@ -471,14 +471,30 @@ if [ "$total_pulls" -gt 0 ]; then
     fi
 else
     echo "ℹ️ No pull operations detected in the specified time period" >&2
+    
+    # Gather diagnostic information for the issue
+    diagnostic_info="Analysis period: $start_time to $end_time (${TIME_PERIOD_HOURS}h)
+Registry: $ACR_NAME ($login_server)
+Resource Group: $RESOURCE_GROUP
+Subscription: $SUBSCRIPTION_ID
+Log Analytics Workspace: ${LOG_WORKSPACE_ID:-'Not configured'}
+Metrics source: $([ -n "$LOG_WORKSPACE_ID" ] && echo 'Log Analytics' || echo 'Azure Monitor Metrics only')
+
+This could indicate:
+- No applications are currently pulling images from this registry
+- Applications are using cached images and not pulling frequently
+- The time period analyzed may be too short
+- Applications may be pulling from a different registry
+- Registry may be newly created with no usage yet"
+
     add_issue \
         "No pull operations detected" \
         4 \
         "Some pull activity expected for active registries" \
         "No pull operations found in the last $TIME_PERIOD_HOURS hours" \
-        "Time period: $TIME_PERIOD_HOURS hours, Registry: $ACR_NAME" \
-        "Verify that applications are actively using ACR \`$ACR_NAME\`, or adjust the time period for analysis in resource group \`$RESOURCE_GROUP\`" \
-        "Check application configurations and registry usage patterns"
+        "$diagnostic_info" \
+        "Verify that applications are actively using ACR \`$ACR_NAME\`, check application configurations, or adjust the time period for analysis in resource group \`$RESOURCE_GROUP\`. Consider checking repository list and recent image pushes." \
+        "az acr repository list --name $ACR_NAME && az acr repository show-tags --name $ACR_NAME --repository <repo-name>"
 fi
 
 if [ "$total_pushes" -gt 0 ]; then
@@ -499,14 +515,31 @@ if [ "$total_pushes" -gt 0 ]; then
     fi
 else
     echo "ℹ️ No push operations detected in the specified time period" >&2
+    
+    # Gather diagnostic information for the issue
+    diagnostic_info="Analysis period: $start_time to $end_time (${TIME_PERIOD_HOURS}h)
+Registry: $ACR_NAME ($login_server)
+Resource Group: $RESOURCE_GROUP
+Subscription: $SUBSCRIPTION_ID
+Log Analytics Workspace: ${LOG_WORKSPACE_ID:-'Not configured'}
+Metrics source: $([ -n "$LOG_WORKSPACE_ID" ] && echo 'Log Analytics' || echo 'Azure Monitor Metrics only')
+
+This could indicate:
+- CI/CD pipelines are not actively pushing to this registry
+- Development activity may be low during the analyzed period
+- Images may be pushed to a different registry or environment
+- The time period analyzed may not cover recent development activity
+- Registry may be used only for pulling pre-built images
+- Build processes may be failing before reaching the push stage"
+
     add_issue \
         "No push operations detected" \
         4 \
         "Some push activity expected for active development" \
         "No push operations found in the last $TIME_PERIOD_HOURS hours" \
-        "Time period: $TIME_PERIOD_HOURS hours, Registry: $ACR_NAME" \
-        "Verify that CI/CD pipelines are actively pushing to ACR \`$ACR_NAME\`, or adjust the time period for analysis in resource group \`$RESOURCE_GROUP\`" \
-        "Check CI/CD pipeline configurations and deployment processes"
+        "$diagnostic_info" \
+        "Verify that CI/CD pipelines are actively pushing to ACR \`$ACR_NAME\`, check pipeline configurations and build processes, or adjust the time period for analysis in resource group \`$RESOURCE_GROUP\`. Consider checking recent repository activity." \
+        "az acr repository list --name $ACR_NAME && az acr task list --registry $ACR_NAME"
 fi
 
 # Additional analysis if both operations are present

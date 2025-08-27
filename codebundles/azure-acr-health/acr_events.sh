@@ -50,10 +50,41 @@ fi
 
 echo "📊 Using Log Analytics workspace: $LOG_WORKSPACE_ID" >&2
 
-query_result=$(az monitor log-analytics query --workspace "$LOG_WORKSPACE_ID" --analytics-query "ContainerRegistryRepositoryEvents | where ResultType != 0 | summarize count() by ResultType, bin(TimeGenerated, 5m) | top 5 by count_" 2>/dev/null)
+# First, check if the ContainerRegistryRepositoryEvents table exists
+table_check_query="ContainerRegistryRepositoryEvents | take 1"
+table_check_result=$(az monitor log-analytics query --workspace "$LOG_WORKSPACE_ID" --analytics-query "$table_check_query" 2>table_check_error.log)
+table_check_exit_code=$?
+
+if [ $table_check_exit_code -ne 0 ]; then
+  table_error=$(cat table_check_error.log 2>/dev/null || echo "Unknown error occurred")
+  
+  # Check if it's a PathNotFoundError (table doesn't exist)
+  if echo "$table_error" | grep -q "PathNotFoundError\|does not exist"; then
+    add_issue "ContainerRegistryRepositoryEvents table not found in Log Analytics" 4 "ACR diagnostic logs should be configured to send events to Log Analytics" "ContainerRegistryRepositoryEvents table does not exist in the workspace" "Log Analytics workspace: $LOG_WORKSPACE_ID
+ACR: $ACR_NAME
+Resource Group: $RESOURCE_GROUP
+Error: $table_error
+
+This indicates that either:
+1. Diagnostic settings are not configured for the ACR
+2. No ACR events have been generated yet
+3. The diagnostic logs category 'ContainerRegistryRepositoryEvents' is not enabled" "Configure diagnostic settings for ACR \`$ACR_NAME\` to send ContainerRegistryRepositoryEvents logs to the Log Analytics workspace. This will enable monitoring of pull/push operations and failures." "az monitor diagnostic-settings create --resource \$(az acr show --name $ACR_NAME --resource-group $RESOURCE_GROUP --query id -o tsv) --workspace $LOG_WORKSPACE_ID --logs '[{\"category\":\"ContainerRegistryRepositoryEvents\",\"enabled\":true}]' --name acr-diagnostics"
+  else
+    add_issue "Failed to access Log Analytics workspace" 4 "Should be able to query Log Analytics workspace" "Cannot access ContainerRegistryRepositoryEvents table" "Log Analytics workspace: $LOG_WORKSPACE_ID
+Error: $table_error" "Check permissions to Log Analytics workspace and verify the workspace ID is correct for ACR \`$ACR_NAME\` in resource group \`$RESOURCE_GROUP\`" "az monitor log-analytics workspace show --workspace-name \$(basename $LOG_WORKSPACE_ID) --resource-group $RESOURCE_GROUP"
+  fi
+  rm -f table_check_error.log
+  cat "$ISSUES_FILE"
+  exit 0
+fi
+
+# If table exists, proceed with the actual query
+query_result=$(az monitor log-analytics query --workspace "$LOG_WORKSPACE_ID" --analytics-query "ContainerRegistryRepositoryEvents | where ResultType != 0 | summarize count() by ResultType, bin(TimeGenerated, 5m) | top 5 by count_" 2>query_error.log)
 
 if [ $? -ne 0 ]; then
-  add_issue "Failed to query repository events" 4 "Should be able to query repository events" "Command failed" "See CLI errors" "Check permissions and workspace configuration for ACR \`$ACR_NAME\` in resource group \`$RESOURCE_GROUP\`"
+  error_details=$(cat query_error.log 2>/dev/null || echo "Unknown error occurred")
+  add_issue "Failed to query repository events" 4 "Should be able to query repository events" "Command failed" "Query error: $error_details" "Check permissions and workspace configuration for ACR \`$ACR_NAME\` in resource group \`$RESOURCE_GROUP\`. Verify Log Analytics workspace access and that diagnostic settings are configured to send ACR events to the workspace."
+  rm -f query_error.log
 fi
 
 # Output the JSON file content to stdout for Robot Framework
