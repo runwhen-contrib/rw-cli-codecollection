@@ -97,26 +97,48 @@ login_server=$(echo "$acr_info" | jq -r '.loginServer')
 admin_username=$(echo "$admin_creds" | jq -r '.username')
 # admin_password=$(echo "$admin_creds" | jq -r '.passwords[0].value')
 
-# Test ACR login using Azure CLI (this uses the current Azure authentication)
-echo "🔐 Testing ACR login using Azure CLI..." >&2
-if ! az acr login --name "$ACR_NAME" >acr_login.log 2>&1; then
-  login_error=$(cat acr_login.log 2>/dev/null || echo "Unknown error")
+# Test ACR authentication using token-based approach (Docker CLI not available)
+echo "🔐 Testing ACR authentication using token..." >&2
+token_result=$(az acr login --name "$ACR_NAME" --expose-token 2>acr_token_error.log)
+token_exit_code=$?
+
+if [ $token_exit_code -ne 0 ]; then
+  token_error=$(cat acr_token_error.log 2>/dev/null || echo "Unknown error")
   add_issue \
-    "ACR login failed using Azure CLI" \
+    "ACR token authentication failed" \
     2 \
-    "Should be able to login to ACR using current Azure authentication" \
-    "az acr login failed" \
-    "Login error: $login_error" \
+    "Should be able to authenticate to ACR using Azure credentials" \
+    "az acr login --expose-token failed" \
+    "Token authentication error: $token_error" \
     "Check Azure authentication and permissions for ACR \`$ACR_NAME\`. Ensure you have AcrPush or AcrPull role in resource group \`$RESOURCE_GROUP\`."
-  echo '{"status": "acr_login_failed"}' >&2
+  echo '{"status": "acr_auth_failed"}' >&2
+  rm -f acr_token_error.log
   cat "$ISSUES_FILE"
   exit 0
-else
-  echo "✅ ACR login successful" >&2
 fi
 
+# Verify we got a valid token response
+if echo "$token_result" | jq -e '.accessToken' >/dev/null 2>&1; then
+  echo "✅ ACR token authentication successful" >&2
+  token_length=$(echo "$token_result" | jq -r '.accessToken' | wc -c)
+  echo "   Token received (length: $token_length characters)" >&2
+else
+  add_issue \
+    "ACR token response invalid" \
+    2 \
+    "Should receive valid access token from ACR" \
+    "Token response does not contain valid accessToken" \
+    "Token response: $token_result" \
+    "Check ACR \`$ACR_NAME\` configuration and Azure authentication in resource group \`$RESOURCE_GROUP\`."
+  echo '{"status": "invalid_token"}' >&2
+  cat "$ISSUES_FILE"
+  exit 0
+fi
+
+rm -f acr_token_error.log
+
 # If everything succeeded
-rm -f az_acr_show_err.log az_acr_cred_err.log acr_login.log
+rm -f az_acr_show_err.log az_acr_cred_err.log acr_token_error.log
 
 echo '{"status": "reachable"}' >&2
 echo '[]' > "$ISSUES_FILE"

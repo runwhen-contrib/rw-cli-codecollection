@@ -230,7 +230,7 @@ if [ "$admin_enabled" = "true" ]; then
         4 \
         "Admin user should be disabled for production environments" \
         "Admin user is currently enabled" \
-        "Admin user provides full access with username/password authentication" \
+        "Admin user provides full access with username/password authentication, which poses security risks in production environments" \
         "Disable admin user for ACR \`$ACR_NAME\` and use Azure AD authentication with service principals or managed identities in resource group \`$RESOURCE_GROUP\`" \
         "az acr update --name $ACR_NAME --admin-enabled false"
 fi
