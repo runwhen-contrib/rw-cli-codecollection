@@ -16,39 +16,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check for Resource Health Issues Affecting ACR `${ACR_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Check Azure Resource Health status for the ACR to identify platform-level issues.
-    [Tags]    access:read-only    ACR    Azure    ResourceHealth    Health
-    ${resource_health}=    RW.CLI.Run Bash File
-    ...    bash_file=acr_resource_health.sh
-    ...    env=${env}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
-    ...    show_in_rwl_cheatsheet=true
-    RW.Core.Add Pre To Report    ${resource_health.stderr}
-    
-    # Add portal URL for Resource Health
-    ${acr_resource_id}=    RW.CLI.Run Cli
-    ...    cmd=az acr show --name "${ACR_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
-    ...    env=${env}
-    ...    timeout_seconds=30
-    ...    include_in_history=false
-    ${resource_health_url}=    Set Variable    https://portal.azure.com/#@/resource${acr_resource_id.stdout.strip()}/resourceHealth
-    RW.Core.Add Pre To Report    🔗 View Resource Health in Azure Portal: ${resource_health_url}
 
-    ${issues}=    Evaluate    json.loads(r'''${resource_health.stdout}''')    json
-    IF    len(@{issues}) > 0
-        FOR    ${issue}    IN    @{issues}
-            RW.Core.Add Issue
-            ...    severity=${issue["severity"]}
-            ...    title=${issue["title"]}
-            ...    expected=${issue["expected"]}
-            ...    actual=${issue["actual"]}
-            ...    reproduce_hint=${issue.get("reproduce_hint", "")}
-            ...    details=${issue["details"]}
-            ...    next_steps=${issue["next_steps"]}
-        END
-    END
 
 Check Network Configuration for ACR `${ACR_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Analyze network access rules, private endpoints, firewall settings, and connectivity.

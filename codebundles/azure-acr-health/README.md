@@ -4,7 +4,7 @@ This bundle provides comprehensive health checks for Azure Container Registries 
 
 ## Included Health Checks
 
-- **Azure Resource Health**: Integrates with Azure Resource Health API to detect platform-level issues
+
 - **Network Configuration**: Analyzes network access rules, private endpoints, firewall settings, and connectivity
 - **DNS & TLS Reachability**: Verifies DNS resolution and HTTPS/TLS connectivity to ACR endpoint
 - **Authentication & Authorization**: Tests login capabilities and analyzes authentication methods
@@ -18,7 +18,7 @@ This bundle provides comprehensive health checks for Azure Container Registries 
 ## Main Tasks
 
 ### Runbook Tasks (Issue Detection & Remediation)
-- `Check for Resource Health Issues Affecting ACR`
+
 - `Check Network Configuration for ACR`
 - `Check DNS & TLS Reachability for Registry`
 - `Check ACR Login & Authentication`
@@ -34,7 +34,7 @@ This bundle provides comprehensive health checks for Azure Container Registries 
 - `Check ACR Pull/Push Success Ratio`
 - `Check ACR Storage Utilization`
 - `Check ACR Network Configuration`
-- `Check ACR Resource Health`
+
 - `Check ACR Security Configuration`
 - `Generate Comprehensive ACR Health Score`
 
@@ -88,7 +88,7 @@ robot sli.robot
 - `sli.robot` - Service Level Indicator scoring for monitoring integration
 
 ### Health Check Scripts
-- `acr_resource_health.sh` - Azure Resource Health API integration
+
 - `acr_network_config.sh` - Network configuration and connectivity analysis
 - `acr_reachability.sh` - DNS and TLS connectivity testing
 - `acr_authentication.sh` - Authentication and login testing

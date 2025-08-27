@@ -116,28 +116,7 @@ Check ACR Network Configuration for Registry `${ACR_NAME}`
     Set Global Variable    ${network_score}    ${score}
     RW.Core.Push Metric    ${score}    sub_name=network_config
 
-Check ACR Resource Health for Registry `${ACR_NAME}`
-    [Documentation]    Checks Azure Resource Health status for the ACR.
-    [Tags]    ACR    Azure    ResourceHealth    Health
-    ${resource_health}=    RW.CLI.Run Bash File
-    ...    bash_file=acr_resource_health.sh
-    ...    env=${env}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
-    ${issues_list}=    RW.CLI.Run Cli
-    ...    cmd=cat resource_health_issues.json
-    ...    env=${env}
-    ...    timeout_seconds=30
-    ...    include_in_history=false
-    TRY
-        ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
-        ${score}=    Evaluate    0 if len(@{issues}) > 0 else 1
-    EXCEPT
-        Log    Failed to parse resource health issues JSON, defaulting to score 0
-        ${score}=    Set Variable    0
-    END
-    Set Global Variable    ${resource_health_score}    ${score}
-    RW.Core.Push Metric    ${score}    sub_name=resource_health
+
 
 Check ACR Security Configuration
     [Documentation]    Analyzes ACR security configuration including RBAC, admin user settings, network access, and authentication methods.
@@ -186,7 +165,7 @@ Generate Comprehensive ACR Health Score for Registry `${ACR_NAME}` in Resource G
     [Tags]    ACR    Azure    Health    Score    SLI
     
     # Calculate and push overall health score
-    ${comprehensive_health_score}=    Evaluate    (${reachability_score} + ${sku_score} + ${pull_push_score} + ${storage_score} + ${network_score} + ${resource_health_score} + ${security_score}) / 7
+    ${comprehensive_health_score}=    Evaluate    (${reachability_score} + ${sku_score} + ${pull_push_score} + ${storage_score} + ${network_score} + ${security_score}) / 6
     ${health_score}=    Convert to Number    ${comprehensive_health_score}    2
     RW.Core.Push Metric    ${health_score}
 
@@ -260,7 +239,7 @@ Suite Initialization
     Set Global Variable    ${pull_push_score}    0
     Set Global Variable    ${storage_score}    0
     Set Global Variable    ${network_score}    0
-    Set Global Variable    ${resource_health_score}    0
+
     Set Global Variable    ${security_score}    0
     
     Set Suite Variable
