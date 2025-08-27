@@ -7,7 +7,7 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://placeholder.svg
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/containers/10105-icon-service-Container-Registries.svg
   alias: {{match_resource.resource.name}} Azure ACR Health
   asMeasuredBy: Composite health score of resources & activities. 
   configProvided:
@@ -15,7 +15,7 @@ spec:
     value: SLX_PLACEHOLDER
   owners:
   - {{workspace.owner_email}}
-  statement: Monitors the health of Azure Container Registry (ACR) by checking reachability, SKU metrics, pull/push success ratios, and storage utilization.
+  statement: Monitors the health of Azure Container Registry (ACR) by checking reachability, metrics, pull/push success ratios, and storage utilization.
   additionalContext:  
     {% include "azure-hierarchy.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"
