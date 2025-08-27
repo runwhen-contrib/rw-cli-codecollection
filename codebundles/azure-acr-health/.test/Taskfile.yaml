@@ -259,7 +259,8 @@ tasks:
           exit 1
         fi
         URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/secrets"
-        PAYLOAD="{\"secrets\": {\"az_subscriptionId\": \"${ARM_SUBSCRIPTION_ID}\", \"az_clientId\": \"${AZ_CLIENT_ID}\", \"az_tenantId\": \"${AZ_TENANT_ID}\", \"az_clientSecret\": \"${AZ_CLIENT_SECRET}\"}}"
+        # Upload Azure service principal secrets with correct naming convention
+        PAYLOAD="{\"secrets\": {\"azure_clientId\": \"${AZ_CLIENT_ID}\", \"azure_tenantId\": \"${AZ_TENANT_ID}\", \"azure_clientSecret\": \"${AZ_CLIENT_SECRET}\", \"azure_subscriptionId\": \"${ARM_SUBSCRIPTION_ID}\"}}"
         echo "Uploading secrets to $URL"
         response_code=$(curl -X POST "$URL" \
           -H "Authorization: Bearer $RW_PAT" \
@@ -271,6 +272,27 @@ tasks:
         else
           echo "Failed to upload secrets: $SLX_NAME to $URL. Unexpected response code: $response_code"
         fi
+        
+        # Update secretsProvided in generated files to use azure:sp pattern
+        echo "Updating secretsProvided sections in generated files..."
+        for dir in "$BASE_DIR"/*; do
+          if [ -d "$dir" ]; then
+            for file in "$dir"/*.yaml; do
+              if [ -f "$file" ] && grep -q "secretsProvided" "$file"; then
+                echo "  Updating $file"
+                # Use yq to replace the secretsProvided section with correct workspace keys
+                yq eval '.spec.secretsProvided = [
+                  {"name": "azure_credentials", "workspaceKey": "azure:sp@cli"},
+                  {"name": "az_subscriptionId", "workspaceKey": "azure_subscriptionId"},
+                  {"name": "az_clientId", "workspaceKey": "azure_clientId"},
+                  {"name": "az_tenantId", "workspaceKey": "azure_tenantId"},
+                  {"name": "az_clientSecret", "workspaceKey": "azure_clientSecret"}
+                ]' -i "$file"
+              fi
+            done
+          fi
+        done
+        
         for dir in "$BASE_DIR"/*; do
           if [ -d "$dir" ]; then
             SLX_NAME=$(basename "$dir")
