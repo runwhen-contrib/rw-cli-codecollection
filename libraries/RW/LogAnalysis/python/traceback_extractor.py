@@ -65,7 +65,6 @@ class TimestampedTracebackExtractor:
     def is_traceback_start(self, line: str) -> bool:
         """Check if line starts a traceback."""
         _, clean_line = self.extract_timestamp(line)
-        print(clean_line, "\n")
         return any(pattern.match(clean_line) for pattern in self.traceback_start_patterns)
     
     def is_chain_indicator(self, line: str) -> bool:
@@ -147,7 +146,6 @@ class TimestampedTracebackExtractor:
             line = lines[i]
 
             if self.is_traceback_start(line):
-                # print(line, "\n")
                 traceback, end_idx = self._extract_single_traceback(lines, i)
                 if traceback:
                     tracebacks.append(traceback)
