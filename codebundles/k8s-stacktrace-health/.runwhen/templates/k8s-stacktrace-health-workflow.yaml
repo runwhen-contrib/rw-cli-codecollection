@@ -1,0 +1,25 @@
+apiVersion: runwhen.com/v1
+kind: Workflow
+metadata:
+  name: {{slx_name}}-{{ "Stacktrace Health Alert Workflow" | replace(" ", "-") | lower }}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  fromActivities:
+  - displayName: {{match_resource.resource.metadata.name}} {{match_resource.resource.kind}} Stacktrace Health SLI Alert Workflow
+    description: Start RunSession with Eager Edgar when SLI is alerting for {{match_resource.resource.metadata.name}} {{match_resource.resource.kind | lower}} stacktrace health
+    actions:
+    - tasks:
+        slx: {{slx_name.split('--')[1]}}
+        persona: eager-edgar
+        titles:
+          - '*'
+        sessionTTL: 20m
+    match:
+      activityVerbs:
+      - SLI_ALERTS_STARTED
+      slxs:
+      - {{slx_name.split('--')[1]}}
+    name: {{match_resource.resource.metadata.name}}-{{ "Stacktrace Health Alert Workflow" | replace(" ", "-") | lower }}

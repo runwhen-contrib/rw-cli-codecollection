@@ -1,0 +1,190 @@
+commands:
+- command: kubectl logs ${pod_name} --context ${CONTEXT} -n ${NAMESPACE} -c ${container_name} --tail=${LOG_LINES} --since=${LOG_AGE} --limit-bytes ${LOG_SIZE}
+  doc_links: '
+
+    - [Viewing and Filtering Logs](https://kubernetes.io/docs/concepts/cluster-administration/logging/){:target="_blank"}
+
+    - [Kubectl Command Reference](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#logs){:target="_blank"}'
+  explanation: This command fetches logs from a specific container within a pod for stacktrace analysis. It limits the output to a specific number of lines, time window, and byte size to prevent API overload while ensuring sufficient data for stacktrace detection. Works with any Kubernetes workload type.
+  multi_line_details: '
+
+    # Fetch logs from a specific container for stacktrace analysis
+
+    kubectl logs ${pod_name} --context ${CONTEXT} -n ${NAMESPACE} -c ${container_name} \
+      --tail=${LOG_LINES} \
+      --since=${LOG_AGE} \
+      --limit-bytes ${LOG_SIZE}
+
+    # This command is optimized for stacktrace detection by:
+    # - Limiting log lines to prevent overwhelming the analysis
+    # - Focusing on recent logs within the specified time window
+    # - Controlling byte size to prevent API timeouts
+    # - Targeting specific containers to avoid noise from sidecar containers
+
+    '
+  name: fetch_container_logs_for_stacktrace_analysis
+  when_is_it_useful: '1. Troubleshooting application crashes or errors by analyzing stacktraces in container logs to identify the root cause of failures across any workload type.
+
+
+    2. Monitoring application health by detecting Python, Java, or other language stacktraces that indicate runtime exceptions or errors in deployments, statefulsets, or daemonsets.
+
+
+    3. Investigating intermittent application issues where stacktraces provide crucial debugging information about the failure conditions in any Kubernetes workload.
+
+
+    4. Performing post-incident analysis to understand what went wrong by examining stacktraces that occurred during the incident timeframe across different workload types.
+
+
+    5. Proactive monitoring to detect application errors early through automated stacktrace detection before they impact users significantly, regardless of workload type.'
+
+- command: kubectl get pods --context ${CONTEXT} -n ${NAMESPACE} -l app=${WORKLOAD_NAME} -o name
+  doc_links: '
+
+    - [Kubectl Get Pods Documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+
+    - [Kubernetes Labels and Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}'
+  explanation: This command lists all pods associated with a specific workload using label selectors. It returns pod names in a format suitable for further processing and log extraction. Works with deployments, statefulsets, and daemonsets.
+  multi_line_details: '
+
+    # Get all pods for the workload using label selector
+
+    kubectl get pods --context ${CONTEXT} -n ${NAMESPACE} -l app=${WORKLOAD_NAME} -o name
+
+    # This command:
+    # - Uses label selector to find pods belonging to the workload
+    # - Returns pod names in "pod/podname" format for easy parsing
+    # - Provides the foundation for iterating through all workload pods
+    # - Enables comprehensive stacktrace analysis across all instances
+
+    '
+  name: list_deployment_pods_for_stacktrace_analysis
+  when_is_it_useful: '1. Identifying all pod instances of a workload to ensure comprehensive stacktrace analysis across all running containers, regardless of workload type.
+
+
+    2. Automating log collection from multiple pod replicas to detect stacktraces that might only appear in specific instances in deployments, statefulsets, or daemonsets.
+
+
+    3. Scaling stacktrace monitoring across horizontally scaled applications where errors might occur in any pod replica across different workload types.
+
+
+    4. Building workload-wide health monitoring that checks for stacktraces across all pods rather than just a single instance, supporting all Kubernetes workload types.
+
+
+    5. Troubleshooting distributed application issues where stacktraces in different pods might provide different pieces of the puzzle across various workload configurations.'
+
+- command: kubectl get ${pod_name} --context ${CONTEXT} -n ${NAMESPACE} -o jsonpath='{range .spec.containers[*]}{.name}{"\\n"}{end}'
+  doc_links: '
+
+    - [JSONPath Support in Kubectl](https://kubernetes.io/docs/reference/kubectl/jsonpath/){:target="_blank"}
+
+    - [Kubernetes Pod Specification](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#pod-v1-core){:target="_blank"}'
+  explanation: This command extracts container names from a specific pod using JSONPath. It's essential for iterating through all containers within a pod to perform comprehensive stacktrace analysis.
+  multi_line_details: '
+
+    # Extract container names from a pod for individual log analysis
+
+    kubectl get ${pod_name} --context ${CONTEXT} -n ${NAMESPACE} \
+      -o jsonpath=''{range .spec.containers[*]}{.name}{"\\n"}{end}''
+
+    # This command:
+    # - Uses JSONPath to extract container names from pod specification
+    # - Returns one container name per line for easy parsing
+    # - Enables targeted log collection from each container
+    # - Supports multi-container pod analysis for comprehensive stacktrace detection
+
+    '
+  name: extract_container_names_from_pod
+  when_is_it_useful: '1. Analyzing multi-container pods where stacktraces might appear in any of the containers, requiring individual container log inspection across any workload type.
+
+
+    2. Filtering out sidecar containers or infrastructure containers that are not relevant for application stacktrace analysis in deployments, statefulsets, or daemonsets.
+
+
+    3. Automating log collection workflows that need to process each container separately for optimal stacktrace detection regardless of workload type.
+
+
+    4. Troubleshooting complex applications with multiple containers where different types of errors might appear in different containers across various Kubernetes workloads.
+
+
+    5. Building comprehensive monitoring solutions that check all containers within a pod for application errors and stacktraces across all supported workload types.'
+
+user_variables:
+  - name: WORKLOAD_NAME
+    description: "The name of the Kubernetes workload (deployment, statefulset, or daemonset) to analyze for stacktraces."
+    type: string
+    required: true
+    examples:
+      - "my-app"
+      - "web-server"
+      - "background-worker"
+      
+  - name: WORKLOAD_TYPE
+    default: "deployment"
+    description: "The type of Kubernetes workload to analyze (deployment, statefulset, or daemonset)."
+    type: string
+    required: false
+    enum: ["deployment", "statefulset", "daemonset"]
+    examples:
+      - "deployment"
+      - "statefulset"
+      - "daemonset"
+      
+  - name: LOG_LINES
+    default: "100"
+    description: "The number of log lines to fetch from each container when analyzing for stacktraces. Higher values provide more context but may impact performance."
+    type: string
+    required: false
+    examples:
+      - "50"
+      - "100"
+      - "200"
+      
+  - name: LOG_AGE
+    default: "3h"
+    description: "The time window to fetch logs for stacktrace analysis. Longer periods provide more comprehensive analysis but may impact performance."
+    type: string
+    required: false
+    examples:
+      - "1h"
+      - "3h"
+      - "6h"
+      
+  - name: LOG_SIZE
+    default: "2097152"
+    description: "The maximum size of logs in bytes to fetch from pods for stacktrace analysis. Defaults to 2MB to balance comprehensiveness with performance."
+    type: string
+    required: false
+    examples:
+      - "1048576"
+      - "2097152"
+      - "4194304"
+      
+  - name: IGNORE_CONTAINERS_MATCHING
+    default: "linkerd"
+    description: "Comma-separated string of keywords used to identify and skip container names containing any of these substrings. Useful for filtering out sidecar containers."
+    type: string
+    required: false
+    examples:
+      - "linkerd,istio"
+      - "linkerd,initX,sidecar"
+      - "proxy,mesh"
+      
+  - name: MAX_LOG_LINES
+    default: "100"
+    description: "Maximum number of log lines to fetch per container for SLI checks to prevent API overload while maintaining effective stacktrace detection."
+    type: string
+    required: false
+    examples:
+      - "50"
+      - "100"
+      - "200"
+      
+  - name: MAX_LOG_BYTES
+    default: "256000"
+    description: "Maximum log size in bytes to fetch per container for SLI checks to prevent API overload while maintaining effective stacktrace detection."
+    type: string
+    required: false
+    examples:
+      - "128000"
+      - "256000"
+      - "512000"
