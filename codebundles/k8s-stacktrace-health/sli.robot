@@ -242,7 +242,6 @@ Get Stacktrace Health Score for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}`
     END 
 
     Set Suite Variable    ${stacktrace_score}
-    RW.Core.Push Metric    ${stacktrace_score}
 
 Generate Stacktrace Health Score for `${WORKLOAD_NAME}`
     [Documentation]    Generates the final stacktrace health score and report details
