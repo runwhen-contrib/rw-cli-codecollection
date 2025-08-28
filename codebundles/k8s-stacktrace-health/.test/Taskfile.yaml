@@ -31,12 +31,15 @@ tasks:
         cloudConfig:
           kubernetes: 
             kubeconfigFile: /shared/kubeconfig.secret
+            namespaces: 
+            - online-boutique
         codeCollections:
         - repoURL: "$repo_url"
           branch: "$branch_name"
           codeBundles: ["$codebundle"]
         custom: 
           kubernetes_distribution_binary: kubectl
+          kubeconfig_secret_name: kubeconfig
         EOF
     silent: true
 
