@@ -8,8 +8,8 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/kubernetes/resources/labeled/deploy.svg
-  alias: {{match_resource.resource.metadata.name}} {{match_resource.resource.kind}} Stacktrace Health
-  asMeasuredBy: The presence of stacktraces or tracebacks in application logs indicating runtime errors or exceptions.
+  alias: {{match_resource.resource.metadata.name}} {{match_resource.kind}} Stacktrace Health
+  asMeasuredBy: The presence of stacktraces or tracebacks in application logs indicating runtime errors or exceptions in {{match_resource.resource.metadata.name}}
   configProvided:
   - name: OBJECT_NAME
     value: {{match_resource.resource.metadata.name}}
