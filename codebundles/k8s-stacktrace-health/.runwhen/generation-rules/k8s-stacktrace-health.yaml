@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+    - resourceTypes:
+        - deployment
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: stacktrace-health
+          levelOfDetail: detailed
+          qualifiers: ["resource", "namespace", "cluster"]
+          baseTemplateName: k8s-stacktrace-health
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: k8s-stacktrace-health-taskset.yaml
+            - type: workflow

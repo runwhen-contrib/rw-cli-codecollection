@@ -9,6 +9,7 @@ Library           RW.Core
 Library           RW.CLI
 Library           RW.platform
 Library           RW.K8sLog
+
 Library           OperatingSystem
 Library           String
 Library           Collections
@@ -89,6 +90,7 @@ Suite Initialization
     ...    pattern=.*
     ...    example="errors":\s*\[\]|"warnings":\s*\[\]
     ...    default="errors":\s*\[\]|\\bINFO\\b|\\bDEBUG\\b|\\bTRACE\\b|\\bSTART\\s*-\\s*|\\bSTART\\s*method\\b
+
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
@@ -106,6 +108,7 @@ Suite Initialization
     Set Suite Variable    ${EVENT_THRESHOLD}    ${EVENT_THRESHOLD}
     Set Suite Variable    ${CHECK_SERVICE_ENDPOINTS}    ${CHECK_SERVICE_ENDPOINTS}
     Set Suite Variable    ${LOGS_EXCLUDE_PATTERN}    ${LOGS_EXCLUDE_PATTERN}
+
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${DEPLOYMENT_NAME}    ${DEPLOYMENT_NAME}
@@ -117,6 +120,7 @@ Suite Initialization
     Set Suite Variable    ${pods_notready_score}    0
     Set Suite Variable    ${replica_score}    0
     Set Suite Variable    ${events_score}    0
+
     
     # Check if deployment is scaled to 0 and handle appropriately
     ${scale_check}=    RW.CLI.Run Cli
@@ -379,6 +383,8 @@ Get Recent Warning Events Score for `${DEPLOYMENT_NAME}`
     Set Suite Variable    ${events_score}
     RW.Core.Push Metric    ${events_score}    sub_name=warning_events
 
+
+
 Generate Deployment Health Score for `${DEPLOYMENT_NAME}`
     @{unhealthy_components}=    Create List
     ${unhealthy_list}=    Set Variable    "None"  # Initialize to ensure it's always defined
@@ -400,6 +406,7 @@ Generate Deployment Health Score for `${DEPLOYMENT_NAME}`
         IF    ${pods_notready_score} < 1    Append To List    ${unhealthy_components}    Pod Readiness (${pod_readiness_details})
         IF    ${replica_score} < 1    Append To List    ${unhealthy_components}    Replica Status (${replica_details})
         IF    ${events_score} < 1    Append To List    ${unhealthy_components}    Warning Events (${events_details})
+
         
         ${unhealthy_count}=    Get Length    ${unhealthy_components}
         IF    ${unhealthy_count} > 0

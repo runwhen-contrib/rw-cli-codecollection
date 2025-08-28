@@ -11,6 +11,7 @@ Library             RW.platform
 Library             RW.NextSteps
 Library             RW.K8sHelper
 Library             RW.K8sLog
+
 Library             OperatingSystem
 Library             String
 Library             Collections
@@ -60,6 +61,7 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=1h
     ...    default=3h
+
     ${LOG_ANALYSIS_DEPTH}=    RW.Core.Import User Variable    LOG_ANALYSIS_DEPTH
     ...    type=string
     ...    description=The depth of log analysis to perform - basic, standard, or comprehensive.
@@ -103,6 +105,7 @@ Suite Initialization
     ...    pattern=\d+
     ...    example=300
     ...    default=300
+
     ${CONTAINER_RESTART_AGE}=    RW.Core.Import User Variable    CONTAINER_RESTART_AGE
     ...    type=string
     ...    description=The time window (in (h) hours or (m) minutes) to search for container restarts. Only containers that restarted within this time period will be reported.
@@ -125,6 +128,7 @@ Suite Initialization
     Set Suite Variable    ${DEPLOYMENT_NAME}
     Set Suite Variable    ${LOG_LINES}
     Set Suite Variable    ${LOG_AGE}
+
     Set Suite Variable    ${LOG_ANALYSIS_DEPTH}
     Set Suite Variable    ${LOG_SEVERITY_THRESHOLD}
     Set Suite Variable    ${LOG_PATTERN_CATEGORIES_STR}
@@ -133,6 +137,7 @@ Suite Initialization
     Set Suite Variable    ${LOGS_ERROR_PATTERN}
     Set Suite Variable    ${LOGS_EXCLUDE_PATTERN}
     Set Suite Variable    ${LOG_SCAN_TIMEOUT}
+
     Set Suite Variable    ${CONTAINER_RESTART_AGE}
     Set Suite Variable    ${CONTAINER_RESTART_THRESHOLD}
     # Construct environment dictionary safely to handle special characters in regex patterns
@@ -404,6 +409,8 @@ Fetch Deployment Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
             END
         END
     END
+
+
 
 Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     [Documentation]    Validates if a Liveness probe has possible misconfigurations

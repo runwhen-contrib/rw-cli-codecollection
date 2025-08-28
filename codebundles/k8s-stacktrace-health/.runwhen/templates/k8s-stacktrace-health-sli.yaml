@@ -1,0 +1,68 @@
+apiVersion: runwhen.com/v1
+kind: ServiceLevelIndicator
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+    runwhen.com/sli: "true"
+spec: 
+  displayUnitsLong: OK
+  displayUnitsShort: ok
+  locations:
+    - {{ default_location }}
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/k8s-stacktrace-health/sli.robot
+  intervalStrategy: intermezzo
+  intervalSeconds: 300
+  description: Monitors stacktrace health for the {{match_resource.resource.metadata.name}} {{match_resource.kind | lower}} by detecting application errors and exceptions in logs.
+  configProvided:
+    - name: NAMESPACE
+      value: {{match_resource.resource.metadata.namespace}}
+    - name: CONTEXT
+      value: {{context}}
+    - name: KUBERNETES_DISTRIBUTION_BINARY
+      value: {{custom.kubernetes_distribution_binary | default("kubectl")}}
+    - name: WORKLOAD_NAME
+      value: {{match_resource.resource.metadata.name}}
+    - name: WORKLOAD_TYPE
+      value: {{match_resource.kind | lower}}
+    - name: LOG_AGE
+      value: "10m"
+    - name: MAX_LOG_LINES
+      value: "100"
+    - name: MAX_LOG_BYTES
+      value: "256000"
+    - name: IGNORE_CONTAINERS_MATCHING
+      value: "linkerd"
+  secretsProvided:
+  {% if wb_version %}
+    {% include "kubernetes-auth.yaml" ignore missing %}
+  {% else %}
+    - name: kubeconfig
+      workspaceKey: {{custom.kubeconfig_secret_name}}
+  {% endif %} 
+  alerts:
+    warning:
+      operator: <
+      threshold: '1'
+      for: '15m'
+    ticket:
+      operator: <
+      threshold: '1'
+      for: '30m'
+    page:
+      operator: '=='
+      threshold: '0'
+      for: ''
