@@ -61,4 +61,5 @@ build
 **vm_patch_stdout**
 **vm_mem_stdout**
 **vm_disk_stdout**
-**.test/.gitconfig
+**/.test/.gitconfig
+

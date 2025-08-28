@@ -1,0 +1,157 @@
+version: "3"
+
+tasks:
+  format-and-init-terraform:
+    desc: "Format and initialize Terraform"
+    cmds:
+      - terraform fmt
+      - terraform init
+
+  plan:
+    desc: "Plan Terraform deployment"
+    deps: [format-and-init-terraform]
+    cmds:
+      - |
+        source tf.secret
+        export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)
+        export TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
+        export TF_VAR_tenant_id=$AZ_TENANT_ID
+        terraform plan
+
+  apply:
+    desc: "Apply Terraform configuration"
+    deps: [format-and-init-terraform]
+    cmds:
+      - |
+        source tf.secret
+        export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)
+        export TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
+        export TF_VAR_tenant_id=$AZ_TENANT_ID
+        terraform apply -auto-approve
+
+  destroy:
+    desc: "Destroy Terraform infrastructure"
+    cmds:
+      - |
+        source tf.secret
+        export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)
+        export TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
+        export TF_VAR_tenant_id=$AZ_TENANT_ID
+        terraform destroy -auto-approve
+
+  outputs:
+    desc: "Show Terraform outputs"
+    cmds:
+      - terraform output
+
+  status:
+    desc: "Show infrastructure status"
+    cmds:
+      - |
+        echo "=== Terraform State ==="
+        terraform state list
+        echo ""
+        echo "=== Key Outputs ==="
+        echo "Premium ACR: $(terraform output -raw premium_acr_name 2>/dev/null || echo 'Not deployed')"
+        echo "Basic ACR: $(terraform output -raw basic_acr_name 2>/dev/null || echo 'Not deployed')"
+        echo "Resource Group: $(terraform output -raw resource_group_name 2>/dev/null || echo 'Not deployed')"
+        echo "Log Workspace: $(terraform output -raw log_analytics_workspace_id 2>/dev/null || echo 'Not deployed')"
+
+  test-connectivity:
+    desc: "Test ACR connectivity"
+    cmds:
+      - |
+        ACR_NAME=$(terraform output -raw premium_acr_name)
+        ACR_LOGIN_SERVER=$(terraform output -raw premium_acr_login_server)
+        
+        echo "Testing connectivity to $ACR_LOGIN_SERVER..."
+        
+        # Test DNS resolution
+        echo "=== DNS Test ==="
+        nslookup $ACR_LOGIN_SERVER || echo "DNS resolution failed"
+        
+        # Test HTTPS connectivity
+        echo "=== HTTPS Test ==="
+        curl -I https://$ACR_LOGIN_SERVER/v2/ --max-time 10 || echo "HTTPS connection failed"
+        
+        # Test Azure CLI connectivity
+        echo "=== Azure CLI Test ==="
+        az acr show --name $ACR_NAME --query '{name:name,status:provisioningState,sku:sku.name}'
+
+  populate-test-data:
+    desc: "Populate ACR with test data"
+    cmds:
+      - |
+        source tf.secret
+        ACR_NAME=$(terraform output -raw premium_acr_name)
+        
+        echo "Populating $ACR_NAME with test data..."
+        
+        # Login to ACR
+        az acr login --name $ACR_NAME
+        
+        # Import test images
+        echo "Importing hello-world image..."
+        az acr import --name $ACR_NAME \
+          --source mcr.microsoft.com/hello-world:latest \
+          --image test-repo/hello-world:v1.0 || echo "Failed to import hello-world"
+        
+        echo "Importing nginx image..."
+        az acr import --name $ACR_NAME \
+          --source mcr.microsoft.com/oss/nginx/nginx:1.21.6 \
+          --image test-repo/nginx:latest || echo "Failed to import nginx"
+        
+        echo "Importing busybox image..."
+        az acr import --name $ACR_NAME \
+          --source mcr.microsoft.com/oss/busybox/busybox:1.35 \
+          --image test-repo/busybox:v1.35 || echo "Failed to import busybox"
+        
+        # List repositories
+        echo "=== Current Repositories ==="
+        az acr repository list --name $ACR_NAME --output table
+
+  clean-test-data:
+    desc: "Clean test data from ACR"
+    cmds:
+      - |
+        ACR_NAME=$(terraform output -raw premium_acr_name)
+        
+        echo "Cleaning test data from $ACR_NAME..."
+        
+        # Delete test repositories
+        az acr repository delete --name $ACR_NAME --repository test-repo --yes || echo "No test-repo to delete"
+        
+        echo "Test data cleaned"
+
+  validate:
+    desc: "Validate Terraform configuration"
+    deps: [format-and-init-terraform]
+    cmds:
+      - terraform validate
+
+  clean:
+    desc: "Clean Terraform files"
+    cmds:
+      - rm -f terraform.tfstate*
+      - rm -rf .terraform/
+      - rm -f .terraform.lock.hcl
+
+  setup-secrets:
+    desc: "Setup tf.secret file template"
+    cmds:
+      - |
+        if [ ! -f tf.secret ]; then
+          cat > tf.secret << 'EOF'
+        export ARM_SUBSCRIPTION_ID="your-subscription-id"
+        export ARM_TENANT_ID="your-tenant-id"
+        export ARM_CLIENT_ID="your-service-principal-client-id"
+        export ARM_CLIENT_SECRET="your-service-principal-secret"
+        export AZ_TENANT_ID="your-tenant-id"
+        export AZ_CLIENT_ID="your-service-principal-client-id"
+        export AZ_CLIENT_SECRET="your-service-principal-secret"
+        EOF
+          chmod +x tf.secret
+          echo "Created tf.secret template. Please edit with your credentials."
+        else
+          echo "tf.secret already exists"
+        fi
