@@ -26,7 +26,7 @@ spec:
     pathToRobot: codebundles/k8s-stacktrace-health/sli.robot
   intervalStrategy: intermezzo
   intervalSeconds: 300
-  description: Monitors stacktrace health for the {{match_resource.resource.metadata.name}} {{match_resource.resource.kind | lower}} by detecting application errors and exceptions in logs.
+  description: Monitors stacktrace health for the {{match_resource.resource.metadata.name}} {{match_resource.kind | lower}} by detecting application errors and exceptions in logs.
   configProvided:
     - name: NAMESPACE
       value: {{match_resource.resource.metadata.namespace}}
@@ -37,7 +37,7 @@ spec:
     - name: WORKLOAD_NAME
       value: {{match_resource.resource.metadata.name}}
     - name: WORKLOAD_TYPE
-      value: {{match_resource.resource.kind | lower}}
+      value: {{match_resource.kind | lower}}
     - name: LOG_AGE
       value: "10m"
     - name: MAX_LOG_LINES

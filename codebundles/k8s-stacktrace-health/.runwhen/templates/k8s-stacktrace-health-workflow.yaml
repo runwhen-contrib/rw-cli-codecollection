@@ -8,8 +8,8 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   fromActivities:
-  - displayName: {{match_resource.resource.metadata.name}} {{match_resource.resource.kind}} Stacktrace Health SLI Alert Workflow
-    description: Start RunSession with Eager Edgar when SLI is alerting for {{match_resource.resource.metadata.name}} {{match_resource.resource.kind | lower}} stacktrace health
+  - displayName: {{match_resource.resource.metadata.name}} {{match_resource.kind}} Stacktrace Health SLI Alert Workflow
+    description: Start RunSession with Eager Edgar when SLI is alerting for {{match_resource.resource.metadata.name}} {{match_resource.kind | lower}} stacktrace health
     actions:
     - tasks:
         slx: {{slx_name.split('--')[1]}}

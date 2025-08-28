@@ -30,7 +30,7 @@ spec:
     - name: WORKLOAD_NAME
       value: {{match_resource.resource.metadata.name}}
     - name: WORKLOAD_TYPE
-      value: {{match_resource.resource.kind | lower}}
+      value: {{match_resource.kind | lower}}
     - name: LOG_LINES
       value: "100"
     - name: LOG_AGE

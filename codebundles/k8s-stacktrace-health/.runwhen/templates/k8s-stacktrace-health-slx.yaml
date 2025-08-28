@@ -15,7 +15,7 @@ spec:
     value: {{match_resource.resource.metadata.name}}
   owners:
   - {{workspace.owner_email}}
-  statement: Application logs for {{match_resource.resource.metadata.name}} {{match_resource.resource.kind | lower}} should be free of stacktraces and tracebacks indicating runtime errors.
+  statement: Application logs for {{match_resource.resource.metadata.name}} {{match_resource.kind | lower}} should be free of stacktraces and tracebacks indicating runtime errors.
   additionalContext:  
     {% include "kubernetes-hierarchy.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"
