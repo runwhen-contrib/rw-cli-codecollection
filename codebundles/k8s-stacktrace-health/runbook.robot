@@ -112,7 +112,11 @@ Suite Initialization
         ${scale_status}=    Evaluate    json.loads(r'''${scale_check.stdout}''') if r'''${scale_check.stdout}'''.strip() else {}    json
         ${spec_replicas}=    Evaluate    $scale_status.get('spec_replicas', 1)
         
-        IF    ${spec_replicas} == 0
+        # DaemonSets don't scale to 0 in the traditional sense, so skip scale-down logic for them
+        IF    '${WORKLOAD_TYPE}' == 'daemonset'
+            Log    ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is a DaemonSet - proceeding with stacktrace analysis
+            Set Suite Variable    ${SKIP_STACKTRACE_CHECKS}    ${False}
+        ELSE IF    ${spec_replicas} == 0
             RW.Core.Add Issue
             ...    severity=4
             ...    expected=${WORKLOAD_TYPE} `${WORKLOAD_NAME}` operational status documented
@@ -120,7 +124,7 @@ Suite Initialization
             ...    title=${WORKLOAD_TYPE} `${WORKLOAD_NAME}` is Scaled Down (Informational)
             ...    reproduce_hint=kubectl get ${WORKLOAD_TYPE}/${WORKLOAD_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o yaml
             ...    details=${WORKLOAD_TYPE} `${WORKLOAD_NAME}` is currently scaled to 0 replicas (spec.replicas=0). This is an intentional configuration and not an error. All pod-related healthchecks have been skipped for efficiency. If the workload should be running, scale it up using:\nkubectl scale ${WORKLOAD_TYPE}/${WORKLOAD_NAME} --replicas=<desired_count> --context ${CONTEXT} -n ${NAMESPACE}
-            ...    next_steps=This is informational only. If the deployment should be running, scale it up.
+            ...    next_steps=This is informational only. If the workload should be running, scale it up.
             
             RW.Core.Add Pre To Report    **ℹ️ ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` is scaled to 0 replicas - Skipping stacktrace analysis**\n**Available Condition:** ${scale_status.get('available_condition', 'Unknown')}
             
@@ -130,7 +134,7 @@ Suite Initialization
         END
         
     EXCEPT
-        Log    Warning: Failed to check deployment scale, continuing with normal checks
+        Log    Warning: Failed to check workload scale, continuing with normal checks
         Set Suite Variable    ${SKIP_STACKTRACE_CHECKS}    ${False}
     END
 

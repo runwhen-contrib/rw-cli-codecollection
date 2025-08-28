@@ -87,18 +87,32 @@ Suite Initialization
     # Initialize score variables
     Set Suite Variable    ${stacktrace_score}    0
     
-    # Check if deployment is scaled to 0 and handle appropriately
-    ${scale_check}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${WORKLOAD_TYPE}/${WORKLOAD_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '{spec_replicas: .spec.replicas, ready_replicas: (.status.readyReplicas // 0), available_condition: (.status.conditions[] | select(.type == "Available") | .status // "Unknown"), last_scale_time: (.metadata.annotations."deployment.kubernetes.io/last-applied-configuration" // "N/A")}'
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ...    timeout_seconds=30
+    # Check if workload is scaled to 0 and handle appropriately
+    # Different workload types have different field structures
+    IF    '${WORKLOAD_TYPE}' == 'daemonset'
+        ${scale_check}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${WORKLOAD_TYPE}/${WORKLOAD_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '{spec_replicas: .status.desiredNumberScheduled, ready_replicas: (.status.numberReady // 0), available_condition: (.status.conditions[] | select(.type == "Available") | .status // "Unknown")}'
+        ...    env=${env}
+        ...    secret_file__kubeconfig=${kubeconfig}
+        ...    timeout_seconds=30
+    ELSE
+        # For deployments and statefulsets
+        ${scale_check}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${WORKLOAD_TYPE}/${WORKLOAD_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '{spec_replicas: .spec.replicas, ready_replicas: (.status.readyReplicas // 0), available_condition: (.status.conditions[] | select(.type == "Available") | .status // "Unknown")}'
+        ...    env=${env}
+        ...    secret_file__kubeconfig=${kubeconfig}
+        ...    timeout_seconds=30
+    END
     
     TRY
         ${scale_status}=    Evaluate    json.loads(r'''${scale_check.stdout}''') if r'''${scale_check.stdout}'''.strip() else {}    json
         ${spec_replicas}=    Evaluate    $scale_status.get('spec_replicas', 1)
         
-        IF    ${spec_replicas} == 0
+        # DaemonSets don't scale to 0 in the traditional sense, so skip scale-down logic for them
+        IF    '${WORKLOAD_TYPE}' == 'daemonset'
+            Log    ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is a DaemonSet - proceeding with stacktrace checks
+            Set Suite Variable    ${SKIP_HEALTH_CHECKS}    ${False}
+        ELSE IF    ${spec_replicas} == 0
             Log    ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is scaled to 0 replicas - returning perfect health score
             
             # For scaled-down workloads, return a score of 1.0 to indicate "intentionally down" vs "broken"
@@ -109,7 +123,7 @@ Suite Initialization
         END
         
     EXCEPT
-        Log    Warning: Failed to check deployment scale, continuing with normal stacktrace checks
+        Log    Warning: Failed to check workload scale, continuing with normal stacktrace checks
         Set Suite Variable    ${SKIP_HEALTH_CHECKS}    ${False}
     END
 
