@@ -60,13 +60,13 @@ Suite Initialization
     ...    description=The number of log lines to fetch from the pods when inspecting logs.
     ...    pattern=\d+
     ...    example=100
-    ...    default=100
+    ...    default=2000
     ${LOG_AGE}=    RW.Core.Import User Variable    LOG_AGE
     ...    type=string
     ...    description=The age of logs to fetch from pods, used for log analysis tasks.
     ...    pattern=\w*
     ...    example=1h
-    ...    default=3h
+    ...    default=15m
     ${LOG_SIZE}=    RW.Core.Import User Variable    LOG_SIZE
     ...    type=string
     ...    description=The maximum size of logs in bytes to fetch from pods, used for log analysis tasks. Defaults to 2MB.

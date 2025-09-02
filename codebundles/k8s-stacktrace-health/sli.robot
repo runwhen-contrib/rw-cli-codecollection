@@ -53,7 +53,7 @@ Suite Initialization
     ...    description=Maximum number of log lines to fetch per container to prevent API overload.
     ...    pattern=^\d+$
     ...    example=100
-    ...    default=100
+    ...    default=2000
     ${MAX_LOG_BYTES}=    RW.Core.Import User Variable    MAX_LOG_BYTES
     ...    type=string
     ...    description=Maximum log size in bytes to fetch per container to prevent API overload.
