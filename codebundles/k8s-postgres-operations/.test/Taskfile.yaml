@@ -37,6 +37,7 @@ tasks:
           codeBundles: ["$codebundle"]
         custom: 
           kubernetes_distribution_binary: kubectl
+          kubernetes_distribution: kubernetes
         EOF
     silent: true
 
