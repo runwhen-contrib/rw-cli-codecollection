@@ -145,6 +145,15 @@ fi
 storage_used=$(echo "$usage_info" | jq -r '.value[] | select(.name=="Size") | .currentValue // 0')
 storage_quota=$(echo "$usage_info" | jq -r '.value[] | select(.name=="Size") | .limit // 0')
 
+# Validate that storage values are numeric
+if ! [[ "$storage_used" =~ ^[0-9]+$ ]]; then
+    storage_used=0
+fi
+
+if ! [[ "$storage_quota" =~ ^[0-9]+$ ]]; then
+    storage_quota=0
+fi
+
 # Convert to human readable format
 storage_used_human=$(bytes_to_human "$storage_used")
 storage_quota_human=$(bytes_to_human "$storage_quota")
@@ -155,6 +164,12 @@ echo "📦 Storage quota: $storage_quota_human ($storage_quota bytes)" >&2
 # Calculate usage percentage
 if [ "$storage_quota" -gt 0 ]; then
     storage_percent=$(echo "scale=2; ($storage_used * 100) / $storage_quota" | bc -l 2>/dev/null || echo "0")
+    
+    # Validate storage_percent is a valid number
+    if ! [[ "$storage_percent" =~ ^[0-9]+\.?[0-9]*$ ]]; then
+        storage_percent="0"
+    fi
+    
     storage_available=$((storage_quota - storage_used))
     storage_available_human=$(bytes_to_human "$storage_available")
     
@@ -219,8 +234,10 @@ fi
 
 # Get repository information for detailed analysis
 echo "📦 Analyzing repositories..." >&2
-repo_list=$(az acr repository list --name "$ACR_NAME" -o json 2>/dev/null)
-if [ -n "$repo_list" ] && [ "$repo_list" != "[]" ]; then
+repo_list=$(az acr repository list --name "$ACR_NAME" -o json 2>repo_err.log)
+repo_exit_code=$?
+
+if [ $repo_exit_code -eq 0 ] && [ -n "$repo_list" ] && [ "$repo_list" != "[]" ]; then
     repo_count=$(echo "$repo_list" | jq '. | length')
     echo "📚 Total repositories: $repo_count" >&2
     
@@ -261,18 +278,48 @@ if [ -n "$repo_list" ] && [ "$repo_list" != "[]" ]; then
         rm -f "$large_repos"
     fi
 else
-    echo "📦 No repositories found or unable to list repositories" >&2
-    if [ "$storage_used" -gt 0 ]; then
-        add_issue \
-            "Storage used but no repositories visible" \
-            3 \
-            "If storage is used, repositories should be visible" \
-            "Storage shows ${storage_used_human} used but no repositories found" \
-            "Storage used: $storage_used bytes, Repositories found: 0" \
-            "Check repository permissions for ACR \`$ACR_NAME\`, verify ACR configuration in resource group \`$RESOURCE_GROUP\`, or investigate orphaned data" \
-            "az acr repository list --name $ACR_NAME"
+    # Check if it's a permission/authentication error or truly no repositories
+    if [ $repo_exit_code -ne 0 ]; then
+        repo_error=$(cat repo_err.log 2>/dev/null || echo "Unknown error")
+        echo "📦 Unable to list repositories - Error: $repo_error" >&2
+        
+        # Check if it's a permission error
+        if echo "$repo_error" | grep -i -E "(permission|unauthorized|forbidden|access)" > /dev/null; then
+            add_issue \
+                "Insufficient permissions to list repositories" \
+                3 \
+                "Should have permission to list repositories" \
+                "az acr repository list command failed with permission error" \
+                "Error: $repo_error" \
+                "Grant 'AcrPull' or 'AcrPush' role to the current user/service principal for ACR \`$ACR_NAME\` in resource group \`$RESOURCE_GROUP\`. Check Azure RBAC assignments." \
+                "az role assignment create --assignee \$(az account show --query user.name -o tsv) --role AcrPull --scope /subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.ContainerRegistry/registries/$ACR_NAME"
+        else
+            add_issue \
+                "Failed to retrieve repository list" \
+                3 \
+                "Should be able to list repositories" \
+                "az acr repository list command failed" \
+                "Error: $repo_error" \
+                "Check ACR \`$ACR_NAME\` accessibility, network connectivity, and Azure CLI authentication for resource group \`$RESOURCE_GROUP\`" \
+                "az acr repository list --name $ACR_NAME"
+        fi
+    else
+        echo "📦 No repositories found" >&2
+        if [ "$storage_used" -gt 0 ]; then
+            add_issue \
+                "Storage used but no repositories visible" \
+                3 \
+                "If storage is used, repositories should be visible" \
+                "Storage shows ${storage_used_human} used but no repositories found" \
+                "Storage used: $storage_used bytes, Repositories found: 0" \
+                "Check repository permissions for ACR \`$ACR_NAME\`, verify ACR configuration in resource group \`$RESOURCE_GROUP\`, or investigate orphaned data. May indicate deleted repositories with remaining manifest data." \
+                "az acr repository list --name $ACR_NAME"
+        fi
     fi
 fi
+
+# Clean up repository error log
+rm -f repo_err.log
 
 # Check for retention policies
 echo "🔄 Checking retention policies..." >&2
@@ -301,18 +348,21 @@ fi
 echo "" >&2
 echo "💡 Storage optimization recommendations:" >&2
 
-if [ "$storage_quota" -gt 0 ]; then
+if [ "$storage_quota" -gt 0 ] && [ -n "$storage_percent" ]; then
     storage_percent_int=$(echo "$storage_percent" | cut -d'.' -f1)
     
-    if [ "$storage_percent_int" -gt 50 ]; then
-        echo "   1. Review and delete unused repositories: az acr repository delete --name $ACR_NAME --repository <repo-name>" >&2
-        echo "   2. Clean up old tags: az acr repository untag --name $ACR_NAME --image <image:tag>" >&2
-        echo "   3. Enable retention policies: az acr config retention update --registry $ACR_NAME --status enabled" >&2
-    fi
-    
-    if [ "$storage_percent_int" -gt 80 ]; then
-        echo "   4. Consider upgrading SKU for more storage: az acr update --name $ACR_NAME --sku Premium" >&2
-        echo "   5. Implement automated cleanup in CI/CD pipelines" >&2
+    # Ensure storage_percent_int is a valid integer
+    if [[ "$storage_percent_int" =~ ^[0-9]+$ ]]; then
+        if [ "$storage_percent_int" -gt 50 ]; then
+            echo "   1. Review and delete unused repositories: az acr repository delete --name $ACR_NAME --repository <repo-name>" >&2
+            echo "   2. Clean up old tags: az acr repository untag --name $ACR_NAME --image <image:tag>" >&2
+            echo "   3. Enable retention policies: az acr config retention update --registry $ACR_NAME --status enabled" >&2
+        fi
+        
+        if [ "$storage_percent_int" -gt 80 ]; then
+            echo "   4. Consider upgrading SKU for more storage: az acr update --name $ACR_NAME --sku Premium" >&2
+            echo "   5. Implement automated cleanup in CI/CD pipelines" >&2
+        fi
     fi
 fi
 

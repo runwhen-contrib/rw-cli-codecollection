@@ -1,0 +1,33 @@
+apiVersion: runwhen.com/v1
+kind: ServiceLevelX
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/database.svg
+  alias: {{match_resource.resource.metadata.name}} PostgreSQL Operations
+  asMeasuredBy: PostgreSQL cluster operational health and recovery status as measured by cluster member availability and replication status.
+  configProvided:
+  - name: OBJECT_NAME
+    value: {{match_resource.resource.metadata.name}}
+  - name: OBJECT_API_VERSION
+    value: {{match_resource.resource.apiVersion}}
+  - name: DATABASE_CONTAINER
+    value: postgres
+  owners:
+  - {{workspace.owner_email}}
+  statement: PostgreSQL cluster {{match_resource.resource.metadata.name}} should be operational with healthy cluster members and proper replication status.
+  additionalContext:  
+    {% include "kubernetes-hierarchy.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name }}"
+  tags:  
+    {% include "kubernetes-tags.yaml" ignore missing %}
+    - name: access
+      value: read-write
+    - name: postgres
+      value: zalando
+    - name: operations
+      value: cluster-management
