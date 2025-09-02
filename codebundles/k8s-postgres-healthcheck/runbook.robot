@@ -97,7 +97,7 @@ Get Running Postgres Configuration for Cluster `${OBJECT_NAME}` in Namespace `${
             ...    title=${item["title"]}
             ...    reproduce_hint=${config_health.cmd}
             ...    details=${item}
-            ...    next_steps=Escalate database configuration issues to service owner of `${OBJECT_NAME}` in namespace `${NAMESPACE}`
+            ...    next_steps=Restart PostgreSQL Cluster with Rolling Update for `${OBJECT_NAME}` in `${NAMESPACE}`\nEscalate database configuration issues to service owner of `${OBJECT_NAME}` in namespace `${NAMESPACE}`
         END
     END
     RW.Core.Add Pre To Report    Commands Used:\n${config_health.cmd}
@@ -136,7 +136,7 @@ Fetch Patroni Database Lag for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPAC
                 ...    title=Database member `${item["Member"]}` in Cluster `${item["Cluster"]}` has lag of ${lag_in_mb} MB in `${NAMESPACE}`
                 ...    reproduce_hint=${patroni_output.cmd}
                 ...    details=${patroni_output.stdout}
-                ...    next_steps=Remediate Lagging Patroni Database Member `${item["Member"]}` in Cluster `${item["Cluster"]}` in `${NAMESPACE}`\nFetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
+                ...    next_steps=Reinitialize Failed PostgreSQL Cluster Members for `${item["Cluster"]}` in `${NAMESPACE}`\nCheck PostgreSQL Replication Status for `${item["Cluster"]}` in `${NAMESPACE}`\nFetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
             END
         END
     END
@@ -166,7 +166,7 @@ Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESP
             ...    title=${item["title"]}
             ...    reproduce_hint=${backup_health.cmd}
             ...    details=${item}
-            ...    next_steps=Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`\nCheck Postgres archive settings from running configuration in Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
+            ...    next_steps=Restart PostgreSQL Cluster with Rolling Update for `${OBJECT_NAME}` in `${NAMESPACE}`\nFetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`\nCheck Postgres archive settings from running configuration in Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
         END
     END
     RW.Core.Add Pre To Report    ${full_report.stdout}
@@ -194,11 +194,10 @@ Run DB Queries for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
             ...    title=${item["title"]}
             ...    reproduce_hint=${dbquery.cmd}
             ...    details=${item}
-            ...    next_steps=Verify the database query for postgres cluster`${OBJECT_NAME}` in `${NAMESPACE}`\Check Deployment or StatefulSet Health for `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
+            ...    next_steps=Reinitialize Failed PostgreSQL Cluster Members for `${OBJECT_NAME}` in `${NAMESPACE}`\nRestart PostgreSQL Cluster with Rolling Update for `${OBJECT_NAME}` in `${NAMESPACE}`\nVerify the database query for postgres cluster `${OBJECT_NAME}` in `${NAMESPACE}`\nCheck Deployment or StatefulSet Health for `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
         END
     END
     RW.Core.Add Pre To Report    ${full_report.stdout}
-
 
 *** Keywords ***
 Suite Initialization
