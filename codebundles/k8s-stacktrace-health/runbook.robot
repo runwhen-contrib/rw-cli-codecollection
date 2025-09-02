@@ -60,7 +60,7 @@ Suite Initialization
     ...    description=The number of log lines to fetch from the pods when inspecting logs.
     ...    pattern=\d+
     ...    example=100
-    ...    default=5000
+    ...    default=2000
     ${LOG_AGE}=    RW.Core.Import User Variable    LOG_AGE
     ...    type=string
     ...    description=The age of logs to fetch from pods, used for log analysis tasks.
