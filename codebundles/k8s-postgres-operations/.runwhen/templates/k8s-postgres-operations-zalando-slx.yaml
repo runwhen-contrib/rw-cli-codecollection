@@ -17,10 +17,6 @@ spec:
     value: {{match_resource.resource.apiVersion}}
   - name: DATABASE_CONTAINER
     value: postgres
-  - name: OPERATION
-    value: overview
-  - name: TARGET_MEMBER
-    value: ""
   owners:
   - {{workspace.owner_email}}
   statement: PostgreSQL cluster {{match_resource.resource.metadata.name}} should be operational with healthy cluster members and proper replication status.

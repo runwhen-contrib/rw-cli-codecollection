@@ -41,12 +41,6 @@ spec:
       value: 'postgres'
     - name: OBJECT_KIND
       value: {{match_resource.resource.kind}}.{{match_resource.resource.apiVersion.split('/')[0]}}
-    - name: OPERATION
-      value: 'overview'
-    - name: TARGET_MEMBER
-      value: ''
-    - name: REPLICA_COUNT
-      value: ''
   secretsProvided:
   {% if wb_version %}
     {% include "kubernetes-auth.yaml" ignore missing %}

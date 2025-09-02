@@ -202,21 +202,10 @@ Suite Initialization
     ...    enum=[database,postgres]
     ...    example=database
     ...    default=database
-    ${OPERATION}=    RW.Core.Import User Variable    OPERATION
-    ...    type=string
-    ...    description=The type of operation to perform (overview, failover, restart, replication).
-    ...    enum=[overview,failover,restart,replication]
-    ...    example=overview
-    ...    default=overview
-    ${TARGET_MEMBER}=    RW.Core.Import User Variable    TARGET_MEMBER
-    ...    type=string
-    ...    description=Target member for failover operations (optional).
-    ...    pattern=.*
-    ...    example=my-postgres-cluster-1
-    ...    default=
+
 
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
-    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}","KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}","CONTEXT":"${CONTEXT}","NAMESPACE":"${NAMESPACE}","OBJECT_NAME":"${OBJECT_NAME}","OBJECT_API_VERSION":"${OBJECT_API_VERSION}","DATABASE_CONTAINER":"${DATABASE_CONTAINER}","OPERATION":"${OPERATION}","TARGET_MEMBER":"${TARGET_MEMBER}"}
+    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}","KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}","CONTEXT":"${CONTEXT}","NAMESPACE":"${NAMESPACE}","OBJECT_NAME":"${OBJECT_NAME}","OBJECT_API_VERSION":"${OBJECT_API_VERSION}","DATABASE_CONTAINER":"${DATABASE_CONTAINER}"}
 
 Suite Teardown
     RW.Core.Upload File    cluster_operations_report.out
