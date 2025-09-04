@@ -105,6 +105,12 @@ Suite Initialization
     ...    pattern=\d+
     ...    example=300
     ...    default=300
+    ${EXCLUDED_CONTAINER_NAMES}=    RW.Core.Import User Variable    EXCLUDED_CONTAINER_NAMES
+    ...    type=string
+    ...    description=Comma-separated list of container names to exclude from log analysis (e.g., linkerd-proxy, istio-proxy, vault-agent).
+    ...    pattern=.*
+    ...    example=linkerd-proxy,istio-proxy,vault-agent
+    ...    default=linkerd-proxy,istio-proxy,vault-agent
 
     ${CONTAINER_RESTART_AGE}=    RW.Core.Import User Variable    CONTAINER_RESTART_AGE
     ...    type=string
@@ -118,8 +124,9 @@ Suite Initialization
     ...    pattern=\d+
     ...    example=1
     ...    default=1
-    # Convert comma-separated string to list
+    # Convert comma-separated strings to lists
     @{LOG_PATTERN_CATEGORIES}=    Split String    ${LOG_PATTERN_CATEGORIES_STR}    ,
+    @{EXCLUDED_CONTAINERS}=    Run Keyword If    "${EXCLUDED_CONTAINER_NAMES}" != ""    Split String    ${EXCLUDED_CONTAINER_NAMES}    ,    ELSE    Create List
     
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}
@@ -137,6 +144,8 @@ Suite Initialization
     Set Suite Variable    ${LOGS_ERROR_PATTERN}
     Set Suite Variable    ${LOGS_EXCLUDE_PATTERN}
     Set Suite Variable    ${LOG_SCAN_TIMEOUT}
+    Set Suite Variable    ${EXCLUDED_CONTAINER_NAMES}
+    Set Suite Variable    @{EXCLUDED_CONTAINERS}
 
     Set Suite Variable    ${CONTAINER_RESTART_AGE}
     Set Suite Variable    ${CONTAINER_RESTART_THRESHOLD}
@@ -210,6 +219,7 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
         ...    context=${CONTEXT}
         ...    kubeconfig=${kubeconfig}
         ...    log_age=${LOG_AGE}
+        ...    excluded_containers=@{EXCLUDED_CONTAINERS}
         
         ${scan_results}=    RW.K8sLog.Scan Logs For Issues
         ...    log_dir=${log_dir}
@@ -218,6 +228,7 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
         ...    namespace=${NAMESPACE}
         ...    categories=@{LOG_PATTERN_CATEGORIES}
         ...    custom_patterns_file=runbook_patterns.json
+        ...    excluded_containers=@{EXCLUDED_CONTAINERS}
         
         # Post-process results to filter out patterns matching LOGS_EXCLUDE_PATTERN
         TRY
