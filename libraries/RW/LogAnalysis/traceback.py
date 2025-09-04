@@ -3,9 +3,11 @@
 Main Traceback Extraction library class
 """
 
+import os
+import glob
 from robot.api.deco import keyword, library
 from robot.api import logger
-from typing import List, Union
+from typing import List, Union, Set
 
 from .python.fetch_tracebacks import PythonTracebackExtractor
 from .java.fetch_tracebacks import JavaTracebackExtractor
@@ -25,25 +27,86 @@ class ExtractTraceback:
         self.java_traceback_extractor = JavaTracebackExtractor()
 
     @keyword
-    def extract_tracebacks(self, logs: str, fetch_most_recent: bool = False) -> Union[str, List[str]]:
+    def extract_tracebacks(self, logs_dir: str = None, logs: str = None, fast_exit: bool = False) -> Union[str, List[str]]:
         """
-        Ingests deployment logs to extract tracebacks
+        Ingests deployment logs from a directory or log string to extract tracebacks
 
         Args:
-            deployment_logs: str
+            logs_dir: str - Path to directory containing log files (new interface)
+            logs: str - Log content as string (legacy interface)
+            fast_exit: bool - If True, returns the first traceback found and stops processing
         Results:
-            recent-most traceback, if fetch_most_recent = True
-            list of tracebacks, otherwise
+            recent-most traceback, if fast_exit = True
+            list of unique tracebacks, otherwise
         """
-        logs = str(logs) # safety conversion
-        logs_list = logs.split("\n")
-
-        logger.info(f"Obtained {len(logs_list)} lines for traceback extraction.\n")
-        tracebacks: List[str] = []
+        # Handle legacy interface (logs as string)
+        if logs is not None:
+            logs_str = str(logs)  # safety conversion
+            logs_list = logs_str.split("\n")
+            
+            logger.info(f"Obtained {len(logs_list)} lines for traceback extraction (legacy mode).")
+            tracebacks: Set[str] = set()
+            
+            tracebacks.update(self.python_traceback_extractor.extract_tracebacks_from_logs(logs_list))
+            tracebacks.update(self.java_traceback_extractor.extract_tracebacks_from_logs(logs_list))
+            
+            if fast_exit:
+                return "" if not tracebacks else list(tracebacks)[-1]
+            return list(tracebacks)
         
-        tracebacks.extend(self.python_traceback_extractor.extract_tracebacks_from_logs(logs_list))
-        tracebacks.extend(self.java_traceback_extractor.extract_tracebacks_from_logs(logs_list))
+        # Handle new interface (logs_dir as directory path)
+        if logs_dir is None:
+            logger.error("Either logs_dir or logs parameter must be provided")
+            return [] if not fast_exit else ""
+        
+        if not os.path.exists(logs_dir):
+            logger.error(f"Logs directory does not exist: {logs_dir}")
+            return [] if not fast_exit else ""
+        
+        # Find all .txt files in the directory and subdirectories
+        log_files = []
+        for root, dirs, files in os.walk(logs_dir):
+            for file in files:
+                if file.endswith('.txt'):
+                    log_files.append(os.path.join(root, file))
+        
+        logger.info(f"Found {len(log_files)} log files for traceback extraction.")
+        
+        tracebacks: Set[str] = set()  
+        
+        # Process each log file
+        for log_file in log_files:
+            try:
+                with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+                    logs_list = []
+                    for line in f:
+                        logs_list.append(line.rstrip('\n'))
 
-        if fetch_most_recent:
+                logger.info(f"Processing {log_file} with {len(logs_list)} lines")
+                
+                # Extract Python tracebacks
+                python_tracebacks = self.python_traceback_extractor.extract_tracebacks_from_logs(logs_list)
+                if python_tracebacks:
+                    tracebacks.update(python_tracebacks)
+                    if fast_exit:
+                        logger.info(f"Found Python traceback in {log_file}, fast exit enabled")
+                        return python_tracebacks[-1]
+                
+                # Extract Java tracebacks
+                java_tracebacks = self.java_traceback_extractor.extract_tracebacks_from_logs(logs_list)
+                if java_tracebacks:
+                    tracebacks.update(java_tracebacks)
+                    if fast_exit:
+                        logger.info(f"Found Java traceback in {log_file}, fast exit enabled")
+                        return java_tracebacks[-1]
+                        
+            except Exception as e:
+                logger.error(f"Error processing log file {log_file}: {str(e)}")
+                continue
+        
+        tracebacks = list(tracebacks)
+        logger.info(f"Extracted {len(tracebacks)} total unique tracebacks from {len(log_files)} files")
+        
+        if fast_exit:
             return "" if not tracebacks else tracebacks[-1]
         return tracebacks

@@ -10,6 +10,7 @@ Library             RW.CLI
 Library             RW.platform
 Library             RW.NextSteps
 Library             RW.K8sHelper
+Library             RW.K8sLog
 Library             RW.LogAnalysis.ExtractTraceback
 Library             OperatingSystem
 Library             String
@@ -73,7 +74,7 @@ Suite Initialization
     ...    pattern=\d*
     ...    example=1024
     ...    default=2097152
-    ${IGNORE_CONTAINERS_MATCHING}=    RW.Core.Import User Variable    IGNORE_CONTAINERS_MATCHING
+    ${EXCLUDED_CONTAINER_NAMES}=    RW.Core.Import User Variable    EXCLUDED_CONTAINER_NAMES
     ...    type=string
     ...    description=comma-separated string of keywords used to identify and skip container names containing any of these substrings."
     ...    pattern=\w*
@@ -89,7 +90,7 @@ Suite Initialization
     Set Suite Variable    ${LOG_LINES}
     Set Suite Variable    ${LOG_AGE}
     Set Suite Variable    ${LOG_SIZE}
-    Set Suite Variable    ${IGNORE_CONTAINERS_MATCHING}
+    Set Suite Variable    ${EXCLUDED_CONTAINER_NAMES}
     
     # Construct environment dictionary safely to handle special characters in regex patterns
     &{env_dict}=    Create Dictionary    
@@ -150,120 +151,53 @@ Analyze Workload Stacktraces for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Namespac
     ...    troubleshooting
     ...    errors
     ...    access:read-only
-    # Skip pod-related checks if deployment is scaled to 0
+    # Skip pod-related checks if workload is scaled to 0
     IF    not ${SKIP_STACKTRACE_CHECKS}
-
-        # Step-1: Fetch all pods for the workload
-        ${workload_pod_names_lines}=    RW.CLI.Run Cli
-        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -l app=${WORKLOAD_NAME} -o name
-        ...    env=${env}
-        ...    secret_file__kubeconfig=${kubeconfig}
-        ...    show_in_rwl_cheatsheet=true
-        ...    render_in_commandlist=true
+        # Convert comma-separated string to list for excluded containers
+        @{EXCLUDED_CONTAINERS}=    Run Keyword If    "${EXCLUDED_CONTAINER_NAMES}" != ""    Split String    ${EXCLUDED_CONTAINER_NAMES}    ,    ELSE    Create List
         
-        IF    ${workload_pod_names_lines.returncode} == 0
-            # split lines to get the pods as a list of pod-names
-            ${workload_pod_names_list}=    Split To Lines    ${workload_pod_names_lines.stdout}
-            
-            # Step-2: iterate through each pod-name and fetch its logs
-            FOR    ${pod_name}    IN    @{workload_pod_names_list}
-                # Step-3: Fetch container names of this pod
-                ${pod_container_names_lines}=    RW.CLI.Run Cli
-                ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${pod_name} --context ${CONTEXT} -n ${NAMESPACE} -o jsonpath='{range .spec.containers[*]}{.name}{"\\n"}{end}'
-                ...    env=${env}
-                ...    secret_file__kubeconfig=${kubeconfig}
-                ...    show_in_rwl_cheatsheet=true
-                ...    render_in_commandlist=true
-                
-                IF    ${pod_container_names_lines.returncode} == 0
-                    # split lines to get the list of container names 
-                    ${container_names_list}=    Split To Lines    ${pod_container_names_lines.stdout}
-                    
-                    # separate the csv argument into a list of patterns to ignore.
-                    ${ignore_container_patterns}=    Split String    ${IGNORE_CONTAINERS_MATCHING}    ,
+        # Fetch logs using RW.K8sLog library (same pattern as deployment healthcheck)
+        ${log_dir}=    RW.K8sLog.Fetch Workload Logs
+        ...    workload_type=${WORKLOAD_TYPE}
+        ...    workload_name=${WORKLOAD_NAME}
+        ...    namespace=${NAMESPACE}
+        ...    context=${CONTEXT}
+        ...    kubeconfig=${kubeconfig}
+        ...    log_age=${LOG_AGE}
+        ...    max_log_lines=${LOG_LINES}
+        ...    max_log_bytes=${LOG_SIZE}
+        ...    excluded_containers=${EXCLUDED_CONTAINERS}
         
-                    # Step-4: iterate through each container within each pod and fetch its logs
-                    FOR    ${container_name}    IN    @{container_names_list}
-                        
-                        # skip log-fetch for this container if its name is to be ignored
-                        ${skip_container}=    Set Variable    ${False}
-                        
-                        TRY                            
-                            # try matching patterns to the container name to determine if its to be ignored
-                            FOR    ${filter}    IN    @{ignore_container_patterns}
-                                IF    '${filter}' in '${container_name}'
-                                    ${skip_container}=    Set Variable    ${True}
-                                    Exit For Loop
-                                END
-                            END
-
-                            IF    not ${skip_container}
-                                # Step-5: Fetch raw logs for this pod.container
-                                ${workload_logs}=    RW.CLI.Run Cli
-                                ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs ${pod_name} --context ${CONTEXT} -n ${NAMESPACE} -c ${container_name} --tail=${LOG_LINES} --since=${LOG_AGE} --limit-bytes ${LOG_SIZE}
-                                ...    env=${env}
-                                ...    secret_file__kubeconfig=${kubeconfig}
-                                ...    show_in_rwl_cheatsheet=true
-                                ...    render_in_commandlist=true
-                                
-                                IF    ${workload_logs.returncode} != 0
-                                    RW.Core.Add Issue
-                                    ...    severity=3
-                                    ...    expected=Workload logs should be accessible for stacktrace analysis for POD `${pod_name}` in namespace `${NAMESPACE}`
-                                    ...    actual=Failed to fetch workload logs for stacktrace analysis for POD `${pod_name}` in namespace `${NAMESPACE}`
-                                    ...    title=Unable to Fetch Workload Logs for Stacktrace Analysis `${WORKLOAD_NAME}`
-                                    ...    reproduce_hint=${workload_logs.cmd}
-                                    ...    details=Log collection failed with exit code ${workload_logs.returncode}:\n\nSTDOUT:\n${workload_logs.stdout}\n\nSTDERR:\n${workload_logs.stderr}
-                                    ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm ${WORKLOAD_TYPE} '${WORKLOAD_NAME}' exists in the namespace\nCheck if pod '${pod_name}' exists and is reachable\n
-                                ELSE
-                                    ${tracebacks}=    RW.LogAnalysis.ExtractTraceback.Extract Tracebacks
-                                    ...    logs=${workload_logs.stdout}
-                                    
-                                    # check total no. of tracebacks extracted
-                                    ${total_tracebacks}=    Get Length     ${tracebacks}
-
-                                    IF    ${total_tracebacks} == 0
-                                        # no tracebacks found for this container in this pod
-                                        RW.Core.Add Pre To Report    **📋 No Stacktraces for Container `${container_name}` in Pod `${pod_name}` for ${WORKLOAD_TYPE} ${WORKLOAD_NAME} Found in Last ${LOG_LINES} lines, ${LOG_AGE} age.**\n**Commands Used:** ${workload_logs.cmd}\n\n
-                                    ELSE
-                                        ${agg_tracebacks}=    Evaluate    "-----------------------------------------------------------\\n".join(${tracebacks})
-                                        RW.Core.Add Pre To Report    **🔍 Stacktraces Found for Container `${container_name}` in Pod `${pod_name}` for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}`:**\n\n${agg_tracebacks}\n\n
-
-                                        RW.Core.Add Issue
-                                        ...    severity=2
-                                        ...    expected=No Stacktraces for Container `${container_name}` in Pod `${pod_name}` for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` Found.
-                                        ...    actual=Stacktraces are found for Container `${container_name}` in Pod `${pod_name}` for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}`
-                                        ...    title=Stacktraces detected in Container `${container_name}` for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}`
-                                        ...    reproduce_hint=${workload_logs.cmd}
-                                        ...    details=${tracebacks}
-                                        ...    next_steps=Inspect container `${container_name}` inside pod `${pod_name}` managed by ${WORKLOAD_TYPE} `${WORKLOAD_NAME}`\nReview application logs for the root cause of the stacktrace\nCheck application configuration and resource limits\nConsider scaling or restarting the ${WORKLOAD_TYPE} if issues persist
-                                        ...    next_action=analyseStacktrace
-                                    END
-                                END
-                            END                
-                        EXCEPT    AS    ${error}
-                            RW.Core.Add Pre To Report    Exception encountered for container `${container_name}` in pod `${pod_name}` for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}`\n:${error}
-                        END
-                    END            
-                ELSE
-                    RW.Core.Add Issue
-                    ...    severity=3
-                    ...    expected=Container list should be retrievable for pod `${pod_name}` in ${WORKLOAD_TYPE} `${WORKLOAD_NAME}`
-                    ...    actual=Failed to retrieve container list for pod `${pod_name}` in ${WORKLOAD_TYPE} `${WORKLOAD_NAME}`
-                    ...    title=Unable to List Containers in ${WORKLOAD_TYPE} `${WORKLOAD_NAME}`
-                    ...    reproduce_hint=${pod_container_names_lines.cmd}
-                    ...    details=Container listing failed with return code: ${pod_container_names_lines.returncode}, stderr: ${pod_container_names_lines.stderr}
-                    ...    next_steps=Verify pod exists and is accessible\nCheck kubeconfig and context configuration\nEnsure proper RBAC permissions for pod inspection
-                END
-            END
+        # Extract stacktraces from the log directory using the traceback library
+        ${tracebacks}=    RW.LogAnalysis.ExtractTraceback.Extract Tracebacks
+        ...    logs_dir=${log_dir}
+        
+        # Check total number of tracebacks extracted
+        ${total_tracebacks}=    Get Length    ${tracebacks}
+        
+        IF    ${total_tracebacks} == 0
+            # No tracebacks found
+            RW.Core.Add Pre To Report    **📋 No Stacktraces Found for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Namespace `${NAMESPACE}`**\n**Log Analysis Period:** ${LOG_AGE}\n**Max Log Lines:** ${LOG_LINES}\n**Max Log Size:** ${LOG_SIZE} bytes\n**Excluded Containers:** ${EXCLUDED_CONTAINER_NAMES}\n\nLog analysis completed successfully with no stacktraces detected.
         ELSE
-            RW.Core.Add Issue
-            ...    severity=2
-            ...    expected=Pod list should be retrievable for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in namespace `${NAMESPACE}`
-            ...    actual=Failed to retrieve pod list for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in namespace `${NAMESPACE}`
-            ...    title=Unable to List Pods for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}`
-            ...    reproduce_hint=${workload_pod_names_lines.cmd}
-            ...    details=Pod listing failed with return code: ${workload_pod_names_lines.returncode}, stderr: ${workload_pod_names_lines.stderr}
-            ...    next_steps=Verify ${WORKLOAD_TYPE} exists in the specified namespace\nCheck kubeconfig and context configuration\nEnsure proper RBAC permissions for pod listing\nConfirm namespace '${NAMESPACE}' exists
+            # Stacktraces found - create issues for each one
+            ${delimiter}=    Evaluate    '-' * 80
+            
+            FOR    ${traceback}    IN    @{tracebacks}
+                RW.Core.Add Issue
+                ...    severity=2
+                ...    expected=No stacktraces should be present in ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` logs in namespace `${NAMESPACE}`
+                ...    actual=Stacktrace detected in ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` logs in namespace `${NAMESPACE}`
+                ...    title=Stacktrace Detected in ${WORKLOAD_TYPE} `${WORKLOAD_NAME}`
+                ...    reproduce_hint=Check application logs for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in namespace `${NAMESPACE}`
+                ...    details=${delimiter}\n${traceback}\n${delimiter}
+                ...    next_steps=Review application logs for the root cause of the stacktrace\nCheck application configuration and resource limits\nInvestigate the specific error conditions that led to this stacktrace\nConsider scaling or restarting the ${WORKLOAD_TYPE} if issues persist\nMonitor application health and performance metrics
+            END
+            
+            # Create consolidated report showing all stacktraces
+            ${agg_tracebacks}=    Evaluate    "\\n" + "${delimiter}\\n" + "${delimiter}\\n".join(${tracebacks}) + "\\n" + "${delimiter}"
+            RW.Core.Add Pre To Report    **🔍 Stacktraces Found for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Namespace `${NAMESPACE}`**\n**Total Stacktraces:** ${total_tracebacks}\n**Log Analysis Period:** ${LOG_AGE}\n**Max Log Lines:** ${LOG_LINES}\n**Max Log Size:** ${LOG_SIZE} bytes\n**Excluded Containers:** ${EXCLUDED_CONTAINER_NAMES}\n\n${agg_tracebacks}
         END
+        
+        # Clean up temporary log files
+        RW.K8sLog.Cleanup Temp Files
     END
