@@ -78,8 +78,8 @@ Suite Initialization
     ...    type=string
     ...    description=comma-separated string of keywords used to identify and skip container names containing any of these substrings."
     ...    pattern=\w*
-    ...    example=linkerd,initX
-    ...    default=linkerd
+    ...    example=linkerd-proxy,istio-proxy,vault-agent
+    ...    default=linkerd-proxy,istio-proxy,vault-agent
     
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}
