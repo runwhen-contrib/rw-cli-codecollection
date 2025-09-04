@@ -264,7 +264,7 @@ Get Critical Log Errors and Score for Deployment `${DEPLOYMENT_NAME}`
         ...    log_age=${LOG_AGE}
         ...    max_log_lines=${MAX_LOG_LINES}
         ...    max_log_bytes=${MAX_LOG_BYTES}
-        ...    excluded_containers=@{EXCLUDED_CONTAINERS}
+        ...    excluded_containers=${EXCLUDED_CONTAINERS}
         
         # Use only critical error patterns for fast SLI checks
         @{critical_categories}=    Create List    GenericError    AppFailure    StackTrace
@@ -276,7 +276,7 @@ Get Critical Log Errors and Score for Deployment `${DEPLOYMENT_NAME}`
         ...    namespace=${NAMESPACE}
         ...    categories=${critical_categories}
         ...    custom_patterns_file=sli_critical_patterns.json
-        ...    excluded_containers=@{EXCLUDED_CONTAINERS}
+        ...    excluded_containers=${EXCLUDED_CONTAINERS}
         
         # Post-process results to filter out patterns matching LOGS_EXCLUDE_PATTERN
         TRY

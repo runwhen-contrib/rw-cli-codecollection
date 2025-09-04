@@ -219,7 +219,7 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
         ...    context=${CONTEXT}
         ...    kubeconfig=${kubeconfig}
         ...    log_age=${LOG_AGE}
-        ...    excluded_containers=@{EXCLUDED_CONTAINERS}
+        ...    excluded_containers=${EXCLUDED_CONTAINERS}
         
         ${scan_results}=    RW.K8sLog.Scan Logs For Issues
         ...    log_dir=${log_dir}
@@ -228,7 +228,7 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
         ...    namespace=${NAMESPACE}
         ...    categories=@{LOG_PATTERN_CATEGORIES}
         ...    custom_patterns_file=runbook_patterns.json
-        ...    excluded_containers=@{EXCLUDED_CONTAINERS}
+        ...    excluded_containers=${EXCLUDED_CONTAINERS}
         
         # Post-process results to filter out patterns matching LOGS_EXCLUDE_PATTERN
         TRY
