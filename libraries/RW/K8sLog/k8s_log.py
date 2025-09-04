@@ -729,7 +729,8 @@ class K8sLog:
     @keyword
     def fetch_workload_logs(self, workload_type: str, workload_name: str, namespace: str, 
                            context: str, kubeconfig: platform.Secret, log_age: str = "10m",
-                           max_log_lines: str = "1000", max_log_bytes: str = "256000") -> str:
+                           max_log_lines: str = "1000", max_log_bytes: str = "256000", 
+                           excluded_containers: List[str] = None) -> str:
         """Fetch logs for a Kubernetes workload and prepare them for analysis.
         
         Args:
@@ -741,13 +742,21 @@ class K8sLog:
             log_age: How far back to fetch logs (default: 10m)
             max_log_lines: Maximum number of log lines to fetch per container (default: 1000)
             max_log_bytes: Maximum log size in bytes to fetch per container (default: 256000)
+            excluded_containers: List of container names to exclude from log collection (default: None)
             
         Returns:
             Path to the directory containing fetched logs
         """
         # Create temporary directory for this analysis session
         if not self.temp_dir:
-            self.temp_dir = tempfile.mkdtemp(prefix="k8s_log_analysis_")
+            codebundle_temp_dir = os.getenv("CODEBUNDLE_TEMP_DIR")
+            if codebundle_temp_dir:
+                # Use CODEBUNDLE_TEMP_DIR (already unique per codebundle execution)
+                self.temp_dir = os.path.join(codebundle_temp_dir, "k8s_log_analysis")
+                os.makedirs(self.temp_dir, exist_ok=True)
+            else:
+                # Fallback to system temp directory (mkdtemp already ensures uniqueness)
+                self.temp_dir = tempfile.mkdtemp(prefix="k8s_log_analysis_")
         
         # Write kubeconfig to temp file
         kubeconfig_path = os.path.join(self.temp_dir, "kubeconfig")
@@ -771,6 +780,7 @@ class K8sLog:
                 json.dump(pods, f, indent=2)
             
             # Fetch logs for each pod/container
+            excluded_containers = excluded_containers or []
             for pod in pods:
                 pod_name = pod['metadata']['name']
                 logger.info(f"Processing Pod: {pod_name}")
@@ -778,6 +788,12 @@ class K8sLog:
                 containers = pod.get('spec', {}).get('containers', [])
                 for container in containers:
                     container_name = container['name']
+                    
+                    # Skip excluded containers
+                    if container_name in excluded_containers:
+                        logger.info(f"  Skipping excluded container: {container_name}")
+                        continue
+                        
                     logger.info(f"  Container: {container_name}")
                     
                     # Fetch logs for this container
@@ -791,7 +807,11 @@ class K8sLog:
                     with open(log_file, 'w') as f:
                         f.write(logs_content)
             
-            logger.info(f"Successfully fetched logs for {workload_type}/{workload_name}")
+            # Log summary of what was processed
+            if excluded_containers:
+                logger.info(f"Successfully fetched logs for {workload_type}/{workload_name} (excluded containers: {', '.join(excluded_containers)})")
+            else:
+                logger.info(f"Successfully fetched logs for {workload_type}/{workload_name}")
             logger.info(f"Logs stored in: {logs_dir}")
             return self.temp_dir
             
@@ -801,7 +821,7 @@ class K8sLog:
     @keyword
     def scan_logs_for_issues(self, log_dir: str, workload_type: str, workload_name: str, 
                            namespace: str, categories: List[str] = None, 
-                           custom_patterns_file: str = None) -> Dict[str, Any]:
+                           custom_patterns_file: str = None, excluded_containers: List[str] = None) -> Dict[str, Any]:
         """Scan fetched logs for various error patterns and issues.
         
         Args:
@@ -811,6 +831,7 @@ class K8sLog:
             namespace: Kubernetes namespace
             categories: List of categories to scan for (optional, defaults to all)
             custom_patterns_file: Path to custom error patterns JSON file (optional)
+            excluded_containers: List of container names that were excluded during log fetch (optional)
             
         Returns:
             Dictionary containing scan results with issues and summary
@@ -822,7 +843,7 @@ class K8sLog:
         
         try:
             return self._scan_logs_for_issues_impl(log_dir, workload_type, workload_name, 
-                                                 namespace, categories, custom_patterns_file)
+                                                 namespace, categories, custom_patterns_file, excluded_containers)
         except TimeoutError:
             logger.warning(f"Log scanning timed out after {timeout_seconds} seconds")
             return {
@@ -845,7 +866,7 @@ class K8sLog:
 
     def _scan_logs_for_issues_impl(self, log_dir: str, workload_type: str, workload_name: str, 
                                  namespace: str, categories: List[str] = None, 
-                                 custom_patterns_file: str = None) -> Dict[str, Any]:
+                                 custom_patterns_file: str = None, excluded_containers: List[str] = None) -> Dict[str, Any]:
         """Implementation of log scanning with timeout protection."""
         if categories is None:
             categories = [
@@ -1186,7 +1207,7 @@ class K8sLog:
 
     @keyword
     def analyze_log_anomalies(self, log_dir: str, workload_type: str, workload_name: str, 
-                             namespace: str) -> Dict[str, Any]:
+                             namespace: str, excluded_containers: List[str] = None) -> Dict[str, Any]:
         """Analyze logs for repeating patterns and anomalies.
         
         Args:
@@ -1194,6 +1215,7 @@ class K8sLog:
             workload_type: Type of workload
             workload_name: Name of the workload
             namespace: Kubernetes namespace
+            excluded_containers: List of container names that were excluded during log fetch (optional)
             
         Returns:
             Dictionary containing anomaly analysis results

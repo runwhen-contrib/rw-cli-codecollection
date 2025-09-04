@@ -90,6 +90,12 @@ Suite Initialization
     ...    pattern=.*
     ...    example="errors":\s*\[\]|"warnings":\s*\[\]
     ...    default="errors":\s*\[\]|\\bINFO\\b|\\bDEBUG\\b|\\bTRACE\\b|\\bSTART\\s*-\\s*|\\bSTART\\s*method\\b
+    ${EXCLUDED_CONTAINER_NAMES}=    RW.Core.Import User Variable    EXCLUDED_CONTAINER_NAMES
+    ...    type=string
+    ...    description=Comma-separated list of container names to exclude from log analysis (e.g., linkerd-proxy, istio-proxy, vault-agent).
+    ...    pattern=.*
+    ...    example=linkerd-proxy,istio-proxy,vault-agent
+    ...    default=linkerd-proxy,istio-proxy,vault-agent
 
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
@@ -108,6 +114,11 @@ Suite Initialization
     Set Suite Variable    ${EVENT_THRESHOLD}    ${EVENT_THRESHOLD}
     Set Suite Variable    ${CHECK_SERVICE_ENDPOINTS}    ${CHECK_SERVICE_ENDPOINTS}
     Set Suite Variable    ${LOGS_EXCLUDE_PATTERN}    ${LOGS_EXCLUDE_PATTERN}
+    Set Suite Variable    ${EXCLUDED_CONTAINER_NAMES}    ${EXCLUDED_CONTAINER_NAMES}
+    
+    # Convert comma-separated string to list
+    @{EXCLUDED_CONTAINERS}=    Run Keyword If    "${EXCLUDED_CONTAINER_NAMES}" != ""    Split String    ${EXCLUDED_CONTAINER_NAMES}    ,    ELSE    Create List
+    Set Suite Variable    @{EXCLUDED_CONTAINERS}
 
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
@@ -253,6 +264,7 @@ Get Critical Log Errors and Score for Deployment `${DEPLOYMENT_NAME}`
         ...    log_age=${LOG_AGE}
         ...    max_log_lines=${MAX_LOG_LINES}
         ...    max_log_bytes=${MAX_LOG_BYTES}
+        ...    excluded_containers=${EXCLUDED_CONTAINERS}
         
         # Use only critical error patterns for fast SLI checks
         @{critical_categories}=    Create List    GenericError    AppFailure    StackTrace
@@ -264,6 +276,7 @@ Get Critical Log Errors and Score for Deployment `${DEPLOYMENT_NAME}`
         ...    namespace=${NAMESPACE}
         ...    categories=${critical_categories}
         ...    custom_patterns_file=sli_critical_patterns.json
+        ...    excluded_containers=${EXCLUDED_CONTAINERS}
         
         # Post-process results to filter out patterns matching LOGS_EXCLUDE_PATTERN
         TRY
