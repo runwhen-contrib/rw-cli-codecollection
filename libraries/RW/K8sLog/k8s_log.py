@@ -4,7 +4,6 @@ import os
 import json
 import re
 import signal
-import uuid
 from pathlib import Path
 import subprocess
 import tempfile
@@ -754,9 +753,8 @@ class K8sLog:
                 self.temp_dir = os.path.join(codebundle_temp_dir, "k8s_log_analysis")
                 os.makedirs(self.temp_dir, exist_ok=True)
             else:
-                # Fallback to system temp directory with UUID to prevent collisions
-                unique_id = str(uuid.uuid4())[:8]
-                self.temp_dir = tempfile.mkdtemp(prefix=f"k8s_log_analysis_{unique_id}_")
+                # Fallback to system temp directory (mkdtemp already ensures uniqueness)
+                self.temp_dir = tempfile.mkdtemp(prefix="k8s_log_analysis_")
         
         # Write kubeconfig to temp file
         kubeconfig_path = os.path.join(self.temp_dir, "kubeconfig")
