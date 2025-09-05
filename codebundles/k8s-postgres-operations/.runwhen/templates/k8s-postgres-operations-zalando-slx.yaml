@@ -7,7 +7,7 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/database.svg
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/postgresql.svg
   alias: {{match_resource.resource.metadata.name}} PostgreSQL Operations
   asMeasuredBy: PostgreSQL cluster operational health and recovery status as measured by cluster member availability and replication status.
   configProvided:
