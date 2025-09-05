@@ -39,13 +39,9 @@ class PythonTracebackExtractor:
                             tb_dict = json.loads(tb_dict_str)
                             stacktrace_str = tb_dict.get("stacktrace", "")
                             if stacktrace_str:
-                                # TODO: decide if timestamp should also be supplied, might be useful for dedup
-                                timestamp = log_str_json_obj.get("timestamp", "")
-                                full_tb_str = f"Traceback time:{timestamp}\n\n" if timestamp else ""
-                                full_tb_str += stacktrace_str
-                                tracebacks.append(full_tb_str)
+                                # no TIMESTAMP for now
+                                tracebacks.append(stacktrace_str)
                         except Exception as tb_dict_parse_excp:
-                            # TODO: decide if the following is needed/relevant
                             # append this as a exception str
                             # report this to the exception block of tracebacks
                             logger.error(f"Exception while parsing tb_dict_str: \n{tb_dict_str}\n{tb_dict_parse_excp}")
@@ -74,6 +70,7 @@ class PythonTracebackExtractor:
                     tracebacks.extend(curr_log_tracebacks)
         except Exception as excp:
             # BuiltIn().log_to_console(f"\n{''.join(traceback.format_exception(type(excp), excp, excp.__traceback__))}\n")
+            logger.error(f"Exception while loading/parsing log_str: \n{excp}\n\n{log_str}")
             
             # check if log_str has traceback patterns and store'em
             curr_log_tracebacks = self.timestamped_log_tb_extractor.extract_from_string(log_str)
@@ -96,8 +93,10 @@ class PythonTracebackExtractor:
         tracebacks = []
         if isinstance(logs, list):
             for dp_log in logs:
-                if dp_log.startswith('{'):
-                    tracebacks.extend(self.extract_traceback_from_dict_log(dp_log))
+                # Handle timestamped log lines by stripping timestamp and whitespace before '{'
+                cleaned_log = self._strip_timestamp_from_log_line(dp_log)
+                if cleaned_log.startswith('{'):
+                    tracebacks.extend(self.extract_traceback_from_dict_log(cleaned_log))
         else:
             logs = str(logs)
             # check if logs has traceback patterns and store'em
@@ -105,3 +104,23 @@ class PythonTracebackExtractor:
             if curr_log_tracebacks:
                 tracebacks.extend(curr_log_tracebacks)
         return tracebacks
+    
+    def _strip_timestamp_from_log_line(self, log_line: str) -> str:
+        """
+        Strip timestamp and trailing whitespace from log line to get to the JSON content.
+        
+        Handles formats like:
+        - 2025-09-03T20:38:52.746707599Z {"event": ...}
+        - 2025-09-03T20:38:52.746707599Z   {"event": ...}
+        """
+        if not log_line or not log_line.strip():
+            return log_line
+            
+        # Find the position of the first opening curly brace
+        brace_pos = log_line.find('{')
+        if brace_pos == -1:
+            # No JSON content found, return original line
+            return log_line
+            
+        # Return everything from the opening brace onwards
+        return log_line[brace_pos:]

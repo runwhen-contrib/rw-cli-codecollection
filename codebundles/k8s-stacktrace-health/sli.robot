@@ -9,6 +9,7 @@ Library           RW.Core
 Library           RW.CLI
 Library           RW.platform
 Library           RW.LogAnalysis.ExtractTraceback
+Library           RW.K8sLog
 Library           OperatingSystem
 Library           String
 Library           Collections
@@ -60,12 +61,12 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=256000
     ...    default=256000
-    ${IGNORE_CONTAINERS_MATCHING}=    RW.Core.Import User Variable    IGNORE_CONTAINERS_MATCHING
+    ${EXCLUDED_CONTAINER_NAMES}=    RW.Core.Import User Variable    EXCLUDED_CONTAINER_NAMES
     ...    type=string
-    ...    description=comma-separated string of keywords used to identify and skip container names containing any of these substrings."
-    ...    pattern=\w*
-    ...    example=linkerd,initX
-    ...    default=linkerd
+    ...    description=Comma-separated list of container names to exclude from log analysis (e.g., linkerd-proxy, istio-proxy, vault-agent).
+    ...    pattern=.*
+    ...    example=linkerd-proxy,istio-proxy,vault-agent
+    ...    default=linkerd-proxy,istio-proxy,vault-agent
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.
@@ -77,12 +78,16 @@ Suite Initialization
     Set Suite Variable    ${LOG_AGE}    ${LOG_AGE}
     Set Suite Variable    ${MAX_LOG_LINES}    ${MAX_LOG_LINES}
     Set Suite Variable    ${MAX_LOG_BYTES}    ${MAX_LOG_BYTES}
-    Set Suite Variable    ${IGNORE_CONTAINERS_MATCHING}    ${IGNORE_CONTAINERS_MATCHING}
+    Set Suite Variable    ${EXCLUDED_CONTAINER_NAMES}    ${EXCLUDED_CONTAINER_NAMES}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${WORKLOAD_NAME}    ${WORKLOAD_NAME}
     Set Suite Variable    ${WORKLOAD_TYPE}    ${WORKLOAD_TYPE}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
+
+    # Convert comma-separated string to list
+    @{EXCLUDED_CONTAINERS}=    Run Keyword If    "${EXCLUDED_CONTAINER_NAMES}" != ""    Split String    ${EXCLUDED_CONTAINER_NAMES}    ,    ELSE    Create List
+    Set Suite Variable    @{EXCLUDED_CONTAINERS}
     
     # Initialize score variables
     Set Suite Variable    ${stacktrace_score}    0
@@ -138,107 +143,38 @@ Get Stacktrace Health Score for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}`
         ${stacktrace_score}=    Set Variable    1.0
         Set Suite Variable    ${stacktrace_details}     ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` is intentionally scaled to 0 replicas - Score: ${stacktrace_score}
     ELSE
-        # default init of stacktrace score
-        ${stacktrace_score}=    Set Variable    1.0
-
-        # empty string to store stacktraces/errors-from-commands
-        ${stacktrace_details_temp}=    Set Variable    ${EMPTY}
-
-        # Step-1: Fetch all pods for the workload
-        ${workload_pod_names_lines}=    RW.CLI.Run Cli
-        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -l app=${WORKLOAD_NAME} -o name
-        ...    env=${env}
-        ...    secret_file__kubeconfig=${kubeconfig}
-        ...    show_in_rwl_cheatsheet=true
-        ...    render_in_commandlist=true
+        # Fetch logs using RW.K8sLog library (same pattern as deployment healthcheck)
+        ${log_dir}=    RW.K8sLog.Fetch Workload Logs
+        ...    workload_type=${WORKLOAD_TYPE}
+        ...    workload_name=${WORKLOAD_NAME}
+        ...    namespace=${NAMESPACE}
+        ...    context=${CONTEXT}
+        ...    kubeconfig=${kubeconfig}
+        ...    log_age=${LOG_AGE}
+        ...    max_log_lines=${MAX_LOG_LINES}
+        ...    max_log_bytes=${MAX_LOG_BYTES}
+        ...    excluded_containers=${EXCLUDED_CONTAINERS}
         
-        IF    ${workload_pod_names_lines.returncode} == 0
-            # split lines to get the pods as a list of pod-names
-            ${workload_pod_names_list}=    Split To Lines    ${workload_pod_names_lines.stdout}
-            
-            # set to True if a stacktrace is found within any valid container of any pod of this workload ==> fire SLI alert
-            ${stacktrace_found}=    Set Variable    False
+        # Extract stacktraces from the log directory
+        ${recentmost_stacktrace}=    RW.LogAnalysis.ExtractTraceback.Extract Tracebacks
+        ...    logs_dir=${log_dir}
+        ...    fast_exit=${True}
 
-            # Step-2: iterate through each pod-name and fetch its logs
-            FOR    ${pod_name}    IN    @{workload_pod_names_list}
-                # Step-3: Fetch container names of this pod
-                ${pod_container_names_lines}=    RW.CLI.Run Cli
-                ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${pod_name} --context ${CONTEXT} -n ${NAMESPACE} -o jsonpath='{range .spec.containers[*]}{.name}{"\\n"}{end}'
-                ...    env=${env}
-                ...    secret_file__kubeconfig=${kubeconfig}
-                ...    show_in_rwl_cheatsheet=true
-                ...    render_in_commandlist=true
-                
-                IF    ${pod_container_names_lines.returncode} == 0
-                    # split lines to get the list of container names 
-                    ${container_names_list}=    Split To Lines    ${pod_container_names_lines.stdout}
-
-                    # separate the csv argument into a list of patterns to ignore.
-                    ${ignore_container_patterns}=    Split String    ${IGNORE_CONTAINERS_MATCHING}    ,
+        ${stacktrace_length}=    Get Length    ${recentmost_stacktrace}
         
-                    # Step-4: iterate through each container within each pod and fetch its logs
-                    FOR    ${container_name}    IN    @{container_names_list}
-                        
-                        # skip log-fetch for this container if its name is to be ignored
-                        ${skip_container}=    Set Variable    ${False}
-
-                        TRY
-                            # try matching patterns to the container name to determine if its to be ignored
-                            FOR    ${filter}    IN    @{ignore_container_patterns}
-                                IF    '${filter}' in '${container_name}'
-                                    ${skip_container}=    Set Variable    ${True}
-                                    Exit For Loop
-                                END
-                            END
-
-                            IF    not ${skip_container}
-                                # Step-5: Fetch raw logs for this pod.container
-                                ${workload_logs}=    RW.CLI.Run Cli
-                                ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs ${pod_name} --context ${CONTEXT} -n ${NAMESPACE} -c ${container_name} --tail=${MAX_LOG_LINES} --since=${LOG_AGE} --limit-bytes ${MAX_LOG_BYTES}
-                                ...    env=${env}
-                                ...    secret_file__kubeconfig=${kubeconfig}
-                                ...    show_in_rwl_cheatsheet=true
-                                ...    render_in_commandlist=true
-                                
-                                IF    ${workload_logs.returncode} == 0                                    
-                                    # fetch the recent-most stacktrace
-                                    ${recentmost_stacktrace}=    RW.LogAnalysis.ExtractTraceback.Extract Tracebacks
-                                    ...    logs=${workload_logs.stdout}
-                                    ...    fetch_most_recent=${True}
-
-                                    ${stacktrace_length}=    Get Length    ${recentmost_stacktrace}
-
-                                    IF    ${stacktrace_length} != 0
-                                        # stacktrace found                                        
-                                        # fast exit out of both loops to fire an alert now that a stacktrace has been found
-                                        ${stacktrace_found}=    Set Variable    True
-                                        ${stacktrace_score}=    Set Variable    0
-                                        ${delimiter}=    Evaluate    '-' * 150
-                                        ${stacktrace_details_temp}=    Catenate    ${stacktrace_details_temp}    ${delimiter}\n${recentmost_stacktrace}\n${delimiter}
-                                        Exit For Loop
-                                    END
-                                ELSE
-                                    ${stacktrace_details_temp}=    Catenate    ${stacktrace_details_temp}    Unable to fetch workload logs for container `${container_name}` in pod `${pod_name}`
-                                END
-                            END
-                        EXCEPT
-                            ${stacktrace_details_temp}=    Catenate    ${stacktrace_details_temp}    Exception encountered for container `${container_name}` in pod `${pod_name}`.
-                        END
-                    END
-                    
-                    # fast exit since a stacktrace has been found ==> fire an SLI alert
-                    IF    ${stacktrace_found}
-                        Exit For Loop
-                    END
-                ELSE
-                    ${stacktrace_details_temp}=    Catenate    ${stacktrace_details_temp}    Error while fetching containers for pod `${pod_name}`
-                END
-            END
+        IF    ${stacktrace_length} != 0
+            # Stacktrace found - set score to 0
+            ${stacktrace_score}=    Set Variable    0
+            ${delimiter}=    Evaluate    '-' * 150
+            Set Suite Variable    ${stacktrace_details}    **Stacktrace(s) identified**:\n${delimiter}\n${recentmost_stacktrace}\n${delimiter}
         ELSE
-            ${stacktrace_details_temp}=    Catenate    ${stacktrace_details_temp}   Error while fetching pod-names for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}`
+            # No stacktraces found - set score to 1
+            ${stacktrace_score}=    Set Variable    1.0
+            Set Suite Variable    ${stacktrace_details}    **No Stacktraces identified.**\n\nLog analysis completed successfully.
         END
-        ${stacktrace_details_header}=    Set Variable If    ${stacktrace_found}    **Stacktrace(s) identified**:\n    **No Stacktraces identified.**\n\nHere are the command logs:\n
-        Set Suite Variable    ${stacktrace_details}   ${stacktrace_details_header}\n${stacktrace_details_temp}\n\n
+        
+        # Clean up temporary log files
+        RW.K8sLog.Cleanup Temp Files
     END 
 
     Set Suite Variable    ${stacktrace_score}
