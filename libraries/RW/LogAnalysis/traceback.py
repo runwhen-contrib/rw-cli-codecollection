@@ -72,7 +72,8 @@ class ExtractTraceback:
         
         logger.info(f"Found {len(log_files)} log files for traceback extraction.")
         
-        tracebacks: Set[str] = set()  
+        tracebacks: Set[str] = set()
+        
         
         # Process each log file
         for log_file in log_files:
