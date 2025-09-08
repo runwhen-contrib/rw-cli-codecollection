@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
 Main Traceback Extraction library class
+
+Author: akshayrw25
 """
 
 import os
@@ -75,7 +77,7 @@ class ExtractTraceback:
         tracebacks: Set[str] = set()
         
         
-        # Process each log file
+        # Process each log file for python stacktraces
         for log_file in log_files:
             try:
                 with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
@@ -91,19 +93,18 @@ class ExtractTraceback:
                     tracebacks.update(python_tracebacks)
                     if fast_exit:
                         logger.info(f"Found Python traceback in {log_file}, fast exit enabled")
-                        return python_tracebacks[-1]
-                
-                # Extract Java tracebacks
-                java_tracebacks = self.java_traceback_extractor.extract_tracebacks_from_logs(logs_list)
-                if java_tracebacks:
-                    tracebacks.update(java_tracebacks)
-                    if fast_exit:
-                        logger.info(f"Found Java traceback in {log_file}, fast exit enabled")
-                        return java_tracebacks[-1]
-                        
+                        return python_tracebacks[-1]                        
             except Exception as e:
                 logger.error(f"Error processing log file {log_file}: {str(e)}")
                 continue
+
+        # process the logs_dir directly to extract JAVA stacktraces
+        java_stacktraces = self.java_traceback_extractor.extract_tracebacks_from_logs_dir(log_files)
+        if java_stacktraces:
+            tracebacks.update(java_stacktraces)
+            if fast_exit:
+                logger.info(f"Found Java stacktrace in {log_files}, fast exit enabled")
+                return java_stacktraces[-1]
         
         tracebacks = list(tracebacks)
         logger.info(f"Extracted {len(tracebacks)} total unique tracebacks from {len(log_files)} files")
