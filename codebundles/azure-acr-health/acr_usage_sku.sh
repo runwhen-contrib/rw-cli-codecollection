@@ -130,7 +130,7 @@ if [ $? -ne 0 ] || [ -z "$usage_info" ]; then
         "Check permissions and verify ACR \`$ACR_NAME\` exists in resource group \`$RESOURCE_GROUP\`" \
         "az acr show-usage --name $ACR_NAME --subscription $SUBSCRIPTION_ID"
     
-    echo "⚠️ Failed to retrieve usage information"
+    echo "⚠️ Failed to retrieve usage information" >&2
     rm -f usage_err.log acr_show_err.log
     exit 0
 fi
