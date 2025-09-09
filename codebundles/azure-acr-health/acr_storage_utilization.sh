@@ -107,7 +107,7 @@ if [ $? -ne 0 ] || [ -z "$acr_info" ]; then
         "Verify ACR name \`$ACR_NAME\`, resource group \`$RESOURCE_GROUP\`, and permissions" \
         "az acr show --name $ACR_NAME --resource-group $RESOURCE_GROUP"
     
-    echo "❌ Failed to retrieve ACR information"
+    echo "❌ Failed to retrieve ACR information" >&2
     rm -f acr_show_err.log
     exit 0
 fi
@@ -136,7 +136,7 @@ if [ $? -ne 0 ] || [ -z "$usage_info" ]; then
         "Check permissions and verify ACR \`$ACR_NAME\` accessibility in resource group \`$RESOURCE_GROUP\`" \
         "az acr show-usage --name $ACR_NAME --subscription $SUBSCRIPTION_ID"
     
-    echo "❌ Failed to retrieve storage usage"
+    echo "❌ Failed to retrieve storage usage" >&2
     rm -f usage_err.log acr_show_err.log
     exit 0
 fi

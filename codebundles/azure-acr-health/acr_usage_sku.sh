@@ -206,10 +206,10 @@ case "$sku" in
             "az acr update --name $ACR_NAME --sku Standard"
         ;;
     "Standard")
-        echo "✅ Standard SKU detected - good for most workloads"
+        echo "✅ Standard SKU detected - good for most workloads" >&2
         ;;
     "Premium")
-        echo "🚀 Premium SKU detected - full feature set available"
+        echo "🚀 Premium SKU detected - full feature set available" >&2
         ;;
     *)
         add_issue \
