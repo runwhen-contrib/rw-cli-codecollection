@@ -42,7 +42,7 @@ import ast
 import re
 from datetime import datetime
 from robot.api import logger
-from timestamp_handler import TimestampHandler
+from .timestamp_handler import TimestampHandler
 
 JAVA_PATTERN = re.compile(r'\s*at\s+[a-zA-Z_][\w$]*(\.[a-zA-Z_][\w$]*)+\([^)]*\)')
 
@@ -435,7 +435,7 @@ class JavaTracebackExtractor:
         try:
             sorted_stacktraces = sorted(unique_stacktraces_with_timestamps, key=sort_by_timestamp_windows)
         except Exception as e:
-            logger.error(f"Exception encountered while sorting stacktraces: {e}")
+            logger.error(f"Exception encountered while sorting stacktraces by java traceback extractor: {e}")
             # Fall back to unsorted if sorting fails
             sorted_stacktraces = unique_stacktraces_with_timestamps
         
@@ -610,7 +610,7 @@ class JavaTracebackExtractor:
                 file_stacktraces = self.extract_tracebacks_from_logs(log_lines)
                 all_stacktraces.extend(file_stacktraces)                
             except Exception as e:
-                logger.error(f"Error processing log file {log_file_path}: {str(e)}")
+                logger.error(f"Error processing log file {log_file_path} by java traceback extractor: {str(e)}")
                 continue
         
         # Deduplicate stacktraces across all files

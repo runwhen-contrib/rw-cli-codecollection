@@ -44,7 +44,7 @@ class PythonTracebackExtractor:
                         except Exception as tb_dict_parse_excp:
                             # append this as a exception str
                             # report this to the exception block of tracebacks
-                            logger.error(f"Exception while parsing tb_dict_str: \n{tb_dict_str}\n{tb_dict_parse_excp}")
+                            logger.error(f"Exception while parsing tb_dict_str from python traceback extractor: \n{tb_dict_str}\n{tb_dict_parse_excp}")
                             
                             # TODO: if tracebacks are reported, runner-worker may start to have too many tracebacks leading to a traceback SLI alert.
                             # logger.error(''.join(traceback.format_exception(type(tb_dict_parse_excp), tb_dict_parse_excp, tb_dict_parse_excp.__traceback__)))
@@ -70,7 +70,7 @@ class PythonTracebackExtractor:
                     tracebacks.extend(curr_log_tracebacks)
         except Exception as excp:
             # BuiltIn().log_to_console(f"\n{''.join(traceback.format_exception(type(excp), excp, excp.__traceback__))}\n")
-            logger.error(f"Exception while loading/parsing log_str: \n{excp}\n\n{log_str}")
+            logger.error(f"Exception while loading/parsing log_str from python traceback extractor: \n{excp}\n\n{log_str}")
             
             # check if log_str has traceback patterns and store'em
             curr_log_tracebacks = self.timestamped_log_tb_extractor.extract_from_string(log_str)
