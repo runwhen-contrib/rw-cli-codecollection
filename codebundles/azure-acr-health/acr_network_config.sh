@@ -415,5 +415,5 @@ echo "📋 Issues found: $issue_count" >&2
 if [ "$issue_count" -gt 0 ]; then
     echo "" >&2
     echo "Issues:" >&2
-    jq -r '.[] | "  - \(.title) (Severity: \(.severity))"' "$ISSUES_FILE"
+    jq -r '.[] | "  - \(.title) (Severity: \(.severity))"' "$ISSUES_FILE" >&2
 fi
