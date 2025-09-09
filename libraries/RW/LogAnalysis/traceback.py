@@ -41,6 +41,15 @@ class ExtractTraceback:
             recent-most traceback, if fast_exit = True
             list of unique tracebacks, otherwise
         """
+        # Handle new interface (logs_dir as directory path)
+        if logs_dir is None and logs is None:
+            logger.error("Either logs_dir or logs parameter must be provided")
+            return [] if not fast_exit else ""
+        
+        if not os.path.exists(logs_dir):
+            logger.error(f"Logs directory does not exist: {logs_dir}")
+            return [] if not fast_exit else ""
+        
         # Handle legacy interface (logs as string)
         if logs is not None:
             logs_str = str(logs)  # safety conversion
@@ -56,15 +65,6 @@ class ExtractTraceback:
                 return "" if not tracebacks else list(tracebacks)[-1]
             return list(tracebacks)
         
-        # Handle new interface (logs_dir as directory path)
-        if logs_dir is None:
-            logger.error("Either logs_dir or logs parameter must be provided")
-            return [] if not fast_exit else ""
-        
-        if not os.path.exists(logs_dir):
-            logger.error(f"Logs directory does not exist: {logs_dir}")
-            return [] if not fast_exit else ""
-        
         # Find all .txt files in the directory and subdirectories
         log_files = []
         for root, dirs, files in os.walk(logs_dir):
@@ -77,34 +77,19 @@ class ExtractTraceback:
         tracebacks: Set[str] = set()
         
         
-        # Process each log file for python stacktraces
-        for log_file in log_files:
-            try:
-                with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
-                    logs_list = []
-                    for line in f:
-                        logs_list.append(line.rstrip('\n'))
-
-                logger.info(f"Processing {log_file} with {len(logs_list)} lines")
-                
-                # Extract Python tracebacks
-                python_tracebacks = self.python_traceback_extractor.extract_tracebacks_from_logs(logs_list)
-                if python_tracebacks:
-                    tracebacks.update(python_tracebacks)
-                    if fast_exit:
-                        logger.info(f"Found Python traceback in {log_file}, fast exit enabled")
-                        return python_tracebacks[-1]                        
-            except Exception as e:
-                logger.error(f"Error processing log file {log_file}: {str(e)}")
-                continue
-
-        # process the logs_dir directly to extract JAVA stacktraces
-        java_stacktraces = self.java_traceback_extractor.extract_tracebacks_from_logs_dir(log_files)
-        if java_stacktraces:
-            tracebacks.update(java_stacktraces)
-            if fast_exit:
-                logger.info(f"Found Java stacktrace in {log_files}, fast exit enabled")
-                return java_stacktraces[-1]
+        # Process log files to extract tracebacks from both Python and Java
+        extractors = [
+            (self.python_traceback_extractor, "Python"),
+            (self.java_traceback_extractor, "Java")
+        ]
+        
+        for extractor, language in extractors:
+            extracted_tracebacks = extractor.extract_tracebacks_from_log_files(log_files, fast_exit=fast_exit)
+            if extracted_tracebacks:
+                tracebacks.update(extracted_tracebacks)
+                if fast_exit:
+                    logger.info(f"Found {language} traceback in {log_files}, fast exit enabled")
+                    return extracted_tracebacks[-1]
         
         tracebacks = list(tracebacks)
         logger.info(f"Extracted {len(tracebacks)} total unique tracebacks from {len(log_files)} files")

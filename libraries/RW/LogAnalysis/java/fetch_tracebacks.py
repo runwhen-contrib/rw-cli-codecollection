@@ -14,7 +14,7 @@ Processing Flow:
 6. Output: Returns a clean list of unique, meaningful stacktraces
 
 Key Features:
-- Batch processing of multiple log files (primary entry point: extract_tracebacks_from_logs_dir)
+- Batch processing of multiple log files (primary entry point: extract_tracebacks_from_log_files)
 - Intelligent timestamp handling via separate TimestampHandler class
 - Support for various timestamp formats (DD-MM-YYYY, ISO 8601, YYYY-MM-DD)
 - Robust multi-line log entry reconstruction
@@ -29,7 +29,7 @@ Architecture:
 
 Entry Point Usage:
     extractor = JavaTracebackExtractor()
-    stacktraces = extractor.extract_tracebacks_from_logs_dir(log_file_paths)
+    stacktraces = extractor.extract_tracebacks_from_log_files(log_file_paths)
 
 Individual Log Processing:
     extractor = JavaTracebackExtractor()
@@ -576,7 +576,7 @@ class JavaTracebackExtractor:
         # Filter logs to find those containing stacktrace information
         return self.filter_logs_having_trace(reconstructed_logs)
 
-    def extract_tracebacks_from_logs_dir(self, log_files: list[str]) -> list[str]:
+    def extract_tracebacks_from_log_files(self, log_files: list[str], fast_exit: bool = False) -> list[str]:
         """
         Extract Java stacktraces from multiple log files.
         
@@ -585,10 +585,12 @@ class JavaTracebackExtractor:
         
         Args:
             log_files: List of paths to log files to process
+            fast_exit: If True, returns immediately after finding the first stacktrace
             
         Returns:
             list[str]: List of unique Java stacktraces found across all files,
-                      deduplicated and sorted by timestamp
+                      deduplicated and sorted by timestamp. If fast_exit is True,
+                      returns a list with only the first stacktrace found.
                       
         Note:
             This method handles file reading errors gracefully, logging them
@@ -608,7 +610,12 @@ class JavaTracebackExtractor:
                 
                 # Extract stacktraces from this file
                 file_stacktraces = self.extract_tracebacks_from_logs(log_lines)
-                all_stacktraces.extend(file_stacktraces)                
+                all_stacktraces.extend(file_stacktraces)
+                
+                # If fast_exit is enabled and we found stacktraces, return immediately
+                if fast_exit and file_stacktraces:
+                    return file_stacktraces[:1]  # Return only the first stacktrace
+                    
             except Exception as e:
                 logger.error(f"Error processing log file {log_file_path} by java traceback extractor: {str(e)}")
                 continue
