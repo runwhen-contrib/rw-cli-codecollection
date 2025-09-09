@@ -25,9 +25,16 @@ if [ -z "$SUBSCRIPTION_ID" ] || [ -z "$RESOURCE_GROUP" ] || [ -z "$ACR_NAME" ]; 
   [ -z "$SUBSCRIPTION_ID" ] && missing_vars+=("AZURE_SUBSCRIPTION_ID")
   [ -z "$RESOURCE_GROUP" ] && missing_vars+=("AZ_RESOURCE_GROUP")
   [ -z "$ACR_NAME" ] && missing_vars+=("ACR_NAME")
-  echo "Missing required environment variables: ${missing_vars[*]}"
-  echo '{"error": "Required environment variables not set"}'
-  exit 1
+  echo "Missing required environment variables: ${missing_vars[*]}" >&2
+  add_issue \
+    "Missing required environment variables" \
+    4 \
+    "All required environment variables should be set" \
+    "Missing variables: ${missing_vars[*]}" \
+    "Required variables: AZURE_SUBSCRIPTION_ID, AZ_RESOURCE_GROUP, ACR_NAME" \
+    "Set the missing environment variables and retry"
+  cat "$ISSUES_FILE"
+  exit 0
 fi
 
 if ! az account show --subscription "$SUBSCRIPTION_ID" >/dev/null 2>&1; then
@@ -65,7 +72,7 @@ if [ $? -ne 0 ] || [ -z "$acr_info" ]; then
       "Tried: az acr show --name $ACR_NAME --resource-group $RESOURCE_GROUP --subscription $SUBSCRIPTION_ID" \
       "Check if ACR \`$ACR_NAME\` exists in resource group \`$RESOURCE_GROUP\`, is spelled correctly, and is accessible from your network."
   fi
-  echo '{"status": "unreachable"}'
+  cat "$ISSUES_FILE"
   exit 0
 fi
 
@@ -89,7 +96,7 @@ if [ $? -ne 0 ] || [ -z "$admin_creds" ]; then
       "Tried: az acr credential show --name $ACR_NAME --resource-group $RESOURCE_GROUP" \
       "Check if admin user is enabled for ACR \`$ACR_NAME\` and you have sufficient permissions in resource group \`$RESOURCE_GROUP\`."
   fi
-  echo '{"status": "no_admin_creds"}'
+  cat "$ISSUES_FILE"
   exit 0
 fi
 
@@ -111,7 +118,6 @@ if [ $token_exit_code -ne 0 ]; then
     "az acr login --expose-token failed" \
     "Token authentication error: $token_error" \
     "Check Azure authentication and permissions for ACR \`$ACR_NAME\`. Ensure you have AcrPush or AcrPull role in resource group \`$RESOURCE_GROUP\`."
-  echo '{"status": "acr_auth_failed"}' >&2
   rm -f acr_token_error.log
   cat "$ISSUES_FILE"
   exit 0
@@ -130,7 +136,6 @@ else
     "Token response does not contain valid accessToken" \
     "Token response: $token_result" \
     "Check ACR \`$ACR_NAME\` configuration and Azure authentication in resource group \`$RESOURCE_GROUP\`."
-  echo '{"status": "invalid_token"}' >&2
   cat "$ISSUES_FILE"
   exit 0
 fi

@@ -107,7 +107,7 @@ if [ $? -ne 0 ] || [ -z "$acr_info" ]; then
         "Verify ACR name \`$ACR_NAME\`, resource group \`$RESOURCE_GROUP\`, and permissions" \
         "az acr show --name $ACR_NAME --resource-group $RESOURCE_GROUP"
     
-    echo "❌ Failed to retrieve ACR information"
+    echo "❌ Failed to retrieve ACR information" >&2
     rm -f acr_show_err.log
     exit 0
 fi
@@ -136,7 +136,7 @@ if [ $? -ne 0 ] || [ -z "$usage_info" ]; then
         "Check permissions and verify ACR \`$ACR_NAME\` accessibility in resource group \`$RESOURCE_GROUP\`" \
         "az acr show-usage --name $ACR_NAME --subscription $SUBSCRIPTION_ID"
     
-    echo "❌ Failed to retrieve storage usage"
+    echo "❌ Failed to retrieve storage usage" >&2
     rm -f usage_err.log acr_show_err.log
     exit 0
 fi
@@ -234,8 +234,71 @@ fi
 
 # Get repository information for detailed analysis
 echo "📦 Analyzing repositories..." >&2
+
+# Function to attempt ACR authentication using multiple methods
+authenticate_to_acr() {
+    echo "🔐 Authenticating to ACR registry..." >&2
+    
+    # Method 1: Try standard ACR login
+    if az acr login --name "$ACR_NAME" 2>acr_login_err.log; then
+        echo "✅ ACR authentication successful (standard login)" >&2
+        rm -f acr_login_err.log
+        return 0
+    fi
+    
+    # Method 2: Try ACR login with expose-token for service principal scenarios
+    echo "🔑 Trying ACR login with token exposure..." >&2
+    if az acr login --name "$ACR_NAME" --expose-token 2>acr_login_err2.log; then
+        echo "✅ ACR authentication successful (token-based)" >&2
+        rm -f acr_login_err.log acr_login_err2.log
+        return 0
+    fi
+    
+    # Method 3: Try to refresh Azure authentication first, then retry
+    echo "🔄 Refreshing Azure authentication..." >&2
+    if az account get-access-token --refresh >/dev/null 2>&1; then
+        echo "✅ Azure token refreshed, retrying ACR login..." >&2
+        if az acr login --name "$ACR_NAME" 2>acr_login_err3.log; then
+            echo "✅ ACR authentication successful (after token refresh)" >&2
+            rm -f acr_login_err.log acr_login_err2.log acr_login_err3.log
+            return 0
+        fi
+    fi
+    
+    # If all methods fail, log the errors but continue
+    echo "⚠️ All ACR authentication methods failed, proceeding with repository listing..." >&2
+    acr_login_error=$(cat acr_login_err.log acr_login_err2.log acr_login_err3.log 2>/dev/null | head -10)
+    echo "Authentication errors: $acr_login_error" >&2
+    rm -f acr_login_err.log acr_login_err2.log acr_login_err3.log
+    return 1
+}
+
+# Attempt ACR authentication
+authenticate_to_acr
+
+# Now attempt to list repositories with better error handling
 repo_list=$(az acr repository list --name "$ACR_NAME" -o json 2>repo_err.log)
 repo_exit_code=$?
+
+# If repository listing fails, try alternative method using REST API
+if [ $repo_exit_code -ne 0 ]; then
+    echo "🔄 Repository listing failed, trying alternative method..." >&2
+    
+    # Try using Azure REST API to get repository information
+    access_token=$(az account get-access-token --resource https://management.azure.com/ --query accessToken -o tsv 2>/dev/null)
+    if [ -n "$access_token" ] && [ "$access_token" != "null" ]; then
+        echo "🌐 Attempting to get repository info via Azure REST API..." >&2
+        
+        # Try to get repository information through Azure Resource Manager
+        registry_url="https://management.azure.com/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.ContainerRegistry/registries/$ACR_NAME"
+        
+        # This won't give us repositories directly, but we can check if the registry is accessible
+        registry_info=$(curl -s -H "Authorization: Bearer $access_token" "$registry_url?api-version=2021-09-01" 2>/dev/null)
+        if echo "$registry_info" | jq -e '.properties' >/dev/null 2>&1; then
+            echo "✅ Registry accessible via REST API, but repository listing requires ACR data plane access" >&2
+        fi
+    fi
+fi
 
 if [ $repo_exit_code -eq 0 ] && [ -n "$repo_list" ] && [ "$repo_list" != "[]" ]; then
     repo_count=$(echo "$repo_list" | jq '. | length')
@@ -283,16 +346,28 @@ else
         repo_error=$(cat repo_err.log 2>/dev/null || echo "Unknown error")
         echo "📦 Unable to list repositories - Error: $repo_error" >&2
         
-        # Check if it's a permission error
-        if echo "$repo_error" | grep -i -E "(permission|unauthorized|forbidden|access)" > /dev/null; then
-            add_issue \
-                "Insufficient permissions to list repositories" \
-                3 \
-                "Should have permission to list repositories" \
-                "az acr repository list command failed with permission error" \
-                "Error: $repo_error" \
-                "Grant 'AcrPull' or 'AcrPush' role to the current user/service principal for ACR \`$ACR_NAME\` in resource group \`$RESOURCE_GROUP\`. Check Azure RBAC assignments." \
-                "az role assignment create --assignee \$(az account show --query user.name -o tsv) --role AcrPull --scope /subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.ContainerRegistry/registries/$ACR_NAME"
+        # Check if it's a permission/authentication error
+        if echo "$repo_error" | grep -i -E "(permission|unauthorized|forbidden|access|CONNECTIVITY_REFRESH_TOKEN_ERROR|denied)" > /dev/null; then
+            # Check if it's specifically a token refresh error
+            if echo "$repo_error" | grep -i "CONNECTIVITY_REFRESH_TOKEN_ERROR" > /dev/null; then
+                add_issue \
+                    "Azure authentication token refresh error" \
+                    3 \
+                    "Azure authentication should work without token refresh errors" \
+                    "ACR access failed due to token connectivity issues" \
+                    "Error: $repo_error" \
+                    "Try refreshing Azure authentication with 'az login' or 'az account get-access-token --refresh'. If using service principal, verify credentials and network connectivity. For ACR \`$ACR_NAME\` in resource group \`$RESOURCE_GROUP\`, ensure proper RBAC roles (AcrPull/AcrPush) are assigned." \
+                    "az login --scope https://management.azure.com//.default && az acr login --name $ACR_NAME"
+            else
+                add_issue \
+                    "Insufficient permissions to list repositories" \
+                    3 \
+                    "Should have permission to list repositories" \
+                    "az acr repository list command failed with permission error" \
+                    "Error: $repo_error" \
+                    "Grant 'AcrPull' or 'AcrPush' role to the current user/service principal for ACR \`$ACR_NAME\` in resource group \`$RESOURCE_GROUP\`. Check Azure RBAC assignments. If admin user is disabled, ensure proper Azure AD authentication." \
+                    "az role assignment create --assignee \$(az account show --query user.name -o tsv) --role AcrPull --scope /subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.ContainerRegistry/registries/$ACR_NAME"
+            fi
         else
             add_issue \
                 "Failed to retrieve repository list" \
@@ -318,8 +393,8 @@ else
     fi
 fi
 
-# Clean up repository error log
-rm -f repo_err.log
+# Clean up repository and authentication error logs
+rm -f repo_err.log acr_login_err.log
 
 # Check for retention policies
 echo "🔄 Checking retention policies..." >&2

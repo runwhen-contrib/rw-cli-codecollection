@@ -189,16 +189,16 @@ if [ -n "$network_rule_set" ]; then
     vnet_rules=$(echo "$network_rule_set" | jq '.virtualNetworkRules // []')
     vnet_rule_count=$(echo "$vnet_rules" | jq '. | length')
     
-    echo "🌐 Virtual Network Rules: $vnet_rule_count configured"
+    echo "🌐 Virtual Network Rules: $vnet_rule_count configured" >&2
     
     if [ "$vnet_rule_count" -gt 0 ]; then
-        echo "   Configured VNet rules:"
-        echo "$vnet_rules" | jq -r '.[] | "   - \(.virtualNetworkResourceId | split("/") | .[-1]) (Action: \(.action // "Allow"))"'
+        echo "   Configured VNet rules:" >&2
+        echo "$vnet_rules" | jq -r '.[] | "   - \(.virtualNetworkResourceId | split("/") | .[-1]) (Action: \(.action // "Allow"))"' >&2
     fi
     
     # Check default action
     default_action=$(echo "$network_rule_set" | jq -r '.defaultAction // "Allow"')
-    echo "⚙️ Default Action: $default_action"
+    echo "⚙️ Default Action: $default_action" >&2
     
     if [ "$default_action" = "Allow" ] && [ "$public_network_access" = "Enabled" ]; then
         add_issue \
@@ -236,7 +236,7 @@ if command -v nslookup >/dev/null 2>&1; then
         fi
     fi
 else
-    echo "ℹ️ nslookup not available - skipping DNS test"
+    echo "ℹ️ nslookup not available - skipping DNS test" >&2
 fi
 
 # Test basic connectivity
@@ -252,8 +252,8 @@ if command -v curl >/dev/null 2>&1; then
         if echo "$connectivity_test" | grep -q "401 Unauthorized\|401"; then
             echo "✅ Expected authentication challenge received" >&2
         else
-            echo "ℹ️ Unexpected response (may indicate network filtering):"
-            echo "$connectivity_test" | head -3
+            echo "ℹ️ Unexpected response (may indicate network filtering):" >&2
+            echo "$connectivity_test" | head -3 >&2
         fi
     else
         case $curl_exit_code in
@@ -290,19 +290,19 @@ if command -v curl >/dev/null 2>&1; then
         esac
     fi
 else
-    echo "ℹ️ curl not available - skipping connectivity test"
+    echo "ℹ️ curl not available - skipping connectivity test" >&2
 fi
 
 # Check for geo-replication (Premium SKU feature)
 if [ "$sku" = "Premium" ]; then
-    echo "🌍 Checking geo-replication configuration..."
+    echo "🌍 Checking geo-replication configuration..." >&2
     replications=$(az acr replication list --registry "$ACR_NAME" -o json 2>/dev/null)
     
     if [ -n "$replications" ] && [ "$replications" != "[]" ]; then
         replication_count=$(echo "$replications" | jq '. | length')
-        echo "🌐 Geo-replications: $replication_count locations"
+        echo "🌐 Geo-replications: $replication_count locations" >&2
         
-        echo "$replications" | jq -r '.[] | "   - \(.location) (Status: \(.provisioningState // "Unknown"))"'
+        echo "$replications" | jq -r '.[] | "   - \(.location) (Status: \(.provisioningState // "Unknown"))"' >&2
         
         # Check for failed replications
         failed_replications=$(echo "$replications" | jq -r '.[] | select(.provisioningState != "Succeeded") | .location')
@@ -317,7 +317,7 @@ if [ "$sku" = "Premium" ]; then
                 "az acr replication list --registry $ACR_NAME"
         fi
     else
-        echo "ℹ️ No geo-replications configured (Premium feature)"
+        echo "ℹ️ No geo-replications configured (Premium feature)" >&2
     fi
 else
     echo "ℹ️ Geo-replication not available (requires Premium SKU)" >&2
@@ -329,7 +329,7 @@ webhooks=$(az acr webhook list --registry "$ACR_NAME" -o json 2>/dev/null)
 
 if [ -n "$webhooks" ] && [ "$webhooks" != "[]" ]; then
     webhook_count=$(echo "$webhooks" | jq '. | length')
-    echo "🔗 Webhooks: $webhook_count configured"
+    echo "🔗 Webhooks: $webhook_count configured" >&2
     
     # Check webhook status and configuration
     echo "$webhooks" | jq -c '.[]' | while read -r webhook; do
@@ -337,7 +337,7 @@ if [ -n "$webhooks" ] && [ "$webhooks" != "[]" ]; then
         webhook_status=$(echo "$webhook" | jq -r '.status // "Unknown"')
         service_uri=$(echo "$webhook" | jq -r '.serviceUri // "Unknown"')
         
-        echo "   - $webhook_name: $webhook_status ($service_uri)"
+        echo "   - $webhook_name: $webhook_status ($service_uri)" >&2
         
         if [ "$webhook_status" != "enabled" ]; then
             add_issue \
@@ -380,9 +380,9 @@ echo "   3. Test docker login: docker login $login_server" >&2
 echo "   4. Check firewall rules for ports 443 (HTTPS)" >&2
 
 if [ "$public_network_access" = "Disabled" ]; then
-    echo "   5. Verify private endpoint DNS resolution"
-    echo "   6. Check private endpoint connection status"
-    echo "   7. Verify subnet and VNet configuration"
+    echo "   5. Verify private endpoint DNS resolution" >&2
+    echo "   6. Check private endpoint connection status" >&2
+    echo "   7. Verify subnet and VNet configuration" >&2
 fi
 
 # Generate portal URLs
@@ -395,7 +395,7 @@ echo "   ACR Overview: $portal_url" >&2
 echo "   Networking: ${portal_url}/networking" >&2
 echo "   Private Endpoints: ${portal_url}/privateEndpointConnections" >&2
 if [ "$sku" = "Premium" ]; then
-    echo "   Geo-replication: ${portal_url}/replications"
+    echo "   Geo-replication: ${portal_url}/replications" >&2
 fi
 echo "   Webhooks: ${portal_url}/webhooks" >&2
 
@@ -415,5 +415,5 @@ echo "📋 Issues found: $issue_count" >&2
 if [ "$issue_count" -gt 0 ]; then
     echo "" >&2
     echo "Issues:" >&2
-    jq -r '.[] | "  - \(.title) (Severity: \(.severity))"' "$ISSUES_FILE"
+    jq -r '.[] | "  - \(.title) (Severity: \(.severity))"' "$ISSUES_FILE" >&2
 fi
