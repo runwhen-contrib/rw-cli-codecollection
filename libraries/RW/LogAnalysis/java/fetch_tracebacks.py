@@ -70,7 +70,7 @@ class JavaTracebackExtractor:
         """Initialize the JavaTracebackExtractor with a TimestampHandler instance."""
         self.timestamp_handler = TimestampHandler()
     
-    def matches_any_timestamp_pattern(self, text):
+    def _matches_any_timestamp_pattern(self, text):
         """
         Check if text matches any of the supported timestamp patterns.
         
@@ -84,7 +84,7 @@ class JavaTracebackExtractor:
         """
         return self.timestamp_handler.matches_any_timestamp_pattern(text)
 
-    def has_timestamp_at_alphanumeric_start(self, line):
+    def _has_timestamp_at_alphanumeric_start(self, line):
         """
         Check if there's a timestamp pattern starting from the first alphanumeric character.
         
@@ -99,7 +99,7 @@ class JavaTracebackExtractor:
         """
         return self.timestamp_handler.has_timestamp_at_alphanumeric_start(line)
 
-    def line_starts_with_at(self, log_line: str) -> bool:
+    def _line_starts_with_at(self, log_line: str) -> bool:
         """
         Check if a log line contains Java stacktrace frame information.
         
@@ -115,14 +115,14 @@ class JavaTracebackExtractor:
             
         Example:
             >>> extractor = JavaTracebackExtractor()
-            >>> extractor.line_starts_with_at("    at com.example.Class.method(Class.java:123)")
+            >>> extractor._line_starts_with_at("    at com.example.Class.method(Class.java:123)")
             True
-            >>> extractor.line_starts_with_at("INFO: Application started")
+            >>> extractor._line_starts_with_at("INFO: Application started")
             False
         """
         return JAVA_PATTERN.search(log_line) is not None
 
-    def extract_timestamp_from_line(self, log_line: str, return_position: bool = False):
+    def _extract_timestamp_from_line(self, log_line: str, return_position: bool = False):
         """
         Extract timestamp from a log line using the defined patterns.
         
@@ -130,15 +130,14 @@ class JavaTracebackExtractor:
         
         Args:
             log_line: The log line to extract timestamp from
-            return_position: If True, returns a tuple (timestamp, start_pos, end_pos)
+            return_position: This parameter is for backward compatibility and is always True.
         
         Returns:
-            - If return_position=False: timestamp string or None
-            - If return_position=True: tuple (timestamp, start_pos, end_pos) or (None, None, None)
+            tuple: (timestamp, start_pos, end_pos) or (None, None, None)
         """
-        return self.timestamp_handler.extract_timestamp_from_line(log_line, return_position)
+        return self.timestamp_handler.extract_timestamp_from_line(log_line)
 
-    def parse_timestamp_to_datetime(self, timestamp_str: str):
+    def _parse_timestamp_to_datetime(self, timestamp_str: str):
         """
         Parse timestamp string to datetime object using known patterns.
         
@@ -153,7 +152,7 @@ class JavaTracebackExtractor:
         """
         return self.timestamp_handler.parse_timestamp_to_datetime(timestamp_str)
     
-    def get_timestamp_from_stacktrace(self, stacktrace: str, get_min: bool = False, debug: bool = False):
+    def _get_timestamp_from_stacktrace(self, stacktrace: str, get_min: bool = False, debug: bool = False):
         """
         Extract the earliest or latest timestamp from a stacktrace.
         
@@ -171,7 +170,7 @@ class JavaTracebackExtractor:
         return self.timestamp_handler.get_timestamp_from_stacktrace(stacktrace, get_min, debug)
 
     # Wrapper functions for backward compatibility and clarity
-    def get_min_timestamp_from_stacktrace(self, stacktrace: str, debug: bool = False):
+    def _get_min_timestamp_from_stacktrace(self, stacktrace: str, debug: bool = False):
         """
         Get the earliest timestamp from a stacktrace.
         
@@ -187,7 +186,7 @@ class JavaTracebackExtractor:
         """
         return self.timestamp_handler.get_min_timestamp_from_stacktrace(stacktrace, debug)
 
-    def get_max_timestamp_from_stacktrace(self, stacktrace: str, debug: bool = False):
+    def _get_max_timestamp_from_stacktrace(self, stacktrace: str, debug: bool = False):
         """
         Get the latest timestamp from a stacktrace.
         
@@ -203,7 +202,7 @@ class JavaTracebackExtractor:
         """
         return self.timestamp_handler.get_max_timestamp_from_stacktrace(stacktrace, debug)
 
-    def is_single_line_stacktrace(self, stacktrace: str) -> bool:
+    def _is_single_line_stacktrace(self, stacktrace: str) -> bool:
         """
         Check if a stacktrace consists of a single line.
         
@@ -215,19 +214,8 @@ class JavaTracebackExtractor:
         """
         return '\n' not in stacktrace.strip()
 
-    def is_multi_line_stacktrace(self, stacktrace: str) -> bool:
-        """
-        Check if a stacktrace consists of multiple lines.
-        
-        Args:
-            stacktrace: The stacktrace text to check
-            
-        Returns:
-            bool: True if the stacktrace contains newlines, False otherwise
-        """
-        return '\n' in stacktrace.strip()
 
-    def aggregate_java_stacktraces(self, stacktraces: list[str]) -> list[str]:
+    def _aggregate_java_stacktraces(self, stacktraces: list[str]) -> list[str]:
         """
         Aggregate Java stacktraces based on timestamp proximity and format.
         
@@ -264,7 +252,7 @@ class JavaTracebackExtractor:
             
         if len(stacktraces) == 1:
             # If single entry is multi-line stacktrace, retain it; otherwise return empty list
-            if self.is_multi_line_stacktrace(stacktraces[0]):
+            if not self._is_single_line_stacktrace(stacktraces[0]):
                 return stacktraces
             else:
                 return []
@@ -278,14 +266,14 @@ class JavaTracebackExtractor:
             next_stacktrace = stacktraces[next_index]
             
             # Get timestamps from both stacktraces
-            current_timestamp = self.get_max_timestamp_from_stacktrace(current_stacktrace)
-            next_timestamp = self.get_min_timestamp_from_stacktrace(next_stacktrace)
+            current_timestamp = self._get_max_timestamp_from_stacktrace(current_stacktrace)
+            next_timestamp = self._get_min_timestamp_from_stacktrace(next_stacktrace)
             
             # Determine stacktrace formats
-            is_current_single_line = self.is_single_line_stacktrace(current_stacktrace)
-            is_current_multi_line = self.is_multi_line_stacktrace(current_stacktrace)
-            is_next_single_line = self.is_single_line_stacktrace(next_stacktrace)
-            is_next_multi_line = self.is_multi_line_stacktrace(next_stacktrace)
+            is_current_single_line = self._is_single_line_stacktrace(current_stacktrace)
+            is_current_multi_line = not is_current_single_line
+            is_next_single_line = self._is_single_line_stacktrace(next_stacktrace)
+            is_next_multi_line = not is_next_single_line
 
             # CASE 1: Current stacktrace has no timestamp
             if current_timestamp is None:
@@ -337,12 +325,12 @@ class JavaTracebackExtractor:
             # Check if we've processed the last stacktrace
             if next_index == len(stacktraces):
                 # Remove single-line stacktraces at the end as they're not useful alone
-                if self.is_single_line_stacktrace(results[current_index]):
+                if self._is_single_line_stacktrace(results[current_index]):
                     results.pop(current_index)
 
         return results
 
-    def remove_timestamps_from_stacktrace(self, stacktrace: str):
+    def _remove_timestamps_from_stacktrace(self, stacktrace: str):
         """
         Remove timestamp patterns from a stacktrace to facilitate deduplication.
         
@@ -359,7 +347,7 @@ class JavaTracebackExtractor:
         """
         return self.timestamp_handler.remove_timestamps_from_stacktrace(stacktrace)
 
-    def deduplicate_stacktraces(self, stacktraces: list[str]) -> list[str]:
+    def _deduplicate_stacktraces(self, stacktraces: list[str]) -> list[str]:
         """
         Deduplicate stacktraces by ignoring timestamp differences.
         
@@ -384,7 +372,7 @@ class JavaTracebackExtractor:
             ...     "2024-01-15T10:30:45.123Z ERROR: NullPointerException",
             ...     "2024-01-15T10:35:45.123Z ERROR: NullPointerException"  # Same error, different time
             ... ]
-            >>> len(extractor.deduplicate_stacktraces(traces))
+            >>> len(extractor._deduplicate_stacktraces(traces))
             1
         """
         if not stacktraces:
@@ -395,11 +383,11 @@ class JavaTracebackExtractor:
         
         for stacktrace in stacktraces:
             # Remove timestamps for comparison
-            normalized_stacktrace, _ = self.remove_timestamps_from_stacktrace(stacktrace)
+            normalized_stacktrace, _ = self._remove_timestamps_from_stacktrace(stacktrace)
             
             # Get the min and max timestamps from this stacktrace
-            min_timestamp = self.get_min_timestamp_from_stacktrace(stacktrace)
-            max_timestamp = self.get_max_timestamp_from_stacktrace(stacktrace)
+            min_timestamp = self._get_min_timestamp_from_stacktrace(stacktrace)
+            max_timestamp = self._get_max_timestamp_from_stacktrace(stacktrace)
             
             # If this normalized trace is not yet in our unique traces, add it
             if normalized_stacktrace not in unique_traces:
@@ -443,7 +431,7 @@ class JavaTracebackExtractor:
         return [trace for trace, _, _ in sorted_stacktraces]
 
 
-    def filter_logs_having_trace(self, logs: list[str]) -> list[str]:
+    def _filter_logs_having_trace(self, logs: list[str]) -> list[str]:
         """
         Filter logs to extract only those containing Java stacktrace information.
         
@@ -471,7 +459,7 @@ class JavaTracebackExtractor:
             ...     "INFO: Application started",
             ...     "Exception in thread main: java.lang.NullPointerException\n    at com.example.Class.method(Class.java:123)"
             ... ]
-            >>> stacktraces = extractor.filter_logs_having_trace(logs)
+            >>> stacktraces = extractor._filter_logs_having_trace(logs)
             >>> len(stacktraces) > 0 and "Exception" in stacktraces[0]
             True
         """
@@ -493,7 +481,7 @@ class JavaTracebackExtractor:
             
             # Identify lines that contain stacktrace frames
             stacktrace_frame_lines = [
-                line for line in valid_lines if self.line_starts_with_at(line)
+                line for line in valid_lines if self._line_starts_with_at(line)
             ]
             
             # Check if this log contains stacktrace information
@@ -512,7 +500,7 @@ class JavaTracebackExtractor:
             # Skip empty blocks
             if block:
                 # Aggregate related stacktraces within each block
-                aggregated_stacktraces.extend(self.aggregate_java_stacktraces(block))
+                aggregated_stacktraces.extend(self._aggregate_java_stacktraces(block))
         
         return aggregated_stacktraces
 
@@ -562,7 +550,7 @@ class JavaTracebackExtractor:
             cleaned_line = line.strip()
             
             # If line starts with a timestamp, it's likely a new log entry
-            if self.has_timestamp_at_alphanumeric_start(cleaned_line):
+            if self._has_timestamp_at_alphanumeric_start(cleaned_line):
                 reconstructed_logs.append(cleaned_line)
             else:
                 # No timestamp - this is likely a continuation of the previous log entry
@@ -574,7 +562,7 @@ class JavaTracebackExtractor:
                     reconstructed_logs[-1] += f'\n{cleaned_line}'
 
         # Filter logs to find those containing stacktrace information
-        return self.filter_logs_having_trace(reconstructed_logs)
+        return self._filter_logs_having_trace(reconstructed_logs)
 
     def extract_tracebacks_from_log_files(self, log_files: list[str], fast_exit: bool = False) -> list[str]:
         """
@@ -621,6 +609,6 @@ class JavaTracebackExtractor:
                 continue
         
         # Deduplicate stacktraces across all files
-        unique_stacktraces = self.deduplicate_stacktraces(all_stacktraces)
+        unique_stacktraces = self._deduplicate_stacktraces(all_stacktraces)
         
         return unique_stacktraces

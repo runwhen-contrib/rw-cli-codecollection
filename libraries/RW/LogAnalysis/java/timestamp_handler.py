@@ -127,7 +127,7 @@ class TimestampHandler:
         remaining_line = line[first_alnum_pos:]
         return self.matches_any_timestamp_pattern(remaining_line)
 
-    def extract_timestamp_from_line(self, log_line: str, return_position: bool = False) -> Optional[str] | Tuple[Optional[str], Optional[int], Optional[int]]:
+    def extract_timestamp_from_line(self, log_line: str) -> Tuple[Optional[str], Optional[int], Optional[int]]:
         """
         Extract timestamp from a log line using the defined patterns.
         
@@ -137,27 +137,22 @@ class TimestampHandler:
         
         Args:
             log_line (str): The log line to extract timestamp from
-            return_position (bool): If True, returns a tuple (timestamp, start_pos, end_pos)
-        
+            
         Returns:
-            - If return_position=False: timestamp string or None
-            - If return_position=True: tuple (timestamp, start_pos, end_pos) or (None, None, None)
+            - tuple (timestamp, start_pos, end_pos) or (None, None, None)
         
         Example:
             >>> handler = TimestampHandler()
             >>> handler.extract_timestamp_from_line("2024-01-15T10:30:45.123Z ERROR: Something failed")
-            '2024-01-15T10:30:45.123Z'
+            ('2024-01-15T10:30:45.123Z', 0, 24)
             >>> timestamp, start, end = handler.extract_timestamp_from_line(
-            ...     "2024-01-15T10:30:45.123Z ERROR", return_position=True)
+            ...     "2024-01-15T10:30:45.123Z ERROR")
             >>> timestamp
             '2024-01-15T10:30:45.123Z'
         """
         cleaned_line = log_line.strip()
         if not cleaned_line:
-            if return_position:
-                return None, None, None
-            else:
-                return None
+            return None, None, None
         
         # Find the first alphanumeric character
         first_alnum_pos = None
@@ -167,10 +162,7 @@ class TimestampHandler:
                 break
         
         if first_alnum_pos is None:
-            if return_position:
-                return None, None, None
-            else:
-                return None
+            return None, None, None
         
         # Check if timestamp pattern exists from that position
         remaining_text = cleaned_line[first_alnum_pos:]
@@ -181,16 +173,10 @@ class TimestampHandler:
                 timestamp = match.group(0)
                 start_pos, end_pos = match.span()
                 
-                if return_position:
-                    return timestamp, start_pos, end_pos
-                else:
-                    return timestamp
+                return timestamp, start_pos, end_pos
         
         # No timestamp found
-        if return_position:
-            return None, None, None
-        else:
-            return None
+        return None, None, None
 
     def parse_timestamp_to_datetime(self, timestamp_str: str) -> Optional[datetime]:
         """
@@ -280,7 +266,7 @@ class TimestampHandler:
             print(f"\n\tGetting {'min' if get_min else 'max'} timestamp from stacktrace: {stacktrace}\n")
         
         for line in stacktrace_lines:
-            timestamp_str = self.extract_timestamp_from_line(line)
+            timestamp_str, _, _ = self.extract_timestamp_from_line(line)
             if timestamp_str:
                 parsed_datetime = self.parse_timestamp_to_datetime(timestamp_str)
                 
@@ -376,7 +362,7 @@ class TimestampHandler:
         
         for line in stacktrace_lines:
             # Extract timestamp with position information
-            timestamp, start_pos, end_pos = self.extract_timestamp_from_line(line, return_position=True)
+            timestamp, start_pos, end_pos = self.extract_timestamp_from_line(line)
             
             if timestamp:
                 # Store the absolute position and the timestamp
