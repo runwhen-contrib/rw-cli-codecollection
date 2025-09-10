@@ -42,16 +42,7 @@ spec:
     - name: azure_credentials
       workspaceKey: AUTH DETAILS NOT FOUND
   {% endif %}
-  alerts:
-    warning:
-      operator: <
-      threshold: '1'
-      for: '20m'
-    ticket:
-      operator: <
-      threshold: '1'
-      for: '30m'
-    page:
-      operator: '=='
-      threshold: '0'
-      for: ''
+  alertConfig:
+    tasks:
+      persona: eager-edgar
+      sessionTTL: 10m
