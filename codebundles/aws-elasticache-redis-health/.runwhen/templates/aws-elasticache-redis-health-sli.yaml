@@ -35,3 +35,7 @@ spec:
       workspaceKey: {{custom.aws_secret_access_key}}
     - name: AWS_ROLE_ARN
       workspaceKey: {{custom.aws_role_arn}}
+  alertConfig:
+    tasks:
+      persona: eager-edgar
+      sessionTTL: 10m

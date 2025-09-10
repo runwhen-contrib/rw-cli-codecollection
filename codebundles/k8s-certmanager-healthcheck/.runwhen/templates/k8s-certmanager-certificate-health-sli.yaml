@@ -42,12 +42,7 @@ spec:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
   {% endif %}
-  alerts:
-    warning:
-      operator: '>'
-      threshold: '0'
-      for: '10m'
-    ticket:
-      operator: '>'
-      threshold: '0'
-      for: '15m'
+  alertConfig:
+    tasks:
+      persona: eager-edgar
+      sessionTTL: 10m
