@@ -46,10 +46,6 @@ class ExtractTraceback:
             logger.error("Either logs_dir or logs parameter must be provided")
             return [] if not fast_exit else ""
         
-        if not os.path.exists(logs_dir):
-            logger.error(f"Logs directory does not exist: {logs_dir}")
-            return [] if not fast_exit else ""
-        
         # Handle legacy interface (logs as string)
         if logs is not None:
             logs_str = str(logs)  # safety conversion
@@ -64,6 +60,11 @@ class ExtractTraceback:
             if fast_exit:
                 return "" if not tracebacks else list(tracebacks)[-1]
             return list(tracebacks)
+
+        # Handle new interface (logs_dir as directory path)
+        if not os.path.exists(logs_dir):
+            logger.error(f"Logs directory does not exist: {logs_dir}")
+            return [] if not fast_exit else ""
         
         # Find all .txt files in the directory and subdirectories
         log_files = []
