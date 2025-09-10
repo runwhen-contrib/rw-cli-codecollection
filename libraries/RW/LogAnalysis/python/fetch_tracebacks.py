@@ -42,9 +42,10 @@ class PythonTracebackExtractor:
                                 # no TIMESTAMP for now
                                 tracebacks.append(stacktrace_str)
                         except Exception as tb_dict_parse_excp:
-                            # append this as a exception str
                             # report this to the exception block of tracebacks
-                            logger.error(f"Exception while parsing tb_dict_str: \n{tb_dict_str}\n{tb_dict_parse_excp}")
+                            logger.error(f"Couldn't catch the following log_str as a valid python stacktrace.\n"
+                                f"Exception while parsing tb_dict_str from python traceback extractor: {tb_dict_parse_excp}\n"
+                                f"\tlog_str: {tb_dict_str[:100]}...\n")
                             
                             # TODO: if tracebacks are reported, runner-worker may start to have too many tracebacks leading to a traceback SLI alert.
                             # logger.error(''.join(traceback.format_exception(type(tb_dict_parse_excp), tb_dict_parse_excp, tb_dict_parse_excp.__traceback__)))
@@ -70,7 +71,9 @@ class PythonTracebackExtractor:
                     tracebacks.extend(curr_log_tracebacks)
         except Exception as excp:
             # BuiltIn().log_to_console(f"\n{''.join(traceback.format_exception(type(excp), excp, excp.__traceback__))}\n")
-            logger.error(f"Exception while loading/parsing log_str: \n{excp}\n\n{log_str}")
+            logger.error(f"Couldn't catch the following log_str as a valid python stacktrace.\n"
+                f"Exception while loading/parsing log_str from python traceback extractor: {excp}\n"
+                f"\tlog_str: {log_str[:100]}...\n")
             
             # check if log_str has traceback patterns and store'em
             curr_log_tracebacks = self.timestamped_log_tb_extractor.extract_from_string(log_str)
@@ -104,6 +107,48 @@ class PythonTracebackExtractor:
             if curr_log_tracebacks:
                 tracebacks.extend(curr_log_tracebacks)
         return tracebacks
+    
+    def extract_tracebacks_from_log_files(self, log_files: list[str], fast_exit: bool = False) -> list[str]:
+        """
+        Extract Python stacktraces from multiple log files.
+        
+        This method processes a list of log files, extracts stacktraces from each,
+        and returns a list of all found stacktraces.
+        
+        Args:
+            log_files: List of paths to log files to process
+            fast_exit: If True, returns immediately after finding the first stacktrace
+            
+        Returns:
+            list[str]: List of Python stacktraces found across all files.
+                      If fast_exit is True, returns a list with only the first stacktrace found.
+                      
+        Note:
+            This method handles file reading errors gracefully, logging them
+            but continuing with other files.
+        """
+        all_stacktraces = []
+        
+        # Process each log file
+        for log_file_path in log_files:
+            try:
+                # Read the log file line by line
+                with open(log_file_path, 'r', encoding='utf-8', errors='ignore') as file:
+                    log_lines = [line.rstrip('\n') for line in file]
+                
+                # Extract stacktraces from this file
+                file_stacktraces = self.extract_tracebacks_from_logs(log_lines)
+                all_stacktraces.extend(file_stacktraces)
+                
+                # If fast_exit is enabled and we found stacktraces, return immediately
+                if fast_exit and file_stacktraces:
+                    return file_stacktraces[:1]  # Return only the first stacktrace
+                    
+            except Exception as e:
+                logger.error(f"Error processing log file {log_file_path} by python traceback extractor: {str(e)}")
+                continue
+        
+        return all_stacktraces
     
     def _strip_timestamp_from_log_line(self, log_line: str) -> str:
         """

@@ -195,7 +195,7 @@ Analyze Workload Stacktraces for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Namespac
             END
             
             # Create consolidated report showing all stacktraces
-            ${agg_tracebacks}=    Evaluate    "\\n" + "${delimiter}\\n" + "${delimiter}\\n".join(${tracebacks}) + "\\n" + "${delimiter}"
+            ${agg_tracebacks}=    Evaluate    "\\n" + "\\n${delimiter}\\n".join(${tracebacks})
             RW.Core.Add Pre To Report    **🔍 Stacktraces Found for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Namespace `${NAMESPACE}`**\n**Total Stacktraces:** ${total_tracebacks}\n**Log Analysis Period:** ${LOG_AGE}\n**Max Log Lines:** ${LOG_LINES}\n**Max Log Size:** ${LOG_SIZE} bytes\n**Excluded Containers:** ${EXCLUDED_CONTAINER_NAMES}\n\n${agg_tracebacks}
         END
         
