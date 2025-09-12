@@ -40,8 +40,7 @@ spec:
     - name: azure_credentials
       workspaceKey: {{custom.azure_credentials_secret_name}}
   {% endif %}
-  alerts:
-    warning:
-      operator: <
-      threshold: '1'
-      for: '2m' 
+  alertConfig:
+    tasks:
+      persona: eager-edgar
+      sessionTTL: 10m
