@@ -36,16 +36,38 @@ if echo "$messages" | grep -q "PodInitializing"; then
     add_issue "4" "Pods initializing" "$messages" "Retry in a few minutes and verify that workload is running.\nInspect Warning Events"
 fi
 
-if echo "$messages" | grep -q "Startup probe failed"; then
-    add_issue "2" "Startup probe failure" "$messages" "Check Deployment Logs\nReview Startup Probe Configuration\nIncrease Startup Probe Timeout and Threshold\nIdentify Resource Constrained Pods In Namespace \`$NAMESPACE\`"
+# Consolidate probe failures to avoid duplicate issues
+probe_issues_found=false
+
+if echo "$messages" | grep -q "Startup probe failed\|Readiness probe errored\|Readiness probe failed"; then
+    # Determine which probe types are failing
+    probe_types=""
+    next_steps=""
+    
+    if echo "$messages" | grep -q "Startup probe failed"; then
+        probe_types="startup"
+        next_steps="Check Deployment Logs\nReview Startup Probe Configuration\nIncrease Startup Probe Timeout and Threshold"
+    fi
+    
+    if echo "$messages" | grep -q "Readiness probe errored\|Readiness probe failed"; then
+        if [ -n "$probe_types" ]; then
+            probe_types="$probe_types and readiness"
+            next_steps="$next_steps\nCheck Readiness Probe Configuration"
+        else
+            probe_types="readiness"
+            next_steps="Check Readiness Probe Configuration"
+        fi
+    fi
+    
+    # Add resource constraint check for any probe failure
+    next_steps="$next_steps\nIdentify Resource Constrained Pods In Namespace \`$NAMESPACE\`"
+    
+    add_issue "2" "$(echo $probe_types | sed 's/^./\U&/') probe failures" "$messages" "$next_steps"
+    probe_issues_found=true
 fi
 
-if echo "$messages" | grep -q "Liveness probe failed\|Liveness probe errored"; then
+if echo "$messages" | grep -q "Liveness probe failed\|Liveness probe errored" && [ "$probe_issues_found" = false ]; then
     add_issue "3" "Liveness probe failure" "$messages" "Check Liveliness Probe Configuration"
-fi
-
-if echo "$messages" | grep -q "Readiness probe errored\|Readiness probe failed"; then
-    add_issue "2" "Readiness probe failure" "$messages" "Check Readiness Probe Configuration"
 fi
 
 if echo "$messages" | grep -q "PodFailed"; then

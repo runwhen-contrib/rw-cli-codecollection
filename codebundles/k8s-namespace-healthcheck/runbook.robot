@@ -64,6 +64,53 @@ Inspect Warning Events in Namespace `${NAMESPACE}`
             # Usually this resource no longer exists.
             # FIXME: Consider a deeper insight into an object that no longer exists but the event still does
             IF    $owner_name != "Unknown"
+                # Get current health status for the workload to provide context
+                ${workload_health}=    Set Variable    **Current Status:** Unable to retrieve
+                IF    "${owner_kind}" == "Deployment"
+                    ${health_check}=    RW.CLI.Run Cli
+                    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${owner_name} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '{desired_replicas: .spec.replicas, ready_replicas: (.status.readyReplicas // 0), available_replicas: (.status.availableReplicas // 0), conditions: [.status.conditions[]? | select(.type == "Available") | {status: .status, reason: .reason}]}'
+                    ...    env=${env}
+                    ...    secret_file__kubeconfig=${kubeconfig}
+                    ...    include_in_history=false
+                    
+                    IF    ${health_check.returncode} == 0 and '''${health_check.stdout}''' != ''
+                        TRY
+                            ${health_data}=    Evaluate    json.loads(r'''${health_check.stdout}''') if r'''${health_check.stdout}'''.strip() else {}    json
+                            ${desired}=    Evaluate    $health_data.get('desired_replicas', 0)
+                            ${ready}=    Evaluate    $health_data.get('ready_replicas', 0)
+                            ${available}=    Evaluate    $health_data.get('available_replicas', 0)
+                            ${conditions}=    Evaluate    $health_data.get('conditions', [])
+                            
+                            ${workload_health}=    Set Variable    **Current Deployment Status:** ${ready}/${desired} ready replicas, ${available} available
+                            FOR    ${condition}    IN    @{conditions}
+                                ${cond_status}=    Evaluate    $condition.get('status', 'Unknown')
+                                ${cond_reason}=    Evaluate    $condition.get('reason', '')
+                                ${workload_health}=    Catenate    ${workload_health}    \n**Available:** ${cond_status} (${cond_reason})
+                            END
+                        EXCEPT
+                            Log    Warning: Failed to parse deployment health status for ${owner_name}
+                        END
+                    END
+                ELSE IF    "${owner_kind}" == "Pod"
+                    ${health_check}=    RW.CLI.Run Cli
+                    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pod/${owner_name} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '{phase: .status.phase, ready: (.status.conditions[]? | select(.type == "Ready") | .status), restart_count: (.status.containerStatuses[]? | .restartCount) | add}'
+                    ...    env=${env}
+                    ...    secret_file__kubeconfig=${kubeconfig}
+                    ...    include_in_history=false
+                    
+                    IF    ${health_check.returncode} == 0 and '''${health_check.stdout}''' != ''
+                        TRY
+                            ${health_data}=    Evaluate    json.loads(r'''${health_check.stdout}''') if r'''${health_check.stdout}'''.strip() else {}    json
+                            ${phase}=    Evaluate    $health_data.get('phase', 'Unknown')
+                            ${ready}=    Evaluate    $health_data.get('ready', 'Unknown')
+                            ${restarts}=    Evaluate    $health_data.get('restart_count', 0)
+                            ${workload_health}=    Set Variable    **Current Pod Status:** Phase=${phase}, Ready=${ready}, Restarts=${restarts}
+                        EXCEPT
+                            Log    Warning: Failed to parse pod health status for ${owner_name}
+                        END
+                    END
+                END
+                
                 ${issues}=    RW.CLI.Run Bash File
                 ...    bash_file=workload_issues.sh
                 ...    cmd_override=./workload_issues.sh "${messages}" "${owner_kind}" "${owner_name}"
@@ -71,13 +118,36 @@ Inspect Warning Events in Namespace `${NAMESPACE}`
                 ...    include_in_history=False
                 ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
                 FOR    ${issue}    IN    @{issue_list}
+                    # Improve issue descriptions to distinguish between different types of problems
+                    ${is_pod_issue}=    Evaluate    "${owner_kind}" == "Pod"
+                    IF    ${is_pod_issue}
+                        ${actual_description}=    Set Variable    Pod-level issues detected for `${owner_name}` in namespace `${NAMESPACE}` - check if other pods in the workload are healthy
+                    ELSE
+                        ${actual_description}=    Set Variable    Warning events found for ${owner_kind} `${owner_name}` in namespace `${NAMESPACE}` which indicate potential issues
+                    END
+                    
+                    # Adjust severity based on current workload health for deployments
+                    ${adjusted_severity}=    Set Variable    ${issue["severity"]}
+                    IF    "${owner_kind}" == "Deployment" and '''${workload_health}''' != '''**Current Status:** Unable to retrieve'''
+                        # Check if deployment is healthy (has ready replicas and is available)
+                        ${has_zero_ready}=    Evaluate    __import__('re').search(r'\b0/\d+\s+ready replicas', '''${workload_health}''') is not None    modules=re
+                        ${is_healthy}=    Evaluate    "ready replicas" in '''${workload_health}''' and "True" in '''${workload_health}''' and not ${has_zero_ready}
+                        
+                        # Lower severity for probe failures when deployment is healthy
+                        ${is_probe_issue}=    Evaluate    "probe failures" in '''${issue["title"]}'''.lower()
+                        IF    ${is_healthy} and ${is_probe_issue}
+                            ${adjusted_severity}=    Set Variable    4
+                            Log    Lowering severity to 4 for probe failures in healthy deployment ${owner_name}
+                        END
+                    END
+                    
                     RW.Core.Add Issue
-                    ...    severity=${issue["severity"]}
+                    ...    severity=${adjusted_severity}
                     ...    expected=Warning events should not be present in namespace `${NAMESPACE}` for ${owner_kind} `${owner_name}`
-                    ...    actual=Warning events are found in namespace `${NAMESPACE}` for ${owner_kind} `${owner_name}` which indicate potential issues.
+                    ...    actual=${actual_description}
                     ...    title= ${issue["title"]}
                     ...    reproduce_hint=kubectl get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE}
-                    ...    details=${issue["details"]}
+                    ...    details=${workload_health}\n\n${issue["details"]}
                     ...    next_steps=${issue["next_steps"]}
                 END
             END
