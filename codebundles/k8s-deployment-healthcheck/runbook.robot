@@ -59,8 +59,8 @@ Suite Initialization
     ...    type=string
     ...    description=The age of logs to fetch from pods, used for log analysis tasks.
     ...    pattern=\w*
-    ...    example=1h
-    ...    default=3h
+    ...    example=10m
+    ...    default=10m
 
     ${LOG_ANALYSIS_DEPTH}=    RW.Core.Import User Variable    LOG_ANALYSIS_DEPTH
     ...    type=string
@@ -98,7 +98,7 @@ Suite Initialization
     ...    description=Pattern used to exclude entries from log analysis when searching for errors. Use regex patterns to filter out false positives like JSON structures.
     ...    pattern=.*
     ...    example="errors":\s*\[\]|"warnings":\s*\[\]
-    ...    default="errors":\s*\[\]|\\bINFO\\b|\\bDEBUG\\b|\\bTRACE\\b|\\bSTART\\s*-\\s*|\\bSTART\\s*method\\b
+    ...    default="errors":\\s*\\[\\]|\\bINFO\\b|\\bDEBUG\\b|\\bTRACE\\b|\\bSTART\\s*-\\s*|\\bSTART\\s*method\\b
     ${LOG_SCAN_TIMEOUT}=    RW.Core.Import User Variable    LOG_SCAN_TIMEOUT
     ...    type=string
     ...    description=Timeout in seconds for log scanning operations. Increase this value if log scanning times out on large log files.
@@ -116,8 +116,8 @@ Suite Initialization
     ...    type=string
     ...    description=The time window (in (h) hours or (m) minutes) to search for container restarts. Only containers that restarted within this time period will be reported.
     ...    pattern=\w*
-    ...    example=1h
-    ...    default=1h
+    ...    example=10m
+    ...    default=10m
     ${CONTAINER_RESTART_THRESHOLD}=    RW.Core.Import User Variable    CONTAINER_RESTART_THRESHOLD
     ...    type=string
     ...    description=The minimum number of restarts required to trigger an issue. Containers with restart counts below this threshold will be ignored.
@@ -126,7 +126,12 @@ Suite Initialization
     ...    default=1
     # Convert comma-separated strings to lists
     @{LOG_PATTERN_CATEGORIES}=    Split String    ${LOG_PATTERN_CATEGORIES_STR}    ,
-    @{EXCLUDED_CONTAINERS}=    Run Keyword If    "${EXCLUDED_CONTAINER_NAMES}" != ""    Split String    ${EXCLUDED_CONTAINER_NAMES}    ,    ELSE    Create List
+    @{EXCLUDED_CONTAINERS_RAW}=    Run Keyword If    "${EXCLUDED_CONTAINER_NAMES}" != ""    Split String    ${EXCLUDED_CONTAINER_NAMES}    ,    ELSE    Create List
+    @{EXCLUDED_CONTAINERS}=    Create List
+    FOR    ${container}    IN    @{EXCLUDED_CONTAINERS_RAW}
+        ${trimmed_container}=    Strip String    ${container}
+        Append To List    ${EXCLUDED_CONTAINERS}    ${trimmed_container}
+    END
     
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}
@@ -200,7 +205,7 @@ Suite Initialization
 
 *** Tasks ***
 Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
-    [Documentation]    Fetches and analyzes logs from the deployment pods for errors, stack traces, connection issues, and other patterns that indicate application health problems.
+    [Documentation]    Fetches and analyzes logs from the deployment pods for errors, stack traces, connection issues, and other patterns that indicate application health problems. Note: Warning messages about missing log files for excluded containers (like linkerd-proxy, istio-proxy) are expected and harmless.
     [Tags]
     ...    logs
     ...    application
@@ -212,23 +217,37 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
     ...    access:read-only
     # Skip pod-related checks if deployment is scaled to 0
     IF    not ${SKIP_POD_CHECKS}
-        ${log_dir}=    RW.K8sLog.Fetch Workload Logs
-        ...    workload_type=deployment
-        ...    workload_name=${DEPLOYMENT_NAME}
-        ...    namespace=${NAMESPACE}
-        ...    context=${CONTEXT}
-        ...    kubeconfig=${kubeconfig}
-        ...    log_age=${LOG_AGE}
-        ...    excluded_containers=${EXCLUDED_CONTAINERS}
+        # Temporarily suppress log warnings for excluded containers (they're expected)
+        TRY
+            ${log_dir}=    RW.K8sLog.Fetch Workload Logs
+            ...    workload_type=deployment
+            ...    workload_name=${DEPLOYMENT_NAME}
+            ...    namespace=${NAMESPACE}
+            ...    context=${CONTEXT}
+            ...    kubeconfig=${kubeconfig}
+            ...    log_age=${LOG_AGE}
+            ...    excluded_containers=${EXCLUDED_CONTAINERS}
+        EXCEPT    AS    ${log_error}
+            # If log fetching fails completely, log the error but continue
+            Log    Warning: Log fetching encountered an error: ${log_error}
+            # Set empty log directory to continue with other checks
+            ${log_dir}=    Set Variable    ${EMPTY}
+        END
         
-        ${scan_results}=    RW.K8sLog.Scan Logs For Issues
-        ...    log_dir=${log_dir}
-        ...    workload_type=deployment
-        ...    workload_name=${DEPLOYMENT_NAME}
-        ...    namespace=${NAMESPACE}
-        ...    categories=@{LOG_PATTERN_CATEGORIES}
-        ...    custom_patterns_file=runbook_patterns.json
-        ...    excluded_containers=${EXCLUDED_CONTAINERS}
+        # Only scan logs if we have a valid log directory
+        IF    '''${log_dir}''' != '''${EMPTY}'''
+            ${scan_results}=    RW.K8sLog.Scan Logs For Issues
+            ...    log_dir=${log_dir}
+            ...    workload_type=deployment
+            ...    workload_name=${DEPLOYMENT_NAME}
+            ...    namespace=${NAMESPACE}
+            ...    categories=@{LOG_PATTERN_CATEGORIES}
+            ...    custom_patterns_file=runbook_patterns.json
+            ...    excluded_containers=${EXCLUDED_CONTAINERS}
+        ELSE
+            # Create empty scan results if no logs were fetched
+            ${scan_results}=    Evaluate    {"issues": [], "summary": ["No logs available for analysis"]}
+        END
         
         # Post-process results to filter out patterns matching LOGS_EXCLUDE_PATTERN
         TRY
@@ -582,14 +601,21 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
                 ${deployment_scaled_down}=    Set Variable    ${SKIP_POD_CHECKS}
                 
                 # Get current pod list to filter out events for non-existent pods
+                # First get the deployment's actual label selector instead of assuming app=${DEPLOYMENT_NAME}
+                ${deployment_selector}=    RW.CLI.Run Cli
+                ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.spec.selector.matchLabels | to_entries | map("\(.key)=\(.value)") | join(",")'
+                ...    env=${env}
+                ...    secret_file__kubeconfig=${kubeconfig}
+                ...    include_in_history=false
+                
                 ${current_pods}=    RW.CLI.Run Cli
-                ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -l app=${DEPLOYMENT_NAME} -o json | jq -r '.items[].metadata.name'
+                ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -l ${deployment_selector.stdout} -o json | jq -r '.items[].metadata.name'
                 ...    env=${env}
                 ...    secret_file__kubeconfig=${kubeconfig}
                 ...    include_in_history=false
                 
                 ${existing_pod_names}=    Create List
-                IF    ${current_pods.returncode} == 0 and '''${current_pods.stdout}''' != ''
+                IF    ${deployment_selector.returncode} == 0 and '''${deployment_selector.stdout}''' != '' and ${current_pods.returncode} == 0 and '''${current_pods.stdout}''' != ''
                     @{pod_lines}=    Split String    ${current_pods.stdout}    \n
                     FOR    ${pod_name}    IN    @{pod_lines}
                         ${trimmed_pod}=    Strip String    ${pod_name}
@@ -597,6 +623,8 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
                             Append To List    ${existing_pod_names}    ${trimmed_pod}
                         END
                     END
+                ELSE
+                    Log    Warning: Could not retrieve deployment selector or current pods, skipping pod existence filtering
                 END
                 
                 # Get current deployment health status for context
@@ -975,18 +1003,21 @@ Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` in Namespace `${N
                 # Try to parse as JSON first, but handle plain text responses gracefully
                 ${output_text}=    Set Variable    ${container_restarts.stdout.strip()}
                 
-                # Check if output looks like JSON (starts with { or [)
-                ${is_json}=    Evaluate    $output_text.startswith(('{', '[')) if $output_text else False
+                # Look for JSON in the output (may be mixed with text)
+                ${json_match}=    Evaluate    __import__('re').search(r'\\{.*\\}', r'''${output_text}''', __import__('re').DOTALL)    modules=re
                 
-                IF    ${is_json}
-                    ${restart_data}=    Evaluate    json.loads(r'''${container_restarts.stdout}''')    json
+                IF    ${json_match}
+                    ${json_text}=    Evaluate    $json_match.group(0) if $json_match else '{}'
+                    ${restart_data}=    Evaluate    json.loads(r'''${json_text}''')    json
                     ${restart_issues}=    Evaluate    $restart_data.get('issues', [])
                     ${restart_summary}=    Evaluate    $restart_data.get('summary', {})
+                    ${is_json}=    Set Variable    ${True}
                 ELSE
                     # Handle plain text response (no restarts found)
                     ${restart_data}=    Create Dictionary    issues=@{EMPTY}    summary=@{EMPTY}
                     ${restart_issues}=    Create List
                     ${restart_summary}=    Create Dictionary    total_containers=0    containers_with_restarts=0
+                    ${is_json}=    Set Variable    ${False}
                 END
                 
                 FOR    ${issue}    IN    @{restart_issues}

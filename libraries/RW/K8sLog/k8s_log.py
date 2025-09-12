@@ -911,7 +911,7 @@ class K8sLog:
             with open(pods_json_path, "r", encoding="utf-8") as f:
                 pods_data = json.load(f)
         except Exception as e:
-            logger.warn(f"Error reading pods JSON: {e}")
+            logger.warning(f"Error reading pods JSON: {e}")
             return {"issues": [], "summary": ["No pods data found for analysis."]}
 
         # Pre-compile all regex patterns for better performance
@@ -966,7 +966,7 @@ class K8sLog:
 
                 log_file = log_path / f"{workload_type}_{workload_name}_logs" / f"{pod}_{container}_logs.txt"
                 if not log_file.is_file():
-                    logger.warn(f"  Warning: No log file found at {log_file}")
+                    logger.warning(f"  Warning: No log file found at {log_file}")
                     continue
 
                 # Check file size before processing
@@ -1228,7 +1228,7 @@ class K8sLog:
             with open(pods_json_path, "r", encoding="utf-8") as f:
                 pods_data = json.load(f)
         except Exception as e:
-            logger.warn(f"Error reading pods JSON: {e}")
+            logger.warning(f"Error reading pods JSON: {e}")
             return {"issues": [], "summary": ["No pods data found for anomaly analysis."]}
 
         issues_json = {"issues": [], "summary": []}
@@ -1249,7 +1249,7 @@ class K8sLog:
 
                 log_file = log_path / f"{workload_type}_{workload_name}_logs" / f"{pod}_{container}_logs.txt"
                 if not log_file.is_file():
-                    logger.warn(f"  Warning: No log file found at {log_file}")
+                    logger.warning(f"  Warning: No log file found at {log_file}")
                     continue
 
                 with open(log_file, "r", encoding="utf-8") as lf:
@@ -1627,4 +1627,4 @@ class K8sLog:
                 self.temp_dir = None
                 logger.info("Cleaned up temporary log analysis files")
             except Exception as e:
-                logger.warn(f"Failed to cleanup temporary files: {str(e)}") 
+                logger.warning(f"Failed to cleanup temporary files: {str(e)}") 

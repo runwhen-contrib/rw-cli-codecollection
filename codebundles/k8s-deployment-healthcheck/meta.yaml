@@ -568,7 +568,7 @@ commands:
 
 user_variables:
   - name: CONTAINER_RESTART_AGE
-    default: "1h"
+    default: "10m"
     description: "The time window (in (h) hours or (m) minutes) to search for container restarts. Only containers that restarted within this time period will be reported."
     type: string
     required: false
