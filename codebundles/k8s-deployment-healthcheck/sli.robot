@@ -117,7 +117,12 @@ Suite Initialization
     Set Suite Variable    ${EXCLUDED_CONTAINER_NAMES}    ${EXCLUDED_CONTAINER_NAMES}
     
     # Convert comma-separated string to list
-    @{EXCLUDED_CONTAINERS}=    Run Keyword If    "${EXCLUDED_CONTAINER_NAMES}" != ""    Split String    ${EXCLUDED_CONTAINER_NAMES}    ,    ELSE    Create List
+    @{EXCLUDED_CONTAINERS_RAW}=    Run Keyword If    "${EXCLUDED_CONTAINER_NAMES}" != ""    Split String    ${EXCLUDED_CONTAINER_NAMES}    ,    ELSE    Create List
+    @{EXCLUDED_CONTAINERS}=    Create List
+    FOR    ${container}    IN    @{EXCLUDED_CONTAINERS_RAW}
+        ${trimmed_container}=    Strip String    ${container}
+        Append To List    ${EXCLUDED_CONTAINERS}    ${trimmed_container}
+    END
     Set Suite Variable    @{EXCLUDED_CONTAINERS}
 
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}

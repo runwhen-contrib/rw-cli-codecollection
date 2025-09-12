@@ -50,8 +50,8 @@ if [[ -z "$NAMESPACE" ]]; then
     exit 1
 fi
 
-# Parse EVENT_AGE - default to 30 if not set
-EVENT_AGE_MINUTES=$(parse_event_age "${EVENT_AGE:-30}")
+# Parse EVENT_AGE - default to 5 if not set (aligned with SLI frequency)
+EVENT_AGE_MINUTES=$(parse_event_age "${EVENT_AGE:-5}")
 
 # Create temporary directory under current working directory
 TEMP_DIR="./temp_warning_events_$$_$(date +%s)"
@@ -69,8 +69,20 @@ if ! $KUBERNETES_DISTRIBUTION_BINARY get events \
     exit 1
 fi
 
-# Process events with jq
-jq -r --argjson event_age_minutes "$EVENT_AGE_MINUTES" '
+# Get current pods to filter out events for non-existent pods
+CURRENT_PODS_FILE="$TEMP_DIR/current_pods.json"
+if ! $KUBERNETES_DISTRIBUTION_BINARY get pods \
+    --context "$CONTEXT" \
+    -n "$NAMESPACE" \
+    -o json > "$CURRENT_PODS_FILE"; then
+    echo "Warning: Failed to fetch current pods, proceeding without pod filtering" >&2
+    echo "[]" > "$CURRENT_PODS_FILE"
+fi
+
+# Process events with jq, filtering out events for non-existent pods
+jq -r --argjson event_age_minutes "$EVENT_AGE_MINUTES" --slurpfile current_pods "$CURRENT_PODS_FILE" '
+# Create a set of current pod names for filtering
+($current_pods[0].items // [] | map(.metadata.name) | unique) as $existing_pods |
 [.items[] | 
   # Filter out events with unknown or missing object names
   select(
@@ -79,6 +91,14 @@ jq -r --argjson event_age_minutes "$EVENT_AGE_MINUTES" '
     .involvedObject.name != "Unknown" and
     .involvedObject.kind != null and 
     .involvedObject.kind != ""
+  ) |
+  # Filter out pod events for non-existent pods
+  select(
+    if .involvedObject.kind == "Pod" then
+      (.involvedObject.name as $pod_name | $existing_pods | index($pod_name) != null)
+    else
+      true
+    end
   ) | {
     namespace: .involvedObject.namespace,
     kind: .involvedObject.kind,

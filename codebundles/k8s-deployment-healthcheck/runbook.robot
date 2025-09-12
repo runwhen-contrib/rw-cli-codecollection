@@ -59,8 +59,8 @@ Suite Initialization
     ...    type=string
     ...    description=The age of logs to fetch from pods, used for log analysis tasks.
     ...    pattern=\w*
-    ...    example=1h
-    ...    default=3h
+    ...    example=10m
+    ...    default=10m
 
     ${LOG_ANALYSIS_DEPTH}=    RW.Core.Import User Variable    LOG_ANALYSIS_DEPTH
     ...    type=string
@@ -98,7 +98,7 @@ Suite Initialization
     ...    description=Pattern used to exclude entries from log analysis when searching for errors. Use regex patterns to filter out false positives like JSON structures.
     ...    pattern=.*
     ...    example="errors":\s*\[\]|"warnings":\s*\[\]
-    ...    default="errors":\s*\[\]|\\bINFO\\b|\\bDEBUG\\b|\\bTRACE\\b|\\bSTART\\s*-\\s*|\\bSTART\\s*method\\b
+    ...    default="errors":\\s*\\[\\]|\\bINFO\\b|\\bDEBUG\\b|\\bTRACE\\b|\\bSTART\\s*-\\s*|\\bSTART\\s*method\\b
     ${LOG_SCAN_TIMEOUT}=    RW.Core.Import User Variable    LOG_SCAN_TIMEOUT
     ...    type=string
     ...    description=Timeout in seconds for log scanning operations. Increase this value if log scanning times out on large log files.
@@ -116,8 +116,8 @@ Suite Initialization
     ...    type=string
     ...    description=The time window (in (h) hours or (m) minutes) to search for container restarts. Only containers that restarted within this time period will be reported.
     ...    pattern=\w*
-    ...    example=1h
-    ...    default=1h
+    ...    example=10m
+    ...    default=10m
     ${CONTAINER_RESTART_THRESHOLD}=    RW.Core.Import User Variable    CONTAINER_RESTART_THRESHOLD
     ...    type=string
     ...    description=The minimum number of restarts required to trigger an issue. Containers with restart counts below this threshold will be ignored.
@@ -126,7 +126,12 @@ Suite Initialization
     ...    default=1
     # Convert comma-separated strings to lists
     @{LOG_PATTERN_CATEGORIES}=    Split String    ${LOG_PATTERN_CATEGORIES_STR}    ,
-    @{EXCLUDED_CONTAINERS}=    Run Keyword If    "${EXCLUDED_CONTAINER_NAMES}" != ""    Split String    ${EXCLUDED_CONTAINER_NAMES}    ,    ELSE    Create List
+    @{EXCLUDED_CONTAINERS_RAW}=    Run Keyword If    "${EXCLUDED_CONTAINER_NAMES}" != ""    Split String    ${EXCLUDED_CONTAINER_NAMES}    ,    ELSE    Create List
+    @{EXCLUDED_CONTAINERS}=    Create List
+    FOR    ${container}    IN    @{EXCLUDED_CONTAINERS_RAW}
+        ${trimmed_container}=    Strip String    ${container}
+        Append To List    ${EXCLUDED_CONTAINERS}    ${trimmed_container}
+    END
     
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}
@@ -200,7 +205,7 @@ Suite Initialization
 
 *** Tasks ***
 Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
-    [Documentation]    Fetches and analyzes logs from the deployment pods for errors, stack traces, connection issues, and other patterns that indicate application health problems.
+    [Documentation]    Fetches and analyzes logs from the deployment pods for errors, stack traces, connection issues, and other patterns that indicate application health problems. Note: Warning messages about missing log files for excluded containers (like linkerd-proxy, istio-proxy) are expected and harmless.
     [Tags]
     ...    logs
     ...    application
@@ -212,23 +217,37 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
     ...    access:read-only
     # Skip pod-related checks if deployment is scaled to 0
     IF    not ${SKIP_POD_CHECKS}
-        ${log_dir}=    RW.K8sLog.Fetch Workload Logs
-        ...    workload_type=deployment
-        ...    workload_name=${DEPLOYMENT_NAME}
-        ...    namespace=${NAMESPACE}
-        ...    context=${CONTEXT}
-        ...    kubeconfig=${kubeconfig}
-        ...    log_age=${LOG_AGE}
-        ...    excluded_containers=${EXCLUDED_CONTAINERS}
+        # Temporarily suppress log warnings for excluded containers (they're expected)
+        TRY
+            ${log_dir}=    RW.K8sLog.Fetch Workload Logs
+            ...    workload_type=deployment
+            ...    workload_name=${DEPLOYMENT_NAME}
+            ...    namespace=${NAMESPACE}
+            ...    context=${CONTEXT}
+            ...    kubeconfig=${kubeconfig}
+            ...    log_age=${LOG_AGE}
+            ...    excluded_containers=${EXCLUDED_CONTAINERS}
+        EXCEPT    AS    ${log_error}
+            # If log fetching fails completely, log the error but continue
+            Log    Warning: Log fetching encountered an error: ${log_error}
+            # Set empty log directory to continue with other checks
+            ${log_dir}=    Set Variable    ${EMPTY}
+        END
         
-        ${scan_results}=    RW.K8sLog.Scan Logs For Issues
-        ...    log_dir=${log_dir}
-        ...    workload_type=deployment
-        ...    workload_name=${DEPLOYMENT_NAME}
-        ...    namespace=${NAMESPACE}
-        ...    categories=@{LOG_PATTERN_CATEGORIES}
-        ...    custom_patterns_file=runbook_patterns.json
-        ...    excluded_containers=${EXCLUDED_CONTAINERS}
+        # Only scan logs if we have a valid log directory
+        IF    '''${log_dir}''' != '''${EMPTY}'''
+            ${scan_results}=    RW.K8sLog.Scan Logs For Issues
+            ...    log_dir=${log_dir}
+            ...    workload_type=deployment
+            ...    workload_name=${DEPLOYMENT_NAME}
+            ...    namespace=${NAMESPACE}
+            ...    categories=@{LOG_PATTERN_CATEGORIES}
+            ...    custom_patterns_file=runbook_patterns.json
+            ...    excluded_containers=${EXCLUDED_CONTAINERS}
+        ELSE
+            # Create empty scan results if no logs were fetched
+            ${scan_results}=    Evaluate    {"issues": [], "summary": ["No logs available for analysis"]}
+        END
         
         # Post-process results to filter out patterns matching LOGS_EXCLUDE_PATTERN
         TRY
@@ -538,8 +557,9 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}` in Names
 Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches warning events related to the deployment workload in the namespace and triages any issues found in the events.
     [Tags]    access:read-only  events    workloads    errors    warnings    get    deployment    ${DEPLOYMENT_NAME}
+    # Use EVENT_AGE from SLI configuration to align with SLI frequency (10m + buffer = 15m)
     ${events}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '(now - (60*60*3)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind == "Deployment" or .involvedObject.kind == "Pod" or .involvedObject.kind == "ReplicaSet") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}")) and (.lastTimestamp // empty | if . then fromdateiso8601 else 0 end) >= $time_limit) | {kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, count: .count} ] | group_by([.kind, .name]) | map(if length > 0 then {kind: .[0].kind, name: .[0].name, total_count: (map(.count // 1) | add), reasons: (map(.reason) | unique), messages: (map(.message) | unique), firstTimestamp: (map(.firstTimestamp // empty | if . then fromdateiso8601 else 0 end) | sort | .[0] | if . > 0 then todateiso8601 else null end), lastTimestamp: (map(.lastTimestamp // empty | if . then fromdateiso8601 else 0 end) | sort | reverse | .[0] | if . > 0 then todateiso8601 else null end)} else empty end) | map(. + {summary: "\(.kind) \(.name): \(.total_count) events (\(.reasons | join(", ")))"}) | {events_summary: map(.summary), total_objects: length, events: .}'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '(now - (60*15)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind == "Deployment" or .involvedObject.kind == "Pod" or .involvedObject.kind == "ReplicaSet") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}")) and (.lastTimestamp // empty | if . then fromdateiso8601 else 0 end) >= $time_limit) | {kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, count: .count} ] | group_by([.kind, .name]) | map(if length > 0 then {kind: .[0].kind, name: .[0].name, total_count: (map(.count // 1) | add), reasons: (map(.reason) | unique), messages: (map(.message) | unique), firstTimestamp: (map(.firstTimestamp // empty | if . then fromdateiso8601 else 0 end) | sort | .[0] | if . > 0 then todateiso8601 else null end), lastTimestamp: (map(.lastTimestamp // empty | if . then fromdateiso8601 else 0 end) | sort | reverse | .[0] | if . > 0 then todateiso8601 else null end)} else empty end) | map(. + {summary: "\(.kind) \(.name): \(.total_count) events (\(.reasons | join(", ")))"}) | {events_summary: map(.summary), total_objects: length, events: .}'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
@@ -558,9 +578,9 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    **Event Retrieval Failed for Deployment `${DEPLOYMENT_NAME}`**\n\nFailed to retrieve events:\n\n${events.stderr}\n\n**Commands Used:** ${history}
     ELSE
-        # Collect ALL events (Normal + Warning) for last 3 hours including Deployment, ReplicaSet, and Pod levels
+        # Collect ALL events (Normal + Warning) for last 15 minutes (aligned with SLI frequency + buffer) including Deployment, ReplicaSet, and Pod levels
         ${all_events}=    RW.CLI.Run Cli
-        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq --argjson hours 3 '(now - ($hours * 3600)) as $time_limit | [.items[] | select((.involvedObject.kind == "Deployment" or .involvedObject.kind == "Pod" or .involvedObject.kind == "ReplicaSet") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}")) and (.lastTimestamp // empty | if . then fromdateiso8601 else now end) >= $time_limit)] | sort_by(.lastTimestamp // .firstTimestamp) | {total_events: length, normal_events: (map(select(.type == "Normal")) | length), warning_events: (map(select(.type == "Warning")) | length), deployment_events: (map(select(.involvedObject.kind == "Deployment")) | length), replicaset_events: (map(select(.involvedObject.kind == "ReplicaSet")) | length), pod_events: (map(select(.involvedObject.kind == "Pod")) | length), events_by_type: (group_by(.type) | map({type: .[0].type, count: length, reasons: (map(.reason) | group_by(.) | map({reason: .[0], count: length}))})), chronological_events: (map({timestamp: (.lastTimestamp // .firstTimestamp), type: .type, kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message}) | sort_by(.timestamp)), recent_warnings: (map(select(.type == "Warning")) | map({timestamp: (.lastTimestamp // .firstTimestamp), kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message}) | sort_by(.timestamp) | reverse | .[0:10])}'
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq --argjson minutes 15 '(now - ($minutes * 60)) as $time_limit | [.items[] | select((.involvedObject.kind == "Deployment" or .involvedObject.kind == "Pod" or .involvedObject.kind == "ReplicaSet") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}")) and (.lastTimestamp // empty | if . then fromdateiso8601 else now end) >= $time_limit)] | sort_by(.lastTimestamp // .firstTimestamp) | {total_events: length, normal_events: (map(select(.type == "Normal")) | length), warning_events: (map(select(.type == "Warning")) | length), deployment_events: (map(select(.involvedObject.kind == "Deployment")) | length), replicaset_events: (map(select(.involvedObject.kind == "ReplicaSet")) | length), pod_events: (map(select(.involvedObject.kind == "Pod")) | length), events_by_type: (group_by(.type) | map({type: .[0].type, count: length, reasons: (map(.reason) | group_by(.) | map({reason: .[0], count: length}))})), chronological_events: (map({timestamp: (.lastTimestamp // .firstTimestamp), type: .type, kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message}) | sort_by(.timestamp)), recent_warnings: (map(select(.type == "Warning")) | map({timestamp: (.lastTimestamp // .firstTimestamp), kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message}) | sort_by(.timestamp) | reverse | .[0:10])}'
         ...    env=${env}
         ...    secret_file__kubeconfig=${kubeconfig}
         ...    include_in_history=false
@@ -571,7 +591,7 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
             ${total_count}=    Evaluate    $event_data.get('total_events', 0)
             
             # Build comprehensive event report
-            RW.Core.Add Pre To Report    **📊 Complete Event Summary for Deployment `${DEPLOYMENT_NAME}` (Last 3 Hours)**\n**Total Events:** ${total_count} (${event_data.get('normal_events', 0)} Normal, ${event_data.get('warning_events', 0)} Warning)\n**Event Distribution:** ${event_data.get('deployment_events', 0)} Deployment, ${event_data.get('replicaset_events', 0)} ReplicaSet, ${event_data.get('pod_events', 0)} Pod
+            RW.Core.Add Pre To Report    **📊 Complete Event Summary for Deployment `${DEPLOYMENT_NAME}` (Last 15 Minutes)**\n**Total Events:** ${total_count} (${event_data.get('normal_events', 0)} Normal, ${event_data.get('warning_events', 0)} Warning)\n**Event Distribution:** ${event_data.get('deployment_events', 0)} Deployment, ${event_data.get('replicaset_events', 0)} ReplicaSet, ${event_data.get('pod_events', 0)} Pod
             
             IF    ${warning_count} > 0
                 ${event_object_data}=    Evaluate    json.loads(r'''${events.stdout}''') if r'''${events.stdout}'''.strip() else {}    json
@@ -579,6 +599,64 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
                 
                 # Check if deployment is currently scaled to 0 to filter stale events
                 ${deployment_scaled_down}=    Set Variable    ${SKIP_POD_CHECKS}
+                
+                # Get current pod list to filter out events for non-existent pods
+                # First get the deployment's actual label selector instead of assuming app=${DEPLOYMENT_NAME}
+                ${deployment_selector}=    RW.CLI.Run Cli
+                ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.spec.selector.matchLabels | to_entries | map("\(.key)=\(.value)") | join(",")'
+                ...    env=${env}
+                ...    secret_file__kubeconfig=${kubeconfig}
+                ...    include_in_history=false
+                
+                ${current_pods}=    RW.CLI.Run Cli
+                ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -l ${deployment_selector.stdout} -o json | jq -r '.items[].metadata.name'
+                ...    env=${env}
+                ...    secret_file__kubeconfig=${kubeconfig}
+                ...    include_in_history=false
+                
+                ${existing_pod_names}=    Create List
+                IF    ${deployment_selector.returncode} == 0 and '''${deployment_selector.stdout}''' != '' and ${current_pods.returncode} == 0 and '''${current_pods.stdout}''' != ''
+                    @{pod_lines}=    Split String    ${current_pods.stdout}    \n
+                    FOR    ${pod_name}    IN    @{pod_lines}
+                        ${trimmed_pod}=    Strip String    ${pod_name}
+                        IF    '''${trimmed_pod}''' != ''
+                            Append To List    ${existing_pod_names}    ${trimmed_pod}
+                        END
+                    END
+                ELSE
+                    Log    Warning: Could not retrieve deployment selector or current pods, skipping pod existence filtering
+                END
+                
+                # Get current deployment health status for context
+                ${deployment_health}=    RW.CLI.Run Cli
+                ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '{name: .metadata.name, desired_replicas: .spec.replicas, ready_replicas: (.status.readyReplicas // 0), available_replicas: (.status.availableReplicas // 0), unavailable_replicas: (.status.unavailableReplicas // 0), conditions: [.status.conditions[]? | select(.type == "Available" or .type == "Progressing") | {type: .type, status: .status, reason: .reason, message: .message}]}'
+                ...    env=${env}
+                ...    secret_file__kubeconfig=${kubeconfig}
+                ...    include_in_history=false
+                
+                ${health_context}=    Set Variable    **Current Deployment Status:** Unable to retrieve
+                IF    ${deployment_health.returncode} == 0 and '''${deployment_health.stdout}''' != ''
+                    TRY
+                        ${health_data}=    Evaluate    json.loads(r'''${deployment_health.stdout}''') if r'''${deployment_health.stdout}'''.strip() else {}    json
+                        ${desired}=    Evaluate    $health_data.get('desired_replicas', 0)
+                        ${ready}=    Evaluate    $health_data.get('ready_replicas', 0)
+                        ${available}=    Evaluate    $health_data.get('available_replicas', 0)
+                        ${unavailable}=    Evaluate    $health_data.get('unavailable_replicas', 0)
+                        ${conditions}=    Evaluate    $health_data.get('conditions', [])
+                        
+                        ${health_context}=    Set Variable    **Current Deployment Status:** ${ready}/${desired} ready replicas, ${available} available, ${unavailable} unavailable
+                        
+                        # Add condition details if available
+                        FOR    ${condition}    IN    @{conditions}
+                            ${cond_type}=    Evaluate    $condition.get('type', 'Unknown')
+                            ${cond_status}=    Evaluate    $condition.get('status', 'Unknown')
+                            ${cond_reason}=    Evaluate    $condition.get('reason', '')
+                            ${health_context}=    Catenate    ${health_context}    \n**${cond_type}:** ${cond_status} (${cond_reason})
+                        END
+                    EXCEPT
+                        Log    Warning: Failed to parse deployment health status
+                    END
+                END
                 
                 # Create consolidated issues for warnings found
                 ${object_list_length}=    Get Length    ${object_list}
@@ -592,9 +670,21 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
                         ${message_string}=    Catenate    SEPARATOR=;    @{item["messages"]}
                         ${messages}=    RW.K8sHelper.Sanitize Messages    ${message_string}
                         
-                        # Skip stale pod events if deployment is scaled down
+                        # Skip stale pod events if deployment is scaled down or pod no longer exists
                         ${skip_stale_event}=    Set Variable    ${False}
-                        IF    ${deployment_scaled_down} and '${item["kind"]}' == 'Pod'
+                        
+                        # Check if this is a pod event for a non-existent pod
+                        IF    '${item["kind"]}' == 'Pod'
+                            ${pod_name}=    Set Variable    ${item["name"]}
+                            ${pod_exists}=    Evaluate    "${pod_name}" in $existing_pod_names
+                            IF    not ${pod_exists}
+                                ${skip_stale_event}=    Set Variable    ${True}
+                                Log    Skipping event for non-existent pod: ${pod_name}
+                            END
+                        END
+                        
+                        # Also skip stale events if deployment is scaled down
+                        IF    not ${skip_stale_event} and ${deployment_scaled_down} and '${item["kind"]}' == 'Pod'
                             # Find scale-down timestamp from chronological events
                             ${scale_events}=    Evaluate    [event for event in $event_data.get('chronological_events', []) if 'ScalingReplicaSet' in event.get('reason', '') and 'Scaled down' in event.get('message', '')]
                             ${scale_events_length}=    Get Length    ${scale_events}
@@ -711,13 +801,41 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
                             ${event_details_str}=    Catenate    ${event_details_str}    \n
                         END
                         
+                        # Determine if this is a deployment-level issue or pod-level issue
+                        ${is_deployment_issue}=    Evaluate    any(event.get('resource', '').startswith('Deployment/') for event in $issue.get('event_details', []))
+                        ${pod_count}=    Evaluate    len([event for event in $issue.get('event_details', []) if event.get('resource', '').startswith('Pod/')])
+                        
+                        # Create more accurate issue descriptions
+                        IF    ${is_deployment_issue}
+                            ${actual_description}=    Set Variable    Deployment-level issues detected for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                        ELSE IF    ${pod_count} > 0
+                            ${actual_description}=    Set Variable    Pod-level issues detected in ${pod_count} pod(s) of deployment `${DEPLOYMENT_NAME}` - deployment may still be functional
+                        ELSE
+                            ${actual_description}=    Set Variable    ${enhanced_title} detected for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                        END
+                        
+                        # Adjust severity based on current deployment health
+                        ${adjusted_severity}=    Set Variable    ${issue["severity"]}
+                        IF    '''${health_context}''' != '''**Current Deployment Status:** Unable to retrieve'''
+                            # Check if deployment is healthy (has ready replicas and is available)
+                            ${has_zero_ready}=    Evaluate    __import__('re').search(r'\b0/\d+\s+ready replicas', '''${health_context}''') is not None    modules=re
+                            ${is_healthy}=    Evaluate    "ready replicas" in '''${health_context}''' and "True" in '''${health_context}''' and not ${has_zero_ready}
+                            
+                            # Lower severity for probe failures when deployment is healthy
+                            ${is_probe_issue}=    Evaluate    "probe failures" in '''${enhanced_title}'''.lower()
+                            IF    ${is_healthy} and ${is_probe_issue}
+                                ${adjusted_severity}=    Set Variable    4
+                                Log    Lowering severity to 4 for probe failures in healthy deployment ${DEPLOYMENT_NAME}
+                            END
+                        END
+                        
                         RW.Core.Add Issue
-                        ...    severity=${issue["severity"]}
+                        ...    severity=${adjusted_severity}
                         ...    expected=No warning events should be present for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                        ...    actual=${enhanced_title} detected for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                        ...    actual=${actual_description}
                         ...    title=${enhanced_title}
                         ...    reproduce_hint=${events.cmd}
-                        ...    details=${details_prefix}${event_details_str}${issue["details"]}
+                        ...    details=${health_context}\n\n${details_prefix}${event_details_str}${issue["details"]}
                         ...    next_steps=${issue["next_steps"]}
                     END
                     
@@ -885,18 +1003,21 @@ Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` in Namespace `${N
                 # Try to parse as JSON first, but handle plain text responses gracefully
                 ${output_text}=    Set Variable    ${container_restarts.stdout.strip()}
                 
-                # Check if output looks like JSON (starts with { or [)
-                ${is_json}=    Evaluate    $output_text.startswith(('{', '[')) if $output_text else False
+                # Look for JSON in the output (may be mixed with text)
+                ${json_match}=    Evaluate    __import__('re').search(r'\\{.*\\}', r'''${output_text}''', __import__('re').DOTALL)    modules=re
                 
-                IF    ${is_json}
-                    ${restart_data}=    Evaluate    json.loads(r'''${container_restarts.stdout}''')    json
+                IF    ${json_match}
+                    ${json_text}=    Evaluate    $json_match.group(0) if $json_match else '{}'
+                    ${restart_data}=    Evaluate    json.loads(r'''${json_text}''')    json
                     ${restart_issues}=    Evaluate    $restart_data.get('issues', [])
                     ${restart_summary}=    Evaluate    $restart_data.get('summary', {})
+                    ${is_json}=    Set Variable    ${True}
                 ELSE
                     # Handle plain text response (no restarts found)
                     ${restart_data}=    Create Dictionary    issues=@{EMPTY}    summary=@{EMPTY}
                     ${restart_issues}=    Create List
                     ${restart_summary}=    Create Dictionary    total_containers=0    containers_with_restarts=0
+                    ${is_json}=    Set Variable    ${False}
                 END
                 
                 FOR    ${issue}    IN    @{restart_issues}
