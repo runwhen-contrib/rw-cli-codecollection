@@ -178,13 +178,7 @@ Analyze Workload Stacktraces for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Namespac
         IF    ${total_tracebacks} == 0
             # No tracebacks found
             RW.Core.Add Pre To Report    **📋 No Stacktraces Found for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Namespace `${NAMESPACE}`**\n**Log Analysis Period:** ${LOG_AGE}\n**Max Log Lines:** ${LOG_LINES}\n**Max Log Size:** ${LOG_SIZE} bytes\n**Excluded Containers:** ${EXCLUDED_CONTAINER_NAMES}\n\nLog analysis completed successfully with no stacktraces detected.
-        ELSE
-            # Also print logs from all the files in the log directory
-            ${all_logs}=    RW.LogAnalysis.ExtractTraceback.Extract Logs From Logs Dir
-            ...    logs_dir=${log_dir}
-            
-            RW.Core.Add Pre To Report    **📋 Logs From All Files in Logs Directory:**\n${all_logs}
-            
+        ELSE            
             # Stacktraces found - create issues for each one
             ${delimiter}=    Evaluate    '-' * 80
             
