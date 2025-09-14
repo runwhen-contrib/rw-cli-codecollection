@@ -29,6 +29,40 @@ class ExtractTraceback:
         self.java_traceback_extractor = JavaTracebackExtractor()
 
     @keyword
+    def extract_logs_from_logs_dir(self, logs_dir: str) -> str:
+        """
+        Ingests log content from a directory and returns a string of all the logs
+        """
+         # Handle new interface (logs_dir as directory path)
+        if logs_dir is None:
+            logger.error("logs_dir must be provided")
+            return ""
+        
+        if not os.path.exists(logs_dir):
+            logger.error(f"Logs directory does not exist: {logs_dir}")
+            return ""
+        
+        log_files = []
+        for root, dirs, files in os.walk(logs_dir):
+            for file in files:
+                if file.endswith('.txt'):
+                    log_files.append(os.path.join(root, file))
+        
+        all_logs = f"{'='*50}\tLOG LINES\t{'='*50}\n"
+        
+        # Process each log file
+        for log_file_path in log_files:
+            try:
+                # Read the log file line by line
+                with open(log_file_path, 'r', encoding='utf-8', errors='ignore') as file:
+                    log_lines = [line.rstrip('\n') for line in file]
+                all_logs += f"\t{'-'*40} {log_file_path.strip()} {'-'*40}\n" + "\n".join(log_lines) + "\n"
+            except Exception as _:
+                continue
+        
+        return all_logs
+    
+    @keyword
     def extract_tracebacks(self, logs_dir: str = None, logs: str = None, fast_exit: bool = False) -> Union[str, List[str]]:
         """
         Ingests deployment logs from a directory or log string to extract tracebacks
