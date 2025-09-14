@@ -470,43 +470,47 @@ class JavaTracebackExtractor:
         stacktrace_blocks = [[]]
         
         for log_idx, log_entry in enumerate(logs):
-            # Split multi-line log entries
-            log_lines = log_entry.split("\n")
-            
-            # Clean up each line (remove leading dashes and dollar signs)
-            cleaned_lines = [line.strip().lstrip('-').lstrip('$') for line in log_lines]
-            
-            # Filter out empty lines
-            valid_lines = [line for line in cleaned_lines if line]
-            
-            # Reconstruct the log entry with cleaned lines
-            formatted_log = "\n".join(valid_lines)
-            
-            # Identify lines that contain stacktrace frames
-            stacktrace_frame_lines = [
-                line for line in valid_lines if self._line_starts_with_at(line)
-            ]
+            try:
+                # Split multi-line log entries
+                log_lines = log_entry.split("\n")
+                
+                # Clean up each line (remove leading dashes and dollar signs)
+                cleaned_lines = [line.strip().lstrip('-').lstrip('$') for line in log_lines]
+                
+                # Filter out empty lines
+                valid_lines = [line for line in cleaned_lines if line]
+                
+                # Reconstruct the log entry with cleaned lines
+                formatted_log = "\n".join(valid_lines)
+                
+                # Identify lines that contain stacktrace frames
+                stacktrace_frame_lines = [
+                    line for line in valid_lines if self._line_starts_with_at(line)
+                ]
 
-            # Check if this log contains stacktrace information
-            if JAVA_EXCEPTION_PATTERN.search(formatted_log):
-                # new exception means a potential new block
-                if log_idx == 0:
-                    stacktrace_blocks.append([formatted_log])
+                # Check if this log contains stacktrace information
+                if JAVA_EXCEPTION_PATTERN.search(formatted_log):
+                    # new exception means a potential new block
+                    if log_idx == 0:
+                        stacktrace_blocks.append([formatted_log])
+                    else:
+                        if JAVA_EXCEPTION_PATTERN.search(logs[log_idx-1]):
+                            # previous log entry was an exception, so we add it to the current block's current line
+                            stacktrace_blocks[-1][-1] += formatted_log
+                        else:
+                            # previous log entry was not an exception, so we start a new block
+                            stacktrace_blocks.append([formatted_log])
                 else:
-                    if JAVA_EXCEPTION_PATTERN.search(logs[log_idx-1]):
-                        # previous log entry was an exception, so we add it to the current block's current line
-                        stacktrace_blocks[-1][-1] += formatted_log
-                    else:
-                        # previous log entry was not an exception, so we start a new block
-                        stacktrace_blocks.append([formatted_log])
-            else:
-                # This is a stacktrace entry - add it to the current block
-                if len(stacktrace_frame_lines) >= 1:
-                    if len(stacktrace_blocks) == 0: # we found an at statement first instead of an exception
-                        stacktrace_blocks.append([formatted_log])
-                    else:
-                        stacktrace_blocks[-1].append(formatted_log)
-
+                    # This is a stacktrace entry - add it to the current block
+                    if len(stacktrace_frame_lines) >= 1:
+                        if len(stacktrace_blocks) == 0: # we found an at statement first instead of an exception
+                            stacktrace_blocks.append([formatted_log])
+                        else:
+                            stacktrace_blocks[-1].append(formatted_log)
+            except Exception as e:
+                logger.error(f"Exception encountered while filtering logs having trace by java traceback extractor: {e}\nLOG: {log_entry}\n")
+                continue
+                
         # Process each block of related stacktrace entries
         aggregated_stacktraces = []
         for block in stacktrace_blocks:
@@ -515,7 +519,17 @@ class JavaTracebackExtractor:
                 # Aggregate related stacktraces within each block
                 aggregated_stacktraces.extend(self._aggregate_java_stacktraces(block))
 
-        return aggregated_stacktraces
+        # Filter aggregated stacktraces to keep only those with at least one "at" line
+        filtered_stacktraces = []
+        for stacktrace in aggregated_stacktraces:
+            # Split the stacktrace by newlines and check if any line starts with "at"
+            stacktrace_lines = stacktrace.split('\n')
+            has_at_line = any(self._line_starts_with_at(line) for line in stacktrace_lines)
+            
+            if has_at_line:
+                filtered_stacktraces.append(stacktrace)
+
+        return filtered_stacktraces
 
     def extract_tracebacks_from_logs(self, logs: list[str] | str) -> list[str]:
         """
