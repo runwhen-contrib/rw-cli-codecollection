@@ -44,7 +44,10 @@ from datetime import datetime
 from robot.api import logger
 from .timestamp_handler import TimestampHandler
 
-JAVA_PATTERN = re.compile(r'\s*at\s+[a-zA-Z_][\w$]*(\.[a-zA-Z_][\w$]*)+\([^)]*\)')
+JAVA_AT_FRAME_PATTERN = re.compile(r'(?:\s|\\t)*at\s+[a-zA-Z_][\w$/]*(\.[a-zA-Z_][\w$/]*)+\([^)]*\)')
+
+# Pattern to match Java exception class names (e.g., java.lang.NullPointerException, com.azure.core.amqp.exception.AmqpException)
+JAVA_EXCEPTION_PATTERN = re.compile(r'[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)*\.[A-Z][a-zA-Z]*Exception')
 
 
 class JavaTracebackExtractor:
@@ -120,7 +123,7 @@ class JavaTracebackExtractor:
             >>> extractor._line_starts_with_at("INFO: Application started")
             False
         """
-        return JAVA_PATTERN.search(log_line) is not None
+        return JAVA_AT_FRAME_PATTERN.search(log_line) is not None
 
     def _extract_timestamp_from_line(self, log_line: str, return_position: bool = False):
         """
@@ -466,34 +469,48 @@ class JavaTracebackExtractor:
         # Initialize with an empty block to collect stacktrace entries
         stacktrace_blocks = [[]]
         
-        for log_entry in logs:
-            # Split multi-line log entries
-            log_lines = log_entry.split("\n")
-            
-            # Clean up each line (remove leading dashes and dollar signs)
-            cleaned_lines = [line.strip().lstrip('-').lstrip('$') for line in log_lines]
-            
-            # Filter out empty lines
-            valid_lines = [line for line in cleaned_lines if line]
-            
-            # Reconstruct the log entry with cleaned lines
-            formatted_log = "\n".join(valid_lines)
-            
-            # Identify lines that contain stacktrace frames
-            stacktrace_frame_lines = [
-                line for line in valid_lines if self._line_starts_with_at(line)
-            ]
-            
-            # Check if this log contains stacktrace information
-            if ("exception" in formatted_log.lower() and stacktrace_frame_lines) or len(stacktrace_frame_lines) >= 1:
-                # This is a stacktrace entry - add it to the current block
-                stacktrace_blocks[-1].append(formatted_log)
-            else:
-                # Not a stacktrace entry - start a new block for future entries
-                # Only create a new block if the current one isn't empty
-                if stacktrace_blocks[-1]:
-                    stacktrace_blocks.append([])
+        for log_idx, log_entry in enumerate(logs):
+            try:
+                # Split multi-line log entries
+                log_lines = log_entry.split("\n")
+                
+                # Clean up each line (remove leading dashes and dollar signs)
+                cleaned_lines = [line.strip().lstrip('-').lstrip('$') for line in log_lines]
+                
+                # Filter out empty lines
+                valid_lines = [line for line in cleaned_lines if line]
+                
+                # Reconstruct the log entry with cleaned lines
+                formatted_log = "\n".join(valid_lines)
+                
+                # Identify lines that contain stacktrace frames
+                stacktrace_frame_lines = [
+                    line for line in valid_lines if self._line_starts_with_at(line)
+                ]
 
+                # Check if this log contains stacktrace information
+                if JAVA_EXCEPTION_PATTERN.search(formatted_log):
+                    # new exception means a potential new block
+                    if log_idx == 0:
+                        stacktrace_blocks.append([formatted_log])
+                    else:
+                        if JAVA_EXCEPTION_PATTERN.search(logs[log_idx-1]):
+                            # previous log entry was an exception, so we add it to the current block's current line
+                            stacktrace_blocks[-1][-1] += formatted_log
+                        else:
+                            # previous log entry was not an exception, so we start a new block
+                            stacktrace_blocks.append([formatted_log])
+                else:
+                    # This is a stacktrace entry - add it to the current block
+                    if len(stacktrace_frame_lines) >= 1:
+                        if len(stacktrace_blocks) == 0: # we found an at statement first instead of an exception
+                            stacktrace_blocks.append([formatted_log])
+                        else:
+                            stacktrace_blocks[-1].append(formatted_log)
+            except Exception as e:
+                logger.error(f"Exception encountered while filtering logs having trace by java traceback extractor: {e}\nLOG: {log_entry}\n")
+                continue
+                
         # Process each block of related stacktrace entries
         aggregated_stacktraces = []
         for block in stacktrace_blocks:
@@ -501,8 +518,18 @@ class JavaTracebackExtractor:
             if block:
                 # Aggregate related stacktraces within each block
                 aggregated_stacktraces.extend(self._aggregate_java_stacktraces(block))
-        
-        return aggregated_stacktraces
+
+        # Filter aggregated stacktraces to keep only those with at least one "at" line
+        filtered_stacktraces = []
+        for stacktrace in aggregated_stacktraces:
+            # Split the stacktrace by newlines and check if any line starts with "at"
+            stacktrace_lines = stacktrace.split('\n')
+            has_at_line = any(self._line_starts_with_at(line) for line in stacktrace_lines)
+            
+            if has_at_line:
+                filtered_stacktraces.append(stacktrace)
+
+        return filtered_stacktraces
 
     def extract_tracebacks_from_logs(self, logs: list[str] | str) -> list[str]:
         """
