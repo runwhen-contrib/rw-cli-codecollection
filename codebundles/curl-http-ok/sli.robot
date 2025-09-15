@@ -37,23 +37,41 @@ Validate HTTP URL Availability and Timeliness for ${URL}
     [Documentation]    Use cURL to validate the http response  
     [Tags]    cURL    HTTP    Ingress    Latency    Errors
     ${curl_rsp}=    RW.CLI.Run Cli
-    ...    cmd=curl --connect-timeout 5 --max-time 15 -o /dev/null -w '{"http_code": "\%{http_code}", "time_total": \%{time_total}, "curl_exit_code": \%{exitcode}}' -s ${URL}
-    ${json}=    Evaluate    json.loads(r'''${curl_rsp.stdout}''')    json
-    ${latency}=    Set Variable    ${json['time_total']}
-    ${status_code}=    Set Variable    ${json['http_code']}
-    ${curl_exit_code}=    Set Variable    ${json['curl_exit_code']}
+    ...    cmd=curl --connect-timeout 5 --max-time 15 -L -o /dev/null -w '{"http_code": "\%{http_code}", "time_total": \%{time_total}, "curl_exit_code": \%{exitcode}}' -s ${URL}
     
-    # Check for curl command failures (exit code != 0)
-    ${curl_success}=    Evaluate    1 if ${curl_exit_code} == 0 else 0
+    # Check curl command success first (before JSON parsing)
+    ${curl_success}=    Evaluate    1 if ${curl_rsp.returncode} == 0 else 0
     
-    # Check for connection failures (HTTP 000 status code)
-    ${connection_success}=    Evaluate    1 if "${status_code}" != "000" else 0
+    # Initialize default values for failed curl commands
+    ${latency}=    Set Variable    0
+    ${status_code}=    Set Variable    000
+    ${connection_success}=    Set Variable    0
+    ${http_ok}=    Set Variable    0
+    ${latency_within_target}=    Set Variable    0
     
-    # Check if HTTP status code matches desired response code
-    ${http_ok}=    Evaluate    1 if "${status_code}" == "${DESIRED_RESPONSE_CODE}" else 0
-    
-    # Check if latency is within target
-    ${latency_within_target}=    Evaluate    1 if ${latency} <= ${TARGET_LATENCY} else 0
+    # Only parse JSON if curl succeeded and stdout is not empty
+    IF    ${curl_success} == 1 and $curl_rsp.stdout != ""
+        TRY
+            ${json}=    Evaluate    json.loads(r'''${curl_rsp.stdout}''')    json
+            ${latency}=    Set Variable    ${json['time_total']}
+            ${status_code}=    Set Variable    ${json['http_code']}
+            
+            # Check for connection failures (HTTP 000 status code)
+            ${connection_success}=    Evaluate    1 if "${status_code}" != "000" else 0
+            
+            # Check if HTTP status code matches desired response code
+            ${http_ok}=    Evaluate    1 if "${status_code}" == "${DESIRED_RESPONSE_CODE}" else 0
+            
+            # Check if latency is within target
+            ${latency_within_target}=    Evaluate    1 if ${latency} <= ${TARGET_LATENCY} else 0
+        EXCEPT
+            # JSON parsing failed - treat as connection failure
+            Log    Failed to parse JSON from curl output: ${curl_rsp.stdout}
+        END
+    ELSE
+        # Curl failed or no output - already set defaults above
+        Log    Curl command failed with return code: ${curl_rsp.returncode}
+    END
     
     # Overall health score: all conditions must be met for a score of 1
     # If curl fails or connection fails (000), score is 0 regardless of other factors

@@ -1,5 +1,5 @@
 commands:
-- command: 'curl --connect-timeout 5 --max-time 15 -o /dev/null -w ''{"http_code": "%{http_code}", "time_total": %{time_total}, "curl_exit_code": %{exitcode}}''
+- command: 'curl --connect-timeout 5 --max-time 15 -L -o /dev/null -w ''{"http_code": "%{http_code}", "time_total": %{time_total}, "curl_exit_code": %{exitcode}}''
     -s ${URL}'
   doc_links: '
 
@@ -9,24 +9,25 @@ commands:
 
     - [JSON format overview](https://www.json.org/json-en.html){:target="_blank"}'
   explanation: This command uses the curl utility to send a request to a specified
-    URL with connection and timeout limits, then outputs the HTTP response code, 
-    total time, and curl exit code in JSON format. The -o /dev/null option discards 
-    the normal output, and -s ensures it runs silently. The exit code helps detect 
-    connection failures that result in 000 HTTP status codes.
+    URL with connection and timeout limits, then outputs the HTTP response code,
+    total time, and curl exit code in JSON format. The -L option follows redirects,
+    -o /dev/null option discards the normal output, and -s ensures it runs silently.
+    The exit code helps detect connection failures that result in 000 HTTP status codes.
   multi_line_details: "# This command uses curl to send an HTTP request to the specified\
     \ URL and capture the response time, HTTP status code, and curl exit code.\n\n\
     # --connect-timeout 5: Sets connection timeout to 5 seconds\n# --max-time 15:\
-    \ Sets maximum time for the entire operation to 15 seconds\n# -o /dev/null: Specifies\
-    \ a file or device to write output to. In this case, we're writing the response\
-    \ to /dev/null to discard it.\n# -w '{\"http_code\": %{http_code}, \"time_total\"\
-    : %{time_total}, \"curl_exit_code\": %{exitcode}}': This option customizes the\
-    \ output format of curl to return the HTTP status code, total time taken for\
-    \ the request, and curl's exit code for error detection.\n# -s: Suppresses the\
-    \ progress meter and any other non-error output.\n\n# The curl_exit_code helps\
-    \ detect connection failures that result in 000 HTTP status codes.\n# Replace\
-    \ ${URL} with the actual URL that you want to send the request to.\n\ncurl --connect-timeout\
-    \ 5 --max-time 15 -o /dev/null \\\n  -w '{\"http_code\": %{http_code}, \"time_total\"\
-    : %{time_total}, \"curl_exit_code\": %{exitcode}}' \\\n  -s ${URL}"
+    \ Sets maximum time for the entire operation to 15 seconds\n# -L: Follows redirects\
+    \ (HTTP 3xx responses)\n# -o /dev/null: Specifies a file or device to write output\
+    \ to. In this case, we're writing the response to /dev/null to discard it.\n\
+    # -w '{\"http_code\": %{http_code}, \"time_total\": %{time_total}, \"curl_exit_code\"\
+    : %{exitcode}}': This option customizes the output format of curl to return\
+    \ the HTTP status code, total time taken for the request, and curl's exit code\
+    \ for error detection.\n# -s: Suppresses the progress meter and any other non-error\
+    \ output.\n\n# The curl_exit_code helps detect connection failures that result\
+    \ in 000 HTTP status codes.\n# Replace ${URL} with the actual URL that you want\
+    \ to send the request to.\n\ncurl --connect-timeout 5 --max-time 15 -L -o /dev/null\
+    \ \\\n  -w '{\"http_code\": %{http_code}, \"time_total\": %{time_total},\
+    \ \"curl_exit_code\": %{exitcode}}' \\\n  -s ${URL}"
   name: check_http_url_availability_and_timeliness_for_url
   when_is_it_useful: '1. Monitoring the uptime and response time of a web server or
     service

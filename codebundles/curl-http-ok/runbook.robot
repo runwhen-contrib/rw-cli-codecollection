@@ -17,7 +17,7 @@ Check HTTP URL Availability and Timeliness for `${URL}`
     [Documentation]    Use cURL to validate the http response
     [Tags]    curl    http    ingress    latency    errors    access:read-only
     ${curl_rsp}=    RW.CLI.Run Cli
-    ...    cmd=curl --connect-timeout 5 --max-time 15 -o /dev/null -w '{"http_code": "\%{http_code}", "time_total": \%{time_total}, "curl_exit_code": \%{exitcode}}' -s ${URL}
+    ...    cmd=curl --connect-timeout 5 --max-time 15 -L -o /dev/null -w '{"http_code": "\%{http_code}", "time_total": \%{time_total}, "curl_exit_code": \%{exitcode}}' -s ${URL}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
     ${owner_kind}=    RW.CLI.Run Cli
@@ -30,9 +30,6 @@ Check HTTP URL Availability and Timeliness for `${URL}`
                 ...    cmd=echo '${OWNER_DETAILS}' | jq -r .namespace | sed 's/ *$//' | tr -d '\n'
                 ...    include_in_history=False
     
-    # Parse curl response JSON for all checks
-    ${json}=    Evaluate    json.loads(r'''${curl_rsp.stdout}''')    json
-    
     # Check curl exit code first - if this fails, it's a connection issue
     IF    ${curl_rsp.returncode} != 0
         RW.Core.Add Issue
@@ -44,6 +41,22 @@ Check HTTP URL Availability and Timeliness for `${URL}`
         ...    details=curl command failed when trying to reach ${URL}.\n\nCurl Response: ${curl_rsp.stdout}\nCurl Exit Code: ${curl_rsp.returncode}\nCurl Stderr: ${curl_rsp.stderr}\n\nThis indicates a connection failure, DNS resolution failure, or other network issue.\n\nCommon curl exit codes:\n- 6: Could not resolve host\n- 7: Failed to connect to host\n- 28: Operation timeout\n- 35: SSL connect error\n\nCheck network connectivity, DNS resolution, and firewall rules.
         ...    next_steps=Check Network Connectivity to `${URL}`\nVerify DNS Resolution for the Target Host\nCheck Firewall Rules and Security Groups\nInspect ${owner_kind.stdout} `${owner_name.stdout}` Configuration
     ELSE
+        # Parse JSON only if curl succeeded
+        TRY
+            ${json}=    Evaluate    json.loads(r'''${curl_rsp.stdout}''')    json
+        EXCEPT
+            # JSON parsing failed - treat as connection failure
+            RW.Core.Add Issue
+            ...    severity=2
+            ...    title=HTTP connection failed for ${owner_kind.stdout} `${owner_name.stdout}` - malformed response
+            ...    expected=Valid JSON response from curl command
+            ...    actual=Failed to parse JSON from curl output
+            ...    reproduce_hint=Run: ${curl_rsp.cmd}
+            ...    details=curl command succeeded but returned malformed JSON response.\n\nCurl Response: ${curl_rsp.stdout}\nCurl Exit Code: ${curl_rsp.returncode}\nCurl Stderr: ${curl_rsp.stderr}
+            ...    next_steps=Check ${owner_kind.stdout} `${owner_name.stdout}` Status and Readiness\nVerify Service Endpoints and Load Balancer Configuration\nCheck Network Policies and Ingress Rules
+            RETURN
+        END
+        
         IF    "${json['http_code']}" == "000"
             RW.Core.Add Issue
             ...    severity=2
@@ -63,23 +76,37 @@ Check HTTP URL Availability and Timeliness for `${URL}`
             ...    details=${URL} responded with HTTP status code ${json['http_code']} instead of expected ${DESIRED_RESPONSE_CODE}.\n\nCurl Response: ${curl_rsp.stdout}\n\nCheck related ingress objects, services, and pods.
             ...    next_steps=Check ${owner_kind.stdout} Log for Issues with `${owner_name.stdout}`\n Troubleshoot Warning Events in Namespace `${owner_namespace.stdout}`\nQuery Traces for HTTP Errors in Namespace `${owner_namespace.stdout}`
         END
-    END
-    # Check latency only if connection was successful
-    ${latency}=    Set Variable    ${json['time_total']}
-    IF    ${curl_rsp.returncode} == 0 and "${json['http_code']}" != "000" and ${latency} > ${TARGET_LATENCY}
-        RW.Core.Add Issue
-        ...    severity=4
-        ...    title=HTTP latency exceeded target latency for ${owner_kind.stdout} `${owner_name.stdout}`
-        ...    expected=HTTP response time should be <= ${TARGET_LATENCY} seconds
-        ...    actual=HTTP response time was ${latency} seconds
-        ...    reproduce_hint=Run: ${curl_rsp.cmd}
-        ...    details=${URL} responded with high latency of ${latency} seconds (target: ${TARGET_LATENCY}s).\n\nCurl Response: ${curl_rsp.stdout}\n\nCheck services, pods, load balancers, and virtual machines for unexpected saturation.
-        ...    next_steps=Check ${owner_kind.stdout} Log for Issues with `${owner_name.stdout}`\nMonitor Resource Usage in Namespace `${owner_namespace.stdout}`\nCheck Load Balancer and Network Performance
+        
+        # Check latency only if connection was successful and no other issues found
+        ${latency}=    Set Variable    ${json['time_total']}
+        IF    "${json['http_code']}" != "000" and ${latency} > ${TARGET_LATENCY}
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    title=HTTP latency exceeded target latency for ${owner_kind.stdout} `${owner_name.stdout}`
+            ...    expected=HTTP response time should be <= ${TARGET_LATENCY} seconds
+            ...    actual=HTTP response time was ${latency} seconds
+            ...    reproduce_hint=Run: ${curl_rsp.cmd}
+            ...    details=${URL} responded with high latency of ${latency} seconds (target: ${TARGET_LATENCY}s).\n\nCurl Response: ${curl_rsp.stdout}\n\nCheck services, pods, load balancers, and virtual machines for unexpected saturation.
+            ...    next_steps=Check ${owner_kind.stdout} Log for Issues with `${owner_name.stdout}`\nMonitor Resource Usage in Namespace `${owner_namespace.stdout}`\nCheck Load Balancer and Network Performance
+        END
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
-    RW.Core.Add Pre To Report    URL Latency: ${latency}
-    RW.Core.Add Pre To Report    URL Response Code: ${json['http_code']}
+    
+    # Add reporting with safe defaults for failed curl commands
+    IF    ${curl_rsp.returncode} == 0
+        TRY
+            ${json_for_report}=    Evaluate    json.loads(r'''${curl_rsp.stdout}''')    json
+            RW.Core.Add Pre To Report    URL Latency: ${json_for_report['time_total']}
+            RW.Core.Add Pre To Report    URL Response Code: ${json_for_report['http_code']}
+        EXCEPT
+            RW.Core.Add Pre To Report    URL Latency: N/A (JSON parse failed)
+            RW.Core.Add Pre To Report    URL Response Code: N/A (JSON parse failed)
+        END
+    ELSE
+        RW.Core.Add Pre To Report    URL Latency: N/A (curl failed)
+        RW.Core.Add Pre To Report    URL Response Code: N/A (curl failed)
+    END
 
 
 *** Keywords ***
