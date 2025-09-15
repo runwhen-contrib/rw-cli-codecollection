@@ -2,7 +2,6 @@ name: Java Log Analysis Tests
 
 on:
   push:
-    branches: [ main ]
     paths:
       - 'libraries/RW/LogAnalysis/java/**'
       - '.github/workflows/java-log-analysis-tests.yml'
