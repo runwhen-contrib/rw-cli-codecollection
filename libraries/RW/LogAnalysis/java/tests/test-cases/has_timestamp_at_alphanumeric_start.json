@@ -1,0 +1,16 @@
+{
+  "test_cases": [
+    {
+      "name": "valid_iso_timestamp_at_start",
+      "input": "2024-01-15T10:30:45.123Z INFO: Application started",
+      "expected": true,
+      "description": "ISO timestamp at the beginning of line"
+    },
+    {
+      "name": "stacktrace_line_no_timestamp",
+      "input": "    at com.example.Class.method(Class.java:123)",
+      "expected": false,
+      "description": "Java stacktrace line without timestamp"
+    }
+  ]
+}

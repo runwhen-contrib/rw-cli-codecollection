@@ -1,0 +1,14 @@
+[run]
+# Always consider source relative to repo root (not the cwd)
+source = .
+branch = True
+
+[report]
+# Exclude test code, init files, migrations, etc.
+omit =
+    */tests/*
+    */__init__.py
+    */migrations/*
+    */venv/*
+    **/simple_runner.py
+show_missing = true
