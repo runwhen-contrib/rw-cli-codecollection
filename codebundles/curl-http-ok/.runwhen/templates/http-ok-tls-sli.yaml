@@ -34,3 +34,16 @@ spec:
     - name: DESIRED_RESPONSE_CODE
       value: '200'
   secretsProvided: []
+  alerts:
+    warning:
+      operator: <
+      threshold: '1'
+      for: '5m'
+    ticket:
+      operator: <
+      threshold: '1'
+      for: '15m'
+    page:
+      operator: '=='
+      threshold: '0'
+      for: ''
