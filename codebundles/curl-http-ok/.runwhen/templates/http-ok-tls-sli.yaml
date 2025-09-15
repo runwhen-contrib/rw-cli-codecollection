@@ -38,12 +38,5 @@ spec:
     warning:
       operator: <
       threshold: '1'
-      for: '5m'
-    ticket:
-      operator: <
-      threshold: '1'
-      for: '15m'
-    page:
-      operator: '=='
-      threshold: '0'
-      for: ''
+      for: '10m'
+
