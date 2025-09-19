@@ -10,7 +10,7 @@ inputs:
     description: 'GitHub token for API access'
     required: true
   openai-api-key:
-    description: 'OpenAI API key for AI generation'
+    description: 'OpenAI API key for AI generation (required for AI-powered generation)'
     required: false
     default: ''
 

@@ -20,7 +20,7 @@ failure_labels:
 # AI Configuration
 ai:
   # AI service to use: "openai", "template", or "hybrid"
-  service: "hybrid"
+  service: "openai"
   
   # OpenAI settings
   openai:

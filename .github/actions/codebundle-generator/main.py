@@ -33,13 +33,23 @@ class CodebundleGenerator:
         self.config = self._load_config()
         
         # Initialize OpenAI if available and configured
-        if OPENAI_AVAILABLE and openai_api_key and self.config.get('ai', {}).get('service') in ['openai', 'hybrid']:
+        ai_service = self.config.get('ai', {}).get('service', 'template')
+        logger.info(f"AI service configuration: {ai_service}")
+        logger.info(f"OpenAI available: {OPENAI_AVAILABLE}")
+        logger.info(f"OpenAI API key provided: {'Yes' if openai_api_key else 'No'}")
+        
+        if OPENAI_AVAILABLE and openai_api_key and ai_service in ['openai', 'hybrid']:
             openai.api_key = openai_api_key
             self.ai_enabled = True
-            logger.info("AI generation enabled with OpenAI")
+            logger.info("🤖 AI generation enabled with OpenAI")
         else:
             self.ai_enabled = False
-            logger.info("Using template-based generation")
+            if not OPENAI_AVAILABLE:
+                logger.info("📝 Using template-based generation (OpenAI not available)")
+            elif not openai_api_key:
+                logger.info("📝 Using template-based generation (no OpenAI API key)")
+            else:
+                logger.info(f"📝 Using template-based generation (service: {ai_service})")
         
         # Set workspace - find the repository root
         current_dir = Path.cwd()
@@ -453,6 +463,8 @@ class CodebundleGenerator:
         use_ai = (self.ai_enabled and 
                   self.config.get('ai', {}).get('use_ai_for', {}).get('scripts', False))
         
+        logger.info(f"🔧 Script generation method: {'AI' if use_ai else 'Template'}")
+        
         if use_ai:
             return self._generate_scripts_with_ai(requirements, templates)
         else:
@@ -701,6 +713,8 @@ echo "Task completed: {task}"
         use_ai = (self.ai_enabled and 
                   self.config.get('ai', {}).get('use_ai_for', {}).get('robot_tasks', False))
         
+        logger.info(f"🤖 Robot tasks generation method: {'AI' if use_ai else 'Template'}")
+        
         if use_ai:
             return self._generate_robot_tasks_with_ai(requirements, templates)
         else:
@@ -938,6 +952,8 @@ Suite Initialization
         # Check if AI should be used for documentation
         use_ai = (self.ai_enabled and 
                   self.config.get('ai', {}).get('use_ai_for', {}).get('documentation', False))
+        
+        logger.info(f"📚 Documentation generation method: {'AI' if use_ai else 'Template'}")
         
         if use_ai:
             return self._generate_readme_with_ai(requirements)
