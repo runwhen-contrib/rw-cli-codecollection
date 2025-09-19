@@ -13,6 +13,13 @@ from typing import Dict, List, Optional, Tuple
 from github import Github
 from jinja2 import Template
 
+# Try to import OpenAI
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -23,6 +30,17 @@ class CodebundleGenerator:
         self.repo = self.gh.get_repo(os.environ['GITHUB_REPOSITORY'])
         self.issue = self.repo.get_issue(issue_number)
         self.openai_api_key = openai_api_key
+        self.config = self._load_config()
+        
+        # Initialize OpenAI if available and configured
+        if OPENAI_AVAILABLE and openai_api_key and self.config.get('ai', {}).get('service') in ['openai', 'hybrid']:
+            openai.api_key = openai_api_key
+            self.ai_enabled = True
+            logger.info("AI generation enabled with OpenAI")
+        else:
+            self.ai_enabled = False
+            logger.info("Using template-based generation")
+        
         # Set workspace - find the repository root
         current_dir = Path.cwd()
         # If we're in the action directory, go up to find the repo root
@@ -38,6 +56,139 @@ class CodebundleGenerator:
         logger.info(f"Workspace root: {self.workspace_root}")
         logger.info(f"Codebundles directory: {self.workspace_root / 'codebundles'}")
         logger.info(f"Codebundles exists: {(self.workspace_root / 'codebundles').exists()}")
+        
+    def _load_config(self) -> Dict:
+        """Load configuration from config file"""
+        try:
+            config_path = self.workspace_root / '.github' / 'codebundle-generator-config.yml'
+            if config_path.exists():
+                with open(config_path, 'r') as f:
+                    return yaml.safe_load(f)
+        except Exception as e:
+            logger.warning(f"Failed to load config: {e}")
+        return {}
+    
+    def _get_reference_codebundles(self, requirements: Dict) -> List[Dict]:
+        """Get reference codebundles for AI guidance"""
+        platform = requirements['platform']
+        purpose = requirements['purpose']
+        
+        # Get reference codebundle names from config
+        ref_config = self.config.get('reference_codebundles', {})
+        ref_names = ref_config.get(platform, {}).get(purpose, [])
+        
+        if not ref_names:
+            # Fallback to any codebundles for the platform
+            ref_names = []
+            for purpose_key, bundles in ref_config.get(platform, {}).items():
+                ref_names.extend(bundles[:2])  # Limit to 2 per purpose
+        
+        # Load actual codebundle content
+        reference_bundles = []
+        for name in ref_names[:3]:  # Limit to 3 references
+            bundle_path = self.workspace_root / 'codebundles' / name
+            if bundle_path.exists():
+                bundle_data = self._load_codebundle_content(bundle_path)
+                if bundle_data:
+                    reference_bundles.append(bundle_data)
+        
+        return reference_bundles
+    
+    def _load_codebundle_content(self, bundle_path: Path) -> Optional[Dict]:
+        """Load content from a reference codebundle"""
+        try:
+            content = {
+                'name': bundle_path.name,
+                'meta': {},
+                'scripts': [],
+                'robot_content': '',
+                'readme': ''
+            }
+            
+            # Load meta.yaml
+            meta_path = bundle_path / 'meta.yaml'
+            if meta_path.exists():
+                with open(meta_path, 'r') as f:
+                    content['meta'] = yaml.safe_load(f)
+            
+            # Load scripts
+            for script_file in bundle_path.glob('*.sh'):
+                with open(script_file, 'r') as f:
+                    content['scripts'].append({
+                        'name': script_file.name,
+                        'content': f.read()[:1000]  # Limit content
+                    })
+            
+            # Load robot file
+            robot_path = bundle_path / 'runbook.robot'
+            if robot_path.exists():
+                with open(robot_path, 'r') as f:
+                    content['robot_content'] = f.read()[:1000]  # Limit content
+            
+            # Load README
+            readme_path = bundle_path / 'README.md'
+            if readme_path.exists():
+                with open(readme_path, 'r') as f:
+                    content['readme'] = f.read()[:500]  # Limit content
+            
+            return content
+        except Exception as e:
+            logger.warning(f"Failed to load reference codebundle {bundle_path.name}: {e}")
+            return None
+    
+    def _generate_with_ai(self, prompt: str, context: str = "") -> Optional[str]:
+        """Generate content using OpenAI"""
+        if not self.ai_enabled:
+            return None
+        
+        try:
+            ai_config = self.config.get('ai', {}).get('openai', {})
+            
+            messages = [
+                {"role": "system", "content": "You are an expert DevOps engineer creating RunWhen codebundles. Generate high-quality, production-ready code following best practices."},
+                {"role": "user", "content": f"{context}\n\n{prompt}"}
+            ]
+            
+            response = openai.ChatCompletion.create(
+                model=ai_config.get('model', 'gpt-4'),
+                messages=messages,
+                max_tokens=ai_config.get('max_tokens', 2000),
+                temperature=ai_config.get('temperature', 0.3)
+            )
+            
+            return response.choices[0].message.content.strip()
+        
+        except Exception as e:
+            logger.warning(f"AI generation failed: {e}")
+            if self.config.get('ai', {}).get('fallback_to_template', True):
+                logger.info("Falling back to template generation")
+            return None
+    
+    def _build_reference_context(self, reference_bundles: List[Dict], requirements: Dict) -> str:
+        """Build context string from reference codebundles"""
+        if not reference_bundles:
+            return "No reference codebundles available."
+        
+        context_parts = [
+            f"Reference codebundles for {requirements['platform']} {requirements['purpose']} tasks:",
+            ""
+        ]
+        
+        for bundle in reference_bundles:
+            context_parts.append(f"## {bundle['name']}")
+            
+            if bundle.get('meta'):
+                context_parts.append(f"Description: {bundle['meta'].get('description', 'N/A')}")
+            
+            if bundle.get('scripts'):
+                context_parts.append("Example scripts:")
+                for script in bundle['scripts'][:2]:  # Limit to 2 scripts per bundle
+                    context_parts.append(f"### {script['name']}")
+                    context_parts.append(f"```bash\n{script['content'][:500]}...\n```")
+            
+            context_parts.append("")
+        
+        return "\n".join(context_parts)
         
     def parse_issue_requirements(self) -> Dict:
         """Parse GitHub issue to extract codebundle requirements"""
@@ -295,9 +446,65 @@ class CodebundleGenerator:
             return False
     
     def generate_scripts(self, requirements: Dict, templates: Dict) -> Dict[str, str]:
-        """Generate bash scripts for each task"""
+        """Generate bash scripts for each task (AI-enhanced)"""
         logger.info("Generating bash scripts...")
         
+        # Check if AI should be used for scripts
+        use_ai = (self.ai_enabled and 
+                  self.config.get('ai', {}).get('use_ai_for', {}).get('scripts', False))
+        
+        if use_ai:
+            return self._generate_scripts_with_ai(requirements, templates)
+        else:
+            return self._generate_scripts_with_templates(requirements, templates)
+    
+    def _generate_scripts_with_ai(self, requirements: Dict, templates: Dict) -> Dict[str, str]:
+        """Generate scripts using AI with reference codebundle guidance"""
+        scripts = {}
+        
+        # Get reference codebundles for context
+        reference_bundles = self._get_reference_codebundles(requirements)
+        
+        # Build context from reference bundles
+        context = self._build_reference_context(reference_bundles, requirements)
+        
+        for i, task in enumerate(requirements['tasks']):
+            script_name = self._task_to_script_name(task)
+            
+            prompt = f"""
+Generate a bash script for this task: {task}
+
+Platform: {requirements['platform']}
+Service Type: {requirements['service_type']}
+Purpose: {requirements['purpose']}
+
+Requirements:
+- Follow the patterns shown in the reference examples
+- Include proper error handling and logging
+- Use platform-specific CLI commands
+- Add helpful comments
+- Return meaningful exit codes
+- Include validation steps
+
+The script should be production-ready and follow DevOps best practices.
+"""
+            
+            ai_content = self._generate_with_ai(prompt, context)
+            
+            if ai_content:
+                scripts[script_name] = ai_content
+                logger.info(f"Generated script {script_name} with AI")
+            else:
+                # Fallback to template generation
+                script_content = self._generate_script_content(task, requirements['platform'], 
+                                                             self._get_script_template(requirements['platform'], templates))
+                scripts[script_name] = script_content
+                logger.info(f"Generated script {script_name} with template fallback")
+        
+        return scripts
+    
+    def _generate_scripts_with_templates(self, requirements: Dict, templates: Dict) -> Dict[str, str]:
+        """Generate scripts using templates (original method)"""
         scripts = {}
         platform = requirements['platform']
         
@@ -487,9 +694,55 @@ echo "Task completed: {task}"
 '''
     
     def generate_robot_tasks(self, requirements: Dict, templates: Dict) -> str:
-        """Generate Robot Framework tasks"""
+        """Generate Robot Framework tasks (AI-enhanced)"""
         logger.info("Generating Robot Framework tasks...")
         
+        # Check if AI should be used for robot tasks
+        use_ai = (self.ai_enabled and 
+                  self.config.get('ai', {}).get('use_ai_for', {}).get('robot_tasks', False))
+        
+        if use_ai:
+            return self._generate_robot_tasks_with_ai(requirements, templates)
+        else:
+            return self._generate_robot_tasks_with_templates(requirements, templates)
+    
+    def _generate_robot_tasks_with_ai(self, requirements: Dict, templates: Dict) -> str:
+        """Generate Robot Framework tasks using AI"""
+        # Get reference codebundles for context
+        reference_bundles = self._get_reference_codebundles(requirements)
+        context = self._build_reference_context(reference_bundles, requirements)
+        
+        prompt = f"""
+Generate a Robot Framework file for these tasks: {', '.join(requirements['tasks'])}
+
+Platform: {requirements['platform']}
+Service Type: {requirements['service_type']}
+Purpose: {requirements['purpose']}
+Codebundle Name: {requirements['codebundle_name']}
+
+Requirements:
+- Follow Robot Framework syntax exactly
+- Include proper documentation and metadata
+- Use RW.Core library for bash script execution
+- Include proper error handling
+- Add meaningful tags
+- Follow the patterns from reference examples
+- Include Suite Setup with environment variables
+
+Generate a complete Robot Framework file with *** Settings ***, *** Tasks ***, and *** Keywords *** sections.
+"""
+        
+        ai_content = self._generate_with_ai(prompt, context)
+        
+        if ai_content:
+            logger.info("Generated Robot Framework tasks with AI")
+            return ai_content
+        else:
+            logger.info("Falling back to template-based Robot Framework generation")
+            return self._generate_robot_tasks_with_templates(requirements, templates)
+    
+    def _generate_robot_tasks_with_templates(self, requirements: Dict, templates: Dict) -> str:
+        """Generate Robot Framework tasks using templates (original method)"""
         platform = requirements['platform']
         codebundle_name = requirements['codebundle_name']
         tasks = requirements['tasks']
@@ -679,8 +932,57 @@ Suite Initialization
 5. For automated monitoring and alerting in CI/CD pipelines'''
     
     def generate_readme(self, requirements: Dict) -> str:
-        """Generate README.md content"""
+        """Generate README.md content (AI-enhanced)"""
         logger.info("Generating README.md...")
+        
+        # Check if AI should be used for documentation
+        use_ai = (self.ai_enabled and 
+                  self.config.get('ai', {}).get('use_ai_for', {}).get('documentation', False))
+        
+        if use_ai:
+            return self._generate_readme_with_ai(requirements)
+        else:
+            return self._generate_readme_with_templates(requirements)
+    
+    def _generate_readme_with_ai(self, requirements: Dict) -> str:
+        """Generate README using AI"""
+        # Get reference codebundles for context
+        reference_bundles = self._get_reference_codebundles(requirements)
+        context = self._build_reference_context(reference_bundles, requirements)
+        
+        prompt = f"""
+Generate a comprehensive README.md for this codebundle:
+
+Name: {requirements['codebundle_name']}
+Platform: {requirements['platform']}
+Service Type: {requirements['service_type']}
+Purpose: {requirements['purpose']}
+Tasks: {', '.join(requirements['tasks'])}
+
+Requirements:
+- Follow markdown format
+- Include clear overview and description
+- List all tasks with explanations
+- Include usage instructions
+- Add prerequisites and setup steps
+- Include troubleshooting section
+- Follow the style and structure of reference examples
+- Be comprehensive but concise
+
+Generate a professional, well-structured README.md file.
+"""
+        
+        ai_content = self._generate_with_ai(prompt, context)
+        
+        if ai_content:
+            logger.info("Generated README with AI")
+            return ai_content
+        else:
+            logger.info("Falling back to template-based README generation")
+            return self._generate_readme_with_templates(requirements)
+    
+    def _generate_readme_with_templates(self, requirements: Dict) -> str:
+        """Generate README using templates (original method)"""
         
         codebundle_name = requirements['codebundle_name']
         platform = requirements['platform']
