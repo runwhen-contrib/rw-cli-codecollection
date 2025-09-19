@@ -612,6 +612,174 @@ Check StatefulSet PersistentVolumeClaims for `${STATEFULSET_NAME}` in Namespace 
         RW.Core.Add Pre To Report    Commands Used: ${history}
     END
 
+Identify Recent Configuration Changes for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
+    [Documentation]    Identifies recent configuration changes from ControllerRevision analysis that might be related to current issues.
+    [Tags]
+    ...    configuration
+    ...    changes
+    ...    tracking
+    ...    controllerrevision
+    ...    statefulset
+    ...    analysis
+    ...    access:read-only
+    
+    # Run configuration change analysis using bash script (matches other task patterns)
+    ${config_analysis}=    RW.CLI.Run Cli
+    ...    cmd=bash track_statefulset_config_changes.sh "${STATEFULSET_NAME}" "${NAMESPACE}" "${CONTEXT}" "24h"
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    
+    # Add the full analysis output to the report
+    RW.Core.Add Pre To Report    **Configuration Change Analysis for StatefulSet `${STATEFULSET_NAME}`**\n\n```\n${config_analysis.stdout}\n```
+    
+    # Parse output for specific patterns and create issues if needed
+    ${output}=    Set Variable    ${config_analysis.stdout}
+    
+    # Check for recent ControllerRevision changes
+    IF    "Recent ControllerRevision change detected" in $output
+        # Extract ControllerRevision information for issue creation
+        ${lines}=    Split String    ${output}    \n
+        ${current_revision}=    Set Variable    Unknown
+        ${change_time}=    Set Variable    Unknown
+        
+        FOR    ${line}    IN    @{lines}
+            IF    "Current ControllerRevision:" in $line
+                # Extract ControllerRevision name (everything between "Current ControllerRevision: " and " (created:")
+                ${rev_part}=    Evaluate    "${line}".split("Current ControllerRevision: ")[1] if len("${line}".split("Current ControllerRevision: ")) > 1 else "Unknown"
+                ${current_revision}=    Evaluate    "${rev_part}".split(" (created:")[0] if " (created:" in "${rev_part}" else "${rev_part}"
+                
+                # Extract timestamp (everything between "(created: " and ",")
+                IF    "(created: " in $line
+                    ${time_part}=    Evaluate    "${line}".split("(created: ")[1] if len("${line}".split("(created: ")) > 1 else "Unknown"
+                    ${change_time}=    Evaluate    "${time_part}".split(",")[0] if "," in "${time_part}" else "${time_part}".split(")")[0] if ")" in "${time_part}" else "${time_part}"
+                END
+            END
+        END
+        
+        # Check for CRITICAL volume claim template changes
+        IF    "Volume Claim Template Changes Detected" in $output
+            # Extract volume template change details from output
+            ${volume_details}=    Set Variable    ${EMPTY}
+            ${in_volume_section}=    Set Variable    ${False}
+            FOR    ${line}    IN    @{lines}
+                IF    "Volume Claim Template Changes Detected!" in $line
+                    ${in_volume_section}=    Set Variable    ${True}
+                ELSE IF    ${in_volume_section}
+                    IF    "Previous volume claim templates:" in $line or "Current volume claim templates:" in $line or $line.strip().startswith("- ")
+                        # Clean up emojis and format for issue details
+                        ${clean_line}=    Evaluate    "${line}".replace("🚨", "").replace("⚠️", "").strip()
+                        ${volume_details}=    Set Variable    ${volume_details}${clean_line}\n
+                    ELSE IF    $line.strip() == ""
+                        ${in_volume_section}=    Set Variable    ${False}
+                    END
+                END
+            END
+            
+            RW.Core.Add Issue
+            ...    severity=2
+            ...    expected=Volume claim templates should be stable for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+            ...    actual=Volume claim template was modified recently for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+            ...    title=CRITICAL: Volume Claim Template Changes Detected for StatefulSet `${STATEFULSET_NAME}`
+            ...    reproduce_hint=Check ControllerRevision history for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+            ...    details=CRITICAL CONFIGURATION CHANGE DETECTED\n\nChange Type: Volume Claim Template Update\nTimestamp: ${change_time}\nCurrent Revision: ${current_revision}\n\nWARNING: This is a critical change for StatefulSets that can affect data persistence!\n\nVolume Template Changes:\n${volume_details}\nThis change requires immediate attention as it affects persistent storage for the StatefulSet.
+            ...    next_steps=CRITICAL: Volume template changes require immediate attention\nVerify persistent volume compatibility\nCheck for data migration requirements\nEnsure backup procedures are in place\nMonitor pod startup and volume attachment\nValidate data integrity after changes
+        END
+        
+        # Check for container image changes
+        IF    "Container Image Changes Detected" in $output
+            # Extract image change details from output
+            ${image_details}=    Set Variable    ${EMPTY}
+            ${in_image_section}=    Set Variable    ${False}
+            FOR    ${line}    IN    @{lines}
+                IF    "Container Image Changes Detected:" in $line
+                    ${in_image_section}=    Set Variable    ${True}
+                ELSE IF    ${in_image_section}
+                    IF    "Previous images:" in $line or "Current images:" in $line or $line.strip().startswith("- ")
+                        ${image_details}=    Set Variable    ${image_details}${line}\n
+                    ELSE IF    $line.strip() == ""
+                        ${in_image_section}=    Set Variable    ${False}
+                    END
+                END
+            END
+            
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Container images should be stable for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+            ...    actual=Container image was updated recently for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+            ...    title=Recent Container Image Update Detected for StatefulSet `${STATEFULSET_NAME}`
+            ...    reproduce_hint=Check ControllerRevision history for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+            ...    details=Configuration Change Detected\n\nChange Type: Container Image Update\nTimestamp: ${change_time}\nCurrent Revision: ${current_revision}\n\nImage Changes:\n${image_details}\nThis change may be related to current StatefulSet issues. Verify the image update was intentional and check for known issues with the new image version.
+            ...    next_steps=Verify the image update was intentional\nCheck if the new image version has known issues\nReview StatefulSet rolling update status\nMonitor ordered pod updates (StatefulSets update sequentially)
+        END
+        
+        # Check for environment variable changes
+        IF    "Environment Variable Changes Detected" in $output
+            # Extract environment variable change details from output
+            ${env_details}=    Set Variable    ${EMPTY}
+            ${in_env_section}=    Set Variable    ${False}
+            FOR    ${line}    IN    @{lines}
+                IF    "Environment Variable Changes Detected:" in $line
+                    ${in_env_section}=    Set Variable    ${True}
+                ELSE IF    ${in_env_section}
+                    ${line_stripped}=    Evaluate    "${line}".strip()
+                    ${is_indented}=    Evaluate    len("${line}") > len("${line_stripped}") and "${line}".startswith(" ")
+                    IF    "Added variables:" in $line or "Removed variables:" in $line or "Modified variables:" in $line or "Summary:" in $line or ${is_indented}
+                        # Clean up emojis and format for issue details
+                        ${clean_line}=    Evaluate    "${line}".replace("➕", "").replace("➖", "").replace("🔄", "").replace("📊", "").strip()
+                        ${env_details}=    Set Variable    ${env_details}${clean_line}\n
+                    ELSE IF    $line.strip() == ""
+                        ${in_env_section}=    Set Variable    ${False}
+                    END
+                END
+            END
+            
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    expected=Environment configuration should be stable for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+            ...    actual=Environment variables were modified recently for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+            ...    title=Recent Environment Configuration Changes Detected for StatefulSet `${STATEFULSET_NAME}`
+            ...    reproduce_hint=Check ControllerRevision history for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+            ...    details=Configuration Change Detected\n\nChange Type: Environment Variables Update\nTimestamp: ${change_time}\nCurrent Revision: ${current_revision}\n\nEnvironment Variable Changes:\n${env_details}\nThese environment variable changes may be related to current StatefulSet issues. Review the changes to ensure they align with expected configuration.
+            ...    next_steps=Review recent environment variable changes\nVerify changes align with expected configuration\nCheck application logs for configuration-related errors\nMonitor ordered pod updates (StatefulSets update sequentially)
+        END
+        
+        # Check for resource requirement changes
+        IF    "Resource Requirement Changes Detected" in $output
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    expected=Resource limits should be stable for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+            ...    actual=Resource limits/requests were modified recently for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+            ...    title=Recent Resource Limit Changes Detected for StatefulSet `${STATEFULSET_NAME}`
+            ...    reproduce_hint=Check ControllerRevision history for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+            ...    details=**Configuration Change Detected**\n\n**Change Type:** Resource Limits/Requests Update\n**Timestamp:** ${change_time}\n**Current Revision:** ${current_revision}\n\nSee full analysis in report for detailed resource comparison.
+            ...    next_steps=Monitor resource utilization after changes\nVerify resource limits are appropriate for workload\nCheck for resource constraint issues\nEnsure persistent volume performance is adequate\nMonitor ordered pod updates (StatefulSets update sequentially)
+        END
+    END
+    
+    # Check for kubectl apply detection
+    IF    "Recent kubectl apply detected" in $output
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=StatefulSet configuration should be synchronized for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+        ...    actual=Recent kubectl apply operation detected for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+        ...    title=Recent kubectl apply Operation Detected for StatefulSet `${STATEFULSET_NAME}`
+        ...    reproduce_hint=Check StatefulSet generation vs observed generation for `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+        ...    details=Recent kubectl apply operation detected. The StatefulSet configuration has been updated but may still be processing.\n\nSee full analysis in report for generation gap details.
+        ...    next_steps=Wait for controller to process changes\nCheck StatefulSet status and conditions\nVerify no resource constraints are preventing updates\nMonitor ordered pod updates (StatefulSets update sequentially)
+    END
+    
+    # Check for configuration drift
+    IF    "Configuration drift detected" in $output
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=StatefulSet configuration should be synchronized for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+        ...    actual=Configuration drift detected for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+        ...    title=Configuration Drift Detected for StatefulSet `${STATEFULSET_NAME}`
+        ...    reproduce_hint=Check StatefulSet generation vs observed generation for `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+        ...    details=Configuration drift detected. The StatefulSet has been modified but the controller hasn't processed all changes yet.\n\nSee full analysis in report for drift details.
+        ...    next_steps=Wait for controller to process changes\nCheck StatefulSet status and conditions\nVerify no resource constraints are preventing updates\nMonitor ordered pod updates (StatefulSets update sequentially)
+    END
+
 
 *** Keywords ***
 Suite Initialization
