@@ -17,6 +17,56 @@ success_labels:
 failure_labels:
   - "codebundle-failed"
 
+# AI Configuration
+ai:
+  # AI service to use: "openai", "template", or "hybrid"
+  service: "openai"
+  
+  # OpenAI settings
+  openai:
+    model: "gpt-4"
+    max_tokens: 2000
+    temperature: 0.3
+    
+  # Fallback to template generation if AI fails
+  fallback_to_template: true
+  
+  # Use AI for specific components
+  use_ai_for:
+    scripts: true
+    robot_tasks: true
+    documentation: true
+    cursorrules: false  # Keep template-based for consistency
+
+# Reference Codebundles for AI Guidance
+reference_codebundles:
+  azure:
+    network-security:
+      - "azure-aks-triage"
+      - "azure-appgateway-health"
+    health:
+      - "azure-acr-health"
+      - "azure-appservice-webapp-health"
+    triage:
+      - "azure-aks-triage"
+      - "azure-vm-triage"
+  
+  k8s:
+    health:
+      - "k8s-loki-healthcheck"
+      - "k8s-fluxcd-helm-health"
+    triage:
+      - "k8s-kubectl-triage"
+      - "k8s-pod-restart-triage"
+  
+  aws:
+    health:
+      - "aws-elasticache-redis-health"
+      - "aws-rds-health"
+    triage:
+      - "aws-ec2-triage"
+      - "aws-lambda-triage"
+
 # Platform detection keywords
 platforms:
   azure:
@@ -62,4 +112,5 @@ defaults:
   max_similar_bundles: 3
   script_template_size_limit: 2000
   robot_template_size_limit: 2000
+  max_reference_codebundles: 3
 

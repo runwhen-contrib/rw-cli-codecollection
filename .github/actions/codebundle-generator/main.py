@@ -13,6 +13,13 @@ from typing import Dict, List, Optional, Tuple
 from github import Github
 from jinja2 import Template
 
+# Try to import OpenAI
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -23,6 +30,27 @@ class CodebundleGenerator:
         self.repo = self.gh.get_repo(os.environ['GITHUB_REPOSITORY'])
         self.issue = self.repo.get_issue(issue_number)
         self.openai_api_key = openai_api_key
+        self.config = self._load_config()
+        
+        # Initialize OpenAI if available and configured
+        ai_service = self.config.get('ai', {}).get('service', 'template')
+        logger.info(f"AI service configuration: {ai_service}")
+        logger.info(f"OpenAI available: {OPENAI_AVAILABLE}")
+        logger.info(f"OpenAI API key provided: {'Yes' if openai_api_key else 'No'}")
+        
+        if OPENAI_AVAILABLE and openai_api_key and ai_service in ['openai', 'hybrid']:
+            openai.api_key = openai_api_key
+            self.ai_enabled = True
+            logger.info("🤖 AI generation enabled with OpenAI")
+        else:
+            self.ai_enabled = False
+            if not OPENAI_AVAILABLE:
+                logger.info("📝 Using template-based generation (OpenAI not available)")
+            elif not openai_api_key:
+                logger.info("📝 Using template-based generation (no OpenAI API key)")
+            else:
+                logger.info(f"📝 Using template-based generation (service: {ai_service})")
+        
         # Set workspace - find the repository root
         current_dir = Path.cwd()
         # If we're in the action directory, go up to find the repo root
@@ -38,6 +66,139 @@ class CodebundleGenerator:
         logger.info(f"Workspace root: {self.workspace_root}")
         logger.info(f"Codebundles directory: {self.workspace_root / 'codebundles'}")
         logger.info(f"Codebundles exists: {(self.workspace_root / 'codebundles').exists()}")
+        
+    def _load_config(self) -> Dict:
+        """Load configuration from config file"""
+        try:
+            config_path = self.workspace_root / '.github' / 'codebundle-generator-config.yml'
+            if config_path.exists():
+                with open(config_path, 'r') as f:
+                    return yaml.safe_load(f)
+        except Exception as e:
+            logger.warning(f"Failed to load config: {e}")
+        return {}
+    
+    def _get_reference_codebundles(self, requirements: Dict) -> List[Dict]:
+        """Get reference codebundles for AI guidance"""
+        platform = requirements['platform']
+        purpose = requirements['purpose']
+        
+        # Get reference codebundle names from config
+        ref_config = self.config.get('reference_codebundles', {})
+        ref_names = ref_config.get(platform, {}).get(purpose, [])
+        
+        if not ref_names:
+            # Fallback to any codebundles for the platform
+            ref_names = []
+            for purpose_key, bundles in ref_config.get(platform, {}).items():
+                ref_names.extend(bundles[:2])  # Limit to 2 per purpose
+        
+        # Load actual codebundle content
+        reference_bundles = []
+        for name in ref_names[:3]:  # Limit to 3 references
+            bundle_path = self.workspace_root / 'codebundles' / name
+            if bundle_path.exists():
+                bundle_data = self._load_codebundle_content(bundle_path)
+                if bundle_data:
+                    reference_bundles.append(bundle_data)
+        
+        return reference_bundles
+    
+    def _load_codebundle_content(self, bundle_path: Path) -> Optional[Dict]:
+        """Load content from a reference codebundle"""
+        try:
+            content = {
+                'name': bundle_path.name,
+                'meta': {},
+                'scripts': [],
+                'robot_content': '',
+                'readme': ''
+            }
+            
+            # Load meta.yaml
+            meta_path = bundle_path / 'meta.yaml'
+            if meta_path.exists():
+                with open(meta_path, 'r') as f:
+                    content['meta'] = yaml.safe_load(f)
+            
+            # Load scripts
+            for script_file in bundle_path.glob('*.sh'):
+                with open(script_file, 'r') as f:
+                    content['scripts'].append({
+                        'name': script_file.name,
+                        'content': f.read()[:1000]  # Limit content
+                    })
+            
+            # Load robot file
+            robot_path = bundle_path / 'runbook.robot'
+            if robot_path.exists():
+                with open(robot_path, 'r') as f:
+                    content['robot_content'] = f.read()[:1000]  # Limit content
+            
+            # Load README
+            readme_path = bundle_path / 'README.md'
+            if readme_path.exists():
+                with open(readme_path, 'r') as f:
+                    content['readme'] = f.read()[:500]  # Limit content
+            
+            return content
+        except Exception as e:
+            logger.warning(f"Failed to load reference codebundle {bundle_path.name}: {e}")
+            return None
+    
+    def _generate_with_ai(self, prompt: str, context: str = "") -> Optional[str]:
+        """Generate content using OpenAI"""
+        if not self.ai_enabled:
+            return None
+        
+        try:
+            ai_config = self.config.get('ai', {}).get('openai', {})
+            
+            messages = [
+                {"role": "system", "content": "You are an expert DevOps engineer creating RunWhen codebundles. Generate high-quality, production-ready code following best practices."},
+                {"role": "user", "content": f"{context}\n\n{prompt}"}
+            ]
+            
+            response = openai.ChatCompletion.create(
+                model=ai_config.get('model', 'gpt-4'),
+                messages=messages,
+                max_tokens=ai_config.get('max_tokens', 2000),
+                temperature=ai_config.get('temperature', 0.3)
+            )
+            
+            return response.choices[0].message.content.strip()
+        
+        except Exception as e:
+            logger.warning(f"AI generation failed: {e}")
+            if self.config.get('ai', {}).get('fallback_to_template', True):
+                logger.info("Falling back to template generation")
+            return None
+    
+    def _build_reference_context(self, reference_bundles: List[Dict], requirements: Dict) -> str:
+        """Build context string from reference codebundles"""
+        if not reference_bundles:
+            return "No reference codebundles available."
+        
+        context_parts = [
+            f"Reference codebundles for {requirements['platform']} {requirements['purpose']} tasks:",
+            ""
+        ]
+        
+        for bundle in reference_bundles:
+            context_parts.append(f"## {bundle['name']}")
+            
+            if bundle.get('meta'):
+                context_parts.append(f"Description: {bundle['meta'].get('description', 'N/A')}")
+            
+            if bundle.get('scripts'):
+                context_parts.append("Example scripts:")
+                for script in bundle['scripts'][:2]:  # Limit to 2 scripts per bundle
+                    context_parts.append(f"### {script['name']}")
+                    context_parts.append(f"```bash\n{script['content'][:500]}...\n```")
+            
+            context_parts.append("")
+        
+        return "\n".join(context_parts)
         
     def parse_issue_requirements(self) -> Dict:
         """Parse GitHub issue to extract codebundle requirements"""
@@ -271,12 +432,18 @@ class CodebundleGenerator:
             readme_content = self.generate_readme(requirements)
             cursorrules_content = self.generate_cursorrules(requirements)
             
+            # Generate SLI content
+            sli_content = self.generate_sli_robot(requirements, templates)
+            
             # Write files
             self._write_scripts(codebundle_dir, scripts)
             self._write_robot_file(codebundle_dir, robot_content)
+            self._write_sli_file(codebundle_dir, sli_content)
             self._write_meta_yaml(codebundle_dir, meta_content)
             self._write_readme(codebundle_dir, readme_content)
             self._write_cursorrules(codebundle_dir, cursorrules_content)
+            self._create_test_directory(codebundle_dir, requirements)
+            self._create_runwhen_directory(codebundle_dir, requirements)
             
             # Set outputs for GitHub Action
             self._set_github_outputs(requirements, scripts, robot_content)
@@ -289,9 +456,67 @@ class CodebundleGenerator:
             return False
     
     def generate_scripts(self, requirements: Dict, templates: Dict) -> Dict[str, str]:
-        """Generate bash scripts for each task"""
+        """Generate bash scripts for each task (AI-enhanced)"""
         logger.info("Generating bash scripts...")
         
+        # Check if AI should be used for scripts
+        use_ai = (self.ai_enabled and 
+                  self.config.get('ai', {}).get('use_ai_for', {}).get('scripts', False))
+        
+        logger.info(f"🔧 Script generation method: {'AI' if use_ai else 'Template'}")
+        
+        if use_ai:
+            return self._generate_scripts_with_ai(requirements, templates)
+        else:
+            return self._generate_scripts_with_templates(requirements, templates)
+    
+    def _generate_scripts_with_ai(self, requirements: Dict, templates: Dict) -> Dict[str, str]:
+        """Generate scripts using AI with reference codebundle guidance"""
+        scripts = {}
+        
+        # Get reference codebundles for context
+        reference_bundles = self._get_reference_codebundles(requirements)
+        
+        # Build context from reference bundles
+        context = self._build_reference_context(reference_bundles, requirements)
+        
+        for i, task in enumerate(requirements['tasks']):
+            script_name = self._task_to_script_name(task)
+            
+            prompt = f"""
+Generate a bash script for this task: {task}
+
+Platform: {requirements['platform']}
+Service Type: {requirements['service_type']}
+Purpose: {requirements['purpose']}
+
+Requirements:
+- Follow the patterns shown in the reference examples
+- Include proper error handling and logging
+- Use platform-specific CLI commands
+- Add helpful comments
+- Return meaningful exit codes
+- Include validation steps
+
+The script should be production-ready and follow DevOps best practices.
+"""
+            
+            ai_content = self._generate_with_ai(prompt, context)
+            
+            if ai_content:
+                scripts[script_name] = ai_content
+                logger.info(f"Generated script {script_name} with AI")
+            else:
+                # Fallback to template generation
+                script_content = self._generate_script_content(task, requirements['platform'], 
+                                                             self._get_script_template(requirements['platform'], templates))
+                scripts[script_name] = script_content
+                logger.info(f"Generated script {script_name} with template fallback")
+        
+        return scripts
+    
+    def _generate_scripts_with_templates(self, requirements: Dict, templates: Dict) -> Dict[str, str]:
+        """Generate scripts using templates (original method)"""
         scripts = {}
         platform = requirements['platform']
         
@@ -481,9 +706,57 @@ echo "Task completed: {task}"
 '''
     
     def generate_robot_tasks(self, requirements: Dict, templates: Dict) -> str:
-        """Generate Robot Framework tasks"""
+        """Generate Robot Framework tasks (AI-enhanced)"""
         logger.info("Generating Robot Framework tasks...")
         
+        # Check if AI should be used for robot tasks
+        use_ai = (self.ai_enabled and 
+                  self.config.get('ai', {}).get('use_ai_for', {}).get('robot_tasks', False))
+        
+        logger.info(f"🤖 Robot tasks generation method: {'AI' if use_ai else 'Template'}")
+        
+        if use_ai:
+            return self._generate_robot_tasks_with_ai(requirements, templates)
+        else:
+            return self._generate_robot_tasks_with_templates(requirements, templates)
+    
+    def _generate_robot_tasks_with_ai(self, requirements: Dict, templates: Dict) -> str:
+        """Generate Robot Framework tasks using AI"""
+        # Get reference codebundles for context
+        reference_bundles = self._get_reference_codebundles(requirements)
+        context = self._build_reference_context(reference_bundles, requirements)
+        
+        prompt = f"""
+Generate a Robot Framework file for these tasks: {', '.join(requirements['tasks'])}
+
+Platform: {requirements['platform']}
+Service Type: {requirements['service_type']}
+Purpose: {requirements['purpose']}
+Codebundle Name: {requirements['codebundle_name']}
+
+Requirements:
+- Follow Robot Framework syntax exactly
+- Include proper documentation and metadata
+- Use RW.Core library for bash script execution
+- Include proper error handling
+- Add meaningful tags
+- Follow the patterns from reference examples
+- Include Suite Setup with environment variables
+
+Generate a complete Robot Framework file with *** Settings ***, *** Tasks ***, and *** Keywords *** sections.
+"""
+        
+        ai_content = self._generate_with_ai(prompt, context)
+        
+        if ai_content:
+            logger.info("Generated Robot Framework tasks with AI")
+            return ai_content
+        else:
+            logger.info("Falling back to template-based Robot Framework generation")
+            return self._generate_robot_tasks_with_templates(requirements, templates)
+    
+    def _generate_robot_tasks_with_templates(self, requirements: Dict, templates: Dict) -> str:
+        """Generate Robot Framework tasks using templates (original method)"""
         platform = requirements['platform']
         codebundle_name = requirements['codebundle_name']
         tasks = requirements['tasks']
@@ -527,6 +800,62 @@ Suite Initialization
 '''
         
         return robot_content
+    
+    def generate_sli_robot(self, requirements: Dict, templates: Dict) -> str:
+        """Generate SLI Robot Framework file"""
+        logger.info("Generating SLI Robot Framework file...")
+        
+        platform = requirements['platform']
+        codebundle_name = requirements['codebundle_name']
+        
+        # Generate SLI tasks (simplified versions that return metrics)
+        sli_tasks = []
+        for task in requirements['tasks'][:3]:  # Limit to 3 SLI tasks
+            script_name = self._task_to_script_name(task)
+            task_name = task.replace('Check ', '').replace('check ', '')
+            
+            sli_task = f'''{task} SLI
+    [Documentation]    SLI for {task}
+    [Tags]    {platform}    sli    {task_name.lower().replace(' ', '-')}
+    ${{result}}=    RW.CLI.Run Bash File
+    ...    bash_file={script_name}
+    ...    env=${{env}}
+    ...    include_in_history=false
+    
+    # Parse result and push metric
+    ${{issues}}=    RW.CLI.Run CLI    cat ${{OUTPUT_DIR}}/results.json | jq '.issues | length'
+    ${{metric_value}}=    Set Variable If    ${{issues.stdout}} == 0    1    0
+    RW.Core.Push Metric    ${{metric_value}}'''
+            
+            sli_tasks.append(sli_task)
+        
+        sli_content = f'''*** Settings ***
+Documentation       SLI for {requirements['title']}
+Metadata            Author    auto-generated
+Metadata            Display Name    {codebundle_name.replace('-', ' ').title()} SLI
+Metadata            Supports    {platform.upper()}
+
+Library             BuiltIn
+Library             RW.Core
+Library             RW.CLI
+Library             RW.platform
+Library             OperatingSystem
+
+Suite Setup         Suite Initialization
+
+*** Tasks ***
+{chr(10).join(sli_tasks)}
+
+*** Keywords ***
+Suite Initialization
+    RW.Core.Import Service    bash
+    RW.Core.Import Service    k8s
+    RW.Core.Import Service    curl
+    Set Suite Variable    ${{OUTPUT_DIR}}    /tmp/rwi_output
+    Create Directory    ${{OUTPUT_DIR}}
+'''
+        
+        return sli_content
     
     def _get_robot_template(self, templates: Dict) -> str:
         """Get Robot Framework template"""
@@ -617,8 +946,59 @@ Suite Initialization
 5. For automated monitoring and alerting in CI/CD pipelines'''
     
     def generate_readme(self, requirements: Dict) -> str:
-        """Generate README.md content"""
+        """Generate README.md content (AI-enhanced)"""
         logger.info("Generating README.md...")
+        
+        # Check if AI should be used for documentation
+        use_ai = (self.ai_enabled and 
+                  self.config.get('ai', {}).get('use_ai_for', {}).get('documentation', False))
+        
+        logger.info(f"📚 Documentation generation method: {'AI' if use_ai else 'Template'}")
+        
+        if use_ai:
+            return self._generate_readme_with_ai(requirements)
+        else:
+            return self._generate_readme_with_templates(requirements)
+    
+    def _generate_readme_with_ai(self, requirements: Dict) -> str:
+        """Generate README using AI"""
+        # Get reference codebundles for context
+        reference_bundles = self._get_reference_codebundles(requirements)
+        context = self._build_reference_context(reference_bundles, requirements)
+        
+        prompt = f"""
+Generate a comprehensive README.md for this codebundle:
+
+Name: {requirements['codebundle_name']}
+Platform: {requirements['platform']}
+Service Type: {requirements['service_type']}
+Purpose: {requirements['purpose']}
+Tasks: {', '.join(requirements['tasks'])}
+
+Requirements:
+- Follow markdown format
+- Include clear overview and description
+- List all tasks with explanations
+- Include usage instructions
+- Add prerequisites and setup steps
+- Include troubleshooting section
+- Follow the style and structure of reference examples
+- Be comprehensive but concise
+
+Generate a professional, well-structured README.md file.
+"""
+        
+        ai_content = self._generate_with_ai(prompt, context)
+        
+        if ai_content:
+            logger.info("Generated README with AI")
+            return ai_content
+        else:
+            logger.info("Falling back to template-based README generation")
+            return self._generate_readme_with_templates(requirements)
+    
+    def _generate_readme_with_templates(self, requirements: Dict) -> str:
+        """Generate README using templates (original method)"""
         
         codebundle_name = requirements['codebundle_name']
         platform = requirements['platform']
@@ -714,33 +1094,171 @@ For issues or questions about this auto-generated codebundle:
         
         platform = requirements['platform']
         service_type = requirements['service_type']
+        purpose = requirements['purpose']
+        codebundle_name = requirements['codebundle_name']
         
-        return f'''# {requirements['codebundle_name']} Cursor Rules
+        return f'''# {codebundle_name.replace('-', ' ').title()} Codebundle - Cursor Rules
 
-## Codebundle Context
-This is an auto-generated codebundle for {platform} {service_type} {requirements['purpose']}.
+## Overview
+This codebundle provides {purpose} monitoring for {platform} {service_type.replace('-', ' ')}, including automated checks, validation, and reporting.
 
-## Platform-Specific Guidelines
+## File Structure and Patterns
 
-### {platform.upper()} Best Practices
-- Use appropriate CLI commands and error handling
-- Follow established patterns from similar codebundles
-- Include proper authentication and subscription management
-- Generate structured JSON output for issue reporting
+### Robot Framework Files (.robot)
+- **runbook.robot**: Main execution file with tasks and keywords for troubleshooting
+- **sli.robot**: Service Level Indicator definitions for monitoring
+- Follow Robot Framework syntax and conventions
+- Use consistent task naming: `Check/Get/Fetch [Entity] [Action] for [Resource] In [Scope]`
+- Always include proper documentation and tags for each task
 
-## Code Standards
-- Bash scripts should include error handling and validation
-- Robot Framework tasks should follow naming conventions
-- All scripts should output to $OUTPUT_DIR/results.json
-- Include meaningful logging and progress indicators
+### Bash Scripts (.sh)
+- All scripts must be executable (`chmod +x`)
+- Use consistent naming: `[entity]_[action].sh`
+- Include comprehensive error handling and validation
+- Provide clear stdout output with structured formatting
+- Generate both human-readable and machine-readable outputs
+- Output JSON results to `$OUTPUT_DIR/results.json`
 
-## Issue Reporting Format
-Issues should be reported in JSON format with:
-- title: Clear, descriptive issue title
-- details: Specific details about the problem
-- severity: 1-4 scale (1=Critical, 4=Low)
-- next_steps: Actionable remediation steps
+## Issue Reporting Standards
+
+### Issue Severity Levels
+- **Severity 1**: Critical issues affecting service availability
+- **Severity 2**: High-impact issues requiring immediate attention
+- **Severity 3**: Medium-impact issues that should be addressed (warnings, recommendations)
+- **Severity 4**: Low-impact informational issues (configuration recommendations)
+
+### Issue Titles
+- **MUST** include entity name and resource information
+- **MUST** include resource group/namespace context
+- **MUST** be clear, concise, and descriptive
+- **Format**: `"[Entity] '[name]' in [Resource] '[resource_name]' has [issue_description]"`
+
+### Issue Details
+- **MUST** include complete context (Resource, Group, Subscription/Cluster)
+- **MUST** include time period information when relevant
+- **MUST** include relevant metrics with clear labels
+- **MUST** include specific detected issues with values
+- **MUST** include actionable next steps for troubleshooting
+- **Format**: Structured sections with clear headers and bullet points
+
+## Configuration Variables
+
+### Required Variables
+{self._generate_required_vars(platform)}
+
+### Optional Threshold Variables
+- `TIME_PERIOD_MINUTES`: Time period for analysis (default: 30)
+- `ERROR_RATE_THRESHOLD`: Error rate threshold % (default: 10)
+- `PERFORMANCE_THRESHOLD`: Performance threshold for alerts
+
+## Script Development Guidelines
+
+### Error Handling
+- Always validate required environment variables at script start
+- Provide meaningful error messages with context
+- Use proper exit codes (0 for success, non-zero for errors)
+- Handle missing or null data gracefully
+
+### Output Generation
+- Generate JSON output to `$OUTPUT_DIR/results.json`
+- Include timestamps in reports
+- Provide both summary and detailed information
+- **JSON Validation**: Always validate JSON output before writing
+- **Error Handling**: Provide fallback JSON if validation fails
+
+### {platform.upper()} Integration
+{self._generate_platform_guidelines(platform)}
+
+## Testing Requirements
+
+### Script Validation
+- All scripts must pass syntax validation (`bash -n`)
+- Test with mock data to ensure output generation
+- Validate JSON structure and content
+- Test error handling scenarios
+
+### Integration Testing
+- Test with real {platform} resources when possible
+- Verify issue detection and reporting
+- Test threshold configurations
+- Validate portal/console link generation
+
+## Security Considerations
+
+### Authentication
+- Use service principal/service account authentication
+- Never hardcode credentials in scripts
+- Validate CLI authentication before operations
+- Handle authentication errors gracefully
+
+### Data Handling
+- Sanitize output data for sensitive information
+- Use appropriate permissions for resource access
+- Log operations for audit purposes
+- Handle PII data appropriately
+
+## Performance Guidelines
+
+### Resource Usage
+- Minimize API calls where possible
+- Use appropriate time intervals for metrics
+- Cache results when appropriate
+- Handle large datasets efficiently
+
+### Timeout Handling
+- Set appropriate timeouts for long-running operations
+- Provide progress indicators for lengthy operations
+- Handle partial failures gracefully
 '''
+    
+    def _generate_required_vars(self, platform: str) -> str:
+        """Generate required variables section for platform"""
+        if platform == 'azure':
+            return '''- `AZ_RESOURCE_GROUP`: Azure resource group name
+- `AZURE_RESOURCE_SUBSCRIPTION_ID`: Azure subscription ID (optional)'''
+        elif platform == 'k8s':
+            return '''- `CONTEXT`: Kubernetes context name
+- `NAMESPACE`: Kubernetes namespace'''
+        elif platform == 'aws':
+            return '''- `AWS_REGION`: AWS region
+- `AWS_ACCOUNT_ID`: AWS account ID (optional)'''
+        elif platform == 'gcp':
+            return '''- `GCP_PROJECT_ID`: GCP project ID
+- `GCP_REGION`: GCP region (optional)'''
+        else:
+            return '''- Platform-specific configuration variables as needed'''
+    
+    def _generate_platform_guidelines(self, platform: str) -> str:
+        """Generate platform-specific guidelines"""
+        if platform == 'azure':
+            return '''- Use Azure CLI for resource management and queries
+- Follow Azure Resource Manager patterns
+- Include proper subscription and resource group context
+- Use Azure Monitor APIs for metrics collection
+- Generate Azure Portal links for easy navigation'''
+        elif platform == 'k8s':
+            return '''- Use kubectl for cluster operations
+- Follow Kubernetes API conventions
+- Include proper namespace and context handling
+- Use Kubernetes metrics APIs when available
+- Generate cluster dashboard links when possible'''
+        elif platform == 'aws':
+            return '''- Use AWS CLI for resource management
+- Follow AWS API patterns and conventions
+- Include proper region and account context
+- Use CloudWatch for metrics collection
+- Generate AWS Console links for resources'''
+        elif platform == 'gcp':
+            return '''- Use gcloud CLI for resource management
+- Follow Google Cloud API patterns
+- Include proper project and region context
+- Use Cloud Monitoring for metrics
+- Generate Google Cloud Console links'''
+        else:
+            return '''- Follow platform-specific best practices
+- Use appropriate CLI tools and APIs
+- Include proper authentication and context
+- Generate relevant console/dashboard links'''
     
     def _write_scripts(self, codebundle_dir: Path, scripts: Dict[str, str]):
         """Write bash scripts to codebundle directory"""
@@ -754,6 +1272,11 @@ Issues should be reported in JSON format with:
     def _write_robot_file(self, codebundle_dir: Path, content: str):
         """Write Robot Framework file"""
         with open(codebundle_dir / 'runbook.robot', 'w') as f:
+            f.write(content)
+    
+    def _write_sli_file(self, codebundle_dir: Path, content: str):
+        """Write SLI Robot Framework file"""
+        with open(codebundle_dir / 'sli.robot', 'w') as f:
             f.write(content)
     
     def _write_meta_yaml(self, codebundle_dir: Path, content: str):
@@ -771,17 +1294,375 @@ Issues should be reported in JSON format with:
         with open(codebundle_dir / '.cursorrules', 'w') as f:
             f.write(content)
     
+    def _create_test_directory(self, codebundle_dir: Path, requirements: Dict):
+        """Create .test directory structure"""
+        test_dir = codebundle_dir / '.test'
+        test_dir.mkdir(exist_ok=True)
+        
+        # Create basic test README
+        test_readme = f'''# Test Infrastructure for {requirements['codebundle_name']}
+
+This directory contains testing infrastructure for the {requirements['codebundle_name']} codebundle.
+
+## Structure
+
+- **README.md**: This file
+- **terraform/**: Terraform configurations for test resources (if needed)
+- **test_data/**: Sample data for testing
+- **scripts/**: Test automation scripts
+
+## Usage
+
+This test infrastructure is designed to validate the codebundle functionality in a controlled environment.
+
+### Prerequisites
+
+- Appropriate cloud credentials configured
+- Test environment access
+- Required CLI tools installed
+
+### Running Tests
+
+```bash
+# Navigate to the codebundle directory
+cd codebundles/{requirements['codebundle_name']}
+
+# Run the runbook for testing
+ro runbook.robot
+
+# Run the SLI for testing  
+ro sli.robot
+```
+
+## Test Data
+
+Test data should be placed in the `test_data/` directory and should include:
+
+- Sample configuration files
+- Mock API responses
+- Expected output examples
+
+## Automation
+
+Test automation scripts should:
+
+- Set up test resources
+- Execute the codebundle
+- Validate outputs
+- Clean up resources
+
+---
+
+*Auto-generated test infrastructure*
+'''
+        
+        with open(test_dir / 'README.md', 'w') as f:
+            f.write(test_readme)
+    
+    def _create_runwhen_directory(self, codebundle_dir: Path, requirements: Dict):
+        """Create .runwhen directory structure with templates"""
+        runwhen_dir = codebundle_dir / '.runwhen'
+        runwhen_dir.mkdir(exist_ok=True)
+        
+        # Create generation-rules directory
+        gen_rules_dir = runwhen_dir / 'generation-rules'
+        gen_rules_dir.mkdir(exist_ok=True)
+        
+        # Create templates directory
+        templates_dir = runwhen_dir / 'templates'
+        templates_dir.mkdir(exist_ok=True)
+        
+        codebundle_name = requirements['codebundle_name']
+        platform = requirements['platform']
+        service_type = requirements['service_type']
+        
+        # Generate generation rules
+        generation_rules = self._generate_generation_rules(requirements)
+        with open(gen_rules_dir / f"{codebundle_name}.yaml", 'w') as f:
+            f.write(generation_rules)
+        
+        # Generate SLI template
+        sli_template = self._generate_sli_template(requirements)
+        with open(templates_dir / f"{codebundle_name}-sli.yaml", 'w') as f:
+            f.write(sli_template)
+        
+        # Generate taskset template
+        taskset_template = self._generate_taskset_template(requirements)
+        with open(templates_dir / f"{codebundle_name}-taskset.yaml", 'w') as f:
+            f.write(taskset_template)
+        
+        # Generate SLX template
+        slx_template = self._generate_slx_template(requirements)
+        with open(templates_dir / f"{codebundle_name}-slx.yaml", 'w') as f:
+            f.write(slx_template)
+        
+        # Generate workflow template
+        workflow_template = self._generate_workflow_template(requirements)
+        with open(templates_dir / f"{codebundle_name}-workflow.yaml", 'w') as f:
+            f.write(workflow_template)
+    
+    def _generate_generation_rules(self, requirements: Dict) -> str:
+        """Generate generation rules YAML"""
+        codebundle_name = requirements['codebundle_name']
+        platform = requirements['platform']
+        
+        # Map platform to resource types
+        resource_types = {
+            'azure': 'azure_network_security_groups' if 'network' in requirements['service_type'] else 'azure_resources',
+            'aws': 'aws_security_groups' if 'network' in requirements['service_type'] else 'aws_resources', 
+            'gcp': 'gcp_firewall_rules' if 'network' in requirements['service_type'] else 'gcp_resources',
+            'k8s': 'kubernetes_network_policies' if 'network' in requirements['service_type'] else 'kubernetes_resources'
+        }
+        
+        return f'''apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: {platform}
+  generationRules:
+    - resourceTypes:
+        - {resource_types.get(platform, f'{platform}_resources')}
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: {codebundle_name}
+          qualifiers: ["resource", "resource_group"]
+          baseTemplateName: {codebundle_name}
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: {codebundle_name}-taskset.yaml
+            - type: workflow
+'''
+    
+    def _generate_sli_template(self, requirements: Dict) -> str:
+        """Generate SLI template YAML"""
+        codebundle_name = requirements['codebundle_name']
+        platform = requirements['platform']
+        
+        # Platform-specific config
+        config_vars = self._get_platform_config_vars(platform)
+        auth_include = self._get_platform_auth_include(platform)
+        
+        return f'''apiVersion: runwhen.com/v1
+kind: ServiceLevelIndicator
+metadata:
+  name: {{{{slx_name}}}}
+  labels:
+    {{% include "common-labels.yaml" %}}
+  annotations:
+    {{% include "common-annotations.yaml" %}}
+spec:
+  displayUnitsLong: OK
+  displayUnitsShort: ok
+  locations:
+    - {{{{default_location}}}}
+  description: Measures the {requirements['purpose']} of {platform} {requirements['service_type'].replace('-', ' ')}.
+  codeBundle:
+    {{% if repo_url %}}
+    repoUrl: {{{{repo_url}}}}
+    {{% else %}}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {{% endif %}}
+    {{% if ref %}}
+    ref: {{{{ref}}}}
+    {{% else %}}
+    ref: main
+    {{% endif %}}
+    pathToRobot: codebundles/{codebundle_name}/sli.robot
+  intervalStrategy: intermezzo
+  intervalSeconds: 300
+  configProvided:{config_vars}
+  secretsProvided:{auth_include}
+  alerts:
+    warning:
+      operator: <
+      threshold: '1'
+      for: '20m'
+    ticket:
+      operator: <
+      threshold: '1'
+      for: '30m'
+    page:
+      operator: '=='
+      threshold: '0'
+      for: ''
+'''
+    
+    def _generate_taskset_template(self, requirements: Dict) -> str:
+        """Generate taskset template YAML"""
+        codebundle_name = requirements['codebundle_name']
+        platform = requirements['platform']
+        
+        config_vars = self._get_platform_config_vars(platform)
+        auth_include = self._get_platform_auth_include(platform)
+        
+        return f'''apiVersion: runwhen.com/v1
+kind: Runbook
+metadata:
+  name: {{{{slx_name}}}}
+  labels:
+    {{% include "common-labels.yaml" %}}
+  annotations:
+    {{% include "common-annotations.yaml" %}}
+spec:
+  location: {{{{default_location}}}}
+  description: Analyzes {platform} {requirements['service_type'].replace('-', ' ')} for {requirements['purpose']} issues
+  codeBundle:
+    {{% if repo_url %}}
+    repoUrl: {{{{repo_url}}}}
+    {{% else %}}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {{% endif %}}
+    {{% if ref %}}
+    ref: {{{{ref}}}}
+    {{% else %}}
+    ref: main
+    {{% endif %}}
+    pathToRobot: codebundles/{codebundle_name}/runbook.robot
+  configProvided:{config_vars}
+  secretsProvided:{auth_include}
+'''
+    
+    def _generate_slx_template(self, requirements: Dict) -> str:
+        """Generate SLX template YAML"""
+        codebundle_name = requirements['codebundle_name']
+        
+        return f'''apiVersion: runwhen.com/v1
+kind: ServiceLevelX
+metadata:
+  name: {{{{slx_name}}}}
+  labels:
+    {{% include "common-labels.yaml" %}}
+  annotations:
+    {{% include "common-annotations.yaml" %}}
+spec:
+  description: {requirements['purpose'].title()} monitoring for {requirements['platform']} {requirements['service_type'].replace('-', ' ')}
+  sli:
+    name: {{{{slx_name}}}}-sli
+  runbook:
+    name: {{{{slx_name}}}}-runbook
+'''
+    
+    def _generate_workflow_template(self, requirements: Dict) -> str:
+        """Generate workflow template YAML"""
+        codebundle_name = requirements['codebundle_name']
+        
+        return f'''apiVersion: runwhen.com/v1
+kind: Workflow
+metadata:
+  name: {{{{slx_name}}}}
+  labels:
+    {{% include "common-labels.yaml" %}}
+  annotations:
+    {{% include "common-annotations.yaml" %}}
+spec:
+  description: Automated {requirements['purpose']} workflow for {requirements['platform']} {requirements['service_type'].replace('-', ' ')}
+  location: {{{{default_location}}}}
+  steps:
+    - name: check-{requirements['purpose']}
+      runbook:
+        name: {{{{slx_name}}}}-runbook
+      triggers:
+        - type: sli
+          sliName: {{{{slx_name}}}}-sli
+          operator: <
+          threshold: 1
+'''
+    
+    def _get_platform_config_vars(self, platform: str) -> str:
+        """Get platform-specific config variables for templates"""
+        if platform == 'azure':
+            return '''
+    - name: AZ_RESOURCE_GROUP
+      value: {{resource_group.name}}
+    - name: AZURE_RESOURCE_SUBSCRIPTION_ID
+      value: "{{ subscription_id }}"
+    - name: AZURE_SUBSCRIPTION_NAME
+      value: "{{ subscription_name }}"'''
+        elif platform == 'k8s':
+            return '''
+    - name: CONTEXT
+      value: {{context}}
+    - name: NAMESPACE
+      value: {{namespace}}'''
+        elif platform == 'aws':
+            return '''
+    - name: AWS_REGION
+      value: {{region}}
+    - name: AWS_ACCOUNT_ID
+      value: "{{ account_id }}"'''
+        elif platform == 'gcp':
+            return '''
+    - name: GCP_PROJECT_ID
+      value: {{project_id}}
+    - name: GCP_REGION
+      value: {{region}}'''
+        else:
+            return '''
+    - name: PLATFORM_CONFIG
+      value: {{platform_config}}'''
+    
+    def _get_platform_auth_include(self, platform: str) -> str:
+        """Get platform-specific auth include for templates"""
+        if platform == 'azure':
+            return '''
+  {% if wb_version %}
+    {% include "azure-auth.yaml" ignore missing %}
+  {% else %}
+    - name: azure_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}'''
+        elif platform == 'k8s':
+            return '''
+  {% if wb_version %}
+    {% include "k8s-auth.yaml" ignore missing %}
+  {% else %}
+    - name: kubeconfig
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}'''
+        elif platform == 'aws':
+            return '''
+  {% if wb_version %}
+    {% include "aws-auth.yaml" ignore missing %}
+  {% else %}
+    - name: aws_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}'''
+        elif platform == 'gcp':
+            return '''
+  {% if wb_version %}
+    {% include "gcp-auth.yaml" ignore missing %}
+  {% else %}
+    - name: gcp_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}'''
+        else:
+            return '''
+    - name: platform_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND'''
+    
     def _set_github_outputs(self, requirements: Dict, scripts: Dict, robot_content: str):
         """Set GitHub Action outputs"""
         
         # Set outputs for GitHub Action
         github_output = os.environ.get('GITHUB_OUTPUT')
+        logger.info(f"GITHUB_OUTPUT environment variable: {github_output}")
+        
         if github_output:
+            logger.info(f"Writing outputs to: {github_output}")
             with open(github_output, 'a') as f:
                 f.write(f"codebundle-name={requirements['codebundle_name']}\n")
-                f.write(f"generated-scripts={', '.join(scripts.keys())}\n")
+                f.write(f"generated-files={', '.join(scripts.keys())}\n")
                 f.write(f"generated-tasks={len(requirements['tasks'])}\n")
                 f.write(f"success=true\n")
+            logger.info("Outputs written successfully")
+        else:
+            logger.warning("GITHUB_OUTPUT environment variable not set - outputs will not be available")
 
 def main():
     """Main entry point"""
