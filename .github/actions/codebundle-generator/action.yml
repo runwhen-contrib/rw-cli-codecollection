@@ -1,0 +1,41 @@
+name: 'Codebundle Generator'
+description: 'Generate codebundle from GitHub issue using AI and existing templates'
+author: 'RunWhen'
+
+inputs:
+  issue-number:
+    description: 'GitHub issue number'
+    required: true
+  github-token:
+    description: 'GitHub token for API access'
+    required: true
+  openai-api-key:
+    description: 'OpenAI API key for AI generation'
+    required: false
+    default: ''
+
+outputs:
+  codebundle-name:
+    description: 'Generated codebundle directory name'
+  generated-scripts:
+    description: 'List of generated bash scripts'
+  generated-tasks:
+    description: 'List of generated Robot Framework tasks'
+  success:
+    description: 'Whether generation was successful'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Run codebundle generator
+      shell: bash
+      run: |
+        cd ${{ github.action_path }}
+        python main.py
+      env:
+        INPUT_ISSUE_NUMBER: ${{ inputs.issue-number }}
+        INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
+        INPUT_OPENAI_API_KEY: ${{ inputs.openai-api-key }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        GITHUB_OUTPUT: ${{ github.output }}
+
