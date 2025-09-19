@@ -27,6 +27,16 @@ outputs:
 runs:
   using: 'composite'
   steps:
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      shell: bash
+      run: |
+        pip install PyGithub pyyaml jinja2 openai
+    
     - name: Run codebundle generator
       shell: bash
       run: |
