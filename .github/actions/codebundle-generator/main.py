@@ -282,6 +282,7 @@ class CodebundleGenerator:
             self._write_readme(codebundle_dir, readme_content)
             self._write_cursorrules(codebundle_dir, cursorrules_content)
             self._create_test_directory(codebundle_dir, requirements)
+            self._create_runwhen_directory(codebundle_dir, requirements)
             
             # Set outputs for GitHub Action
             self._set_github_outputs(requirements, scripts, robot_content)
@@ -1039,6 +1040,293 @@ Test automation scripts should:
         
         with open(test_dir / 'README.md', 'w') as f:
             f.write(test_readme)
+    
+    def _create_runwhen_directory(self, codebundle_dir: Path, requirements: Dict):
+        """Create .runwhen directory structure with templates"""
+        runwhen_dir = codebundle_dir / '.runwhen'
+        runwhen_dir.mkdir(exist_ok=True)
+        
+        # Create generation-rules directory
+        gen_rules_dir = runwhen_dir / 'generation-rules'
+        gen_rules_dir.mkdir(exist_ok=True)
+        
+        # Create templates directory
+        templates_dir = runwhen_dir / 'templates'
+        templates_dir.mkdir(exist_ok=True)
+        
+        codebundle_name = requirements['codebundle_name']
+        platform = requirements['platform']
+        service_type = requirements['service_type']
+        
+        # Generate generation rules
+        generation_rules = self._generate_generation_rules(requirements)
+        with open(gen_rules_dir / f"{codebundle_name}.yaml", 'w') as f:
+            f.write(generation_rules)
+        
+        # Generate SLI template
+        sli_template = self._generate_sli_template(requirements)
+        with open(templates_dir / f"{codebundle_name}-sli.yaml", 'w') as f:
+            f.write(sli_template)
+        
+        # Generate taskset template
+        taskset_template = self._generate_taskset_template(requirements)
+        with open(templates_dir / f"{codebundle_name}-taskset.yaml", 'w') as f:
+            f.write(taskset_template)
+        
+        # Generate SLX template
+        slx_template = self._generate_slx_template(requirements)
+        with open(templates_dir / f"{codebundle_name}-slx.yaml", 'w') as f:
+            f.write(slx_template)
+        
+        # Generate workflow template
+        workflow_template = self._generate_workflow_template(requirements)
+        with open(templates_dir / f"{codebundle_name}-workflow.yaml", 'w') as f:
+            f.write(workflow_template)
+    
+    def _generate_generation_rules(self, requirements: Dict) -> str:
+        """Generate generation rules YAML"""
+        codebundle_name = requirements['codebundle_name']
+        platform = requirements['platform']
+        
+        # Map platform to resource types
+        resource_types = {
+            'azure': 'azure_network_security_groups' if 'network' in requirements['service_type'] else 'azure_resources',
+            'aws': 'aws_security_groups' if 'network' in requirements['service_type'] else 'aws_resources', 
+            'gcp': 'gcp_firewall_rules' if 'network' in requirements['service_type'] else 'gcp_resources',
+            'k8s': 'kubernetes_network_policies' if 'network' in requirements['service_type'] else 'kubernetes_resources'
+        }
+        
+        return f'''apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: {platform}
+  generationRules:
+    - resourceTypes:
+        - {resource_types.get(platform, f'{platform}_resources')}
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: {codebundle_name}
+          qualifiers: ["resource", "resource_group"]
+          baseTemplateName: {codebundle_name}
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: {codebundle_name}-taskset.yaml
+            - type: workflow
+'''
+    
+    def _generate_sli_template(self, requirements: Dict) -> str:
+        """Generate SLI template YAML"""
+        codebundle_name = requirements['codebundle_name']
+        platform = requirements['platform']
+        
+        # Platform-specific config
+        config_vars = self._get_platform_config_vars(platform)
+        auth_include = self._get_platform_auth_include(platform)
+        
+        return f'''apiVersion: runwhen.com/v1
+kind: ServiceLevelIndicator
+metadata:
+  name: {{{{slx_name}}}}
+  labels:
+    {{% include "common-labels.yaml" %}}
+  annotations:
+    {{% include "common-annotations.yaml" %}}
+spec:
+  displayUnitsLong: OK
+  displayUnitsShort: ok
+  locations:
+    - {{{{default_location}}}}
+  description: Measures the {requirements['purpose']} of {platform} {requirements['service_type'].replace('-', ' ')}.
+  codeBundle:
+    {{% if repo_url %}}
+    repoUrl: {{{{repo_url}}}}
+    {{% else %}}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {{% endif %}}
+    {{% if ref %}}
+    ref: {{{{ref}}}}
+    {{% else %}}
+    ref: main
+    {{% endif %}}
+    pathToRobot: codebundles/{codebundle_name}/sli.robot
+  intervalStrategy: intermezzo
+  intervalSeconds: 300
+  configProvided:{config_vars}
+  secretsProvided:{auth_include}
+  alerts:
+    warning:
+      operator: <
+      threshold: '1'
+      for: '20m'
+    ticket:
+      operator: <
+      threshold: '1'
+      for: '30m'
+    page:
+      operator: '=='
+      threshold: '0'
+      for: ''
+'''
+    
+    def _generate_taskset_template(self, requirements: Dict) -> str:
+        """Generate taskset template YAML"""
+        codebundle_name = requirements['codebundle_name']
+        platform = requirements['platform']
+        
+        config_vars = self._get_platform_config_vars(platform)
+        auth_include = self._get_platform_auth_include(platform)
+        
+        return f'''apiVersion: runwhen.com/v1
+kind: Runbook
+metadata:
+  name: {{{{slx_name}}}}
+  labels:
+    {{% include "common-labels.yaml" %}}
+  annotations:
+    {{% include "common-annotations.yaml" %}}
+spec:
+  location: {{{{default_location}}}}
+  description: Analyzes {platform} {requirements['service_type'].replace('-', ' ')} for {requirements['purpose']} issues
+  codeBundle:
+    {{% if repo_url %}}
+    repoUrl: {{{{repo_url}}}}
+    {{% else %}}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {{% endif %}}
+    {{% if ref %}}
+    ref: {{{{ref}}}}
+    {{% else %}}
+    ref: main
+    {{% endif %}}
+    pathToRobot: codebundles/{codebundle_name}/runbook.robot
+  configProvided:{config_vars}
+  secretsProvided:{auth_include}
+'''
+    
+    def _generate_slx_template(self, requirements: Dict) -> str:
+        """Generate SLX template YAML"""
+        codebundle_name = requirements['codebundle_name']
+        
+        return f'''apiVersion: runwhen.com/v1
+kind: ServiceLevelX
+metadata:
+  name: {{{{slx_name}}}}
+  labels:
+    {{% include "common-labels.yaml" %}}
+  annotations:
+    {{% include "common-annotations.yaml" %}}
+spec:
+  description: {requirements['purpose'].title()} monitoring for {requirements['platform']} {requirements['service_type'].replace('-', ' ')}
+  sli:
+    name: {{{{slx_name}}}}-sli
+  runbook:
+    name: {{{{slx_name}}}}-runbook
+'''
+    
+    def _generate_workflow_template(self, requirements: Dict) -> str:
+        """Generate workflow template YAML"""
+        codebundle_name = requirements['codebundle_name']
+        
+        return f'''apiVersion: runwhen.com/v1
+kind: Workflow
+metadata:
+  name: {{{{slx_name}}}}
+  labels:
+    {{% include "common-labels.yaml" %}}
+  annotations:
+    {{% include "common-annotations.yaml" %}}
+spec:
+  description: Automated {requirements['purpose']} workflow for {requirements['platform']} {requirements['service_type'].replace('-', ' ')}
+  location: {{{{default_location}}}}
+  steps:
+    - name: check-{requirements['purpose']}
+      runbook:
+        name: {{{{slx_name}}}}-runbook
+      triggers:
+        - type: sli
+          sliName: {{{{slx_name}}}}-sli
+          operator: <
+          threshold: 1
+'''
+    
+    def _get_platform_config_vars(self, platform: str) -> str:
+        """Get platform-specific config variables for templates"""
+        if platform == 'azure':
+            return '''
+    - name: AZ_RESOURCE_GROUP
+      value: {{resource_group.name}}
+    - name: AZURE_RESOURCE_SUBSCRIPTION_ID
+      value: "{{ subscription_id }}"
+    - name: AZURE_SUBSCRIPTION_NAME
+      value: "{{ subscription_name }}"'''
+        elif platform == 'k8s':
+            return '''
+    - name: CONTEXT
+      value: {{context}}
+    - name: NAMESPACE
+      value: {{namespace}}'''
+        elif platform == 'aws':
+            return '''
+    - name: AWS_REGION
+      value: {{region}}
+    - name: AWS_ACCOUNT_ID
+      value: "{{ account_id }}"'''
+        elif platform == 'gcp':
+            return '''
+    - name: GCP_PROJECT_ID
+      value: {{project_id}}
+    - name: GCP_REGION
+      value: {{region}}'''
+        else:
+            return '''
+    - name: PLATFORM_CONFIG
+      value: {{platform_config}}'''
+    
+    def _get_platform_auth_include(self, platform: str) -> str:
+        """Get platform-specific auth include for templates"""
+        if platform == 'azure':
+            return '''
+  {% if wb_version %}
+    {% include "azure-auth.yaml" ignore missing %}
+  {% else %}
+    - name: azure_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}'''
+        elif platform == 'k8s':
+            return '''
+  {% if wb_version %}
+    {% include "k8s-auth.yaml" ignore missing %}
+  {% else %}
+    - name: kubeconfig
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}'''
+        elif platform == 'aws':
+            return '''
+  {% if wb_version %}
+    {% include "aws-auth.yaml" ignore missing %}
+  {% else %}
+    - name: aws_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}'''
+        elif platform == 'gcp':
+            return '''
+  {% if wb_version %}
+    {% include "gcp-auth.yaml" ignore missing %}
+  {% else %}
+    - name: gcp_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}'''
+        else:
+            return '''
+    - name: platform_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND'''
     
     def _set_github_outputs(self, requirements: Dict, scripts: Dict, robot_content: str):
         """Set GitHub Action outputs"""
