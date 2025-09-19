@@ -271,12 +271,17 @@ class CodebundleGenerator:
             readme_content = self.generate_readme(requirements)
             cursorrules_content = self.generate_cursorrules(requirements)
             
+            # Generate SLI content
+            sli_content = self.generate_sli_robot(requirements, templates)
+            
             # Write files
             self._write_scripts(codebundle_dir, scripts)
             self._write_robot_file(codebundle_dir, robot_content)
+            self._write_sli_file(codebundle_dir, sli_content)
             self._write_meta_yaml(codebundle_dir, meta_content)
             self._write_readme(codebundle_dir, readme_content)
             self._write_cursorrules(codebundle_dir, cursorrules_content)
+            self._create_test_directory(codebundle_dir, requirements)
             
             # Set outputs for GitHub Action
             self._set_github_outputs(requirements, scripts, robot_content)
@@ -528,6 +533,62 @@ Suite Initialization
         
         return robot_content
     
+    def generate_sli_robot(self, requirements: Dict, templates: Dict) -> str:
+        """Generate SLI Robot Framework file"""
+        logger.info("Generating SLI Robot Framework file...")
+        
+        platform = requirements['platform']
+        codebundle_name = requirements['codebundle_name']
+        
+        # Generate SLI tasks (simplified versions that return metrics)
+        sli_tasks = []
+        for task in requirements['tasks'][:3]:  # Limit to 3 SLI tasks
+            script_name = self._task_to_script_name(task)
+            task_name = task.replace('Check ', '').replace('check ', '')
+            
+            sli_task = f'''{task} SLI
+    [Documentation]    SLI for {task}
+    [Tags]    {platform}    sli    {task_name.lower().replace(' ', '-')}
+    ${{result}}=    RW.CLI.Run Bash File
+    ...    bash_file={script_name}
+    ...    env=${{env}}
+    ...    include_in_history=false
+    
+    # Parse result and push metric
+    ${{issues}}=    RW.CLI.Run CLI    cat ${{OUTPUT_DIR}}/results.json | jq '.issues | length'
+    ${{metric_value}}=    Set Variable If    ${{issues.stdout}} == 0    1    0
+    RW.Core.Push Metric    ${{metric_value}}'''
+            
+            sli_tasks.append(sli_task)
+        
+        sli_content = f'''*** Settings ***
+Documentation       SLI for {requirements['title']}
+Metadata            Author    auto-generated
+Metadata            Display Name    {codebundle_name.replace('-', ' ').title()} SLI
+Metadata            Supports    {platform.upper()}
+
+Library             BuiltIn
+Library             RW.Core
+Library             RW.CLI
+Library             RW.platform
+Library             OperatingSystem
+
+Suite Setup         Suite Initialization
+
+*** Tasks ***
+{chr(10).join(sli_tasks)}
+
+*** Keywords ***
+Suite Initialization
+    RW.Core.Import Service    bash
+    RW.Core.Import Service    k8s
+    RW.Core.Import Service    curl
+    Set Suite Variable    ${{OUTPUT_DIR}}    /tmp/rwi_output
+    Create Directory    ${{OUTPUT_DIR}}
+'''
+        
+        return sli_content
+    
     def _get_robot_template(self, templates: Dict) -> str:
         """Get Robot Framework template"""
         if templates['robot_tasks']:
@@ -714,33 +775,171 @@ For issues or questions about this auto-generated codebundle:
         
         platform = requirements['platform']
         service_type = requirements['service_type']
+        purpose = requirements['purpose']
+        codebundle_name = requirements['codebundle_name']
         
-        return f'''# {requirements['codebundle_name']} Cursor Rules
+        return f'''# {codebundle_name.replace('-', ' ').title()} Codebundle - Cursor Rules
 
-## Codebundle Context
-This is an auto-generated codebundle for {platform} {service_type} {requirements['purpose']}.
+## Overview
+This codebundle provides {purpose} monitoring for {platform} {service_type.replace('-', ' ')}, including automated checks, validation, and reporting.
 
-## Platform-Specific Guidelines
+## File Structure and Patterns
 
-### {platform.upper()} Best Practices
-- Use appropriate CLI commands and error handling
-- Follow established patterns from similar codebundles
-- Include proper authentication and subscription management
-- Generate structured JSON output for issue reporting
+### Robot Framework Files (.robot)
+- **runbook.robot**: Main execution file with tasks and keywords for troubleshooting
+- **sli.robot**: Service Level Indicator definitions for monitoring
+- Follow Robot Framework syntax and conventions
+- Use consistent task naming: `Check/Get/Fetch [Entity] [Action] for [Resource] In [Scope]`
+- Always include proper documentation and tags for each task
 
-## Code Standards
-- Bash scripts should include error handling and validation
-- Robot Framework tasks should follow naming conventions
-- All scripts should output to $OUTPUT_DIR/results.json
-- Include meaningful logging and progress indicators
+### Bash Scripts (.sh)
+- All scripts must be executable (`chmod +x`)
+- Use consistent naming: `[entity]_[action].sh`
+- Include comprehensive error handling and validation
+- Provide clear stdout output with structured formatting
+- Generate both human-readable and machine-readable outputs
+- Output JSON results to `$OUTPUT_DIR/results.json`
 
-## Issue Reporting Format
-Issues should be reported in JSON format with:
-- title: Clear, descriptive issue title
-- details: Specific details about the problem
-- severity: 1-4 scale (1=Critical, 4=Low)
-- next_steps: Actionable remediation steps
+## Issue Reporting Standards
+
+### Issue Severity Levels
+- **Severity 1**: Critical issues affecting service availability
+- **Severity 2**: High-impact issues requiring immediate attention
+- **Severity 3**: Medium-impact issues that should be addressed (warnings, recommendations)
+- **Severity 4**: Low-impact informational issues (configuration recommendations)
+
+### Issue Titles
+- **MUST** include entity name and resource information
+- **MUST** include resource group/namespace context
+- **MUST** be clear, concise, and descriptive
+- **Format**: `"[Entity] '[name]' in [Resource] '[resource_name]' has [issue_description]"`
+
+### Issue Details
+- **MUST** include complete context (Resource, Group, Subscription/Cluster)
+- **MUST** include time period information when relevant
+- **MUST** include relevant metrics with clear labels
+- **MUST** include specific detected issues with values
+- **MUST** include actionable next steps for troubleshooting
+- **Format**: Structured sections with clear headers and bullet points
+
+## Configuration Variables
+
+### Required Variables
+{self._generate_required_vars(platform)}
+
+### Optional Threshold Variables
+- `TIME_PERIOD_MINUTES`: Time period for analysis (default: 30)
+- `ERROR_RATE_THRESHOLD`: Error rate threshold % (default: 10)
+- `PERFORMANCE_THRESHOLD`: Performance threshold for alerts
+
+## Script Development Guidelines
+
+### Error Handling
+- Always validate required environment variables at script start
+- Provide meaningful error messages with context
+- Use proper exit codes (0 for success, non-zero for errors)
+- Handle missing or null data gracefully
+
+### Output Generation
+- Generate JSON output to `$OUTPUT_DIR/results.json`
+- Include timestamps in reports
+- Provide both summary and detailed information
+- **JSON Validation**: Always validate JSON output before writing
+- **Error Handling**: Provide fallback JSON if validation fails
+
+### {platform.upper()} Integration
+{self._generate_platform_guidelines(platform)}
+
+## Testing Requirements
+
+### Script Validation
+- All scripts must pass syntax validation (`bash -n`)
+- Test with mock data to ensure output generation
+- Validate JSON structure and content
+- Test error handling scenarios
+
+### Integration Testing
+- Test with real {platform} resources when possible
+- Verify issue detection and reporting
+- Test threshold configurations
+- Validate portal/console link generation
+
+## Security Considerations
+
+### Authentication
+- Use service principal/service account authentication
+- Never hardcode credentials in scripts
+- Validate CLI authentication before operations
+- Handle authentication errors gracefully
+
+### Data Handling
+- Sanitize output data for sensitive information
+- Use appropriate permissions for resource access
+- Log operations for audit purposes
+- Handle PII data appropriately
+
+## Performance Guidelines
+
+### Resource Usage
+- Minimize API calls where possible
+- Use appropriate time intervals for metrics
+- Cache results when appropriate
+- Handle large datasets efficiently
+
+### Timeout Handling
+- Set appropriate timeouts for long-running operations
+- Provide progress indicators for lengthy operations
+- Handle partial failures gracefully
 '''
+    
+    def _generate_required_vars(self, platform: str) -> str:
+        """Generate required variables section for platform"""
+        if platform == 'azure':
+            return '''- `AZ_RESOURCE_GROUP`: Azure resource group name
+- `AZURE_RESOURCE_SUBSCRIPTION_ID`: Azure subscription ID (optional)'''
+        elif platform == 'k8s':
+            return '''- `CONTEXT`: Kubernetes context name
+- `NAMESPACE`: Kubernetes namespace'''
+        elif platform == 'aws':
+            return '''- `AWS_REGION`: AWS region
+- `AWS_ACCOUNT_ID`: AWS account ID (optional)'''
+        elif platform == 'gcp':
+            return '''- `GCP_PROJECT_ID`: GCP project ID
+- `GCP_REGION`: GCP region (optional)'''
+        else:
+            return '''- Platform-specific configuration variables as needed'''
+    
+    def _generate_platform_guidelines(self, platform: str) -> str:
+        """Generate platform-specific guidelines"""
+        if platform == 'azure':
+            return '''- Use Azure CLI for resource management and queries
+- Follow Azure Resource Manager patterns
+- Include proper subscription and resource group context
+- Use Azure Monitor APIs for metrics collection
+- Generate Azure Portal links for easy navigation'''
+        elif platform == 'k8s':
+            return '''- Use kubectl for cluster operations
+- Follow Kubernetes API conventions
+- Include proper namespace and context handling
+- Use Kubernetes metrics APIs when available
+- Generate cluster dashboard links when possible'''
+        elif platform == 'aws':
+            return '''- Use AWS CLI for resource management
+- Follow AWS API patterns and conventions
+- Include proper region and account context
+- Use CloudWatch for metrics collection
+- Generate AWS Console links for resources'''
+        elif platform == 'gcp':
+            return '''- Use gcloud CLI for resource management
+- Follow Google Cloud API patterns
+- Include proper project and region context
+- Use Cloud Monitoring for metrics
+- Generate Google Cloud Console links'''
+        else:
+            return '''- Follow platform-specific best practices
+- Use appropriate CLI tools and APIs
+- Include proper authentication and context
+- Generate relevant console/dashboard links'''
     
     def _write_scripts(self, codebundle_dir: Path, scripts: Dict[str, str]):
         """Write bash scripts to codebundle directory"""
@@ -754,6 +953,11 @@ Issues should be reported in JSON format with:
     def _write_robot_file(self, codebundle_dir: Path, content: str):
         """Write Robot Framework file"""
         with open(codebundle_dir / 'runbook.robot', 'w') as f:
+            f.write(content)
+    
+    def _write_sli_file(self, codebundle_dir: Path, content: str):
+        """Write SLI Robot Framework file"""
+        with open(codebundle_dir / 'sli.robot', 'w') as f:
             f.write(content)
     
     def _write_meta_yaml(self, codebundle_dir: Path, content: str):
@@ -770,6 +974,71 @@ Issues should be reported in JSON format with:
         """Write .cursorrules file"""
         with open(codebundle_dir / '.cursorrules', 'w') as f:
             f.write(content)
+    
+    def _create_test_directory(self, codebundle_dir: Path, requirements: Dict):
+        """Create .test directory structure"""
+        test_dir = codebundle_dir / '.test'
+        test_dir.mkdir(exist_ok=True)
+        
+        # Create basic test README
+        test_readme = f'''# Test Infrastructure for {requirements['codebundle_name']}
+
+This directory contains testing infrastructure for the {requirements['codebundle_name']} codebundle.
+
+## Structure
+
+- **README.md**: This file
+- **terraform/**: Terraform configurations for test resources (if needed)
+- **test_data/**: Sample data for testing
+- **scripts/**: Test automation scripts
+
+## Usage
+
+This test infrastructure is designed to validate the codebundle functionality in a controlled environment.
+
+### Prerequisites
+
+- Appropriate cloud credentials configured
+- Test environment access
+- Required CLI tools installed
+
+### Running Tests
+
+```bash
+# Navigate to the codebundle directory
+cd codebundles/{requirements['codebundle_name']}
+
+# Run the runbook for testing
+ro runbook.robot
+
+# Run the SLI for testing  
+ro sli.robot
+```
+
+## Test Data
+
+Test data should be placed in the `test_data/` directory and should include:
+
+- Sample configuration files
+- Mock API responses
+- Expected output examples
+
+## Automation
+
+Test automation scripts should:
+
+- Set up test resources
+- Execute the codebundle
+- Validate outputs
+- Clean up resources
+
+---
+
+*Auto-generated test infrastructure*
+'''
+        
+        with open(test_dir / 'README.md', 'w') as f:
+            f.write(test_readme)
     
     def _set_github_outputs(self, requirements: Dict, scripts: Dict, robot_content: str):
         """Set GitHub Action outputs"""
