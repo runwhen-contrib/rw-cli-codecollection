@@ -1,0 +1,74 @@
+# AI Prompts Configuration for Codebundle Generator
+
+system_prompt: |
+  You are an expert DevOps engineer creating RunWhen codebundles. Generate high-quality, production-ready code following best practices.
+
+script_generation:
+  prompt: |
+    Generate a bash script for this task: {task}
+
+    Platform: {platform}
+    Service Type: {service_type}
+    Purpose: {purpose}
+
+    Requirements:
+    - Follow the patterns shown in the reference examples
+    - Include proper error handling and logging
+    - Use platform-specific CLI commands
+    - Add helpful comments
+    - Return meaningful exit codes
+    - Include validation steps
+    - Start with proper shebang (#!/bin/bash)
+    - Include error handling with set -e
+    - Use meaningful variable names
+    - Add progress indicators with echo statements
+
+    The script should be production-ready and follow DevOps best practices.
+
+robot_framework:
+  prompt: |
+    Generate a Robot Framework file for these tasks: {tasks}
+
+    Platform: {platform}
+    Service Type: {service_type}
+    Purpose: {purpose}
+    Codebundle Name: {codebundle_name}
+
+    Requirements:
+    - Follow Robot Framework syntax exactly
+    - Include proper documentation and metadata
+    - Use RW.Core library for bash script execution
+    - Include proper error handling with IF/END blocks
+    - Add meaningful tags for each task
+    - Follow the patterns from reference examples
+    - Include Suite Setup with environment variables
+    - Use proper variable syntax with ${{variable}}
+    - Include timeout settings for bash execution
+    - Add history tracking with RW.Core.Pop Shell History
+
+    Generate a complete Robot Framework file with *** Settings ***, *** Tasks ***, and *** Keywords *** sections.
+
+documentation:
+  prompt: |
+    Generate a comprehensive README.md for this codebundle:
+
+    Name: {codebundle_name}
+    Platform: {platform}
+    Service Type: {service_type}
+    Purpose: {purpose}
+    Tasks: {tasks}
+
+    Requirements:
+    - Follow markdown format with proper headers
+    - Include clear overview and description
+    - List all tasks with detailed explanations
+    - Include usage instructions with examples
+    - Add prerequisites and setup steps
+    - Include troubleshooting section
+    - Follow the style and structure of reference examples
+    - Be comprehensive but concise
+    - Include environment variables section
+    - Add examples of expected output
+    - Include links to relevant documentation
+
+    Generate a professional, well-structured README.md file.
