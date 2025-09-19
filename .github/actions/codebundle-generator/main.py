@@ -45,11 +45,17 @@ class CodebundleGenerator:
         else:
             self.ai_enabled = False
             if not OPENAI_AVAILABLE:
-                logger.info("📝 Using template-based generation (OpenAI not available)")
+                logger.info("📝 Using template-based generation (OpenAI package not available)")
             elif not openai_api_key:
-                logger.info("📝 Using template-based generation (no OpenAI API key)")
+                logger.info("📝 Using template-based generation (no OpenAI API key provided)")
+            elif ai_service == 'template':
+                logger.info("📝 Using template-based generation (configured for templates)")
             else:
                 logger.info(f"📝 Using template-based generation (service: {ai_service})")
+            
+            # If AI service is configured but not available, warn user
+            if ai_service == 'openai' and not openai_api_key:
+                logger.warning("⚠️  AI service is set to 'openai' but no API key provided. Add OPENAI_API_KEY to secrets for AI generation.")
         
         # Set workspace - find the repository root
         current_dir = Path.cwd()
@@ -1667,12 +1673,22 @@ spec:
 def main():
     """Main entry point"""
     try:
+        # Debug: Log all environment variables starting with INPUT_
+        logger.info("=== ACTION INPUTS DEBUG ===")
+        for key, value in os.environ.items():
+            if key.startswith('INPUT_'):
+                # Mask sensitive values
+                display_value = value if key != 'INPUT_OPENAI_API_KEY' else ('***' + value[-4:] if value else 'NOT_SET')
+                logger.info(f"{key}: {display_value}")
+        logger.info("=== END INPUTS DEBUG ===")
+        
         # Get inputs from environment
         issue_number = int(os.environ['INPUT_ISSUE_NUMBER'])
         github_token = os.environ['INPUT_GITHUB_TOKEN']
         openai_api_key = os.environ.get('INPUT_OPENAI_API_KEY', '')
         
         logger.info(f"Starting codebundle generation for issue #{issue_number}")
+        logger.info(f"OpenAI API key length: {len(openai_api_key) if openai_api_key else 0}")
         
         # Initialize generator
         generator = CodebundleGenerator(issue_number, github_token, openai_api_key)

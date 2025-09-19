@@ -9,6 +9,11 @@ on:
         description: 'Issue number to process'
         required: true
         type: number
+      use_ai:
+        description: 'Use AI for generation (requires OpenAI API key in secrets)'
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   generate-codebundle:

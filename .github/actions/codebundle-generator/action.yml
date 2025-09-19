@@ -37,6 +37,17 @@ runs:
       run: |
         pip install PyGithub pyyaml jinja2 openai
     
+    - name: Debug action inputs
+      shell: bash
+      run: |
+        cd ${{ github.action_path }}
+        python test_inputs.py
+      env:
+        INPUT_ISSUE_NUMBER: ${{ inputs.issue-number }}
+        INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
+        INPUT_OPENAI_API_KEY: ${{ inputs.openai-api-key }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+    
     - name: Run codebundle generator
       shell: bash
       run: |
