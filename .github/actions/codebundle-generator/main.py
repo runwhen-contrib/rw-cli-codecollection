@@ -23,9 +23,21 @@ class CodebundleGenerator:
         self.repo = self.gh.get_repo(os.environ['GITHUB_REPOSITORY'])
         self.issue = self.repo.get_issue(issue_number)
         self.openai_api_key = openai_api_key
-        self.workspace_root = Path.cwd()
+        # Set workspace - find the repository root
+        current_dir = Path.cwd()
+        # If we're in the action directory, go up to find the repo root
+        if '.github/actions' in str(current_dir):
+            # Go up from .github/actions/codebundle-generator to repo root
+            self.workspace_root = current_dir.parent.parent.parent
+        else:
+            # We're already in the repo root or GitHub Actions workspace
+            self.workspace_root = current_dir
         
         logger.info(f"Initialized generator for issue #{issue_number}")
+        logger.info(f"Current directory: {current_dir}")
+        logger.info(f"Workspace root: {self.workspace_root}")
+        logger.info(f"Codebundles directory: {self.workspace_root / 'codebundles'}")
+        logger.info(f"Codebundles exists: {(self.workspace_root / 'codebundles').exists()}")
         
     def parse_issue_requirements(self) -> Dict:
         """Parse GitHub issue to extract codebundle requirements"""

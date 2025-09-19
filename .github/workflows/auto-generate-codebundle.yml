@@ -30,14 +30,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: |
-          pip install PyGithub pyyaml jinja2 openai
 
       - name: Update labels - Start Processing
         uses: actions/github-script@v7
@@ -86,7 +78,7 @@ jobs:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
 
       - name: Create Pull Request
-        if: steps.generate.outputs.codebundle-name != ''
+        if: steps.generate.outputs.success == 'true' || steps.generate.outputs.codebundle-name != ''
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -120,7 +112,7 @@ jobs:
           delete-branch: true
 
       - name: Update issue labels on success
-        if: steps.generate.outputs.success == 'true'
+        if: steps.generate.outputs.success == 'true' || steps.generate.outputs.codebundle-name != ''
         uses: actions/github-script@v7
         with:
           script: |
