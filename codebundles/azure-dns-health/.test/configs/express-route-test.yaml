@@ -1,0 +1,15 @@
+# Express Route DNS Test Configuration
+# This configuration tests DNS resolution through Express Route
+
+variables:
+  RESOURCE_GROUPS: "production-rg"
+  TEST_FQDNS: "myapp.privatelink.database.windows.net"
+  EXPRESS_ROUTE_DNS_ZONES: "internal.company.com,corp.company.com"
+  DNS_SERVER_IPS: "10.0.0.4,10.0.1.4"
+  FORWARD_LOOKUP_ZONES: "internal.company.com"
+
+# Expected behavior:
+# - Tests Express Route DNS zones: internal.company.com, corp.company.com
+# - Tests DNS server connectivity: 10.0.0.4, 10.0.1.4
+# - Monitors latency through Express Route
+# - Should detect high latency or packet drops indicating route congestion

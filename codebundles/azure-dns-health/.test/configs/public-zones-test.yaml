@@ -1,0 +1,15 @@
+# Public DNS Zone Test Configuration
+# This configuration tests public DNS zones and external resolution
+
+variables:
+  RESOURCE_GROUPS: "production-rg,network-rg"
+  TEST_FQDNS: "myapp.privatelink.database.windows.net"
+  PUBLIC_ZONES: "example.com,mycompany.com"
+  PUBLIC_DOMAINS: "google.com,github.com"
+  DNS_RESOLVERS: "8.8.8.8,1.1.1.1"
+
+# Expected behavior:
+# - Tests public zones: example.com, mycompany.com
+# - Tests external domains: google.com, github.com
+# - Tests external resolvers: 8.8.8.8, 1.1.1.1
+# - Should validate external DNS resolution and upstream forwarding

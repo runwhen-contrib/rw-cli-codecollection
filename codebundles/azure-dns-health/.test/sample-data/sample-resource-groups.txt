@@ -1,0 +1,32 @@
+# Sample Resource Groups for DNS Health Testing
+# These are example resource groups that might contain DNS zones and VNets
+
+# Production Environment
+production-rg
+prod-dns-rg
+prod-network-rg
+prod-app-rg
+
+# Staging Environment
+staging-rg
+staging-dns-rg
+staging-network-rg
+staging-app-rg
+
+# Development Environment
+dev-rg
+dev-dns-rg
+dev-network-rg
+dev-app-rg
+
+# Network-specific Resource Groups
+network-rg
+dns-rg
+vnet-rg
+private-link-rg
+
+# Application-specific Resource Groups
+app-rg
+api-rg
+web-rg
+database-rg
