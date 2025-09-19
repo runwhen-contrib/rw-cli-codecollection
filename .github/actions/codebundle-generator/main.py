@@ -776,12 +776,18 @@ Issues should be reported in JSON format with:
         
         # Set outputs for GitHub Action
         github_output = os.environ.get('GITHUB_OUTPUT')
+        logger.info(f"GITHUB_OUTPUT environment variable: {github_output}")
+        
         if github_output:
+            logger.info(f"Writing outputs to: {github_output}")
             with open(github_output, 'a') as f:
                 f.write(f"codebundle-name={requirements['codebundle_name']}\n")
-                f.write(f"generated-scripts={', '.join(scripts.keys())}\n")
+                f.write(f"generated-files={', '.join(scripts.keys())}\n")
                 f.write(f"generated-tasks={len(requirements['tasks'])}\n")
                 f.write(f"success=true\n")
+            logger.info("Outputs written successfully")
+        else:
+            logger.warning("GITHUB_OUTPUT environment variable not set - outputs will not be available")
 
 def main():
     """Main entry point"""

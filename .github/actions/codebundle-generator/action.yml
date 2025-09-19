@@ -47,5 +47,5 @@ runs:
         INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
         INPUT_OPENAI_API_KEY: ${{ inputs.openai-api-key }}
         GITHUB_REPOSITORY: ${{ github.repository }}
-        GITHUB_OUTPUT: ${{ github.output }}
+        GITHUB_OUTPUT: ${{ env.GITHUB_OUTPUT }}
 
