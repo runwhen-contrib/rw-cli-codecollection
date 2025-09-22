@@ -84,23 +84,23 @@ runs:
           echo "=== Setting composite action outputs ==="
           
           # Read each line and set as output
-          while IFS='=' read -r key value; do
+          while IFS='=' read -r key value || [ -n "$key" ]; do
             if [ -n "$key" ] && [ -n "$value" ]; then
-              echo "$key=$value" >> ${{ env.GITHUB_OUTPUT }}
+              echo "$key=$value" >> "${{ env.GITHUB_OUTPUT }}"
               echo "Set output: $key=$value"
             fi
           done < "$OUTPUT_FILE"
         else
           echo "❌ Output file not found: $OUTPUT_FILE"
           # Set default failure outputs
-          echo "success=false" >> ${{ env.GITHUB_OUTPUT }}
-          echo "codebundle-name=no-output-file" >> ${{ env.GITHUB_OUTPUT }}
-          echo "generated-files=none" >> ${{ env.GITHUB_OUTPUT }}
-          echo "generated-tasks=0" >> ${{ env.GITHUB_OUTPUT }}
-          echo "total-tokens=0" >> ${{ env.GITHUB_OUTPUT }}
-          echo "prompt-tokens=0" >> ${{ env.GITHUB_OUTPUT }}
-          echo "completion-tokens=0" >> ${{ env.GITHUB_OUTPUT }}
-          echo "api-calls=0" >> ${{ env.GITHUB_OUTPUT }}
+          echo "success=false" >> "${{ env.GITHUB_OUTPUT }}"
+          echo "codebundle-name=no-output-file" >> "${{ env.GITHUB_OUTPUT }}"
+          echo "generated-files=none" >> "${{ env.GITHUB_OUTPUT }}"
+          echo "generated-tasks=0" >> "${{ env.GITHUB_OUTPUT }}"
+          echo "total-tokens=0" >> "${{ env.GITHUB_OUTPUT }}"
+          echo "prompt-tokens=0" >> "${{ env.GITHUB_OUTPUT }}"
+          echo "completion-tokens=0" >> "${{ env.GITHUB_OUTPUT }}"
+          echo "api-calls=0" >> "${{ env.GITHUB_OUTPUT }}"
         fi
         echo "=== End output processing ==="
         
