@@ -103,9 +103,9 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "feat: auto-generated codebundle from issue #${{ github.event.inputs.issue_number || github.event.issue.number }}"
-          title: "🤖 Auto-generated codebundle: ${{ steps.generate.outputs.codebundle-name }}"
+          title: "![Eager Edgar](https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/Eager-Edgar-Happy.png) Auto-generated codebundle: ${{ steps.generate.outputs.codebundle-name }}"
           body: |
-            ## 🤖 Auto-Generated Codebundle
+            ## ![Eager Edgar](https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/Eager-Edgar-Happy.png) Auto-Generated Codebundle
             
             This codebundle was automatically generated based on issue #${{ github.event.inputs.issue_number || github.event.issue.number }}
             
@@ -156,7 +156,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: ${{ github.event.inputs.issue_number || github.event.issue.number }},
-              body: `🤖 **Codebundle Generated Successfully!**
+              body: `![Eager Edgar](https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/Eager-Edgar-Happy.png) **Codebundle Generated Successfully!**
               
               I've created a pull request with your auto-generated codebundle: **${{ steps.generate.outputs.codebundle-name }}**
               
