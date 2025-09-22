@@ -962,7 +962,7 @@ Generate a professional, well-structured README.md file.""")
         return ai_content
     
     def generate_cursorrules(self, requirements: Dict) -> str:
-        """Generate .cursorrules file"""
+        """Generate README using templates (original method)"""
         
         codebundle_name = requirements['codebundle_name']
         platform = requirements['platform']
