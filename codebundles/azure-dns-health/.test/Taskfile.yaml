@@ -337,7 +337,7 @@ tasks:
     cmds:
       - |
         # Source Envs for Auth
-        source /workspace/codecollection-devtools/auth/terraform-azure
+        source terraform/tf.secret
 
         # Set Additional env
         export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID --query id -o tsv)
