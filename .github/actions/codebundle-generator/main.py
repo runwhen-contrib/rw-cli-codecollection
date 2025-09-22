@@ -45,6 +45,14 @@ class CodebundleGenerator:
         self.config = self._load_config()
         self.prompts = self._load_prompts()
         
+        # Initialize token tracking
+        self.token_usage = {
+            'total_prompt_tokens': 0,
+            'total_completion_tokens': 0,
+            'total_tokens': 0,
+            'api_calls': 0
+        }
+        
         # Initialize OpenAI if available and configured
         ai_service = self.config.get('ai', {}).get('service', 'template')
         logger.info(f"AI service configuration: {ai_service}")
@@ -209,6 +217,20 @@ class CodebundleGenerator:
             )
             
             generated_content = response.choices[0].message.content.strip()
+            
+            # Track token usage
+            if hasattr(response, 'usage') and response.usage:
+                prompt_tokens = response.usage.prompt_tokens
+                completion_tokens = response.usage.completion_tokens
+                total_tokens = response.usage.total_tokens
+                
+                self.token_usage['total_prompt_tokens'] += prompt_tokens
+                self.token_usage['total_completion_tokens'] += completion_tokens
+                self.token_usage['total_tokens'] += total_tokens
+                self.token_usage['api_calls'] += 1
+                
+                logger.info(f"📊 Token usage - Prompt: {prompt_tokens}, Completion: {completion_tokens}, Total: {total_tokens}")
+            
             logger.info(f"✅ OpenAI response received for {component_type}")
             logger.info(f"📊 Response length: {len(generated_content)} characters")
             
@@ -1624,7 +1646,12 @@ spec:
                 f.write(f"generated-files={', '.join(scripts.keys())}\n")
                 f.write(f"generated-tasks={len(requirements['tasks'])}\n")
                 f.write(f"success=true\n")
+                f.write(f"total-tokens={self.token_usage['total_tokens']}\n")
+                f.write(f"prompt-tokens={self.token_usage['total_prompt_tokens']}\n")
+                f.write(f"completion-tokens={self.token_usage['total_completion_tokens']}\n")
+                f.write(f"api-calls={self.token_usage['api_calls']}\n")
             logger.info("Outputs written successfully")
+            logger.info(f"📊 Total token usage: {self.token_usage['total_tokens']} tokens across {self.token_usage['api_calls']} API calls")
         else:
             logger.warning("GITHUB_OUTPUT environment variable not set - outputs will not be available")
 

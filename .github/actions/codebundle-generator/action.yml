@@ -23,6 +23,14 @@ outputs:
     description: 'List of generated Robot Framework tasks'
   success:
     description: 'Whether generation was successful'
+  total-tokens:
+    description: 'Total tokens used across all AI generation calls'
+  prompt-tokens:
+    description: 'Total prompt tokens used'
+  completion-tokens:
+    description: 'Total completion tokens used'
+  api-calls:
+    description: 'Number of OpenAI API calls made'
 
 runs:
   using: 'composite'

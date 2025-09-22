@@ -103,9 +103,9 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "feat: auto-generated codebundle from issue #${{ github.event.inputs.issue_number || github.event.issue.number }}"
-          title: "![Eager Edgar](https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/Eager-Edgar-Happy.png) Auto-generated codebundle: ${{ steps.generate.outputs.codebundle-name }}"
+          title: "✨ Auto-generated codebundle: ${{ steps.generate.outputs.codebundle-name }}"
           body: |
-            ## ![Eager Edgar](https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/Eager-Edgar-Happy.png) Auto-Generated Codebundle
+            ## ✨ Auto-Generated Codebundle
             
             This codebundle was automatically generated based on issue #${{ github.event.inputs.issue_number || github.event.issue.number }}
             
@@ -113,6 +113,12 @@ jobs:
             - **Codebundle**: `codebundles/${{ steps.generate.outputs.codebundle-name }}/`
             - **Scripts**: ${{ steps.generate.outputs.generated-files }}
             - **Tasks**: ${{ steps.generate.outputs.generated-tasks }}
+            
+            ### 📊 AI Generation Summary
+            - **Total Tokens Used**: ${{ steps.generate.outputs.total-tokens }}
+            - **Prompt Tokens**: ${{ steps.generate.outputs.prompt-tokens }}
+            - **Completion Tokens**: ${{ steps.generate.outputs.completion-tokens }}
+            - **API Calls Made**: ${{ steps.generate.outputs.api-calls }}
             
             ### Review Checklist
             - [ ] Review generated bash scripts for correctness
@@ -156,7 +162,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: ${{ github.event.inputs.issue_number || github.event.issue.number }},
-              body: `![Eager Edgar](https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/Eager-Edgar-Happy.png) **Codebundle Generated Successfully!**
+              body: `✨ **Codebundle Generated Successfully!**
               
               I've created a pull request with your auto-generated codebundle: **${{ steps.generate.outputs.codebundle-name }}**
               
@@ -165,6 +171,10 @@ jobs:
               - Generated bash scripts for your tasks
               - Robot Framework task definitions
               - Documentation and metadata
+              
+              📊 **AI Generation Stats:**
+              - Total tokens used: ${{ steps.generate.outputs.total-tokens }}
+              - API calls made: ${{ steps.generate.outputs.api-calls }}
               
               Please review the generated code and merge when ready!`
             });
