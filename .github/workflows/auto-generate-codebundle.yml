@@ -103,22 +103,35 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "feat: auto-generated codebundle from issue #${{ github.event.inputs.issue_number || github.event.issue.number }}"
-          title: "✨ Auto-generated codebundle: ${{ steps.generate.outputs.codebundle-name }}"
+          title: "✨ Auto-generated codebundle: ${{ steps.generate.outputs.codebundle-name || format('from issue #{0}', github.event.inputs.issue_number || github.event.issue.number) }}"
           body: |
             ## ✨ Auto-Generated Codebundle
             
-            This codebundle was automatically generated based on issue #${{ github.event.inputs.issue_number || github.event.issue.number }}
+            This codebundle was automatically generated using AI based on the requirements in issue #${{ github.event.inputs.issue_number || github.event.issue.number }}.
             
-            ### Generated Components
-            - **Codebundle**: `codebundles/${{ steps.generate.outputs.codebundle-name }}/`
-            - **Scripts**: ${{ steps.generate.outputs.generated-files }}
-            - **Tasks**: ${{ steps.generate.outputs.generated-tasks }}
+            ### 📦 Generated Components
             
-            ### 📊 AI Generation Summary
-            - **Total Tokens Used**: ${{ steps.generate.outputs.total-tokens }}
-            - **Prompt Tokens**: ${{ steps.generate.outputs.prompt-tokens }}
-            - **Completion Tokens**: ${{ steps.generate.outputs.completion-tokens }}
-            - **API Calls Made**: ${{ steps.generate.outputs.api-calls }}
+            **Codebundle Location:** `codebundles/${{ steps.generate.outputs.codebundle-name || 'unknown' }}/`
+            
+            **Generated Files:**
+            - **Bash Scripts:** ${{ steps.generate.outputs.generated-files || 'None listed' }}
+            - **Robot Framework Tasks:** ${{ steps.generate.outputs.generated-tasks || 'Unknown count' }} tasks
+            - **Documentation:** README.md with usage instructions
+            - **Metadata:** meta.yaml with platform configuration
+            - **Cursor Rules:** .cursorrules for development assistance
+            - **RunWhen Templates:** .runwhen/ directory with SLI, Taskset, and Workflow templates
+            - **Test Directory:** .test/ for validation scripts
+            
+            ### 🤖 AI Generation Details
+            
+            | Metric | Value |
+            |--------|-------|
+            | **Total Tokens Used** | ${{ steps.generate.outputs.total-tokens || 'Not available' }} |
+            | **Prompt Tokens** | ${{ steps.generate.outputs.prompt-tokens || 'Not available' }} |
+            | **Completion Tokens** | ${{ steps.generate.outputs.completion-tokens || 'Not available' }} |
+            | **API Calls Made** | ${{ steps.generate.outputs.api-calls || 'Not available' }} |
+            | **Model Used** | GPT-4 |
+            | **Generation Method** | AI-powered with reference codebundle context |
             
             ### Review Checklist
             - [ ] Review generated bash scripts for correctness

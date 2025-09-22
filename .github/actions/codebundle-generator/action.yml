@@ -17,7 +17,7 @@ inputs:
 outputs:
   codebundle-name:
     description: 'Generated codebundle directory name'
-  generated-scripts:
+  generated-files:
     description: 'List of generated bash scripts'
   generated-tasks:
     description: 'List of generated Robot Framework tasks'
@@ -57,10 +57,20 @@ runs:
         GITHUB_REPOSITORY: ${{ github.repository }}
     
     - name: Run codebundle generator
+      id: generator
       shell: bash
       run: |
         cd ${{ github.action_path }}
         python main.py
+        
+        # Debug: Show what was written to GITHUB_OUTPUT
+        echo "=== GITHUB_OUTPUT contents ==="
+        if [ -f "$GITHUB_OUTPUT" ]; then
+          cat "$GITHUB_OUTPUT"
+        else
+          echo "GITHUB_OUTPUT file not found: $GITHUB_OUTPUT"
+        fi
+        echo "=== End GITHUB_OUTPUT ==="
       env:
         INPUT_ISSUE_NUMBER: ${{ inputs.issue-number }}
         INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
