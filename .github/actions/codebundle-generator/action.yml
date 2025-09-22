@@ -83,13 +83,11 @@ runs:
           echo ""
           echo "=== Setting composite action outputs ==="
           
-          # Read each line and set as output
-          while IFS='=' read -r key value || [ -n "$key" ]; do
-            if [ -n "$key" ] && [ -n "$value" ]; then
-              echo "$key=$value" >> "${{ env.GITHUB_OUTPUT }}"
-              echo "Set output: $key=$value"
-            fi
-          done < "$OUTPUT_FILE"
+          # Read each line and set as output using grep and sed for safety
+          grep -E '^[a-zA-Z0-9_-]+=' "$OUTPUT_FILE" | while IFS='=' read -r key value; do
+            echo "$key=$value" >> "${{ env.GITHUB_OUTPUT }}"
+            echo "Set output: $key=$value"
+          done
         else
           echo "❌ Output file not found: $OUTPUT_FILE"
           # Set default failure outputs
