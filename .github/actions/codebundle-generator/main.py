@@ -1694,6 +1694,18 @@ def main():
             logger.info("Codebundle generation completed successfully!")
         else:
             logger.error("Codebundle generation failed!")
+            # Set failure outputs
+            github_output = os.environ.get('GITHUB_OUTPUT')
+            if github_output:
+                with open(github_output, 'a') as f:
+                    f.write(f"success=false\n")
+                    f.write(f"codebundle-name=generation-failed\n")
+                    f.write(f"generated-files=none\n")
+                    f.write(f"generated-tasks=0\n")
+                    f.write(f"total-tokens=0\n")
+                    f.write(f"prompt-tokens=0\n")
+                    f.write(f"completion-tokens=0\n")
+                    f.write(f"api-calls=0\n")
             exit(1)
             
     except Exception as e:
@@ -1703,6 +1715,13 @@ def main():
         if github_output:
             with open(github_output, 'a') as f:
                 f.write(f"success=false\n")
+                f.write(f"codebundle-name=fatal-error\n")
+                f.write(f"generated-files=none\n")
+                f.write(f"generated-tasks=0\n")
+                f.write(f"total-tokens=0\n")
+                f.write(f"prompt-tokens=0\n")
+                f.write(f"completion-tokens=0\n")
+                f.write(f"api-calls=0\n")
         exit(1)
 
 if __name__ == "__main__":
