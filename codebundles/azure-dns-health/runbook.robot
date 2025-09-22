@@ -1,12 +1,12 @@
 *** Settings ***
 Documentation       This taskset performs comprehensive DNS health monitoring and validation tasks for Azure environments.
-...                 Includes private/public DNS zone checks, cross-VNet resolution validation, broken record detection,
+...                 Includes private/public DNS zone checks, broken record detection,
 ...                 HA database checks, external resolution validation, forward lookup zones, and Express Route latency monitoring.
 ...                 Supports multiple FQDNs, multiple zones, and both Azure-specific and generic DNS monitoring scenarios.
 
-Metadata            Author    runwhen-contrib
+Metadata            Author    stewartshea
 Metadata            Display Name    Azure DNS Health & Monitoring (Multi-Zone)
-Metadata            Supports    Azure    DNS    Private DNS    Public DNS    Forward Zones    VNet    Express Route
+Metadata            Supports    Azure    DNS    Private DNS    Public DNS    Forward Zones    Express Route
 
 Library             BuiltIn
 Library             RW.Core
@@ -21,7 +21,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check Private DNS Zone Records
     [Documentation]    Verifies record counts and integrity for private DNS zones in the specified resource group(s)
-    [Tags]    azure    dns    private-dns    zone-records
+    [Tags]    access:read-only    azure    dns    private-dns    zone-records
     
     # Process multiple resource groups if specified
     @{resource_groups}=    Split String    ${RESOURCE_GROUPS}    ,
@@ -30,7 +30,7 @@ Check Private DNS Zone Records
         ${rg}=    Strip String    ${rg}
         Continue For Loop If    '${rg}' == ''
         
-        ${zone_check_cmd}=    Set Variable    az network private-dns zone list --resource-group "${rg}" --output json | jq -r '.[] | "Zone: " + .name + " Records: " + (.numberOfRecordSets | tostring) + " RG: ${rg}"'
+        ${zone_check_cmd}=    Set Variable    az network private-dns zone list --resource-group "${rg}" --output json | jq -r '.[] | "Zone: " + .name + " Records: " + (.numberOfRecordSets | tostring) + " RG: '${rg}'"'
         
         ${rsp}=    RW.CLI.Run Cli
         ...    cmd=${zone_check_cmd}
@@ -70,7 +70,7 @@ Check Private DNS Zone Records
 
 Check Public DNS Zone Records
     [Documentation]    Verifies record counts and integrity for public DNS zones in the specified resource group(s)
-    [Tags]    azure    dns    public-dns    zone-records
+    [Tags]    access:read-only    azure    dns    public-dns    zone-records
     
     # Process multiple resource groups if specified
     @{resource_groups}=    Split String    ${RESOURCE_GROUPS}    ,
@@ -79,7 +79,7 @@ Check Public DNS Zone Records
         ${rg}=    Strip String    ${rg}
         Continue For Loop If    '${rg}' == ''
         
-        ${zone_check_cmd}=    Set Variable    az network dns zone list --resource-group "${rg}" --output json | jq -r '.[] | "Zone: " + .name + " Records: " + (.numberOfRecordSets | tostring) + " RG: ${rg}"'
+        ${zone_check_cmd}=    Set Variable    az network dns zone list --resource-group "${rg}" --output json | jq -r '.[] | "Zone: " + .name + " Records: " + (.numberOfRecordSets | tostring) + " RG: '${rg}'"'
         
         ${rsp}=    RW.CLI.Run Cli
         ...    cmd=${zone_check_cmd}
@@ -88,6 +88,7 @@ Check Public DNS Zone Records
         RW.Core.Add Pre To Report    Public DNS Zone Records Check - Resource Group: ${rg}
         RW.Core.Add Pre To Report    Command: ${zone_check_cmd}
         RW.Core.Add Pre To Report    Output: ${rsp.stdout}
+        RW.Core.Add Pre To Report    Stderr: ${rsp.stderr}
         
         # Check for zones with minimal records (less than expected minimum)
         ${minimal_records_pattern}=    Set Variable    Records: [0-2]\\b
@@ -119,73 +120,15 @@ Check Public DNS Zone Records
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
-Validate DNS Resolution Across VNets
-    [Documentation]    Tests DNS resolution from each linked infrastructure VNet to confirm records resolve correctly for multiple FQDNs
-    [Tags]    azure    dns    vnet    resolution
-    
-    # Process multiple resource groups for VNet discovery
-    @{resource_groups}=    Split String    ${RESOURCE_GROUPS}    ,
-    @{test_fqdns}=    Split String    ${TEST_FQDNS}    ,
-    
-    FOR    ${rg}    IN    @{resource_groups}
-        ${rg}=    Strip String    ${rg}
-        Continue For Loop If    '${rg}' == ''
-        
-        # Get VNet information and test resolution
-        ${vnet_list_cmd}=    Set Variable    az network vnet list --resource-group "${rg}" --output json | jq -r '.[] | .name'
-        
-        ${rsp}=    RW.CLI.Run Cli
-        ...    cmd=${vnet_list_cmd}
-        ...    timeout_seconds=300
-        
-        ${vnets}=    Split String    ${rsp.stdout}    \n
-        
-        FOR    ${vnet}    IN    @{vnets}
-            ${vnet}=    Strip String    ${vnet}
-            Continue For Loop If    '${vnet}' == ''
-            
-            # Test each FQDN from this VNet
-            FOR    ${fqdn}    IN    @{test_fqdns}
-                ${fqdn}=    Strip String    ${fqdn}
-                Continue For Loop If    '${fqdn}' == ''
-                
-                # Test DNS resolution from VNet context
-                ${dns_test_cmd}=    Set Variable    nslookup ${fqdn} && echo "VNet: ${vnet} FQDN: ${fqdn} - DNS Resolution: SUCCESS" || echo "VNet: ${vnet} FQDN: ${fqdn} - DNS Resolution: FAILED"
-                
-                ${dns_rsp}=    RW.CLI.Run Cli
-                ...    cmd=${dns_test_cmd}
-                ...    timeout_seconds=60
-                
-                RW.Core.Add Pre To Report    DNS Resolution Test - VNet: ${vnet}, FQDN: ${fqdn}
-                RW.Core.Add Pre To Report    Command: ${dns_test_cmd}
-                RW.Core.Add Pre To Report    Output: ${dns_rsp.stdout}
-                
-                ${resolution_failed}=    Run Keyword And Return Status    Should Contain    ${dns_rsp.stdout}    FAILED
-                IF    ${resolution_failed}
-                    RW.Core.Add Issue
-                    ...    severity=2
-                    ...    expected=DNS resolution should work from all VNets for all FQDNs
-                    ...    actual=DNS resolution failed from VNet ${vnet} for FQDN ${fqdn}
-                    ...    title=DNS Resolution Failure in VNet ${vnet} for ${fqdn}
-                    ...    reproduce_hint=Test DNS resolution from VNet ${vnet} for FQDN ${fqdn}
-                    ...    details=VNet: ${vnet}\nFQDN: ${fqdn}\nResource Group: ${rg}\nResult: ${dns_rsp.stdout}
-                    ...    next_steps=1. Check VNet DNS configuration in ${rg}\n2. Verify private DNS zone links for ${fqdn}\n3. Test connectivity between VNet and DNS resolvers\n4. Check DNS forwarder configuration
-                END
-            END
-        END
-    END
-    
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Detect Broken Record Resolution
     [Documentation]    Implements repeated pull/flush/pull DNS checks for multiple FQDNs to detect failures before TTL expiry
-    [Tags]    azure    dns    resolution    consistency
+    [Tags]    access:read-only    azure    dns    resolution    consistency
     
     # Test all configured FQDNs with cache flush
-    @{all_fqdns}=    Split String    ${ALL_TEST_FQDNS}    ,
+    @{broken_resolution_fqdns}=    Split String    ${TEST_FQDNS}    ,
     
-    FOR    ${fqdn}    IN    @{all_fqdns}
+    FOR    ${fqdn}    IN    @{broken_resolution_fqdns}
         ${fqdn}=    Strip String    ${fqdn}
         Continue For Loop If    '${fqdn}' == ''
         
@@ -233,7 +176,7 @@ Detect Broken Record Resolution
 
 Test Forward Lookup Zones
     [Documentation]    Tests forward lookup zones and conditional forwarders for proper resolution
-    [Tags]    azure    dns    forward-lookup    conditional-forwarders
+    [Tags]    access:read-only    azure    dns    forward-lookup    conditional-forwarders
     
     # Test forward lookup zones if specified
     IF    '${FORWARD_LOOKUP_ZONES}' != ''
@@ -305,7 +248,7 @@ Test Forward Lookup Zones
 
 External Resolution Validation
     [Documentation]    Tests resolution of multiple public and private hosted domains through multiple resolvers, testing upstream forwarding
-    [Tags]    azure    dns    external    public    resolvers
+    [Tags]    access:read-only    azure    dns    external    public    resolvers
     
     # Test public domain resolution through multiple resolvers
     IF    '${PUBLIC_DOMAINS}' != ''
@@ -375,7 +318,7 @@ External Resolution Validation
 
 Express Route Latency and Saturation Check
     [Documentation]    Alerts if DNS queries through multiple forwarded zones show high latency or packet drops, indicating possible route congestion
-    [Tags]    azure    dns    express-route    latency    performance
+    [Tags]    access:read-only    azure    dns    express-route    latency    performance
     
     # Test DNS query latency through Express Route for multiple zones
     IF    '${EXPRESS_ROUTE_DNS_ZONES}' != ''
@@ -386,7 +329,7 @@ Express Route Latency and Saturation Check
             Continue For Loop If    '${zone}' == ''
             
             # Perform multiple DNS queries to measure latency
-            ${latency_test}=    Set Variable    for i in {1..10}; do echo "Query $i for ${zone}:"; time nslookup test.${zone} 2>&1 | grep real; sleep 1; done
+            ${latency_test}=    Set Variable    for i in {1..10}; do echo "Query $i for ${zone}:"; (time nslookup test.${zone} 2>&1) 2>&1 | grep -E "real|user|sys"; sleep 1; done
             
             ${latency_rsp}=    RW.CLI.Run Cli
             ...    cmd=${latency_test}
@@ -394,6 +337,19 @@ Express Route Latency and Saturation Check
             
             RW.Core.Add Pre To Report    Express Route DNS Latency Check - Zone: ${zone}
             RW.Core.Add Pre To Report    Latency Results: ${latency_rsp.stdout}
+            
+            # Check if no timing data was captured (domain doesn't exist)
+            ${no_timing_data}=    Run Keyword And Return Status    Should Be Empty    ${latency_rsp.stdout}
+            IF    ${no_timing_data}
+                RW.Core.Add Issue
+                ...    severity=1
+                ...    expected=Express Route DNS latency data should be available for zone ${zone}
+                ...    actual=No latency data captured for zone ${zone} - domain test.${zone} may not exist
+                ...    title=Express Route DNS Latency Data Unavailable for ${zone}
+                ...    reproduce_hint=Test DNS resolution for test.${zone} to verify domain existence
+                ...    details=Zone: ${zone}\nTest Domain: test.${zone}\nReason: Domain may not exist or DNS resolution failed\nLatency Results: ${latency_rsp.stdout}
+                ...    next_steps=1. Verify that test.${zone} domain exists\n2. Check DNS configuration for ${zone}\n3. Ensure proper DNS forwarder setup\n4. Test with a valid subdomain
+            END
             
             # Extract latency values and check for high latency
             ${high_latency_pattern}=    Set Variable    real\\s+0m([5-9]|[1-9][0-9])\\.[0-9]+s
@@ -427,48 +383,6 @@ Express Route Latency and Saturation Check
         END
     END
     
-    # Test for packet drops using ping to multiple DNS servers
-    IF    '${DNS_SERVER_IPS}' != ''
-        @{dns_servers}=    Split String    ${DNS_SERVER_IPS}    ,
-        
-        FOR    ${dns_server}    IN    @{dns_servers}
-            ${dns_server}=    Strip String    ${dns_server}
-            Continue For Loop If    '${dns_server}' == ''
-            
-            ${ping_test}=    Set Variable    ping -c 10 ${dns_server} | grep "packet loss"
-            ${ping_rsp}=    RW.CLI.Run Cli
-            ...    cmd=${ping_test}
-            ...    timeout_seconds=60
-            
-            RW.Core.Add Pre To Report    DNS Server Connectivity Test - Server: ${dns_server}
-            RW.Core.Add Pre To Report    Ping Results: ${ping_rsp.stdout}
-            
-            ${packet_loss}=    Run Keyword And Return Status    Should Match Regexp    ${ping_rsp.stdout}    [1-9][0-9]*% packet loss
-            IF    ${packet_loss}
-                RW.Core.Add Issue
-                ...    severity=2
-                ...    expected=No packet loss to DNS servers through Express Route
-                ...    actual=Packet loss detected to DNS server ${dns_server}
-                ...    title=Packet Loss to DNS Server ${dns_server} Through Express Route
-                ...    reproduce_hint=Test connectivity to DNS server ${dns_server}
-                ...    details=DNS Server: ${dns_server}\nPing Results: ${ping_rsp.stdout}
-                ...    next_steps=1. Check Express Route health\n2. Review network path to DNS server ${dns_server}\n3. Monitor Express Route performance\n4. Check for network congestion
-            END
-            
-            # Check for complete connectivity failures
-            ${ping_failed}=    Run Keyword And Return Status    Should Contain    ${ping_rsp.stdout}    100% packet loss
-            IF    ${ping_failed}
-                RW.Core.Add Issue
-                ...    severity=3
-                ...    expected=DNS servers should be reachable through Express Route
-                ...    actual=Complete connectivity failure to DNS server ${dns_server}
-                ...    title=DNS Server ${dns_server} Unreachable Through Express Route
-                ...    reproduce_hint=Test network connectivity to DNS server ${dns_server}
-                ...    details=DNS Server: ${dns_server} is completely unreachable\nPing Results: ${ping_rsp.stdout}
-                ...    next_steps=1. Check Express Route status\n2. Verify DNS server ${dns_server} is operational\n3. Review network routing\n4. Check firewall rules\n5. Validate Express Route peering
-            END
-        END
-    END
     
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -555,8 +469,8 @@ Suite Initialization
     # Create consolidated FQDN list for comprehensive testing
     ${all_fqdns_list}=    Create List
     IF    '${TEST_FQDNS}' != ''
-        @{test_fqdns}=    Split String    ${TEST_FQDNS}    ,
-        FOR    ${fqdn}    IN    @{test_fqdns}
+        @{init_test_fqdns}=    Split String    ${TEST_FQDNS}    ,
+        FOR    ${fqdn}    IN    @{init_test_fqdns}
             ${fqdn}=    Strip String    ${fqdn}
             Continue For Loop If    '${fqdn}' == ''
             Append To List    ${all_fqdns_list}    ${fqdn}

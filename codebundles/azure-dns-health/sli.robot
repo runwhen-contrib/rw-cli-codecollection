@@ -3,7 +3,7 @@ Documentation       This SLI measures DNS health metrics for Azure environments 
 ...                 latency measurements, and availability of DNS services across multiple VNets, zones, and FQDNs.
 ...                 Supports private DNS zones, public DNS zones, forward lookup zones, and comprehensive multi-FQDN testing.
 
-Metadata            Author    runwhen-contrib
+Metadata            Author    stewartshea
 Metadata            Display Name    Azure DNS Health Metrics (Multi-Zone)
 Metadata            Supports    Azure    DNS    Private DNS    Public DNS    Forward Zones    VNet    SLI
 
@@ -72,14 +72,19 @@ DNS Resolution Success Rate
         END
     END
     
-    # Calculate success rate percentage
+    # Calculate binary score (1=all pass, 0=any fail)
     IF    ${total_tests} > 0
-        ${success_rate}=    Evaluate    (${successful_tests} * 100) / ${total_tests}
+        IF    ${successful_tests} == ${total_tests}
+            ${dns_resolution_score}=    Set Variable    ${1}
+        ELSE
+            ${dns_resolution_score}=    Set Variable    ${0}
+        END
     ELSE
-        ${success_rate}=    Set Variable    ${100}
+        ${dns_resolution_score}=    Set Variable    ${1}
     END
     
-    RW.Core.Push Metric    ${success_rate}
+    Set Global Variable    ${dns_resolution_score}
+    RW.Core.Push Metric    ${dns_resolution_score}    sub_name=resolution_success
 
 DNS Query Latency
     [Documentation]    Measures average DNS query latency in milliseconds across all configured FQDNs and pushes the metric
@@ -150,20 +155,27 @@ DNS Query Latency
         END
     END
     
-    # Calculate average latency
+    # Calculate binary score (1=acceptable latency, 0=high latency)
     IF    ${query_count} > 0
         ${avg_latency}=    Evaluate    ${total_latency} / ${query_count}
+        # Binary score: 1 if <500ms, 0 if >=500ms
+        IF    ${avg_latency} < 500
+            ${dns_latency_score}=    Set Variable    ${1}
+        ELSE
+            ${dns_latency_score}=    Set Variable    ${0}
+        END
     ELSE
-        ${avg_latency}=    Set Variable    ${0}
+        ${dns_latency_score}=    Set Variable    ${0}
     END
     
-    RW.Core.Push Metric    ${avg_latency}
+    Set Global Variable    ${dns_latency_score}
+    RW.Core.Push Metric    ${dns_latency_score}    sub_name=latency_performance
 
 Private DNS Zone Health
     [Documentation]    Measures the health of private DNS zones across multiple resource groups (1 for healthy, 0 for unhealthy)
     [Tags]    azure    dns    private-dns    zone-health    sli
     
-    ${zone_health}=    Set Variable    ${1}
+    ${dns_zone_health_score}=    Set Variable    ${1}
     ${total_zones}=    Set Variable    ${0}
     ${healthy_zones}=    Set Variable    ${0}
     
@@ -182,9 +194,10 @@ Private DNS Zone Health
         
         IF    ${rsp.returncode} == 0
             ${zone_count_str}=    Strip String    ${rsp.stdout}
-            ${zone_count_valid}=    Run Keyword And Return Status    Should Match Regexp    ${zone_count_str}    ^[0-9]+$
-            IF    ${zone_count_valid}
-                ${zone_count}=    Convert To Integer    ${zone_count_str}
+            # Remove any ANSI escape codes and non-numeric characters
+            ${zone_count_clean}=    Get Regexp Matches    ${zone_count_str}    [0-9]+
+            IF    ${zone_count_clean}
+                ${zone_count}=    Convert To Integer    ${zone_count_clean[0]}
                 ${total_zones}=    Evaluate    ${total_zones} + ${zone_count}
                 
                 # Check for empty zones in this resource group
@@ -196,9 +209,10 @@ Private DNS Zone Health
                     
                     IF    ${record_rsp.returncode} == 0
                         ${healthy_zones_str}=    Strip String    ${record_rsp.stdout}
-                        ${healthy_zones_valid}=    Run Keyword And Return Status    Should Match Regexp    ${healthy_zones_str}    ^[0-9]+$
-                        IF    ${healthy_zones_valid}
-                            ${rg_healthy_zones}=    Convert To Integer    ${healthy_zones_str}
+                        # Remove any ANSI escape codes and non-numeric characters
+                        ${healthy_zones_clean}=    Get Regexp Matches    ${healthy_zones_str}    [0-9]+
+                        IF    ${healthy_zones_clean}
+                            ${rg_healthy_zones}=    Convert To Integer    ${healthy_zones_clean[0]}
                             ${healthy_zones}=    Evaluate    ${healthy_zones} + ${rg_healthy_zones}
                         END
                     END
@@ -212,16 +226,17 @@ Private DNS Zone Health
         ${health_percentage}=    Evaluate    (${healthy_zones} * 100) / ${total_zones}
         # Consider healthy if 80% or more zones have records
         IF    ${health_percentage} >= 80
-            ${zone_health}=    Set Variable    ${1}
+            ${dns_zone_health_score}=    Set Variable    ${1}
         ELSE
-            ${zone_health}=    Set Variable    ${0}
+            ${dns_zone_health_score}=    Set Variable    ${0}
         END
     ELSE
         # No zones found - could be healthy (no zones needed) or unhealthy (zones expected)
-        ${zone_health}=    Set Variable    ${1}
+        ${dns_zone_health_score}=    Set Variable    ${1}
     END
     
-    RW.Core.Push Metric    ${zone_health}
+    Set Global Variable    ${dns_zone_health_score}
+    RW.Core.Push Metric    ${dns_zone_health_score}    sub_name=zone_health
 
 External DNS Resolver Availability
     [Documentation]    Measures availability of external DNS resolvers (percentage of working resolvers)
@@ -287,10 +302,27 @@ External DNS Resolver Availability
         END
     END
     
-    # Calculate availability percentage
-    ${availability}=    Evaluate    (${working_resolvers} * 100) / ${total_resolvers}
+    # Calculate availability as binary score (1=all working, 0=any failing)
+    IF    ${total_resolvers} > 0
+        IF    ${working_resolvers} == ${total_resolvers}
+            ${dns_resolver_score}=    Set Variable    ${1}
+        ELSE
+            ${dns_resolver_score}=    Set Variable    ${0}
+        END
+    ELSE
+        ${dns_resolver_score}=    Set Variable    ${0}
+    END
     
-    RW.Core.Push Metric    ${availability}
+    Set Global Variable    ${dns_resolver_score}
+    RW.Core.Push Metric    ${dns_resolver_score}    sub_name=resolver_availability
+
+Generate DNS Health Score
+    [Documentation]    Calculates the overall DNS health score as the average of all individual task scores
+    [Tags]    azure    dns    aggregated    health    sli
+    
+    ${dns_health_score}=    Evaluate    (${dns_resolution_score} + ${dns_latency_score} + ${dns_zone_health_score} + ${dns_resolver_score}) / 4
+    ${health_score}=    Convert To Number    ${dns_health_score}    2
+    RW.Core.Push Metric    ${health_score}
 
 *** Keywords ***
 Suite Initialization

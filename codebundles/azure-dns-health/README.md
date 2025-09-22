@@ -10,7 +10,6 @@ This codebundle provides comprehensive DNS health monitoring for Azure environme
 - **External DNS Resolver Availability**: Tests availability of external DNS resolvers
 - **Forward Lookup Zone Testing**: Tests forward lookup zones and conditional forwarders
 - **Public Zone Testing**: Tests public DNS zones for external resolution
-- **Cross-VNet DNS Resolution**: Validates DNS resolution across multiple VNets
 - **Express Route Latency Monitoring**: Monitors DNS query latency through Express Route
 
 ## Configuration Variables
@@ -87,10 +86,6 @@ Verifies record counts and integrity for public DNS zones in the specified resou
 
 **Tags**: `azure`, `dns`, `public-dns`, `zone-records`
 
-### Validate DNS Resolution Across VNets
-Tests DNS resolution from each linked infrastructure VNet to confirm records resolve correctly for multiple FQDNs.
-
-**Tags**: `azure`, `dns`, `vnet`, `resolution`
 
 ### Detect Broken Record Resolution
 Implements repeated pull/flush/pull DNS checks for multiple FQDNs to detect failures before TTL expiry.
@@ -159,7 +154,7 @@ The codebundle pushes the following metrics:
 
 ### Common Issues
 
-1. **DNS Resolution Failures**: Check VNet DNS configuration and private DNS zone links
+1. **DNS Resolution Failures**: Check DNS configuration and private DNS zone links
 2. **High Latency**: Monitor Express Route performance and DNS forwarder configuration
 3. **Empty DNS Zones**: Verify DNS zone configuration and record sets
 4. **External Resolution Issues**: Check DNS forwarder configuration and upstream connectivity
