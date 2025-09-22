@@ -82,6 +82,20 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
 
+      - name: Debug Action Outputs
+        continue-on-error: true
+        run: |
+          echo "=== ACTION OUTPUTS DEBUG ==="
+          echo "codebundle-name: '${{ steps.generate.outputs.codebundle-name }}'"
+          echo "generated-files: '${{ steps.generate.outputs.generated-files }}'"
+          echo "generated-tasks: '${{ steps.generate.outputs.generated-tasks }}'"
+          echo "success: '${{ steps.generate.outputs.success }}'"
+          echo "total-tokens: '${{ steps.generate.outputs.total-tokens }}'"
+          echo "prompt-tokens: '${{ steps.generate.outputs.prompt-tokens }}'"
+          echo "completion-tokens: '${{ steps.generate.outputs.completion-tokens }}'"
+          echo "api-calls: '${{ steps.generate.outputs.api-calls }}'"
+          echo "=== END OUTPUTS DEBUG ==="
+
       - name: Check if codebundle was generated
         id: check-generation
         run: |
