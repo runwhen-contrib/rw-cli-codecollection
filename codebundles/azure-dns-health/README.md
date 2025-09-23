@@ -48,9 +48,6 @@ This codebundle provides comprehensive DNS health monitoring for Azure environme
   - Example: `dc01,mail,web`
   - Default: Empty
 
-- **`DNS_SERVER_IPS`**: Comma-separated list of DNS server IP addresses for connectivity testing
-  - Example: `10.0.0.4,10.0.1.4`
-  - Default: Empty
 
 ## SLI Tasks
 
@@ -132,7 +129,6 @@ variables:
   RESOURCE_GROUPS: "production-rg"
   TEST_FQDNS: "myapp.privatelink.database.windows.net"
   EXPRESS_ROUTE_DNS_ZONES: "internal.company.com,corp.company.com"
-  DNS_SERVER_IPS: "10.0.0.4,10.0.1.4"
 ```
 
 ## Prerequisites

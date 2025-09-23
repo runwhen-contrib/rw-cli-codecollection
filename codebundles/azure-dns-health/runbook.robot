@@ -445,13 +445,6 @@ Suite Initialization
     ...    example=internal.company.com,corp.company.com
     ...    default=""
     
-    ${FORWARD_LOOKUP_ZONES}=    RW.Core.Import User Variable    FORWARD_LOOKUP_ZONES
-    ...    type=string
-    ...    description=Comma-separated list of forward lookup zones to test (optional)
-    ...    pattern=.*
-    ...    example=internal.company.com,corp.local
-    ...    default=""
-    
     ${FORWARD_ZONE_TEST_SUBDOMAINS}=    RW.Core.Import User Variable    FORWARD_ZONE_TEST_SUBDOMAINS
     ...    type=string
     ...    description=Comma-separated list of subdomains to test in forward lookup zones (optional)
@@ -459,12 +452,6 @@ Suite Initialization
     ...    example=dc01,mail,web
     ...    default=""
     
-    ${DNS_SERVER_IPS}=    RW.Core.Import User Variable    DNS_SERVER_IPS
-    ...    type=string
-    ...    description=Comma-separated list of DNS server IP addresses for connectivity testing (optional)
-    ...    pattern=.*
-    ...    example=10.0.0.4,10.0.1.4
-    ...    default=""
     
     # Create consolidated FQDN list for comprehensive testing
     ${all_fqdns_list}=    Create List
@@ -505,5 +492,4 @@ Suite Initialization
     Set Suite Variable    ${PUBLIC_DOMAINS}
     Set Suite Variable    ${EXPRESS_ROUTE_DNS_ZONES}
     Set Suite Variable    ${FORWARD_ZONE_TEST_SUBDOMAINS}
-    Set Suite Variable    ${DNS_SERVER_IPS}
     Set Suite Variable    ${ALL_TEST_FQDNS}
