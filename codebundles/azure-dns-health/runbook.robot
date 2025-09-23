@@ -1,8 +1,9 @@
 *** Settings ***
 Documentation       This taskset performs comprehensive DNS health monitoring and validation tasks for Azure environments.
-...                 Includes private/public DNS zone checks, broken record detection,
-...                 HA database checks, external resolution validation, forward lookup zones, and Express Route latency monitoring.
-...                 Supports multiple FQDNs, multiple zones, and both Azure-specific and generic DNS monitoring scenarios.
+...                 Includes private/public DNS zone record validation, broken DNS resolution detection,
+...                 forward lookup zone testing, external resolution validation, and Express Route latency monitoring.
+...                 Provides detailed issue reporting with severity levels and actionable next steps.
+...                 Supports multiple FQDNs, resource groups, zones, and both Azure-specific and generic DNS monitoring scenarios.
 
 Metadata            Author    stewartshea
 Metadata            Display Name    Azure DNS Health & Monitoring (Multi-Zone)

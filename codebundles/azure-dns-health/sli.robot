@@ -1,7 +1,8 @@
 *** Settings ***
 Documentation       This SLI measures DNS health metrics for Azure environments including resolution success rates,
-...                 latency measurements, and availability of DNS services across multiple VNets, zones, and FQDNs.
-...                 Supports private DNS zones, public DNS zones, forward lookup zones, and comprehensive multi-FQDN testing.
+...                 latency measurements, private DNS zone health, and external DNS resolver availability.
+...                 Provides binary scoring (0/1) for each metric and calculates an overall DNS health score.
+...                 Supports multiple FQDNs, private/public DNS zones, forward lookup zones, and external resolver testing.
 
 Metadata            Author    stewartshea
 Metadata            Display Name    Azure DNS Health Metrics (Multi-Zone)
