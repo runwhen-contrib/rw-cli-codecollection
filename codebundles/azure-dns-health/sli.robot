@@ -59,19 +59,32 @@ DNS Resolution Success Rate
         END
     END
     
+    # Debug: Log what FQDNs are being tested
+    ${fqdn_count}=    Get Length    ${all_fqdns_list}
+    Log    DNS Resolution Test: Testing ${fqdn_count} FQDNs: ${all_fqdns_list}
+    
     # Test all FQDNs
     FOR    ${fqdn}    IN    @{all_fqdns_list}
         ${total_tests}=    Evaluate    ${total_tests} + 1
-        ${test_cmd}=    Set Variable    nslookup ${fqdn} >/dev/null 2>&1 && echo "SUCCESS" || echo "FAILED"
+        ${test_cmd}=    Set Variable    dig +short ${fqdn} @8.8.8.8 >/dev/null 2>&1 && echo "SUCCESS" || (nslookup ${fqdn} 8.8.8.8 >/dev/null 2>&1 && echo "SUCCESS" || echo "FAILED")
         ${rsp}=    RW.CLI.Run Cli
         ...    cmd=${test_cmd}
         ...    timeout_seconds=30
         
-        ${success}=    Run Keyword And Return Status    Should Contain    ${rsp.stdout}    SUCCESS
-        IF    ${success}
-            ${successful_tests}=    Evaluate    ${successful_tests} + 1
+        # Check for command execution failure first
+        IF    ${rsp.returncode} != 0
+            # Command failed to execute - treat as DNS failure
+            Log    DNS command failed for ${fqdn}: ${rsp.stderr}
+        ELSE
+            ${success}=    Run Keyword And Return Status    Should Contain    ${rsp.stdout}    SUCCESS
+            IF    ${success}
+                ${successful_tests}=    Evaluate    ${successful_tests} + 1
+            END
         END
     END
+    
+    # Debug: Log test results
+    Log    DNS Resolution Results: ${successful_tests}/${total_tests} tests passed
     
     # Calculate binary score (1=all pass, 0=any fail)
     IF    ${total_tests} > 0
@@ -81,7 +94,8 @@ DNS Resolution Success Rate
             ${dns_resolution_score}=    Set Variable    ${0}
         END
     ELSE
-        ${dns_resolution_score}=    Set Variable    ${1}
+        # No FQDNs configured for testing - this should be an error, not success
+        ${dns_resolution_score}=    Set Variable    ${0}
     END
     
     Set Global Variable    ${dns_resolution_score}
@@ -141,20 +155,28 @@ DNS Query Latency
     
     # Test latency for all FQDNs in the list
     FOR    ${fqdn}    IN    @{all_fqdns_list}
-        ${latency_cmd}=    Set Variable    time nslookup ${fqdn} 2>&1 | grep real | awk '{print $2}' | sed 's/[^0-9.]//g'
+        ${latency_cmd}=    Set Variable    start_time=$(date +%s.%N); dig +short ${fqdn} @8.8.8.8 >/dev/null 2>&1; end_time=$(date +%s.%N); echo "scale=3; ($end_time - $start_time) * 1000" | bc 2>/dev/null || echo "0"
         ${rsp}=    RW.CLI.Run Cli
         ...    cmd=${latency_cmd}
         ...    timeout_seconds=30
         
-        ${latency_str}=    Strip String    ${rsp.stdout}
-        ${latency_valid}=    Run Keyword And Return Status    Should Match Regexp    ${latency_str}    ^[0-9]+\\.?[0-9]*$
-        IF    ${latency_valid}
-            ${latency_seconds}=    Convert To Number    ${latency_str}
-            ${latency_ms}=    Evaluate    ${latency_seconds} * 1000
-            ${total_latency}=    Evaluate    ${total_latency} + ${latency_ms}
-            ${query_count}=    Evaluate    ${query_count} + 1
+        # Check for command execution failure first
+        IF    ${rsp.returncode} != 0
+            # Command failed to execute - skip this measurement
+            Log    DNS latency command failed for ${fqdn}: ${rsp.stderr}
+        ELSE
+            ${latency_str}=    Strip String    ${rsp.stdout}
+            ${latency_valid}=    Run Keyword And Return Status    Should Match Regexp    ${latency_str}    ^[0-9]+\\.?[0-9]*$
+            IF    ${latency_valid}
+                ${latency_ms}=    Convert To Number    ${latency_str}
+                ${total_latency}=    Evaluate    ${total_latency} + ${latency_ms}
+                ${query_count}=    Evaluate    ${query_count} + 1
+            END
         END
     END
+    
+    # Debug: Log latency test results
+    Log    DNS Latency Results: ${query_count} successful measurements, total latency: ${total_latency}ms
     
     # Calculate binary score (1=acceptable latency, 0=high latency)
     IF    ${query_count} > 0
@@ -232,8 +254,8 @@ Private DNS Zone Health
             ${dns_zone_health_score}=    Set Variable    ${0}
         END
     ELSE
-        # No zones found - could be healthy (no zones needed) or unhealthy (zones expected)
-        ${dns_zone_health_score}=    Set Variable    ${1}
+        # No zones found - this indicates missing configuration or access issues
+        ${dns_zone_health_score}=    Set Variable    ${0}
     END
     
     Set Global Variable    ${dns_zone_health_score}
@@ -248,14 +270,20 @@ External DNS Resolver Availability
     
     # Test default resolver
     ${total_resolvers}=    Evaluate    ${total_resolvers} + 1
-    ${test_cmd}=    Set Variable    nslookup google.com >/dev/null 2>&1 && echo "SUCCESS" || echo "FAILED"
+    ${test_cmd}=    Set Variable    dig +short google.com @8.8.8.8 >/dev/null 2>&1 && echo "SUCCESS" || (nslookup google.com 8.8.8.8 >/dev/null 2>&1 && echo "SUCCESS" || echo "FAILED")
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${test_cmd}
     ...    timeout_seconds=30
     
-    ${success}=    Run Keyword And Return Status    Should Contain    ${rsp.stdout}    SUCCESS
-    IF    ${success}
-        ${working_resolvers}=    Evaluate    ${working_resolvers} + 1
+    # Check for command execution failure first
+    IF    ${rsp.returncode} != 0
+        # Command failed to execute - treat as resolver failure
+        Log    Default resolver test command failed: ${rsp.stderr}
+    ELSE
+        ${success}=    Run Keyword And Return Status    Should Contain    ${rsp.stdout}    SUCCESS
+        IF    ${success}
+            ${working_resolvers}=    Evaluate    ${working_resolvers} + 1
+        END
     END
     
     # Test specific DNS resolvers if configured
@@ -271,9 +299,15 @@ External DNS Resolver Availability
             ...    cmd=${test_cmd}
             ...    timeout_seconds=30
             
-            ${success}=    Run Keyword And Return Status    Should Contain    ${rsp.stdout}    SUCCESS
-            IF    ${success}
-                ${working_resolvers}=    Evaluate    ${working_resolvers} + 1
+            # Check for command execution failure first
+            IF    ${rsp.returncode} != 0
+                # Command failed to execute - treat as resolver failure
+                Log    Resolver ${resolver} test command failed: ${rsp.stderr}
+            ELSE
+                ${success}=    Run Keyword And Return Status    Should Contain    ${rsp.stdout}    SUCCESS
+                IF    ${success}
+                    ${working_resolvers}=    Evaluate    ${working_resolvers} + 1
+                END
             END
         END
     ELSE
@@ -285,9 +319,15 @@ External DNS Resolver Availability
         ...    cmd=${test_cmd}
         ...    timeout_seconds=30
         
-        ${success}=    Run Keyword And Return Status    Should Contain    ${rsp.stdout}    SUCCESS
-        IF    ${success}
-            ${working_resolvers}=    Evaluate    ${working_resolvers} + 1
+        # Check for command execution failure first
+        IF    ${rsp.returncode} != 0
+            # Command failed to execute - treat as resolver failure
+            Log    Google DNS (8.8.8.8) test command failed: ${rsp.stderr}
+        ELSE
+            ${success}=    Run Keyword And Return Status    Should Contain    ${rsp.stdout}    SUCCESS
+            IF    ${success}
+                ${working_resolvers}=    Evaluate    ${working_resolvers} + 1
+            END
         END
         
         # Test Cloudflare DNS (1.1.1.1)
@@ -297,9 +337,15 @@ External DNS Resolver Availability
         ...    cmd=${test_cmd}
         ...    timeout_seconds=30
         
-        ${success}=    Run Keyword And Return Status    Should Contain    ${rsp.stdout}    SUCCESS
-        IF    ${success}
-            ${working_resolvers}=    Evaluate    ${working_resolvers} + 1
+        # Check for command execution failure first
+        IF    ${rsp.returncode} != 0
+            # Command failed to execute - treat as resolver failure
+            Log    Cloudflare DNS (1.1.1.1) test command failed: ${rsp.stderr}
+        ELSE
+            ${success}=    Run Keyword And Return Status    Should Contain    ${rsp.stdout}    SUCCESS
+            IF    ${success}
+                ${working_resolvers}=    Evaluate    ${working_resolvers} + 1
+            END
         END
     END
     

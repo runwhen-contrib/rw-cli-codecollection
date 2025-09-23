@@ -133,7 +133,7 @@ Detect Broken Record Resolution
         ${fqdn}=    Strip String    ${fqdn}
         Continue For Loop If    '${fqdn}' == ''
         
-        ${dns_test}=    Set Variable    for i in {1..3}; do echo "=== Test $i for ${fqdn} ==="; nslookup ${fqdn}; sleep 2; sudo systemctl flush-dns 2>/dev/null || echo "DNS flush attempted"; sleep 1; done
+        ${dns_test}=    Set Variable    for i in {1..3}; do echo "=== Test $i for ${fqdn} ==="; dig +nocmd +noall +answer ${fqdn} @8.8.8.8 || nslookup ${fqdn} 8.8.8.8; sleep 2; done
         
         ${rsp}=    RW.CLI.Run Cli
         ...    cmd=${dns_test}
