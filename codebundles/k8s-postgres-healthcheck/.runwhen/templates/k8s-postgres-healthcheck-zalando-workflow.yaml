@@ -8,8 +8,8 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   fromActivities:
-  - displayName: {{ match_resource.resource_group.name }} Zalando Postgres SLI Alert Workflow
-    description: Start RunSession with Eager Edgar when SLI is alerting for {{ match_resource.resource_group.name }} Zalando Postgres health
+  - displayName: {{match_resource.resource.metadata.name}} Zalando Postgres SLI Alert Workflow
+    description: Start RunSession with Eager Edgar when SLI is alerting for {{match_resource.resource.metadata.name}} Zalando Postgres health
     actions:
     - tasks:
         slx: {{slx_name.split('--')[1]}}
@@ -22,4 +22,4 @@ spec:
       - SLI_ALERTS_STARTED
       slxs:
       - {{slx_name.split('--')[1]}}
-    name: {{ match_resource.resource_group.name }}-{{ "Zalando Postgres SLI Alert Workflow" | replace(" ", "-") | lower }}
+    name: {{match_resource.resource.metadata.name}}-{{ "Zalando Postgres SLI Alert Workflow" | replace(" ", "-") | lower }}
