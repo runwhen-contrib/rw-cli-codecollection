@@ -1,0 +1,24 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: azure
+  generationRules:
+    - resourceTypes:
+        - azure_network_dns_zones
+        - azure_network_private_dns_zones
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: az-dns-health
+          qualifiers: [subscription_id]
+          baseTemplateName: azure-dns-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: azure-dns-health-taskset.yaml
+            - type: workflow

@@ -25,3 +25,21 @@ variable "sp_principal_id" {
   type        = string
   default     = ""
 }
+
+variable "public_domain" {
+  description = "Public domain for DNS testing (should be a real domain you control)"
+  type        = string
+  default     = "dns-health-test.azure.runwhen.com"
+}
+
+variable "parent_domain_name" {
+  description = "Parent domain name for DNS delegation (e.g., azure.runwhen.com)"
+  type        = string
+  default     = "azure.runwhen.com"
+}
+
+variable "parent_domain_resource_group" {
+  description = "Resource group containing the parent domain"
+  type        = string
+  default     = "nonprod-network"
+}

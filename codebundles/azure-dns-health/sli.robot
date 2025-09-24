@@ -49,13 +49,13 @@ DNS Resolution Success Rate
         END
     END
     
-    # Add public zones
-    IF    '${PUBLIC_ZONES}' != ''
-        @{public_zones}=    Split String    ${PUBLIC_ZONES}    ,
-        FOR    ${zone}    IN    @{public_zones}
-            ${zone}=    Strip String    ${zone}
-            Continue For Loop If    '${zone}' == ''
-            Append To List    ${all_fqdns_list}    ${zone}
+    # Add public domains
+    IF    '${PUBLIC_DOMAINS}' != ''
+        @{public_domains}=    Split String    ${PUBLIC_DOMAINS}    ,
+        FOR    ${domain}    IN    @{public_domains}
+            ${domain}=    Strip String    ${domain}
+            Continue For Loop If    '${domain}' == ''
+            Append To List    ${all_fqdns_list}    ${domain}
         END
     END
     
@@ -63,23 +63,19 @@ DNS Resolution Success Rate
     ${fqdn_count}=    Get Length    ${all_fqdns_list}
     Log    DNS Resolution Test: Testing ${fqdn_count} FQDNs: ${all_fqdns_list}
     
-    # Test all FQDNs
+    # Fast DNS resolution test (optimized for SLI speed)
     FOR    ${fqdn}    IN    @{all_fqdns_list}
         ${total_tests}=    Evaluate    ${total_tests} + 1
-        ${test_cmd}=    Set Variable    dig +short ${fqdn} @8.8.8.8 >/dev/null 2>&1 && echo "SUCCESS" || (nslookup ${fqdn} 8.8.8.8 >/dev/null 2>&1 && echo "SUCCESS" || echo "FAILED")
+        # Use faster dig with short timeout for SLI
+        ${test_cmd}=    Set Variable    timeout 5 dig +short +time=2 +tries=1 ${fqdn} @8.8.8.8 | head -1 | grep -q . && echo "SUCCESS" || echo "FAILED"
         ${rsp}=    RW.CLI.Run Cli
         ...    cmd=${test_cmd}
-        ...    timeout_seconds=30
+        ...    timeout_seconds=8
         
-        # Check for command execution failure first
-        IF    ${rsp.returncode} != 0
-            # Command failed to execute - treat as DNS failure
-            Log    DNS command failed for ${fqdn}: ${rsp.stderr}
-        ELSE
-            ${success}=    Run Keyword And Return Status    Should Contain    ${rsp.stdout}    SUCCESS
-            IF    ${success}
-                ${successful_tests}=    Evaluate    ${successful_tests} + 1
-            END
+        # Quick success check
+        ${success}=    Run Keyword And Return Status    Should Contain    ${rsp.stdout}    SUCCESS
+        IF    ${success}
+            ${successful_tests}=    Evaluate    ${successful_tests} + 1
         END
     END
     
@@ -138,35 +134,37 @@ DNS Query Latency
         END
     END
     
-    # Add public zones if we have room
-    IF    '${PUBLIC_ZONES}' != ''
+    # Add public domains if we have room
+    IF    '${PUBLIC_DOMAINS}' != ''
         ${list_length}=    Get Length    ${all_fqdns_list}
         IF    ${list_length} < 10
-            @{public_zones}=    Split String    ${PUBLIC_ZONES}    ,
-            FOR    ${zone}    IN    @{public_zones}
-                ${zone}=    Strip String    ${zone}
-                Continue For Loop If    '${zone}' == ''
-                Append To List    ${all_fqdns_list}    ${zone}
+            @{public_domains}=    Split String    ${PUBLIC_DOMAINS}    ,
+            FOR    ${domain}    IN    @{public_domains}
+                ${domain}=    Strip String    ${domain}
+                Continue For Loop If    '${domain}' == ''
+                Append To List    ${all_fqdns_list}    ${domain}
                 ${list_length}=    Get Length    ${all_fqdns_list}
                 Exit For Loop If    ${list_length} >= 10
             END
         END
     END
     
-    # Test latency for all FQDNs in the list
-    FOR    ${fqdn}    IN    @{all_fqdns_list}
-        ${latency_cmd}=    Set Variable    start_time=$(date +%s.%N); dig +short ${fqdn} @8.8.8.8 >/dev/null 2>&1; end_time=$(date +%s.%N); echo "scale=3; ($end_time - $start_time) * 1000" | bc 2>/dev/null || echo "0"
+    # Fast latency test for SLI (limit to first 3 FQDNs for speed)
+    ${test_limit}=    Set Variable    3
+    ${fqdn_count}=    Get Length    ${all_fqdns_list}
+    ${actual_limit}=    Set Variable If    ${fqdn_count} < ${test_limit}    ${fqdn_count}    ${test_limit}
+    
+    FOR    ${i}    IN RANGE    ${actual_limit}
+        ${fqdn}=    Get From List    ${all_fqdns_list}    ${i}
+        # Faster latency measurement without bc dependency
+        ${latency_cmd}=    Set Variable    timeout 5 bash -c 'start=$(date +%s%N); dig +short +time=2 +tries=1 ${fqdn} @8.8.8.8 >/dev/null 2>&1; end=$(date +%s%N); echo $((($end - $start) / 1000000))'
         ${rsp}=    RW.CLI.Run Cli
         ...    cmd=${latency_cmd}
-        ...    timeout_seconds=30
+        ...    timeout_seconds=8
         
-        # Check for command execution failure first
-        IF    ${rsp.returncode} != 0
-            # Command failed to execute - skip this measurement
-            Log    DNS latency command failed for ${fqdn}: ${rsp.stderr}
-        ELSE
+        IF    ${rsp.returncode} == 0 and '${rsp.stdout.strip()}' != ''
             ${latency_str}=    Strip String    ${rsp.stdout}
-            ${latency_valid}=    Run Keyword And Return Status    Should Match Regexp    ${latency_str}    ^[0-9]+\\.?[0-9]*$
+            ${latency_valid}=    Run Keyword And Return Status    Should Match Regexp    ${latency_str}    ^[0-9]+$
             IF    ${latency_valid}
                 ${latency_ms}=    Convert To Number    ${latency_str}
                 ${total_latency}=    Evaluate    ${total_latency} + ${latency_ms}
@@ -202,44 +200,39 @@ Private DNS Zone Health
     ${total_zones}=    Set Variable    ${0}
     ${healthy_zones}=    Set Variable    ${0}
     
-    # Check private DNS zones in all resource groups
+    # Fast private DNS zone health check (single call per RG)
     @{resource_groups}=    Split String    ${RESOURCE_GROUPS}    ,
     
     FOR    ${rg}    IN    @{resource_groups}
         ${rg}=    Strip String    ${rg}
         Continue For Loop If    '${rg}' == ''
         
-        # Check zone count in this resource group
-        ${zone_check_cmd}=    Set Variable    az network private-dns zone list --resource-group "${rg}" --output json | jq -r 'length'
-        ${rsp}=    RW.CLI.Run Cli
-        ...    cmd=${zone_check_cmd}
-        ...    timeout_seconds=120
+        # Get total zone count
+        ${total_cmd}=    Set Variable    timeout 15 az network private-dns zone list --resource-group "${rg}" --query "length(@)" --output tsv 2>/dev/null || echo "0"
+        ${total_rsp}=    RW.CLI.Run Cli
+        ...    cmd=${total_cmd}
+        ...    timeout_seconds=20
         
-        IF    ${rsp.returncode} == 0
-            ${zone_count_str}=    Strip String    ${rsp.stdout}
-            # Remove any ANSI escape codes and non-numeric characters
-            ${zone_count_clean}=    Get Regexp Matches    ${zone_count_str}    [0-9]+
-            IF    ${zone_count_clean}
-                ${zone_count}=    Convert To Integer    ${zone_count_clean[0]}
-                ${total_zones}=    Evaluate    ${total_zones} + ${zone_count}
-                
-                # Check for empty zones in this resource group
-                IF    ${zone_count} > 0
-                    ${record_check_cmd}=    Set Variable    az network private-dns zone list --resource-group "${rg}" --output json | jq -r '.[] | select(.numberOfRecordSets > 0) | .name' | wc -l
-                    ${record_rsp}=    RW.CLI.Run Cli
-                    ...    cmd=${record_check_cmd}
-                    ...    timeout_seconds=120
-                    
-                    IF    ${record_rsp.returncode} == 0
-                        ${healthy_zones_str}=    Strip String    ${record_rsp.stdout}
-                        # Remove any ANSI escape codes and non-numeric characters
-                        ${healthy_zones_clean}=    Get Regexp Matches    ${healthy_zones_str}    [0-9]+
-                        IF    ${healthy_zones_clean}
-                            ${rg_healthy_zones}=    Convert To Integer    ${healthy_zones_clean[0]}
-                            ${healthy_zones}=    Evaluate    ${healthy_zones} + ${rg_healthy_zones}
-                        END
-                    END
-                END
+        # Get healthy zone count (zones with records)
+        ${healthy_cmd}=    Set Variable    timeout 15 az network private-dns zone list --resource-group "${rg}" --query "[?numberOfRecordSets > \`0\`] | length(@)" --output tsv 2>/dev/null || echo "0"
+        ${healthy_rsp}=    RW.CLI.Run Cli
+        ...    cmd=${healthy_cmd}
+        ...    timeout_seconds=20
+        
+        # Process results if both commands succeeded
+        IF    ${total_rsp.returncode} == 0 and ${healthy_rsp.returncode} == 0
+            ${rg_total_str}=    Set Variable    ${total_rsp.stdout.strip()}
+            ${rg_healthy_str}=    Set Variable    ${healthy_rsp.stdout.strip()}
+            
+            # Only convert if they're actually numbers
+            ${is_total_numeric}=    Run Keyword And Return Status    Should Match Regexp    ${rg_total_str}    ^\\d+$
+            ${is_healthy_numeric}=    Run Keyword And Return Status    Should Match Regexp    ${rg_healthy_str}    ^\\d+$
+            
+            IF    ${is_total_numeric} and ${is_healthy_numeric}
+                ${rg_total}=    Convert To Integer    ${rg_total_str}
+                ${rg_healthy}=    Convert To Integer    ${rg_healthy_str}
+                ${total_zones}=    Evaluate    ${total_zones} + ${rg_total}
+                ${healthy_zones}=    Evaluate    ${healthy_zones} + ${rg_healthy}
             END
         END
     END
@@ -268,84 +261,32 @@ External DNS Resolver Availability
     ${total_resolvers}=    Set Variable    ${0}
     ${working_resolvers}=    Set Variable    ${0}
     
-    # Test default resolver
-    ${total_resolvers}=    Evaluate    ${total_resolvers} + 1
-    ${test_cmd}=    Set Variable    dig +short google.com @8.8.8.8 >/dev/null 2>&1 && echo "SUCCESS" || (nslookup google.com 8.8.8.8 >/dev/null 2>&1 && echo "SUCCESS" || echo "FAILED")
-    ${rsp}=    RW.CLI.Run Cli
-    ...    cmd=${test_cmd}
-    ...    timeout_seconds=30
+    # Fast resolver availability test (parallel testing)
+    @{test_resolvers}=    Create List    8.8.8.8    1.1.1.1
     
-    # Check for command execution failure first
-    IF    ${rsp.returncode} != 0
-        # Command failed to execute - treat as resolver failure
-        Log    Default resolver test command failed: ${rsp.stderr}
-    ELSE
-        ${success}=    Run Keyword And Return Status    Should Contain    ${rsp.stdout}    SUCCESS
-        IF    ${success}
-            ${working_resolvers}=    Evaluate    ${working_resolvers} + 1
+    # Add custom resolvers if configured (limit to first 2 for SLI speed)
+    IF    '${DNS_RESOLVERS}' != ''
+        @{custom_resolvers}=    Split String    ${DNS_RESOLVERS}    ,
+        ${custom_count}=    Get Length    ${custom_resolvers}
+        ${limit}=    Set Variable If    ${custom_count} > 2    2    ${custom_count}
+        FOR    ${i}    IN RANGE    ${limit}
+            ${resolver}=    Strip String    ${custom_resolvers}[${i}]
+            Continue For Loop If    '${resolver}' == ''
+            Append To List    ${test_resolvers}    ${resolver}
         END
     END
     
-    # Test specific DNS resolvers if configured
-    IF    '${DNS_RESOLVERS}' != ''
-        @{resolvers}=    Split String    ${DNS_RESOLVERS}    ,
-        FOR    ${resolver}    IN    @{resolvers}
-            ${resolver}=    Strip String    ${resolver}
-            Continue For Loop If    '${resolver}' == ''
-            
-            ${total_resolvers}=    Evaluate    ${total_resolvers} + 1
-            ${test_cmd}=    Set Variable    nslookup google.com ${resolver} >/dev/null 2>&1 && echo "SUCCESS" || echo "FAILED"
-            ${rsp}=    RW.CLI.Run Cli
-            ...    cmd=${test_cmd}
-            ...    timeout_seconds=30
-            
-            # Check for command execution failure first
-            IF    ${rsp.returncode} != 0
-                # Command failed to execute - treat as resolver failure
-                Log    Resolver ${resolver} test command failed: ${rsp.stderr}
-            ELSE
-                ${success}=    Run Keyword And Return Status    Should Contain    ${rsp.stdout}    SUCCESS
-                IF    ${success}
-                    ${working_resolvers}=    Evaluate    ${working_resolvers} + 1
-                END
-            END
-        END
-    ELSE
-        # Test default external resolvers if no specific resolvers configured
-        # Test Google DNS (8.8.8.8)
+    # Test all resolvers with fast timeout
+    FOR    ${resolver}    IN    @{test_resolvers}
         ${total_resolvers}=    Evaluate    ${total_resolvers} + 1
-        ${test_cmd}=    Set Variable    nslookup google.com 8.8.8.8 >/dev/null 2>&1 && echo "SUCCESS" || echo "FAILED"
+        ${test_cmd}=    Set Variable    timeout 3 dig +short +time=1 +tries=1 google.com @${resolver} | grep -q . && echo "SUCCESS" || echo "FAILED"
         ${rsp}=    RW.CLI.Run Cli
         ...    cmd=${test_cmd}
-        ...    timeout_seconds=30
+        ...    timeout_seconds=5
         
-        # Check for command execution failure first
-        IF    ${rsp.returncode} != 0
-            # Command failed to execute - treat as resolver failure
-            Log    Google DNS (8.8.8.8) test command failed: ${rsp.stderr}
-        ELSE
-            ${success}=    Run Keyword And Return Status    Should Contain    ${rsp.stdout}    SUCCESS
-            IF    ${success}
-                ${working_resolvers}=    Evaluate    ${working_resolvers} + 1
-            END
-        END
-        
-        # Test Cloudflare DNS (1.1.1.1)
-        ${total_resolvers}=    Evaluate    ${total_resolvers} + 1
-        ${test_cmd}=    Set Variable    nslookup google.com 1.1.1.1 >/dev/null 2>&1 && echo "SUCCESS" || echo "FAILED"
-        ${rsp}=    RW.CLI.Run Cli
-        ...    cmd=${test_cmd}
-        ...    timeout_seconds=30
-        
-        # Check for command execution failure first
-        IF    ${rsp.returncode} != 0
-            # Command failed to execute - treat as resolver failure
-            Log    Cloudflare DNS (1.1.1.1) test command failed: ${rsp.stderr}
-        ELSE
-            ${success}=    Run Keyword And Return Status    Should Contain    ${rsp.stdout}    SUCCESS
-            IF    ${success}
-                ${working_resolvers}=    Evaluate    ${working_resolvers} + 1
-            END
+        ${success}=    Run Keyword And Return Status    Should Contain    ${rsp.stdout}    SUCCESS
+        IF    ${success}
+            ${working_resolvers}=    Evaluate    ${working_resolvers} + 1
         END
     END
     
@@ -380,45 +321,134 @@ Suite Initialization
     ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
     ...    pattern=.*
     
-    # Import required configuration variables
+    # Import auto-discovery configuration
+    ${AUTO_DISCOVER_DNS_RESOURCES}=    RW.Core.Import User Variable    AUTO_DISCOVER_DNS_RESOURCES
+    ...    type=string
+    ...    description=Enable automatic discovery of Azure DNS resources (true/false). When enabled, reduces required configuration to just Azure credentials.
+    ...    pattern=^(true|false)$
+    ...    example=true
+    ...    default=false
+    
+    ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_RESOURCE_SUBSCRIPTION_ID
+    ...    type=string
+    ...    description=Azure subscription ID for auto-discovery and resource access. Leave empty to use current Azure CLI subscription.
+    ...    pattern=^$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+    ...    example=2a0cf760-baef-4446-b75c-75c4f8a6267f
+    ...    default=""
+    
+    # Import configuration variables (optional when auto-discovery is enabled)
     ${RESOURCE_GROUPS}=    RW.Core.Import User Variable    RESOURCE_GROUPS
     ...    type=string
-    ...    description=Comma-separated list of Azure resource groups containing DNS zones and VNets
-    ...    pattern=.*
-    ...    example=my-plink-rg,production-rg,network-rg
+    ...    description=Azure resource groups containing your DNS zones (comma-separated if multiple). Leave empty to use auto-discovery. Example: production-rg or network-rg,app-rg
+    ...    pattern=^$|^[a-zA-Z0-9._-]+(,[a-zA-Z0-9._-]+)*$
+    ...    example=production-rg
+    ...    default=""
     
     ${TEST_FQDNS}=    RW.Core.Import User Variable    TEST_FQDNS
     ...    type=string
-    ...    description=Comma-separated list of FQDNs to test for DNS resolution
-    ...    pattern=.*
-    ...    example=myapp.privatelink.database.windows.net,myapi.privatelink.azurewebsites.net
+    ...    description=Important domains/services to monitor for DNS resolution (comma-separated if multiple). Leave empty to use auto-discovery. Example: myapp.database.windows.net or api.mycompany.com,db.mycompany.com
+    ...    pattern=^$|^[a-zA-Z0-9.-]+(,[a-zA-Z0-9.-]+)*$
+    ...    example=myapp.database.windows.net
+    ...    default=""
     
     # Import optional DNS testing configuration
     ${FORWARD_LOOKUP_ZONES}=    RW.Core.Import User Variable    FORWARD_LOOKUP_ZONES
     ...    type=string
-    ...    description=Comma-separated list of forward lookup zones to test (optional)
-    ...    pattern=.*
-    ...    example=internal.company.com,corp.local
+    ...    description=Internal company domains that forward to on-premises DNS (optional, for hybrid environments). Example: internal.company.com
+    ...    pattern=^$|^[a-zA-Z0-9.-]+(,[a-zA-Z0-9.-]+)*$
+    ...    example=internal.company.com
     ...    default=""
     
-    ${PUBLIC_ZONES}=    RW.Core.Import User Variable    PUBLIC_ZONES
+    ${PUBLIC_DOMAINS}=    RW.Core.Import User Variable    PUBLIC_DOMAINS
     ...    type=string
-    ...    description=Comma-separated list of public DNS zones to test (optional)
-    ...    pattern=.*
-    ...    example=example.com,mycompany.com
+    ...    description=Your public websites to test external DNS resolution (optional). Example: mycompany.com,blog.mycompany.com
+    ...    pattern=^$|^[a-zA-Z0-9.-]+(,[a-zA-Z0-9.-]+)*$
+    ...    example=mycompany.com
     ...    default=""
     
     ${DNS_RESOLVERS}=    RW.Core.Import User Variable    DNS_RESOLVERS
     ...    type=string
-    ...    description=Comma-separated list of specific DNS resolvers to test against (optional)
-    ...    pattern=.*
-    ...    example=8.8.8.8,1.1.1.1,10.0.0.4
+    ...    description=Custom DNS servers to test against (optional, uses Google/Cloudflare if empty). Example: 10.0.0.4,10.0.1.4
+    ...    pattern=^$|^[0-9.]+(,[0-9.]+)*$
+    ...    example=10.0.0.4
     ...    default=""
+    
+    # Lightweight auto-discovery for SLI (cache-first approach)
+    IF    "${AUTO_DISCOVER_DNS_RESOURCES}" == "true"
+        Log    Auto-discovery enabled for SLI. Checking for cached results...
+        
+        # Check if recent discovery results exist (avoid expensive re-discovery)
+        ${discovery_exists}=    Run Keyword And Return Status    File Should Exist    ${CURDIR}/azure_dns_discovery.json
+        ${cache_valid}=    Set Variable    ${False}
+        
+        IF    ${discovery_exists}
+            # Check if cache is recent (less than 1 hour old)
+            ${cache_check}=    RW.CLI.Run Cli
+            ...    cmd=find ${CURDIR}/azure_dns_discovery.json -mmin -60 | wc -l
+            ...    timeout_seconds=5
+            
+            ${cache_valid}=    Run Keyword And Return Status    Should Be Equal As Strings    ${cache_check.stdout.strip()}    1
+        END
+        
+        # Only run discovery if no valid cache exists
+        IF    not ${cache_valid}
+            Log    No valid cache found. Running lightweight discovery for SLI...
+            
+            # Run discovery script (same as runbook but with shorter timeout for SLI)
+            ${discovery_result}=    RW.CLI.Run Cli
+            ...    cmd=cd ${CURDIR} && AZURE_RESOURCE_SUBSCRIPTION_ID="${AZURE_RESOURCE_SUBSCRIPTION_ID}" bash azure_dns_auto_discovery.sh
+            ...    timeout_seconds=60
+            
+            ${discovery_exists}=    Run Keyword And Return Status    File Should Exist    ${CURDIR}/azure_dns_discovery.json
+        END
+        
+        # Parse results efficiently
+        IF    ${discovery_exists}
+            ${auto_resource_groups_result}=    RW.CLI.Run Cli
+            ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.resource_groups | join(",") // ""'
+            ...    timeout_seconds=10
+            ${auto_resource_groups}=    Set Variable    ${auto_resource_groups_result.stdout.strip()}
+            
+            ${auto_test_fqdns_result}=    RW.CLI.Run Cli
+            ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.suggested_test_fqdns | join(",") // ""'
+            ...    timeout_seconds=10
+            ${auto_test_fqdns}=    Set Variable    ${auto_test_fqdns_result.stdout.strip()}
+            
+            ${auto_forward_zones_result}=    RW.CLI.Run Cli
+            ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.forward_lookup_zones | join(",") // ""'
+            ...    timeout_seconds=10
+            ${auto_forward_zones}=    Set Variable    ${auto_forward_zones_result.stdout.strip()}
+            
+            ${auto_public_domains_result}=    RW.CLI.Run Cli
+            ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.public_dns_zones | join(",") // ""'
+            ...    timeout_seconds=10
+            ${auto_public_domains}=    Set Variable    ${auto_public_domains_result.stdout.strip()}
+            
+            ${auto_dns_resolvers_result}=    RW.CLI.Run Cli
+            ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.dns_resolvers | join(",") // ""'
+            ...    timeout_seconds=10
+            ${auto_dns_resolvers}=    Set Variable    ${auto_dns_resolvers_result.stdout.strip()}
+            
+            # When auto-discovery is enabled, always use discovered values (same as runbook)
+            ${RESOURCE_GROUPS}=    Set Variable    ${auto_resource_groups}
+            ${TEST_FQDNS}=    Set Variable    ${auto_test_fqdns}
+            ${FORWARD_LOOKUP_ZONES}=    Set Variable    ${auto_forward_zones}
+            ${PUBLIC_DOMAINS}=    Set Variable    ${auto_public_domains}
+            ${DNS_RESOLVERS}=    Set Variable    ${auto_dns_resolvers}
+            
+            ${cache_status}=    Set Variable If    ${cache_valid}    cached    fresh
+            Log    SLI auto-discovery completed using ${cache_status} results.
+        ELSE
+            Log    Auto-discovery failed for SLI. Using manual configuration.
+        END
+    END
     
     # Set all suite variables
     Set Suite Variable    ${azure_credentials}
+    Set Suite Variable    ${AUTO_DISCOVER_DNS_RESOURCES}
+    Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     Set Suite Variable    ${RESOURCE_GROUPS}
     Set Suite Variable    ${TEST_FQDNS}
     Set Suite Variable    ${FORWARD_LOOKUP_ZONES}
-    Set Suite Variable    ${PUBLIC_ZONES}
+    Set Suite Variable    ${PUBLIC_DOMAINS}
     Set Suite Variable    ${DNS_RESOLVERS}
