@@ -24,4 +24,3 @@ spec:
             - type: sli
             - type: runbook
               templateName: azure-appservice-webapp-health-taskset.yaml
-            - type: workflow
