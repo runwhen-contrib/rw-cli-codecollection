@@ -264,16 +264,9 @@ External Resolution Validation
     [Documentation]    Tests resolution of multiple public and private hosted domains through multiple resolvers, testing upstream forwarding
     [Tags]    access:read-only    azure    dns    external    public    resolvers
     
-    # Test public domain resolution through multiple resolvers
-    ${public_domains_length}=    Get Length    ${PUBLIC_DOMAINS}
-    IF    ${public_domains_length} > 0
-        # Handle case where PUBLIC_DOMAINS might already be a list or a string
-        ${split_result}=    Run Keyword And Return Status    Split String    ${PUBLIC_DOMAINS}    ,
-        IF    ${split_result}
-            @{public_domains}=    Split String    ${PUBLIC_DOMAINS}    ,
-        ELSE
-            @{public_domains}=    Set Variable    ${PUBLIC_DOMAINS}
-        END
+     # Test public domain resolution through multiple resolvers
+     IF    '${PUBLIC_DOMAINS}' != '' and '${PUBLIC_DOMAINS}' != '""'
+         @{public_domains}=    Split String    ${PUBLIC_DOMAINS}    ,
         
         FOR    ${domain}    IN    @{public_domains}
             ${domain}=    Strip String    ${domain}
@@ -608,14 +601,14 @@ Suite Initialization
             Append To List    ${all_fqdns_list}    ${zone}
         END
     END
-    IF    $PUBLIC_DOMAINS not in ['', '""']
-        @{public_domains}=    Split String    ${PUBLIC_DOMAINS}    ,
-        FOR    ${domain}    IN    @{public_domains}
-            ${domain}=    Strip String    ${domain}
-            Continue For Loop If    '${domain}' == ''
-            Append To List    ${all_fqdns_list}    ${domain}
-        END
-    END
+     IF    '${PUBLIC_DOMAINS}' != '' and '${PUBLIC_DOMAINS}' != '""'
+         @{public_domains_init}=    Split String    ${PUBLIC_DOMAINS}    ,
+         FOR    ${domain}    IN    @{public_domains_init}
+             ${domain}=    Strip String    ${domain}
+             Continue For Loop If    '${domain}' == ''
+             Append To List    ${all_fqdns_list}    ${domain}
+         END
+     END
     
     ${ALL_TEST_FQDNS}=    Evaluate    ','.join($all_fqdns_list)
     
