@@ -17,7 +17,8 @@ This Terraform configuration creates the necessary Azure infrastructure for test
 - `privatelink.blob.core.windows.net` - For blob storage private endpoints
 
 ### Public DNS Zone
-- `dns-health-test.com` - Public DNS zone for testing
+- `dns-health-test.azure.runwhen.com` - Public DNS zone for testing (real subdomain)
+- Automatic NS delegation from parent `azure.runwhen.com` zone
 
 ### DNS Records
 - Private DNS A records for testing resolution
@@ -26,6 +27,18 @@ This Terraform configuration creates the necessary Azure infrastructure for test
 ### Role Assignments
 - Reader role for resource group access
 - DNS Zone Contributor role for DNS management
+
+## Variables
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `resource_group` | Resource group name | `"azure-dns-health"` | No |
+| `location` | Azure region | `"East US"` | No |
+| `public_domain` | Public domain for DNS testing | `"dns-health-test.azure.runwhen.com"` | No |
+| `parent_domain_name` | Parent domain for delegation | `"azure.runwhen.com"` | No |
+| `parent_domain_resource_group` | Parent domain resource group | `"nonprod-network"` | No |
+| `sp_principal_id` | Service principal object ID | `""` | No |
+| `tags` | Resource tags | See variables.tf | No |
 
 ## Usage
 

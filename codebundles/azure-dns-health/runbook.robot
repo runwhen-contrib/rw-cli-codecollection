@@ -37,9 +37,9 @@ Check Private DNS Zone Records
         ...    cmd=${zone_check_cmd}
         ...    timeout_seconds=300
         
-        RW.Core.Add Pre To Report    Private DNS Zone Records Check - Resource Group: ${rg}
-        RW.Core.Add Pre To Report    Command: ${zone_check_cmd}
-        RW.Core.Add Pre To Report    Output: ${rsp.stdout}
+        RW.Core.Add Pre To Report    === DNS Zone Health Check ===
+        RW.Core.Add Pre To Report    Resource Group: ${rg}
+        RW.Core.Add Pre To Report    Zone Information: ${rsp.stdout}
         
         # Check for empty zones or missing records
         ${empty_zones}=    Run Keyword And Return Status    Should Contain    ${rsp.stdout}    Records: 0
@@ -67,6 +67,8 @@ Check Private DNS Zone Records
     END
     
     ${history}=    RW.CLI.Pop Shell History
+    RW.Core.Add Pre To Report    === Task Summary ===
+    RW.Core.Add Pre To Report    Private DNS zone health check completed for all specified resource groups.
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Check Public DNS Zone Records
@@ -86,10 +88,13 @@ Check Public DNS Zone Records
         ...    cmd=${zone_check_cmd}
         ...    timeout_seconds=300
         
-        RW.Core.Add Pre To Report    Public DNS Zone Records Check - Resource Group: ${rg}
-        RW.Core.Add Pre To Report    Command: ${zone_check_cmd}
-        RW.Core.Add Pre To Report    Output: ${rsp.stdout}
-        RW.Core.Add Pre To Report    Stderr: ${rsp.stderr}
+        RW.Core.Add Pre To Report    === Public DNS Zone Health Check ===
+        RW.Core.Add Pre To Report    Resource Group: ${rg}
+        RW.Core.Add Pre To Report    Zone Information: ${rsp.stdout}
+        ${has_stderr}=    Run Keyword And Return Status    Should Not Be Empty    ${rsp.stderr}
+        IF    ${has_stderr}
+            RW.Core.Add Pre To Report    Warnings: ${rsp.stderr}
+        END
         
         # Check for zones with minimal records (less than expected minimum)
         ${minimal_records_pattern}=    Set Variable    Records: [0-2]\\b
@@ -97,7 +102,7 @@ Check Public DNS Zone Records
         ${minimal_count}=    Get Length    ${minimal_zones}
         IF    ${minimal_count} > 0
             RW.Core.Add Issue
-            ...    severity=1
+            ...    severity=4
             ...    expected=Public DNS zones should have adequate record sets
             ...    actual=Found ${minimal_count} public DNS zones with minimal records in resource group ${rg}
             ...    title=Public DNS Zones with Minimal Records in ${rg}
@@ -133,15 +138,23 @@ Detect Broken Record Resolution
         ${fqdn}=    Strip String    ${fqdn}
         Continue For Loop If    '${fqdn}' == ''
         
-        ${dns_test}=    Set Variable    for i in {1..3}; do echo "=== Test $i for ${fqdn} ==="; dig +nocmd +noall +answer ${fqdn} @8.8.8.8 || nslookup ${fqdn} 8.8.8.8; sleep 2; done
+        # Use custom DNS resolver if configured, otherwise default to Google DNS
+        IF    '${DNS_RESOLVERS}' != ''
+            @{dns_resolver_list}=    Split String    ${DNS_RESOLVERS}    ,
+            ${first_resolver}=    Get From List    ${dns_resolver_list}    0
+            ${resolver}=    Strip String    ${first_resolver}
+        ELSE
+            ${resolver}=    Set Variable    8.8.8.8
+        END
+        ${dns_test}=    Set Variable    for i in {1..3}; do echo "=== Test $i for ${fqdn} ==="; dig +nocmd +noall +answer ${fqdn} @${resolver} || nslookup ${fqdn} ${resolver}; sleep 2; done
         
         ${rsp}=    RW.CLI.Run Cli
         ...    cmd=${dns_test}
         ...    timeout_seconds=120
         
-        RW.Core.Add Pre To Report    DNS Resolution Consistency Test
-        RW.Core.Add Pre To Report    FQDN: ${fqdn}
-        RW.Core.Add Pre To Report    Output: ${rsp.stdout}
+        RW.Core.Add Pre To Report    === DNS Resolution Test ===
+        RW.Core.Add Pre To Report    Testing Domain: ${fqdn}
+        RW.Core.Add Pre To Report    Test Results: ${rsp.stdout}
         
         # Check for resolution failures
         ${failures}=    Get Regexp Matches    ${rsp.stdout}    can't find.*NXDOMAIN|server can't find
@@ -251,9 +264,9 @@ External Resolution Validation
     [Documentation]    Tests resolution of multiple public and private hosted domains through multiple resolvers, testing upstream forwarding
     [Tags]    access:read-only    azure    dns    external    public    resolvers
     
-    # Test public domain resolution through multiple resolvers
-    IF    '${PUBLIC_DOMAINS}' != ''
-        @{public_domains}=    Split String    ${PUBLIC_DOMAINS}    ,
+     # Test public domain resolution through multiple resolvers
+     IF    '${PUBLIC_DOMAINS}' != '' and '${PUBLIC_DOMAINS}' != '""'
+         @{public_domains}=    Split String    ${PUBLIC_DOMAINS}    ,
         
         FOR    ${domain}    IN    @{public_domains}
             ${domain}=    Strip String    ${domain}
@@ -265,43 +278,68 @@ External Resolution Validation
             ...    cmd=${default_test}
             ...    timeout_seconds=60
             
-            # Test with Google DNS
-            ${google_test}=    Set Variable    nslookup ${domain} 8.8.8.8
-            ${google_rsp}=    RW.CLI.Run Cli
-            ...    cmd=${google_test}
-            ...    timeout_seconds=60
+            # Determine which resolvers to test
+            @{test_resolvers}=    Create List    8.8.8.8    1.1.1.1
+            @{resolver_names}=    Create List    Google DNS (8.8.8.8)    Cloudflare DNS (1.1.1.1)
             
-            # Test with Cloudflare DNS
-            ${cloudflare_test}=    Set Variable    nslookup ${domain} 1.1.1.1
-            ${cloudflare_rsp}=    RW.CLI.Run Cli
-            ...    cmd=${cloudflare_test}
-            ...    timeout_seconds=60
+            IF    '${DNS_RESOLVERS}' != ''
+                @{custom_resolvers}=    Split String    ${DNS_RESOLVERS}    ,
+                @{test_resolvers}=    Create List
+                @{resolver_names}=    Create List
+                FOR    ${resolver}    IN    @{custom_resolvers}
+                    ${resolver}=    Strip String    ${resolver}
+                    Continue For Loop If    '${resolver}' == ''
+                    Append To List    ${test_resolvers}    ${resolver}
+                    Append To List    ${resolver_names}    Custom DNS (${resolver})
+                END
+            END
+            
+            # Test with each resolver
+            @{resolver_results}=    Create List
+            ${resolver_count}=    Get Length    ${test_resolvers}
+            FOR    ${i}    IN RANGE    ${resolver_count}
+                ${resolver}=    Get From List    ${test_resolvers}    ${i}
+                ${resolver_name}=    Get From List    ${resolver_names}    ${i}
+                ${resolver_test}=    Set Variable    nslookup ${domain} ${resolver}
+                ${resolver_rsp}=    RW.CLI.Run Cli
+                ...    cmd=${resolver_test}
+                ...    timeout_seconds=60
+                Append To List    ${resolver_results}    ${resolver_rsp.stdout}
+                RW.Core.Add Pre To Report    ${resolver_name}: ${resolver_rsp.stdout}
+            END
             
             RW.Core.Add Pre To Report    External DNS Resolution Validation - Domain: ${domain}
             RW.Core.Add Pre To Report    Default Resolver: ${default_rsp.stdout}
-            RW.Core.Add Pre To Report    Google DNS (8.8.8.8): ${google_rsp.stdout}
-            RW.Core.Add Pre To Report    Cloudflare DNS (1.1.1.1): ${cloudflare_rsp.stdout}
             
             # Check for resolution inconsistencies
             ${default_failed}=    Run Keyword And Return Status    Should Contain    ${default_rsp.stdout}    can't find
-            ${google_failed}=    Run Keyword And Return Status    Should Contain    ${google_rsp.stdout}    can't find
-            ${cloudflare_failed}=    Run Keyword And Return Status    Should Contain    ${cloudflare_rsp.stdout}    can't find
+            ${failed_count}=    Set Variable    ${default_failed}
+            ${resolver_results_count}=    Get Length    ${resolver_results}
+            ${total_resolvers}=    Evaluate    ${resolver_results_count} + 1
             
-            ${total_failures}=    Evaluate    ${default_failed} + ${google_failed} + ${cloudflare_failed}
+            # Build details string for issue reporting
+            ${details}=    Set Variable    Domain: ${domain}\nDefault: ${default_rsp.stdout}
+            FOR    ${i}    IN RANGE    ${resolver_results_count}
+                ${result}=    Get From List    ${resolver_results}    ${i}
+                ${resolver_name}=    Get From List    ${resolver_names}    ${i}
+                ${resolver_failed}=    Run Keyword And Return Status    Should Contain    ${result}    can't find
+                ${failed_count}=    Evaluate    ${failed_count} + ${resolver_failed}
+                ${details}=    Set Variable    ${details}\n${resolver_name}: ${result}
+            END
             
-            IF    ${total_failures} > 0
+            IF    ${failed_count} > 0
                 RW.Core.Add Issue
                 ...    severity=2
                 ...    expected=Public domain should resolve through all DNS resolvers
-                ...    actual=Public domain ${domain} resolution failed through ${total_failures} resolver(s)
+                ...    actual=Public domain ${domain} resolution failed through ${failed_count} resolver(s)
                 ...    title=External DNS Resolution Inconsistency for ${domain}
                 ...    reproduce_hint=Test DNS resolution for ${domain} through multiple resolvers
-                ...    details=Domain: ${domain}\nDefault: ${default_rsp.stdout}\nGoogle: ${google_rsp.stdout}\nCloudflare: ${cloudflare_rsp.stdout}
+                ...    details=${details}
                 ...    next_steps=1. Check DNS forwarder configuration\n2. Verify upstream DNS connectivity\n3. Review firewall rules for DNS traffic\n4. Test network connectivity to external resolvers
             END
             
             # Check for complete resolution failures across all resolvers
-            IF    ${total_failures} == 3
+            IF    ${failed_count} == ${total_resolvers}
                 RW.Core.Add Issue
                 ...    severity=3
                 ...    expected=Public domain should resolve through at least one resolver
@@ -397,62 +435,153 @@ Suite Initialization
     ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
     ...    pattern=.*
     
-    # Import required configuration variables
+    # Import auto-discovery configuration
+    ${AUTO_DISCOVER_DNS_RESOURCES}=    RW.Core.Import User Variable    AUTO_DISCOVER_DNS_RESOURCES
+    ...    type=string
+    ...    description=Enable automatic discovery of Azure DNS resources (true/false). When enabled, reduces required configuration to just Azure credentials.
+    ...    pattern=^(true|false)$
+    ...    example=true
+    ...    default=false
+    
+    ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_RESOURCE_SUBSCRIPTION_ID
+    ...    type=string
+    ...    description=Azure subscription ID for auto-discovery and resource access. Leave empty to use current Azure CLI subscription.
+    ...    pattern=^$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+    ...    example=2a0cf760-baef-4446-b75c-75c4f8a6267f
+    ...    default=""
+    
+    # Import configuration variables (optional when auto-discovery is enabled)
     ${RESOURCE_GROUPS}=    RW.Core.Import User Variable    RESOURCE_GROUPS
     ...    type=string
-    ...    description=Comma-separated list of Azure resource groups containing DNS zones and VNets
-    ...    pattern=.*
-    ...    example=my-plink-rg,production-rg,network-rg
+    ...    description=Azure resource groups containing your DNS zones (comma-separated if multiple). Leave empty to use auto-discovery. Example: production-rg or network-rg,app-rg
+    ...    pattern=^$|^[a-zA-Z0-9._-]+(,[a-zA-Z0-9._-]+)*$
+    ...    example=production-rg
+    ...    default=""
     
     ${TEST_FQDNS}=    RW.Core.Import User Variable    TEST_FQDNS
     ...    type=string
-    ...    description=Comma-separated list of FQDNs to test for DNS resolution across VNets
-    ...    pattern=.*
-    ...    example=myapp.privatelink.database.windows.net,myapi.privatelink.azurewebsites.net
+    ...    description=Important domains/services to monitor for DNS resolution (comma-separated if multiple). Leave empty to use auto-discovery. Example: myapp.database.windows.net or api.mycompany.com,db.mycompany.com
+    ...    pattern=^$|^[a-zA-Z0-9.-]+(,[a-zA-Z0-9.-]+)*$
+    ...    example=myapp.database.windows.net
+    ...    default=""
     
     # Import optional DNS testing configuration
     ${FORWARD_LOOKUP_ZONES}=    RW.Core.Import User Variable    FORWARD_LOOKUP_ZONES
     ...    type=string
-    ...    description=Comma-separated list of forward lookup zones to test (optional)
-    ...    pattern=.*
-    ...    example=internal.company.com,corp.local
-    ...    default=""
-    
-    ${PUBLIC_ZONES}=    RW.Core.Import User Variable    PUBLIC_ZONES
-    ...    type=string
-    ...    description=Comma-separated list of public DNS zones to test (optional)
-    ...    pattern=.*
-    ...    example=example.com,mycompany.com
-    ...    default=""
-    
-    ${DNS_RESOLVERS}=    RW.Core.Import User Variable    DNS_RESOLVERS
-    ...    type=string
-    ...    description=Comma-separated list of specific DNS resolvers to test against (optional)
-    ...    pattern=.*
-    ...    example=8.8.8.8,1.1.1.1,10.0.0.4
+    ...    description=Internal company domains that forward to on-premises DNS (optional, for hybrid environments). Example: internal.company.com
+    ...    pattern=^$|^[a-zA-Z0-9.-]+(,[a-zA-Z0-9.-]+)*$
+    ...    example=internal.company.com
     ...    default=""
     
     ${PUBLIC_DOMAINS}=    RW.Core.Import User Variable    PUBLIC_DOMAINS
     ...    type=string
-    ...    description=Comma-separated list of public domains for external resolution validation (optional)
-    ...    pattern=.*
-    ...    example=example.com,mycompany.com
+    ...    description=Your public websites to test external DNS resolution (optional). Example: mycompany.com,blog.mycompany.com
+    ...    pattern=^$|^[a-zA-Z0-9.-]+(,[a-zA-Z0-9.-]+)*$
+    ...    example=mycompany.com
+    ...    default=""
+    
+    ${DNS_RESOLVERS}=    RW.Core.Import User Variable    DNS_RESOLVERS
+    ...    type=string
+    ...    description=Custom DNS servers to test against (optional, uses Google/Cloudflare if empty). Example: 10.0.0.4,10.0.1.4
+    ...    pattern=^$|^[0-9.]+(,[0-9.]+)*$
+    ...    example=10.0.0.4
     ...    default=""
     
     ${EXPRESS_ROUTE_DNS_ZONES}=    RW.Core.Import User Variable    EXPRESS_ROUTE_DNS_ZONES
     ...    type=string
-    ...    description=Comma-separated list of DNS zones accessed through Express Route for latency testing (optional)
-    ...    pattern=.*
-    ...    example=internal.company.com,corp.company.com
+    ...    description=Domains accessed through Express Route for latency monitoring (optional). Example: internal.company.com
+    ...    pattern=^$|^[a-zA-Z0-9.-]+(,[a-zA-Z0-9.-]+)*$
+    ...    example=internal.company.com
     ...    default=""
     
     ${FORWARD_ZONE_TEST_SUBDOMAINS}=    RW.Core.Import User Variable    FORWARD_ZONE_TEST_SUBDOMAINS
     ...    type=string
-    ...    description=Comma-separated list of subdomains to test in forward lookup zones (optional)
-    ...    pattern=.*
-    ...    example=dc01,mail,web
+    ...    description=Specific servers to test in forward lookup zones (optional). Example: dc01,mail,web
+    ...    pattern=^$|^[a-zA-Z0-9-]+(,[a-zA-Z0-9-]+)*$
+    ...    example=dc01,mail
     ...    default=""
     
+    
+    # Auto-discovery logic
+    IF    "${AUTO_DISCOVER_DNS_RESOURCES}" == "true"
+        Log    Auto-discovery enabled. Running Azure DNS resource discovery...
+        RW.Core.Add Pre To Report    === Auto-Discovery Mode ===
+        RW.Core.Add Pre To Report    Automatically discovering Azure DNS resources...
+        
+        ${discovery_result}=    RW.CLI.Run Cli
+        ...    cmd=cd ${CURDIR} && AZURE_RESOURCE_SUBSCRIPTION_ID="${AZURE_RESOURCE_SUBSCRIPTION_ID}" bash azure_dns_auto_discovery.sh
+        ...    timeout_seconds=300
+        
+        RW.Core.Add Pre To Report    Auto-discovery output: ${discovery_result.stdout}
+        
+        # Parse discovery results
+        ${discovery_exists}=    Run Keyword And Return Status    File Should Exist    ${CURDIR}/azure_dns_discovery.json
+        IF    ${discovery_exists}
+            ${discovery_json}=    RW.CLI.Run Cli
+            ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.resource_groups | join(",") // ""'
+            ...    timeout_seconds=30
+            
+            ${auto_resource_groups}=    Strip String    ${discovery_json.stdout}
+            
+            ${auto_test_fqdns_result}=    RW.CLI.Run Cli
+            ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.suggested_test_fqdns | join(",") // ""'
+            ...    timeout_seconds=30
+            
+            ${auto_test_fqdns}=    Strip String    ${auto_test_fqdns_result.stdout}
+            
+            ${auto_forward_zones_result}=    RW.CLI.Run Cli
+            ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.forward_lookup_zones | join(",") // ""'
+            ...    timeout_seconds=30
+            
+            ${auto_forward_zones}=    Strip String    ${auto_forward_zones_result.stdout}
+            
+            ${auto_public_domains_result}=    RW.CLI.Run Cli
+            ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.public_dns_zones | join(",") // ""'
+            ...    timeout_seconds=30
+            
+            ${auto_public_domains}=    Strip String    ${auto_public_domains_result.stdout}
+            
+            ${auto_express_route_result}=    RW.CLI.Run Cli
+            ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.express_route_zones | join(",") // ""'
+            ...    timeout_seconds=30
+            
+            ${auto_express_route}=    Strip String    ${auto_express_route_result.stdout}
+            
+            ${auto_dns_resolvers_result}=    RW.CLI.Run Cli
+            ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.dns_resolvers | join(",") // ""'
+            ...    timeout_seconds=30
+            
+            ${auto_dns_resolvers}=    Strip String    ${auto_dns_resolvers_result.stdout}
+            
+            # When auto-discovery is enabled, always use discovered values
+            ${RESOURCE_GROUPS}=    Set Variable    ${auto_resource_groups}
+            ${TEST_FQDNS}=    Set Variable    ${auto_test_fqdns}
+            ${FORWARD_LOOKUP_ZONES}=    Set Variable    ${auto_forward_zones}
+            ${PUBLIC_DOMAINS}=    Set Variable    ${auto_public_domains}
+            ${EXPRESS_ROUTE_DNS_ZONES}=    Set Variable    ${auto_express_route}
+            ${DNS_RESOLVERS}=    Set Variable    ${auto_dns_resolvers}
+            
+            RW.Core.Add Pre To Report    === Auto-Discovery Results ===
+            RW.Core.Add Pre To Report    Resource Groups: ${RESOURCE_GROUPS}
+            RW.Core.Add Pre To Report    Test FQDNs: ${TEST_FQDNS}
+            RW.Core.Add Pre To Report    Forward Lookup Zones: ${FORWARD_LOOKUP_ZONES}
+            RW.Core.Add Pre To Report    Public Domains: ${PUBLIC_DOMAINS}
+            RW.Core.Add Pre To Report    Express Route Zones: ${EXPRESS_ROUTE_DNS_ZONES}
+            RW.Core.Add Pre To Report    DNS Resolvers: ${DNS_RESOLVERS}
+            
+            Log    Auto-discovery completed successfully. Using discovered Azure DNS resources.
+        ELSE
+            Log    Auto-discovery failed. Discovery file not found. Using manual configuration.
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Auto-discovery should generate azure_dns_discovery.json
+            ...    actual=Auto-discovery script failed or did not generate results file
+            ...    title=Auto-discovery Failed
+            ...    reproduce_hint=Check Azure CLI authentication and permissions: az account show
+            ...    details=Auto-discovery was enabled but failed to generate results. Falling back to manual configuration. Ensure Azure CLI is authenticated and has permissions to list DNS zones.
+            ...    next_steps=1. Run 'az login' to authenticate\n2. Verify permissions with 'az network private-dns zone list'\n3. Set AUTO_DISCOVER_DNS_RESOURCES=false to use manual configuration
+        END
+    END
     
     # Create consolidated FQDN list for comprehensive testing
     ${all_fqdns_list}=    Create List
@@ -472,23 +601,37 @@ Suite Initialization
             Append To List    ${all_fqdns_list}    ${zone}
         END
     END
-    IF    '${PUBLIC_ZONES}' != ''
-        @{public_zones}=    Split String    ${PUBLIC_ZONES}    ,
-        FOR    ${zone}    IN    @{public_zones}
-            ${zone}=    Strip String    ${zone}
-            Continue For Loop If    '${zone}' == ''
-            Append To List    ${all_fqdns_list}    ${zone}
-        END
-    END
+     IF    '${PUBLIC_DOMAINS}' != '' and '${PUBLIC_DOMAINS}' != '""'
+         @{public_domains_init}=    Split String    ${PUBLIC_DOMAINS}    ,
+         FOR    ${domain}    IN    @{public_domains_init}
+             ${domain}=    Strip String    ${domain}
+             Continue For Loop If    '${domain}' == ''
+             Append To List    ${all_fqdns_list}    ${domain}
+         END
+     END
     
     ${ALL_TEST_FQDNS}=    Evaluate    ','.join($all_fqdns_list)
     
+    # Validate configuration
+    ${total_fqdns}=    Get Length    ${all_fqdns_list}
+    IF    ${total_fqdns} == 0
+        RW.Core.Add Issue
+        ...    severity=3
+        ...    expected=At least one FQDN should be configured for testing
+        ...    actual=No FQDNs found in TEST_FQDNS, FORWARD_LOOKUP_ZONES, or PUBLIC_DOMAINS
+        ...    title=No DNS Targets Configured
+        ...    reproduce_hint=Configure at least one of: TEST_FQDNS, FORWARD_LOOKUP_ZONES, or PUBLIC_DOMAINS
+        ...    details=Configuration validation failed: No domains specified for DNS testing
+        ...    next_steps=1. Set TEST_FQDNS with your important domains\n2. Or set FORWARD_LOOKUP_ZONES for on-premises domains\n3. Or set PUBLIC_DOMAINS for public website monitoring
+    END
+    
     # Set all suite variables
     Set Suite Variable    ${azure_credentials}
+    Set Suite Variable    ${AUTO_DISCOVER_DNS_RESOURCES}
+    Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     Set Suite Variable    ${RESOURCE_GROUPS}
     Set Suite Variable    ${TEST_FQDNS}
     Set Suite Variable    ${FORWARD_LOOKUP_ZONES}
-    Set Suite Variable    ${PUBLIC_ZONES}
     Set Suite Variable    ${DNS_RESOLVERS}
     Set Suite Variable    ${PUBLIC_DOMAINS}
     Set Suite Variable    ${EXPRESS_ROUTE_DNS_ZONES}
