@@ -4,8 +4,9 @@ spec:
   platform: azure
   generationRules:
     - resourceTypes:
-        - azure_network_dns_zones
-        - azure_network_private_dns_zones
+        - azure_dns_zones
+        - azure_dnsresolver_dns_resolvers
+        - azure_privatedns_private_zones
       matchRules:
         - type: pattern
           pattern: ".+"
