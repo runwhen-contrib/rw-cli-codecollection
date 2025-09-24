@@ -19,3 +19,4 @@ spec:
           - type: sli
           - type: runbook
             templateName: k8s-postgres-healthcheck-zalando-taskset.yaml
+          - type: workflow
