@@ -162,7 +162,8 @@ DNS Query Latency
         ...    cmd=${latency_cmd}
         ...    timeout_seconds=8
         
-        IF    ${rsp.returncode} == 0 and '${rsp.stdout.strip()}' != ''
+        ${stripped_stdout}=    Strip String    ${rsp.stdout}
+        IF    ${rsp.returncode} == 0 and '${stripped_stdout}' != ''
             ${latency_str}=    Strip String    ${rsp.stdout}
             ${latency_valid}=    Run Keyword And Return Status    Should Match Regexp    ${latency_str}    ^[0-9]+$
             IF    ${latency_valid}
@@ -221,8 +222,8 @@ Private DNS Zone Health
         
         # Process results if both commands succeeded
         IF    ${total_rsp.returncode} == 0 and ${healthy_rsp.returncode} == 0
-            ${rg_total_str}=    Set Variable    ${total_rsp.stdout.strip()}
-            ${rg_healthy_str}=    Set Variable    ${healthy_rsp.stdout.strip()}
+            ${rg_total_str}=    Strip String    ${total_rsp.stdout}
+            ${rg_healthy_str}=    Strip String    ${healthy_rsp.stdout}
             
             # Only convert if they're actually numbers
             ${is_total_numeric}=    Run Keyword And Return Status    Should Match Regexp    ${rg_total_str}    ^\\d+$
@@ -270,7 +271,8 @@ External DNS Resolver Availability
         ${custom_count}=    Get Length    ${custom_resolvers}
         ${limit}=    Set Variable If    ${custom_count} > 2    2    ${custom_count}
         FOR    ${i}    IN RANGE    ${limit}
-            ${resolver}=    Strip String    ${custom_resolvers}[${i}]
+            ${resolver}=    Get From List    ${custom_resolvers}    ${i}
+            ${resolver}=    Strip String    ${resolver}
             Continue For Loop If    '${resolver}' == ''
             Append To List    ${test_resolvers}    ${resolver}
         END
@@ -387,7 +389,8 @@ Suite Initialization
             ...    cmd=find ${CURDIR}/azure_dns_discovery.json -mmin -60 | wc -l
             ...    timeout_seconds=5
             
-            ${cache_valid}=    Run Keyword And Return Status    Should Be Equal As Strings    ${cache_check.stdout.strip()}    1
+            ${cache_check_output}=    Strip String    ${cache_check.stdout}
+            ${cache_valid}=    Run Keyword And Return Status    Should Be Equal As Strings    ${cache_check_output}    1
         END
         
         # Only run discovery if no valid cache exists
@@ -407,27 +410,27 @@ Suite Initialization
             ${auto_resource_groups_result}=    RW.CLI.Run Cli
             ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.resource_groups | join(",") // ""'
             ...    timeout_seconds=10
-            ${auto_resource_groups}=    Set Variable    ${auto_resource_groups_result.stdout.strip()}
+            ${auto_resource_groups}=    Strip String    ${auto_resource_groups_result.stdout}
             
             ${auto_test_fqdns_result}=    RW.CLI.Run Cli
             ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.suggested_test_fqdns | join(",") // ""'
             ...    timeout_seconds=10
-            ${auto_test_fqdns}=    Set Variable    ${auto_test_fqdns_result.stdout.strip()}
+            ${auto_test_fqdns}=    Strip String    ${auto_test_fqdns_result.stdout}
             
             ${auto_forward_zones_result}=    RW.CLI.Run Cli
             ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.forward_lookup_zones | join(",") // ""'
             ...    timeout_seconds=10
-            ${auto_forward_zones}=    Set Variable    ${auto_forward_zones_result.stdout.strip()}
+            ${auto_forward_zones}=    Strip String    ${auto_forward_zones_result.stdout}
             
             ${auto_public_domains_result}=    RW.CLI.Run Cli
             ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.public_dns_zones | join(",") // ""'
             ...    timeout_seconds=10
-            ${auto_public_domains}=    Set Variable    ${auto_public_domains_result.stdout.strip()}
+            ${auto_public_domains}=    Strip String    ${auto_public_domains_result.stdout}
             
             ${auto_dns_resolvers_result}=    RW.CLI.Run Cli
             ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.dns_resolvers | join(",") // ""'
             ...    timeout_seconds=10
-            ${auto_dns_resolvers}=    Set Variable    ${auto_dns_resolvers_result.stdout.strip()}
+            ${auto_dns_resolvers}=    Strip String    ${auto_dns_resolvers_result.stdout}
             
             # When auto-discovery is enabled, always use discovered values (same as runbook)
             ${RESOURCE_GROUPS}=    Set Variable    ${auto_resource_groups}

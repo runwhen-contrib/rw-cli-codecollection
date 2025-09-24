@@ -102,7 +102,7 @@ Check Public DNS Zone Records
         ${minimal_count}=    Get Length    ${minimal_zones}
         IF    ${minimal_count} > 0
             RW.Core.Add Issue
-            ...    severity=1
+            ...    severity=4
             ...    expected=Public DNS zones should have adequate record sets
             ...    actual=Found ${minimal_count} public DNS zones with minimal records in resource group ${rg}
             ...    title=Public DNS Zones with Minimal Records in ${rg}
@@ -139,7 +139,13 @@ Detect Broken Record Resolution
         Continue For Loop If    '${fqdn}' == ''
         
         # Use custom DNS resolver if configured, otherwise default to Google DNS
-        ${resolver}=    Set Variable If    '${DNS_RESOLVERS}' != ''    ${DNS_RESOLVERS.split(',')[0].strip()}    8.8.8.8
+        IF    '${DNS_RESOLVERS}' != ''
+            @{dns_resolver_list}=    Split String    ${DNS_RESOLVERS}    ,
+            ${first_resolver}=    Get From List    ${dns_resolver_list}    0
+            ${resolver}=    Strip String    ${first_resolver}
+        ELSE
+            ${resolver}=    Set Variable    8.8.8.8
+        END
         ${dns_test}=    Set Variable    for i in {1..3}; do echo "=== Test $i for ${fqdn} ==="; dig +nocmd +noall +answer ${fqdn} @${resolver} || nslookup ${fqdn} ${resolver}; sleep 2; done
         
         ${rsp}=    RW.CLI.Run Cli
@@ -297,7 +303,8 @@ External Resolution Validation
             
             # Test with each resolver
             @{resolver_results}=    Create List
-            FOR    ${i}    IN RANGE    len(${test_resolvers})
+            ${resolver_count}=    Get Length    ${test_resolvers}
+            FOR    ${i}    IN RANGE    ${resolver_count}
                 ${resolver}=    Get From List    ${test_resolvers}    ${i}
                 ${resolver_name}=    Get From List    ${resolver_names}    ${i}
                 ${resolver_test}=    Set Variable    nslookup ${domain} ${resolver}
@@ -314,11 +321,12 @@ External Resolution Validation
             # Check for resolution inconsistencies
             ${default_failed}=    Run Keyword And Return Status    Should Contain    ${default_rsp.stdout}    can't find
             ${failed_count}=    Set Variable    ${default_failed}
-            ${total_resolvers}=    Evaluate    len(${resolver_results}) + 1
+            ${resolver_results_count}=    Get Length    ${resolver_results}
+            ${total_resolvers}=    Evaluate    ${resolver_results_count} + 1
             
             # Build details string for issue reporting
             ${details}=    Set Variable    Domain: ${domain}\nDefault: ${default_rsp.stdout}
-            FOR    ${i}    IN RANGE    len(${resolver_results})
+            FOR    ${i}    IN RANGE    ${resolver_results_count}
                 ${result}=    Get From List    ${resolver_results}    ${i}
                 ${resolver_name}=    Get From List    ${resolver_names}    ${i}
                 ${resolver_failed}=    Run Keyword And Return Status    Should Contain    ${result}    can't find
@@ -520,37 +528,37 @@ Suite Initialization
             ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.resource_groups | join(",") // ""'
             ...    timeout_seconds=30
             
-            ${auto_resource_groups}=    Set Variable    ${discovery_json.stdout.strip()}
+            ${auto_resource_groups}=    Strip String    ${discovery_json.stdout}
             
             ${auto_test_fqdns_result}=    RW.CLI.Run Cli
             ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.suggested_test_fqdns | join(",") // ""'
             ...    timeout_seconds=30
             
-            ${auto_test_fqdns}=    Set Variable    ${auto_test_fqdns_result.stdout.strip()}
+            ${auto_test_fqdns}=    Strip String    ${auto_test_fqdns_result.stdout}
             
             ${auto_forward_zones_result}=    RW.CLI.Run Cli
             ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.forward_lookup_zones | join(",") // ""'
             ...    timeout_seconds=30
             
-            ${auto_forward_zones}=    Set Variable    ${auto_forward_zones_result.stdout.strip()}
+            ${auto_forward_zones}=    Strip String    ${auto_forward_zones_result.stdout}
             
             ${auto_public_domains_result}=    RW.CLI.Run Cli
             ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.public_dns_zones | join(",") // ""'
             ...    timeout_seconds=30
             
-            ${auto_public_domains}=    Set Variable    ${auto_public_domains_result.stdout.strip()}
+            ${auto_public_domains}=    Strip String    ${auto_public_domains_result.stdout}
             
             ${auto_express_route_result}=    RW.CLI.Run Cli
             ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.express_route_zones | join(",") // ""'
             ...    timeout_seconds=30
             
-            ${auto_express_route}=    Set Variable    ${auto_express_route_result.stdout.strip()}
+            ${auto_express_route}=    Strip String    ${auto_express_route_result.stdout}
             
             ${auto_dns_resolvers_result}=    RW.CLI.Run Cli
             ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.dns_resolvers | join(",") // ""'
             ...    timeout_seconds=30
             
-            ${auto_dns_resolvers}=    Set Variable    ${auto_dns_resolvers_result.stdout.strip()}
+            ${auto_dns_resolvers}=    Strip String    ${auto_dns_resolvers_result.stdout}
             
             # When auto-discovery is enabled, always use discovered values
             ${RESOURCE_GROUPS}=    Set Variable    ${auto_resource_groups}
@@ -600,7 +608,7 @@ Suite Initialization
             Append To List    ${all_fqdns_list}    ${zone}
         END
     END
-    IF    $PUBLIC_DOMAINS != '' and $PUBLIC_DOMAINS != '""'
+    IF    $PUBLIC_DOMAINS not in ['', '""']
         @{public_domains}=    Split String    ${PUBLIC_DOMAINS}    ,
         FOR    ${domain}    IN    @{public_domains}
             ${domain}=    Strip String    ${domain}
