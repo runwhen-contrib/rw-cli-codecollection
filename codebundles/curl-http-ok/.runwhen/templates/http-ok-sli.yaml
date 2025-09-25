@@ -28,7 +28,7 @@ spec:
   intervalSeconds: 30
   configProvided:
     - name: URLS
-      value: "{% for rule in match_resource.resource.spec.rules %}{% for path in rule.http.paths %}{% if not loop.first or not forloop.first %},{% endif %}http://{{rule.host}}{% if path.path and path.path != "/" %}{{path.path}}{% endif %}{% endfor %}{% endfor %}"
+      value: "{% set counter = 0 %}{% for rule in match_resource.resource.spec.rules %}{% for path in rule.http.paths %}{% if counter > 0 %},{% endif %}{% set counter = counter + 1 %}http://{{rule.host}}{% if path.path and path.path != "/" %}{{path.path}}{% endif %}{% endfor %}{% endfor %}"
     - name: TARGET_LATENCY
       value: '1.2'
     - name: DESIRED_RESPONSE_CODE
