@@ -31,10 +31,10 @@ Check HTTP URL Availability and Timeliness
         Check Single HTTP URL    ${url}
     END
 
+*** Keywords ***
 Check Single HTTP URL
     [Documentation]    Use cURL to validate a single http response
     [Arguments]    ${test_url}
-    [Tags]    curl    http    single-url    access:read-only
     ${curl_rsp}=    RW.CLI.Run Cli
     ...    cmd=curl --connect-timeout 5 --max-time 15 -L -o /dev/null -w '{"http_code": "\%{http_code}", "time_total": \%{time_total}, "curl_exit_code": \%{exitcode}}' -s ${test_url}
     ...    show_in_rwl_cheatsheet=true
@@ -130,8 +130,6 @@ Check Single HTTP URL
         RW.Core.Add Pre To Report    URL Response Code: N/A (curl failed)
     END
 
-
-*** Keywords ***
 Suite Initialization
     ${URL}=    RW.Core.Import User Variable    URL
     ...    type=string

@@ -69,14 +69,12 @@ Validate HTTP URL Availability and Timeliness
     
     # Push metrics
     RW.Core.Push Metric    ${overall_healthy}    sub_name=overall_health
-    RW.Core.Push Metric    ${healthy_urls}    sub_name=healthy_urls
-    RW.Core.Push Metric    ${total_urls}    sub_name=total_urls
     RW.Core.Push Metric    ${overall_healthy}
 
+*** Keywords ***
 Test Single URL
     [Documentation]    Test a single URL and return health score
     [Arguments]    ${test_url}
-    [Tags]    cURL    HTTP    Single-URL
     
     ${curl_rsp}=    RW.CLI.Run Cli
     ...    cmd=curl --connect-timeout 5 --max-time 15 -L -o /dev/null -w '{"http_code": "\%{http_code}", "time_total": \%{time_total}, "curl_exit_code": \%{exitcode}}' -s ${test_url}
