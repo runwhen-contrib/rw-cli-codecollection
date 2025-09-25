@@ -326,29 +326,29 @@ Suite Initialization
     # Import auto-discovery configuration
     ${AUTO_DISCOVER_DNS_RESOURCES}=    RW.Core.Import User Variable    AUTO_DISCOVER_DNS_RESOURCES
     ...    type=string
-    ...    description=Enable automatic discovery of Azure DNS resources (true/false). When enabled, reduces required configuration to just Azure credentials.
+    ...    description=Enable smart Azure DNS autodiscovery (true/false). Analyzes actual Azure DNS configuration instead of using generic defaults.
     ...    pattern=^(true|false)$
     ...    example=true
-    ...    default=false
+    ...    default=true
     
     ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_RESOURCE_SUBSCRIPTION_ID
     ...    type=string
-    ...    description=Azure subscription ID for auto-discovery and resource access. Leave empty to use current Azure CLI subscription.
+    ...    description=Azure subscription ID for autodiscovery. Leave empty to use current Azure CLI subscription.
     ...    pattern=^$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
     ...    example=2a0cf760-baef-4446-b75c-75c4f8a6267f
     ...    default=""
     
-    # Import configuration variables (optional when auto-discovery is enabled)
+    # Import configuration variables (optional when autodiscovery is enabled)
     ${RESOURCE_GROUPS}=    RW.Core.Import User Variable    RESOURCE_GROUPS
     ...    type=string
-    ...    description=Azure resource groups containing your DNS zones (comma-separated if multiple). Leave empty to use auto-discovery. Example: production-rg or network-rg,app-rg
+    ...    description=Azure resource groups containing your DNS zones (comma-separated if multiple). Leave empty for autodiscovery. Example: production-rg or network-rg,app-rg
     ...    pattern=^$|^[a-zA-Z0-9._-]+(,[a-zA-Z0-9._-]+)*$
     ...    example=production-rg
     ...    default=""
     
     ${TEST_FQDNS}=    RW.Core.Import User Variable    TEST_FQDNS
     ...    type=string
-    ...    description=Important domains/services to monitor for DNS resolution (comma-separated if multiple). Leave empty to use auto-discovery. Example: myapp.database.windows.net or api.mycompany.com,db.mycompany.com
+    ...    description=Important domains/services to monitor for DNS resolution (comma-separated if multiple). Leave empty for autodiscovery. Example: myapp.database.windows.net or api.mycompany.com,db.mycompany.com
     ...    pattern=^$|^[a-zA-Z0-9.-]+(,[a-zA-Z0-9.-]+)*$
     ...    example=myapp.database.windows.net
     ...    default=""
@@ -375,16 +375,17 @@ Suite Initialization
     ...    example=10.0.0.4
     ...    default=""
     
-    # Lightweight auto-discovery for SLI (cache-first approach)
+    
+    # Smart Auto-discovery logic (lightweight for SLI)
     IF    "${AUTO_DISCOVER_DNS_RESOURCES}" == "true"
-        Log    Auto-discovery enabled for SLI. Checking for cached results...
+        Log    Smart autodiscovery enabled for SLI. Analyzing Azure DNS configuration...
         
-        # Check if recent discovery results exist (avoid expensive re-discovery)
+        # Check if recent discovery results exist (cache-first approach for SLI performance)
         ${discovery_exists}=    Run Keyword And Return Status    File Should Exist    ${CURDIR}/azure_dns_discovery.json
         ${cache_valid}=    Set Variable    ${False}
         
         IF    ${discovery_exists}
-            # Check if cache is recent (less than 1 hour old)
+            # Check if cache is recent (less than 1 hour old for SLI)
             ${cache_check}=    RW.CLI.Run Cli
             ...    cmd=find ${CURDIR}/azure_dns_discovery.json -mmin -60 | wc -l
             ...    timeout_seconds=5
@@ -395,12 +396,11 @@ Suite Initialization
         
         # Only run discovery if no valid cache exists
         IF    not ${cache_valid}
-            Log    No valid cache found. Running lightweight discovery for SLI...
+            Log    No valid cache found. Running smart autodiscovery for SLI...
             
-            # Run discovery script (same as runbook but with shorter timeout for SLI)
             ${discovery_result}=    RW.CLI.Run Cli
-            ...    cmd=cd ${CURDIR} && AZURE_RESOURCE_SUBSCRIPTION_ID="${AZURE_RESOURCE_SUBSCRIPTION_ID}" bash azure_dns_auto_discovery.sh
-            ...    timeout_seconds=60
+            ...    cmd=cd ${CURDIR} && AZURE_RESOURCE_SUBSCRIPTION_ID="${AZURE_RESOURCE_SUBSCRIPTION_ID}" RESOURCE_GROUPS="${RESOURCE_GROUPS}" bash azure_dns_smart_discovery.sh
+            ...    timeout_seconds=120
             
             ${discovery_exists}=    Run Keyword And Return Status    File Should Exist    ${CURDIR}/azure_dns_discovery.json
         END
@@ -432,17 +432,17 @@ Suite Initialization
             ...    timeout_seconds=10
             ${auto_dns_resolvers}=    Strip String    ${auto_dns_resolvers_result.stdout}
             
-            # When auto-discovery is enabled, always use discovered values (same as runbook)
-            ${RESOURCE_GROUPS}=    Set Variable    ${auto_resource_groups}
-            ${TEST_FQDNS}=    Set Variable    ${auto_test_fqdns}
-            ${FORWARD_LOOKUP_ZONES}=    Set Variable    ${auto_forward_zones}
-            ${PUBLIC_DOMAINS}=    Set Variable    ${auto_public_domains}
-            ${DNS_RESOLVERS}=    Set Variable    ${auto_dns_resolvers}
+            # Use autodiscovered values if manual config is empty
+            ${RESOURCE_GROUPS}=    Set Variable If    '${RESOURCE_GROUPS}' == ''    ${auto_resource_groups}    ${RESOURCE_GROUPS}
+            ${TEST_FQDNS}=    Set Variable If    '${TEST_FQDNS}' == ''    ${auto_test_fqdns}    ${TEST_FQDNS}
+            ${FORWARD_LOOKUP_ZONES}=    Set Variable If    '${FORWARD_LOOKUP_ZONES}' == ''    ${auto_forward_zones}    ${FORWARD_LOOKUP_ZONES}
+            ${PUBLIC_DOMAINS}=    Set Variable If    '${PUBLIC_DOMAINS}' == ''    ${auto_public_domains}    ${PUBLIC_DOMAINS}
+            ${DNS_RESOLVERS}=    Set Variable If    '${DNS_RESOLVERS}' == ''    ${auto_dns_resolvers}    ${DNS_RESOLVERS}
             
             ${cache_status}=    Set Variable If    ${cache_valid}    cached    fresh
-            Log    SLI auto-discovery completed using ${cache_status} results.
+            Log    SLI smart autodiscovery completed using ${cache_status} results.
         ELSE
-            Log    Auto-discovery failed for SLI. Using manual configuration.
+            Log    Smart autodiscovery failed for SLI. Using manual configuration.
         END
     END
     
