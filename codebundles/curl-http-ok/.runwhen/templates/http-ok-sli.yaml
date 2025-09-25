@@ -28,7 +28,7 @@ spec:
   intervalSeconds: 30
   configProvided:
     - name: URL
-      value: http://{{match_resource.resource.spec.rules[0].host}}
+      value: http://{{match_resource.resource.spec.rules[0].host}}{% if match_resource.resource.spec.rules[0].http.paths[0].path and match_resource.resource.spec.rules[0].http.paths[0].path != "/" %}{{match_resource.resource.spec.rules[0].http.paths[0].path}}{% endif %}
     - name: TARGET_LATENCY
       value: '1.2'
     - name: DESIRED_RESPONSE_CODE
