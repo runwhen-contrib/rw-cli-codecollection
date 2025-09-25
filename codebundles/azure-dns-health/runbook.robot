@@ -435,35 +435,35 @@ Suite Initialization
     ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
     ...    pattern=.*
     
-    # Import auto-discovery configuration
-    ${AUTO_DISCOVER_DNS_RESOURCES}=    RW.Core.Import User Variable    AUTO_DISCOVER_DNS_RESOURCES
-    ...    type=string
-    ...    description=Enable automatic discovery of Azure DNS resources (true/false). When enabled, reduces required configuration to just Azure credentials.
-    ...    pattern=^(true|false)$
-    ...    example=true
-    ...    default=false
+     # Import auto-discovery configuration
+     ${AUTO_DISCOVER_DNS_RESOURCES}=    RW.Core.Import User Variable    AUTO_DISCOVER_DNS_RESOURCES
+     ...    type=string
+     ...    description=Enable smart Azure DNS autodiscovery (true/false). Analyzes actual Azure DNS configuration instead of using generic defaults.
+     ...    pattern=^(true|false)$
+     ...    example=true
+     ...    default=true
+     
+     ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_RESOURCE_SUBSCRIPTION_ID
+     ...    type=string
+     ...    description=Azure subscription ID for autodiscovery. Leave empty to use current Azure CLI subscription.
+     ...    pattern=^$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+     ...    example=2a0cf760-baef-4446-b75c-75c4f8a6267f
+     ...    default=""
+     
+     # Import configuration variables (optional when autodiscovery is enabled)
+     ${RESOURCE_GROUPS}=    RW.Core.Import User Variable    RESOURCE_GROUPS
+     ...    type=string
+     ...    description=Azure resource groups containing your DNS zones (comma-separated if multiple). Leave empty for autodiscovery. Example: production-rg or network-rg,app-rg
+     ...    pattern=^$|^[a-zA-Z0-9._-]+(,[a-zA-Z0-9._-]+)*$
+     ...    example=production-rg
+     ...    default=""
     
-    ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_RESOURCE_SUBSCRIPTION_ID
-    ...    type=string
-    ...    description=Azure subscription ID for auto-discovery and resource access. Leave empty to use current Azure CLI subscription.
-    ...    pattern=^$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
-    ...    example=2a0cf760-baef-4446-b75c-75c4f8a6267f
-    ...    default=""
-    
-    # Import configuration variables (optional when auto-discovery is enabled)
-    ${RESOURCE_GROUPS}=    RW.Core.Import User Variable    RESOURCE_GROUPS
-    ...    type=string
-    ...    description=Azure resource groups containing your DNS zones (comma-separated if multiple). Leave empty to use auto-discovery. Example: production-rg or network-rg,app-rg
-    ...    pattern=^$|^[a-zA-Z0-9._-]+(,[a-zA-Z0-9._-]+)*$
-    ...    example=production-rg
-    ...    default=""
-    
-    ${TEST_FQDNS}=    RW.Core.Import User Variable    TEST_FQDNS
-    ...    type=string
-    ...    description=Important domains/services to monitor for DNS resolution (comma-separated if multiple). Leave empty to use auto-discovery. Example: myapp.database.windows.net or api.mycompany.com,db.mycompany.com
-    ...    pattern=^$|^[a-zA-Z0-9.-]+(,[a-zA-Z0-9.-]+)*$
-    ...    example=myapp.database.windows.net
-    ...    default=""
+     ${TEST_FQDNS}=    RW.Core.Import User Variable    TEST_FQDNS
+     ...    type=string
+     ...    description=Important domains/services to monitor for DNS resolution (comma-separated if multiple). Leave empty for autodiscovery. Example: myapp.database.windows.net or api.mycompany.com,db.mycompany.com
+     ...    pattern=^$|^[a-zA-Z0-9.-]+(,[a-zA-Z0-9.-]+)*$
+     ...    example=myapp.database.windows.net
+     ...    default=""
     
     # Import optional DNS testing configuration
     ${FORWARD_LOOKUP_ZONES}=    RW.Core.Import User Variable    FORWARD_LOOKUP_ZONES
@@ -501,89 +501,89 @@ Suite Initialization
     ...    example=dc01,mail
     ...    default=""
     
-    
-    # Auto-discovery logic
-    IF    "${AUTO_DISCOVER_DNS_RESOURCES}" == "true"
-        Log    Auto-discovery enabled. Running Azure DNS resource discovery...
-        RW.Core.Add Pre To Report    === Auto-Discovery Mode ===
-        RW.Core.Add Pre To Report    Automatically discovering Azure DNS resources...
-        
-        ${discovery_result}=    RW.CLI.Run Cli
-        ...    cmd=cd ${CURDIR} && AZURE_RESOURCE_SUBSCRIPTION_ID="${AZURE_RESOURCE_SUBSCRIPTION_ID}" bash azure_dns_auto_discovery.sh
-        ...    timeout_seconds=300
-        
-        RW.Core.Add Pre To Report    Auto-discovery output: ${discovery_result.stdout}
-        
-        # Parse discovery results
-        ${discovery_exists}=    Run Keyword And Return Status    File Should Exist    ${CURDIR}/azure_dns_discovery.json
-        IF    ${discovery_exists}
-            ${discovery_json}=    RW.CLI.Run Cli
-            ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.resource_groups | join(",") // ""'
-            ...    timeout_seconds=30
-            
-            ${auto_resource_groups}=    Strip String    ${discovery_json.stdout}
-            
-            ${auto_test_fqdns_result}=    RW.CLI.Run Cli
-            ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.suggested_test_fqdns | join(",") // ""'
-            ...    timeout_seconds=30
-            
-            ${auto_test_fqdns}=    Strip String    ${auto_test_fqdns_result.stdout}
-            
-            ${auto_forward_zones_result}=    RW.CLI.Run Cli
-            ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.forward_lookup_zones | join(",") // ""'
-            ...    timeout_seconds=30
-            
-            ${auto_forward_zones}=    Strip String    ${auto_forward_zones_result.stdout}
-            
-            ${auto_public_domains_result}=    RW.CLI.Run Cli
-            ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.public_dns_zones | join(",") // ""'
-            ...    timeout_seconds=30
-            
-            ${auto_public_domains}=    Strip String    ${auto_public_domains_result.stdout}
-            
-            ${auto_express_route_result}=    RW.CLI.Run Cli
-            ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.express_route_zones | join(",") // ""'
-            ...    timeout_seconds=30
-            
-            ${auto_express_route}=    Strip String    ${auto_express_route_result.stdout}
-            
-            ${auto_dns_resolvers_result}=    RW.CLI.Run Cli
-            ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.dns_resolvers | join(",") // ""'
-            ...    timeout_seconds=30
-            
-            ${auto_dns_resolvers}=    Strip String    ${auto_dns_resolvers_result.stdout}
-            
-            # When auto-discovery is enabled, always use discovered values
-            ${RESOURCE_GROUPS}=    Set Variable    ${auto_resource_groups}
-            ${TEST_FQDNS}=    Set Variable    ${auto_test_fqdns}
-            ${FORWARD_LOOKUP_ZONES}=    Set Variable    ${auto_forward_zones}
-            ${PUBLIC_DOMAINS}=    Set Variable    ${auto_public_domains}
-            ${EXPRESS_ROUTE_DNS_ZONES}=    Set Variable    ${auto_express_route}
-            ${DNS_RESOLVERS}=    Set Variable    ${auto_dns_resolvers}
-            
-            RW.Core.Add Pre To Report    === Auto-Discovery Results ===
-            RW.Core.Add Pre To Report    Resource Groups: ${RESOURCE_GROUPS}
-            RW.Core.Add Pre To Report    Test FQDNs: ${TEST_FQDNS}
-            RW.Core.Add Pre To Report    Forward Lookup Zones: ${FORWARD_LOOKUP_ZONES}
-            RW.Core.Add Pre To Report    Public Domains: ${PUBLIC_DOMAINS}
-            RW.Core.Add Pre To Report    Express Route Zones: ${EXPRESS_ROUTE_DNS_ZONES}
-            RW.Core.Add Pre To Report    DNS Resolvers: ${DNS_RESOLVERS}
-            
-            Log    Auto-discovery completed successfully. Using discovered Azure DNS resources.
-        ELSE
-            Log    Auto-discovery failed. Discovery file not found. Using manual configuration.
-            RW.Core.Add Issue
-            ...    severity=3
-            ...    expected=Auto-discovery should generate azure_dns_discovery.json
-            ...    actual=Auto-discovery script failed or did not generate results file
-            ...    title=Auto-discovery Failed
-            ...    reproduce_hint=Check Azure CLI authentication and permissions: az account show
-            ...    details=Auto-discovery was enabled but failed to generate results. Falling back to manual configuration. Ensure Azure CLI is authenticated and has permissions to list DNS zones.
-            ...    next_steps=1. Run 'az login' to authenticate\n2. Verify permissions with 'az network private-dns zone list'\n3. Set AUTO_DISCOVER_DNS_RESOURCES=false to use manual configuration
-        END
-    END
-    
-    # Create consolidated FQDN list for comprehensive testing
+     
+     # Smart Auto-discovery logic
+     IF    "${AUTO_DISCOVER_DNS_RESOURCES}" == "true"
+         Log    Smart autodiscovery enabled. Analyzing actual Azure DNS configuration...
+         RW.Core.Add Pre To Report    === Smart Azure DNS Autodiscovery ===
+         RW.Core.Add Pre To Report    Analyzing actual Azure DNS infrastructure configuration...
+         
+         ${discovery_result}=    RW.CLI.Run Cli
+         ...    cmd=cd ${CURDIR} && AZURE_RESOURCE_SUBSCRIPTION_ID="${AZURE_RESOURCE_SUBSCRIPTION_ID}" RESOURCE_GROUPS="${RESOURCE_GROUPS}" bash azure_dns_smart_discovery.sh
+         ...    timeout_seconds=300
+         
+         RW.Core.Add Pre To Report    Smart autodiscovery output: ${discovery_result.stdout}
+         
+         # Parse discovery results
+         ${discovery_exists}=    Run Keyword And Return Status    File Should Exist    ${CURDIR}/azure_dns_discovery.json
+         IF    ${discovery_exists}
+             ${auto_resource_groups_result}=    RW.CLI.Run Cli
+             ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.resource_groups | join(",") // ""'
+             ...    timeout_seconds=30
+             
+             ${auto_resource_groups}=    Strip String    ${auto_resource_groups_result.stdout}
+             
+             ${auto_test_fqdns_result}=    RW.CLI.Run Cli
+             ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.suggested_test_fqdns | join(",") // ""'
+             ...    timeout_seconds=30
+             
+             ${auto_test_fqdns}=    Strip String    ${auto_test_fqdns_result.stdout}
+             
+             ${auto_forward_zones_result}=    RW.CLI.Run Cli
+             ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.forward_lookup_zones | join(",") // ""'
+             ...    timeout_seconds=30
+             
+             ${auto_forward_zones}=    Strip String    ${auto_forward_zones_result.stdout}
+             
+             ${auto_public_domains_result}=    RW.CLI.Run Cli
+             ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.public_dns_zones | join(",") // ""'
+             ...    timeout_seconds=30
+             
+             ${auto_public_domains}=    Strip String    ${auto_public_domains_result.stdout}
+             
+             ${auto_express_route_result}=    RW.CLI.Run Cli
+             ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.express_route_zones | join(",") // ""'
+             ...    timeout_seconds=30
+             
+             ${auto_express_route}=    Strip String    ${auto_express_route_result.stdout}
+             
+             ${auto_dns_resolvers_result}=    RW.CLI.Run Cli
+             ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.dns_resolvers | join(",") // ""'
+             ...    timeout_seconds=30
+             
+             ${auto_dns_resolvers}=    Strip String    ${auto_dns_resolvers_result.stdout}
+             
+             # Use autodiscovered values if manual config is empty
+             ${RESOURCE_GROUPS}=    Set Variable If    '${RESOURCE_GROUPS}' == ''    ${auto_resource_groups}    ${RESOURCE_GROUPS}
+             ${TEST_FQDNS}=    Set Variable If    '${TEST_FQDNS}' == ''    ${auto_test_fqdns}    ${TEST_FQDNS}
+             ${FORWARD_LOOKUP_ZONES}=    Set Variable If    '${FORWARD_LOOKUP_ZONES}' == ''    ${auto_forward_zones}    ${FORWARD_LOOKUP_ZONES}
+             ${PUBLIC_DOMAINS}=    Set Variable If    '${PUBLIC_DOMAINS}' == ''    ${auto_public_domains}    ${PUBLIC_DOMAINS}
+             ${EXPRESS_ROUTE_DNS_ZONES}=    Set Variable If    '${EXPRESS_ROUTE_DNS_ZONES}' == ''    ${auto_express_route}    ${EXPRESS_ROUTE_DNS_ZONES}
+             ${DNS_RESOLVERS}=    Set Variable If    '${DNS_RESOLVERS}' == ''    ${auto_dns_resolvers}    ${DNS_RESOLVERS}
+             
+             RW.Core.Add Pre To Report    === Smart Autodiscovery Results ===
+             RW.Core.Add Pre To Report    Resource Groups: ${RESOURCE_GROUPS}
+             RW.Core.Add Pre To Report    Test FQDNs: ${TEST_FQDNS}
+             RW.Core.Add Pre To Report    Forward Lookup Zones: ${FORWARD_LOOKUP_ZONES}
+             RW.Core.Add Pre To Report    Public Domains: ${PUBLIC_DOMAINS}
+             RW.Core.Add Pre To Report    Express Route Zones: ${EXPRESS_ROUTE_DNS_ZONES}
+             RW.Core.Add Pre To Report    DNS Resolvers (Azure-specific): ${DNS_RESOLVERS}
+             
+             Log    Smart autodiscovery completed successfully. Using discovered Azure DNS infrastructure.
+         ELSE
+             Log    Smart autodiscovery failed. Using manual configuration.
+             RW.Core.Add Issue
+             ...    severity=4
+             ...    expected=Smart autodiscovery should analyze Azure DNS configuration
+             ...    actual=Smart autodiscovery failed - using manual configuration
+             ...    title=Smart Autodiscovery Failed
+             ...    reproduce_hint=Check Azure CLI authentication and permissions: az account show
+             ...    details=Smart autodiscovery was enabled but failed to analyze Azure DNS infrastructure. Falling back to manual configuration.
+             ...    next_steps=1. Run 'az login' to authenticate\n2. Verify permissions with 'az network private-dns zone list'\n3. Set AUTO_DISCOVER_DNS_RESOURCES=false to use manual configuration only
+         END
+     END
+     
+     # Create consolidated FQDN list for comprehensive testing
     ${all_fqdns_list}=    Create List
     IF    '${TEST_FQDNS}' != ''
         @{init_test_fqdns}=    Split String    ${TEST_FQDNS}    ,
@@ -625,15 +625,15 @@ Suite Initialization
         ...    next_steps=1. Set TEST_FQDNS with your important domains\n2. Or set FORWARD_LOOKUP_ZONES for on-premises domains\n3. Or set PUBLIC_DOMAINS for public website monitoring
     END
     
-    # Set all suite variables
-    Set Suite Variable    ${azure_credentials}
-    Set Suite Variable    ${AUTO_DISCOVER_DNS_RESOURCES}
-    Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
-    Set Suite Variable    ${RESOURCE_GROUPS}
-    Set Suite Variable    ${TEST_FQDNS}
-    Set Suite Variable    ${FORWARD_LOOKUP_ZONES}
-    Set Suite Variable    ${DNS_RESOLVERS}
-    Set Suite Variable    ${PUBLIC_DOMAINS}
-    Set Suite Variable    ${EXPRESS_ROUTE_DNS_ZONES}
-    Set Suite Variable    ${FORWARD_ZONE_TEST_SUBDOMAINS}
-    Set Suite Variable    ${ALL_TEST_FQDNS}
+     # Set all suite variables
+     Set Suite Variable    ${azure_credentials}
+     Set Suite Variable    ${AUTO_DISCOVER_DNS_RESOURCES}
+     Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
+     Set Suite Variable    ${RESOURCE_GROUPS}
+     Set Suite Variable    ${TEST_FQDNS}
+     Set Suite Variable    ${FORWARD_LOOKUP_ZONES}
+     Set Suite Variable    ${DNS_RESOLVERS}
+     Set Suite Variable    ${PUBLIC_DOMAINS}
+     Set Suite Variable    ${EXPRESS_ROUTE_DNS_ZONES}
+     Set Suite Variable    ${FORWARD_ZONE_TEST_SUBDOMAINS}
+     Set Suite Variable    ${ALL_TEST_FQDNS}
