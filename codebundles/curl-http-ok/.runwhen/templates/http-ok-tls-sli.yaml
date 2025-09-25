@@ -28,7 +28,7 @@ spec:
   intervalSeconds: 30
   configProvided:
     - name: URLS
-      value: "{% set urls = [] %}{% for rule in match_resource.resource.spec.rules %}{% for path in rule.http.paths %}{% set url = 'https://' + rule.host %}{% if path.path and path.path != '/' %}{% set url = url + path.path %}{% endif %}{% set urls = urls + [url] %}{% endfor %}{% endfor %}{{ urls | join(',') }}"
+      value: "{% for rule in match_resource.resource.spec.rules %}{% for path in rule.http.paths %}{% if not loop.first %},{% endif %}https://{{rule.host}}{% if path.path and path.path != "/" %}{{path.path}}{% endif %}{% endfor %}{% endfor %}"
     - name: TARGET_LATENCY
       value: '1.2'
     - name: DESIRED_RESPONSE_CODE
