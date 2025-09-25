@@ -76,7 +76,7 @@ jobs:
 
       - name: Generate Codebundle
         id: generate
-        uses: ./.github/actions/codebundle-generator
+        uses: runwhen-contrib/github-actions/codebundle-generator@feat/auto-cb
         with:
           issue-number: ${{ github.event.inputs.issue_number || github.event.issue.number }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
