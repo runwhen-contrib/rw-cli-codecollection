@@ -17,14 +17,8 @@ Check HTTP URL Availability and Timeliness
     [Documentation]    Use cURL to validate single or multiple http responses
     [Tags]    curl    http    ingress    latency    errors    access:read-only
     
-    # Determine which URLs to test
-    ${urls_to_test}=    Set Variable    ${URL}
-    IF    "${URLS}" != ""
-        ${urls_to_test}=    Set Variable    ${URLS}
-    END
-    
     # Split URLs by comma and clean whitespace
-    ${url_list}=    Evaluate    [url.strip() for url in "${urls_to_test}".split(',') if url.strip()]
+    ${url_list}=    Evaluate    [url.strip() for url in "${URLS}".split(',') if url.strip()]
     
     # Test each URL
     FOR    ${url}    IN    @{url_list}
@@ -131,17 +125,11 @@ Check Single HTTP URL
     END
 
 Suite Initialization
-    ${URL}=    RW.Core.Import User Variable    URL
-    ...    type=string
-    ...    description=What URL to perform requests against (single URL for backward compatibility).
-    ...    pattern=\w*
-    ...    default=https://www.runwhen.com
-    ...    example=https://www.runwhen.com
     ${URLS}=    RW.Core.Import User Variable    URLS
     ...    type=string
-    ...    description=Comma-separated list of URLs to perform requests against. If provided, overrides URL variable.
+    ...    description=Comma-separated list of URLs to perform requests against.
     ...    pattern=\w*
-    ...    default=
+    ...    default=https://www.runwhen.com
     ...    example=https://www.runwhen.com,https://api.runwhen.com
     ${TARGET_LATENCY}=    RW.Core.Import User Variable    TARGET_LATENCY
     ...    type=string
@@ -162,7 +150,6 @@ Suite Initialization
     ...    default={"name": "my-ingress", "kind": "Ingress", "namespace": "default"}
     ...    example={"name": "my-ingress", "kind": "Ingress", "namespace": "default"}
     Set Suite Variable    ${DESIRED_RESPONSE_CODE}    ${DESIRED_RESPONSE_CODE}
-    Set Suite Variable    ${URL}    ${URL}
     Set Suite Variable    ${URLS}    ${URLS}
     Set Suite Variable    ${TARGET_LATENCY}    ${TARGET_LATENCY}
     Set Suite Variable    ${OWNER_DETAILS}    ${OWNER_DETAILS}

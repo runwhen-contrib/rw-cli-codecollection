@@ -14,17 +14,11 @@ Suite Setup         Suite Initialization
 
 *** Keywords ***
 Suite Initialization
-    ${URL}=    RW.Core.Import User Variable    URL
-    ...    type=string
-    ...    description=What URL to perform requests against (single URL for backward compatibility).
-    ...    pattern=\w*
-    ...    default=https://www.runwhen.com
-    ...    example=https://www.runwhen.com
     ${URLS}=    RW.Core.Import User Variable    URLS
     ...    type=string
-    ...    description=Comma-separated list of URLs to perform requests against. If provided, overrides URL variable.
+    ...    description=Comma-separated list of URLs to perform requests against.
     ...    pattern=\w*
-    ...    default=
+    ...    default=https://www.runwhen.com
     ...    example=https://www.runwhen.com,https://api.runwhen.com
     ${TARGET_LATENCY}=    RW.Core.Import User Variable    TARGET_LATENCY
     ...    type=string
@@ -43,14 +37,8 @@ Validate HTTP URL Availability and Timeliness
     [Documentation]    Use cURL to validate single or multiple http responses
     [Tags]    cURL    HTTP    Ingress    Latency    Errors
     
-    # Determine which URLs to test
-    ${urls_to_test}=    Set Variable    ${URL}
-    IF    "${URLS}" != ""
-        ${urls_to_test}=    Set Variable    ${URLS}
-    END
-    
     # Split URLs by comma and clean whitespace
-    ${url_list}=    Evaluate    [url.strip() for url in "${urls_to_test}".split(',') if url.strip()]
+    ${url_list}=    Evaluate    [url.strip() for url in "${URLS}".split(',') if url.strip()]
     
     # Initialize overall health tracking
     ${overall_healthy}=    Set Variable    1
