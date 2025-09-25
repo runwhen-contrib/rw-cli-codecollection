@@ -9,7 +9,7 @@ metadata:
 spec:
   fromActivities:
   - displayName: {{match_resource.resource.metadata.name}} HTTP OK AKS TLS SLI Alert Workflow
-    description: Start RunSession with Eager Edgar when SLI is alerting for {{match_resource.resource.spec.rules[0].host}} HTTPS health on AKS
+    description: "Start RunSession with Eager Edgar when SLI is alerting for {{match_resource.resource.spec.rules[0].host}}{% if match_resource.resource.spec.rules[0].http.paths[0].path and match_resource.resource.spec.rules[0].http.paths[0].path != "/" %}{{match_resource.resource.spec.rules[0].http.paths[0].path}}{% endif %} HTTPS health on AKS"
     actions:
     - tasks:
         slx: {{slx_name.split('--')[1]}}

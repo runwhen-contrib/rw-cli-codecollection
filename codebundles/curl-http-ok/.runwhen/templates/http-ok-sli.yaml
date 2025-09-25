@@ -27,8 +27,8 @@ spec:
   intervalStrategy: intermezzo
   intervalSeconds: 30
   configProvided:
-    - name: URL
-      value: http://{{match_resource.resource.spec.rules[0].host}}
+    - name: URLS
+      value: "{% for rule in match_resource.resource.spec.rules %}{% for path in rule.http.paths %}http://{{rule.host}}{% if path.path and path.path != "/" %}{{path.path}}{% endif %}{% if not loop.last %},{% endif %}{% endfor %}{% if not loop.last %},{% endif %}{% endfor %}"
     - name: TARGET_LATENCY
       value: '1.2'
     - name: DESIRED_RESPONSE_CODE

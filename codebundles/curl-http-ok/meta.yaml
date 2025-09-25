@@ -1,6 +1,6 @@
 commands:
 - command: 'curl --connect-timeout 5 --max-time 15 -L -o /dev/null -w ''{"http_code": "%{http_code}", "time_total": %{time_total}, "curl_exit_code": %{exitcode}}''
-    -s ${URL}'
+    -s ${URLS}'
   doc_links: '
 
     - [curl documentation](https://curl.se/docs/manpage.html){:target="_blank"}
@@ -24,10 +24,10 @@ commands:
     \ the HTTP status code, total time taken for the request, and curl's exit code\
     \ for error detection.\n# -s: Suppresses the progress meter and any other non-error\
     \ output.\n\n# The curl_exit_code helps detect connection failures that result\
-    \ in 000 HTTP status codes.\n# Replace ${URL} with the actual URL that you want\
+    \ in 000 HTTP status codes.\n# Replace ${URLS} with the actual URLs that you want\
     \ to send the request to.\n\ncurl --connect-timeout 5 --max-time 15 -L -o /dev/null\
     \ \\\n  -w '{\"http_code\": %{http_code}, \"time_total\": %{time_total},\
-    \ \"curl_exit_code\": %{exitcode}}' \\\n  -s ${URL}"
+    \ \"curl_exit_code\": %{exitcode}}' \\\n  -s ${URLS}"
   name: check_http_url_availability_and_timeliness_for_url
   when_is_it_useful: '1. Monitoring the uptime and response time of a web server or
     service

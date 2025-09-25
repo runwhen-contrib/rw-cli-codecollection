@@ -14,12 +14,12 @@ Suite Setup         Suite Initialization
 
 *** Keywords ***
 Suite Initialization
-    ${URL}=    RW.Core.Import User Variable    URL
+    ${URLS}=    RW.Core.Import User Variable    URLS
     ...    type=string
-    ...    description=What URL to perform requests against.
+    ...    description=Comma-separated list of URLs to perform requests against.
     ...    pattern=\w*
     ...    default=https://www.runwhen.com
-    ...    example=https://www.runwhen.com
+    ...    example=https://www.runwhen.com,https://api.runwhen.com
     ${TARGET_LATENCY}=    RW.Core.Import User Variable    TARGET_LATENCY
     ...    type=string
     ...    description=The maximum latency in seconds as a float value allowed for requests to have.
@@ -33,11 +33,39 @@ Suite Initialization
     ...    default=200
     ...    example=200
 *** Tasks ***
-Validate HTTP URL Availability and Timeliness for ${URL}
-    [Documentation]    Use cURL to validate the http response  
+Validate HTTP URL Availability and Timeliness
+    [Documentation]    Use cURL to validate single or multiple http responses
     [Tags]    cURL    HTTP    Ingress    Latency    Errors
+    
+    # Split URLs by comma and clean whitespace
+    ${url_list}=    Evaluate    [url.strip() for url in "${URLS}".split(',') if url.strip()]
+    
+    # Initialize overall health tracking
+    ${overall_healthy}=    Set Variable    1
+    ${total_urls}=    Get Length    ${url_list}
+    ${healthy_urls}=    Set Variable    0
+    
+    # Test each URL
+    FOR    ${url}    IN    @{url_list}
+        ${url_healthy}=    Test Single URL    ${url}
+        IF    ${url_healthy} == 1
+            ${healthy_urls}=    Evaluate    ${healthy_urls} + 1
+        ELSE
+            ${overall_healthy}=    Set Variable    0
+        END
+    END
+    
+    # Push metrics
+    RW.Core.Push Metric    ${overall_healthy}    sub_name=overall_health
+    RW.Core.Push Metric    ${overall_healthy}
+
+*** Keywords ***
+Test Single URL
+    [Documentation]    Test a single URL and return health score
+    [Arguments]    ${test_url}
+    
     ${curl_rsp}=    RW.CLI.Run Cli
-    ...    cmd=curl --connect-timeout 5 --max-time 15 -L -o /dev/null -w '{"http_code": "\%{http_code}", "time_total": \%{time_total}, "curl_exit_code": \%{exitcode}}' -s ${URL}
+    ...    cmd=curl --connect-timeout 5 --max-time 15 -L -o /dev/null -w '{"http_code": "\%{http_code}", "time_total": \%{time_total}, "curl_exit_code": \%{exitcode}}' -s ${test_url}
     
     # Check curl command success first (before JSON parsing)
     ${curl_success}=    Evaluate    1 if ${curl_rsp.returncode} == 0 else 0
@@ -66,21 +94,22 @@ Validate HTTP URL Availability and Timeliness for ${URL}
             ${latency_within_target}=    Evaluate    1 if ${latency} <= ${TARGET_LATENCY} else 0
         EXCEPT
             # JSON parsing failed - treat as connection failure
-            Log    Failed to parse JSON from curl output: ${curl_rsp.stdout}
+            Log    Failed to parse JSON from curl output for ${test_url}: ${curl_rsp.stdout}
         END
     ELSE
         # Curl failed or no output - already set defaults above
-        Log    Curl command failed with return code: ${curl_rsp.returncode}
+        Log    Curl command failed for ${test_url} with return code: ${curl_rsp.returncode}
     END
     
-    # Overall health score: all conditions must be met for a score of 1
-    # If curl fails or connection fails (000), score is 0 regardless of other factors
-    ${score}=    Evaluate    int(${curl_success} * ${connection_success} * ${http_ok} * ${latency_within_target})
+    # Overall health score for this URL: all conditions must be met for a score of 1
+    ${url_score}=    Evaluate    int(${curl_success} * ${connection_success} * ${http_ok} * ${latency_within_target})
     
-    # Push individual metrics for better observability
-    RW.Core.Push Metric    ${curl_success}    sub_name=curl_success
-    RW.Core.Push Metric    ${connection_success}    sub_name=connection_success
-    RW.Core.Push Metric    ${http_ok}    sub_name=http_status_ok
-    RW.Core.Push Metric    ${latency_within_target}    sub_name=latency_ok
-    RW.Core.Push Metric    ${score}    sub_name=http_health
-    RW.Core.Push Metric    ${score}
+    # Push individual metrics for this URL (sanitize URL for metric name)
+    ${url_metric_name}=    Evaluate    "${test_url}".replace("://", "_").replace("/", "_").replace(".", "_").replace("-", "_")
+    RW.Core.Push Metric    ${curl_success}    sub_name=curl_success_${url_metric_name}
+    RW.Core.Push Metric    ${connection_success}    sub_name=connection_success_${url_metric_name}
+    RW.Core.Push Metric    ${http_ok}    sub_name=http_status_ok_${url_metric_name}
+    RW.Core.Push Metric    ${latency_within_target}    sub_name=latency_ok_${url_metric_name}
+    RW.Core.Push Metric    ${url_score}    sub_name=url_health_${url_metric_name}
+    
+    [Return]    ${url_score}
