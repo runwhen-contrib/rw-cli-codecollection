@@ -204,6 +204,7 @@ Suite Initialization
 
 
 *** Tasks ***
+
 Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches and analyzes logs from the deployment pods for errors, stack traces, connection issues, and other patterns that indicate application health problems. Note: Warning messages about missing log files for excluded containers (like linkerd-proxy, istio-proxy) are expected and harmless.
     [Tags]
@@ -1045,4 +1046,160 @@ Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` in Namespace `${N
                 RW.Core.Add Pre To Report    **Container Restart Analysis for Deployment `${DEPLOYMENT_NAME}`**\n**Status:** Completed but results parsing failed\n\n**Raw Output:**\n${container_restarts.stdout}
             END
         END
+    END
+
+Identify Recent Configuration Changes for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
+    [Documentation]    Identifies recent configuration changes from ReplicaSet analysis that might be related to current issues.
+    [Tags]
+    ...    configuration
+    ...    changes
+    ...    tracking
+    ...    replicaset
+    ...    deployment
+    ...    analysis
+    ...    access:read-only
+    
+    # Run configuration change analysis using bash script (matches other task patterns)
+    ${config_analysis}=    RW.CLI.Run Cli
+    ...    cmd=bash track_deployment_config_changes.sh "${DEPLOYMENT_NAME}" "${NAMESPACE}" "${CONTEXT}" "24h"
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    
+    # Add the full analysis output to the report
+    RW.Core.Add Pre To Report    **Configuration Change Analysis for Deployment `${DEPLOYMENT_NAME}`**\n\n\n${config_analysis.stdout}\n
+    
+    # Parse output for specific patterns and create issues if needed
+    ${output}=    Set Variable    ${config_analysis.stdout}
+    
+    # Check for recent ReplicaSet changes
+    IF    "Recent ReplicaSet change detected" in $output
+        # Extract ReplicaSet information for issue creation
+        ${lines}=    Split String    ${output}    \n
+        ${current_rs}=    Set Variable    Unknown
+        ${change_time}=    Set Variable    Unknown
+        
+        FOR    ${line}    IN    @{lines}
+            IF    "Current ReplicaSet:" in $line
+                # Extract ReplicaSet name (everything between "Current ReplicaSet: " and " (created:")
+                ${rs_part}=    Evaluate    "${line}".split("Current ReplicaSet: ")[1] if len("${line}".split("Current ReplicaSet: ")) > 1 else "Unknown"
+                ${current_rs}=    Evaluate    "${rs_part}".split(" (created:")[0] if " (created:" in "${rs_part}" else "${rs_part}"
+                
+                # Extract timestamp (everything between "(created: " and ")")
+                IF    "(created: " in $line and ")" in $line
+                    ${time_part}=    Evaluate    "${line}".split("(created: ")[1] if len("${line}".split("(created: ")) > 1 else "Unknown"
+                    ${change_time}=    Evaluate    "${time_part}".split(")")[0] if ")" in "${time_part}" else "${time_part}"
+                END
+            END
+        END
+        
+        # Check for container image changes
+        IF    "Container Image Changes Detected" in $output
+            # Extract image change details from output
+            ${image_details}=    Set Variable    ${EMPTY}
+            ${in_image_section}=    Set Variable    ${False}
+            FOR    ${line}    IN    @{lines}
+                IF    "Container Image Changes Detected:" in $line
+                    ${in_image_section}=    Set Variable    ${True}
+                ELSE IF    ${in_image_section}
+                    IF    "Previous images:" in $line or "Current images:" in $line or $line.strip().startswith("- ")
+                        ${image_details}=    Set Variable    ${image_details}${line}\n
+                    ELSE IF    $line.strip() == ""
+                        ${in_image_section}=    Set Variable    ${False}
+                    END
+                END
+            END
+            
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Container images should be stable for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    actual=Container image was updated recently for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    title=Recent Container Image Update Detected for Deployment `${DEPLOYMENT_NAME}`
+            ...    reproduce_hint=Check ReplicaSet history for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    details=Configuration Change Detected\n\nChange Type: Container Image Update\nTimestamp: ${change_time}\nCurrent ReplicaSet: ${current_rs}\n\nImage Changes:\n${image_details}\nThis change may be related to current deployment issues. Verify the image update was intentional and check for known issues with the new image version.
+            ...    next_steps=Verify the image update was intentional\nCheck if the new image version has known issues\nReview deployment rollout status
+        END
+        
+        # Check for environment variable changes
+        IF    "Environment Variable Changes Detected" in $output
+            # Extract environment variable change details from output
+            ${env_details}=    Set Variable    ${EMPTY}
+            ${in_env_section}=    Set Variable    ${False}
+            FOR    ${line}    IN    @{lines}
+                IF    "Environment Variable Changes Detected:" in $line
+                    ${in_env_section}=    Set Variable    ${True}
+                ELSE IF    ${in_env_section}
+                    ${line_stripped}=    Evaluate    "${line}".strip()
+                    ${is_indented}=    Evaluate    len("${line}") > len("${line_stripped}") and "${line}".startswith(" ")
+                    IF    "Added variables:" in $line or "Removed variables:" in $line or "Modified variables:" in $line or "Summary:" in $line or ${is_indented}
+                        # Clean up emojis and format for issue details
+                        ${clean_line}=    Evaluate    "${line}".replace("➕", "").replace("➖", "").replace("🔄", "").replace("📊", "").strip()
+                        ${env_details}=    Set Variable    ${env_details}${clean_line}\n
+                    ELSE IF    $line.strip() == ""
+                        ${in_env_section}=    Set Variable    ${False}
+                    END
+                END
+            END
+            
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    expected=Environment configuration should be stable for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    actual=Environment variables were modified recently for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    title=Recent Environment Configuration Changes Detected for Deployment `${DEPLOYMENT_NAME}`
+            ...    reproduce_hint=Check ReplicaSet history for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    details=Configuration Change Detected\n\nChange Type: Environment Variables Update\nTimestamp: ${change_time}\nCurrent ReplicaSet: ${current_rs}\n\nEnvironment Variable Changes:\n${env_details}\nThese environment variable changes may be related to current deployment issues. Review the changes to ensure they align with expected configuration.
+            ...    next_steps=Review recent environment variable changes\nVerify changes align with expected configuration\nCheck application logs for configuration-related errors
+        END
+        
+        # Check for resource requirement changes
+        IF    "Resource Requirement Changes Detected" in $output
+            # Extract resource change details from output
+            ${resource_details}=    Set Variable    ${EMPTY}
+            ${in_resource_section}=    Set Variable    ${False}
+            FOR    ${line}    IN    @{lines}
+                IF    "Resource Requirement Changes Detected:" in $line
+                    ${in_resource_section}=    Set Variable    ${True}
+                ELSE IF    ${in_resource_section}
+                    IF    "Previous resources:" in $line or "Current resources:" in $line or $line.strip().startswith("- ")
+                        # Clean up emojis and format for issue details
+                        ${clean_line}=    Evaluate    "${line}".replace("📊", "").strip()
+                        ${resource_details}=    Set Variable    ${resource_details}${clean_line}\n
+                    ELSE IF    $line.strip() == ""
+                        ${in_resource_section}=    Set Variable    ${False}
+                    END
+                END
+            END
+            
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    expected=Resource limits should be stable for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    actual=Resource limits/requests were modified recently for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    title=Recent Resource Limit Changes Detected for Deployment `${DEPLOYMENT_NAME}`
+            ...    reproduce_hint=Check ReplicaSet history for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    details=Configuration Change Detected\n\nChange Type: Resource Limits/Requests Update\nTimestamp: ${change_time}\nCurrent ReplicaSet: ${current_rs}\n\nResource Changes:\n${resource_details}\nThese resource limit changes may be related to current deployment issues. Monitor resource utilization and verify the limits are appropriate for the workload.
+            ...    next_steps=Monitor resource utilization after changes\nVerify resource limits are appropriate for workload\nCheck for resource constraint issues
+        END
+    END
+    
+    # Check for kubectl apply detection
+    IF    "Recent kubectl apply detected" in $output
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=Deployment configuration should be synchronized for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+        ...    actual=Recent kubectl apply operation detected for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+        ...    title=Recent kubectl apply Operation Detected for Deployment `${DEPLOYMENT_NAME}`
+        ...    reproduce_hint=Check deployment generation vs observed generation for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+        ...    details=Recent kubectl apply operation detected. The deployment configuration has been updated but may still be processing.\n\nSee full analysis in report for generation gap details.
+        ...    next_steps=Wait for controller to process changes\nCheck deployment status and conditions\nVerify no resource constraints are preventing updates
+    END
+    
+    # Check for configuration drift
+    IF    "Configuration drift detected" in $output
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=Deployment configuration should be synchronized for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+        ...    actual=Configuration drift detected for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+        ...    title=Configuration Drift Detected for Deployment `${DEPLOYMENT_NAME}`
+        ...    reproduce_hint=Check deployment generation vs observed generation for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+        ...    details=Configuration drift detected. The deployment has been modified but the controller hasn't processed all changes yet.\n\nSee full analysis in report for drift details.
+        ...    next_steps=Wait for controller to process changes\nCheck deployment status and conditions\nVerify no resource constraints are preventing updates
     END
