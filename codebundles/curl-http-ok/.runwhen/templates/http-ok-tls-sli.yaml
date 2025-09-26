@@ -34,9 +34,7 @@ spec:
     - name: DESIRED_RESPONSE_CODE
       value: '200'
   secretsProvided: []
-  alerts:
-    warning:
-      operator: <
-      threshold: '1'
-      for: '10m'
-
+  alertConfig:
+    tasks:
+      persona: eager-edgar
+      sessionTTL: 10m
