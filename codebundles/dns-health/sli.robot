@@ -1,12 +1,12 @@
 *** Settings ***
-Documentation       This SLI measures DNS health metrics for Azure environments including resolution success rates,
-...                 latency measurements, private DNS zone health, and external DNS resolver availability.
+Documentation       This SLI measures DNS health metrics including resolution success rates,
+...                 latency measurements, DNS zone health, and external DNS resolver availability.
 ...                 Provides binary scoring (0/1) for each metric and calculates an overall DNS health score.
-...                 Supports multiple FQDNs, private/public DNS zones, forward lookup zones, and external resolver testing.
+...                 Supports multiple FQDNs, DNS zones, forward lookup zones, and external resolver testing.
 
 Metadata            Author    stewartshea
-Metadata            Display Name    Azure DNS Health Metrics (Multi-Zone)
-Metadata            Supports    Azure    DNS    Private DNS    Public DNS    Forward Zones    VNet    SLI
+Metadata            Display Name    DNS Health Metrics
+Metadata            Supports    DNS    Resolution    Latency    Zones    SLI
 
 Library             BuiltIn
 Library             RW.Core
@@ -21,7 +21,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 DNS Resolution Success Rate
     [Documentation]    Measures the success rate of DNS resolution across all configured FQDNs and pushes a metric (0-100)
-    [Tags]    azure    dns    resolution    success-rate    sli
+    [Tags]    dns    resolution    success-rate    sli
     
     ${total_tests}=    Set Variable    ${0}
     ${successful_tests}=    Set Variable    ${0}
@@ -99,7 +99,7 @@ DNS Resolution Success Rate
 
 DNS Query Latency
     [Documentation]    Measures average DNS query latency in milliseconds across all configured FQDNs and pushes the metric
-    [Tags]    azure    dns    latency    performance    sli
+    [Tags]    dns    latency    performance    sli
     
     ${total_latency}=    Set Variable    ${0}
     ${query_count}=    Set Variable    ${0}
@@ -193,63 +193,58 @@ DNS Query Latency
     Set Global Variable    ${dns_latency_score}
     RW.Core.Push Metric    ${dns_latency_score}    sub_name=latency_performance
 
-Private DNS Zone Health
-    [Documentation]    Measures the health of private DNS zones across multiple resource groups (1 for healthy, 0 for unhealthy)
-    [Tags]    azure    dns    private-dns    zone-health    sli
+DNS Zone Health
+    [Documentation]    Measures the health of configured DNS zones (1 for healthy, 0 for unhealthy)
+    [Tags]    dns    zone-health    sli
     
     ${dns_zone_health_score}=    Set Variable    ${1}
     ${total_zones}=    Set Variable    ${0}
     ${healthy_zones}=    Set Variable    ${0}
     
-    # Fast private DNS zone health check (single call per RG)
-    @{resource_groups}=    Split String    ${RESOURCE_GROUPS}    ,
+    # Check if we have any zones to test
+    IF    '${DNS_ZONES}' == ''
+        Log    No DNS zones configured for health check
+        Set Global Variable    ${dns_zone_health_score}
+        RW.Core.Push Metric    ${dns_zone_health_score}    sub_name=zone_health
+        RETURN
+    END
     
-    FOR    ${rg}    IN    @{resource_groups}
-        ${rg}=    Strip String    ${rg}
-        Continue For Loop If    '${rg}' == ''
+    @{dns_zones}=    Split String    ${DNS_ZONES}    ,
+    
+    FOR    ${zone}    IN    @{dns_zones}
+        ${zone}=    Strip String    ${zone}
+        Continue For Loop If    '${zone}' == ''
         
-        # Get total zone count
-        ${total_cmd}=    Set Variable    timeout 15 az network private-dns zone list --resource-group "${rg}" --query "length(@)" --output tsv 2>/dev/null || echo "0"
-        ${total_rsp}=    RW.CLI.Run Cli
-        ...    cmd=${total_cmd}
-        ...    timeout_seconds=20
+        Log    Checking DNS zone health: ${zone}
+        ${total_zones}=    Evaluate    ${total_zones} + 1
         
-        # Get healthy zone count (zones with records)
-        ${healthy_cmd}=    Set Variable    timeout 15 az network private-dns zone list --resource-group "${rg}" --query "[?numberOfRecordSets > \`0\`] | length(@)" --output tsv 2>/dev/null || echo "0"
-        ${healthy_rsp}=    RW.CLI.Run Cli
-        ...    cmd=${healthy_cmd}
-        ...    timeout_seconds=20
+        # Test zone health by attempting to resolve NS records
+        ${zone_check}=    RW.CLI.Run Cli
+        ...    cmd=dig NS ${zone} +short +timeout=5 | head -1
+        ...    timeout_seconds=10
         
-        # Process results if both commands succeeded
-        IF    ${total_rsp.returncode} == 0 and ${healthy_rsp.returncode} == 0
-            ${rg_total_str}=    Strip String    ${total_rsp.stdout}
-            ${rg_healthy_str}=    Strip String    ${healthy_rsp.stdout}
-            
-            # Only convert if they're actually numbers
-            ${is_total_numeric}=    Run Keyword And Return Status    Should Match Regexp    ${rg_total_str}    ^\\d+$
-            ${is_healthy_numeric}=    Run Keyword And Return Status    Should Match Regexp    ${rg_healthy_str}    ^\\d+$
-            
-            IF    ${is_total_numeric} and ${is_healthy_numeric}
-                ${rg_total}=    Convert To Integer    ${rg_total_str}
-                ${rg_healthy}=    Convert To Integer    ${rg_healthy_str}
-                ${total_zones}=    Evaluate    ${total_zones} + ${rg_total}
-                ${healthy_zones}=    Evaluate    ${healthy_zones} + ${rg_healthy}
-            END
+        # If we get NS records, zone is considered healthy
+        ${ns_result}=    Strip String    ${zone_check.stdout}
+        IF    '${ns_result}' != '' and '${zone_check.returncode}' == '0'
+            ${healthy_zones}=    Evaluate    ${healthy_zones} + 1
+            Log    Zone ${zone}: Healthy (NS records found)
+        ELSE
+            Log    Zone ${zone}: Unhealthy (no NS records or query failed)
         END
     END
     
-    # Calculate overall health score
+    # Calculate binary score (1 if >=80% zones healthy, 0 otherwise)
     IF    ${total_zones} > 0
-        ${health_percentage}=    Evaluate    (${healthy_zones} * 100) / ${total_zones}
-        # Consider healthy if 80% or more zones have records
+        ${health_percentage}=    Evaluate    (${healthy_zones} / ${total_zones}) * 100
         IF    ${health_percentage} >= 80
             ${dns_zone_health_score}=    Set Variable    ${1}
         ELSE
             ${dns_zone_health_score}=    Set Variable    ${0}
         END
+        Log    Zone Health: ${healthy_zones}/${total_zones} zones healthy (${health_percentage}%) - Score: ${dns_zone_health_score}
     ELSE
-        # No zones found - this indicates missing configuration or access issues
-        ${dns_zone_health_score}=    Set Variable    ${0}
+        Log    No DNS zones found to check
+        ${dns_zone_health_score}=    Set Variable    ${1}
     END
     
     Set Global Variable    ${dns_zone_health_score}
@@ -257,7 +252,7 @@ Private DNS Zone Health
 
 External DNS Resolver Availability
     [Documentation]    Measures availability of external DNS resolvers (percentage of working resolvers)
-    [Tags]    azure    dns    external    resolver    availability    sli
+    [Tags]    dns    external    resolver    availability    sli
     
     ${total_resolvers}=    Set Variable    ${0}
     ${working_resolvers}=    Set Variable    ${0}
@@ -316,44 +311,14 @@ Generate DNS Health Score
 
 *** Keywords ***
 Suite Initialization
-    # Import Azure credentials
-    ${azure_credentials}=    RW.Core.Import Secret
-    ...    azure_credentials
-    ...    type=string
-    ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
-    ...    pattern=.*
-    
-    # Import auto-discovery configuration
-    ${AUTO_DISCOVER_DNS_RESOURCES}=    RW.Core.Import User Variable    AUTO_DISCOVER_DNS_RESOURCES
-    ...    type=string
-    ...    description=Enable smart Azure DNS autodiscovery (true/false). Analyzes actual Azure DNS configuration instead of using generic defaults.
-    ...    pattern=^(true|false)$
-    ...    example=true
-    ...    default=true
-    
-    ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_RESOURCE_SUBSCRIPTION_ID
-    ...    type=string
-    ...    description=Azure subscription ID for autodiscovery. Leave empty to use current Azure CLI subscription.
-    ...    pattern=^$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
-    ...    example=2a0cf760-baef-4446-b75c-75c4f8a6267f
-    ...    default=""
-    
-    # Import configuration variables (optional when autodiscovery is enabled)
-    ${RESOURCE_GROUPS}=    RW.Core.Import User Variable    RESOURCE_GROUPS
-    ...    type=string
-    ...    description=Azure resource groups containing your DNS zones (comma-separated if multiple). Leave empty for autodiscovery. Example: production-rg or network-rg,app-rg
-    ...    pattern=^$|^[a-zA-Z0-9._-]+(,[a-zA-Z0-9._-]+)*$
-    ...    example=production-rg
-    ...    default=""
-    
+    # Import DNS configuration variables
     ${TEST_FQDNS}=    RW.Core.Import User Variable    TEST_FQDNS
     ...    type=string
-    ...    description=Important domains/services to monitor for DNS resolution (comma-separated if multiple). Leave empty for autodiscovery. Example: myapp.database.windows.net or api.mycompany.com,db.mycompany.com
-    ...    pattern=^$|^[a-zA-Z0-9.-]+(,[a-zA-Z0-9.-]+)*$
-    ...    example=myapp.database.windows.net
-    ...    default=""
+    ...    description=Important domains/services to monitor for DNS resolution (comma-separated if multiple). Example: api.mycompany.com,db.mycompany.com
+    ...    pattern=^[a-zA-Z0-9.-]+(,[a-zA-Z0-9.-]+)*$
+    ...    example=api.mycompany.com,db.mycompany.com
+    ...    default=google.com,example.com
     
-    # Import optional DNS testing configuration
     ${FORWARD_LOOKUP_ZONES}=    RW.Core.Import User Variable    FORWARD_LOOKUP_ZONES
     ...    type=string
     ...    description=Internal company domains that forward to on-premises DNS (optional, for hybrid environments). Example: internal.company.com
@@ -370,88 +335,21 @@ Suite Initialization
     
     ${DNS_RESOLVERS}=    RW.Core.Import User Variable    DNS_RESOLVERS
     ...    type=string
-    ...    description=Custom DNS servers to test against (optional, uses Google/Cloudflare if empty). Example: 10.0.0.4,10.0.1.4
-    ...    pattern=^$|^[0-9.]+(,[0-9.]+)*$
-    ...    example=10.0.0.4
+    ...    description=Custom DNS servers to test against (comma-separated). Example: 10.0.0.4,10.0.1.4 or 8.8.8.8,1.1.1.1
+    ...    pattern=^[0-9.]+(,[0-9.]+)*$
+    ...    example=8.8.8.8,1.1.1.1
+    ...    default=8.8.8.8,1.1.1.1
+    
+    ${DNS_ZONES}=    RW.Core.Import User Variable    DNS_ZONES
+    ...    type=string
+    ...    description=DNS zones to check health for (comma-separated). Can be private or public zones. Example: mycompany.com,internal.corp
+    ...    pattern=^$|^[a-zA-Z0-9.-]+(,[a-zA-Z0-9.-]+)*$
+    ...    example=mycompany.com,internal.corp
     ...    default=""
     
-    
-    # Smart Auto-discovery logic (lightweight for SLI)
-    IF    "${AUTO_DISCOVER_DNS_RESOURCES}" == "true"
-        Log    Smart autodiscovery enabled for SLI. Analyzing Azure DNS configuration...
-        
-        # Check if recent discovery results exist (cache-first approach for SLI performance)
-        ${discovery_exists}=    Run Keyword And Return Status    File Should Exist    ${CURDIR}/azure_dns_discovery.json
-        ${cache_valid}=    Set Variable    ${False}
-        
-        IF    ${discovery_exists}
-            # Check if cache is recent (less than 1 hour old for SLI)
-            ${cache_check}=    RW.CLI.Run Cli
-            ...    cmd=find ${CURDIR}/azure_dns_discovery.json -mmin -60 | wc -l
-            ...    timeout_seconds=5
-            
-            ${cache_check_output}=    Strip String    ${cache_check.stdout}
-            ${cache_valid}=    Run Keyword And Return Status    Should Be Equal As Strings    ${cache_check_output}    1
-        END
-        
-        # Only run discovery if no valid cache exists
-        IF    not ${cache_valid}
-            Log    No valid cache found. Running smart autodiscovery for SLI...
-            
-            ${discovery_result}=    RW.CLI.Run Cli
-            ...    cmd=cd ${CURDIR} && AZURE_RESOURCE_SUBSCRIPTION_ID="${AZURE_RESOURCE_SUBSCRIPTION_ID}" RESOURCE_GROUPS="${RESOURCE_GROUPS}" bash azure_dns_smart_discovery.sh
-            ...    timeout_seconds=120
-            
-            ${discovery_exists}=    Run Keyword And Return Status    File Should Exist    ${CURDIR}/azure_dns_discovery.json
-        END
-        
-        # Parse results efficiently
-        IF    ${discovery_exists}
-            ${auto_resource_groups_result}=    RW.CLI.Run Cli
-            ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.resource_groups | join(",") // ""'
-            ...    timeout_seconds=10
-            ${auto_resource_groups}=    Strip String    ${auto_resource_groups_result.stdout}
-            
-            ${auto_test_fqdns_result}=    RW.CLI.Run Cli
-            ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.suggested_test_fqdns | join(",") // ""'
-            ...    timeout_seconds=10
-            ${auto_test_fqdns}=    Strip String    ${auto_test_fqdns_result.stdout}
-            
-            ${auto_forward_zones_result}=    RW.CLI.Run Cli
-            ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.forward_lookup_zones | join(",") // ""'
-            ...    timeout_seconds=10
-            ${auto_forward_zones}=    Strip String    ${auto_forward_zones_result.stdout}
-            
-            ${auto_public_domains_result}=    RW.CLI.Run Cli
-            ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.public_dns_zones | join(",") // ""'
-            ...    timeout_seconds=10
-            ${auto_public_domains}=    Strip String    ${auto_public_domains_result.stdout}
-            
-            ${auto_dns_resolvers_result}=    RW.CLI.Run Cli
-            ...    cmd=cat ${CURDIR}/azure_dns_discovery.json | jq -r '.discovery.dns_resolvers | join(",") // ""'
-            ...    timeout_seconds=10
-            ${auto_dns_resolvers}=    Strip String    ${auto_dns_resolvers_result.stdout}
-            
-            # Use autodiscovered values if manual config is empty
-            ${RESOURCE_GROUPS}=    Set Variable If    '${RESOURCE_GROUPS}' == ''    ${auto_resource_groups}    ${RESOURCE_GROUPS}
-            ${TEST_FQDNS}=    Set Variable If    '${TEST_FQDNS}' == ''    ${auto_test_fqdns}    ${TEST_FQDNS}
-            ${FORWARD_LOOKUP_ZONES}=    Set Variable If    '${FORWARD_LOOKUP_ZONES}' == ''    ${auto_forward_zones}    ${FORWARD_LOOKUP_ZONES}
-            ${PUBLIC_DOMAINS}=    Set Variable If    '${PUBLIC_DOMAINS}' == ''    ${auto_public_domains}    ${PUBLIC_DOMAINS}
-            ${DNS_RESOLVERS}=    Set Variable If    '${DNS_RESOLVERS}' == ''    ${auto_dns_resolvers}    ${DNS_RESOLVERS}
-            
-            ${cache_status}=    Set Variable If    ${cache_valid}    cached    fresh
-            Log    SLI smart autodiscovery completed using ${cache_status} results.
-        ELSE
-            Log    Smart autodiscovery failed for SLI. Using manual configuration.
-        END
-    END
-    
     # Set all suite variables
-    Set Suite Variable    ${azure_credentials}
-    Set Suite Variable    ${AUTO_DISCOVER_DNS_RESOURCES}
-    Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
-    Set Suite Variable    ${RESOURCE_GROUPS}
     Set Suite Variable    ${TEST_FQDNS}
     Set Suite Variable    ${FORWARD_LOOKUP_ZONES}
     Set Suite Variable    ${PUBLIC_DOMAINS}
     Set Suite Variable    ${DNS_RESOLVERS}
+    Set Suite Variable    ${DNS_ZONES}
