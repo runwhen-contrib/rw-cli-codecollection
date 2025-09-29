@@ -243,8 +243,9 @@ DNS Zone Health
         END
         Log    Zone Health: ${healthy_zones}/${total_zones} zones healthy (${health_percentage}%) - Score: ${dns_zone_health_score}
     ELSE
-        Log    No DNS zones found to check
-        ${dns_zone_health_score}=    Set Variable    ${1}
+        # DNS zones were configured but none were processed - this indicates failure
+        Log    DNS zones were configured but none could be processed - Score: 0
+        ${dns_zone_health_score}=    Set Variable    ${0}
     END
     
     Set Global Variable    ${dns_zone_health_score}
