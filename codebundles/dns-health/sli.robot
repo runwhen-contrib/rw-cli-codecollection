@@ -204,6 +204,7 @@ DNS Zone Health
     # Check if we have any zones to test
     IF    '${DNS_ZONES}' == ''
         Log    No DNS zones configured for health check
+        ${dns_zone_health_score}=    Set Variable    ${0}
         Set Global Variable    ${dns_zone_health_score}
         RW.Core.Push Metric    ${dns_zone_health_score}    sub_name=zone_health
         RETURN
