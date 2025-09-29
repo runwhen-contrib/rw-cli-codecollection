@@ -7,7 +7,7 @@ Documentation       This taskset performs comprehensive DNS health monitoring an
 
 Metadata            Author    stewartshea
 Metadata            Display Name    DNS Health & Monitoring
-Metadata            Supports    DNS    Generic
+Metadata            Supports    DNS    Azure    GCP    AWS
 
 Library             BuiltIn
 Library             RW.Core

@@ -6,7 +6,7 @@ Documentation       This SLI measures DNS health metrics including resolution su
 
 Metadata            Author    stewartshea
 Metadata            Display Name    DNS Health Metrics
-Metadata            Supports    DNS    Resolution    Latency    Zones    SLI
+Metadata            Supports    DNS    Azure    GCP    AWS
 
 Library             BuiltIn
 Library             RW.Core
