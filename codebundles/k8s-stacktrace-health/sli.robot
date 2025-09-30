@@ -43,12 +43,7 @@ Suite Initialization
     ...    enum=[deployment,statefulset,daemonset]
     ...    example=deployment
     ...    default=deployment
-    ${LOG_AGE}=    RW.Core.Import User Variable    LOG_AGE
-    ...    type=string
-    ...    description=The time window to fetch logs for stacktrace analysis.
-    ...    pattern=((\d+?)m|(\d+?)h)?
-    ...    example=10m
-    ...    default=10m
+    ${LOG_AGE}=     RW.Core.Import Platform Variable    RW_LOOKBACK_WINDOW
     ${MAX_LOG_LINES}=    RW.Core.Import User Variable    MAX_LOG_LINES
     ...    type=string
     ...    description=Maximum number of log lines to fetch per container to prevent API overload.
