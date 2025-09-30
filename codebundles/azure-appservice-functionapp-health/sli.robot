@@ -5,6 +5,7 @@ Metadata            Display Name    Azure Function App Triage
 Metadata            Supports    Azure    AppService    Health
 
 Library             BuiltIn
+Library             String
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
@@ -184,6 +185,16 @@ Generate Function App Health Score for `${FUNCTION_APP_NAME}` in resource group 
 
 
 *** Keywords ***
+Normalize Lookback Window
+    [Arguments]    ${raw}
+    ${raw}=    Strip String    ${raw}
+    ${raw}=    Replace String Using Regexp    ${raw}    \s+    ${EMPTY}
+    ${len}=    Get Length    ${raw}
+    Should Be True    ${len} >= 2
+    ${num}=    Get Substring    ${raw}    0    ${len-1}
+    Should Match Regexp    ${num}    ^[0-9]+$
+    ${num}=    Convert To Integer    ${num}
+    RETURN    ${num}
 Suite Initialization
     ${AZ_RESOURCE_GROUP}=    RW.Core.Import User Variable    AZ_RESOURCE_GROUP
     ...    type=string
@@ -202,11 +213,8 @@ Suite Initialization
     ...    type=string
     ...    description=The Azure subscription ID to use for resource operations.
     ...    pattern=\w*
-    ${TIME_PERIOD_MINUTES}=    RW.Core.Import User Variable    TIME_PERIOD_MINUTES
-    ...    type=string
-    ...    description=The time period, in minutes, to look back for activites/events. 
-    ...    pattern=\w*
-    ...    default=10
+    ${LOOKBACK_WINDOW}=    RW.Core.Import Platform Variable    RW_LOOKBACK_WINDOW
+    ${TIME_PERIOD_MINUTES}=    Normalize Lookback Window    ${LOOKBACK_WINDOW}
     ${CPU_THRESHOLD}=    RW.Core.Import User Variable    CPU_THRESHOLD
     ...    type=string
     ...    description=The CPU % threshold in which to generate an issue.

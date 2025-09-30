@@ -67,13 +67,7 @@ Suite Initialization
     ...    type=string
     ...    description=The Kubernetes labels used to select the resource for logs.
     ...    pattern=\w*
-    ${LOGS_SINCE}=    RW.Core.Import User Variable
-    ...    LOGS_SINCE
-    ...    type=string
-    ...    description=How far back to fetch logs from containers in Kubernetes. Making this too recent and running the codebundle often could cause adverse performance.
-    ...    pattern=\w*
-    ...    example=15m
-    ...    default=15m
+    ${LOGS_SINCE}=    RW.Core.Import Platform Variable    RW_LOOKBACK_WINDOW
     ${EXCLUDE_PATTERN}=    RW.Core.Import User Variable
     ...    EXCLUDE_PATTERN
     ...    type=string
