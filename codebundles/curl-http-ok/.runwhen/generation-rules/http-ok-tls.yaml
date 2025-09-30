@@ -26,5 +26,3 @@ spec:
             - type: slo
             - type: runbook
               templateName: http-ok-tls-taskset.yaml
-            - type: workflow
-              templateName: http-ok-tls-workflow.yaml
