@@ -180,11 +180,8 @@ Suite Initialization
     ...    description=The Azure Subscription ID for the resource.
     ...    pattern=\w*
     ...    default=""
-    ${TIME_PERIOD_MINUTES}=    RW.Core.Import User Variable    TIME_PERIOD_MINUTES
-    ...    type=string
-    ...    description=The time period, in minutes, to look back for activites/events. 
-    ...    pattern=\w*
-    ...    default=10
+    ${LOOKBACK_WINDOW}=     RW.Core.Import Platform Variable    RW_LOOKBACK_WINDOW
+    ${TIME_PERIOD_MINUTES}=    ${LOOKBACK_WINDOW}
     ${CPU_THRESHOLD}=    RW.Core.Import User Variable    CPU_THRESHOLD
     ...    type=string
     ...    description=The CPU % threshold in which to generate an issue.

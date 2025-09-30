@@ -48,12 +48,8 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=1
     ...    default=1
-    ${LOG_AGE}=    RW.Core.Import User Variable    LOG_AGE
-    ...    type=string
-    ...    description=The time window to fetch logs for analysis.
-    ...    pattern=((\d+?)m|(\d+?)h)?
-    ...    example=10m
-    ...    default=10m
+    ${LOOKBACK_WINDOW}=     RW.Core.Import Platform Variable    RW_LOOKBACK_WINDOW
+    ${LOG_AGE}=     ${LOOKBACK_WINDOW}
     ${MAX_LOG_LINES}=    RW.Core.Import User Variable    MAX_LOG_LINES
     ...    type=string
     ...    description=Maximum number of log lines to fetch per container to prevent API overload.

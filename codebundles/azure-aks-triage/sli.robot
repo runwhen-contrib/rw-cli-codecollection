@@ -105,11 +105,8 @@ Suite Initialization
     ...    type=string
     ...    description=The Azure Subscription ID for the resource.  
     ...    pattern=\w*
-    ${TIME_PERIOD_MINUTES}=    RW.Core.Import User Variable    TIME_PERIOD_MINUTES
-    ...    type=string
-    ...    description=The time period, in minutes, to look back for activites/events. 
-    ...    pattern=\w*
-    ...    default=10
+    ${LOOKBACK_WINDOW}=     RW.Core.Import Platform Variable    RW_LOOKBACK_WINDOW
+    ${TIME_PERIOD_MINUTES}=    ${LOOKBACK_WINDOW}
     Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AKS_CLUSTER}    ${AKS_CLUSTER}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
