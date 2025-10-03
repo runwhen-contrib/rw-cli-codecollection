@@ -1,0 +1,27 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: azure
+  generationRules:
+    - resourceTypes:
+        - azure_appservice_web_apps
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+        - type: pattern
+          pattern: "^functionapp(?:,.*)?$"
+          properties: [kind]
+          mode: substring
+      slxs:
+        - baseName: az-appsvc-function-health
+          qualifiers: ["resource", "resource_group"]
+          baseTemplateName: azure-appservice-function-health
+          levelOfDetail: detailed
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: azure-appservice-function-health-taskset.yaml
+            - type: workflow

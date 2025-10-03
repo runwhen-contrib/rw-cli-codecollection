@@ -1,0 +1,25 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: kubernetes
+  generationRules:
+    - resourceTypes:
+        -  cluster
+      matchRules:
+        - type: and
+          matches:
+            - type: pattern
+              pattern: ".+"
+              properties: [name]
+              mode: substring
+      slxs:
+        - baseName: cluster-node-health
+          qualifiers: ["cluster"]
+          baseTemplateName: k8s-cluster-node-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: k8s-cluster-node-health-taskset.yaml
+            - type: workflow

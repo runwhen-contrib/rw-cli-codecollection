@@ -1,0 +1,61 @@
+Traceback (most recent call last):
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/django/db/backends/utils.py", line 84, in _execute
+    return self.cursor.execute(sql, params)
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/django/db/backends/mysql/base.py", line 71, in execute
+    return self.cursor.execute(query, args)
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/MySQLdb/cursors.py", line 206, in execute
+    res = self._query(query)
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/MySQLdb/cursors.py", line 319, in _query
+    db.query(q)
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/MySQLdb/connections.py", line 226, in query
+    _mysql.connection.query(self, query)
+MySQLdb._exceptions.OperationalError: (2003, "Can't connect to MySQL server on 'your-db-host' (111)")
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/path/to/your/project/manage.py", line 22, in <module>
+    main()
+  File "/path/to/your/project/manage.py", line 18, in main
+    execute_from_command_line(sys.argv)
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/django/core/management/__init__.py", line 419, in execute_from_command_line
+    utility.execute()
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/django/core/management/__init__.py", line 413, in execute
+    self.fetch_command(subcommand).run_from_argv(self.argv)
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/django/core/management/base.py", line 354, in run_from_argv
+    self.execute(*args, **cmd_options)
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/django/core/management/base.py", line 398, in execute
+    output = self.handle(*args, **options)
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/django/core/management/commands/migrate.py", line 90, in handle
+    executor = MigrationExecutor(connection, self.migration_progress_callback)
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/django/db/migrations/executor.py", line 18, in __init__
+    self.loader = MigrationLoader(self.connection)
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/django/db/migrations/loader.py", line 49, in __init__
+    self.build_graph()
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/django/db/migrations/loader.py", line 212, in build_graph
+    self.applied_migrations = recorder.applied_migrations()
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/django/db/migrations/recorder.py", line 77, in applied_migrations
+    if self.has_table():
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/django/db/migrations/recorder.py", line 55, in has_table
+    with self.connection.cursor() as cursor:
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/django/db/backends/base/base.py", line 259, in cursor
+    return self._cursor()
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/django/db/backends/base/base.py", line 235, in _cursor
+    self.ensure_connection()
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/django/db/backends/base/base.py", line 219, in ensure_connection
+    self.connect()
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/django/db/utils.py", line 90, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/django/db/backends/base/base.py", line 219, in ensure_connection
+    self.connect()
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/django/db/backends/base/base.py", line 200, in connect
+    self.connection = self.get_new_connection(conn_params)
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/django/db/backends/mysql/base.py", line 234, in get_new_connection
+    connection = Database.connect(**conn_params)
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/MySQLdb/__init__.py", line 130, in Connect
+    return Connection(*args, **kwargs)
+  File "/path/to/your/virtualenv/lib/python3.8/site-packages/MySQLdb/connections.py", line 56, in __init__
+    super().__init__(*args, **kwargs2)
+django.db.utils.OperationalError: (2003, "Can't connect to MySQL server on 'your-db-host' (111)")

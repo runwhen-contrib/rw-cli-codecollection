@@ -1,0 +1,720 @@
+#!/usr/bin/env bash
+# set -euo pipefail
+
+# -----------------------------------------------------------------------------
+# ENV VARS REQUIRED:
+#   APP_GATEWAY_NAME   (Name of the Application Gateway)
+#   AZ_RESOURCE_GROUP  (Resource Group of the Application Gateway)
+#
+# OPTIONAL:
+#   DAYS_THRESHOLD     (Integer) - days before expiry to warn, default=30
+#
+# The script:
+#   1) Retrieves the Application Gateway JSON
+#   2) Identifies *used* SSL certificates from:
+#      - .httpListeners[].sslCertificate.id
+#      - or .listeners[].sslCertificateId (fallback if .httpListeners is empty)
+#      - or .sslProfile references
+#   3) Checks the .expiry field or queries ssl-cert show => .publicCertData
+#   4) Fallback to live TLS checks in this order:
+#      a) If a listener has a hostname (SNI), curl https://<hostname>
+#      b) Otherwise, or if that fails, use the gateway’s public IP or DNS
+#   5) Logs issues if near/past expiration or unknown
+#   6) Skips certs not in use
+# -----------------------------------------------------------------------------
+
+# Function to extract timestamp from log line, fallback to current time
+extract_log_timestamp() {
+    local log_line="$1"
+    local fallback_timestamp=$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")
+    
+    if [[ -z "$log_line" ]]; then
+        echo "$fallback_timestamp"
+        return
+    fi
+    
+    # Try to extract common timestamp patterns
+    # ISO 8601 format: 2024-01-15T10:30:45.123Z
+    if [[ "$log_line" =~ ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{3})?Z?) ]]; then
+        echo "${BASH_REMATCH[1]}"
+        return
+    fi
+    
+    # Standard log format: 2024-01-15 10:30:45
+    if [[ "$log_line" =~ ([0-9]{4}-[0-9]{2}-[0-9]{2}[[:space:]]+[0-9]{2}:[0-9]{2}:[0-9]{2}) ]]; then
+        # Convert to ISO format
+        local extracted_time="${BASH_REMATCH[1]}"
+        local iso_time=$(date -d "$extracted_time" -u +"%Y-%m-%dT%H:%M:%S.000Z" 2>/dev/null)
+        if [[ $? -eq 0 ]]; then
+            echo "$iso_time"
+        else
+            echo "$fallback_timestamp"
+        fi
+        return
+    fi
+    
+    # DD-MM-YYYY HH:MM:SS format
+    if [[ "$log_line" =~ ([0-9]{2}-[0-9]{2}-[0-9]{4}[[:space:]]+[0-9]{2}:[0-9]{2}:[0-9]{2}) ]]; then
+        local extracted_time="${BASH_REMATCH[1]}"
+        # Convert DD-MM-YYYY to YYYY-MM-DD for date parsing
+        local day=$(echo "$extracted_time" | cut -d' ' -f1 | cut -d'-' -f1)
+        local month=$(echo "$extracted_time" | cut -d' ' -f1 | cut -d'-' -f2)
+        local year=$(echo "$extracted_time" | cut -d' ' -f1 | cut -d'-' -f3)
+        local time_part=$(echo "$extracted_time" | cut -d' ' -f2)
+        local iso_time=$(date -d "$year-$month-$day $time_part" -u +"%Y-%m-%dT%H:%M:%S.000Z" 2>/dev/null)
+        if [[ $? -eq 0 ]]; then
+            echo "$iso_time"
+        else
+            echo "$fallback_timestamp"
+        fi
+        return
+    fi
+    
+    # Fallback to current timestamp
+    echo "$fallback_timestamp"
+}
+
+: "${APP_GATEWAY_NAME:?Must set APP_GATEWAY_NAME}"
+: "${AZ_RESOURCE_GROUP:?Must set AZ_RESOURCE_GROUP}"
+
+newline=$'\n'
+DAYS_THRESHOLD="${DAYS_THRESHOLD:-30}"
+OUTPUT_FILE="appgw_ssl_certificate_checks.json"
+
+issues_json='{"issues": []}'
+
+echo "Checking SSL certificates for AppGw \`$APP_GATEWAY_NAME\` in RG \`$AZ_RESOURCE_GROUP\`..."
+echo "Will warn if certificates expire in < $DAYS_THRESHOLD days."
+
+##################################
+# Helper: log an issue to JSON
+##################################
+log_issue() {
+  local issue_title="$1"
+  local issue_details="$2"
+  local issue_severity="$3"
+  local issue_next_step="$4"
+
+  issues_json=$(echo "$issues_json" | jq \
+    --arg title "$issue_title" \
+    --arg details "$issue_details" \
+    --arg severity "$issue_severity" \
+    --arg nextStep "$issue_next_step" \
+    '.issues += [{
+       "title": $title,
+       "details": $details,
+       "next_step": $nextStep,
+       "severity": ($severity | tonumber)
+     }]')
+}
+
+##################################
+# Function: parse 'publicCertData' => expiry epoch
+# Output in global var parse_epoch=0 if fail
+##################################
+parse_epoch=0
+parse_public_cert_data() {
+  local cert_data="$1"
+  parse_epoch=0
+
+  # if it's raw PEM with 'BEGIN CERTIFICATE'
+  if [[ "$cert_data" =~ "BEGIN CERTIFICATE" ]]; then
+    local cert_pem="$cert_data"
+    local end_date
+    end_date=$(echo "$cert_pem" | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
+    if [[ -n "$end_date" ]]; then
+      local e
+      e=$(date -d "$end_date" +%s 2>/dev/null || echo 0)
+      parse_epoch="$e"
+    fi
+    return
+  fi
+
+  # Otherwise, assume it's base64
+  local tmpfile
+  tmpfile=./tmpcert
+  echo "$cert_data" | base64 -d > "$tmpfile" 2>/dev/null || true
+
+  # (1) Try DER -> PEM
+  local der_pem
+  der_pem=$(openssl x509 -in "$tmpfile" -inform DER -outform PEM 2>/dev/null || echo '')
+  if [[ -n "$der_pem" ]]; then
+    local end_date
+    end_date=$(echo "$der_pem" | openssl x509 -noout -enddate | cut -d= -f2)
+    if [[ -n "$end_date" ]]; then
+      local e
+      e=$(date -d "$end_date" +%s 2>/dev/null || echo 0)
+      parse_epoch="$e"
+    fi
+    rm -f "$tmpfile"
+    return
+  fi
+
+  # (2) Try no-pass PFX
+  local pfx_pem
+  pfx_pem=$(openssl pkcs12 -in "$tmpfile" -nokeys -clcerts -passin pass: 2>/dev/null | openssl x509 -outform PEM 2>/dev/null || echo '')
+  if [[ -n "$pfx_pem" ]]; then
+    local end_date
+    end_date=$(echo "$pfx_pem" | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
+    if [[ -n "$end_date" ]]; then
+      local e
+      e=$(date -d "$end_date" +%s 2>/dev/null || echo 0)
+      parse_epoch="$e"
+    fi
+  fi
+  rm -f "$tmpfile"
+}
+
+##################################
+# Function: parse live certificate expiry
+# from 'curl --insecure -v https://<hostnameOrIp>'
+# Return epoch in global var fallback_epoch=0 if fail
+##################################
+fallback_epoch=0
+parse_live_tls_expiry() {
+  local target="$1"
+  fallback_epoch=0
+
+  echo "Trying live TLS check on: $target"
+  local curl_output
+  # We need both stdout and stderr, because curl logs SSL handshake to stderr
+  if ! curl_output="$(curl --insecure -v "https://$target" 2>&1)"; then
+    echo "curl failed on $target. Possibly no listener or unreachable."
+    return
+  fi
+
+  # Typically: "*  expire date: Jul 15 23:59:59 2025 GMT"
+  local expire_line
+  expire_line=$(echo "$curl_output" | awk '/expire date:/ {print $0; exit}')
+  if [[ -z "$expire_line" ]]; then
+    echo "No 'expire date:' line found for $target."
+    return
+  fi
+
+  # Parse out the date portion
+  local expire_str
+  expire_str=$(echo "$expire_line" | sed -E 's/.*expire date:\s*(.*)$/\1/')
+  if [[ -z "$expire_str" ]]; then
+    echo "Could not parse expiry from line '$expire_line'."
+    return
+  fi
+
+  local e
+  e=$(date -d "$expire_str" +%s 2>/dev/null || echo 0)
+  if [[ "$e" -eq 0 ]]; then
+    echo "Could not convert date '$expire_str' to epoch for $target."
+    return
+  fi
+
+  fallback_epoch="$e"
+}
+
+##################################
+# 1) Retrieve the AppGw main JSON
+##################################
+echo "Fetching Application Gateway configuration..."
+OUTPUT_ERR="appgw_err.log"
+if ! appgw_json=$(az network application-gateway show \
+  --name "$APP_GATEWAY_NAME" \
+  --resource-group "$AZ_RESOURCE_GROUP" \
+  -o json 2>"$OUTPUT_ERR"); then
+  error_msg=$(cat "$OUTPUT_ERR")
+  rm -f "$OUTPUT_ERR"
+  log_issue \
+    "Failed to Fetch Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\` in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\`" \
+    "$error_msg" \
+    "1" \
+    "Check CLI permissions or resource name correctness."
+  echo "$issues_json" > "$OUTPUT_FILE"
+  exit 1
+fi
+rm -f "$OUTPUT_ERR"
+
+##################################
+# DEBUG: Dump some partial JSON
+##################################
+echo "DEBUG: Dumping .httpListeners, .listeners => listeners_debug.json"
+echo "$appgw_json" | jq '{httpListeners: .httpListeners, listeners: .listeners}' > "listeners_debug.json"
+
+##################################
+# 2) Identify "effective" array of listeners
+##################################
+http_listeners_json=$(echo "$appgw_json" | jq -c '.httpListeners // []')
+if [[ "$http_listeners_json" == "[]" ]]; then
+  echo "No .httpListeners found; checking .listeners instead..."
+  http_listeners_json=$(echo "$appgw_json" | jq -c '.listeners // []')
+  if [[ "$http_listeners_json" == "[]" ]]; then
+    echo "No .listeners either. Exiting."
+    log_issue \
+      "No Listeners Found for Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\` in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\`" \
+      "No .httpListeners or .listeners in AppGw JSON. Possibly a different API version." \
+      "3" \
+      "Check the raw JSON in Azure Portal or use a different approach."
+    echo "$issues_json" > "$OUTPUT_FILE"
+    exit 0
+  fi
+fi
+
+##################################
+# 2A) Collect any hostnames from the listeners
+#     For SNI-based listeners, Azure stores "hostName" or "hostNames"
+##################################
+declare -A listener_hostnames_map
+# We'll store: listener_name => "host1 host2..."
+
+while IFS= read -r obj; do
+  name=$(echo "$obj" | jq -r '.name // empty')
+  [[ -z "$name" || "$name" == "null" ]] && continue
+
+  # For legacy or single, might be .hostName
+  single=$(echo "$obj" | jq -r '.hostName // empty')
+  if [[ -n "$single" && "$single" != "null" ]]; then
+    listener_hostnames_map["$name"]="$single"
+  fi
+
+  # For newer ones, might be .hostNames[] (array)
+  arr=$(echo "$obj" | jq -r '.hostNames[]?')
+  if [[ -n "$arr" ]]; then
+    # combine space delimited
+    # If there's already a single hostName in the map, we'll append
+    combined="${listener_hostnames_map["$name"]}"
+    while IFS= read -r h; do
+      combined="$combined $h"
+    done <<< "$arr"
+    # Trim leading/trailing spaces
+    combined="$(echo "$combined" | xargs)"
+    listener_hostnames_map["$name"]="$combined"
+  fi
+done < <(echo "$http_listeners_json" | jq -c '.[]?')
+
+##################################
+# 3) Build a list of used cert names
+#    from .sslCertificate or .sslCertificateId
+#    plus .sslProfile references
+##################################
+direct_cert_names=()
+
+while IFS= read -r obj; do
+  ssl_cert_id=$(echo "$obj" | jq -r '( .sslCertificate?.id // .sslCertificateId // "" ) | select(. != null)')
+  [[ -z "$ssl_cert_id" || "$ssl_cert_id" == "null" ]] && continue
+
+  c_name=$(echo "$ssl_cert_id" | sed -E 's|.*/sslCertificates/([^/]+)$|\1|')
+  [[ -n "$c_name" ]] && direct_cert_names+=("$c_name")
+done < <(echo "$http_listeners_json" | jq -c '.[]?')
+
+# Collect SSL profiles if present
+declare -A ssl_profile_id_to_name
+while IFS= read -r prof_json; do
+  p_id=$(echo "$prof_json" | jq -r '.id // empty')
+  p_nm=$(echo "$prof_json" | jq -r '.name // empty')
+  [[ -n "$p_id" && -n "$p_nm" ]] && ssl_profile_id_to_name["$p_id"]="$p_nm"
+done < <(echo "$appgw_json" | jq -c '.sslProfiles[]?')
+
+# build map from profileName => space-delimited cert IDs
+declare -A ssl_profile_certs_map
+while IFS= read -r prof_json; do
+  nm=$(echo "$prof_json" | jq -r '.name // empty')
+  [[ -z "$nm" ]] && continue
+  cert_ids=$(echo "$prof_json" | jq -r '.sslCertificates[]?')
+  c_list=()
+  if [[ -n "$cert_ids" ]]; then
+    while IFS= read -r cid; do
+      c_list+=("$cid")
+    done <<< "$cert_ids"
+    ssl_profile_certs_map["$nm"]="${c_list[*]}"
+  fi
+done < <(echo "$appgw_json" | jq -c '.sslProfiles[]?')
+
+profile_based_certs=()
+# For each listener, see if there's .sslProfile
+while IFS= read -r obj; do
+  ssl_prof_id=$(echo "$obj" | jq -r '( .sslProfile?.id // .sslProfileId // "" ) | select(. != null)')
+  [[ -z "$ssl_prof_id" || "$ssl_prof_id" == "null" ]] && continue
+
+  prof_name="${ssl_profile_id_to_name["$ssl_prof_id"]}"
+  [[ -z "$prof_name" ]] && continue
+
+  # now get the cert IDs from ssl_profile_certs_map
+  cert_ids_str="${ssl_profile_certs_map["$prof_name"]}"
+  if [[ -n "$cert_ids_str" ]]; then
+    for cid in $cert_ids_str; do
+      c_name=$(echo "$cid" | sed -E 's|.*/sslCertificates/([^/]+)$|\1|')
+      [[ -n "$c_name" ]] && profile_based_certs+=("$c_name")
+    done
+  fi
+done < <(echo "$http_listeners_json" | jq -c '.[]?')
+
+all_used_certs=()
+all_used_certs+=("${direct_cert_names[@]}")
+all_used_certs+=("${profile_based_certs[@]}")
+all_used_certs=( $(printf "%s\n" "${all_used_certs[@]}" | sort -u) )
+
+if [[ "${#all_used_certs[@]}" -eq 0 ]]; then
+  echo "No SSL cert references found in .sslCertificate or .sslProfile."
+  log_issue \
+    "No SSL Certificates in Use for Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\` in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\`" \
+    "Listeners do not reference any sslCertificate or sslProfile." \
+    "3" \
+    "If using Key Vault or plain HTTP, this may be expected."
+  echo "$issues_json" > "$OUTPUT_FILE"
+  exit 0
+fi
+
+echo "Discovered in-use certificate names: ${all_used_certs[*]}"
+
+##################################
+# For the fallback, also retrieve
+# the public IP / DNS name if present
+##################################
+fallback_gw_ip_or_dns=''
+public_ip_id=$(echo "$appgw_json" | jq -r '.frontendIPConfigurations[]? | select(.publicIPAddress != null) | .publicIPAddress.id // empty' | head -n1)
+if [[ -n "$public_ip_id" ]]; then
+  pip_json=$(az network public-ip show --ids "$public_ip_id" -o json 2>/dev/null || echo '')
+  if [[ -n "$pip_json" ]]; then
+    raw_ip=$(echo "$pip_json" | jq -r '.ipAddress // empty')
+    if [[ -n "$raw_ip" && "$raw_ip" != "null" ]]; then
+      fallback_gw_ip_or_dns="$raw_ip"
+    else
+      raw_dns=$(echo "$pip_json" | jq -r '.dnsSettings.fqdn // empty')
+      if [[ -n "$raw_dns" && "$raw_dns" != "null" ]]; then
+        fallback_gw_ip_or_dns="$raw_dns"
+      fi
+    fi
+  fi
+fi
+echo "Public IP or DNS fallback: $fallback_gw_ip_or_dns"
+
+##################################
+# 4) Parse .sslCertificates[] from the AppGw config
+##################################
+ssl_certs_json=$(echo "$appgw_json" | jq -c '.sslCertificates[]?')
+if [[ -z "$ssl_certs_json" ]]; then
+  echo "No .sslCertificates[] in AppGw. Possibly Key Vault only?"
+  log_issue \
+    "No sslCertificates[] in Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\` in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\`" \
+    "The AppGw has no sslCertificates[] array in its config." \
+    "3" \
+    "If Key Vault references are used, parse from Key Vault or fallback to live check."
+  echo "$issues_json" > "$OUTPUT_FILE"
+  exit 0
+fi
+
+warn_days="$DAYS_THRESHOLD"
+current_time=$(date +%s)
+
+##################################
+# 5) For each in-use cert, parse:
+#   (A) .expiry
+#   (B) ssl-cert show -> publicCertData
+#   (C) fallback live checks:
+#       1) hostnames from the listener
+#       2) if no hostname or all fail, gateway's public IP
+##################################
+while IFS= read -r cert_json; do
+  c_name=$(echo "$cert_json" | jq -r '.name // "UnknownCertName"')
+
+  # skip if not in use
+  if ! printf "%s\n" "${all_used_certs[@]}" | grep -Fxq "$c_name"; then
+    continue
+  fi
+  echo "Processing in-use certificate: $c_name"
+  expiry_epoch=0
+
+  # (A) .expiry
+  expiry_str=$(echo "$cert_json" | jq -r '.expiry // empty')
+  if [[ -n "$expiry_str" && "$expiry_str" != "null" ]]; then
+    local_e=$(date -d "$expiry_str" +%s 2>/dev/null || echo 0)
+    if [[ "$local_e" -gt 0 ]]; then
+      expiry_epoch="$local_e"
+      echo "Found .expiry for $c_name => $expiry_str"
+    fi
+  fi
+
+  # (B) If no valid epoch yet, call ssl-cert show
+  if [[ "$expiry_epoch" == "0" ]]; then
+    echo "No valid .expiry, calling ssl-cert show for $c_name..."
+    show_err="ssl_cert_show_err.log"
+    ssl_show_json=$(az network application-gateway ssl-cert show \
+      --resource-group "$AZ_RESOURCE_GROUP" \
+      --gateway-name "$APP_GATEWAY_NAME" \
+      --name "$c_name" -o json 2>"$show_err" || echo '')
+    if [[ -n "$ssl_show_json" ]]; then
+      rm -f "$show_err"
+      pub_cert_data=$(echo "$ssl_show_json" | jq -r '.publicCertData // empty')
+      if [[ -n "$pub_cert_data" && "$pub_cert_data" != "null" ]]; then
+        parse_public_cert_data "$pub_cert_data"
+        if [[ "$parse_epoch" -gt 0 ]]; then
+          expiry_epoch="$parse_epoch"
+          echo "Parsed expiry for $c_name via publicCertData => $(date -d "@$expiry_epoch")"
+        fi
+      else
+        echo "ssl-cert show => no publicCertData for $c_name"
+      fi
+    else
+      err_msg=$(cat "$show_err" 2>/dev/null || echo '')
+      rm -f "$show_err"
+      echo "ssl-cert show failed for $c_name => $err_msg"
+    fi
+  fi
+
+  # (C) If still zero, do fallback live checks
+  if [[ "$expiry_epoch" == "0" ]]; then
+    echo "No expiry from config; trying a live TLS check for $c_name..."
+
+    # 1) Find any listener(s) that reference this certificate, gather hostnames
+    #    Then attempt each
+    # We'll parse the entire list again (inefficient but simple),
+    # checking if .sslCertificate or .sslProfile resolves to c_name
+    # then collecting hostnames from listener_hostnames_map
+
+    success=0
+    # gather all potential hostnames
+    all_listener_hostnames=""
+    while IFS= read -r obj; do
+      lst_name=$(echo "$obj" | jq -r '.name // empty')
+      [[ -z "$lst_name" || "$lst_name" == "null" ]] && continue
+
+      # Does this listener reference c_name?
+      # either direct or via sslProfile?
+      sc_id=$(echo "$obj" | jq -r '( .sslCertificate?.id // .sslCertificateId // "" ) | select(. != null)')
+      prof_id=$(echo "$obj" | jq -r '( .sslProfile?.id // .sslProfileId // "" ) | select(. != null)')
+
+      ref_names=()
+      # direct?
+      if [[ -n "$sc_id" && "$sc_id" != "null" ]]; then
+        sc_parsed=$(echo "$sc_id" | sed -E 's|.*/sslCertificates/([^/]+)$|\1|')
+        ref_names+=("$sc_parsed")
+      fi
+      # profile?
+      if [[ -n "$prof_id" && "$prof_id" != "null" ]]; then
+        # map profile => certs
+        pf_nm="${ssl_profile_id_to_name["$prof_id"]}"
+        if [[ -n "$pf_nm" ]]; then
+          cids="${ssl_profile_certs_map["$pf_nm"]}"
+          if [[ -n "$cids" ]]; then
+            for x in $cids; do
+              xnm=$(echo "$x" | sed -E 's|.*/sslCertificates/([^/]+)$|\1|')
+              ref_names+=("$xnm")
+            done
+          fi
+        fi
+      fi
+
+      # If c_name is in ref_names, we gather hostnames from listener_hostnames_map
+      if printf "%s\n" "${ref_names[@]}" | grep -Fxq "$c_name"; then
+        hlist="${listener_hostnames_map["$lst_name"]}"
+        if [[ -n "$hlist" ]]; then
+          all_listener_hostnames="$all_listener_hostnames $hlist"
+        fi
+      fi
+    done < <(echo "$http_listeners_json" | jq -c '.[]?')
+
+    all_listener_hostnames="$(echo "$all_listener_hostnames" | xargs)"  # trim
+    if [[ -n "$all_listener_hostnames" ]]; then
+      # try each unique hostname
+      unique_hosts=( $(printf "%s\n" $all_listener_hostnames | sort -u) )
+      for h in "${unique_hosts[@]}"; do
+        parse_live_tls_expiry "$h"
+        if [[ "$fallback_epoch" -gt 0 ]]; then
+          expiry_epoch="$fallback_epoch"
+          success=1
+          echo "Got expiry via live check on $h => $(date -d "@$expiry_epoch")"
+          break
+        fi
+      done
+    fi
+
+    # 2) If still not found and we have a public IP, try that
+    if [[ "$success" -eq 0 && -n "$fallback_gw_ip_or_dns" ]]; then
+      parse_live_tls_expiry "$fallback_gw_ip_or_dns"
+      if [[ "$fallback_epoch" -gt 0 ]]; then
+        expiry_epoch="$fallback_epoch"
+        success=1
+        echo "Got expiry via fallback IP check => $(date -d "@$expiry_epoch")"
+      fi
+    fi
+
+    if [[ "$success" -eq 0 ]]; then
+      log_issue \
+        "Cannot Determine Cert Expiry for \`$c_name\` in Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\` in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\`" \
+        "No .expiry, no parseable publicCertData, and live checks to hostnames/IP failed." \
+        "4" \
+        "If using Key Vault or a passworded PFX, query Key Vault or re-upload a parseable cert."
+      continue
+    fi
+  fi
+
+  # We have expiry_epoch now, compare
+  diff_secs=$(( expiry_epoch - current_time ))
+  diff_days=$(( diff_secs / 86400 ))
+  echo "Days until expiration for $c_name: $diff_days"
+
+  if (( diff_days < 0 )); then
+    log_issue \
+      "SSL Certificate \`$c_name\` Expired in Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\` in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\`" \
+      "Expired on $(date -d "@$expiry_epoch" +'%Y-%m-%d %H:%M:%S %Z') ($((-diff_days)) days ago)." \
+      "2" \
+      "Renew or replace immediately."
+  elif (( diff_days < warn_days )); then
+    log_issue \
+      "SSL Certificate \`$c_name\` Near Expiry in Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\` in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\`" \
+      "Expires in $diff_days days ($(date -d "@$expiry_epoch" +'%Y-%m-%d %H:%M:%S %Z'))." \
+      "3" \
+      "Initiate renewal process for SSL Certificates In App Gateway \`$APP_GATEWAY_NAME\` in \`$AZ_RESOURCE_GROUP\`"
+  else
+    echo "Certificate \`$c_name\` is valid for $diff_days more days. No issues."
+  fi
+
+done <<< "$ssl_certs_json"
+
+##################################
+# 6) Additional SSL Configuration Diagnostics for Storage Account Backends
+##################################
+echo "Running additional SSL configuration diagnostics for storage account backends..."
+
+# Get backend health status for SSL hostname mismatch detection
+BACKEND_HEALTH=$(az network application-gateway show-backend-health \
+  --name "$APP_GATEWAY_NAME" \
+  --resource-group "$AZ_RESOURCE_GROUP" \
+  -o json 2>/dev/null)
+
+if [[ -n "$BACKEND_HEALTH" ]]; then
+  # Extract backend pools
+  BACKEND_POOLS=$(echo "$appgw_json" | jq -r '.backendAddressPools[]? | @base64')
+  
+  if [[ -n "$BACKEND_POOLS" ]]; then
+    for pool_data in $BACKEND_POOLS; do
+      pool=$(echo "$pool_data" | base64 --decode)
+      pool_name=$(echo "$pool" | jq -r '.name')
+      
+      # Check if this pool has storage account backends
+      STORAGE_ADDRESSES=$(echo "$pool" | jq -r '.backendAddresses[]? | select(.fqdn | contains(".blob.core.windows.net") or contains(".file.core.windows.net") or contains(".queue.core.windows.net") or contains(".table.core.windows.net")) | .fqdn')
+      
+      if [[ -n "$STORAGE_ADDRESSES" ]]; then
+        echo "  Checking storage account backends in pool: $pool_name"
+        
+        # Extract storage account names
+        for address in $STORAGE_ADDRESSES; do
+          storage_account_name=""
+          if [[ "$address" == *.blob.core.windows.net ]]; then
+            storage_account_name=$(echo "$address" | sed 's/.blob.core.windows.net//')
+            service_type="Blob"
+          elif [[ "$address" == *.file.core.windows.net ]]; then
+            storage_account_name=$(echo "$address" | sed 's/.file.core.windows.net//')
+            service_type="File"
+          elif [[ "$address" == *.queue.core.windows.net ]]; then
+            storage_account_name=$(echo "$address" | sed 's/.queue.core.windows.net//')
+            service_type="Queue"
+          elif [[ "$address" == *.table.core.windows.net ]]; then
+            storage_account_name=$(echo "$address" | sed 's/.table.core.windows.net//')
+            service_type="Table"
+          fi
+          
+          if [[ -n "$storage_account_name" ]]; then
+            echo "    Storage Account: $storage_account_name ($service_type)"
+            
+            # Check if this backend is unhealthy due to SSL certificate hostname mismatch
+            # Try multiple approaches to find the backend health data
+            UNHEALTHY_BACKEND=""
+            
+            # First try: match by pool name
+            UNHEALTHY_BACKEND=$(echo "$BACKEND_HEALTH" | jq -r --arg pool_name "$pool_name" --arg address "$address" '.backendAddressPools[] | select(.backendAddressPool.name == $pool_name) | .backendHttpSettingsCollection[].servers[] | select(.address == $address and .health != "Healthy") | .healthProbeLog')
+            
+            # Second try: match by pool ID if name match fails
+            if [[ -z "$UNHEALTHY_BACKEND" ]]; then
+                pool_id=$(echo "$pool" | jq -r '.id')
+                UNHEALTHY_BACKEND=$(echo "$BACKEND_HEALTH" | jq -r --arg pool_id "$pool_id" --arg address "$address" '.backendAddressPools[] | select(.backendAddressPool.id == $pool_id) | .backendHttpSettingsCollection[].servers[] | select(.address == $address and .health != "Healthy") | .healthProbeLog')
+            fi
+            
+            # Third try: match by address only if both name and ID matches fail
+            if [[ -z "$UNHEALTHY_BACKEND" ]]; then
+                UNHEALTHY_BACKEND=$(echo "$BACKEND_HEALTH" | jq -r --arg address "$address" '.backendAddressPools[] | .backendHttpSettingsCollection[].servers[] | select(.address == $address and .health != "Healthy") | .healthProbeLog')
+            fi
+            
+            # Check for SSL-related issues with more flexible pattern matching
+            SSL_ISSUE_DETECTED=false
+            if [[ -n "$UNHEALTHY_BACKEND" ]]; then
+                # Check for various SSL certificate hostname mismatch patterns
+                if [[ "$UNHEALTHY_BACKEND" == *"Common Name of the leaf certificate"* ]] || \
+                   [[ "$UNHEALTHY_BACKEND" == *"certificate"* ]] && [[ "$UNHEALTHY_BACKEND" == *"hostname"* ]] || \
+                   [[ "$UNHEALTHY_BACKEND" == *"SSL"* ]] || \
+                   [[ "$UNHEALTHY_BACKEND" == *"TLS"* ]] || \
+                   [[ "$UNHEALTHY_BACKEND" == *"name"* ]] && [[ "$UNHEALTHY_BACKEND" == *"mismatch"* ]]; then
+                    SSL_ISSUE_DETECTED=true
+                fi
+            fi
+            
+            if [[ "$SSL_ISSUE_DETECTED" == "true" ]]; then
+              echo "    ⚠️  SSL Certificate hostname mismatch detected!"
+              
+              # Find the HTTP settings and probe used by this pool
+              # Try multiple approaches to find HTTP settings
+              HTTP_SETTINGS_NAMES=""
+              
+              # First try: match by pool name
+              HTTP_SETTINGS_NAMES=$(echo "$appgw_json" | jq -r --arg pool_name "$pool_name" '.requestRoutingRules[] | select(.backendAddressPool.name == $pool_name) | .httpSettings.name')
+              
+              # Second try: match by pool ID if name match fails
+              if [[ -z "$HTTP_SETTINGS_NAMES" ]]; then
+                  pool_id=$(echo "$pool" | jq -r '.id')
+                  HTTP_SETTINGS_NAMES=$(echo "$appgw_json" | jq -r --arg pool_id "$pool_id" '.requestRoutingRules[] | select(.backendAddressPool.id == $pool_id) | .httpSettings.name')
+              fi
+              
+              # Third try: match by pool name in different field structure
+              if [[ -z "$HTTP_SETTINGS_NAMES" ]]; then
+                  HTTP_SETTINGS_NAMES=$(echo "$appgw_json" | jq -r --arg pool_name "$pool_name" '.requestRoutingRules[] | select(.backendAddressPool.name == $pool_name) | .httpSettings.name // empty')
+              fi
+              
+              for http_settings_name in $HTTP_SETTINGS_NAMES; do
+                if [[ -n "$http_settings_name" ]]; then
+                  echo "      Checking HTTP settings: $http_settings_name"
+                  
+                  # Get HTTP settings configuration
+                  HTTP_SETTINGS=$(echo "$appgw_json" | jq -r --arg name "$http_settings_name" '.backendHttpSettingsCollection[] | select(.name == $name)')
+                  HOSTNAME=$(echo "$HTTP_SETTINGS" | jq -r '.hostName // "NOT_SET"')
+                  
+                  # Check if hostname is incorrect
+                  if [[ "$HOSTNAME" == "NOT_SET" ]] || [[ "$HOSTNAME" == "$address" ]]; then
+                    echo "      ❌ Incorrect hostname configuration detected!"
+                    
+                    log_issue \
+                      "SSL Certificate Hostname Mismatch - HTTP Settings for Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\` in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\`" \
+                      "Backend pool '$pool_name' with storage account '$storage_account_name' in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\` has incorrect hostname configuration in HTTP settings '$http_settings_name'. Current hostname: '$HOSTNAME', Expected: '$storage_account_name'" \
+                      "2" \
+                      "Fix HTTP settings hostname: az network application-gateway http-settings update --gateway-name '$APP_GATEWAY_NAME' --resource-group '$AZ_RESOURCE_GROUP' --name '$http_settings_name' --host-name '$storage_account_name'"
+                  fi
+                  
+                  # Check probe configuration
+                  PROBE_NAME=$(echo "$HTTP_SETTINGS" | jq -r '.probe.name // "NOT_SET"')
+                  if [[ "$PROBE_NAME" != "NOT_SET" ]]; then
+                    echo "      Checking probe: $PROBE_NAME"
+                    
+                    PROBE_CONFIG=$(echo "$appgw_json" | jq -r --arg name "$PROBE_NAME" '.probes[] | select(.name == $name)')
+                    PROBE_HOST=$(echo "$PROBE_CONFIG" | jq -r '.host // "NOT_SET"')
+                    
+                    # Check if probe hostname is incorrect
+                    if [[ "$PROBE_HOST" == "NOT_SET" ]] || [[ "$PROBE_HOST" == "$address" ]]; then
+                      echo "        ❌ Incorrect probe hostname configuration detected!"
+                      
+                      log_issue \
+                        "SSL Certificate Hostname Mismatch - Health Probe for Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\` in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\`" \
+                        "Backend pool '$pool_name' with storage account '$storage_account_name' in Subscription \`${AZURE_SUBSCRIPTION_NAME:-Unknown}\` has incorrect hostname configuration in health probe '$PROBE_NAME'. Current hostname: '$PROBE_HOST', Expected: '$storage_account_name'" \
+                        "2" \
+                        "Fix health probe hostname: az network application-gateway probe update --gateway-name '$APP_GATEWAY_NAME' --resource-group '$AZ_RESOURCE_GROUP' --name '$PROBE_NAME' --host '$storage_account_name'"
+                    fi
+                  fi
+                fi
+              done
+            fi
+          fi
+        done
+      fi
+    done
+  fi
+fi
+
+##################################
+# 7) Output final JSON
+##################################
+echo "SSL certificate check completed. Saving results to $OUTPUT_FILE"
+echo "$issues_json" > "$OUTPUT_FILE"

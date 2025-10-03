@@ -1,0 +1,1032 @@
+commands:
+- command: 'kubectl get events --field-selector type=Warning --context ${CONTEXT}
+    -n ${NAMESPACE} -o json > $HOME/warning_events.json && cat $HOME/warning_events.json
+    | jq -r ''[.items[] | {namespace: .involvedObject.namespace, kind: .involvedObject.kind,
+    baseName: ((if .involvedObject.kind == "Pod" then (.involvedObject.name | split("-")[:-1]
+    | join("-")) else .involvedObject.name end) // ""), count: .count, firstTimestamp:
+    .firstTimestamp, lastTimestamp: .lastTimestamp, reason: .reason, message: .message}]
+    | group_by(.namespace, .kind, .baseName) | map({object: (.[0].namespace + "/"
+    + .[0].kind + "/" + .[0].baseName), total_events: (reduce .[] as $event (0; .
+    + $event.count)), summary_messages: (map(.message) | unique | join("; ")), oldest_timestamp:
+    (map(.firstTimestamp) | sort | first), most_recent_timestamp: (map(.lastTimestamp)
+    | sort | last)}) | map(select((now - ((.most_recent_timestamp | fromdateiso8601)))/60
+    <= ${EVENT_AGE} ))'''
+  doc_links: '
+
+    '
+  explanation: This command uses kubectl to get events of type Warning from a specific
+    context and namespace and output the results in JSON format, then it filters and
+    processes the data using jq to group and summarize the events based on namespace,
+    kind, and base name, and filter them based on event age.
+  multi_line_details: "\n# Set the kubectl context and namespace variables\nexport\
+    \ CONTEXT=my-context\nexport NAMESPACE=my-namespace\n\n# Use kubectl to get events\
+    \ of type Warning in JSON format and save it to a file in the user's home directory\n\
+    kubectl get events --field-selector type=Warning --context $CONTEXT -n $NAMESPACE\
+    \ -o json > $HOME/warning_events.json\n\n# Use jq to parse and manipulate the\
+    \ JSON output from kubectl to extract relevant information\ncat $HOME/warning_events.json\
+    \ | jq -r '\n  # Create an array of objects containing selected fields from the\
+    \ original JSON\n  [.items[] |\n    {\n      namespace: .involvedObject.namespace,\n\
+    \      kind: .involvedObject.kind,\n      baseName: (\n        (if .involvedObject.kind\
+    \ == \"Pod\" then \n          (.involvedObject.name | split(\"-\")[:-1] | join(\"\
+    -\"))\n         else\n          .involvedObject.name\n        end) // \"\"\n \
+    \     ),\n      count: .count,\n      firstTimestamp: .firstTimestamp,\n     \
+    \ lastTimestamp: .lastTimestamp,\n      reason: .reason,\n      message: .message\n\
+    \    }\n  ] \n  # Group the objects by namespace, kind, and baseName\n  | group_by(.namespace,\
+    \ .kind, .baseName) \n  # Map the grouped objects into new objects with aggregated\
+    \ values\n  | map(\n      {\n        object: (.[0].namespace + \"/\" + .[0].kind\
+    \ + \"/\" + .[0].baseName),\n        total_events: (reduce .[] as $event (0; .\
+    \ + $event.count)),\n        summary_messages: (map(.message) | unique | join(\"\
+    ; \")),\n        oldest_timestamp: (map(.firstTimestamp) | sort | first),\n  \
+    \      most_recent_timestamp: (map(.lastTimestamp) | sort | last)\n      }\n \
+    \   )\n  # Filter out objects based on their most recent timestamp compared to\
+    \ a given event age\n  | map(select((now - ((.most_recent_timestamp | fromdateiso8601)))/60\
+    \ <= ${EVENT_AGE} ))\n'\n\nIn this multi-line command, we set the kubectl context\
+    \ and namespace, use kubectl to retrieve warning events in JSON format, and then\
+    \ use jq to manipulate the JSON data and extract relevant information according\
+    \ to specific criteria. Each step is accompanied by comments explaining its purpose.\
+    \ This should help newer or less experienced DevOps engineers understand and execute\
+    \ the command effectively."
+  name: inspect_warning_events_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events - As a
+    DevOps or Site Reliability Engineer, you may use this command to gather and analyze
+    warning events related to CrashLoopBackoff errors in a specific context and namespace,
+    in order to identify the root cause and potential solutions.
+
+
+    2. Performance monitoring and analysis - The command can be used to collect and
+    process warning events related to performance issues, such as high CPU or memory
+    usage, in order to identify and address potential bottlenecks in the system.
+
+
+    3. Security incident investigation - In the event of a security incident, the
+    command can be used to gather warning events related to unauthorized access attempts
+    or other suspicious activities, in order to assess the impact and take appropriate
+    remediation actions.
+
+
+    4. Resource allocation and optimization - By using the command to analyze warning
+    events related to resource constraints, such as pods being evicted due to insufficient
+    resources, DevOps or Site Reliability Engineers can make informed decisions about
+    resource allocation and optimization.
+
+
+    5. Application troubleshooting - When troubleshooting application issues, the
+    command can be used to gather and analyze warning events related to application
+    failures or errors, in order to understand the impact on the overall system and
+    identify potential fixes.'
+- command: 'kubectl get events --field-selector type=Warning --context ${CONTEXT}
+    -n ${NAMESPACE} -o json > $HOME/warning_events.json && cat $HOME/warning_events.json
+    | jq -r ''[.items[] | {namespace: .involvedObject.namespace, kind: .involvedObject.kind,
+    baseName: ((if .involvedObject.kind == "Pod" then (.involvedObject.name | split("-")[:-1]
+    | join("-")) else .involvedObject.name end) // ""), count: .count, firstTimestamp:
+    .firstTimestamp, lastTimestamp: .lastTimestamp, reason: .reason, message: .message}]
+    | group_by(.namespace, .kind, .baseName) | map({object: (.[0].namespace + "/"
+    + .[0].kind + "/" + .[0].baseName), total_events: (reduce .[] as $event (0; .
+    + $event.count)), summary_messages: (map(.message) | unique | join("; ")), oldest_timestamp:
+    (map(.firstTimestamp) | sort | first), most_recent_timestamp: (map(.lastTimestamp)
+    | sort | last)}) | map(select((now - ((.most_recent_timestamp | fromdateiso8601)))/60
+    <= ${EVENT_AGE} ))'''
+  doc_links: '
+
+    '
+  explanation: This command uses kubectl to get events of type Warning from a specific
+    context and namespace and output the results in JSON format, then it filters and
+    processes the data using jq to group and summarize the events based on namespace,
+    kind, and base name, and filter them based on event age.
+  multi_line_details: "\n# Set the kubectl context and namespace variables\nexport\
+    \ CONTEXT=my-context\nexport NAMESPACE=my-namespace\n\n# Use kubectl to get events\
+    \ of type Warning in JSON format and save it to a file in the user's home directory\n\
+    kubectl get events --field-selector type=Warning --context $CONTEXT -n $NAMESPACE\
+    \ -o json > $HOME/warning_events.json\n\n# Use jq to parse and manipulate the\
+    \ JSON output from kubectl to extract relevant information\ncat $HOME/warning_events.json\
+    \ | jq -r '\n  # Create an array of objects containing selected fields from the\
+    \ original JSON\n  [.items[] |\n    {\n      namespace: .involvedObject.namespace,\n\
+    \      kind: .involvedObject.kind,\n      baseName: (\n        (if .involvedObject.kind\
+    \ == \"Pod\" then \n          (.involvedObject.name | split(\"-\")[:-1] | join(\"\
+    -\"))\n         else\n          .involvedObject.name\n        end) // \"\"\n \
+    \     ),\n      count: .count,\n      firstTimestamp: .firstTimestamp,\n     \
+    \ lastTimestamp: .lastTimestamp,\n      reason: .reason,\n      message: .message\n\
+    \    }\n  ] \n  # Group the objects by namespace, kind, and baseName\n  | group_by(.namespace,\
+    \ .kind, .baseName) \n  # Map the grouped objects into new objects with aggregated\
+    \ values\n  | map(\n      {\n        object: (.[0].namespace + \"/\" + .[0].kind\
+    \ + \"/\" + .[0].baseName),\n        total_events: (reduce .[] as $event (0; .\
+    \ + $event.count)),\n        summary_messages: (map(.message) | unique | join(\"\
+    ; \")),\n        oldest_timestamp: (map(.firstTimestamp) | sort | first),\n  \
+    \      most_recent_timestamp: (map(.lastTimestamp) | sort | last)\n      }\n \
+    \   )\n  # Filter out objects based on their most recent timestamp compared to\
+    \ a given event age\n  | map(select((now - ((.most_recent_timestamp | fromdateiso8601)))/60\
+    \ <= ${EVENT_AGE} ))\n'\n\nIn this multi-line command, we set the kubectl context\
+    \ and namespace, use kubectl to retrieve warning events in JSON format, and then\
+    \ use jq to manipulate the JSON data and extract relevant information according\
+    \ to specific criteria. Each step is accompanied by comments explaining its purpose.\
+    \ This should help newer or less experienced DevOps engineers understand and execute\
+    \ the command effectively."
+  name: inspect_warning_events_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events - As a
+    DevOps or Site Reliability Engineer, you may use this command to gather and analyze
+    warning events related to CrashLoopBackoff errors in a specific context and namespace,
+    in order to identify the root cause and potential solutions.
+
+
+    2. Performance monitoring and analysis - The command can be used to collect and
+    process warning events related to performance issues, such as high CPU or memory
+    usage, in order to identify and address potential bottlenecks in the system.
+
+
+    3. Security incident investigation - In the event of a security incident, the
+    command can be used to gather warning events related to unauthorized access attempts
+    or other suspicious activities, in order to assess the impact and take appropriate
+    remediation actions.
+
+
+    4. Resource allocation and optimization - By using the command to analyze warning
+    events related to resource constraints, such as pods being evicted due to insufficient
+    resources, DevOps or Site Reliability Engineers can make informed decisions about
+    resource allocation and optimization.
+
+
+    5. Application troubleshooting - When troubleshooting application issues, the
+    command can be used to gather and analyze warning events related to application
+    failures or errors, in order to understand the impact on the overall system and
+    identify potential fixes.'
+- command: 'TIME_PERIOD="${CONTAINER_RESTART_AGE}"; TIME_PERIOD_UNIT=$(echo $TIME_PERIOD
+    | awk ''{print substr($0,length($0),1)}''); TIME_PERIOD_VALUE=$(echo $TIME_PERIOD
+    | awk ''{print substr($0,1,length($0)-1)}''); if [[ $TIME_PERIOD_UNIT == "m" ]];
+    then DATE_CMD_ARG="$TIME_PERIOD_VALUE minutes ago"; elif [[ $TIME_PERIOD_UNIT
+    == "h" ]]; then DATE_CMD_ARG="$TIME_PERIOD_VALUE hours ago"; else echo "Unsupported
+    time period unit. Use ''m'' for minutes or ''h'' for hours."; exit 1; fi; THRESHOLD_TIME=$(date
+    -u --date="$DATE_CMD_ARG" +"%Y-%m-%dT%H:%M:%SZ"); $KUBERNETES_DISTRIBUTION_BINARY
+    get pods --context=$CONTEXT -n $NAMESPACE -o json | jq -r --argjson exit_code_explanations
+    ''{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated
+    by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL
+    - Possible OOM", "143":"Graceful Termination SIGTERM"}'' --arg threshold_time
+    "$THRESHOLD_TIME" ''.items[] | select(.status.containerStatuses != null) | select(any(.status.containerStatuses[];
+    .restartCount > 0 and (.lastState.terminated.finishedAt // "1970-01-01T00:00:00Z")
+    > $threshold_time)) | "---\npod_name: \(.metadata.name)\n" + (.status.containerStatuses[]
+    | "containers: \(.name)\nrestart_count: \(.restartCount)\nmessage: \(.state.waiting.message
+    // "N/A")\nterminated_reason: \(.lastState.terminated.reason // "N/A")\nterminated_finishedAt:
+    \(.lastState.terminated.finishedAt // "N/A")\nterminated_exitCode: \(.lastState.terminated.exitCode
+    // "N/A")\nexit_code_explanation: \($exit_code_explanations[.lastState.terminated.exitCode
+    | tostring] // "Unknown exit code")") + "\n---\n"'''
+  doc_links: '
+
+    - [Kubernetes Documentation on `kubectl get events` Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events){:target="_blank"}
+
+    - [Understanding Container Restart Policies in Kubernetes](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy){:target="_blank"}
+
+    - [Logging and Monitoring in Kubernetes](https://kubernetes.io/docs/concepts/cluster-administration/logging/){:target="_blank"}'
+  explanation: This command is pulling container restart data from a Kubernetes cluster
+    and formatting it into a readable output, using a specific time period as a threshold
+    for the restart data. It also includes exit code explanations for various scenarios.
+  multi_line_details: "\n# Set the variable TIME_PERIOD to the value of CONTAINER_RESTART_AGE\n\
+    TIME_PERIOD=\"${CONTAINER_RESTART_AGE}\"\n\n# Get the unit of time from the TIME_PERIOD:\
+    \ 'm' for minutes or 'h' for hours\nTIME_PERIOD_UNIT=$(echo $TIME_PERIOD | awk\
+    \ '{print substr($0,length($0),1)}')\n\n# Extract the numerical value from TIME_PERIOD\n\
+    TIME_PERIOD_VALUE=$(echo $TIME_PERIOD | awk '{print substr($0,1,length($0)-1)}')\n\
+    \n# Depending on the unit of time, create the argument for the date command\n\
+    if [[ $TIME_PERIOD_UNIT == \"m\" ]]; then \n  DATE_CMD_ARG=\"$TIME_PERIOD_VALUE\
+    \ minutes ago\"\nelif [[ $TIME_PERIOD_UNIT == \"h\" ]]; then \n  DATE_CMD_ARG=\"\
+    $TIME_PERIOD_VALUE hours ago\"\nelse \n  echo \"Unsupported time period unit.\
+    \ Use 'm' for minutes or 'h' for hours.\"\n  exit 1\nfi\n\n# Calculate the threshold\
+    \ time based on the DATE_CMD_ARG\nTHRESHOLD_TIME=$(date -u --date=\"$DATE_CMD_ARG\"\
+    \ +\"%Y-%m-%dT%H:%M:%SZ\")\n\n# Use the Kubernetes distribution binary to get\
+    \ pods in JSON format\n$KUBERNETES_DISTRIBUTION_BINARY get pods --context=$CONTEXT\
+    \ -n $NAMESPACE -o json | \\\n  jq -r --argjson exit_code_explanations '{\"0\"\
+    : \"Success\", \"1\": \"Error\", \"2\": \"Misconfiguration\", \\\n    \"130\"\
+    : \"Pod terminated by SIGINT\", \"134\": \"Abnormal Termination SIGABRT\", \\\n\
+    \    \"137\": \"Pod terminated by SIGKILL - Possible OOM\", \"143\":\"Graceful\
+    \ Termination SIGTERM\"}' \\\n    --arg threshold_time \"$THRESHOLD_TIME\" '.items[]\
+    \ | select(.status.containerStatuses != null) | \\\n      select(any(.status.containerStatuses[];\
+    \ .restartCount > 0 and (.lastState.terminated.finishedAt // \"1970-01-01T00:00:00Z\"\
+    ) > $threshold_time)) | \\\n      \"---\\npod_name: \\(.metadata.name)\\n\" +\
+    \ \\\n      (.status.containerStatuses[] | \"containers: \\(.name)\\nrestart_count:\
+    \ \\(.restartCount)\\nmessage: \\(.state.waiting.message // \"N/A\")\\nterminated_reason:\
+    \ \\(.lastState.terminated.reason // \"N/A\")\\nterminated_finishedAt: \\(.lastState.terminated.finishedAt\
+    \ // \"N/A\")\\nterminated_exitCode: \\(.lastState.terminated.exitCode // \"N/A\"\
+    )\\nexit_code_explanation: \\($exit_code_explanations[.lastState.terminated.exitCode\
+    \ | tostring] // \"Unknown exit code\")\") + \"\\n---\\n\"'\n"
+  name: inspect_container_restarts_in_namespace_namespace
+  when_is_it_useful: '1. Monitoring and troubleshooting application performance: A
+    DevOps or SRE might use this command to track and analyze container restarts in
+    a Kubernetes cluster, identifying potential performance issues and making adjustments
+    to improve stability.
+
+
+    2. Investigating deployment failures: When a new deployment fails and containers
+    are continually restarting, this command can be used to gather detailed information
+    about the restart events, including exit codes, in order to diagnose and resolve
+    the issue.
+
+
+    3. Ensuring availability and reliability: By regularly running this command, DevOps
+    or SREs can proactively monitor container restarts in the Kubernetes cluster,
+    aiming to prevent potential downtime by addressing any recurring issues before
+    they escalate.
+
+
+    4. Conducting root cause analysis: After an incident or outage, this command can
+    be used to examine container restart data, helping DevOps or SREs to identify
+    the underlying causes and implement necessary improvements to prevent similar
+    occurrences in the future.
+
+
+    5. Optimizing resource utilization: This command can provide valuable insights
+    into container restarts and exit codes, enabling DevOps or SREs to optimize resource
+    allocation and make informed decisions about scaling and capacity planning within
+    the Kubernetes infrastructure.'
+- command: 'TIME_PERIOD="${CONTAINER_RESTART_AGE}"; TIME_PERIOD_UNIT=$(echo $TIME_PERIOD
+    | awk ''{print substr($0,length($0),1)}''); TIME_PERIOD_VALUE=$(echo $TIME_PERIOD
+    | awk ''{print substr($0,1,length($0)-1)}''); if [[ $TIME_PERIOD_UNIT == "m" ]];
+    then DATE_CMD_ARG="$TIME_PERIOD_VALUE minutes ago"; elif [[ $TIME_PERIOD_UNIT
+    == "h" ]]; then DATE_CMD_ARG="$TIME_PERIOD_VALUE hours ago"; else echo "Unsupported
+    time period unit. Use ''m'' for minutes or ''h'' for hours."; exit 1; fi; THRESHOLD_TIME=$(date
+    -u --date="$DATE_CMD_ARG" +"%Y-%m-%dT%H:%M:%SZ"); $KUBERNETES_DISTRIBUTION_BINARY
+    get pods --context=$CONTEXT -n $NAMESPACE -o json | jq -r --argjson exit_code_explanations
+    ''{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated
+    by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL
+    - Possible OOM", "143":"Graceful Termination SIGTERM"}'' --arg threshold_time
+    "$THRESHOLD_TIME" ''.items[] | select(.status.containerStatuses != null) | select(any(.status.containerStatuses[];
+    .restartCount > 0 and (.lastState.terminated.finishedAt // "1970-01-01T00:00:00Z")
+    > $threshold_time)) | "---\npod_name: \(.metadata.name)\n" + (.status.containerStatuses[]
+    | "containers: \(.name)\nrestart_count: \(.restartCount)\nmessage: \(.state.waiting.message
+    // "N/A")\nterminated_reason: \(.lastState.terminated.reason // "N/A")\nterminated_finishedAt:
+    \(.lastState.terminated.finishedAt // "N/A")\nterminated_exitCode: \(.lastState.terminated.exitCode
+    // "N/A")\nexit_code_explanation: \($exit_code_explanations[.lastState.terminated.exitCode
+    | tostring] // "Unknown exit code")") + "\n---\n"'''
+  doc_links: '
+
+    - [Kubernetes Documentation on `kubectl get events` Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get-events){:target="_blank"}
+
+    - [Understanding Container Restart Policies in Kubernetes](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy){:target="_blank"}
+
+    - [Logging and Monitoring in Kubernetes](https://kubernetes.io/docs/concepts/cluster-administration/logging/){:target="_blank"}'
+  explanation: This command is pulling container restart data from a Kubernetes cluster
+    and formatting it into a readable output, using a specific time period as a threshold
+    for the restart data. It also includes exit code explanations for various scenarios.
+  multi_line_details: "\n# Set the variable TIME_PERIOD to the value of CONTAINER_RESTART_AGE\n\
+    TIME_PERIOD=\"${CONTAINER_RESTART_AGE}\"\n\n# Get the unit of time from the TIME_PERIOD:\
+    \ 'm' for minutes or 'h' for hours\nTIME_PERIOD_UNIT=$(echo $TIME_PERIOD | awk\
+    \ '{print substr($0,length($0),1)}')\n\n# Extract the numerical value from TIME_PERIOD\n\
+    TIME_PERIOD_VALUE=$(echo $TIME_PERIOD | awk '{print substr($0,1,length($0)-1)}')\n\
+    \n# Depending on the unit of time, create the argument for the date command\n\
+    if [[ $TIME_PERIOD_UNIT == \"m\" ]]; then \n  DATE_CMD_ARG=\"$TIME_PERIOD_VALUE\
+    \ minutes ago\"\nelif [[ $TIME_PERIOD_UNIT == \"h\" ]]; then \n  DATE_CMD_ARG=\"\
+    $TIME_PERIOD_VALUE hours ago\"\nelse \n  echo \"Unsupported time period unit.\
+    \ Use 'm' for minutes or 'h' for hours.\"\n  exit 1\nfi\n\n# Calculate the threshold\
+    \ time based on the DATE_CMD_ARG\nTHRESHOLD_TIME=$(date -u --date=\"$DATE_CMD_ARG\"\
+    \ +\"%Y-%m-%dT%H:%M:%SZ\")\n\n# Use the Kubernetes distribution binary to get\
+    \ pods in JSON format\n$KUBERNETES_DISTRIBUTION_BINARY get pods --context=$CONTEXT\
+    \ -n $NAMESPACE -o json | \\\n  jq -r --argjson exit_code_explanations '{\"0\"\
+    : \"Success\", \"1\": \"Error\", \"2\": \"Misconfiguration\", \\\n    \"130\"\
+    : \"Pod terminated by SIGINT\", \"134\": \"Abnormal Termination SIGABRT\", \\\n\
+    \    \"137\": \"Pod terminated by SIGKILL - Possible OOM\", \"143\":\"Graceful\
+    \ Termination SIGTERM\"}' \\\n    --arg threshold_time \"$THRESHOLD_TIME\" '.items[]\
+    \ | select(.status.containerStatuses != null) | \\\n      select(any(.status.containerStatuses[];\
+    \ .restartCount > 0 and (.lastState.terminated.finishedAt // \"1970-01-01T00:00:00Z\"\
+    ) > $threshold_time)) | \\\n      \"---\\npod_name: \\(.metadata.name)\\n\" +\
+    \ \\\n      (.status.containerStatuses[] | \"containers: \\(.name)\\nrestart_count:\
+    \ \\(.restartCount)\\nmessage: \\(.state.waiting.message // \"N/A\")\\nterminated_reason:\
+    \ \\(.lastState.terminated.reason // \"N/A\")\\nterminated_finishedAt: \\(.lastState.terminated.finishedAt\
+    \ // \"N/A\")\\nterminated_exitCode: \\(.lastState.terminated.exitCode // \"N/A\"\
+    )\\nexit_code_explanation: \\($exit_code_explanations[.lastState.terminated.exitCode\
+    \ | tostring] // \"Unknown exit code\")\") + \"\\n---\\n\"'\n"
+  name: inspect_container_restarts_in_namespace_namespace
+  when_is_it_useful: '1. Monitoring and troubleshooting application performance: A
+    DevOps or SRE might use this command to track and analyze container restarts in
+    a Kubernetes cluster, identifying potential performance issues and making adjustments
+    to improve stability.
+
+
+    2. Investigating deployment failures: When a new deployment fails and containers
+    are continually restarting, this command can be used to gather detailed information
+    about the restart events, including exit codes, in order to diagnose and resolve
+    the issue.
+
+
+    3. Ensuring availability and reliability: By regularly running this command, DevOps
+    or SREs can proactively monitor container restarts in the Kubernetes cluster,
+    aiming to prevent potential downtime by addressing any recurring issues before
+    they escalate.
+
+
+    4. Conducting root cause analysis: After an incident or outage, this command can
+    be used to examine container restart data, helping DevOps or SREs to identify
+    the underlying causes and implement necessary improvements to prevent similar
+    occurrences in the future.
+
+
+    5. Optimizing resource utilization: This command can provide valuable insights
+    into container restarts and exit codes, enabling DevOps or SREs to optimize resource
+    allocation and make informed decisions about scaling and capacity planning within
+    the Kubernetes infrastructure.'
+- command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending
+    --no-headers -o json | jq -r ''[.items[] | {pod_name: .metadata.name, status:
+    (.status.phase // "N/A"), message: (.status.conditions[0].message // "N/A"), reason:
+    (.status.conditions[0].reason // "N/A"), containerStatus: (.status.containerStatuses[0].state
+    // "N/A"), containerMessage: (.status.containerStatuses[0].state.waiting?.message
+    // "N/A"), containerReason: (.status.containerStatuses[0].state.waiting?.reason
+    // "N/A")}]'''
+  doc_links: '
+
+    - [kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+
+    - [kubectl Get Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+
+    - [Kubectl Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+
+    - [jq Manual](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command uses kubectl to get information about pods in a specific
+    context and namespace that are pending, and then uses jq to format the output
+    into a more readable JSON format with specific details about each pod's status
+    and containers.
+  multi_line_details: "\n# This command uses kubectl to get information about pods\
+    \ in a specific namespace that are in a Pending state\n# It then uses jq to format\
+    \ the output into a more readable and structured JSON format\n\n# Set the context\
+    \ and namespace for the kubectl command\nCONTEXT=\"your_context\" # replace with\
+    \ the actual context name\nNAMESPACE=\"your_namespace\" # replace with the actual\
+    \ namespace name\n\n# Get the pods in the specified context and namespace that\
+    \ are in a Pending state\nkubectl get pods --context=${CONTEXT} -n ${NAMESPACE}\
+    \ --field-selector=status.phase=Pending --no-headers -o json \\\n  | jq -r '[.items[]\
+    \ |\n  # Select relevant fields from pod metadata and status\n  {pod_name: .metadata.name,\n\
+    \   status: (.status.phase // \"N/A\"),\n   message: (.status.conditions[0].message\
+    \ // \"N/A\"),\n   reason: (.status.conditions[0].reason // \"N/A\"),\n   containerStatus:\
+    \ (.status.containerStatuses[0].state // \"N/A\"),\n   containerMessage: (.status.containerStatuses[0].state.waiting?.message\
+    \ // \"N/A\"),\n   containerReason: (.status.containerStatuses[0].state.waiting?.reason\
+    \ // \"N/A\")}]'\n\nIn this multi-line command, each step is explained with helpful\
+    \ comments to guide newer or less experienced devops engineers through the process\
+    \ and explain what each part of the command does."
+  name: inspect_pending_pods_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to gather detailed information
+    about pending pods to understand why they are continuously crashing and restarting,
+    causing the CrashLoopBackoff event.
+
+
+    2. Investigating high resource utilization: If there is a sudden spike in resource
+    utilization within a specific namespace, the engineer might use this command to
+    drill down into the details of pending pods and their containers to identify any
+    rogue processes or misconfigured resources.
+
+
+    3. Debugging deployment failures: When a deployment fails and pods remain in a
+    pending state, this command can be used to extract specific details about each
+    pod''s status and containers, helping the engineer diagnose the issue and troubleshoot
+    the deployment failure.
+
+
+    4. Monitoring and alerting: As part of a proactive monitoring and alerting system,
+    the engineer might use this command to regularly check on the status of pending
+    pods and capture detailed information for further analysis or triggering alerts
+    if necessary.
+
+
+    5. Performance optimization: In order to improve the overall performance of a
+    Kubernetes cluster, the engineer might use this command to analyze pending pods
+    and identify any inefficiencies or bottlenecks in order to optimize resource allocation
+    and scheduling.'
+- command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending
+    --no-headers -o json | jq -r ''[.items[] | {pod_name: .metadata.name, status:
+    (.status.phase // "N/A"), message: (.status.conditions[0].message // "N/A"), reason:
+    (.status.conditions[0].reason // "N/A"), containerStatus: (.status.containerStatuses[0].state
+    // "N/A"), containerMessage: (.status.containerStatuses[0].state.waiting?.message
+    // "N/A"), containerReason: (.status.containerStatuses[0].state.waiting?.reason
+    // "N/A")}]'''
+  doc_links: '
+
+    - [kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+
+    - [kubectl Get Command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+
+    - [Kubectl Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+
+    - [jq Manual](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command uses kubectl to get information about pods in a specific
+    context and namespace that are pending, and then uses jq to format the output
+    into a more readable JSON format with specific details about each pod's status
+    and containers.
+  multi_line_details: "\n# This command uses kubectl to get information about pods\
+    \ in a specific namespace that are in a Pending state\n# It then uses jq to format\
+    \ the output into a more readable and structured JSON format\n\n# Set the context\
+    \ and namespace for the kubectl command\nCONTEXT=\"your_context\" # replace with\
+    \ the actual context name\nNAMESPACE=\"your_namespace\" # replace with the actual\
+    \ namespace name\n\n# Get the pods in the specified context and namespace that\
+    \ are in a Pending state\nkubectl get pods --context=${CONTEXT} -n ${NAMESPACE}\
+    \ --field-selector=status.phase=Pending --no-headers -o json \\\n  | jq -r '[.items[]\
+    \ |\n  # Select relevant fields from pod metadata and status\n  {pod_name: .metadata.name,\n\
+    \   status: (.status.phase // \"N/A\"),\n   message: (.status.conditions[0].message\
+    \ // \"N/A\"),\n   reason: (.status.conditions[0].reason // \"N/A\"),\n   containerStatus:\
+    \ (.status.containerStatuses[0].state // \"N/A\"),\n   containerMessage: (.status.containerStatuses[0].state.waiting?.message\
+    \ // \"N/A\"),\n   containerReason: (.status.containerStatuses[0].state.waiting?.reason\
+    \ // \"N/A\")}]'\n\nIn this multi-line command, each step is explained with helpful\
+    \ comments to guide newer or less experienced devops engineers through the process\
+    \ and explain what each part of the command does."
+  name: inspect_pending_pods_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to gather detailed information
+    about pending pods to understand why they are continuously crashing and restarting,
+    causing the CrashLoopBackoff event.
+
+
+    2. Investigating high resource utilization: If there is a sudden spike in resource
+    utilization within a specific namespace, the engineer might use this command to
+    drill down into the details of pending pods and their containers to identify any
+    rogue processes or misconfigured resources.
+
+
+    3. Debugging deployment failures: When a deployment fails and pods remain in a
+    pending state, this command can be used to extract specific details about each
+    pod''s status and containers, helping the engineer diagnose the issue and troubleshoot
+    the deployment failure.
+
+
+    4. Monitoring and alerting: As part of a proactive monitoring and alerting system,
+    the engineer might use this command to regularly check on the status of pending
+    pods and capture detailed information for further analysis or triggering alerts
+    if necessary.
+
+
+    5. Performance optimization: In order to improve the overall performance of a
+    Kubernetes cluster, the engineer might use this command to analyze pending pods
+    and identify any inefficiencies or bottlenecks in order to optimize resource allocation
+    and scheduling.'
+- command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed
+    --no-headers -o json | jq -r --argjson exit_code_explanations ''{"0": "Success",
+    "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134":
+    "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM",
+    "143":"Graceful Termination SIGTERM"}'' ''[.items[] | {pod_name: .metadata.name,
+    restart_count: (.status.containerStatuses[0].restartCount // "N/A"), message:
+    (.status.message // "N/A"), terminated_finishedAt: (.status.containerStatuses[0].state.terminated.finishedAt
+    // "N/A"), exit_code: (.status.containerStatuses[0].state.terminated.exitCode
+    // "N/A"), exit_code_explanation: ($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode
+    | tostring] // "Unknown exit code")}]'''
+  doc_links: '
+
+    - [Kubernetes documentation on troubleshooting](https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/){:target="_blank"}
+
+    - [Kubernetes official documentation for kubectl get pods](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+
+    - [jq Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command retrieves information about failed pods in a Kubernetes
+    cluster, including the pod name, restart count, termination message, and exit
+    code explanation. It uses jq to map exit codes to human-readable explanations.
+  multi_line_details: "\n# Set the context and namespace for the kubectl command\n\
+    context=${CONTEXT}\nnamespace=${NAMESPACE}\n\n# Use kubectl to get pods in a specific\
+    \ context and namespace that have failed\n# Then parse the output as JSON and\
+    \ store the data using jq\nkubectl get pods --context=${context} -n ${namespace}\
+    \ --field-selector=status.phase=Failed --no-headers -o json | \\\n\n  # Use jq\
+    \ to format the output for easier readability and understanding\n  jq -r --argjson\
+    \ exit_code_explanations '{\"0\": \"Success\", \"1\": \"Error\", \"2\": \"Misconfiguration\"\
+    , \"130\": \"Pod terminated by SIGINT\", \"134\": \"Abnormal Termination SIGABRT\"\
+    , \"137\": \"Pod terminated by SIGKILL - Possible OOM\", \"143\":\"Graceful Termination\
+    \ SIGTERM\"}' \\\n  '[.items[] | \n   {pod_name: .metadata.name, \n    restart_count:\
+    \ (.status.containerStatuses[0].restartCount // \"N/A\"), \n    message: (.status.message\
+    \ // \"N/A\"), \n    terminated_finishedAt: (.status.containerStatuses[0].state.terminated.finishedAt\
+    \ // \"N/A\"), \n    exit_code: (.status.containerStatuses[0].state.terminated.exitCode\
+    \ // \"N/A\"), \n    exit_code_explanation: ($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode\
+    \ | tostring] // \"Unknown exit code\")}]\n  '\n"
+  name: inspect_failed_pods_in_namespace_namespace
+  when_is_it_useful: '1. Monitoring and troubleshooting application failures in a
+    Kubernetes environment, where pods are repeatedly crashing and going into CrashLoopBackoff
+    due to various issues such as resource constraints, misconfigured containers,
+    or faulty application code.
+
+
+    2. Identifying and addressing issues with pod dependencies, where a pod may be
+    failing due to a dependency on another service or resource that is not available
+    or not functioning properly.
+
+
+    3. Investigating and resolving errors related to container startup or initialization,
+    such as incorrect command line arguments, missing environment variables, or permission
+    issues.
+
+
+    4. Analyzing and debugging issues with persistent storage, where a pod may fail
+    due to problems with accessing or mounting persistent volumes or data.
+
+
+    5. Troubleshooting networking problems, such as DNS configuration issues, network
+    policy violations, or connectivity problems between pods or services within the
+    cluster.'
+- command: 'kubectl get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed
+    --no-headers -o json | jq -r --argjson exit_code_explanations ''{"0": "Success",
+    "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134":
+    "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM",
+    "143":"Graceful Termination SIGTERM"}'' ''[.items[] | {pod_name: .metadata.name,
+    restart_count: (.status.containerStatuses[0].restartCount // "N/A"), message:
+    (.status.message // "N/A"), terminated_finishedAt: (.status.containerStatuses[0].state.terminated.finishedAt
+    // "N/A"), exit_code: (.status.containerStatuses[0].state.terminated.exitCode
+    // "N/A"), exit_code_explanation: ($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode
+    | tostring] // "Unknown exit code")}]'''
+  doc_links: '
+
+    - [Kubernetes documentation on troubleshooting](https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/){:target="_blank"}
+
+    - [Kubernetes official documentation for kubectl get pods](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+
+    - [jq Documentation](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command retrieves information about failed pods in a Kubernetes
+    cluster, including the pod name, restart count, termination message, and exit
+    code explanation. It uses jq to map exit codes to human-readable explanations.
+  multi_line_details: "\n# Set the context and namespace for the kubectl command\n\
+    context=${CONTEXT}\nnamespace=${NAMESPACE}\n\n# Use kubectl to get pods in a specific\
+    \ context and namespace that have failed\n# Then parse the output as JSON and\
+    \ store the data using jq\nkubectl get pods --context=${context} -n ${namespace}\
+    \ --field-selector=status.phase=Failed --no-headers -o json | \\\n\n  # Use jq\
+    \ to format the output for easier readability and understanding\n  jq -r --argjson\
+    \ exit_code_explanations '{\"0\": \"Success\", \"1\": \"Error\", \"2\": \"Misconfiguration\"\
+    , \"130\": \"Pod terminated by SIGINT\", \"134\": \"Abnormal Termination SIGABRT\"\
+    , \"137\": \"Pod terminated by SIGKILL - Possible OOM\", \"143\":\"Graceful Termination\
+    \ SIGTERM\"}' \\\n  '[.items[] | \n   {pod_name: .metadata.name, \n    restart_count:\
+    \ (.status.containerStatuses[0].restartCount // \"N/A\"), \n    message: (.status.message\
+    \ // \"N/A\"), \n    terminated_finishedAt: (.status.containerStatuses[0].state.terminated.finishedAt\
+    \ // \"N/A\"), \n    exit_code: (.status.containerStatuses[0].state.terminated.exitCode\
+    \ // \"N/A\"), \n    exit_code_explanation: ($exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode\
+    \ | tostring] // \"Unknown exit code\")}]\n  '\n"
+  name: inspect_failed_pods_in_namespace_namespace
+  when_is_it_useful: '1. Monitoring and troubleshooting application failures in a
+    Kubernetes environment, where pods are repeatedly crashing and going into CrashLoopBackoff
+    due to various issues such as resource constraints, misconfigured containers,
+    or faulty application code.
+
+
+    2. Identifying and addressing issues with pod dependencies, where a pod may be
+    failing due to a dependency on another service or resource that is not available
+    or not functioning properly.
+
+
+    3. Investigating and resolving errors related to container startup or initialization,
+    such as incorrect command line arguments, missing environment variables, or permission
+    issues.
+
+
+    4. Analyzing and debugging issues with persistent storage, where a pod may fail
+    due to problems with accessing or mounting persistent volumes or data.
+
+
+    5. Troubleshooting networking problems, such as DNS configuration issues, network
+    policy violations, or connectivity problems between pods or services within the
+    cluster.'
+- command: 'kubectl get pods --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r
+    ''.items[] | select(.status.conditions[]? | select(.type == "Ready" and .status
+    == "False" and .reason != "PodCompleted")) | {kind: .kind, name: .metadata.name,
+    conditions: .status.conditions}'' | jq -s ''.'''
+  doc_links: '
+
+    '
+  explanation: This command retrieves information about pods in a specific namespace
+    and context, then filters the results to show only pods that are not ready or
+    have not completed, displaying their kind, name, and conditions in JSON format.
+  multi_line_details: "\n# Set the context and namespace for the kubernetes command\n\
+    CONTEXT=\"my-kube-context\"\nNAMESPACE=\"my-namespace\"\n\n# Get the existing\
+    \ pods in JSON format using kubectl\nkubectl get pods --context ${CONTEXT} -n\
+    \ ${NAMESPACE} -o json \\\n  # Use jq to filter out only the pods that meet specific\
+    \ conditions\n  | jq -r '.items[] | select(.status.conditions[]? | select(.type\
+    \ == \"Ready\" and .status == \"False\" and .reason != \"PodCompleted\")) \\\n\
+    \  # Extract relevant information such as kind, name, and status conditions\n\
+    \  | {kind: .kind, name: .metadata.name, conditions: .status.conditions}' \\\n\
+    \  # Use jq with the -s option to treat the entire input as a single JSON array\n\
+    \  | jq -s '.'\n\nThis multi-line command breaks down each step of the original\
+    \ command with comments explaining what each part does. It's useful for newer\
+    \ or less experienced devops engineers who may not be familiar with all the commands\
+    \ used."
+  name: inspect_workload_status_conditions_in_namespace_namespace
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
+    events to identify and fix any issues causing continuous pod restarts.
+
+
+    2. Identifying and resolving performance issues with pods that are not ready or
+    have not completed, to ensure smooth operation of the application.
+
+
+    3. Troubleshooting and diagnosing connectivity problems within the Kubernetes
+    cluster by examining pod conditions and statuses.
+
+
+    4. Investigating and resolving deployment failures by retrieving information about
+    pods that are not ready or have not completed.
+
+
+    5. Analyzing and troubleshooting resource constraints or bottlenecks within the
+    Kubernetes cluster, by examining the status and conditions of pods in a specific
+    namespace and context.'
+- command: 'kubectl get pods --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r
+    ''.items[] | select(.status.conditions[]? | select(.type == "Ready" and .status
+    == "False" and .reason != "PodCompleted")) | {kind: .kind, name: .metadata.name,
+    conditions: .status.conditions}'' | jq -s ''.'''
+  doc_links: '
+
+    '
+  explanation: This command retrieves information about pods in a specific namespace
+    and context, then filters the results to show only pods that are not ready or
+    have not completed, displaying their kind, name, and conditions in JSON format.
+  multi_line_details: "\n# Set the context and namespace for the kubernetes command\n\
+    CONTEXT=\"my-kube-context\"\nNAMESPACE=\"my-namespace\"\n\n# Get the existing\
+    \ pods in JSON format using kubectl\nkubectl get pods --context ${CONTEXT} -n\
+    \ ${NAMESPACE} -o json \\\n  # Use jq to filter out only the pods that meet specific\
+    \ conditions\n  | jq -r '.items[] | select(.status.conditions[]? | select(.type\
+    \ == \"Ready\" and .status == \"False\" and .reason != \"PodCompleted\")) \\\n\
+    \  # Extract relevant information such as kind, name, and status conditions\n\
+    \  | {kind: .kind, name: .metadata.name, conditions: .status.conditions}' \\\n\
+    \  # Use jq with the -s option to treat the entire input as a single JSON array\n\
+    \  | jq -s '.'\n\nThis multi-line command breaks down each step of the original\
+    \ command with comments explaining what each part does. It's useful for newer\
+    \ or less experienced devops engineers who may not be familiar with all the commands\
+    \ used."
+  name: inspect_workload_status_conditions_in_namespace_namespace
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
+    events to identify and fix any issues causing continuous pod restarts.
+
+
+    2. Identifying and resolving performance issues with pods that are not ready or
+    have not completed, to ensure smooth operation of the application.
+
+
+    3. Troubleshooting and diagnosing connectivity problems within the Kubernetes
+    cluster by examining pod conditions and statuses.
+
+
+    4. Investigating and resolving deployment failures by retrieving information about
+    pods that are not ready or have not completed.
+
+
+    5. Analyzing and troubleshooting resource constraints or bottlenecks within the
+    Kubernetes cluster, by examining the status and conditions of pods in a specific
+    namespace and context.'
+- command: kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT}
+    | xargs -n 1 bash -c 'kubectl get $0 --show-kind --ignore-not-found -n ${NAMESPACE}
+    --context=${CONTEXT}'
+  doc_links: '
+
+    - [kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
+
+    - [Bash Guide for Beginners](http://tldp.org/LDP/Bash-Beginners-Guide/html/){:target="_blank"}'
+  explanation: This command uses kubectl to list all available API resources in the
+    current Kubernetes context, then it uses xargs and bash to get each resource in
+    the specified namespace.
+  multi_line_details: '
+
+    # First, use kubectl to list all the available API resources in the cluster that
+    support the "list" verb and are namespaced
+
+    api_resources=$(kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT})
+
+
+    # Then, for each of the listed resources, use xargs to iterate through them one
+    by one and execute the following command
+
+    echo $api_resources | xargs -n 1 bash -c '' \
+
+
+    # Use kubectl to get information about the current resource being processed
+
+    kubectl get $0 --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}''
+
+    '
+  name: get_listing_of_resources_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: When
+    a Kubernetes pod enters into a CrashLoopBackoff state, it can indicate an issue
+    with the application''s code, configuration, or underlying infrastructure. DevOps
+    or Site Reliability Engineers may need to use the provided command to identify
+    and understand the resources in the affected namespace to diagnose and resolve
+    the issue.
+
+
+    2. Monitoring and maintenance: DevOps or Site Reliability Engineers may want to
+    periodically review all available API resources in a specific namespace to ensure
+    that the deployment, services, and other resources are functioning as expected
+    and to identify any potential issues proactively.
+
+
+    3. Application deployment and updates: Before deploying a new application or updating
+    an existing one in Kubernetes, engineers may use this command to verify the availability
+    and status of all relevant API resources within the specified namespace to ensure
+    a smooth deployment process without any conflicts or disruptions.
+
+
+    4. Resource utilization and capacity planning: To monitor resource usage and plan
+    for capacity scaling in a Kubernetes cluster, DevOps or Site Reliability Engineers
+    may use the provided command to gain insights into the current state of API resources
+    within a specific namespace, allowing them to make informed decisions about resource
+    allocation and scaling.
+
+
+    5. Troubleshooting and debugging: In the event of unexpected errors or performance
+    issues within a particular namespace, engineers may use this command to quickly
+    inspect and analyze all available API resources, helping them to debug and troubleshoot
+    the problem efficiently.'
+- command: kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT}
+    | xargs -n 1 bash -c 'kubectl get $0 --show-kind --ignore-not-found -n ${NAMESPACE}
+    --context=${CONTEXT}'
+  doc_links: '
+
+    - [kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
+
+    - [Bash Guide for Beginners](http://tldp.org/LDP/Bash-Beginners-Guide/html/){:target="_blank"}'
+  explanation: This command uses kubectl to list all available API resources in the
+    current Kubernetes context, then it uses xargs and bash to get each resource in
+    the specified namespace.
+  multi_line_details: '
+
+    # First, use kubectl to list all the available API resources in the cluster that
+    support the "list" verb and are namespaced
+
+    api_resources=$(kubectl api-resources --verbs=list --namespaced -o name --context=${CONTEXT})
+
+
+    # Then, for each of the listed resources, use xargs to iterate through them one
+    by one and execute the following command
+
+    echo $api_resources | xargs -n 1 bash -c '' \
+
+
+    # Use kubectl to get information about the current resource being processed
+
+    kubectl get $0 --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}''
+
+    '
+  name: get_listing_of_resources_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: When
+    a Kubernetes pod enters into a CrashLoopBackoff state, it can indicate an issue
+    with the application''s code, configuration, or underlying infrastructure. DevOps
+    or Site Reliability Engineers may need to use the provided command to identify
+    and understand the resources in the affected namespace to diagnose and resolve
+    the issue.
+
+
+    2. Monitoring and maintenance: DevOps or Site Reliability Engineers may want to
+    periodically review all available API resources in a specific namespace to ensure
+    that the deployment, services, and other resources are functioning as expected
+    and to identify any potential issues proactively.
+
+
+    3. Application deployment and updates: Before deploying a new application or updating
+    an existing one in Kubernetes, engineers may use this command to verify the availability
+    and status of all relevant API resources within the specified namespace to ensure
+    a smooth deployment process without any conflicts or disruptions.
+
+
+    4. Resource utilization and capacity planning: To monitor resource usage and plan
+    for capacity scaling in a Kubernetes cluster, DevOps or Site Reliability Engineers
+    may use the provided command to gain insights into the current state of API resources
+    within a specific namespace, allowing them to make informed decisions about resource
+    allocation and scaling.
+
+
+    5. Troubleshooting and debugging: In the event of unexpected errors or performance
+    issues within a particular namespace, engineers may use this command to quickly
+    inspect and analyze all available API resources, helping them to debug and troubleshoot
+    the problem efficiently.'
+- command: 'kubectl get events --field-selector type!=Warning --context ${CONTEXT}
+    -n ${NAMESPACE} -o json > $HOME/events.json && cat $HOME/events.json | jq -r ''[.items[]
+    | select(.involvedObject.name != null and .involvedObject.name != "" and .involvedObject.name != "Unknown" and .involvedObject.kind != null and .involvedObject.kind != "")
+    | {namespace: .involvedObject.namespace, kind: .involvedObject.kind, name: ((if
+    .involvedObject and .involvedObject.kind == "Pod" then (.involvedObject.name |
+    split("-")[:-1] | join("-")) else .involvedObject.name end) // ""), count: .count,
+    firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, reason: .reason,
+    message: .message}] | group_by(.namespace, .kind, .name) | .[] | {(.[0].namespace
+    + "/" + .[0].kind + "/" + .[0].name): {events: .}}'' | jq -r --argjson threshold
+    "${ANOMALY_THRESHOLD}" ''to_entries[] | {object: .key, oldest_timestamp: ([.value.events[]
+    | .firstTimestamp] | min), most_recent_timestamp: ([.value.events[] | .lastTimestamp]
+    | max), events_per_minute: (reduce .value.events[] as $event (0; . + $event.count)
+    / (((([.value.events[] | .lastTimestamp | fromdateiso8601] | max) - ([.value.events[]
+    | .firstTimestamp | fromdateiso8601] | min)) / 60) | if . < 1 then 1 else . end)),
+    total_events: (reduce .value.events[] as $event (0; . + $event.count)), summary_messages:
+    [.value.events[] | .message] | unique | join("; ")} | select(.events_per_minute
+    > $threshold)'' | jq -s ''.'''
+  doc_links: '
+
+    - [Kubernetes Event Retrieval](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#get){:target="_blank"}
+
+    - [Anomaly Detection in Data](https://towardsdatascience.com/anomaly-detection-for-dummies-15f148e559c1){:target="_blank"}
+
+    - [Formatting Results in JSON](https://www.json.org/json-en.html){:target="_blank"}'
+  explanation: This command retrieves events from a Kubernetes cluster, filters out
+    any warnings, and then processes the data to identify any anomalies based on a
+    specified threshold. The results are formatted in JSON for further analysis.
+  multi_line_details: "\n# Set the kubectl context and namespace to use for the command\n\
+    CONTEXT=\"example-context\"\nNAMESPACE=\"example-namespace\"\n\n# Retrieve events\
+    \ from the Kubernetes cluster using the specified context and namespace, and output\
+    \ the results to a JSON file\nkubectl get events --field-selector type!=Warning\
+    \ --context ${CONTEXT} -n ${NAMESPACE} -o json > $HOME/events.json\n\n# Process\
+    \ the JSON file with jq to extract relevant event information and format it into\
+    \ a new JSON structure\ncat $HOME/events.json | jq -r '[\n  .items[] | {\n   \
+    \ namespace: .involvedObject.namespace,\n    kind: .involvedObject.kind,\n   \
+    \ name: (\n      (if .involvedObject and .involvedObject.kind == \"Pod\" then\n\
+    \        (.involvedObject.name | split(\"-\")[:-1] | join(\"-\"))\n      else\n\
+    \        .involvedObject.name\n      end) // \"\"\n    ),\n    count: .count,\n\
+    \    firstTimestamp: .firstTimestamp,\n    lastTimestamp: .lastTimestamp,\n  \
+    \  reason: .reason,\n    message: .message\n  }\n] | group_by(.namespace, .kind,\
+    \ .name) | .[] | {(.[0].namespace + \"/\" + .[0].kind + \"/\" + .[0].name): {events:\
+    \ .}}'\n\n# Further process the formatted JSON data to calculate anomaly metrics\
+    \ based on specified threshold values\njq -r --argjson threshold \"${ANOMALY_THRESHOLD}\"\
+    \ 'to_entries[] | {\n  object: .key,\n  oldest_timestamp: ([.value.events[] |\
+    \ .firstTimestamp] | min),\n  most_recent_timestamp: ([.value.events[] | .lastTimestamp]\
+    \ | max),\n  events_per_minute: (\n    reduce .value.events[] as $event (0; .\
+    \ + $event.count) / (\n      (\n        (\n          ([.value.events[] | .lastTimestamp\
+    \ | fromdateiso8601] | max) - \n          ([.value.events[] | .firstTimestamp\
+    \ | fromdateiso8601] | min)\n        ) / 60\n      ) | if . < 1 then 1 else .\
+    \ end\n    )\n  ),\n  total_events: (reduce .value.events[] as $event (0; . +\
+    \ $event.count)),\n  summary_messages: [.value.events[] | .message] | unique |\
+    \ join(\"; \")\n} | select(.events_per_minute > $threshold)'\n\n# Combine all\
+    \ individual JSON objects into a single array and output the final processed data\n\
+    jq -s '.'\n"
+  name: check_event_anomalies_in_namespace_namespace
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
+    events
+
+    2. Identifying and resolving performance issues in a Kubernetes cluster
+
+    3. Investigating and addressing application downtime in a Kubernetes environment
+
+    4. Analyzing and optimizing resource utilization in a Kubernetes cluster
+
+    5. Detecting and mitigating potential security incidents in a Kubernetes deployment'
+- command: context="${CONTEXT}"; namespace="${NAMESPACE}"; check_health() { local
+    type=$1; local name=$2; local replicas=$3; local selector=$4; local pdbs=$(kubectl
+    --context "$context" --namespace "$namespace" get pdb -o json | jq -c --arg selector
+    "$selector" '.items[] | select(.spec.selector.matchLabels | to_entries[] | .key
+    + "=" + .value == $selector)'); if [[ $replicas -gt 1 && -z "$pdbs" ]]; then printf
+    "%-30s %-30s %-10s\n" "$type/$name" "" "Missing"; else echo "$pdbs" | jq -c .
+    | while IFS= read -r pdb; do local pdbName=$(echo "$pdb" | jq -r '.metadata.name');
+    local minAvailable=$(echo "$pdb" | jq -r '.spec.minAvailable // ""'); local maxUnavailable=$(echo
+    "$pdb" | jq -r '.spec.maxUnavailable // ""'); if [[ "$minAvailable" == "100%"
+    || "$maxUnavailable" == "0" || "$maxUnavailable" == "0%" ]]; then printf "%-30s
+    %-30s %-10s\n" "$type/$name" "$pdbName" "Risky"; elif [[ $replicas -gt 1 && ("$minAvailable"
+    != "100%" || "$maxUnavailable" != "0" || "$maxUnavailable" != "0%") ]]; then printf
+    "%-30s %-30s %-10s\n" "$type/$name" "$pdbName" "OK"; fi; done; fi; }; echo "Deployments:";
+    echo "_______"; printf "%-30s %-30s %-10s\n" "NAME" "PDB" "STATUS"; kubectl --context
+    "$context" --namespace "$namespace" get deployments -o json | jq -c '.items[]
+    | "\(.metadata.name) \(.spec.replicas) \(.spec.selector.matchLabels | to_entries[]
+    | .key + "=" + .value)"' | while read -r line; do check_health "Deployment" $(echo
+    $line | tr -d '"'); done; echo ""; echo "Statefulsets:"; echo "_______"; printf
+    "%-30s %-30s %-10s\n" "NAME" "PDB" "STATUS"; kubectl --context "$context" --namespace
+    "$namespace" get statefulsets -o json | jq -c '.items[] | "\(.metadata.name) \(.spec.replicas)
+    \(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value)"' | while read
+    -r line; do check_health "StatefulSet" $(echo $line | tr -d '"'); done
+  doc_links: '
+
+    - [Kubernetes Documentation: Overview of Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/){:target="_blank"}
+
+    - [Kubernetes Documentation: StatefulSets Overview](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
+
+    - [Kubernetes Documentation: PodDisruptionBudgets](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/){:target="_blank"}'
+  explanation: This command checks the health of deployments and statefulsets in a
+    Kubernetes cluster by evaluating the corresponding PodDisruptionBudgets (PDBs)
+    to determine if they are missing, risky, or OK based on certain criteria. It then
+    prints the status of each deployment and statefulset along with their associated
+    PDBs.
+  multi_line_details: "\n# Set context and namespace variables for kubectl commands\n\
+    context=\"${CONTEXT}\"\nnamespace=\"${NAMESPACE}\"\n\n# Function to check the\
+    \ health of a resource\ncheck_health() {\n    local type=$1\n    local name=$2\n\
+    \    local replicas=$3\n    local selector=$4\n    # Get relevant PodDisruptionBudgets\
+    \ (pdb) using jq filtering\n    local pdbs=$(kubectl --context \"$context\" --namespace\
+    \ \"$namespace\" get pdb -o json | jq -c --arg selector \"$selector\" '.items[]\
+    \ | select(.spec.selector.matchLabels | to_entries[] | .key + \"=\" + .value ==\
+    \ $selector)')\n  \n    # Check if replicas are greater than 1 and pdb is missing\n\
+    \    if [[ $replicas -gt 1 && -z \"$pdbs\" ]]; then\n        printf \"%-30s %-30s\
+    \ %-10s\\n\" \"$type/$name\" \"\" \"Missing\"\n    else\n        # Loop over each\
+    \ pdb\n        echo \"$pdbs\" | jq -c . | while IFS= read -r pdb; do\n       \
+    \     local pdbName=$(echo \"$pdb\" | jq -r '.metadata.name')\n            local\
+    \ minAvailable=$(echo \"$pdb\" | jq -r '.spec.minAvailable // \"\"')\n       \
+    \     local maxUnavailable=$(echo \"$pdb\" | jq -r '.spec.maxUnavailable // \"\
+    \"')\n\n            # Check if minAvailable is 100% or maxUnavailable is 0 or\
+    \ 0%\n            if [[ \"$minAvailable\" == \"100%\" || \"$maxUnavailable\" ==\
+    \ \"0\" || \"$maxUnavailable\" == \"0%\" ]]; then\n                printf \"%-30s\
+    \ %-30s %-10s\\n\" \"$type/$name\" \"$pdbName\" \"Risky\"\n            # Check\
+    \ if replicas are greater than 1 and minAvailable or maxUnavailable are other\
+    \ than risky values\n            elif [[ $replicas -gt 1 && (\"$minAvailable\"\
+    \ != \"100%\" || \"$maxUnavailable\" != \"0\" || \"$maxUnavailable\" != \"0%\"\
+    ) ]]; then\n                printf \"%-30s %-30s %-10s\\n\" \"$type/$name\" \"\
+    $pdbName\" \"OK\"\n            fi\n        done\n    fi\n}\n\n# Get deployments\
+    \ and check their health\necho \"Deployments:\"\necho \"_______\"\nprintf \"%-30s\
+    \ %-30s %-10s\\n\" \"NAME\" \"PDB\" \"STATUS\"\nkubectl --context \"$context\"\
+    \ --namespace \"$namespace\" get deployments -o json | jq -c '.items[] | \"\\\
+    (.metadata.name) \\(.spec.replicas) \\(.spec.selector.matchLabels | to_entries[]\
+    \ | .key + \"=\" + .value)\"' | while read -r line; do \n    check_health \"Deployment\"\
+    \ $(echo $line | tr -d '\"'); \ndone\n\necho \"\"\n\n# Get statefulsets and check\
+    \ their health\necho \"Statefulsets:\"\necho \"_______\"\nprintf \"%-30s %-30s\
+    \ %-10s\\n\" \"NAME\" \"PDB\" \"STATUS\"\nkubectl --context \"$context\" --namespace\
+    \ \"$namespace\" get statefulsets -o json | jq -c '.items[] | \"\\(.metadata.name)\
+    \ \\(.spec.replicas) \\(.spec.selector.matchLabels | to_entries[] | .key + \"\
+    =\" + .value)\"' | while read -r line; do \n    check_health \"StatefulSet\" $(echo\
+    \ $line | tr -d '\"'); \ndone\n"
+  name: check_missing_or_risky_poddisruptionbudget_policies_in_namepace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this command to check the health of deployments
+    and statefulsets in order to identify any issues causing the CrashLoopBackoff
+    events.
+
+
+    2. Assessing the impact of a recent cluster upgrade: After upgrading a Kubernetes
+    cluster, the engineer may use this command to evaluate the health of deployments
+    and statefulsets to ensure that all resources are still functioning as expected.
+
+
+    3. Investigating system-wide performance issues: In the event of system-wide performance
+    issues, the engineer could use this command to quickly assess the health of various
+    deployments and statefulsets in order to pinpoint any potential causes of the
+    performance degradation.
+
+
+    4. Conducting regular health checks: As part of routine maintenance, the engineer
+    may use this command to regularly check the health of deployments and statefulsets
+    to proactively identify any potential issues before they escalate.
+
+
+    5. Monitoring for compliance with best practices: The engineer may use this command
+    to regularly evaluate the health of deployments and statefulsets against established
+    best practices and guidelines to ensure the cluster is in compliance.'
+- command: bash 'resource_quota_check.sh'
+  doc_links: '
+
+    - [Kubernetes Resource Quotas](https://kubernetes.io/docs/concepts/policy/resource-quotas/){:target="_blank"}
+
+    - [Kubernetes Memory Units](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#meaning-of-memory){:target="_blank"}
+
+    - [Kubernetes CPU Units](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#meaning-of-cpu){:target="_blank"}'
+  explanation: This is a Bash script that calculates resource usage and generates
+    recommendations based on the usage of memory and CPU in a Kubernetes environment.
+    It converts memory to Mi (mebibytes) and CPU to millicores, then checks the usage
+    against set limits and generates corresponding recommendations for adjusting the
+    resource quotas.
+  multi_line_details: "\n#!/bin/bash\n\n# Initialize recommendations array\ndeclare\
+    \ -a recommendations\n\n# Function to convert memory to Mi\nconvert_memory_to_mib()\
+    \ {\n    local memory=$1\n\n    # Extract the number and unit separately\n   \
+    \ local number=${memory//[!0-9]/}\n    local unit=${memory//[0-9]/}\n\n    case\
+    \ $unit in\n        Gi)\n            echo $(( number * 1024 ))  # Convert Gi to\
+    \ Mi\n            ;;\n        Mi)\n            echo $number  # Already in Mi\n\
+    \            ;;\n        Ki)\n            echo $(( number / 1024 ))  # Convert\
+    \ Ki to Mi\n            ;;\n        *)\n            echo $(( number / (1024 *\
+    \ 1024) ))  # Convert bytes to Mi\n            ;;\n    esac\n}\n\n# Function to\
+    \ convert CPU to millicores\nconvert_cpu_to_millicores() {\n    local cpu=$1\n\
+    \    if [[ $cpu =~ ^[0-9]+m$ ]]; then\n        echo ${cpu%m}\n    else\n     \
+    \   echo $(($cpu * 1000))  # Convert CPU cores to millicores\n    fi\n}\n\n# Function\
+    \ to calculate and display resource usage status with recommendations\ncheck_usage()\
+    \ {\n    local quota_name=$1\n    local resource=$2\n    local used=$3\n    local\
+    \ hard=$4\n\n    # Convert memory and CPU to a common unit (Mi and millicores\
+    \ respectively)\n    if [[ $resource == *memory* ]]; then\n        used=$(convert_memory_to_mib\
+    \ $used)\n        hard=$(convert_memory_to_mib $hard)\n    elif [[ $resource ==\
+    \ *cpu* ]]; then\n        used=$(convert_cpu_to_millicores $used)\n        hard=$(convert_cpu_to_millicores\
+    \ $hard)\n    fi\n\n    # Calculating percentage\n    local percentage=0\n   \
+    \ if [ $hard -ne 0 ]; then\n        percentage=$(( 100 * used / hard ))\n    fi\n\
+    \n    # Generate recommendation based on usage\n    local recommendation=\"\"\n\
+    \    local increase_percentage=0\n    local increased_value=0\n    if [ $percentage\
+    \ -ge 100 ]; then\n        if [ $used -gt $hard ]; then\n            # If usage\
+    \ is over 100%, match the current usage\n            echo \"$resource: OVER LIMIT\
+    \ ($percentage%) - Adjust resource quota to match current usage with some headroom\
+    \ for $resource in $NAMESPACE\"\n            increase_percentage=\"${CRITICAL_INCREASE_LEVEL:-40}\"\
+    \n            increased_value=$(( used * increase_percentage / 100 ))\n      \
+    \      suggested_value=$(( increased_value + used ))\n        else\n         \
+    \   echo \"$resource: AT LIMIT ($percentage%) - Immediately increase the resource\
+    \ quota for $resource in $NAMESPACE\"\n            increase_percentage=\"${CRITICAL_INCREASE_LEVEL:-40}\"\
+    \n            increased_value=$(( hard * increase_percentage / 100 ))\n      \
+    \      suggested_value=$(( increased_value + hard ))\n        fi\n        recommendation=\"\
+    {\\\"remediation_type\\\":\\\"resourcequota_update\\\",\\\"increase_percentage\\\
+    \":\\\"$increase_percentage\\\",\\\"limit_type\\\":\\\"hard\\\",\\\"current_value\\\
+    \":\\\"$hard\\\",\\\"suggested_value\\\":\\\"$suggested_value\\\",\\\"quota_name\\\
+    \": \\\"$quota_name\\\", \\\"resource\\\": \\\"$resource\\\", \\\"usage\\\": \\\
+    \"at or above 100%\\\", \\\"severity\\\": \\\"1\\\", \\\"next_step\\\": \\\"Increase\
+    \ the resource quota for $resource in \\`$NAMESPACE\\`\\\"}\"\n    #... (and so\
+    \ on)\n\n# Fetching resource quota details\nquota_json=$(${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ get quota -n \"$NAMESPACE\" --context \"$CONTEXT\" -o json)\n\n# Processing\
+    \ the quota JSON\necho \"Resource Quota and Usage for Namespace: $NAMESPACE in\
+    \ Context: $CONTEXT\"\necho \"===========================================\"\n\n\
+    # Parsing quota JSON\nwhile IFS= read -r item; do\n    quota_name=$(echo \"$item\"\
+    \ | jq -r '.metadata.name')\n    echo \"Quota: $quota_name\"\n\n    # Create temporary\
+    \ files\n    hard_file=$(mktemp)\n    used_file=$(mktemp)\n\n    echo \"$item\"\
+    \ | jq -r '.status.hard | to_entries | .[] | \"\\(.key) \\(.value)\"' > \"$hard_file\"\
+    \n    echo \"$item\" | jq -r '.status.used | to_entries | .[] | \"\\(.key) \\\
+    (.value)\"' > \"$used_file\"\n\n    # Process 'hard' limits and 'used' resources\n\
+    \    while read -r key value; do\n        hard=$(grep \"^$key \" \"$hard_file\"\
+    \ | awk '{print $2}')\n        used=$(grep \"^$key \" \"$used_file\" | awk '{print\
+    \ $2}')\n        check_usage \"$quota_name\" \"$key\" \"${used:-0}\" \"$hard\"\
+    \n    done < \"$hard_file\"\n\n    echo \"-----------------------------------\"\
+    \n\n    # Clean up temporary files\n    rm \"$hard_file\" \"$used_file\"\ndone\
+    \ < <(echo \"$quota_json\" | jq -c '.items[]')\n\n# Outputting recommendations\
+    \ as JSON\nif [ -n \"$recommendations\" ]; then\n    echo \"Recommended Next Steps:\"\
+    \n    echo \"[$recommendations]\" | jq .\nelse\n    echo \"No recommendations.\"\
+    \nfi\n"
+  name: check_resource_quota_utilization_in_namespace_namespace
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes CrashLoopBackoff
+    events to identify the root cause of the crashes and provide recommendations for
+    adjusting resource quotas to prevent future occurrences.
+
+
+    2. Analyzing resource usage in a Kubernetes cluster to identify potential performance
+    bottlenecks and generate recommendations for optimizing resource allocation.
+
+
+    3. Assessing the impact of scaling up or down certain deployments in a Kubernetes
+    environment based on memory and CPU usage, and providing recommendations for adjusting
+    resource quotas accordingly.
+
+
+    4. Identifying and addressing resource contention issues in a Kubernetes cluster
+    by analyzing memory and CPU usage and generating recommendations for redistributing
+    resources among different deployments.
+
+
+    5. Evaluating the performance of applications running in a Kubernetes environment
+    and providing recommendations for fine-tuning resource quotas to improve overall
+    efficiency and stability.'

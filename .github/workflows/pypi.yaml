@@ -1,0 +1,58 @@
+# .github/workflows/pypi.yaml
+name: Publish Pypi Package
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - VERSION
+  workflow_dispatch:
+
+env:
+  PIP_PACKAGE_NAME: rw_cli_keywords
+
+jobs:
+  publish-pypi:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Get version
+        run: |-
+          if [[ -s VERSION ]]; then
+            VERSION=$(cat VERSION)
+            echo "VERSION=$VERSION" >> $GITHUB_ENV
+            echo "VERSION extracted: $VERSION"
+          else
+            echo "VERSION file is missing or empty" >&2
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade packaging setuptools wheel build twine
+
+      - name: Build Package (PEP 517)
+        run: |
+          # Clean old build artifacts first:
+          rm -rf dist build *.egg-info
+          # Use the modern build command:
+          python -m build
+
+      - name: Check distribution
+        run: |
+          twine check dist/*
+
+      - name: Publish
+        run: |
+          twine upload dist/* -u __token__ -p ${{ secrets.PYPI_TOKEN }}
+
+      - name: Notify Slack of pip update
+        uses: slackapi/slack-github-action@v1.19.0
+        with:
+          channel-id: "#codecollections"
+          slack-message: "Just deployed version ${{ env.VERSION }} of ${{ env.PIP_PACKAGE_NAME}} to https://pypi.org/project/${{ env.PIP_PACKAGE_NAME }}"
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

@@ -1,0 +1,69 @@
+{
+    "name": "devtools",
+    "shutdownAction": "none",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "updateRemoteUserUID": false,
+    "overrideCommand": false,
+    "runArgs": [
+        "-p",
+        "3000:3000",
+        "--name",
+        "rw-cli-codecollection"
+    ],
+    "forwardPorts": [
+        3000
+    ],
+    "workspaceFolder": "/home/runwhen/codecollection/",
+    "features": {
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+        "ghcr.io/devcontainers/features/sshd:1": {
+            "version": "latest"
+        }
+    },
+    "remoteUser": "runwhen",
+    // Configure tool-specific properties.
+    "customizations": {
+        // Configure properties specific to VS Code.
+        // configuration following google standard
+        "vscode": {
+            "extensions": [
+                "robocorp.robotframework-lsp",
+                "ms-python.pylint",
+                "ms-python.black-formatter",
+                "ms-python.python",
+                "njpwerner.autodocstring"
+            ],
+            "settings": {
+                "python.languageServer": "Jedi",
+                "python.linting.enabled": true,
+                "python.linting.pylintEnabled": true,
+                "python.linting.pylintArgs": [
+                    "--max-line-length=120",
+                    "--enable=W0614" // track unused imports
+                ],
+                "[python]": {
+                    "editor.insertSpaces": true,
+                    "editor.tabSize": 4
+                },
+                "editor.formatOnSave": true,
+                "editor.lineNumbers": "on",
+                "python.formatting.provider": "black",
+                "python.formatting.blackArgs": [
+                    "--line-length",
+                    "120"
+                ],
+                "robot.language-server.python": "/usr/local/bin/python",
+                "robot.pythonpath": [
+                    "/home/runwhen",
+                    "/home/runwhen/rw-public-codecollection/libraries",
+                    "/home/runwhen/rw-public-codecollection/libraries/RW",
+                    "/home/runwhen/codecollection/libraries",
+                    "/home/runwhen/codecollection/libraries/RW",
+                    "/home/runwhen/dev_facade"
+                ]
+            }
+        }
+    }
+}

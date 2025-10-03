@@ -1,0 +1,89 @@
+commands:
+- command: 'TERRAFORM_API_TOKEN_VALUE=$(cat $TERRAFORM_API_TOKEN) && curl --header
+    "Authorization: Bearer $TERRAFORM_API_TOKEN_VALUE" --header "Content-Type: application/vnd.api+json"
+    -s ''${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}'''
+  doc_links: '
+
+    - [Variables in Terraform](https://www.terraform.io/docs/language/values/variables.html){:target="_blank"}
+
+    - [Terraform API documentation](https://www.terraform.io/docs/cloud/api/index.html){:target="_blank"}
+
+    - [Terraform workspaces](https://www.terraform.io/docs/language/state/workspaces.html){:target="_blank"}'
+  explanation: This command sets a variable `TERRAFORM_API_TOKEN_VALUE` using the
+    value from a file called `$TERRAFORM_API_TOKEN`, then makes a secure request to
+    the Terraform API using that token to fetch information about a specific workspace
+    within an organization.
+  multi_line_details: "\n# Read the contents of the TERRAFORM_API_TOKEN file and store\
+    \ it in the TERRAFORM_API_TOKEN_VALUE variable\nTERRAFORM_API_TOKEN_VALUE=$(cat\
+    \ $TERRAFORM_API_TOKEN) \n\n# Make a GET request to the Terraform API using curl,\
+    \ passing the authentication token in the header\ncurl \\\n--header \"Authorization:\
+    \ Bearer $TERRAFORM_API_TOKEN_VALUE\" \\ \n--header \"Content-Type: application/vnd.api+json\"\
+    \ \\\n-s '${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}'\n\
+    \n\nThis multi-line command breaks down the original one-liner and adds helpful\
+    \ comments to explain each step. This is useful for newer or less experienced\
+    \ devops engineers who may be unfamiliar with the syntax and behavior of the individual\
+    \ commands used in the original command."
+  name: checking_whether_the_terraform_cloud_workspace_terraform_workspace_name_is_in_a_locked_state
+  when_is_it_useful: '1. Deploying a new application or service to a Kubernetes cluster
+    and needing to retrieve information from the Terraform API to ensure the workspace
+    is correctly configured before deployment.
+
+    2. Troubleshooting issues with infrastructure provisioning using Terraform and
+    needing to gather information about workspaces and resources from the Terraform
+    API for debugging purposes.
+
+    3. Automating routine checks and updates for Terraform workspaces within an organization
+    by fetching information from the Terraform API and integrating it into a CI/CD
+    pipeline.
+
+    4. Performing regular audits and security checks on Terraform workspaces by fetching
+    information from the Terraform API and comparing it with predefined security standards
+    and policies.
+
+    5. Integrating Terraform with other tools and platforms within the organization
+    by fetching information from the Terraform API and using it to drive automation
+    and orchestration workflows.'
+- command: 'TERRAFORM_API_TOKEN_VALUE=$(cat $TERRAFORM_API_TOKEN) && curl --header
+    "Authorization: Bearer $TERRAFORM_API_TOKEN_VALUE" --header "Content-Type: application/vnd.api+json"
+    -s ''${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}'''
+  doc_links: '
+
+    - [Variables in Terraform](https://www.terraform.io/docs/language/values/variables.html){:target="_blank"}
+
+    - [Terraform API documentation](https://www.terraform.io/docs/cloud/api/index.html){:target="_blank"}
+
+    - [Terraform workspaces](https://www.terraform.io/docs/language/state/workspaces.html){:target="_blank"}'
+  explanation: This command sets a variable `TERRAFORM_API_TOKEN_VALUE` using the
+    value from a file called `$TERRAFORM_API_TOKEN`, then makes a secure request to
+    the Terraform API using that token to fetch information about a specific workspace
+    within an organization.
+  multi_line_details: "\n# Read the contents of the TERRAFORM_API_TOKEN file and store\
+    \ it in the TERRAFORM_API_TOKEN_VALUE variable\nTERRAFORM_API_TOKEN_VALUE=$(cat\
+    \ $TERRAFORM_API_TOKEN) \n\n# Make a GET request to the Terraform API using curl,\
+    \ passing the authentication token in the header\ncurl \\\n--header \"Authorization:\
+    \ Bearer $TERRAFORM_API_TOKEN_VALUE\" \\ \n--header \"Content-Type: application/vnd.api+json\"\
+    \ \\\n-s '${TERRAFORM_API_URL}/organizations/${TERRAFORM_ORGANIZATION_NAME}/workspaces/${TERRAFORM_WORKSPACE_NAME}'\n\
+    \n\nThis multi-line command breaks down the original one-liner and adds helpful\
+    \ comments to explain each step. This is useful for newer or less experienced\
+    \ devops engineers who may be unfamiliar with the syntax and behavior of the individual\
+    \ commands used in the original command."
+  name: checking_whether_the_terraform_cloud_workspace_terraform_workspace_name_is_in_a_locked_state
+  when_is_it_useful: '1. Deploying a new application or service to a Kubernetes cluster
+    and needing to retrieve information from the Terraform API to ensure the workspace
+    is correctly configured before deployment.
+
+    2. Troubleshooting issues with infrastructure provisioning using Terraform and
+    needing to gather information about workspaces and resources from the Terraform
+    API for debugging purposes.
+
+    3. Automating routine checks and updates for Terraform workspaces within an organization
+    by fetching information from the Terraform API and integrating it into a CI/CD
+    pipeline.
+
+    4. Performing regular audits and security checks on Terraform workspaces by fetching
+    information from the Terraform API and comparing it with predefined security standards
+    and policies.
+
+    5. Integrating Terraform with other tools and platforms within the organization
+    by fetching information from the Terraform API and using it to drive automation
+    and orchestration workflows.'

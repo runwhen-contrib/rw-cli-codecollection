@@ -1,0 +1,177 @@
+commands:
+- command: bash 'query_jaeger_http_errors.sh'
+  doc_links: '
+
+    - [Kubernetes Distribution Binary](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/){:target="_blank"}
+
+    - [Processing Traces of Errors](https://opentracing.io/docs/){:target="_blank"}
+
+    - [HTTP Error Responses](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status){:target="_blank"}'
+  explanation: This script uses the Kubernetes distribution binary to find and analyze
+    Jaeger Query services, fetching and processing traces of errors for different
+    service routes and status codes. It then generates recommended next steps or actions
+    based on specific HTTP error responses found for each service.
+  multi_line_details: "\n#!/bin/bash\n\n# Define an array of label selectors to identify\
+    \ the Jaeger Query service\nLABEL_SELECTORS=(\"app=jaeger,app.kubernetes.io/component=query\"\
+    \ \"app=jaeger-query\")\n\n# Initialize an empty array to hold the names of Jaeger\
+    \ services\nJAEGER_SERVICES=()\n\n# Iterate through the label selectors to find\
+    \ Jaeger Query services\nfor label in \"${LABEL_SELECTORS[@]}\"; do\n    readarray\
+    \ -t services < <(${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} get svc\
+    \ -n ${NAMESPACE} -l ${label} -o jsonpath='{.items[*].metadata.name}')\n    #\
+    \ If services are found with the current label selector, add them to the JAEGER_SERVICES\
+    \ array\n    if [ ${#services[@]} -gt 0 ]; then\n        JAEGER_SERVICES+=(\"\
+    ${services[@]}\")\n    fi\ndone\n\n# Verify that at least one Jaeger Query service\
+    \ was found\nif [ ${#JAEGER_SERVICES[@]} -eq 0 ]; then\n    echo \"Jaeger Query\
+    \ service not found in namespace ${NAMESPACE}\"\n    exit 1\nfi\n\n# Use the first\
+    \ found service for demonstration purposes\nJAEGER_SERVICE_NAME=${JAEGER_SERVICES[0]}\n\
+    echo \"--------\"\necho \"Jaeger Service Found: $JAEGER_SERVICE_NAME\"\necho \"\
+    --------\"\n\n# Fetch all ports for the service\nports=$(${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ --context=${CONTEXT} get svc ${JAEGER_SERVICE_NAME} -n ${NAMESPACE} -o jsonpath='{.spec.ports[*].name}')\n\
+    \n# Convert string to array\nIFS=' ' read -r -a port_names <<< \"$ports\"\n\n\
+    # Initialize JAEGER_PORT to an empty value\nJAEGER_PORT=\"\"\n\n# Loop through\
+    \ all port names and check for your conditions\nfor port_name in \"${port_names[@]}\"\
+    ; do\n    if [[ \"$port_name\" == \"query\" || \"$port_name\" == \"http-query\"\
+    \ || \"$port_name\" == \"query-http\" ]]; then\n        # If a matching port name\
+    \ is found, fetch its port number\n        JAEGER_PORT=$(${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ --context=${CONTEXT} get svc ${JAEGER_SERVICE_NAME} -n ${NAMESPACE} -o jsonpath=\"\
+    {.spec.ports[?(@.name==\\\"$port_name\\\")].port}\")\n        break # Assuming\
+    \ only one matching port is needed\n    fi\ndone\n\nif [ -z \"$JAEGER_PORT\" ];\
+    \ then\n    echo \"Jaeger Query API port not found for service ${JAEGER_SERVICE_NAME}\"\
+    \n    exit 1\nfi\n\necho \"Found Jaeger Query API port: $JAEGER_PORT\"\n\n# Local\
+    \ and remote port configurations for port forwarding\nLOCAL_PORT=16686 # Local\
+    \ port for port-forwarding\nREMOTE_PORT=$JAEGER_PORT\n\n# Start port-forwarding\
+    \ in the background\n${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} port-forward\
+    \ service/${JAEGER_SERVICE_NAME} ${LOCAL_PORT}:${REMOTE_PORT} -n ${NAMESPACE}\
+    \ &\nPF_PID=$!\n\n# Wait a bit for the port-forward to establish\nsleep 5\n\n\
+    # Jaeger Query base URL using the forwarded port\nJAEGER_QUERY_BASE_URL=\"http://localhost:${LOCAL_PORT}\"\
+    \n\n# Query and process service health\necho \"--------\"\necho \"Fetching all\
+    \ available services from Jaeger...\"\nservices=$(curl -s \"${JAEGER_QUERY_BASE_URL}/api/services\"\
+    \ | jq -r '.data[]')\necho \"Available services:\"\necho \"${services}\"\necho\
+    \ \"--------\"\n\n\n# Iterate over each service to fetch and store their traces\
+    \ from the last 5 minutes\ndeclare -A traces\n# Fetch traces for each service\
+    \ and store in associative array\nfor service in $services; do\n    echo \"Fetching\
+    \ traces for service: $service from the last $LOOKBACK...\"\n    traces[\"$service\"\
+    ]=$(curl -s \"${JAEGER_QUERY_BASE_URL}/api/traces?service=${service}&lookback=${LOOKBACK}&limit=1000\"\
+    )\n    # echo \"${traces[\"$service\"]}\" > \"${service}_traces.json\"\ndone\n\
+    \n\n\n\n# Cleanup: Stop the port-forwarding process\necho \"--------\"\necho \"\
+    Clean up port-forward process.\"\nkill $PF_PID\necho \"Port-forwarding stopped.\"\
+    \necho \"--------\"\n\nSPACE_SEPARATED_EXCLUSIONS=\" ${SERVICE_EXCLUSIONS//,/\
+    \ } \"\n\n\n# Process Traces\nfor service in \"${!traces[@]}\"; do\n    if [[\
+    \ $SPACE_SEPARATED_EXCLUSIONS =~ \" $service \" ]]; then\n        echo \"Skipping\
+    \ service $service - found in SERVICE_EXCLUSIONS configuration\"\n    else\n \
+    \       echo \"--------\"\n        echo \"Processing traces for service: $service\"\
+    \n        # Access each service's traces using ${traces[$service]}\n        service_errors=$(echo\
+    \ \"${traces[\"$service\"]}\" | jq '\n        # Define dictionaries for status\
+    \ codes and descriptions\n        def httpStatusDescriptions: {\n            \"\
+    400\": \"Bad Request\",\n            \"401\": \"Unauthorized\",\n            \"\
+    403\": \"Forbidden\",\n            \"404\": \"Not Found\",\n            \"500\"\
+    : \"Internal Server Error\",\n            \"501\": \"Not Implemented\",\n    \
+    \        \"502\": \"Bad Gateway\",\n            \"503\": \"Service Unavailable\"\
+    ,\n            \"504\": \"Gateway Timeout\"\n        };\n\n        # Normalize\
+    \ and process traces\n        [.data[].spans[] |\n        {\n            traceID:\
+    \ .traceID,\n            spanID: .spanID,\n            route_or_url: (\n     \
+    \       [.tags[] | select(.key == \"http.route\" or .key == \"http.url\").value][0]\
+    \ // \"unknown\"\n            | if test(\"http[s]?://[^/]+/[^/]+\") then split(\"\
+    /\")[0:3] | join(\"/\") else . end\n            ),\n            status_code: (.tags[]\
+    \ | select(.key == \"http.status_code\").value | tostring | tonumber)\n      \
+    \  }] |\n        map(select(.status_code != 200)) |\n        group_by(.route_or_url)\
+    \ |\n        map({\n            route_or_url: .[0].route_or_url,\n           \
+    \ by_status_code: group_by(.status_code) | \n            map({\n            status_code:\
+    \ .[0].status_code,\n            status_description: (\n                .[0].status_code\
+    \ | tostring | \n                if httpStatusDescriptions[.] then httpStatusDescriptions[.]\
+    \ else \"Unknown Status Code\" end\n            ),\n            traces: map({traceID:\
+    \ .traceID, spanID: .spanID})\n            })\n        })\n        ')\n      \
+    \  while IFS= read -r line; do\n            route_or_url=$(echo \"$line\" | jq\
+    \ '.route_or_url')\n            # Initialize the recommendation variable\n   \
+    \         issue_details=\"\"\n            \n            while IFS= read -r error;\
+    \ do\n                status_code=$(echo \"$error\" | jq '.status_code')\n   \
+    \             status_description=$(echo \"$error\" | jq -r '.status_description')\n\
+    \                # Generate issue_details based on the status code\n         \
+    \       case \"$status_code\" in\n                    400) \n                \
+    \        http_error_recommendation=\"Check the request syntax.\"\n           \
+    \             details=$(printf '%s' \"${line}\" | sed 's/\"/\\\\\"/g')\n     \
+    \                   issue_details=\"{\\\"severity\\\":\\\"4\\\",\\\"service\\\"\
+    :\\\"$service\\\",\\\"title\\\":\\\"HTTP Error 400 ($status_description) found\
+    \ for service \\`$service\\` in namespace \\`${NAMESPACE}\\`\\\",\\\"next_steps\\\
+    \":\\\"Review issue details for traceIDs and review in Jaeger.\\\",\\\"details\\\
+    \":\\\"View traces in Jaeger and $http_error_recommendation:\\\\n$details\\\"\
+    }\" ;;\n                    401) \n                        http_error_recommendation=\"\
+    Ensure proper authentication.\"\n                        details=$(printf '%s'\
+    \ \"${line}\" | sed 's/\"/\\\\\"/g')\n                        issue_details=\"\
+    {\\\"severity\\\":\\\"4\\\",\\\"service\\\":\\\"$service\\\",\\\"title\\\":\\\"\
+    HTTP Error 401 ($status_description) found for service \\`$service\\` in namespace\
+    \ \\`${NAMESPACE}\\`\\\",\\\"next_steps\\\":\\\"Review issue details for traceIDs\
+    \ and review in Jaeger.\\\",\\\"details\\\":\\\"View traces in Jaeger and $http_error_recommendation:\\\
+    \\n$details\\\"}\" ;;\n                    403) \n                        http_error_recommendation=\"\
+    Check permissions.\"\n                        details=$(printf '%s' \"${line}\"\
+    \ | sed 's/\"/\\\\\"/g')\n                        issue_details=\"{\\\"severity\\\
+    \":\\\"4\\\",\\\"service\\\":\\\"$service\\\",\\\"title\\\":\\\"HTTP Error 403\
+    \ ($status_description) found for service \\`$service\\` in namespace \\`${NAMESPACE}\\\
+    `\\\",\\\"next_steps\\\":\\\"Review issue details for traceIDs and review in Jaeger.\\\
+    \",\\\"details\\\":\\\"View traces in Jaeger and $http_error_recommendation:\\\
+    \\n$details\\\"}\" ;;\n                    404) \n                        http_error_recommendation=\"\
+    Verify the URL or resource.\"\n                        details=$(printf '%s' \"\
+    ${line}\" | sed 's/\"/\\\\\"/g')\n                        issue_details=\"{\\\"\
+    severity\\\":\\\"4\\\",\\\"service\\\":\\\"$service\\\",\\\"title\\\":\\\"HTTP\
+    \ Error 404 ($status_description) found for service \\`$service\\` in namespace\
+    \ \\`${NAMESPACE}\\`\\\",\\\"next_steps\\\":\\\"Review issue details for traceIDs\
+    \ and review in Jaeger.\\\",\\\"details\\\":\\\"View traces in Jaeger and $http_error_recommendation:\\\
+    \\n$details\\\"}\" ;;\n                    500) \n                        http_error_recommendation=\"\
+    Investigate server-side errors.\" \n                        details=$(printf '%s'\
+    \ \"${line}\" | sed 's/\"/\\\\\"/g')\n                        issue_details=\"\
+    {\\\"severity\\\":\\\"4\\\",\\\"service\\\":\\\"$service\\\",\\\"title\\\":\\\"\
+    HTTP Error 500 ($status_description) found for service \\`$service\\` in namespace\
+    \ \\`${NAMESPACE}\\`\\\",\\\"next_steps\\\":\\\"Review issue details for traceIDs\
+    \ and review in Jaeger.\\\\nCheck Log for Issues with \\`$service\\`\\\\nCheck\
+    \ Warning Events for \\`$service\\`\\\",\\\"details\\\":\\\"View traces in Jaeger\
+    \ and $http_error_recommendation:\\\\n$details\\\"}\" ;;\n                   \
+    \ # Add more cases as needed\n                    *) \n                      \
+    \  http_error_recommendation=\"No specific recommendation.\" ;;\n            \
+    \    esac\n                echo $issue_details\n\n                # Initialize\
+    \ issues as an empty array if not already set\n                if [ -z \"$issues\"\
+    \ ]; then\n                    issues=\"[]\"\n                fi\n\n         \
+    \       # Concatenate issue detail to the string\n                if [ -n \"$issue_details\"\
+    \ ]; then\n                    # Remove the closing bracket from issues to prepare\
+    \ for adding a new item\n                    issues=\"${issues%]}\"\n\n      \
+    \              # If issues is not an empty array (more than just \"[\"), add a\
+    \ comma before the new item\n                    if [ \"$issues\" != \"[\" ];\
+    \ then\n                        issues=\"$issues,\"\n                    fi\n\n\
+    \                    # Add the new issue detail and close the array\n        \
+    \            issues=\"$issues $issue_details]\"\n                fi\n\n      \
+    \      done <<< \"$(echo \"$line\" | jq -c '.by_status_code[]')\"\n        done\
+    \ <<< \"$(echo \"$service_errors\" | jq -c '.[]')\"\n    fi\ndone\n\n\n\n# Display\
+    \ all unique recommendations that can be shown as Next Steps\nif [ -n \"$issues\"\
+    \ ]; then\n    echo -e \"\\nRecommended Next Steps: \\n\"\n    echo \"$issues\"\
+    \nfi\n"
+  name: query_traces_in_jaeger_for_unhealthy_http_response_codes_in_namespace_namespace
+  when_is_it_useful: '1. Investigating and resolving performance issues: DevOps or
+    Site Reliability Engineers may use this script to analyze Jaeger traces for the
+    Jaeger Query services to identify any performance bottlenecks or errors in different
+    service routes and status codes, and then take recommended actions to resolve
+    them.
+
+
+    2. Troubleshooting application errors: When an application running on Kubernetes
+    is experiencing frequent CrashLoopBackoff events, DevOps or SREs can use this
+    script to fetch and analyze traces of errors for different service routes and
+    status codes to identify the root cause of the issue and take necessary actions
+    to fix it.
+
+
+    3. Monitoring and optimizing service performance: DevOps or SREs might use this
+    script to regularly monitor and analyze the performance of Jaeger Query services
+    and other related services to proactively identify and address any potential performance
+    issues or errors.
+
+
+    4. Investigating and addressing user-reported errors: If users report specific
+    HTTP error responses while accessing a service running on Kubernetes, DevOps or
+    SREs can use this script to analyze Jaeger traces for the affected service and
+    recommend next steps or actions to address the reported errors.
+
+
+    5. Performing post-incident analysis: After a major incident or outage, DevOps
+    or SREs may use this script to analyze Jaeger traces for affected services to
+    understand the root cause of the incident and identify any errors or performance
+    issues that contributed to it. They can then take recommended actions to prevent
+    similar incidents in the future.'

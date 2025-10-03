@@ -1,0 +1,173 @@
+#!/bin/bash
+
+# Initialize recommendations array
+# Function to extract timestamp from log line, fallback to current time
+extract_log_timestamp() {
+    local log_line="$1"
+    local fallback_timestamp=$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")
+    
+    if [[ -z "$log_line" ]]; then
+        echo "$fallback_timestamp"
+        return
+    fi
+    
+    # Try to extract common timestamp patterns
+    # ISO 8601 format: 2024-01-15T10:30:45.123Z
+    if [[ "$log_line" =~ ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{3})?Z?) ]]; then
+        echo "${BASH_REMATCH[1]}"
+        return
+    fi
+    
+    # Standard log format: 2024-01-15 10:30:45
+    if [[ "$log_line" =~ ([0-9]{4}-[0-9]{2}-[0-9]{2}[[:space:]]+[0-9]{2}:[0-9]{2}:[0-9]{2}) ]]; then
+        # Convert to ISO format
+        local extracted_time="${BASH_REMATCH[1]}"
+        local iso_time=$(date -d "$extracted_time" -u +"%Y-%m-%dT%H:%M:%S.000Z" 2>/dev/null)
+        if [[ $? -eq 0 ]]; then
+            echo "$iso_time"
+        else
+            echo "$fallback_timestamp"
+        fi
+        return
+    fi
+    
+    # DD-MM-YYYY HH:MM:SS format
+    if [[ "$log_line" =~ ([0-9]{2}-[0-9]{2}-[0-9]{4}[[:space:]]+[0-9]{2}:[0-9]{2}:[0-9]{2}) ]]; then
+        local extracted_time="${BASH_REMATCH[1]}"
+        # Convert DD-MM-YYYY to YYYY-MM-DD for date parsing
+        local day=$(echo "$extracted_time" | cut -d' ' -f1 | cut -d'-' -f1)
+        local month=$(echo "$extracted_time" | cut -d' ' -f1 | cut -d'-' -f2)
+        local year=$(echo "$extracted_time" | cut -d' ' -f1 | cut -d'-' -f3)
+        local time_part=$(echo "$extracted_time" | cut -d' ' -f2)
+        local iso_time=$(date -d "$year-$month-$day $time_part" -u +"%Y-%m-%dT%H:%M:%S.000Z" 2>/dev/null)
+        if [[ $? -eq 0 ]]; then
+            echo "$iso_time"
+        else
+            echo "$fallback_timestamp"
+        fi
+        return
+    fi
+    
+    # Fallback to current timestamp
+    echo "$fallback_timestamp"
+}
+
+recommendations=""
+
+convert_to_gigabytes() {
+    size=$1
+    number=$(echo $size | sed -E 's/([0-9]+(\.[0-9]+)?).*/\1/')
+    unit=$(echo $size | sed -E 's/[0-9]+(\.[0-9]+)?(.*)/\2/')
+
+    case $unit in
+        Gi) echo $number ;;
+        Ti) echo $(awk "BEGIN {print $number * 1024}") ;;
+        Pi) echo $(awk "BEGIN {print $number * 1024 * 1024}") ;;
+        *) echo "0" ;;
+    esac
+}
+
+calculate_recommendation() {
+    current_size=$1
+    utilization=$2
+    size_in_gb=$(convert_to_gigabytes $current_size)
+
+    if ! [[ $size_in_gb =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+        echo "0"
+        return
+    fi
+
+    recommended_size=0
+    severity=""
+
+    if [ "$utilization" -ge 100 ]; then
+        recommended_size=$(awk "BEGIN {print int(2 * $size_in_gb + 0.5)}")
+        severity="1"
+    elif [ "$utilization" -ge 95 ]; then
+        recommended_size=$(awk "BEGIN {print int(1.75 * $size_in_gb + 0.5)}")
+        severity="2"
+    elif [ "$utilization" -ge 90 ]; then
+        recommended_size=$(awk "BEGIN {print int(1.5 * $size_in_gb + 0.5)}")
+        severity="3"
+    elif [ "$utilization" -ge 80 ]; then
+        recommended_size=$(awk "BEGIN {print int(1.25 * $size_in_gb + 0.5)}")
+        severity="4"
+    fi
+
+    echo "$recommended_size $severity"
+}
+
+get_top_level_owner() {
+    # Start with the pod's immediate owner reference
+    resource_kind=$1
+    resource_name=$2
+
+    while [ "$resource_kind" == "ReplicaSet" ]; do
+        # Fetch the ReplicaSet's owner reference
+        owner_info=$(${KUBERNETES_DISTRIBUTION_BINARY} get replicaset $resource_name -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.metadata.ownerReferences[0] | "\(.kind)/\(.name)"')
+        resource_kind=$(echo "$owner_info" | cut -d'/' -f1)
+        resource_name=$(echo "$owner_info" | cut -d'/' -f2)
+    done
+
+    echo "$resource_kind/$resource_name"
+}
+
+# Loop over all running pods in the specified namespace and context
+for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.spec.volumes[]?.persistentVolumeClaim) | .metadata.name'); do
+    pod_phase=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.status.phase')
+
+    # Retrieve the pod's immediate owner reference (likely a ReplicaSet)
+    initial_owner_info=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.metadata.ownerReferences[0] | "\(.kind)/\(.name)"')
+    initial_owner_kind=$(echo "$initial_owner_info" | cut -d'/' -f1)
+    initial_owner_name=$(echo "$initial_owner_info" | cut -d'/' -f2)
+
+    # Follow the chain to get the top-level owner (Deployment, StatefulSet, etc.)
+    top_level_owner=$(get_top_level_owner "$initial_owner_kind" "$initial_owner_name")
+    top_level_owner_kind=$(echo "$top_level_owner" | cut -d'/' -f1)
+    top_level_owner_name=$(echo "$top_level_owner" | cut -d'/' -f2)
+
+    # Check if the pod is not in the "Running" phase
+    if [ "$pod_phase" != "Running" ]; then
+        # Skip Pods owned by Jobs as they are meant to be transient
+        if [ "$top_level_owner_kind" == "Job" ]; then
+            continue
+        fi
+        recommendation="{ \"pod\": \"$pod\", \"owner_kind\": \"$top_level_owner_kind\", \"owner_name\": \"$top_level_owner_name\", \"next_steps\": \"Check $top_level_owner_kind \`$top_level_owner_name\` health\nInspect Pending Pods In Namespace \`$NAMESPACE\`\", \"title\": \"Pod `$pod` with PVC is not running\", \"details\": \"Pod $pod, owned by $top_level_owner_kind $top_level_owner_name, is not in a running state.\", \"severity\": \"2\" }"
+        recommendations="${recommendations:+$recommendations, }$recommendation"
+        continue
+    fi
+
+    pod_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod -n ${NAMESPACE} --context ${CONTEXT} -o json)
+
+    for pvc in $(echo "$pod_json" | jq -r '.spec.volumes[] | select(has("persistentVolumeClaim")) | .persistentVolumeClaim.claimName'); do
+        volumeName=$(echo "$pod_json" | jq -r --arg pvcName "$pvc" '.spec.volumes[] | select(.persistentVolumeClaim.claimName == $pvcName) | .name')
+        mountPath=$(echo "$pod_json" | jq -r --arg vol "$volumeName" '.spec.containers[].volumeMounts[] | select(.name == $vol) | .mountPath' | head -n 1)
+        containerName=$(echo "$pod_json" | jq -r --arg vol "$volumeName" '.spec.containers[] | select(.volumeMounts[].name == $vol) | .name' | head -n 1)
+
+        # Attempt to get disk usage, add recommendation if it fails
+        disk_usage=$(${KUBERNETES_DISTRIBUTION_BINARY} exec $pod -n ${NAMESPACE} --context ${CONTEXT} -c $containerName -- df -h $mountPath 2>/dev/null | awk 'NR==2 {print $5}' | sed 's/%//')
+        if [ $? -ne 0 ] || [ -z "$disk_usage" ]; then
+            recommendation="{ \"pvc_name\":\"$pvc\", \"pod\": \"$pod\", \"owner_kind\": \"$top_level_owner_kind\", \"owner_name\": \"$top_level_owner_name\", \"volume_name\": \"$volumeName\", \"container_name\": \"$containerName\", \"mount_path\": \"$mountPath\", \"next_steps\": \"Check $top_level_owner_kind Log for Issues with \`$top_level_owner_name\`\nInspect Container Restarts for $top_level_owner_kind \`$top_level_owner_name\`\", \"title\": \"Disk Utilization Check Failed for \`$pvc\`\", \"details\": \"Unable to retrieve disk utilization for $pvc in pod $pod, owned by $top_level_owner_kind $top_level_owner_name.\", \"severity\": \"4\" }"
+            recommendations="${recommendations:+$recommendations, }$recommendation"
+            continue
+        fi
+
+        disk_size=$(${KUBERNETES_DISTRIBUTION_BINARY} get pvc $pvc -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.status.capacity.storage')
+        recommendation_info=$(calculate_recommendation $disk_size $disk_usage)
+        recommended_new_size=$(echo $recommendation_info | cut -d' ' -f1)
+        severity=$(echo $recommendation_info | cut -d' ' -f2)
+
+        if [ $recommended_new_size -ne 0 ]; then
+            recommendation="{ \"pvc_name\":\"$pvc\", \"pod\": \"$pod\", \"owner_kind\": \"$top_level_owner_kind\", \"owner_name\": \"$top_level_owner_name\", \"volume_name\": \"$volumeName\", \"container_name\": \"$containerName\", \"mount_path\": \"$mountPath\", \"current_size\": \"$disk_size\", \"usage\": \"$disk_usage%\", \"recommended_size\": \"${recommended_new_size}Gi\", \"severity\": \"$severity\", \"title\": \"High Storage Utilization on PVC \`$pvc\`\", \"details\": \"Current size: $disk_size, Utilization: ${disk_usage}%, Recommended new size: ${recommended_new_size}Gi. Owned by $top_level_owner_kind $top_level_owner_name.\", \"next_steps\": \"Expand PVC $pvc to ${recommended_new_size}Gi. in Namespace \`$NAMESPACE\`\" }"
+            recommendations="${recommendations:+$recommendations, }$recommendation"
+        fi
+    done
+done
+
+# Outputting recommendations as JSON
+if [ -n "$recommendations" ]; then
+    echo "[$recommendations]" > pvc_issues.json
+    cat pvc_issues.json
+else
+    echo "[]" > pvc_issues.json
+fi

@@ -1,0 +1,23 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: azure
+  generationRules:
+  - resourceTypes:
+    - azure_compute_virtual_machines
+    matchRules:
+    - type: pattern
+      pattern: ".+"
+      properties: [name]
+      mode: substring
+    slxs:
+    - baseName: vm-os-health
+      levelOfDetail: detailed
+      qualifiers: ["resource_group"]
+      baseTemplateName: azure-vm-os-health
+      outputItems:
+        - type: slx
+        - type: sli
+        - type: runbook
+          templateName: azure-vm-os-health-taskset.yaml
+        - type: workflow

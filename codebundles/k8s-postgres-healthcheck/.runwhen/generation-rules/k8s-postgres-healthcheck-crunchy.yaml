@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+  - resourceTypes:
+      - postgresclusters.postgres-operator.crunchydata.com
+    matchRules:
+    - type: pattern
+      pattern: ".+"
+      properties: [name]
+      mode: substring
+    slxs:
+      - baseName: postgres-health
+        qualifiers: ["resource", "namespace", "cluster"]
+        baseTemplateName: k8s-postgres-healthcheck-crunchy
+        levelOfDetail: detailed
+        outputItems:
+          - type: slx
+          - type: sli
+          - type: runbook
+            templateName: k8s-postgres-healthcheck-crunchy-taskset.yaml
+          - type: workflow

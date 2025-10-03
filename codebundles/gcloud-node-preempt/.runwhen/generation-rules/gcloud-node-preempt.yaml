@@ -1,0 +1,23 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: gcp
+  generationRules:
+    - resourceTypes:
+        -  gcp_compute_instances
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [scheduling/preemptible]
+          mode: substring
+      slxs:
+        - baseName: node-preempt
+          qualifiers: ["project"]
+          baseTemplateName: gcloud-node-preempt
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: slo
+            - type: runbook
+              templateName: gcloud-node-preempt-taskset.yaml

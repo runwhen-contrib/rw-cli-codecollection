@@ -1,0 +1,41 @@
+apiVersion: runwhen.com/v1
+kind: ServiceLevelIndicator
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  displayUnitsLong: OK
+  displayUnitsShort: ok
+  locations:
+    - {{default_location}}
+  description: Measures the response code and latency to the ingress object. 
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/curl-http-ok/sli.robot
+  intervalStrategy: intermezzo
+  intervalSeconds: 30
+  configProvided:
+    - name: URLS
+      value: "{% for rule in match_resource.resource.spec.rules %}{% for path in rule.http.paths %}http://{{rule.host}}{% if path.path and path.path != "/" %}{{path.path}}{% endif %}{% if not loop.last %},{% endif %}{% endfor %}{% if not loop.last %},{% endif %}{% endfor %}"
+    - name: TARGET_LATENCY
+      value: '1.2'
+    - name: DESIRED_RESPONSE_CODE
+      value: '200'
+  secretsProvided: []
+  alerts:
+    warning:
+      operator: <
+      threshold: '1'
+      for: '10m'

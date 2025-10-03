@@ -1,0 +1,109 @@
+# Mapping of Kubernetes troubleshooting suggestions for next steps
+# structure adheres to following rules to keep things DRY:
+# 1. If you foresee a set of titles/objects used under many keys (errors), create anchors and reference them
+# 2. if the set of tasks for the key (error) is unlikely to be used elsewhere, simply hardcode them
+# If an array index contains a ':' it will be formatted seperately as a object hint
+# EXAMPLE:
+#
+# ErrorMessageToSearchOn:
+#   - A suggested task title to run A
+#   - A suggested task title to run B
+#   - A suggested task title to run C
+#   - ObjectTypeAssociatedWithError:$name_variable_of_object_to_run_tasks_against
+# the $name_variable_of_object_to_run_tasks_against can be dynamically injected
+# with the object name to investigate using RW.NextSteps.Format
+# aliases are typically error messages you would associate with the troubleshooting steps
+
+# BEGIN NamespaceTroubleshooting
+NamespaceTroubleshooting: &nst
+  - Trace And Troubleshoot Namespace Warning Events And Errors
+  - Inspect Container Restarts In Namespace
+  - Inspect Pending Pods In Namespace
+  - Inspect Failed Pods In Namespace
+  - Inspect Workload Status Conditions In Namespace
+  - Get Listing Of Resources In Namespace
+  - Check For Namespace Event Anomalies
+  - Check Missing or Risky PodDisruptionBudget Policies
+  - Service:$service_name
+  - Ingress:$ingress_name
+  - Namespace:$namespace_name
+# Aliases
+"Check the namespace for event anomalies": *nst
+"The pods in my namespace are down": *nst
+"Problems with services and applications in my namespace": *nst
+"Troubleshoot applications in namespace": *nst
+"Check services and their applications in namespace": *nst
+# END NamespaceTroubleshooting
+
+
+# BEGIN PersistentVolumeTroubleshooting
+PersistentVolumeTroubleshooting: &pvt
+  - Fetch Events for Unhealthy Kubernetes PersistentVolumeClaims
+  - List PersistentVolumeClaims in Terminating State
+  - List PersistentVolumes in Terminating State
+  - List Pods with Attached Volumes and Related PersistentVolume Details
+  - Fetch the Storage Utilization for PVC Mounts
+  - Check for RWO Persistent Volume Node Attachment Issues
+  - PersistentVolumeClaim:$pvc_name
+# Aliases
+FailedMount: *pvt
+FailedAttachVolume: *pvt
+FailedBinding: *pvt
+# END PersistentVolumeTroubleshooting
+
+# BEGIN DeploymentTroubleshooting
+DeploymentTroubleshooting: &dt
+  - Check Deployment Log For Issues
+  - Troubleshoot Deployment Warning Events
+  - Troubleshoot Deployment Replicas
+  - Check For Deployment Event Anomalies
+  - Deployment:$deployment_name
+# Aliases
+"Deployment has error or warning events": *dt
+"Deployments pods have error or warning events": *dt
+"Deployment failing to roll out": *dt
+"Deployment pods have errors": *dt
+"Deployment pods are failing": *dt
+"Deployment pods have run out of resources": *dt
+"Pod back-off restarting failed": *dt
+# END DeploymentTroubleshooting
+
+# BEGIN ImageTroubleshooting
+ImageTroubleshooting: &it
+  - Check Image Rollover Times In Namespace
+  - List Images and Tags for Every Container in Running Pods
+  - List ImagePullBackOff Events and Test Path and Tags
+# Aliases
+"Back-off pulling image": *it
+"The image in my container is not working": *it
+"failed to pull and unpack image": *it
+"Failed to pull image": *it
+# END ImageTroubleshooting
+
+# BEGIN PostgresTroubleshooting
+PostgresTroubleshooting: &psqlt
+  - Get Standard Postgres Resource Information
+  - Describe Postgres Custom Resources
+  - Get Postgres Pod Logs & Events
+  - Get Postgres Pod Resource Utilization
+  - Get Running Postgres Configuration
+  - Get Patroni Output
+  - Run DB Debug Queries
+  - StatefulSet:$postgres_name
+# Aliases
+OperationalError: *psqlt
+"OperationalError: FATAL:  connection limit exceeded": *psqlt
+"OperationalError: could not connect to server: Connection timed out": *psqlt
+"OperationalError: FATAL: sorry, too many clients already": *psqlt
+# END PostgresTroubleshooting
+
+# BEGIN IngressTroubleshooting
+IngressTroubleshooting: &ingresst
+  - Fetch Ingress Object Health in Namespace
+  - Ingress:$ingress_name
+# Aliases
+"HTTP Errors In Metrics": *ingresst
+"HTTP Errors In Logs": *ingresst
+"Application not receiving traffic": *ingresst
+"Network Errors": *ingresst
+# END IngressTroubleshooting

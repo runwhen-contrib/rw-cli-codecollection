@@ -1,0 +1,23 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: azure
+  generationRules:
+    - resourceTypes:
+        - azure_servicebus_namespaces
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: az-servicebus-health
+          qualifiers: ["resource", "resource_group"]
+          baseTemplateName: az-servicebus-health
+          levelOfDetail: basic
+          outputItems: 
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: az-servicebus-health-taskset.yaml
+            - type: workflow

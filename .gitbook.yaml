@@ -1,0 +1,4 @@
+root: ./
+structure:
+    readme: ./Introduction.md
+    summary: ./SUMMARY.md

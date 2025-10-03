@@ -1,0 +1,529 @@
+commands:
+- command: kubectl get all -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
+    && kubectl describe ${OBJECT_KIND} ${OBJECT_NAME} -n ${NAMESPACE} --context ${CONTEXT}
+  doc_links: '
+
+    - [Retrieve all resources with specific labels in a particular namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
+
+    - [Detailed information about a specific object within a namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}'
+  explanation: This command retrieves all resources with specific labels in a particular
+    namespace, and then provides detailed information about a specific object within
+    that namespace using a specific context.
+  multi_line_details: "\n# First, we want to list all resources with specific labels\
+    \ in a certain namespace and context\nkubectl get all -l ${RESOURCE_LABELS} -n\
+    \ ${NAMESPACE} --context ${CONTEXT}\n\n# Then, we want to describe a specific\
+    \ object of a certain kind and name in the same namespace and context\nkubectl\
+    \ describe ${OBJECT_KIND} ${OBJECT_NAME} -n ${NAMESPACE} --context ${CONTEXT}\n\
+    \ \n\nIn the comments, replace `${RESOURCE_LABELS}`, `${NAMESPACE}`, `${CONTEXT}`,\
+    \ `${OBJECT_KIND}`, and `${OBJECT_NAME}` with the actual values or variables you\
+    \ are using. This will make the command more readable and understandable for newer\
+    \ or less experienced devops engineers."
+  name: list_resources_related_to_postgres_cluster_object_name_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting a Kubernetes CrashLoopBackoff event for a
+    specific pod in a namespace to identify the root cause of the continuous crashing
+    and restarting.
+
+    2. Analyzing resource utilization and performance metrics of specific labeled
+    resources within a namespace to identify any potential bottlenecks or issues.
+
+    3. Investigating the configuration and status of a specific object (such as a
+    deployment or service) within a namespace to verify if it is functioning as expected.
+
+    4. Debugging networking issues by inspecting the network settings and connections
+    of resources with specific labels within a namespace.
+
+    5. Monitoring and analyzing logs and events for a specific object within a namespace
+    to troubleshoot any operational or functional issues.'
+- command: kubectl get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
+    -o=name --field-selector=status.phase=Running
+  doc_links: '
+
+    - [Kubernetes CLI Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
+
+    - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+
+    - [Kubernetes Labels and Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
+
+    - [Kubernetes Pods](https://kubernetes.io/docs/concepts/workloads/pods/pod/){:target="_blank"}'
+  explanation: This command retrieves the names of all pods in a specific namespace
+    and context that have certain resource labels and are currently running. It outputs
+    only the names of the pods as a result.
+  multi_line_details: "\n# The following command retrieves the names of all pods with\
+    \ specific labels and running in a particular namespace, using a specific context.\n\
+    \nkubectl get pods \\  # Uses the kubectl command-line tool to interact with Kubernetes\n\
+    \  -l ${RESOURCE_LABELS} \\  # Specifies the resource labels to filter the pods\n\
+    \  -n ${NAMESPACE} \\  # Specifies the namespace where the pods are located\n\
+    \  --context ${CONTEXT} \\  # Specifies the context for accessing the Kubernetes\
+    \ cluster\n  -o=name \\  # Formats the output to only display the names of the\
+    \ pods\n  --field-selector=status.phase=Running  # Filters the pods based on their\
+    \ running status\n"
+  name: get_postgres_pod_logs_events_for_cluster_object_name_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events to identify
+    and resolve issues with running pods.
+
+    2. Monitoring pod resources to ensure efficient utilization and scaling within
+    a specific namespace and context.
+
+    3. Identifying running pods with specific resource labels for debugging or performance
+    optimization purposes.
+
+    4. Automating routine tasks related to managing and monitoring pods in a Kubernetes
+    environment.
+
+    5. Providing developers with information on currently running pods with specific
+    resource labels for application debugging and development purposes.'
+- command: kubectl get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
+    -o=name --field-selector=status.phase=Running
+  doc_links: '
+
+    - [Kubernetes CLI Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
+
+    - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+
+    - [Kubernetes Labels and Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
+
+    - [Kubernetes Pods](https://kubernetes.io/docs/concepts/workloads/pods/pod/){:target="_blank"}'
+  explanation: This command retrieves the names of all pods in a specific namespace
+    and context that have certain resource labels and are currently running. It outputs
+    only the names of the pods as a result.
+  multi_line_details: "\n# The following command retrieves the names of all pods with\
+    \ specific labels and running in a particular namespace, using a specific context.\n\
+    \nkubectl get pods \\  # Uses the kubectl command-line tool to interact with Kubernetes\n\
+    \  -l ${RESOURCE_LABELS} \\  # Specifies the resource labels to filter the pods\n\
+    \  -n ${NAMESPACE} \\  # Specifies the namespace where the pods are located\n\
+    \  --context ${CONTEXT} \\  # Specifies the context for accessing the Kubernetes\
+    \ cluster\n  -o=name \\  # Formats the output to only display the names of the\
+    \ pods\n  --field-selector=status.phase=Running  # Filters the pods based on their\
+    \ running status\n"
+  name: get_postgres_pod_logs_events_for_cluster_object_name_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events to identify
+    and resolve issues with running pods.
+
+    2. Monitoring pod resources to ensure efficient utilization and scaling within
+    a specific namespace and context.
+
+    3. Identifying running pods with specific resource labels for debugging or performance
+    optimization purposes.
+
+    4. Automating routine tasks related to managing and monitoring pods in a Kubernetes
+    environment.
+
+    5. Providing developers with information on currently running pods with specific
+    resource labels for application debugging and development purposes.'
+- command: kubectl top pods -l ${RESOURCE_LABELS} --containers -n ${NAMESPACE} --context
+    ${CONTEXT}
+  doc_links: '
+
+    - [kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/){:target="_blank"}
+
+    - [Kubernetes Labels and Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
+
+    - [Monitoring Kubernetes Resource Usage](https://kubernetes.io/docs/tasks/debug-application-cluster/resource-usage-monitoring/){:target="_blank"}'
+  explanation: This command uses kubectl to show resource usage of pods with specific
+    labels, including individual container resource usage, in the specified namespace
+    and context.
+  multi_line_details: "# This command is used to get the resource usage of pods that\
+    \ match certain labels in a specific namespace and context\n# kubectl top - Display\
+    \ Resource (CPU/Memory) usage\n# pods - The resource type to display\n# -l ${RESOURCE_LABELS}\
+    \ - Labels to filter the pods by\n# --containers - Include containers in the resource\
+    \ usage\n# -n ${NAMESPACE} - Specify the namespace for the pods\n# --context ${CONTEXT}\
+    \ - Specify the context for the Kubernetes cluster\n\nkubectl top pods \\ # Command\
+    \ to display resource usage of pods\n  -l ${RESOURCE_LABELS} \\ # Filter the pods\
+    \ by specified labels\n  --containers \\ # Include containers in the resource\
+    \ usage\n  -n ${NAMESPACE} \\ # Specify the namespace for the pods\n  --context\
+    \ ${CONTEXT} # Specify the context for the Kubernetes cluster"
+  name: get_postgres_pod_resource_utilization_for_cluster_object_name_in_namespace_namespace
+  when_is_it_useful: '1. Monitoring and troubleshooting Kubernetes pods for high resource
+    usage or bottlenecks
+
+    2. Identifying and addressing performance issues in specific pods or containers
+
+    3. Investigating CrashLoopBackoff events to determine the cause and resolution
+
+    4. Analyzing resource consumption and utilization patterns for capacity planning
+
+    5. Debugging and resolving deployment issues related to pod resource allocation
+    and utilization restrictions.'
+- command: bash 'config_health.sh'
+  doc_links: '
+
+    - [Bash scripting guide](https://www.gnu.org/software/bash/manual/bash.html){:target="_blank"}
+
+    - [PostgreSQL Operator documentation (Crunchy)](https://access.crunchydata.com/documentation/postgres-operator/latest/){:target="_blank"}
+
+    - [PostgreSQL Operator documentation (Zalando)](https://github.com/zalando/postgres-operator){:target="_blank"}'
+  explanation: 'This script is a bash script that performs configuration checks on
+    two different types of PostgreSQL Operators: Crunchy and Zalando. It collects
+    reports and issues related to the configurations and outputs them in a JSON format.'
+  multi_line_details: "\n#!/bin/bash\n\n# Arrays to collect reports and issues\nCONFIG_REPORTS=()\n\
+    ISSUES=()\n\n# Function to generate an issue in JSON format and add to ISSUES\
+    \ array\ngenerate_issue() {\n  issue=$(cat <<EOF\n{\n  \"title\": \"Configuration\
+    \ issue for Postgres Cluster \\`$OBJECT_NAME\\` in \\`$NAMESPACE\\`\",\n  \"description\"\
+    : \"$1\",\n  \"parameter\": \"$2\",\n  \"current_value\": \"$3\",\n  \"expected_value\"\
+    : \"$4\"\n}\nEOF\n)\n  ISSUES+=(\"$issue\")\n}\n\n# Function to display configuration\
+    \ and perform sanity checks for CrunchyDB PostgreSQL Operator\ndisplay_crunchy_config()\
+    \ {\n  POD_NAME=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n \"$NAMESPACE\"\
+    \ --context \"$CONTEXT\" -l postgres-operator.crunchydata.com/role=master -o jsonpath=\"\
+    {.items[0].metadata.name}\")\n  \n  CONFIG=$(${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ exec -n \"$NAMESPACE\" \"$POD_NAME\" --context \"$CONTEXT\" -c \"$DATABASE_CONTAINER\"\
+    \ -- psql -U postgres -c \"SHOW ALL\")\n  \n  echo \"CrunchyDB PostgreSQL Configuration:\"\
+    \n  echo \"$CONFIG\"\n\n  CONFIG_REPORTS+=(\"CrunchyDB PostgreSQL Configuration:\\\
+    n$CONFIG\")\n\n  # Sanity Checks\n  echo \"Performing sanity checks...\"\n  if\
+    \ [[ \"$CONFIG\" == *\"shared_buffers\"* ]]; then\n    echo \"shared_buffers setting\
+    \ is present.\"\n  else\n    generate_issue \"Missing critical configuration parameter\"\
+    \ \"shared_buffers\" \"None\" \"Expected to be present\"\n  fi\n\n  if [[ \"$CONFIG\"\
+    \ == *\"max_connections\"* ]]; then\n    echo \"max_connections setting is present.\"\
+    \n  else\n    generate_issue \"Missing critical configuration parameter\" \"max_connections\"\
+    \ \"None\" \"Expected to be present\"\n  fi\n\n  # Example additional sanity check\
+    \ for max_connections\n  MAX_CONNECTIONS=$(echo \"$CONFIG\" | grep -i max_connections\
+    \ | awk '{print $3}')\n  if (( MAX_CONNECTIONS < 100 )); then\n    generate_issue\
+    \ \"max_connections is set to less than 100\" \"max_connections\" \"$MAX_CONNECTIONS\"\
+    \ \">= 100\"\n  else\n    echo \"max_connections setting is adequate.\"\n  fi\n\
+    \n  # Check if PgBouncer is deployed in the status\n  PGB_READY=$(${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ get postgresclusters.postgres-operator.crunchydata.com \"$OBJECT_NAME\" -n \"\
+    $NAMESPACE\" --context \"$CONTEXT\" -o jsonpath=\"{.status.proxy.pgBouncer.readyReplicas}\"\
+    )\n  if [[ \"$PGB_READY\" -gt 0 ]]; then\n    PGB_CONFIGMAP_NAME=$(${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ get configmap -l postgres-operator.crunchydata.com/role=pgbouncer  -n \"$NAMESPACE\"\
+    \ --context \"$CONTEXT\" -o jsonpath=\"{.items[0].metadata.name}\")\n    display_pgbouncer_config\
+    \ \"$PGB_CONFIGMAP_NAME\"\n  else {\n    echo \"PgBouncer is not deployed for\
+    \ CrunchyDB in the namespace $NAMESPACE.\"\n  }\n  fi\n}\n\n# Function to display\
+    \ configuration and perform sanity checks for Zalando PostgreSQL Operator\ndisplay_zalando_config()\
+    \ {\n  POD_NAME=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n \"$NAMESPACE\"\
+    \ --context \"$CONTEXT\" -l application=spilo -o jsonpath=\"{.items[0].metadata.name}\"\
+    )\n\n  CONFIG=$(${KUBERNETES_DISTRIBUTION_BINARY} exec -n \"$NAMESPACE\" \"$POD_NAME\"\
+    \ --context \"$CONTEXT\" -c \"$DATABASE_CONTAINER\" -- psql -U postgres -c \"\
+    SHOW ALL\")\n  \n  echo \"Zalando PostgreSQL Configuration:\"\n  echo \"$CONFIG\"\
+    \n\n  CONFIG_REPORTS+=(\"Zalando PostgreSQL Configuration:\\n$CONFIG\")\n\n  #\
+    \ Sanity Checks\n  echo \"Performing sanity checks...\"\n  if [[ \"$CONFIG\" ==\
+    \ *\"shared_buffers\"* ]]; then\n    echo \"shared_buffers setting is present.\"\
+    \n  else\n    generate_issue \"Missing critical configuration parameter\" \"shared_buffers\"\
+    \ \"None\" \"Expected to be present\"\n  fi\n\n  if [[ \"$CONFIG\" == *\"max_connections\"\
+    * ]]; then\n    echo \"max_connections setting is present.\"\n  else\n    generate_issue\
+    \ \"Missing critical configuration parameter\" \"max_connections\" \"None\" \"\
+    Expected to be present\"\n  fi\n\n  # Example additional sanity check for max_connections\n\
+    \  MAX_CONNECTIONS=$(echo \"$CONFIG\" | grep -i max_connections | awk '{print\
+    \ $3}')\n  if (( MAX_CONNECTIONS < 100 )); then\n    generate_issue \"max_connections\
+    \ is set to less than 100\" \"max_connections\" \"$MAX_CONNECTIONS\" \">= 100\"\
+    \n  else\n    echo \"max_connections setting is adequate.\"\n  fi\n\n  # Check\
+    \ for PgBouncer\n  PGB_LABEL=\"application=pgbouncer\"\n  display_pgbouncer_config\
+    \ \"$PGB_LABEL\"\n}\n\n# Function to display configuration and perform sanity\
+    \ checks for PgBouncer\ndisplay_pgbouncer_config() {\n  CONFIGMAP_NAME=$1\n  \n\
+    \  if [ -z \"$CONFIGMAP_NAME\" ]; then\n    echo \"PgBouncer ConfigMap is not\
+    \ found in the namespace $NAMESPACE.\"\n    return\n  fi\n  \n  CONFIG=$(${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ get configmap \"$CONFIGMAP_NAME\" -n \"$NAMESPACE\" --context \"$CONTEXT\" -o\
+    \ jsonpath='{.data.pgbouncer\\.ini}')\n  \n  echo \"PgBouncer Configuration:\"\
+    \n  echo \"$CONFIG\"\n\n  CONFIG_REPORTS+=(\"PgBouncer Configuration:\\n$CONFIG\"\
+    )\n\n  # Sanity Checks\n  echo \"Performing sanity checks...\"\n  if grep -q \"\
+    max_client_conn\" <<< \"$CONFIG\"; then\n    echo \"max_client_conn setting is\
+    \ present.\"\n  else\n    generate_issue \"Missing critical configuration parameter\"\
+    \ \"max_client_conn\" \"None\" \"Expected to be present\"\n  fi\n\n  # Example\
+    \ additional sanity check for max_client_conn\n  MAX_CLIENT_CONN=$(grep -i max_client_conn\
+    \ <<< \"$CONFIG\" | awk -F'=' '{print $2}' | tr -d ' ')\n  if (( MAX_CLIENT_CONN\
+    \ < 100 )); then\n    generate_issue \"max_client_conn is set to less than 100\"\
+    \ \"max_client_conn\" \"$MAX_CLIENT_CONN\" \">= 100\"\n  else\n    echo \"max_client_conn\
+    \ setting is adequate.\"\n  fi\n}\n\nif [[ \"$OBJECT_API_VERSION\" == *\"crunchydata.com\"\
+    * ]]; then\n  display_crunchy_config\nelif [[ \"$OBJECT_API_VERSION\" == *\"zalan.do\"\
+    * ]]; then\n  display_zalando_config\nelse\n  echo \"Unsupported API version.\
+    \ Please specify a valid API version containing 'crunchydata.com' or 'zalan.do'.\"\
+    \nfi\n\n# Print the configuration reports and issues\nOUTPUT_FILE=\"../config_report.out\"\
+    \n\necho \"Configuration Report:\" > \"$OUTPUT_FILE\"\nfor report in \"${CONFIG_REPORTS[@]}\"\
+    ; do\n  echo -e \"$report\" >> \"$OUTPUT_FILE\"\ndone\n\necho \"\" >> \"$OUTPUT_FILE\"\
+    \necho \"Issues:\" >> \"$OUTPUT_FILE\"\necho \"[\" >> \"$OUTPUT_FILE\"\nfor issue\
+    \ in \"${ISSUES[@]}\"; do\n  echo \"$issue,\" >> \"$OUTPUT_FILE\"\ndone\n# Remove\
+    \ the last comma and close the JSON array\nsed -i '$ s/,$//' \"$OUTPUT_FILE\"\n\
+    echo \"]\" >> \"$OUTPUT_FILE\"\n\necho \"Configuration report and issues have\
+    \ been written to $OUTPUT_FILE.\"\n\nThese comments provide explanations, contexts,\
+    \ examples, and clarifications that would help newer or less experienced devops\
+    \ engineers understand the purpose and functionality of each part of the script."
+  name: get_running_postgres_configuration_for_cluster_object_name_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events related
+    to Crunchy and Zalando PostgreSQL Operators.
+
+    2. Performing regular configuration checks on the PostgreSQL Operators to ensure
+    they are properly configured and optimized for performance.
+
+    3. Collecting reports and issues related to the configurations of the PostgreSQL
+    Operators and identifying any potential vulnerabilities or security concerns.
+
+    4. Generating JSON formatted output of the configuration checks for further analysis
+    and reporting.
+
+    5. Automating the process of checking and monitoring the PostgreSQL Operators''
+    configurations to ensure they are always up-to-date and compliant with best practices.'
+- command: kubectl exec $(kubectl get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context
+    ${CONTEXT} -o jsonpath='{.items[0].metadata.name}') -n ${NAMESPACE} --context
+    ${CONTEXT} -c ${DATABASE_CONTAINER} -- patronictl list
+  doc_links: '
+
+    - [kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+
+    - [patronictl Documentation](https://patroni.readthedocs.io/en/latest/patronictl.html){:target="_blank"}
+
+    - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+
+    - [Kubernetes Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
+
+    - [Managing Stateful Applications in Kubernetes](https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/){:target="_blank"}'
+  explanation: This command uses kubectl to execute a patronictl command in the specified
+    namespace and context, targeting a specific database container within a workload.
+    It is often used for troubleshooting or managing database clusters in Kubernetes.
+  multi_line_details: '
+
+    # Retrieve the name of the pod associated with the specified workload in the given
+    namespace and context
+
+    POD_NAME=$(kubectl get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context ${CONTEXT}
+    -o jsonpath=''{.items[0].metadata.name}'')
+
+
+    # Execute a command inside the specified pod, namespace, and context, targeting
+    a specific container
+
+    kubectl exec $POD_NAME -n ${NAMESPACE} --context ${CONTEXT} -c ${DATABASE_CONTAINER}
+    -- patronictl list
+
+
+
+    In the first line, we use `kubectl get pods` to retrieve information about the
+    pods associated with the specified workload, namespace, and context. We then use
+    `jsonpath` to extract the name of the pod and store it in the variable `POD_NAME`.
+
+
+    In the second line, we use `kubectl exec` to execute a command inside the specified
+    pod, namespace, and context. We also specify the target container using the `-c`
+    flag, and then run the command `patronictl list` within that container.'
+  name: get_patroni_output_and_add_to_report_for_cluster_object_name_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting a database cluster in Kubernetes that is
+    experiencing CrashLoopBackoff events, to identify the root cause and resolve the
+    issue.
+
+    2. Managing and optimizing database replication and failover processes within
+    a Kubernetes environment.
+
+    3. Performing maintenance or upgrades on database containers within a Kubernetes
+    workload.
+
+    4. Monitoring and adjusting resource allocation for database containers based
+    on usage patterns and performance metrics.
+
+    5. Investigating and resolving connectivity or configuration issues between database
+    containers and other components within a Kubernetes cluster.'
+- command: kubectl exec $(kubectl get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context
+    ${CONTEXT} -o jsonpath='{.items[0].metadata.name}') -n ${NAMESPACE} --context
+    ${CONTEXT} -c ${DATABASE_CONTAINER} -- patronictl list -f json
+  doc_links: '
+
+    - [kubectl command overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+
+    - [patronictl documentation](https://www.postgresql.org/docs/patroni/latest/patronictl.html){:target="_blank"}
+
+    - [Kubernetes namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+
+    - [Kubernetes contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/){:target="_blank"}'
+  explanation: This command is using kubectl to execute a patronictl list command
+    in a specific pod and container within a Kubernetes cluster. It's pulling information
+    about the pods and containers from the specified namespace and context.
+  multi_line_details: '
+
+    # Set variables for better readability and reusability
+
+    WORKLOAD_NAME="your-workload-name"
+
+    NAMESPACE="your-namespace"
+
+    CONTEXT="your-context"
+
+    DATABASE_CONTAINER="your-database-container"
+
+
+    # Get the pod name of the specified workload in the specified namespace and context
+
+    POD_NAME=$(kubectl get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context ${CONTEXT}
+    -o jsonpath=''{.items[0].metadata.name}'')
+
+
+    # Execute a command inside the specified pod, namespace, and context, targeting
+    the specified database container
+
+    kubectl exec $POD_NAME -n ${NAMESPACE} --context ${CONTEXT} -c ${DATABASE_CONTAINER}
+    -- patronictl list -f json
+
+    '
+  name: fetch_patroni_database_lag_for_cluster_object_name_in_namespace_namespace
+  when_is_it_useful: '1. Investigating and diagnosing issues related to Kubernetes
+    CrashLoopBackoff events or pods failing to start properly.
+
+
+    2. Checking the status of pods and containers within a specific namespace in a
+    Kubernetes cluster to ensure they are running as expected.
+
+
+    3. Troubleshooting performance issues or errors occurring within a specific pod
+    or container in a Kubernetes cluster.
+
+
+    4. Monitoring the health and status of pods and containers to ensure they are
+    properly functioning and meeting service level objectives.
+
+
+    5. Performing routine checks and audits of pods and containers within a Kubernetes
+    cluster to maintain optimal system reliability and availability.'
+- command: bash 'backup_health.sh'
+  doc_links: '
+
+    - [Bash shell scripting tutorial](https://www.tutorialspoint.com/unix/unix-shell-scripting.htm){:target="_blank"}
+
+    - [Postgres backup commands documentation](https://www.postgresql.org/docs/current/backup.html){:target="_blank"}
+
+    - [Kubernetes operator documentation](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/){:target="_blank"}'
+  explanation: This script is a Bash shell script that checks the health of backups
+    for Postgres clusters managed by two different Kubernetes operators - CrunchyDB
+    and Zalando PostgreSQL. It generates a report on the status of the backups and
+    any issues encountered, based on the maximum acceptable age for the backup.
+  multi_line_details: "\n#!/bin/bash\n\n# Set the maximum acceptable age of the backup\
+    \ (in seconds) based on BACKUP_MAX_AGE environment variable\nMAX_AGE=$((BACKUP_MAX_AGE\
+    \ * 3600))\n# Arrays to store backup reports and issues\nBACKUP_REPORTS=()\nISSUES=()\n\
+    \n# Function to generate an issue in JSON format\ngenerate_issue() {\n  cat <<EOF\n\
+    {\n    \"title\": \"Backup health issue for Postgres Cluster \\`$OBJECT_NAME\\\
+    ` in \\`$NAMESPACE\\`\",\n    \"description\": \"$1\",\n    \"backup_completion_time\"\
+    : \"$2\",\n    \"backup_age_hours\": \"$3\"\n}\nEOF\n}\n\n# Function to check\
+    \ CrunchyDB PostgreSQL Operator backup\ncheck_crunchy_backup() {\n  POSTGRES_CLUSTER_JSON=$(${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ get postgresclusters.postgres-operator.crunchydata.com $OBJECT_NAME -n \"$NAMESPACE\"\
+    \ --context \"$CONTEXT\" -o json)\n  LATEST_BACKUP_TIME=$(echo \"$POSTGRES_CLUSTER_JSON\"\
+    \ | jq -r '.status.pgbackrest.scheduledBackups | max_by(.completionTime) | .completionTime')\n\
+    \  \n  LATEST_BACKUP_TIMESTAMP=$(date -d \"$LATEST_BACKUP_TIME\" +%s)\n  CURRENT_TIMESTAMP=$(date\
+    \ +%s)\n  BACKUP_AGE=$((CURRENT_TIMESTAMP - LATEST_BACKUP_TIMESTAMP))\n  BACKUP_AGE_HOURS=$(awk\
+    \ \"BEGIN {print $BACKUP_AGE/3600}\")\n\n  BACKUP_REPORTS+=(\"CrunchyDB Backup\
+    \ completed at $LATEST_BACKUP_TIME with age $BACKUP_AGE_HOURS hours.\")\n\n  if\
+    \ [ \"$BACKUP_AGE\" -gt \"$MAX_AGE\" ]; then\n    ISSUES+=(\"$(generate_issue\
+    \ \"The latest backup for the CrunchyDB PostgreSQL cluster \\`$OBJECT_NAME\\`\
+    \ is older than the acceptable limit of $BACKUP_MAX_AGE hour(s).\" \"$LATEST_BACKUP_TIME\"\
+    \ \"$BACKUP_AGE_HOURS\")\")\n  else\n    BACKUP_REPORTS+=(\"CrunchyDB Backup is\
+    \ healthy. Latest backup completed at $LATEST_BACKUP_TIME.\")\n  fi\n}\n\n# Function\
+    \ to check Zalando PostgreSQL Operator backup\ncheck_zalando_backup() {\n  # Assuming\
+    \ that we need to log in to the database to check backup status\n  POD_NAME=$(${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ get pods -n \"$NAMESPACE\" --context \"$CONTEXT\" -l application=spilo -o jsonpath=\"\
+    {.items[0].metadata.name}\")\n\n  LATEST_BACKUP_TIME=$(${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ exec -n \"$NAMESPACE\" \"$POD_NAME\" --context \"$CONTEXT\" -c \"$DATABASE_CONTAINER\"\
+    \ -- bash -c 'psql -U postgres -t -c \"SELECT MAX(backup_time) FROM pg_stat_archiver;\"\
+    ')\n  LATEST_BACKUP_TIMESTAMP=$(date -d \"$LATEST_BACKUP_TIME\" +%s)\n  CURRENT_TIMESTAMP=$(date\
+    \ +%s)\n  BACKUP_AGE=$((CURRENT_TIMESTAMP - LATEST_BACKUP_TIMESTAMP))\n  BACKUP_AGE_HOURS=$(awk\
+    \ \"BEGIN {print $BACKUP_AGE/3600}\")\n\n  BACKUP_REPORTS+=(\"Zalando Backup completed\
+    \ at $LATEST_BACKUP_TIME with age $BACKUP_AGE_HOURS hours.\")\n\n  if [ \"$BACKUP_AGE\"\
+    \ -gt \"$MAX_AGE\" ]; then\n    ISSUES+=(\"$(generate_issue \"The latest backup\
+    \ for the Zalando PostgreSQL cluster is older than the acceptable limit of $BACKUP_MAX_AGE\
+    \ hour(s).\" \"$LATEST_BACKUP_TIME\" \"$BACKUP_AGE_HOURS\")\")\n  else\n    BACKUP_REPORTS+=(\"\
+    Zalando Backup is healthy. Latest backup completed at $LATEST_BACKUP_TIME.\")\n\
+    \  fi\n}\n\n# Check the backup based on API version\nif [[ \"$OBJECT_API_VERSION\"\
+    \ == *\"crunchydata.com\"* ]]; then\n  check_crunchy_backup\nelif [[ \"$OBJECT_API_VERSION\"\
+    \ == *\"zalan.do\"* ]]; then\n  check_zalando_backup\nelse\n  echo \"Unsupported\
+    \ API version: $OBJECT_API_VERSION. Please specify a valid API version containing\
+    \ 'postgres-operator.crunchydata.com' or 'acid.zalan.do'.\"\nfi\n\nOUTPUT_FILE=\"\
+    ../backup_report.out\"\nrm -f $OUTPUT_FILE\n\n# Print the backup reports and issues\n\
+    echo \"Backup Report:\" > \"$OUTPUT_FILE\"\necho \"Maximum age for last backup\
+    \ is set to: $BACKUP_MAX_AGE hour(s)\"  >> \"$OUTPUT_FILE\"\nfor report in \"\
+    ${BACKUP_REPORTS[@]}\"; do\n  echo \"$report\" >> \"$OUTPUT_FILE\"\ndone\n\necho\
+    \ \"\" >> \"$OUTPUT_FILE\"\necho \"Issues:\" >> \"$OUTPUT_FILE\"\necho \"[\" >>\
+    \ \"$OUTPUT_FILE\"\nfor issue in \"${ISSUES[@]}\"; do\n  echo \"$issue,\" >> \"\
+    $OUTPUT_FILE\"\ndone\n# Remove the last comma and close the JSON array\nsed -i\
+    \ '$ s/,$//' \"$OUTPUT_FILE\"\necho \"]\" >> \"$OUTPUT_FILE\"\n"
+  name: check_database_backup_status_for_cluster_object_name_in_namespace_namespace
+  when_is_it_useful: '1. Monitoring and maintaining backup health for Postgres clusters
+    managed by CrunchyDB and Zalando PostgreSQL operators in a Kubernetes environment.
+
+    2. Automating backup health checks and report generation for Postgres clusters
+    to ensure data reliability and availability.
+
+    3. Troubleshooting and identifying any issues with backup processes, such as backup
+    failures or exceeding the maximum acceptable age for backups.
+
+    4. Ensuring compliance with backup policies and best practices for data protection
+    and disaster recovery.
+
+    5. Providing oversight of backup processes for Postgres clusters to prevent data
+    loss and mitigate risks associated with potential backups.'
+- command: bash 'dbquery.sh'
+  doc_links: '
+
+    - [PostgreSQL Operators in Kubernetes](https://www.postgresql.org/docs/){:target="_blank"}
+
+    - [Kubernetes Health Checks](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/){:target="_blank"}
+
+    - [JSON Output Format](https://www.json.org/json-en.html){:target="_blank"}'
+  explanation: This script is designed to execute health queries for different versions
+    of PostgreSQL operators in a Kubernetes environment. It generates a report of
+    query results and any issues encountered during execution, and then writes the
+    report to an output file in JSON format.
+  multi_line_details: "\n#!/bin/bash\n\n# Arrays to collect reports and issues\nQUERY_REPORTS=()\n\
+    ISSUES=()\n\n# Function to sanitize a string for JSON compatibility\nsanitize_string()\
+    \ {\n  echo \"$1\" | sed 's/[\"]/ /g' | tr '\\n' ' ' | tr '\\r' ' '\n}\n\n# Function\
+    \ to generate an issue in JSON format and add to ISSUES array\ngenerate_issue()\
+    \ {\n  local description=$(sanitize_string \"$1\")\n  local query=$(sanitize_string\
+    \ \"$2\")\n  local error=$(sanitize_string \"$3\")\n\n  issue=$(cat <<EOF\n{\n\
+    \  \"title\": \"Health Query Issue\",\n  \"description\": \"$1\",\n  \"description\"\
+    : \"$description\",\n  \"query\": \"$query\",\n  \"error\": \"$error\"\n}\nEOF\n\
+    )\n  ISSUES+=(\"$issue\")\n}\n\n# Function to execute health queries for CrunchyDB\
+    \ PostgreSQL Operator\nexecute_crunchy_queries() {\n  # Getting the name of the\
+    \ pod\n  POD_NAME=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n \"$NAMESPACE\"\
+    \ --context \"$CONTEXT\" -l postgres-operator.crunchydata.com/role=master -o jsonpath=\"\
+    {.items[0].metadata.name}\")\n  \n  # Iterating through each health query and\
+    \ executing it\n  while IFS= read -r query; do\n    echo \"Executing query: $query\"\
+    \n    result=$(${KUBERNETES_DISTRIBUTION_BINARY} exec -n \"$NAMESPACE\" \"$POD_NAME\"\
+    \ --context \"$CONTEXT\" --container \"$DATABASE_CONTAINER\" -- bash -c \"psql\
+    \ -U postgres -c \\\"$query\\\"\" 2>&1)\n    if [ $? -eq 0 ]; then\n      echo\
+    \ \"Query executed successfully.\"\n      QUERY_REPORTS+=(\"Query: $query\\nResult:\\\
+    n$result\\n\")\n    else\n      echo \"Query execution failed.\"\n      generate_issue\
+    \ \"Failed to execute health query\" \"$query\" \"$result\"\n    fi\n  done <<<\
+    \ \"$HEALTH_QUERIES\"\n}\n\n# Function to execute health queries for Zalando PostgreSQL\
+    \ Operator\nexecute_zalando_queries() {\n  # Getting the name of the pod\n  POD_NAME=$(${KUBERNETES_DISTRIBUTION_BINARY}\
+    \ get pods -n \"$NAMESPACE\" --context \"$CONTEXT\" -l application=spilo -o jsonpath=\"\
+    {.items[0].metadata.name}\")\n  \n  # Iterating through each health query and\
+    \ executing it\n  while IFS= read -r query; do\n    echo \"Executing query: $query\"\
+    \n    result=$(${KUBERNETES_DISTRIBUTION_BINARY} exec -n \"$NAMESPACE\" \"$POD_NAME\"\
+    \ --context \"$CONTEXT\" --container \"$DATABASE_CONTAINER\" -- bash -c \"psql\
+    \ -U postgres -c \\\"$query\\\"\" 2>&1)\n    if [ $? -eq 0 ]; then\n      echo\
+    \ \"Query executed successfully.\"\n      QUERY_REPORTS+=(\"Query: $query\\nResult:\\\
+    n$result\\n\")\n    else\n      echo \"Query execution failed.\"\n      generate_issue\
+    \ \"Failed to execute health query\" \"$query\" \"$result\"\n    fi\n  done <<<\
+    \ \"$HEALTH_QUERIES\"\n}\n\n# Setting up health queries based on the OBJECT_API_VERSION\n\
+    HEALTH_QUERIES=$QUERY\n\nif [[ \"$OBJECT_API_VERSION\" == *\"crunchydata.com\"\
+    * ]]; then\n  execute_crunchy_queries\nelif [[ \"$OBJECT_API_VERSION\" == *\"\
+    zalan.do\"* ]]; then\n  execute_zalando_queries\nelse\n  echo \"Unsupported API\
+    \ version. Please specify a valid API version containing 'crunchydata.com' or\
+    \ 'zalan.do'.\"\nfi\n\n# Print the query reports and issues\nOUTPUT_FILE=\"../health_query_report.out\"\
+    \n\necho \"Health Query Report:\" > \"$OUTPUT_FILE\"\nfor report in \"${QUERY_REPORTS[@]}\"\
+    ; do\n  echo -e \"$report\" >> \"$OUTPUT_FILE\"\ndone\n\necho \"\" >> \"$OUTPUT_FILE\"\
+    \necho \"Issues:\" >> \"$OUTPUT_FILE\"\necho \"[\" >> \"$OUTPUT_FILE\"\nfor issue\
+    \ in \"${ISSUES[@]}\"; do\n  echo \"$issue,\" >> \"$OUTPUT_FILE\"\ndone\n# Remove\
+    \ the last comma and close the JSON array\nsed -i '$ s/,$//' \"$OUTPUT_FILE\"\n\
+    echo \"]\" >> \"$OUTPUT_FILE\"\n\necho \"Health query report and issues have been\
+    \ written to $OUTPUT_FILE.\"\n"
+  name: run_db_queries_for_cluster_object_name_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might need to use the script to perform health queries
+    for PostgreSQL operators in a Kubernetes environment to identify any issues with
+    the PostgreSQL instances that could be causing the CrashLoopBackoff events.
+
+
+    2. Monitoring and alerting: The script can be used to regularly execute health
+    queries for PostgreSQL operators and generate reports for monitoring purposes.
+    If any issues are encountered during execution, alerts can be triggered to notify
+    the team of potential problems.
+
+
+    3. Performance tuning: By running the script to execute health queries for PostgreSQL
+    operators, a DevOps or Site Reliability Engineer can analyze the query results
+    to identify any performance bottlenecks or areas for optimization in the Kubernetes
+    environment.
+
+
+    4. Capacity planning: The script can be used to gather information on the health
+    of PostgreSQL instances in a Kubernetes environment, which can then be used for
+    capacity planning purposes to ensure that the infrastructure can support the expected
+    workload.
+
+
+    5. Maintenance and upgrades: When performing maintenance tasks or upgrades in
+    the Kubernetes environment, the script can be used to verify the health of PostgreSQL
+    operators and identify any issues that need to be addressed before proceeding
+    with the maintenance or upgrade.'

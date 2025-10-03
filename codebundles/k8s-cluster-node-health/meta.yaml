@@ -1,0 +1,90 @@
+commands:
+- command: bash 'node_restart_check.sh'
+  doc_links: '
+
+    - [Kubernetes Events API](https://kubernetes.io/docs/reference/using-api/api-concepts/#kubernetes-api){:target="_blank"}
+
+    - [Bash scripting tutorial](https://ryanstutorials.net/bash-scripting-tutorial/){:target="_blank"}
+
+    - [Preemptible VMs in GCP](https://cloud.google.com/preemptible-vms){:target="_blank"}
+
+    - [Spot Instances in AWS](https://aws.amazon.com/ec2/spot/){:target="_blank"}'
+  explanation: This script is a Bash shell script to get node-related events within
+    a specified time range in a Kubernetes context. It summarizes the events based
+    on nodes and categorizes them as preemptible/spot instances for different cloud
+    providers, finding unique nodes started and stopped.
+  multi_line_details: "\n#!/bin/bash\n\n# Read the context passed as an environment\
+    \ variable\ncontext=$CONTEXT\n\n# Set the time interval for fetching the events\
+    \ (e.g., 24 hours)\ninterval=$INTERVAL\n\n# Get the current date and time in ISO\
+    \ 8601 format\nCURRENT_DATE=$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")\n\n# Calculate\
+    \ the start date for the specified time interval using GNU date\nSTART_DATE=$(date\
+    \ -u -d \"$interval ago\" +\"%Y-%m-%dT%H:%M:%SZ\")\n\n# Fetch all node-related\
+    \ events within the specified time range using Kubernetes kubectl command and\
+    \ output it to a file\nkubectl get events -A --context $context \\\n  --field-selector\
+    \ involvedObject.kind=Node \\\n  --output=jsonpath='{range .items[*]}{.lastTimestamp}{\"\
+    \ \"}{.involvedObject.name}{\" \"}{.reason}{\" \"}{.message}{\"\\n\"}{end}' \\\
+    \n  | awk -v start=\"$START_DATE\" -v end=\"$CURRENT_DATE\" '$1 >= start && $1\
+    \ <= end' \\\n  | grep -E \"(Preempt|Shutdown|Drain|Termination|Removed|RemovingNode|Deleted|NodeReady|RegisteredNode)\"\
+    \ \\\n  | sort | uniq > node_events.txt\n\n# Function to check if a node is preemptible/spot\
+    \ based on annotations or labels\ncheck_preemptible_node() {\n    node=$1\n  \
+    \  # Check for the presence of the preemptible/spot-related annotations or labels\
+    \ for GCP, AWS, and Azure\n    is_preemptible=$(kubectl get node \"$node\" -o\
+    \ jsonpath='{.metadata.labels.cloud\\.google\\.com/gke-preemptible}' 2>/dev/null)\n\
+    \    is_spot=$(kubectl get node \"$node\" -o jsonpath='{.metadata.labels.eks\\\
+    .amazonaws\\.com/capacityType}' 2>/dev/null)\n    is_azure_spot=$(kubectl get\
+    \ node \"$node\" -o jsonpath='{.metadata.labels.kubernetes\\.azure\\.com/scalesetpriority}'\
+    \ 2>/dev/null)\n    \n    # Output the result based on the presence of annotations\
+    \ or labels\n    if [[ \"$is_preemptible\" == \"true\" ]]; then\n        echo\
+    \ \"Preemptible (GCP)\"\n    elif [[ \"$is_spot\" == \"SPOT\" ]]; then\n     \
+    \   echo \"Spot (AWS)\"\n    elif [[ \"$is_azure_spot\" == \"spot\" ]]; then\n\
+    \        echo \"Spot (Azure)\"\n    else\n        echo \"Unidentified/Unplanned\"\
+    \n    fi\n}\n\n# Track unique nodes started and stopped using associative arrays\n\
+    declare -A nodes_started\ndeclare -A nodes_stopped\n\n# Read the node events from\
+    \ the file and summarize by node\nwhile read -r line; do\n    node=$(echo \"$line\"\
+    \ | awk '{print $2}')\n    preempt_status=$(check_preemptible_node \"$node\")\n\
+    \    \n    # Print node summary and determine if the node was started or stopped\n\
+    \    if [[ ! \"$current_node\" == \"$node\" ]]; then\n        if [[ -n \"$current_node\"\
+    \ ]]; then\n            echo \"\"  # Empty line between different nodes for readability\n\
+    \        fi\n        echo \"Node: $node\"\n        echo \"Type: $preempt_status\"\
+    \n        echo \"Activities:\"\n        current_node=\"$node\"\n    fi\n    \n\
+    \    # Determine if the node was started or stopped and store the information\
+    \ in the associative arrays\n    if echo \"$line\" | grep -qE \"(NodeReady|RegisteredNode)\"\
+    ; then\n        nodes_started[\"$node\"]=1\n    elif echo \"$line\" | grep -qE\
+    \ \"(Shutdown|Preempt|Termination|Removed)\"; then\n        nodes_stopped[\"$node\"\
+    ]=1\n    fi\n    \n    # Print the event details for the node\n    echo \"  -\
+    \ $line\"\ndone < node_events.txt\n\n# Summary of unique nodes started and stopped\n\
+    unique_nodes_started=${#nodes_started[@]}\nunique_nodes_stopped=${#nodes_stopped[@]}\n\
+    total_node_events=$((unique_nodes_started + unique_nodes_stopped))\n\n# Print\
+    \ the summary of unique nodes started, stopped, and total start/stop events\n\
+    echo \"\"\necho \"Summary:\"\necho \"Unique nodes started: $unique_nodes_started\"\
+    \necho \"Unique nodes stopped: $unique_nodes_stopped\"\necho \"Total start/stop\
+    \ events: $total_node_events\"\n"
+  name: check_for_node_restarts_in_cluster_context_within_interval_interval
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: A DevOps
+    or Site Reliability Engineer might use this script to gather node-related events
+    and identify any patterns or issues that could be causing pods to enter a CrashLoopBackoff
+    state.
+
+
+    2. Monitoring and managing preemptible/spot instances: For organizations using
+    preemptible or spot instances from different cloud providers, a DevOps or Site
+    Reliability Engineer could use this script to track the starting and stopping
+    of unique nodes and ensure they are being utilized effectively.
+
+
+    3. Investigating node failures or disruptions: If there are recurring issues with
+    nodes failing or experiencing disruptions in a Kubernetes cluster, this script
+    can help DevOps or Site Reliability Engineers to identify any specific nodes that
+    are frequently starting or stopping, and potentially causing problems in the cluster.
+
+
+    4. Capacity planning and optimization: By analyzing the events related to node
+    startups and shutdowns, DevOps or Site Reliability Engineers can use this script
+    to gain insights into the overall capacity usage of the Kubernetes cluster and
+    make informed decisions about resource allocation and optimization.
+
+
+    5. Cloud cost management: For organizations looking to optimize their cloud costs,
+    this script can provide valuable information about the usage of preemptible or
+    spot instances from different cloud providers, allowing DevOps or SREs to identify
+    opportunities for cost savings or better utilization of resources.'

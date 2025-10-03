@@ -1,0 +1,23 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+    - resourceTypes:
+        - namespace
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: ns-health
+          levelOfDetail: basic
+          qualifiers: ["namespace", "cluster"]
+          baseTemplateName: k8s-namespace-healthcheck
+          outputItems:
+            - type: slx
+            - type: sli
+            # - type: slo
+            - type: runbook
+              templateName: k8s-namespace-healthcheck-taskset.yaml
+            - type: workflow

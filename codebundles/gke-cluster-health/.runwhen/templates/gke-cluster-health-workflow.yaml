@@ -1,0 +1,25 @@
+apiVersion: runwhen.com/v1
+kind: Workflow
+metadata:
+  name: {{slx_name}}-{{ "GKE Health Alert Workflow" | replace(" ", "-") | lower }}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  fromActivities:
+  - displayName:  {{match_resource.resource.project_id}} GKE Health Alert Workflow
+    description: Start RunSession with Eager Edgar when SLI is alerting for GKE clusters in {{match_resource.resource.project_id}}
+    actions:
+    - tasks:
+        slx: {{slx_name.split('--')[1]}}
+        persona: eager-edgar
+        titles:
+          - '*'
+        sessionTTL: 20m
+    match:
+      activityVerbs:
+      - SLI_ALERTS_STARTED
+      slxs:
+      - {{slx_name.split('--')[1]}}
+    name:  {{match_resource.resource.project_id}}-{{ "GKE Health Alert Workflow" | replace(" ", "-") | lower }}

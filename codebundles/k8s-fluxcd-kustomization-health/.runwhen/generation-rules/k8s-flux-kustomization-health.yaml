@@ -1,0 +1,23 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+    - resourceTypes:
+        - kustomizations.kustomize.toolkit.fluxcd.io
+      matchRules:
+        - type: and
+          matches:
+            - type: pattern
+              pattern: ".+"
+              properties: [name]
+              mode: substring
+      slxs:
+        - baseName: flux-kstmz
+          qualifiers: ["namespace", "cluster"]
+          baseTemplateName: k8s-flux-kustomize-health
+          levelOfDetail: detailed
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: k8s-flux-kustomize-health-taskset.yaml

@@ -1,0 +1,31 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+    - resourceTypes:
+        - ingress
+      matchRules:
+        - type: and
+          matches:
+            - type: pattern
+              pattern: ".+"
+              properties: [name]
+              mode: substring
+            - type: pattern
+              pattern: "networking.gke.io/ingress-finalizer-V2"
+              properties: [metadata/finalizers]
+              mode: substring
+            - resourceType: variables
+              type: pattern
+              pattern: "gcp"
+              properties: [custom/cloud_provider]
+              mode: substring
+      slxs:
+        - baseName: ingress-gce-health
+          qualifiers: ["resource", "namespace", "cluster"]
+          baseTemplateName: k8s-ingress-gce-healthcheck
+          levelOfDetail: detailed
+          outputItems:
+            - type: slx
+            - type: runbook
+              templateName: k8s-ingress-gce-healthcheck-taskset.yaml

@@ -1,0 +1,242 @@
+commands:
+- command: kubectl get all -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT}
+    && kubectl describe ${OBJECT_KIND} ${OBJECT_NAME} -n ${NAMESPACE} --context ${CONTEXT}
+  doc_links: '
+
+    - [Retrieve all resources with specific labels in a particular namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/){:target="_blank"}
+
+    - [Detailed information about a specific object within a namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}'
+  explanation: This command retrieves all resources with specific labels in a particular
+    namespace, and then provides detailed information about a specific PostgreSQL cluster
+    object within that namespace using a specific context.
+  multi_line_details: "\n# First, we want to list all resources with specific labels\
+    \ in a certain namespace and context\nkubectl get all -l ${RESOURCE_LABELS} -n\
+    \ ${NAMESPACE} --context ${CONTEXT}\n\n# Then, we want to describe a specific\
+    \ PostgreSQL cluster object of a certain kind and name in the same namespace and context\nkubectl\
+    \ describe ${OBJECT_KIND} ${OBJECT_NAME} -n ${NAMESPACE} --context ${CONTEXT}\n\
+    \ \n\nIn the comments, replace `${RESOURCE_LABELS}`, `${NAMESPACE}`, `${CONTEXT}`,\
+    \ `${OBJECT_KIND}`, and `${OBJECT_NAME}` with the actual values or variables you\
+    \ are using. This will make the command more readable and understandable for newer\
+    \ or less experienced devops engineers."
+  name: list_resources_related_to_postgres_cluster_object_name_in_namespace_namespace
+  when_is_it_useful: '1. Troubleshooting a Kubernetes PostgreSQL cluster experiencing
+    issues such as failed member initialization or replication problems.
+
+    2. Analyzing resource utilization and performance metrics of PostgreSQL cluster
+    components within a namespace to identify potential bottlenecks or issues.
+
+    3. Investigating the configuration and status of a PostgreSQL cluster object
+    to verify if it is functioning as expected and all members are healthy.
+
+    4. Debugging networking issues by inspecting the network settings and connections
+    of PostgreSQL cluster resources within a namespace.
+
+    5. Monitoring and analyzing logs and events for PostgreSQL cluster operations
+    to troubleshoot any operational or functional issues with cluster members.'
+- command: kubectl exec $(kubectl get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context
+    ${CONTEXT} -o jsonpath='{.items[0].metadata.name}') -n ${NAMESPACE} --context
+    ${CONTEXT} -c ${DATABASE_CONTAINER} -- patronictl list
+  doc_links: '
+
+    - [kubectl Overview](https://kubernetes.io/docs/reference/kubectl/overview/){:target="_blank"}
+
+    - [patronictl Documentation](https://patroni.readthedocs.io/en/latest/patronictl.html){:target="_blank"}
+
+    - [Kubernetes Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}
+
+    - [Kubernetes Contexts](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/){:target="_blank"}
+
+    - [Managing Stateful Applications in Kubernetes](https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/){:target="_blank"}'
+  explanation: This command uses kubectl to execute a patronictl list command in the specified
+    namespace and context, targeting a specific database container within a PostgreSQL
+    cluster workload. It is used for monitoring cluster member status and identifying
+    failed members that need reinitialize.
+  multi_line_details: '
+
+    # Retrieve the name of the pod associated with the specified workload in the given
+    namespace and context
+
+    POD_NAME=$(kubectl get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context ${CONTEXT}
+    -o jsonpath=''{.items[0].metadata.name}'')
+
+
+    # Execute patronictl list command inside the specified pod, namespace, and context,
+    targeting the database container
+
+    kubectl exec $POD_NAME -n ${NAMESPACE} --context ${CONTEXT} -c ${DATABASE_CONTAINER}
+    -- patronictl list
+
+
+
+    In the first line, we use `kubectl get pods` to retrieve information about the
+    pods associated with the specified workload, namespace, and context. We then use
+    `jsonpath` to extract the name of the pod and store it in the variable `POD_NAME`.
+
+
+    In the second line, we use `kubectl exec` to execute the `patronictl list` command
+    inside the specified pod, namespace, and context. We also specify the target container
+    using the `-c` flag to ensure we''re executing within the correct database container.'
+  name: get_patroni_cluster_status_for_cluster_object_name_in_namespace_namespace
+  when_is_it_useful: '1. Identifying failed PostgreSQL cluster members that require
+    reinitialize operations to restore cluster health and functionality.
+
+    2. Managing and monitoring PostgreSQL cluster replication status and member roles
+    within a Kubernetes environment.
+
+    3. Troubleshooting PostgreSQL cluster issues such as split-brain scenarios, replication
+    lag, or member connectivity problems.
+
+    4. Performing routine health checks on PostgreSQL clusters to ensure all members
+    are functioning correctly and maintaining proper cluster topology.
+
+    5. Investigating and resolving PostgreSQL cluster failover scenarios and ensuring
+    proper leader election processes are working as expected.'
+- command: kubectl exec $(kubectl get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context
+    ${CONTEXT} -o jsonpath='{.items[0].metadata.name}') -n ${NAMESPACE} --context
+    ${CONTEXT} -c ${DATABASE_CONTAINER} -- patronictl reinit ${OBJECT_NAME} ${TARGET_MEMBER} --force
+  doc_links: '
+
+    - [patronictl reinit documentation](https://patroni.readthedocs.io/en/latest/patronictl.html#reinit){:target="_blank"}
+
+    - [PostgreSQL Streaming Replication](https://www.postgresql.org/docs/current/warm-standby.html#STREAMING-REPLICATION){:target="_blank"}
+
+    - [Kubernetes StatefulSets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/){:target="_blank"}
+
+    - [PostgreSQL Recovery Configuration](https://www.postgresql.org/docs/current/recovery-config.html){:target="_blank"}'
+  explanation: This command uses kubectl to execute a patronictl reinit command to
+    reinitialize a failed PostgreSQL cluster member, forcing it to resync with the
+    master and restore proper replication.
+  multi_line_details: '
+
+    # Get the name of a running pod from the PostgreSQL cluster workload
+
+    POD_NAME=$(kubectl get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context ${CONTEXT}
+    -o jsonpath=''{.items[0].metadata.name}'')
+
+
+    # Execute patronictl reinit command to reinitialize the failed cluster member
+
+    kubectl exec $POD_NAME -n ${NAMESPACE} --context ${CONTEXT} -c ${DATABASE_CONTAINER}
+    -- patronictl reinit ${OBJECT_NAME} ${TARGET_MEMBER} --force
+
+
+    The patronictl reinit command will:
+
+    1. Stop the PostgreSQL service on the target member
+
+    2. Remove the existing data directory
+
+    3. Create a new base backup from the current master
+
+    4. Start PostgreSQL in recovery mode to catch up with the master
+
+    5. Once caught up, the member will rejoin the cluster as a healthy replica
+
+
+    The --force flag bypasses confirmation prompts, making it suitable for automated
+    operations. Use with caution as this will destroy all data on the target member.'
+  name: reinitialize_failed_postgres_cluster_member_object_name_in_namespace_namespace
+  when_is_it_useful: '1. Recovering from PostgreSQL cluster member failures where
+    a replica has become corrupted or severely out of sync with the master.
+
+    2. Resolving replication issues where a cluster member is unable to catch up
+    with the master due to missing WAL files or corruption.
+
+    3. Fixing PostgreSQL cluster split-brain scenarios where a member has diverged
+    from the cluster and needs to be reinitialized from the current master.
+
+    4. Restoring cluster health after hardware failures, network partitions, or storage
+    issues that have affected individual cluster members.
+
+    5. Performing maintenance operations where a clean reinitialize of a cluster member
+    is preferred over attempting to repair existing data inconsistencies.'
+- command: bash 'cluster_operations.sh'
+  doc_links: '
+
+    - [PostgreSQL High Availability](https://www.postgresql.org/docs/current/high-availability.html){:target="_blank"}
+
+    - [Patroni Configuration](https://patroni.readthedocs.io/en/latest/SETTINGS.html){:target="_blank"}
+
+    - [Kubernetes Operators](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/){:target="_blank"}
+
+    - [PostgreSQL Monitoring](https://www.postgresql.org/docs/current/monitoring.html){:target="_blank"}'
+  explanation: This script performs comprehensive PostgreSQL cluster operations including
+    health monitoring, replication status checks, failover operations, scaling, and
+    cluster restarts for both CrunchyDB and Zalando PostgreSQL operators.
+  multi_line_details: "\n#!/bin/bash\n\n# The cluster_operations.sh script provides\
+    \ multiple operational capabilities:\n\n# 1. CLUSTER OVERVIEW - Get comprehensive\
+    \ cluster status\nOPERATION=overview bash cluster_operations.sh\n\n# 2. REPLICATION\
+    \ STATUS - Check replication health and lag\nOPERATION=replication bash cluster_operations.sh\n\
+    \n# 3. FAILOVER OPERATIONS - Perform manual or automatic failover\nOPERATION=failover\
+    \ TARGET_MEMBER=cluster-member-2 bash cluster_operations.sh\n\n# 4. CLUSTER SCALING\
+    \ - Scale cluster up or down\nOPERATION=scale REPLICA_COUNT=5 bash cluster_operations.sh\n\
+    \n# 5. CLUSTER RESTART - Perform rolling restart of all members\nOPERATION=restart\
+    \ bash cluster_operations.sh\n\n# The script automatically detects the PostgreSQL\
+    \ operator type (CrunchyDB or Zalando)\n# and adjusts its operations accordingly.\n\
+    \n# Key features:\n# - Comprehensive error handling and reporting\n# - JSON-formatted\
+    \ issue tracking\n# - Operator-specific command adaptations\n# - Safety checks\
+    \ and validation\n# - Detailed operation logging\n\n# Output is written to cluster_operations_report.out\
+    \ for review"
+  name: perform_postgres_cluster_operations_for_cluster_object_name_in_namespace_namespace
+  when_is_it_useful: '1. Managing PostgreSQL cluster lifecycle operations such as
+    scaling, failover, and maintenance in Kubernetes environments.
+
+    2. Monitoring and maintaining PostgreSQL cluster health, including replication
+    status and member availability across different operator implementations.
+
+    3. Performing emergency operations on PostgreSQL clusters such as manual failover
+    during master node failures or planned maintenance windows.
+
+    4. Automating PostgreSQL cluster management tasks and integrating them into CI/CD
+    pipelines or operational runbooks.
+
+    5. Troubleshooting complex PostgreSQL cluster issues that require comprehensive
+    status analysis and coordinated operational interventions across multiple cluster
+    members.'
+- command: bash 'reinitialize_cluster_member.sh'
+  doc_links: '
+
+    - [PostgreSQL Streaming Replication](https://www.postgresql.org/docs/current/warm-standby.html#STREAMING-REPLICATION){:target="_blank"}
+
+    - [Patroni Cluster Management](https://patroni.readthedocs.io/en/latest/){:target="_blank"}
+
+    - [CrunchyDB Operator Documentation](https://access.crunchydata.com/documentation/postgres-operator/latest/){:target="_blank"}
+
+    - [Zalando PostgreSQL Operator](https://github.com/zalando/postgres-operator){:target="_blank"}'
+  explanation: This script automatically identifies and reinitializes failed PostgreSQL
+    cluster members, supporting both CrunchyDB and Zalando operators with comprehensive
+    error handling and recovery verification.
+  multi_line_details: "\n#!/bin/bash\n\n# The reinitialize_cluster_member.sh script\
+    \ provides automated recovery for failed PostgreSQL cluster members:\n\n# AUTOMATIC\
+    \ DETECTION\n# - Identifies failed cluster members using patronictl\n# - Analyzes\
+    \ cluster status to find members with issues\n# - Supports both CrunchyDB and\
+    \ Zalando PostgreSQL operators\n\n# RECOVERY METHODS\n# 1. Primary: patronictl\
+    \ reinit command\n#    - Cleanly reinitializes the member from current master\n\
+    #    - Preserves cluster topology and configuration\n\n# 2. Fallback: Pod recreation\n\
+    #    - Deletes and recreates failed pods when patronictl fails\n#    - Allows\
+    \ StatefulSet controller to handle recovery\n\n# VERIFICATION AND MONITORING\n\
+    # - Waits for reinitialize operations to complete\n# - Verifies member health\
+    \ post-recovery\n# - Provides detailed status reporting\n# - Tracks operation\
+    \ success and failures\n\n# ERROR HANDLING\n# - Comprehensive issue tracking\
+    \ in JSON format\n# - Severity-based error classification\n# - Detailed logging\
+    \ for troubleshooting\n# - Graceful handling of edge cases\n\n# The script generates\
+    \ a detailed report in reinitialize_report.out\n# containing all operations performed\
+    \ and any issues encountered."
+  name: reinitialize_failed_postgres_cluster_members_for_cluster_object_name_in_namespace_namespace
+  when_is_it_useful: '1. Automatically recovering from PostgreSQL cluster member
+    failures without manual intervention, reducing downtime and operational overhead.
+
+    2. Resolving PostgreSQL replication issues where cluster members have become
+    corrupted, out of sync, or unable to participate in cluster operations.
+
+    3. Implementing automated healing processes for PostgreSQL clusters in production
+    environments to maintain high availability and data consistency.
+
+    4. Troubleshooting and recovering from complex cluster scenarios such as network
+    partitions, storage failures, or configuration drift that affect individual members.
+
+    5. Performing routine maintenance and recovery operations as part of PostgreSQL
+    cluster management workflows in Kubernetes environments.'
+
+
+

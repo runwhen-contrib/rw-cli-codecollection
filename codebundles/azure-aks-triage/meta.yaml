@@ -1,0 +1,253 @@
+commands:
+- command: bash 'aks_resource_health.sh'
+  doc_links: '
+
+    - [Retrieve the health status for an AKS cluster in Microsoft Azure](https://docs.microsoft.com/en-us/azure/aks/){:target="_blank"}
+
+    - [Subscription ID in Azure](https://docs.microsoft.com/en-us/azure/cost-management-billing/manage/view-my-subscriptions){:target="_blank"}
+
+    - [Microsoft.ResourceHealth provider](https://docs.microsoft.com/en-us/rest/api/resourcehealth/){:target="_blank"}
+
+    - [REST API call to get resource health status for AKS cluster](https://docs.microsoft.com/en-us/rest/api/resourcehealth/resourcehealthrestapi-){:target="_blank"}'
+  explanation: This Bash script is designed to retrieve the health status for an AKS
+    cluster in Microsoft Azure. It first checks if a specific subscription ID is set,
+    then registers the Microsoft.ResourceHealth provider if it's not already registered,
+    and finally makes a REST API call to get the resource health status for the specified
+    AKS cluster.
+  multi_line_details: "\n#!/bin/bash\n\n# Create an empty JSON file for the Azure\
+    \ resource health data\necho \"[]\" > ${OUTPUT_DIR}/az_resource_health.json\n\n\
+    # Check if AZURE_RESOURCE_SUBSCRIPTION_ID is set, otherwise get the current subscription\
+    \ ID\nif [ -z \"$AZURE_RESOURCE_SUBSCRIPTION_ID\" ]; then\n    # Retrieve the\
+    \ current subscription ID using the Azure CLI\n    subscription=$(az account show\
+    \ --query \"id\" -o tsv)\n    echo \"AZURE_RESOURCE_SUBSCRIPTION_ID is not set.\
+    \ Using current subscription ID: $subscription\"\nelse\n    # Use the specified\
+    \ subscription ID\n    subscription=\"$AZURE_RESOURCE_SUBSCRIPTION_ID\"\n    echo\
+    \ \"Using specified subscription ID: $subscription\"\nfi\n\n# Set the subscription\
+    \ to the determined ID\necho \"Switching to subscription ID: $subscription\"\n\
+    az account set --subscription \"$subscription\" || { echo \"Failed to set subscription.\"\
+    ; exit 1; }\n\n# Check if Microsoft.ResourceHealth provider is already registered\n\
+    echo \"Checking registration status of Microsoft.ResourceHealth provider...\"\n\
+    registrationState=$(az provider show --namespace Microsoft.ResourceHealth --query\
+    \ \"registrationState\" -o tsv)\n\n# Register the Microsoft.ResourceHealth provider\
+    \ if it is not already registered\nif [[ \"$registrationState\" != \"Registered\"\
+    \ ]]; then\n    echo \"Registering Microsoft.ResourceHealth provider...\"\n  \
+    \  az provider register --namespace Microsoft.ResourceHealth\n\n    # Wait for\
+    \ the provider to be registered\n    echo \"Waiting for Microsoft.ResourceHealth\
+    \ provider to register...\"\n    for i in {1..10}; do\n        registrationState=$(az\
+    \ provider show --namespace Microsoft.ResourceHealth --query \"registrationState\"\
+    \ -o tsv)\n        if [[ \"$registrationState\" == \"Registered\" ]]; then\n \
+    \           echo \"Microsoft.ResourceHealth provider registered successfully.\"\
+    \n            break\n        else\n            echo \"Current registration state:\
+    \ $registrationState. Retrying in 10 seconds...\"\n            sleep 10\n    \
+    \    fi\n    done\n\n    # Check if the provider is not registered after waiting\n\
+    \    if [[ \"$registrationState\" != \"Registered\" ]]; then\n        echo \"\
+    Error: Microsoft.ResourceHealth provider could not be registered.\"\n        exit\
+    \ 1\n    fi\nelse\n    echo \"Microsoft.ResourceHealth provider is already registered.\"\
+    \nfi\n\n# Perform the REST API call to get the resource health status and save\
+    \ it to the JSON file\necho \"Retrieving health status for AKS cluster...\"\n\
+    az rest --method get --url \"https://management.azure.com/subscriptions/$subscription/resourceGroups/$AZ_RESOURCE_GROUP/providers/Microsoft.ContainerService/managedClusters/$AKS_CLUSTER/providers/Microsoft.ResourceHealth/availabilityStatuses/current?api-version=2023-07-01-preview\"\
+    \ > ${OUTPUT_DIR}/az_resource_health.json\n\n# Display the contents of the JSON\
+    \ file with the resource health data\ncat ${OUTPUT_DIR}/az_resource_health.json\n"
+  name: check_for_resource_health_issues_affecting_aks_cluster_aks_cluster_in_resource_group_az_resource_group
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: The DevOps
+    or Site Reliability Engineer may need to use this Bash script to retrieve the
+    health status of the AKS cluster to identify any potential issues causing the
+    CrashLoopBackoff events.
+
+
+    2. Monitoring and alerting: The engineer may use this script as part of a monitoring
+    and alerting system to regularly check the health status of the AKS cluster and
+    be notified of any issues that arise.
+
+
+    3. Automated remediation: If the script detects a problem with the AKS cluster''s
+    health status, it could be used to trigger automated remediation actions, such
+    as restarting problematic pods or scaling up resources.
+
+
+    4. Capacity planning: By regularly retrieving the health status of the AKS cluster,
+    the engineer can use the information to inform capacity planning decisions and
+    ensure the cluster has sufficient resources to handle current and projected workloads.
+
+
+    5. Incident response: In the event of an incident or outage affecting the AKS
+    cluster, the engineer may use this script to quickly assess the health status
+    and determine the impact on the overall system.'
+- command: bash 'aks_cluster_health.sh'
+  doc_links: '
+
+    - [Azure Subscription ID documentation](https://docs.microsoft.com/en-us/cli/azure/manage-azure-subscriptions-azure-cli?view=azure-cli-latest){:target="_blank"}
+
+    - [AKS Cluster documentation](https://docs.microsoft.com/en-us/azure/aks/){:target="_blank"}'
+  explanation: This bash script first checks the Azure subscription ID and then retrieves
+    details about an AKS cluster in Azure. It then extracts relevant information and
+    summarizes the configuration, checking for any issues such as provisioning failure,
+    missing diagnostic settings, and disabled autoscaling in node pools, and outputs
+    the results in a JSON file for further processing.
+  multi_line_details: "\n#!/bin/bash\n\n# Check if AZURE_RESOURCE_SUBSCRIPTION_ID\
+    \ is set, otherwise get the current subscription ID\nif [ -z \"$AZURE_RESOURCE_SUBSCRIPTION_ID\"\
+    \ ]; then  # check if environment variable is set\n    subscription=$(az account\
+    \ show --query \"id\" -o tsv)  # if not set, get the current subscription ID\n\
+    \    echo \"AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription\
+    \ ID: $subscription\"\nelse\n    subscription=\"$AZURE_RESOURCE_SUBSCRIPTION_ID\"\
+    \  # set subscription to the specified ID\n    echo \"Using specified subscription\
+    \ ID: $subscription\"\nfi\n\n# Set the subscription to the determined ID\necho\
+    \ \"Switching to subscription ID: $subscription\"\naz account set --subscription\
+    \ \"$subscription\" || { echo \"Failed to set subscription.\"; exit 1; }\n\nissues_json='{\"\
+    issues\": []}'  # initialize empty JSON object for issues\n\n# Get cluster details\n\
+    CLUSTER_DETAILS=$(az aks show --name \"$AKS_CLUSTER\" --resource-group \"$AZ_RESOURCE_GROUP\"\
+    \ -o json)\n\n# Extract relevant information from JSON response\nCLUSTER_NAME=$AKS_CLUSTER\n\
+    ID=$(echo \"$CLUSTER_DETAILS\" | jq -r '.id')  # extract cluster ID\nCLUSTER_LOCATION=$(echo\
+    \ \"$CLUSTER_DETAILS\" | jq -r '.location')  # extract cluster location\n# ...\
+    \ (similar extraction for other cluster details)\n\n# Share raw output\necho \"\
+    -------Raw Cluster Details--------\"\necho \"$CLUSTER_DETAILS\" | jq .\n\n# Checks\
+    \ and outputs\necho \"-------Configuration Summary--------\"\necho \"Cluster Name:\
+    \ $CLUSTER_NAME\"\n# ... (similar print statements for other cluster details)\n\
+    \n# Add an issue if provisioning failed\nif [ \"$PROVISIONING_STATE\" != \"Succeeded\"\
+    \ ]; then\n    issues_json=$(echo \"$issues_json\" | jq \\  # construct JSON object\
+    \ for issue\n        --arg title \"Provisioning Failure\" \\\n        --arg nextStep\
+    \ \"Check the provisioning details and troubleshoot failures in the Azure Portal.\"\
+    \ \\\n        --arg severity \"1\" \\\n        --arg details \"Provisioning state:\
+    \ $PROVISIONING_STATE\" \\\n        '.issues += [{\"title\": $title, \"next_step\"\
+    : $nextStep, \"severity\": ($severity | tonumber), \"details\": $details}]'\n\
+    \    )\n    echo \"Issue Detected: Provisioning has failed.\"\nfi\n\n# Check for\
+    \ diagnostics settings\n# ... (similar logic for checking diagnostics settings)\n\
+    \n# Check if any node pools have autoscaling disabled\n# ... (similar logic for\
+    \ checking autoscaling settings)\n\n# Dump the issues into a json list for processing\n\
+    echo \"$issues_json\" > \"$OUTPUT_DIR/az_cluster_health.json\"  # save issues\
+    \ to JSON file\n"
+  name: check_configuration_health_of_aks_cluster_aks_cluster_in_resource_group_az_resource_group
+  when_is_it_useful: '1. Troubleshooting Kubernetes CrashLoopBackoff events: DevOps
+    or SRE might use the script to fetch details about the AKS cluster in Azure, analyze
+    the configuration, and identify any issues that could be causing the CrashLoopBackoff
+    events.
+
+
+    2. Checking for provisioning failure: The script can be used to check if there
+    are any provisioning failures in the AKS cluster, which could indicate a problem
+    with the deployment of resources.
+
+
+    3. Verifying diagnostic settings: DevOps or SRE might use the script to ensure
+    that the necessary diagnostic settings are enabled for monitoring and troubleshooting
+    purposes.
+
+
+    4. Investigating disabled autoscaling in node pools: The script can help in identifying
+    if autoscaling is disabled for the node pools in the AKS cluster, which could
+    impact the scalability of the application.
+
+
+    5. Creating a summary report for auditing purposes: The script can also be used
+    to generate a summary report of the AKS cluster configuration, including any potential
+    issues, for auditing and compliance purposes.'
+- command: bash 'aks_network.sh'
+  doc_links: '
+
+    - [Azure Kubernetes Service (AKS) overview](https://docs.microsoft.com/en-us/azure/aks/intro-kubernetes){:target="_blank"}
+
+    - [Azure Network Security Groups documentation](https://docs.microsoft.com/en-us/azure/virtual-network/security-overview){:target="_blank"}
+
+    - [Azure Route Tables overview](https://docs.microsoft.com/en-us/azure/virtual-network/route-table-overview){:target="_blank"}
+
+    - [Azure Firewall documentation](https://docs.microsoft.com/en-us/azure/firewall/){:target="_blank"}'
+  explanation: This script is a Bash script designed to check the configuration of
+    an Azure Kubernetes Service (AKS) network in Microsoft Azure. It checks for various
+    settings such as Network Security Groups, Route Tables, and the presence of Azure
+    Firewall. The script also generates helpful URLs related to the AKS cluster and
+    its associated resources in the Azure portal.
+  multi_line_details: "\n#!/bin/bash\n\n# Check if AZURE_RESOURCE_SUBSCRIPTION_ID\
+    \ is set, otherwise get the current subscription ID\nif [ -z \"$AZURE_RESOURCE_SUBSCRIPTION_ID\"\
+    \ ]; then\n    subscription=$(az account show --query \"id\" -o tsv) # Command\
+    \ to query Azure account ID in the case of missing subscription ID.\n    echo\
+    \ \"AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID:\
+    \ $subscription\" # Prompt user that no subscription ID was found and it will\
+    \ use the current subscription ID.\nelse\n    subscription=\"$AZURE_RESOURCE_SUBSCRIPTION_ID\"\
+    \n    echo \"Using specified subscription ID: $subscription\" # Notify user that\
+    \ a specific subscription ID is being used.\nfi\n\n# Set the subscription to the\
+    \ determined ID\necho \"Switching to subscription ID: $subscription\"\naz account\
+    \ set --subscription \"$subscription\" || { echo \"Failed to set subscription.\"\
+    ; exit 1; } # Set the subscription ID to the variable $subscription.\n\n# Ensure\
+    \ required environment variables are set\nif [ -z \"$AZ_RESOURCE_GROUP\" ] ||\
+    \ [ -z \"$AKS_CLUSTER\" ]; then\n  echo \"Please set AZ_RESOURCE_GROUP and AKS_CLUSTER\
+    \ environment variables.\" # Notify user if any of the environment variables are\
+    \ not set.\n  exit 1\nfi\n\n# Base Azure Portal URL for generating links\nBASE_PORTAL_URL=\"\
+    https://portal.azure.com/#resource\"\n\n# Get AKS Network Profile\necho \"Fetching\
+    \ AKS network profile...\"\nNETWORK_PROFILE=$(az aks show --resource-group \"\
+    $AZ_RESOURCE_GROUP\" --name \"$AKS_CLUSTER\" --query \"networkProfile\" -o json)\
+    \ \n\n# Extract VNET and Subnet IDs from Agent Pool Profile instead of Network\
+    \ Profile\nVNET_ID=$(az aks show --resource-group \"$AZ_RESOURCE_GROUP\" --name\
+    \ \"$AKS_CLUSTER\" --query \"agentPoolProfiles[0].vnetSubnetId\" -o tsv | awk\
+    \ -F'/subnets' '{print $1}')\nSUBNET_ID=$(az aks show --resource-group \"$AZ_RESOURCE_GROUP\"\
+    \ --name \"$AKS_CLUSTER\" --query \"agentPoolProfiles[0].vnetSubnetId\" -o tsv)\n\
+    echo \"\"\necho \"------VNET------\"\nif [ -n \"$VNET_ID\" ] && [ -n \"$SUBNET_ID\"\
+    \ ]; then\n  echo \"Virtual Network ID: $VNET_ID\"\n  echo \"Subnet ID: $SUBNET_ID\"\
+    \nelse\n  echo \"Warning: No custom VNET or subnet found in the agent pool profile.\"\
+    \n  echo \"The cluster is using Azure CNI without a user-managed VNET.\"\n  echo\
+    \ \"Recommendation: For more control over networking, create the AKS cluster with\
+    \ a user-managed VNET.\"\nfi\n\n# Proceed with NSG and Route Table checks only\
+    \ if VNET and Subnet are available\n# Check Network Security Groups (NSGs) associated\
+    \ with the subnet\necho \"\"\necho \"------NSG------\"\necho \"Checking NSGs for\
+    \ the subnet...\"\nNSG_ID=$(az network vnet subnet show --ids \"$SUBNET_ID\" --query\
+    \ \"networkSecurityGroup.id\" -o tsv)\n\nif [ -n \"$NSG_ID\" ]; then\n  echo \"\
+    NSG ID: $NSG_ID\"\n  echo \"NSG Rules:\"\n  az network nsg rule list --nsg-name\
+    \ \"$(basename \"$NSG_ID\")\" --resource-group \"$AZ_RESOURCE_GROUP\" -o table\n\
+    \n  # Additional NSG rule checks\n  RULES=$(az network nsg rule list --nsg-name\
+    \ \"$(basename \"$NSG_ID\")\" --resource-group \"$AZ_RESOURCE_GROUP\" -o json)\n\
+    \  INBOUND_HTTP=$(echo \"$RULES\" | jq '.[] | select(.access==\"Allow\" and .direction==\"\
+    Inbound\" and .destinationPortRange==\"80\")')\n  if [ -z \"$INBOUND_HTTP\" ];\
+    \ then\n    echo \"Recommendation: Add a rule to allow inbound HTTP (port 80)\
+    \ if your application requires public access.\"\n  fi\n\n  OUTBOUND_INTERNET=$(echo\
+    \ \"$RULES\" | jq '.[] | select(.access==\"Allow\" and .direction==\"Outbound\"\
+    \ and .destinationAddressPrefix==\"Internet\")')\n  if [ -z \"$OUTBOUND_INTERNET\"\
+    \ ]; then\n    echo \"Recommendation: Add a rule to allow outbound internet access\
+    \ if your cluster requires access to public resources.\"\n  fi\nelse\n  echo \"\
+    No NSG associated with the subnet.\"\n  echo \"Recommendation: Associate an NSG\
+    \ with the subnet to control inbound and outbound traffic.\"\nfi\n\n# Get Route\
+    \ Table details for the subnet\necho \"\"\necho \"------Routing------\"\necho\
+    \ \"Checking route table for the subnet...\"\nROUTE_TABLE_ID=$(az network vnet\
+    \ subnet show --ids \"$SUBNET_ID\" --query \"routeTable.id\" -o tsv)\n\nif [ -n\
+    \ \"$ROUTE_TABLE_ID\" ]; then\n  echo \"Route Table ID: $ROUTE_TABLE_ID\"\n  az\
+    \ network route-table route list --route-table-name \"$(basename \"$ROUTE_TABLE_ID\"\
+    )\" --resource-group \"$AZ_RESOURCE_GROUP\" -o table # List the routes for the\
+    \ given route table.\n\n  ROUTES=$(az network route-table route list --route-table-name\
+    \ \"$(basename \"$ROUTE_TABLE_ID\")\" --resource-group \"$AZ_RESOURCE_GROUP\"\
+    \ -o json)\n  INTERNET_ROUTE=$(echo \"$ROUTES\" | jq '.[] | select(.addressPrefix==\"\
+    0.0.0.0/0\")')\n  if [ -z \"$INTERNET_ROUTE\" ]; then\n    echo \"Recommendation:\
+    \ Add a default route (0.0.0.0/0) if the cluster requires internet access.\"\n\
+    \  fi\nelse\n  echo \"No Route Table associated with the subnet.\"\n  echo \"\
+    Recommendation: Consider adding a Route Table to the subnet to manage egress traffic.\"\
+    \nfi\n\n# Check if Firewall is present in the resource group\necho \"\"\necho\
+    \ \"------Firewall------\"\necho \"Checking if Azure Firewall exists in the resource\
+    \ group...\"\naz config set extension.use_dynamic_install=yes_without_prompt\n\
+    FIREWALL_PRESENT=$(az network firewall list --resource-group \"$AZ_RESOURCE_GROUP\"\
+    \ --query \"[?provisioningState=='Succeeded'].id\" -o tsv)\n\nif [ -z \"$FIREWALL_PRESENT\"\
+    \ ]; then\n  echo \"No Azure Firewall detected in the resource group.\"\n  echo\
+    \ \"Recommendation: For secure outbound access, consider adding an Azure Firewall\
+    \ or an NVA in the VNET.\"\nelse\n  echo \"Azure Firewall found: $FIREWALL_PRESENT\"\
+    \nfi\n\necho \"\"\necho \"------Helpful URLS------\"\necho \"URL to AKS Cluster:\
+    \ ${BASE_PORTAL_URL}/subscriptions/$(az account show --query id -o tsv)/resourceGroups/$AZ_RESOURCE_GROUP/providers/Microsoft.ContainerService/managedClusters/$AKS_CLUSTER\"\
+    \necho \"URL to Resource Group: ${BASE_PORTAL_URL}/subscriptions/$(az account\
+    \ show --query id -o tsv)/resourceGroups/$AZ_RESOURCE_GROUP\"\necho \"URL to Virtual\
+    \ Network: ${BASE_PORTAL_URL}${VNET_ID}\"\necho \"URL to NSG: ${BASE_PORTAL_URL}${NSG_ID}\"\
+    \necho \"URL to NSG Rules: ${BASE_PORTAL_URL}${NSG_ID}/securityRules\"\necho \"\
+    URL to Route Table: ${BASE_PORTAL_URL}${ROUTE_TABLE_ID}\"\necho \"URL to Subnet:\
+    \ ${BASE_PORTAL_URL}${SUBNET_ID}\"\nif [ \"$FIREWALL_PRESENT\" ]; then\n    echo\
+    \ \"URL to Azure Firewall: ${BASE_PORTAL_URL}${FIREWALL_PRESENT}\"\nfi\n"
+  name: check_network_configuration_of_aks_cluster_aks_cluster_in_resource_group_az_resource_group
+  when_is_it_useful: '1. Troubleshooting network connectivity issues within an Azure
+    Kubernetes Service (AKS) cluster, such as pods not being able to communicate with
+    each other or with external services.
+
+    2. Verifying the correct implementation of Network Security Groups and Route Tables
+    within the AKS network to ensure proper network isolation and security.
+
+    3. Checking for the presence and correct configuration of Azure Firewall within
+    the AKS network to protect against malicious traffic and unauthorized access.
+
+    4. Reviewing the AKS cluster''s network configuration to ensure compliance with
+    company policies and best practices for network security and performance.
+
+    5. Assisting with the setup and configuration of a new AKS cluster by providing
+    helpful URLs related to its network resources in the Azure portal and verifying
+    proper network settings.'

@@ -1,0 +1,10 @@
+[
+  {
+    "title": "Azure authentication failed for subscription test-sub",
+    "severity": 4,
+    "expected": "Azure CLI should authenticate successfully",
+    "actual": "Azure authentication failed for subscription test-sub",
+    "details": "SUBSCRIPTION_ID: test-sub",
+    "next_steps": "Check Azure credentials and login with 'az login' or set the correct subscription `test-sub`."
+  }
+]

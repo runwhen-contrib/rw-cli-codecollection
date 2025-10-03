@@ -1,0 +1,13 @@
+# Include the top-level files frequently used in a package
+include README.md
+include VERSION
+include requirements.txt
+include LICENSE
+
+# Include everything within the RW directory
+graft RW
+
+# Exclude common unwanted patterns
+exclude *.py[cod]
+exclude __pycache__
+exclude .DS_Store

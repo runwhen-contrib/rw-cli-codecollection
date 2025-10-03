@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+  - resourceTypes:
+    - persistentvolumeclaim
+    matchRules:
+    - type: pattern
+      pattern: "."
+      properties: [name]
+      mode: substring
+    slxs:
+    - baseName: pvc-health
+      levelOfDetail: detailed
+      qualifiers: ["namespace", "cluster"]
+      baseTemplateName: k8s-pvc-healthcheck
+      outputItems:
+        - type: slx
+        - type: sli
+        - type: runbook
+          templateName: k8s-pvc-healthcheck-taskset.yaml
+        - type: workflow

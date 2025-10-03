@@ -1,0 +1,34 @@
+name: Build And Push
+
+on:
+  push:
+    branches:    
+      - main
+  workflow_dispatch:
+
+env:
+  TEST_CODEBUNDLE_PATH: /app/codecollection/codebundles/curl-http-ok/sli.robot
+  CURL_URL: http://localhost:3000/curl-http-ok/sli-log.html
+#TODO add feature branch builds
+
+jobs:
+  build-and-push-ghcr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Build
+        run: |-
+          docker build \
+            -t "ghcr.io/${{ github.repository }}:latest" \
+            -t "ghcr.io/${{ github.repository }}:main" \
+            -f Dockerfile .
+      - name: Smoke Test Build
+        run: |
+          docker run -d -p 3000:3000 --name mycodecollection ghcr.io/${{ github.repository }}:latest 
+          docker exec mycodecollection bash -c "ro ${{ env.TEST_CODEBUNDLE_PATH }} && ls -R /robot_logs"
+          curl --fail-with-body ${{ env.CURL_URL }}
+      - name: Push
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login --username ${{ github.actor }} --password-stdin ghcr.io
+          docker push ghcr.io/${{ github.repository }} --all-tags

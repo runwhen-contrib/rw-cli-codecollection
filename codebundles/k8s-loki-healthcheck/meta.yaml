@@ -1,0 +1,215 @@
+commands:
+- command: 'kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
+    -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath=''{.items[0].metadata.name}'')
+    -- wget -q --header="Accept: application/json" -O - http://localhost:3100/ring
+    | jq -r ''.shards[] | select(.state != "ACTIVE") | {name: .id, state: .state}'''
+  doc_links: '
+
+    - [kubectl command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+
+    - [wget command](https://www.gnu.org/software/wget/manual/wget.html){:target="_blank"}
+
+    - [JSON data retrieval](https://www.json.org/json-en.html){:target="_blank"}
+
+    - [jq filtering](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command uses kubectl to execute a wget command on a specific pod
+    in a specific namespace, retrieving JSON data from a local server and then filtering
+    the data using jq to display only shards with a state other than "ACTIVE."
+  multi_line_details: "\n# Set the kubectl context to the specified CONTEXT and namespace\
+    \ to NAMESPACE\nkubectl --context=${CONTEXT} -n ${NAMESPACE} exec \\\n\n# Get\
+    \ the pod name using the specified CONTEXT and NAMESPACE with label selector \"\
+    app.kubernetes.io/component=single-binary\"\n$(kubectl --context=${CONTEXT} -n\
+    \ ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath='{.items[0].metadata.name}')\
+    \ -- \\\n\n# Use wget to make a HTTP request to http://localhost:3100/ring with\
+    \ Accept header as application/json, then pipe the output to jq for parsing and\
+    \ displaying only the shards with state not equal to \"ACTIVE\" \nwget -q --header=\"\
+    Accept: application/json\" -O - http://localhost:3100/ring | jq -r '.shards[]\
+    \ | select(.state != \"ACTIVE\") | {name: .id, state: .state}'\n"
+  name: check_loki_ring_api_for_unhealthy_shards_in_kubernetes_cluster_namespace
+  when_is_it_useful: '1. Investigating and troubleshooting the cause of Kubernetes
+    CrashLoopBackoff events in a specific pod or namespace.
+
+    2. Monitoring and identifying performance issues within a Kubernetes cluster,
+    such as high CPU or memory usage by certain pods.
+
+    3. Gathering specific data or logs from a pod in order to analyze and diagnose
+    an application or service issue.
+
+    4. Troubleshooting network connectivity problems or latency issues within a Kubernetes
+    environment.
+
+    5. Performing regular maintenance tasks or checks on pods, such as verifying the
+    status of specific services or configurations.'
+- command: 'kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
+    -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath=''{.items[0].metadata.name}'')
+    -- wget -q --header="Accept: application/json" -O - http://localhost:3100/ring
+    | jq -r ''.shards[] | select(.state != "ACTIVE") | {name: .id, state: .state}'''
+  doc_links: '
+
+    - [kubectl command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands){:target="_blank"}
+
+    - [wget command](https://www.gnu.org/software/wget/manual/wget.html){:target="_blank"}
+
+    - [JSON data retrieval](https://www.json.org/json-en.html){:target="_blank"}
+
+    - [jq filtering](https://stedolan.github.io/jq/manual/){:target="_blank"}'
+  explanation: This command uses kubectl to execute a wget command on a specific pod
+    in a specific namespace, retrieving JSON data from a local server and then filtering
+    the data using jq to display only shards with a state other than "ACTIVE."
+  multi_line_details: "\n# Set the kubectl context to the specified CONTEXT and namespace\
+    \ to NAMESPACE\nkubectl --context=${CONTEXT} -n ${NAMESPACE} exec \\\n\n# Get\
+    \ the pod name using the specified CONTEXT and NAMESPACE with label selector \"\
+    app.kubernetes.io/component=single-binary\"\n$(kubectl --context=${CONTEXT} -n\
+    \ ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath='{.items[0].metadata.name}')\
+    \ -- \\\n\n# Use wget to make a HTTP request to http://localhost:3100/ring with\
+    \ Accept header as application/json, then pipe the output to jq for parsing and\
+    \ displaying only the shards with state not equal to \"ACTIVE\" \nwget -q --header=\"\
+    Accept: application/json\" -O - http://localhost:3100/ring | jq -r '.shards[]\
+    \ | select(.state != \"ACTIVE\") | {name: .id, state: .state}'\n"
+  name: check_loki_ring_api_for_unhealthy_shards_in_kubernetes_cluster_namespace
+  when_is_it_useful: '1. Investigating and troubleshooting the cause of Kubernetes
+    CrashLoopBackoff events in a specific pod or namespace.
+
+    2. Monitoring and identifying performance issues within a Kubernetes cluster,
+    such as high CPU or memory usage by certain pods.
+
+    3. Gathering specific data or logs from a pod in order to analyze and diagnose
+    an application or service issue.
+
+    4. Troubleshooting network connectivity problems or latency issues within a Kubernetes
+    environment.
+
+    5. Performing regular maintenance tasks or checks on pods, such as verifying the
+    status of specific services or configurations.'
+- command: 'kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
+    -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath=''{.items[0].metadata.name}'')
+    -- wget -q --header="Accept: application/json" -O - http://localhost:3100/ready'
+  doc_links: '
+
+    - [Kubernetes](https://kubernetes.io/docs/home/){:target="_blank"}
+
+    - [Kubernetes pods](https://kubernetes.io/docs/concepts/workloads/pods/){:target="_blank"}
+
+    - [Container operations](https://kubernetes.io/docs/concepts/containers/){:target="_blank"}
+
+    - [Namespaces in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}'
+  explanation: This command runs a specified operation inside a container running
+    in a Kubernetes pod within a specific namespace and context, fetching some data
+    from a local web server.
+  multi_line_details: '
+
+    # Set the context and namespace for the kubectl command
+
+    CONTEXT=my-context
+
+    NAMESPACE=my-namespace
+
+
+    # Retrieve the name of the pod running the single-binary component
+
+    SINGLE_BINARY_POD=$(kubectl --context=${CONTEXT} -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary
+    -o=jsonpath=''{.items[0].metadata.name}'')
+
+
+    # Execute a command in the specified pod to send an HTTP request to check readiness
+
+    kubectl --context=${CONTEXT} -n ${NAMESPACE} exec ${SINGLE_BINARY_POD} -- wget
+    -q --header="Accept: application/json" -O - http://localhost:3100/ready
+
+
+
+    In this multi-line command, we broke down the original command into smaller, more
+    understandable steps with helpful comments to explain each part. This can help
+    newer or less experienced devops engineers understand the purpose and functionality
+    of the original command.'
+  name: check_loki_api_ready_in_kubernetes_cluster_namespace
+  when_is_it_useful: '1. Debugging a failing deployment: When a Kubernetes pod goes
+    into CrashLoopBackoff, a DevOps or SRE may need to use this command to run an
+    operation inside the container to troubleshoot and diagnose the issue.
+
+
+    2. Troubleshooting network connectivity issues: If there are issues with fetching
+    data from a local web server within a Kubernetes pod, a DevOps or SRE may use
+    this command to test and identify any network connectivity problems.
+
+
+    3. Performance tuning and optimization: DevOps or SREs may utilize this command
+    to run performance tests and collect data from a container running in a Kubernetes
+    pod to optimize resource allocation and improve the overall performance of the
+    application.
+
+
+    4. Monitoring and logging: This command can be used to fetch specific data from
+    a container for monitoring and logging purposes, allowing DevOps or SREs to gain
+    insights into the application''s behavior and performance.
+
+
+    5. Scaling and load testing: When scaling up or performing load testing on a Kubernetes
+    deployment, DevOps or SREs may use this command to fetch data from containers
+    to analyze the impact on the application''s performance and stability.'
+- command: 'kubectl --context=${CONTEXT} -n ${NAMESPACE} exec $(kubectl --context=${CONTEXT}
+    -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary -o=jsonpath=''{.items[0].metadata.name}'')
+    -- wget -q --header="Accept: application/json" -O - http://localhost:3100/ready'
+  doc_links: '
+
+    - [Kubernetes](https://kubernetes.io/docs/home/){:target="_blank"}
+
+    - [Kubernetes pods](https://kubernetes.io/docs/concepts/workloads/pods/){:target="_blank"}
+
+    - [Container operations](https://kubernetes.io/docs/concepts/containers/){:target="_blank"}
+
+    - [Namespaces in Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/){:target="_blank"}'
+  explanation: This command runs a specified operation inside a container running
+    in a Kubernetes pod within a specific namespace and context, fetching some data
+    from a local web server.
+  multi_line_details: '
+
+    # Set the context and namespace for the kubectl command
+
+    CONTEXT=my-context
+
+    NAMESPACE=my-namespace
+
+
+    # Retrieve the name of the pod running the single-binary component
+
+    SINGLE_BINARY_POD=$(kubectl --context=${CONTEXT} -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary
+    -o=jsonpath=''{.items[0].metadata.name}'')
+
+
+    # Execute a command in the specified pod to send an HTTP request to check readiness
+
+    kubectl --context=${CONTEXT} -n ${NAMESPACE} exec ${SINGLE_BINARY_POD} -- wget
+    -q --header="Accept: application/json" -O - http://localhost:3100/ready
+
+
+
+    In this multi-line command, we broke down the original command into smaller, more
+    understandable steps with helpful comments to explain each part. This can help
+    newer or less experienced devops engineers understand the purpose and functionality
+    of the original command.'
+  name: check_loki_api_ready_in_kubernetes_cluster_namespace
+  when_is_it_useful: '1. Debugging a failing deployment: When a Kubernetes pod goes
+    into CrashLoopBackoff, a DevOps or SRE may need to use this command to run an
+    operation inside the container to troubleshoot and diagnose the issue.
+
+
+    2. Troubleshooting network connectivity issues: If there are issues with fetching
+    data from a local web server within a Kubernetes pod, a DevOps or SRE may use
+    this command to test and identify any network connectivity problems.
+
+
+    3. Performance tuning and optimization: DevOps or SREs may utilize this command
+    to run performance tests and collect data from a container running in a Kubernetes
+    pod to optimize resource allocation and improve the overall performance of the
+    application.
+
+
+    4. Monitoring and logging: This command can be used to fetch specific data from
+    a container for monitoring and logging purposes, allowing DevOps or SREs to gain
+    insights into the application''s behavior and performance.
+
+
+    5. Scaling and load testing: When scaling up or performing load testing on a Kubernetes
+    deployment, DevOps or SREs may use this command to fetch data from containers
+    to analyze the impact on the application''s performance and stability.'

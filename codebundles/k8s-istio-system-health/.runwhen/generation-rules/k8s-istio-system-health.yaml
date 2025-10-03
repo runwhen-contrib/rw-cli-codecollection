@@ -1,0 +1,21 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+    - resourceTypes:
+        - namespace
+      matchRules:
+        - type: pattern
+          pattern: "istio-system"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: k8s-istio-system-health
+          levelOfDetail: detailed
+          qualifiers: ["cluster"]
+          baseTemplateName: k8s-istio-system-health
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: k8s-istio-system-health-taskset.yaml
