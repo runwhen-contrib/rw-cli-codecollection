@@ -5,7 +5,6 @@ Metadata            Display Name    Azure APIM Health
 Metadata            Supports    Azure    APIM    Service    Triage    Health
 
 Library             BuiltIn
-Library             String
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
@@ -169,16 +168,6 @@ Generate APIM Health Score
     RW.Core.Push Metric    ${health_score}
 
 *** Keywords ***
-Normalize Lookback Window
-    [Arguments]    ${raw}
-    ${raw}=    Strip String    ${raw}
-    ${raw}=    Replace String Using Regexp    ${raw}    \s+    ${EMPTY}
-    ${len}=    Get Length    ${raw}
-    Should Be True    ${len} >= 2
-    ${num}=    Get Substring    ${raw}    0    ${len-1}
-    Should Match Regexp    ${num}    ^[0-9]+$
-    ${num}=    Convert To Integer    ${num}
-    RETURN    ${num}
 Suite Initialization
     ${AZ_RESOURCE_GROUP}=    RW.Core.Import User Variable    AZ_RESOURCE_GROUP
     ...    type=string
@@ -189,7 +178,7 @@ Suite Initialization
     ...    description=The APIM Instance Name
     ...    pattern=\w*
     ${LOOKBACK_WINDOW}=    RW.Core.Import Platform Variable    RW_LOOKBACK_WINDOW
-    ${TIME_PERIOD_MINUTES}=    Normalize Lookback Window    ${LOOKBACK_WINDOW}
+    ${TIME_PERIOD_MINUTES}=    RW.Core.Normalize Lookback Window    ${LOOKBACK_WINDOW}   1
     ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_RESOURCE_SUBSCRIPTION_ID
     ...    type=string
     ...    description=The Azure Subscription ID for the resource.  

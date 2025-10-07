@@ -67,7 +67,8 @@ Suite Initialization
     ...    type=string
     ...    description=The Kubernetes labels used to select the resource for logs.
     ...    pattern=\w*
-    ${LOGS_SINCE}=    RW.Core.Import Platform Variable    RW_LOOKBACK_WINDOW
+    ${LOOKBACK_WINDOW}=    RW.Core.Import Platform Variable    RW_LOOKBACK_WINDOW
+    ${LOGS_SINCE}=    RW.Core.Normalize Lookback Window     ${LOOKBACK_WINDOW}     2     
     ${EXCLUDE_PATTERN}=    RW.Core.Import User Variable
     ...    EXCLUDE_PATTERN
     ...    type=string
