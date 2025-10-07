@@ -7,8 +7,6 @@ Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
-Library             String
-Library             Collections
 Library             OperatingSystem
 
 Suite Setup         Suite Initialization
@@ -38,23 +36,6 @@ Generate Namespace Score in Kubernetes Cluster `$${CONTEXT}`
 
 
 *** Keywords ***
-Normalize Lookback Window
-    [Arguments]    ${raw}
-    ${raw}=    Strip String    ${raw}
-    ${raw}=    Replace String Using Regexp    ${raw}    \s+    ${EMPTY}
-
-    # validate forms like: 4h, 10m, 30s, 2d, 1w
-    Should Match Regexp    ${raw}    ^[0-9]+[smhdwSMHDW]$
-
-    ${num}=     Replace String Using Regexp    ${raw}    ^([0-9]+)[smhdw]$    \\1
-    ${unit}=    Replace String Using Regexp    ${raw}    ^[0-9]+([smhdw])$    \\1
-
-    &{map}=     Create Dictionary    s=second    m=minute    h=hour    d=day    w=week
-    ${word}=    Get From Dictionary    ${map}    ${unit}
-
-    ${plural}=  Run Keyword If    ${num} != 1    Set Variable    s    ELSE    Set Variable
-    ${normalized}=    Set Variable    ${num} ${word}${plural}
-    RETURN    ${normalized}
 Suite Initialization
     ${kubeconfig}=    RW.Core.Import Secret
     ...    kubeconfig
@@ -75,7 +56,7 @@ Suite Initialization
     ...    default=default
     ...    example=my-main-cluster
     ${LOOKBACK_WINDOW}=    RW.Core.Import Platform Variable    RW_LOOKBACK_WINDOW
-    ${INTERVAL}=    Normalize Lookback Window    ${LOOKBACK_WINDOW}
+    ${INTERVAL}=    RW.Core.Normalize Lookback Window    ${LOOKBACK_WINDOW}     3
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}

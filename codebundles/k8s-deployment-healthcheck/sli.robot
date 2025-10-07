@@ -48,7 +48,8 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=1
     ...    default=1
-    ${LOG_AGE}=     RW.Core.Import Platform Variable    RW_LOOKBACK_WINDOW
+    ${LOOKBACK_WINDOW}=    RW.Core.Import Platform Variable    RW_LOOKBACK_WINDOW
+    ${LOG_AGE}=    RW.Core.Normalize Lookback Window     ${LOOKBACK_WINDOW}     2 
     ${MAX_LOG_LINES}=    RW.Core.Import User Variable    MAX_LOG_LINES
     ...    type=string
     ...    description=Maximum number of log lines to fetch per container to prevent API overload.
