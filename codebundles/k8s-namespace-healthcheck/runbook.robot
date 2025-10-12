@@ -8,6 +8,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.K8sHelper
+Library             RW.K8sLog
 Library             RW.NextSteps
 Library             RW.platform
 Library             OperatingSystem
@@ -49,6 +50,7 @@ Inspect Warning Events in Namespace `${NAMESPACE}`
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
             ${messages}=    RW.K8sHelper.Sanitize Messages    ${item["summary_messages"]}
+            ${event_timestamp}=    Set Variable    ${item["most_recent_timestamp"]}
             ${item_owner_output}=    RW.CLI.Run Cli
             ...    cmd=echo "${item_owner.stdout}" | sed 's/ *$//' | tr -d '\n'
             ...    env=${env}
@@ -113,7 +115,7 @@ Inspect Warning Events in Namespace `${NAMESPACE}`
                 
                 ${issues}=    RW.CLI.Run Bash File
                 ...    bash_file=workload_issues.sh
-                ...    cmd_override=./workload_issues.sh "${messages}" "${owner_kind}" "${owner_name}"
+                ...    cmd_override=./workload_issues.sh "${messages}" "${owner_kind}" "${owner_name}" "${event_timestamp}"
                 ...    env=${env}
                 ...    include_in_history=False
                 ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
@@ -149,6 +151,7 @@ Inspect Warning Events in Namespace `${NAMESPACE}`
                     ...    reproduce_hint=kubectl get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE}
                     ...    details=${workload_health}\n\n${issue["details"]}
                     ...    next_steps=${issue["next_steps"]}
+                    ...    observed_at=${issue["observed_at"]}
                 END
             END
         END
@@ -188,6 +191,7 @@ Inspect Container Restarts In Namespace `${NAMESPACE}`
                 ...    reproduce_hint=${container_restart_details.cmd}
                 ...    details=${item["details"]}
                 ...    next_steps=${item["next_steps"]}
+                ...    observed_at=${item["observed_at"]}
             END
         END
     END
@@ -205,7 +209,7 @@ Inspect Pending Pods In Namespace `${NAMESPACE}`
     [Documentation]    Fetches pods that are pending and provides details.
     [Tags]     access:read-only    namespace    pods    status    pending    ${NAMESPACE}
     ${pending_pods}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending --no-headers -o json | jq -r '[.items[] | {pod_name: .metadata.name, status: (.status.phase // "N/A"), message: (.status.conditions[0].message // "N/A"), reason: (.status.conditions[0].reason // "N/A"), containerStatus: (.status.containerStatuses[0].state // "N/A"), containerMessage: (.status.containerStatuses[0].state.waiting?.message // "N/A"), containerReason: (.status.containerStatuses[0].state.waiting?.reason // "N/A")}]'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending --no-headers -o json | jq -r '[.items[] | {pod_name: .metadata.name, status: (.status.phase // "N/A"), message: (.status.conditions[0].message // "N/A"), reason: (.status.conditions[0].reason // "N/A"), containerStatus: (.status.containerStatuses[0].state // "N/A"), containerMessage: (.status.containerStatuses[0].state.waiting?.message // "N/A"), containerReason: (.status.containerStatuses[0].state.waiting?.reason // "N/A"), observed_at: (.status.conditions[0].lastTransitionTime)}]'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
@@ -233,9 +237,10 @@ Inspect Pending Pods In Namespace `${NAMESPACE}`
             ${message_string}=    Evaluate
             ...    "${item.get('message', '')};${item.get('containerMessage', '')};${item.get('containerReason', '')}"
             ${messages}=    RW.K8sHelper.Sanitize Messages    ${message_string}
+            ${event_timestamp}=    Set Variable    ${item["observed_at"]}
             ${issues}=    RW.CLI.Run Bash File
             ...    bash_file=workload_issues.sh
-            ...    cmd_override=./workload_issues.sh "${messages}" "${owner_kind}" "${owner_name}"
+            ...    cmd_override=./workload_issues.sh "${messages}" "${owner_kind}" "${owner_name}" "${event_timestamp}"
             ...    env=${env}
             ...    include_in_history=False
             ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
@@ -248,6 +253,7 @@ Inspect Pending Pods In Namespace `${NAMESPACE}`
                 ...    reproduce_hint=${pending_pods.cmd}
                 ...    details=${issue["details"]}
                 ...    next_steps=${issue["next_steps"]}
+                ...    observed_at=${issue["observed_at"]}
             END
         END
     END
@@ -287,9 +293,10 @@ Inspect Failed Pods In Namespace `${NAMESPACE}`
             END
             ${message_string}=    Evaluate    "${item.get('message', '')};${item.get('containerMessage', '')}"
             ${messages}=    RW.K8sHelper.Sanitize Messages    ${message_string}
+            ${event_timestamp}=    Set Variable    ${item["terminated_finishedAt"]}
             ${issues}=    RW.CLI.Run Bash File
             ...    bash_file=workload_issues.sh
-            ...    cmd_override=./workload_issues.sh "${messages}" "${owner_kind}" "${owner_name}"
+            ...    cmd_override=./workload_issues.sh "${messages}" "${owner_kind}" "${owner_name}" "${event_timestamp}"
             ...    env=${env}
             ...    include_in_history=False
             ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
@@ -302,6 +309,7 @@ Inspect Failed Pods In Namespace `${NAMESPACE}`
                 ...    reproduce_hint=${unreadypods_details.cmd}
                 ...    details=${issue["details"]}
                 ...    next_steps=${issue["next_steps"]}
+                ...    observed_at=${issue["observed_at"]}
             END
         END
     END
@@ -340,6 +348,7 @@ Inspect Workload Status Conditions In Namespace `${NAMESPACE}`
             ...    cmd=echo "${item["conditions"]}" | sed 's/True/true/g; s/False/false/g; s/None/null/g; s/'\\''/\"/g'
             ...    env=${env}
             ...    include_in_history=False
+            ${observed_at}=    RW.K8sLog.Get First False Condition Timestamp    ${item["conditions"]}
             ${object_status}=    RW.CLI.Run Cli
             ...    cmd=echo '${object_status_string.stdout}' | jq -r '.[] | select(.type == "Ready") | if .message then .message else .reason end' | sed 's/ *$//' | tr -d '\n'
             ...    env=${env}
@@ -378,6 +387,7 @@ Inspect Workload Status Conditions In Namespace `${NAMESPACE}`
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=${object_kind.stdout} `${object_name.stdout}` is owned by ${owner_kind} `${owner_name}` and has indicated an unhealthy status.\n${item}
             ...    next_steps=${item_next_steps.stdout}
+            ...    observed_at=${observed_at}
         END
     END
     ${history}=    RW.CLI.Pop Shell History
@@ -427,6 +437,7 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
             ${messages}=    RW.K8sHelper.Sanitize Messages    ${item["summary_messages"]}
+            ${event_timestamp}=    Set Variable    ${item["firstTimestamp"]}
             ${item_owner_output}=    RW.CLI.Run Cli
             ...    cmd=echo "${item_owner.stdout}" | sed 's/ *$//' | tr -d '\n'
             ...    env=${env}
@@ -440,7 +451,7 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
             END
             ${issues}=    RW.CLI.Run Bash File
             ...    bash_file=workload_issues.sh
-            ...    cmd_override=./workload_issues.sh "${messages}" "${owner_kind}" "${owner_name}"
+            ...    cmd_override=./workload_issues.sh "${messages}" "${owner_kind}" "${owner_name}" "${event_timestamp}"
             ...    env=${env}
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
@@ -454,6 +465,7 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
                 ...    reproduce_hint=${recent_events_by_object.cmd}
                 ...    details=${issue["details"]}
                 ...    next_steps=${issue["next_steps"]}
+                ...    observed_at=${issue["observed_at"]}
             END
         END
     END
@@ -492,6 +504,7 @@ Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`
     IF    len($missing_pdbs.stdout) > 0
         @{missing_pdb_list}=    Split To Lines    ${missing_pdbs.stdout}
         FOR    ${missing_pdb}    IN    @{missing_pdb_list}
+            ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=4
             ...    expected=PodDisruptionBudgets in namespace `${NAMESPACE}` should exist for applications that have more than 1 replica
@@ -500,12 +513,14 @@ Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=${pdb_check.stdout}
             ...    next_steps=Create missing [PodDisruptionBudget](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/#pod-disruption-budgets) for `${missing_pdb}`
+            ...    observed_at=${issue_timestamp}
         END
     END
     # Raise issues on Risky PDBS
     IF    len($risky_pdbs.stdout) > 0
         @{risky_pdb_list}=    Split To Lines    ${risky_pdbs.stdout}
         FOR    ${risky_pdb}    IN    @{risky_pdb_list}
+            ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=4
             ...    expected=PodDisruptionBudgets in `${NAMESPACE}` should not block regular maintenance
@@ -514,6 +529,7 @@ Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=${pdb_check.stdout}
             ...    next_steps=Review [PodDisruptionBudget](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/#pod-disruption-budgets) for `${risky_pdb}` to ensure it allows pods to be evacuated and rescheduled during maintenance periods.
+            ...    observed_at=${issue_timestamp}
         END
     END
     ${history}=    RW.CLI.Pop Shell History
@@ -539,6 +555,7 @@ Check Resource Quota Utilization in Namespace `${NAMESPACE}`
         ${recommendation_list}=    Evaluate    json.loads(r'''${recommendations.stdout}''')    json
         IF    len(@{recommendation_list}) > 0
             FOR    ${item}    IN    @{recommendation_list}
+                ${issue_timestamp}=    DateTime.Get Current Date
                 RW.Core.Add Issue
                 ...    severity=${item["severity"]}
                 ...    expected=Resource quota should not constrain deployment of resources.
@@ -547,6 +564,7 @@ Check Resource Quota Utilization in Namespace `${NAMESPACE}`
                 ...    reproduce_hint=kubectl describe resourcequota -n ${NAMESPACE}
                 ...    details=${item}
                 ...    next_steps=${item["next_step"]}
+                ...    observed_at=${issue_timestamp}
             END
         END
     END

@@ -95,6 +95,9 @@ def stacktrace_report_data(stacktraces: list[StackTraceData], max_report_stacktr
         if st in formatted_stacktraces:
             index = formatted_stacktraces.index(st)
             formatted_stacktraces[index].occurences += 1
+            # Keep the earliest observed_at timestamp when merging duplicates
+            if st.observed_at and (not formatted_stacktraces[index].observed_at or st.observed_at < formatted_stacktraces[index].observed_at):
+                formatted_stacktraces[index].observed_at = st.observed_at
         elif st not in formatted_stacktraces:
             formatted_stacktraces.append(st)
     if len(formatted_stacktraces) == 0:

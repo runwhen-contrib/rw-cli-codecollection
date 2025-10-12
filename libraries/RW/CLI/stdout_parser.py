@@ -5,6 +5,7 @@ Scope: Global
 """
 import re, logging
 from string import Template
+from datetime import datetime, timezone
 from RW import platform
 from RW.Core import Core
 
@@ -25,6 +26,26 @@ RECOGNIZED_STDOUT_PARSE_QUERIES = [
     "raise_issue_if_contains",
     "raise_issue_if_ncontains",
 ]
+
+
+def _extract_timestamp_from_log_line(log_line: str) -> str:
+    """Extract timestamp from a log line, falling back to current time if none found."""
+    if not log_line or not log_line.strip():
+        return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+    
+    try:
+        from RW.LogAnalysis.java.timestamp_handler import TimestampHandler
+        handler = TimestampHandler()
+        timestamp_str, _, _ = handler.extract_timestamp_from_line(log_line)
+        if timestamp_str:
+            dt = handler.parse_timestamp_to_datetime(timestamp_str)
+            if dt:
+                return dt.isoformat().replace('+00:00', 'Z')
+    except Exception as e:
+        logger.debug(f"Failed to extract timestamp from log line: {e}")
+    
+    # Fallback to current timestamp
+    return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 
 
 def parse_cli_output_by_line(
@@ -123,6 +144,7 @@ def parse_cli_output_by_line(
                 reproduce_hint=rsp_code_reproduce_hint,
                 details=f"{set_issue_details} ({e})",
                 next_steps=set_issue_next_steps,
+                observed_at=datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
             )
             issue_count += 1
         else:
@@ -132,6 +154,8 @@ def parse_cli_output_by_line(
         if not line:
             continue
         capture_groups["_line"] = line
+        # Extract timestamp from current line for potential issue reporting
+        line_timestamp = _extract_timestamp_from_log_line(line)
         # attempt to create capture groups and values
         regexp_results = {}
         if lines_like_regexp:
@@ -148,6 +172,7 @@ def parse_cli_output_by_line(
                     reproduce_hints=f"Try apply the regex: {lines_like_regexp} to lines produced by the command: {rsp.parsed_cmd}",
                     details=f"{set_issue_details}",
                     next_steps=f"{set_issue_next_steps}",
+                    observed_at=line_timestamp,
                 )
                 issue_count += 1
                 continue
@@ -350,6 +375,7 @@ def parse_cli_output_by_line(
                         "reproduce_hint": Template(reproduce_hint).safe_substitute(known_symbols),
                         "details": Template(details).safe_substitute(known_symbols),
                         "next_steps": Template(next_steps).safe_substitute(known_symbols),
+                        "observed_at": line_timestamp,
                     }
             else:
                 logger.info(f"Prefix {prefix} not found in capture groups: {capture_groups.keys()}")
