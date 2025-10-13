@@ -33,6 +33,8 @@ spec:
       value: '1.2'
     - name: DESIRED_RESPONSE_CODE
       value: '200'
+    - name: VERIFY_SSL
+      value: 'false'
   secretsProvided: []
   alerts:
     warning:

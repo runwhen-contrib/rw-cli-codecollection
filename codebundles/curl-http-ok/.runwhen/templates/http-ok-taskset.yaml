@@ -29,4 +29,6 @@ spec:
       value: '200'
     - name: OWNER_DETAILS
       value: '{"name":"{{match_resource.resource.metadata.name}}", "kind":"Ingress","namespace":"{{match_resource.resource.metadata.namespace}}"}'
+    - name: VERIFY_SSL
+      value: 'false'
   secretsProvided: []
