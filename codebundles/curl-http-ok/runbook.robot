@@ -29,8 +29,10 @@ Check HTTP URL Availability and Timeliness
 Check Single HTTP URL
     [Documentation]    Use cURL to validate a single http response
     [Arguments]    ${test_url}
+    # Build curl command with conditional SSL verification
+    ${ssl_flag}=    Set Variable If    '${VERIFY_SSL}' == 'false'    --insecure    ${EMPTY}
     ${curl_rsp}=    RW.CLI.Run Cli
-    ...    cmd=curl --connect-timeout 5 --max-time 15 -L -o /dev/null -w '{"http_code": "\%{http_code}", "time_total": \%{time_total}, "curl_exit_code": \%{exitcode}}' -s ${test_url}
+    ...    cmd=curl --connect-timeout 5 --max-time 15 -L -o /dev/null -w '{"http_code": "\%{http_code}", "time_total": \%{time_total}, "time_namelookup": \%{time_namelookup}, "time_connect": \%{time_connect}, "time_appconnect": \%{time_appconnect}, "time_pretransfer": \%{time_pretransfer}, "time_starttransfer": \%{time_starttransfer}, "size_download": \%{size_download}, "speed_download": \%{speed_download}, "remote_ip": "\%{remote_ip}", "remote_port": "\%{remote_port}", "local_ip": "\%{local_ip}", "local_port": "\%{local_port}", "curl_exit_code": \%{exitcode}}' -s ${ssl_flag} ${test_url}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
     ${owner_kind}=    RW.CLI.Run Cli
@@ -51,7 +53,7 @@ Check Single HTTP URL
         ...    expected=Curl command should succeed with exit code 0
         ...    actual=Curl command failed with exit code ${curl_rsp.returncode}
         ...    reproduce_hint=Run: ${curl_rsp.cmd}
-        ...    details=curl command failed when trying to reach ${test_url}.\n\nCurl Response: ${curl_rsp.stdout}\nCurl Exit Code: ${curl_rsp.returncode}\nCurl Stderr: ${curl_rsp.stderr}\n\nThis indicates a connection failure, DNS resolution failure, or other network issue.\n\nCommon curl exit codes:\n- 6: Could not resolve host\n- 7: Failed to connect to host\n- 28: Operation timeout\n- 35: SSL connect error\n\nCheck network connectivity, DNS resolution, and firewall rules.
+        ...    details=curl command failed when trying to reach ${test_url}.\n\nCurl Response: ${curl_rsp.stdout}\nCurl Exit Code: ${curl_rsp.returncode}\nCurl Stderr: ${curl_rsp.stderr}\nCurl Command: ${curl_rsp.cmd}\n\nThis indicates a connection failure, DNS resolution failure, or other network issue.\n\nCommon curl exit codes:\n- 6: Could not resolve host (DNS resolution failed)\n- 7: Failed to connect to host (connection refused/unreachable)\n- 28: Operation timeout (network/server timeout)\n- 35: SSL connect error (SSL handshake failed)\n- 60: SSL certificate problem (untrusted/invalid certificate)\n- 51: SSL peer certificate or SSH remote key was not OK\n- 52: Got nothing (empty response from server)\n- 56: Failure in receiving network data\n\nFor SSL certificate issues (exit codes 35, 51, 60), consider setting VERIFY_SSL=false if using self-signed or untrusted certificates.\n\nTroubleshooting steps:\n1. Check network connectivity and DNS resolution\n2. Verify firewall rules and security groups\n3. Test with a simple curl command: curl -v ${test_url}\n4. Check if the service is running and accessible
         ...    next_steps=Check Network Connectivity to `${test_url}`\nVerify DNS Resolution for the Target Host\nCheck Firewall Rules and Security Groups\nInspect ${owner_kind.stdout} `${owner_name.stdout}` Configuration
     ELSE
         # Parse JSON only if curl succeeded
@@ -86,7 +88,7 @@ Check Single HTTP URL
             ...    expected=HTTP response code should be ${DESIRED_RESPONSE_CODE}
             ...    actual=Received HTTP response code ${json['http_code']}
             ...    reproduce_hint=Run: ${curl_rsp.cmd}
-            ...    details=${test_url} responded with HTTP status code ${json['http_code']} instead of expected ${DESIRED_RESPONSE_CODE}.\n\nCurl Response: ${curl_rsp.stdout}\n\nCheck related ingress objects, services, and pods.
+            ...    details=${test_url} responded with HTTP status code ${json['http_code']} instead of expected ${DESIRED_RESPONSE_CODE}.\n\nDetailed Timing Information:\n- DNS Lookup Time: ${json.get('time_namelookup', 'N/A')}s\n- Connection Time: ${json.get('time_connect', 'N/A')}s\n- SSL Handshake Time: ${json.get('time_appconnect', 'N/A')}s\n- Time to First Byte: ${json.get('time_starttransfer', 'N/A')}s\n- Total Time: ${json.get('time_total', 'N/A')}s\n- Remote IP: ${json.get('remote_ip', 'N/A')}:${json.get('remote_port', 'N/A')}\n- Local IP: ${json.get('local_ip', 'N/A')}:${json.get('local_port', 'N/A')}\n- Download Size: ${json.get('size_download', 'N/A')} bytes\n- Download Speed: ${json.get('speed_download', 'N/A')} bytes/sec\n\nCurl Response: ${curl_rsp.stdout}\n\nHTTP Status Code Meanings:\n- 1xx: Informational responses\n- 2xx: Success responses\n- 3xx: Redirection messages\n- 4xx: Client error responses (check URL, authentication, permissions)\n- 5xx: Server error responses (check server health, resources)\n\nCheck related ingress objects, services, and pods.
             ...    next_steps=Check ${owner_kind.stdout} Log for Issues with `${owner_name.stdout}`\n Troubleshoot Warning Events in Namespace `${owner_namespace.stdout}`\nQuery Traces for HTTP Errors in Namespace `${owner_namespace.stdout}`
         END
         
@@ -99,7 +101,7 @@ Check Single HTTP URL
             ...    expected=HTTP response time should be <= ${TARGET_LATENCY} seconds
             ...    actual=HTTP response time was ${latency} seconds
             ...    reproduce_hint=Run: ${curl_rsp.cmd}
-            ...    details=${test_url} responded with high latency of ${latency} seconds (target: ${TARGET_LATENCY}s).\n\nCurl Response: ${curl_rsp.stdout}\n\nCheck services, pods, load balancers, and virtual machines for unexpected saturation.
+            ...    details=${test_url} responded with high latency of ${latency} seconds (target: ${TARGET_LATENCY}s).\n\nLatency Breakdown:\n- DNS Lookup Time: ${json.get('time_namelookup', 'N/A')}s\n- Connection Time: ${json.get('time_connect', 'N/A')}s\n- SSL Handshake Time: ${json.get('time_appconnect', 'N/A')}s\n- Pre-transfer Time: ${json.get('time_pretransfer', 'N/A')}s\n- Time to First Byte: ${json.get('time_starttransfer', 'N/A')}s\n- Total Time: ${json.get('time_total', 'N/A')}s\n\nConnection Details:\n- Remote IP: ${json.get('remote_ip', 'N/A')}:${json.get('remote_port', 'N/A')}\n- Local IP: ${json.get('local_ip', 'N/A')}:${json.get('local_port', 'N/A')}\n- Download Size: ${json.get('size_download', 'N/A')} bytes\n- Download Speed: ${json.get('speed_download', 'N/A')} bytes/sec\n\nCurl Response: ${curl_rsp.stdout}\n\nLatency Analysis:\n- If DNS lookup time is high: DNS server issues or domain resolution problems\n- If connection time is high: Network connectivity or server load issues\n- If SSL handshake time is high: SSL certificate or TLS configuration issues\n- If time to first byte is high: Server processing or backend issues\n\nCheck services, pods, load balancers, and virtual machines for unexpected saturation.
             ...    next_steps=Check ${owner_kind.stdout} Log for Issues with `${owner_name.stdout}`\nMonitor Resource Usage in Namespace `${owner_namespace.stdout}`\nCheck Load Balancer and Network Performance
         END
     END
@@ -111,17 +113,28 @@ Check Single HTTP URL
         TRY
             ${json_for_report}=    Evaluate    json.loads(r'''${curl_rsp.stdout}''')    json
             RW.Core.Add Pre To Report    URL: ${test_url}
-            RW.Core.Add Pre To Report    URL Latency: ${json_for_report['time_total']}
             RW.Core.Add Pre To Report    URL Response Code: ${json_for_report['http_code']}
+            RW.Core.Add Pre To Report    URL Total Latency: ${json_for_report['time_total']}s
+            RW.Core.Add Pre To Report    URL DNS Lookup Time: ${json_for_report.get('time_namelookup', 'N/A')}s
+            RW.Core.Add Pre To Report    URL Connection Time: ${json_for_report.get('time_connect', 'N/A')}s
+            RW.Core.Add Pre To Report    URL SSL Handshake Time: ${json_for_report.get('time_appconnect', 'N/A')}s
+            RW.Core.Add Pre To Report    URL Time to First Byte: ${json_for_report.get('time_starttransfer', 'N/A')}s
+            RW.Core.Add Pre To Report    URL Remote IP: ${json_for_report.get('remote_ip', 'N/A')}:${json_for_report.get('remote_port', 'N/A')}
+            RW.Core.Add Pre To Report    URL Download Size: ${json_for_report.get('size_download', 'N/A')} bytes
+            RW.Core.Add Pre To Report    URL Download Speed: ${json_for_report.get('speed_download', 'N/A')} bytes/sec
+            RW.Core.Add Pre To Report    SSL Verification: ${VERIFY_SSL}
         EXCEPT
             RW.Core.Add Pre To Report    URL: ${test_url}
             RW.Core.Add Pre To Report    URL Latency: N/A (JSON parse failed)
             RW.Core.Add Pre To Report    URL Response Code: N/A (JSON parse failed)
+            RW.Core.Add Pre To Report    SSL Verification: ${VERIFY_SSL}
         END
     ELSE
         RW.Core.Add Pre To Report    URL: ${test_url}
         RW.Core.Add Pre To Report    URL Latency: N/A (curl failed)
         RW.Core.Add Pre To Report    URL Response Code: N/A (curl failed)
+        RW.Core.Add Pre To Report    Curl Exit Code: ${curl_rsp.returncode}
+        RW.Core.Add Pre To Report    SSL Verification: ${VERIFY_SSL}
     END
 
 Suite Initialization
@@ -149,7 +162,14 @@ Suite Initialization
     ...    pattern=\w*
     ...    default={"name": "my-ingress", "kind": "Ingress", "namespace": "default"}
     ...    example={"name": "my-ingress", "kind": "Ingress", "namespace": "default"}
+    ${VERIFY_SSL}=    RW.Core.Import User Variable    VERIFY_SSL
+    ...    type=string
+    ...    description=Whether to verify SSL certificates. Set to 'false' to ignore SSL certificate errors.
+    ...    pattern=\w*
+    ...    default=false
+    ...    example=true
     Set Suite Variable    ${DESIRED_RESPONSE_CODE}    ${DESIRED_RESPONSE_CODE}
     Set Suite Variable    ${URLS}    ${URLS}
     Set Suite Variable    ${TARGET_LATENCY}    ${TARGET_LATENCY}
     Set Suite Variable    ${OWNER_DETAILS}    ${OWNER_DETAILS}
+    Set Suite Variable    ${VERIFY_SSL}    ${VERIFY_SSL}
