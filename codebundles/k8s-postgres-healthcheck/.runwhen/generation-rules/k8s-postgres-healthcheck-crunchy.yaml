@@ -19,4 +19,3 @@ spec:
           - type: sli
           - type: runbook
             templateName: k8s-postgres-healthcheck-crunchy-taskset.yaml
-          - type: workflow
