@@ -11,6 +11,8 @@ This codebundle configuration requires the following user variables:
 
 - ${DESIRED_RESPONSE_CODE} (string): Indicates the response code that indicates success. It should be a string value. The default value is 200, and an example value is 200.
 
+- ${VERIFY_SSL} (string): Whether to verify SSL certificates. Set to 'false' to ignore SSL certificate errors for self-signed or untrusted certificates. It should be a string value. The default value is false, and an example value is true.
+
 ## TaskSet
 Similar to the SLI, this codebundle configuration requires the following user variables:
 
@@ -19,6 +21,8 @@ Similar to the SLI, this codebundle configuration requires the following user va
 - ${TARGET_LATENCY} (string): Represents the maximum latency in seconds, allowed for requests. It should be a float value. The default value is 1.2, and an example value is 1.2.
 
 - ${DESIRED_RESPONSE_CODE} (string): Indicates the response code that indicates success. It should be a string value. The default value is 200, and an example value is 200.
+
+- ${VERIFY_SSL} (string): Whether to verify SSL certificates. Set to 'false' to ignore SSL certificate errors for self-signed or untrusted certificates. It should be a string value. The default value is false, and an example value is true.
 
 If either the http response code or the target latency are not produced, an issue is raised with the RunWhen Platform so that further troubleshooting can take place. 
 

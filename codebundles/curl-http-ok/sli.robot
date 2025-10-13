@@ -32,6 +32,12 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=200
     ...    example=200
+    ${VERIFY_SSL}=    RW.Core.Import User Variable    VERIFY_SSL
+    ...    type=string
+    ...    description=Whether to verify SSL certificates. Set to 'false' to ignore SSL certificate errors.
+    ...    pattern=\w*
+    ...    default=false
+    ...    example=true
 *** Tasks ***
 Validate HTTP URL Availability and Timeliness
     [Documentation]    Use cURL to validate single or multiple http responses
@@ -64,8 +70,10 @@ Test Single URL
     [Documentation]    Test a single URL and return health score
     [Arguments]    ${test_url}
     
+    # Build curl command with conditional SSL verification
+    ${ssl_flag}=    Set Variable If    '${VERIFY_SSL}' == 'false'    --insecure    ${EMPTY}
     ${curl_rsp}=    RW.CLI.Run Cli
-    ...    cmd=curl --connect-timeout 5 --max-time 15 -L -o /dev/null -w '{"http_code": "\%{http_code}", "time_total": \%{time_total}, "curl_exit_code": \%{exitcode}}' -s ${test_url}
+    ...    cmd=curl --connect-timeout 5 --max-time 15 -L -o /dev/null -w '{"http_code": "\%{http_code}", "time_total": \%{time_total}, "time_namelookup": \%{time_namelookup}, "time_connect": \%{time_connect}, "time_appconnect": \%{time_appconnect}, "time_pretransfer": \%{time_pretransfer}, "time_starttransfer": \%{time_starttransfer}, "size_download": \%{size_download}, "speed_download": \%{speed_download}, "remote_ip": "\%{remote_ip}", "remote_port": "\%{remote_port}", "local_ip": "\%{local_ip}", "local_port": "\%{local_port}", "curl_exit_code": \%{exitcode}}' -s ${ssl_flag} ${test_url}
     
     # Check curl command success first (before JSON parsing)
     ${curl_success}=    Evaluate    1 if ${curl_rsp.returncode} == 0 else 0
