@@ -69,12 +69,13 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=jaeger-all-in-one
     ...    default=none
-   ${LOOKBACK}=    RW.Core.Import User Variable    LOOKBACK
+   ${LOOKBACK_WINDOW}=    RW.Core.Import User Variable    LOOKBACK_WINDOW
     ...    type=string
     ...    description=The age to query for traces. Defaults to 5m. 
     ...    pattern=\w*
     ...    example=1h
     ...    default=5m
+    ${LOOKBACK}=    Set Variable    ${LOOKBACK_WINDOW}
     ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
     ...    type=string
     ...    description=Which binary to use for Kubernetes CLI commands.

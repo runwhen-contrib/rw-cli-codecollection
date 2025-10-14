@@ -90,12 +90,13 @@ Suite Initialization
     ...    description=The GitHub Token used to access the repository.
     ...    pattern=\w*
     ...    default=''
-    ${PERIOD_HOURS}=    RW.Core.Import User Variable    PERIOD_HOURS
+    ${LOOKBACK_WINDOW}=    RW.Core.Import User Variable    LOOKBACK_WINDOW
     ...    type=string
     ...    description=The amount of hours to condider for a healthy last workflow run.
     ...    pattern=\w*
     ...    example=24
     ...    default=24
+    ${PERIOD_HOURS}=    Set Variable    ${LOOKBACK_WINDOW}
     ${ISSUE_SEARCH_STRING}=    RW.Core.Import User Variable    ISSUE_SEARCH_STRING
     ...    type=string
     ...    description=A string that, if found in the analysis output, will generate an Issue. 

@@ -214,11 +214,12 @@ Suite Initialization
     ...    description=The Azure Subscription ID for the resource.
     ...    pattern=\w*
     ...    default=""
-    ${TIME_PERIOD_MINUTES}=    RW.Core.Import User Variable    TIME_PERIOD_MINUTES
+    ${LOOKBACK_WINDOW}=    RW.Core.Import User Variable    LOOKBACK_WINDOW
     ...    type=string
     ...    description=The time period, in minutes, to look back for activites/events. 
     ...    pattern=\w*
     ...    default=10
+    ${TIME_PERIOD_MINUTES}=    Set Variable    ${LOOKBACK_WINDOW}
     ${SCALE_OUT_FACTOR}=    RW.Core.Import User Variable    SCALE_OUT_FACTOR
     ...    type=string
     ...    description=The factor by which to increase the amount of instances within the given App Service Plan.

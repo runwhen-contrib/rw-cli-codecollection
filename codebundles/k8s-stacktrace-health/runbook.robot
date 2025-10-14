@@ -62,12 +62,13 @@ Suite Initialization
     ...    pattern=\d+
     ...    example=100
     ...    default=2000
-    ${LOG_AGE}=    RW.Core.Import User Variable    LOG_AGE
+    ${LOOKBACK_WINDOW}=    RW.Core.Import User Variable    LOOKBACK_WINDOW
     ...    type=string
     ...    description=The age of logs to fetch from pods, used for log analysis tasks.
     ...    pattern=\w*
     ...    example=1h
     ...    default=15m
+    ${LOG_AGE}=    Set Variable    ${LOOKBACK_WINDOW}
     ${LOG_SIZE}=    RW.Core.Import User Variable    LOG_SIZE
     ...    type=string
     ...    description=The maximum size of logs in bytes to fetch from pods, used for log analysis tasks. Defaults to 2MB.

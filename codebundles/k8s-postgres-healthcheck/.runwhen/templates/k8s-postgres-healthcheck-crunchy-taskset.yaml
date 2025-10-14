@@ -20,6 +20,7 @@ spec:
     ref: main
     {% endif %}
     pathToRobot: codebundles/k8s-postgres-healthcheck/runbook.robot
+  lookbackWindow: {{lookback_window}}
   configProvided:
     - name: DISTRIBUTION
       value: {{custom.kubernetes_distribution}}

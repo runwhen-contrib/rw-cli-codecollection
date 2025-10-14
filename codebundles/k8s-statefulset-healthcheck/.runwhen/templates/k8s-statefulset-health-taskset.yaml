@@ -20,6 +20,7 @@ spec:
     ref: main
     {% endif %}
     pathToRobot: codebundles/k8s-statefulset-healthcheck/runbook.robot
+  lookbackWindow: {{lookback_window}}
   configProvided:
     - name: KUBERNETES_DISTRIBUTION_BINARY
       value: {{custom.kubernetes_distribution_binary}}

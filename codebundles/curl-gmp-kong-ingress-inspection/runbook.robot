@@ -143,12 +143,13 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=5.* (matches any 500 error code)
     ...    default=5.*
-    ${TIME_SLICE}=    RW.Core.Import User Variable    TIME_SLICE
+    ${LOOKBACK_WINDOW}=    RW.Core.Import User Variable    LOOKBACK_WINDOW
     ...    type=string
     ...    description=Specify the window of time used to measure the rate.
     ...    pattern=\w*
     ...    example=1m
     ...    default=1m
+    ${TIME_SLICE}=    Set Variable    ${LOOKBACK_WINDOW}
     ${HTTP_ERROR_RATE_THRESHOLD}=    RW.Core.Import User Variable    HTTP_ERROR_RATE_THRESHOLD
     ...    type=string
     ...    description=Specify the error rate threshold that is considered unhealthy. Measured in errors/s.

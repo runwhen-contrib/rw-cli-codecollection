@@ -48,13 +48,14 @@ Suite Initialization
     ...    type=string
     ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
     ...    pattern=\w*
-    ${AZ_HISTORY_RANGE}=    RW.Core.Import User Variable
-    ...    AZ_HISTORY_RANGE
+    ${LOOKBACK_WINDOW}=    RW.Core.Import User Variable
+    ...    LOOKBACK_WINDOW
     ...    type=string
     ...    description=The range of history to check for incidents in the activity log, in hours.
     ...    pattern=\w*
     ...    default=24
     ...    example=24
+    ${AZ_HISTORY_RANGE}=    Set Variable    ${LOOKBACK_WINDOW}
     ${AZ_LB_NAME}=    RW.Core.Import User Variable
     ...    AZ_LB_NAME
     ...    type=string

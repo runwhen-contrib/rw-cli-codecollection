@@ -21,13 +21,12 @@ spec:
     ref: main
     {% endif %}
     pathToRobot: codebundles/azure-appservice-webapp-ops/runbook.robot
+  lookbackWindow: {{lookback_window}}
   configProvided:
     - name: AZ_RESOURCE_GROUP
       value: {{resource_group.name}}
     - name: APP_SERVICE_NAME
       value: {{match_resource.resource.name}}
-    - name: TIME_PERIOD_MINUTES
-      value: "10"
     - name: SCALE_OUT_FACTOR
       value: "2"
     - name: SCALE_IN_FACTOR

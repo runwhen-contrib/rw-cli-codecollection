@@ -179,13 +179,14 @@ Suite Initialization
     ...    enum=[YES,NO]
     ...    example=YES
     ...    default=YES
-    ${LOGS_SINCE}=    RW.Core.Import User Variable
-    ...    LOGS_SINCE
+    ${LOOKBACK_WINDOW}=    RW.Core.Import User Variable
+    ...    LOOKBACK_WINDOW
     ...    type=string
     ...    description=How far back to fetch logs from containers in Kubernetes. Making this too recent and running the codebundle often could cause adverse performance.
     ...    pattern=\w*
     ...    example=15m
     ...    default=15m
+    ${LOGS_SINCE}=    Set Variable    ${LOOKBACK_WINDOW}
     ${EXCLUDE_PATTERN}=    RW.Core.Import User Variable
     ...    EXCLUDE_PATTERN
     ...    type=string

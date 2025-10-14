@@ -303,11 +303,12 @@ Suite Initialization
     ...    description=Interval for latency metrics (format: PT1H, PT30M, PT5M, etc.)
     ...    default=PT1H
     ...    example=PT5M
-    ${TIME_RANGE}=    RW.Core.Import User Variable    TIME_RANGE
+    ${LOOKBACK_WINDOW}=    RW.Core.Import User Variable    LOOKBACK_WINDOW
     ...    type=integer
     ...    description=Time range in hours to look back for metrics
     ...    default=24
     ...    example=24
+    ${TIME_RANGE}=    Set Variable    ${LOOKBACK_WINDOW}
     ${LOG_QUERY_DAYS}=    RW.Core.Import User Variable    LOG_QUERY_DAYS
     ...    type=string
     ...    description=Time range for log queries (format: 1d, 7d, 30d, etc.)

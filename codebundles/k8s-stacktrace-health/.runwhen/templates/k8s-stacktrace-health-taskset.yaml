@@ -20,6 +20,7 @@ spec:
     ref: main
     {% endif %}
     pathToRobot: codebundles/k8s-stacktrace-health/runbook.robot
+  lookbackWindow: {{lookback_window}}
   configProvided:
     - name: NAMESPACE
       value: {{match_resource.resource.metadata.namespace}}
@@ -33,8 +34,6 @@ spec:
       value: {{match_resource.kind | lower}}
     - name: LOG_LINES
       value: "100"
-    - name: LOG_AGE
-      value: "3h"
     - name: LOG_SIZE
       value: "2097152"
     - name: IGNORE_CONTAINERS_MATCHING

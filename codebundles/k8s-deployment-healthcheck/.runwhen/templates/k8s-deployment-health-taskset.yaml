@@ -20,6 +20,7 @@ spec:
     ref: main
     {% endif %}
     pathToRobot: codebundles/k8s-deployment-healthcheck/runbook.robot
+  lookbackWindow: {{lookback_window}}
   configProvided:
     - name: NAMESPACE
       value: {{match_resource.resource.metadata.namespace}}
@@ -33,8 +34,6 @@ spec:
       value: "30m"
     - name: CONTAINER_RESTART_THRESHOLD
       value: "4"
-    - name: LOG_AGE
-      value: "10m"
   secretsProvided:
   {% if wb_version %}
     {% include "kubernetes-auth.yaml" ignore missing %}

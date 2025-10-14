@@ -282,13 +282,14 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=postgresql.acid.zalan.do
     ...    default=
-    ${BACKUP_MAX_AGE}=    RW.Core.Import User Variable
-    ...    BACKUP_MAX_AGE
+    ${LOOKBACK_WINDOW}=    RW.Core.Import User Variable
+    ...    LOOKBACK_WINDOW
     ...    type=string
     ...    description=The maximum age (in hours) of the last backup before an issue is generated.
     ...    pattern=\w*
     ...    example=26
     ...    default=26
+    ${BACKUP_MAX_AGE}=    Set Variable    ${LOOKBACK_WINDOW}
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}

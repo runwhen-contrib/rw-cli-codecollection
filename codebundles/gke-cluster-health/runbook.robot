@@ -58,12 +58,13 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=2
     ...    example=2    
-    ${NODE_HEALTH_LOOKBACK_HOURS}=    RW.Core.Import User Variable    NODE_HEALTH_LOOKBACK_HOURS
+    ${LOOKBACK_WINDOW}=    RW.Core.Import User Variable    LOOKBACK_WINDOW
     ...    type=string
     ...    description=The time (in hours) to look back for node pool events and compute operations when checking node health. 
     ...    pattern=\w*
     ...    default=24
     ...    example=24
+    ${NODE_HEALTH_LOOKBACK_HOURS}=    Set Variable    ${LOOKBACK_WINDOW}
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
     Set Suite Variable
