@@ -11,6 +11,7 @@
 messages="$1"
 owner_kind="$2"  
 owner_name="$3"
+event_timestamp="$4"
 
 issue_details_array=()
 
@@ -19,7 +20,7 @@ add_issue() {
     local title=$2
     local details=$3
     local next_steps=$4
-    issue_details="{\"severity\":\"$severity\",\"title\":\"$title\",\"details\":\"$details\",\"next_steps\":\"$next_steps\"}"
+    issue_details="{\"severity\":\"$severity\",\"title\":\"$title\",\"details\":\"$details\",\"next_steps\":\"$next_steps\",\"observed_at\":\"$event_timestamp\"}"
     issue_details_array+=("$issue_details")
 }
 
@@ -141,5 +142,5 @@ if [ ${#issue_details_array[@]} -gt 0 ]; then
     issues_json="[${issues_json%,}]" # Remove the last comma and wrap in square brackets
     echo "$issues_json" | jq .
 else
-    echo "[{\"severity\":\"4\",\"title\":\"$owner_kind \`$owner_name\` has issues that require further investigation.\",\"details\":\"$messages\",\"next_steps\":\"Escalate issues for $owner_kind \`$owner_name\` to service owner \"}]" | jq .
+    echo "[{\"severity\":\"4\",\"title\":\"$owner_kind \`$owner_name\` has issues that require further investigation.\",\"details\":\"$messages\",\"next_steps\":\"Escalate issues for $owner_kind \`$owner_name\` to service owner \",\"observed_at\":\"$event_timestamp\"}]" | jq .
 fi

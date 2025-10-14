@@ -10,6 +10,7 @@ Library             RW.CLI
 Library             RW.platform
 Library             String
 Library             OperatingSystem
+Library             DateTime
 
 Suite Setup         Suite Initialization
 
@@ -110,6 +111,7 @@ Identify VPA Pod Resource Recommendations in Namespace `${NAMESPACE}`
     END
     IF    len(@{recommendation_list}) > 0
         FOR    ${item}    IN    @{recommendation_list}
+            ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=${item["severity"]}
             ...    expected=Resource requests should closely match VPA recommendations.
@@ -118,6 +120,7 @@ Identify VPA Pod Resource Recommendations in Namespace `${NAMESPACE}`
             ...    reproduce_hint=kubectl describe vpa ${item["vpa_name"]} -n ${NAMESPACE}
             ...    details=${item}
             ...    next_steps=${item["next_step"]}
+            ...    observed_at=${issue_timestamp}
         END
     END
     RW.Core.Add Pre To Report    ${vpa_usage.stdout}\n
@@ -158,6 +161,7 @@ Identify Overutilized Pods in Namespace `${NAMESPACE}`
             ${owner_name}=    Set Variable    "Unknown"
         END
         IF    'CPU usage exceeds threshold' in $item['reason']
+            ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=3
             ...    expected=Pods should be operating under their designated resource limits
@@ -166,8 +170,10 @@ Identify Overutilized Pods in Namespace `${NAMESPACE}`
             ...    reproduce_hint=${pod_usage_analysis.cmd}
             ...    details=${item}
             ...    next_steps=Increase CPU limits for ${owner_kind} `${owner_name}` to ${item["recommended_cpu_increase"]} in namespace `${item["namespace"]}`
+            ...    observed_at=${issue_timestamp}
         END
         IF    'Memory usage exceeds threshold' in $item['reason']
+            ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=3
             ...    expected=Pods should be operating under their designated resource limits
@@ -176,8 +182,10 @@ Identify Overutilized Pods in Namespace `${NAMESPACE}`
             ...    reproduce_hint=${pod_usage_analysis.cmd}
             ...    details=${item}
             ...    next_steps=Increase memory limits for ${owner_kind} `${owner_name}` to ${item["recommended_mem_increase"]} in namespace `${item["namespace"]}`\nInvestigate possible memory leaks with ${owner_kind} `${owner_name}`\nAdd or Adjust HorizontalPodAutoScaler or VerticalPodAutoscaler resources to ${owner_kind} `${owner_name}`
+            ...    observed_at=${issue_timestamp}
         END
         IF    'OOMKilled or exit code 137' in $item['reason']
+            ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=2
             ...    expected=Pods should be operating under their designated resource limits
@@ -186,6 +194,7 @@ Identify Overutilized Pods in Namespace `${NAMESPACE}`
             ...    reproduce_hint=${pod_usage_analysis.cmd}
             ...    details=${item}
             ...    next_steps=Increase memory limits for ${owner_kind} `${owner_name}` to ${item["recommended_mem_increase"]} in namespace `${item["namespace"]}`\nInvestigate possible memory leaks with ${owner_kind} `${owner_name}`\nAdd or Adjust HorizontalPodAutoScaler or VerticalPodAutoscaler resources to ${owner_kind} `${owner_name}`
+            ...    observed_at=${issue_timestamp}
         END
     END
 *** Keywords ***

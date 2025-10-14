@@ -15,6 +15,7 @@ Library             RW.K8sLog
 Library             OperatingSystem
 Library             String
 Library             Collections
+Library             DateTime
 
 Suite Setup         Suite Initialization
 
@@ -181,6 +182,7 @@ Suite Initialization
         ${spec_replicas}=    Evaluate    $scale_status.get('spec_replicas', 1)
         
         IF    ${spec_replicas} == 0
+            ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=4
             ...    expected=Deployment `${DEPLOYMENT_NAME}` operational status documented
@@ -189,6 +191,7 @@ Suite Initialization
             ...    reproduce_hint=kubectl get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o yaml
             ...    details=Deployment `${DEPLOYMENT_NAME}` is currently scaled to 0 replicas (spec.replicas=0). This is an intentional configuration and not an error. All pod-related healthchecks have been skipped for efficiency. If the deployment should be running, scale it up using:\nkubectl scale deployment/${DEPLOYMENT_NAME} --replicas=<desired_count> --context ${CONTEXT} -n ${NAMESPACE}
             ...    next_steps=This is informational only. If the deployment should be running, scale it up.
+            ...    observed_at=${issue_timestamp}
             
             RW.Core.Add Pre To Report    **ℹ️ Deployment `${DEPLOYMENT_NAME}` is scaled to 0 replicas - Skipping pod-related checks**\n**Available Condition:** ${scale_status.get('available_condition', 'Unknown')}
             
@@ -279,6 +282,9 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
                 ${next_steps_raw}=    Evaluate    $issue.get('next_steps', 'Review application logs and resolve underlying issues')
                 ${next_steps}=    Convert To String    ${next_steps_raw}
                 
+                # Use timestamp from log scan results if available, otherwise extract from details
+                ${issue_timestamp}=    Evaluate    $issue.get('observed_at', '')
+
                 RW.Core.Add Issue
                 ...    severity=${severity}
                 ...    expected=Application logs should be free of critical errors for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
@@ -287,6 +293,7 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
                 ...    reproduce_hint=Check application logs for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
                 ...    details=${summarized_details}
                 ...    next_steps=${next_steps}
+                ...    observed_at=${issue_timestamp}
             END
         END
 
@@ -320,6 +327,7 @@ Detect Log Anomalies for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
         ...    include_in_history=false
         
         IF    ${anomaly_results.returncode} != 0
+            ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=3
             ...    expected=Log anomaly detection should complete successfully for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
@@ -328,6 +336,7 @@ Detect Log Anomalies for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
             ...    reproduce_hint=${anomaly_results.cmd}
             ...    details=Anomaly detection failed with exit code ${anomaly_results.returncode}:\n\nSTDOUT:\n${anomaly_results.stdout}\n\nSTDERR:\n${anomaly_results.stderr}
             ...    next_steps=Verify log collection is working properly\nCheck if pods are accessible and generating logs\nReview anomaly detection thresholds
+            ...    observed_at=${issue_timestamp}
         ELSE
             TRY
                 ${anomaly_data}=    Evaluate    json.loads(r'''${anomaly_results.stdout}''') if r'''${anomaly_results.stdout}'''.strip() else []    json
@@ -350,6 +359,7 @@ Detect Log Anomalies for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
                         ${actual_anomalies_count}=    Evaluate    ${actual_anomalies_count} + 1
                         # Create issue for actual anomalies
                         ${severity}=    Evaluate    $item.get('severity', 3)
+                        ${issue_timestamp}=    DateTime.Get Current Date
                         RW.Core.Add Issue
                         ...    severity=${severity}
                         ...    expected=Log patterns should be consistent and normal for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
@@ -358,6 +368,7 @@ Detect Log Anomalies for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
                         ...    reproduce_hint=Review events for ${item.get('kind', 'Unknown')}/${item.get('name', 'Unknown')} in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
                         ...    details=Detected unusually high event rate of ${events_per_minute} events/minute (threshold: ${ANOMALY_THRESHOLD})\n\nReasons: ${item.get('reasons', [])}\n\nSample Messages: ${item.get('messages', [])[:3]}
                         ...    next_steps=Investigate why ${item.get('kind', 'Unknown')}/${item.get('name', 'Unknown')} is generating high event volume\nCheck for resource constraints, misconfigurations, or application issues\nReview the specific event messages for patterns
+                        ...    observed_at=${issue_timestamp}
                     END
                 END
                 
@@ -390,6 +401,7 @@ Fetch Deployment Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
         ...    render_in_commandlist=true
         
         IF    ${deployment_logs.returncode} != 0
+            ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=3
             ...    expected=Deployment logs should be accessible for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
@@ -398,6 +410,7 @@ Fetch Deployment Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
             ...    reproduce_hint=${deployment_logs.cmd}
             ...    details=Log collection failed with exit code ${deployment_logs.returncode}:\n\nSTDOUT:\n${deployment_logs.stdout}\n\nSTDERR:\n${deployment_logs.stderr}
             ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck if pods are running and accessible
+            ...    observed_at=${issue_timestamp}
         ELSE
             # Filter logs to remove repetitive health check messages and focus on meaningful content
             ${filtered_logs}=    RW.CLI.Run Cli
@@ -468,6 +481,7 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
         
         # Check for command failure and create generic issue if needed
         IF    ${liveness_probe_health.returncode} != 0
+            ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=2
             ...    expected=Liveness probe validation should complete for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
@@ -476,6 +490,7 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
             ...    reproduce_hint=${liveness_probe_health.cmd}
             ...    details=Validation script failed with exit code ${liveness_probe_health.returncode}:\n\nSTDOUT:\n${liveness_probe_health.stdout}\n\nSTDERR:\n${liveness_probe_health.stderr}
             ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
+            ...    observed_at=${issue_timestamp}
             ${history}=    RW.CLI.Pop Shell History
             RW.Core.Add Pre To Report    **Liveness Probe Validation Failed for Deployment `${DEPLOYMENT_NAME}`**\n\nFailed to validate liveness probe:\n\n${liveness_probe_health.stderr}\n\n**Commands Used:** ${liveness_probe_health.cmd}
         ELSE
@@ -485,6 +500,7 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
             ...    include_in_history=false
             ${rec_length}=    Get Length    ${recommendations.stdout}
             IF    ${rec_length} > 0
+                ${issue_timestamp}=    DateTime.Get Current Date
                 RW.Core.Add Issue
                 ...    severity=2
                 ...    expected=Liveness probes should be configured and functional for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
@@ -493,6 +509,7 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
                 ...    reproduce_hint=View Commands Used in Report Output
                 ...    details=Liveness Probe Configuration Issues with Deployment ${DEPLOYMENT_NAME}\n${liveness_probe_health.stdout}
                 ...    next_steps=${recommendations.stdout}
+                ...    observed_at=${issue_timestamp}
             END
             ${history}=    RW.CLI.Pop Shell History
             RW.Core.Add Pre To Report    **Liveness Probe Testing Results for Deployment `${DEPLOYMENT_NAME}`**\n\n${liveness_probe_health.stdout}\n\n**Commands Used:** ${liveness_probe_health.cmd}
@@ -524,6 +541,7 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}` in Names
         
         # Check for command failure and create generic issue if needed
         IF    ${readiness_probe_health.returncode} != 0
+            ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=2
             ...    expected=Readiness probe validation should complete for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
@@ -532,6 +550,7 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}` in Names
             ...    reproduce_hint=${readiness_probe_health.cmd}
             ...    details=Validation script failed with exit code ${readiness_probe_health.returncode}:\n\nSTDOUT:\n${readiness_probe_health.stdout}\n\nSTDERR:\n${readiness_probe_health.stderr}
             ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
+            ...    observed_at=${issue_timestamp}
             ${history}=    RW.CLI.Pop Shell History
             RW.Core.Add Pre To Report    **Readiness Probe Validation Failed for Deployment `${DEPLOYMENT_NAME}`**\n\nFailed to validate readiness probe:\n\n${readiness_probe_health.stderr}\n\n**Commands Used:** ${readiness_probe_health.cmd}
         ELSE
@@ -541,6 +560,7 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}` in Names
             ...    include_in_history=false
             ${rec_length}=    Get Length    ${recommendations.stdout}
             IF    ${rec_length} > 0
+                ${issue_timestamp}=    DateTime.Get Current Date
                 RW.Core.Add Issue
                 ...    severity=2
                 ...    expected=Readiness probes should be configured and functional for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
@@ -549,6 +569,7 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}` in Names
                 ...    reproduce_hint=View Commands Used in Report Output
                 ...    details=Readiness Probe Issues with Deployment ${DEPLOYMENT_NAME}\n${readiness_probe_health.stdout}
                 ...    next_steps=${recommendations.stdout}
+                ...    observed_at=${issue_timestamp}
             END
             ${history}=    RW.CLI.Pop Shell History
             RW.Core.Add Pre To Report    **Readiness Probe Validation Results for Deployment `${DEPLOYMENT_NAME}`**\n\n${readiness_probe_health.stdout}\n\n**Commands Used:** ${readiness_probe_health.cmd}
@@ -568,6 +589,7 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
     
     # Check for command failure and create generic issue if needed
     IF    ${events.returncode} != 0
+        ${issue_timestamp}=    DateTime.Get Current Date
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=Deployment warning events should be retrievable for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
@@ -576,6 +598,7 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
         ...    reproduce_hint=${events.cmd}
         ...    details=Command failed with exit code ${events.returncode}:\n\nSTDOUT:\n${events.stdout}\n\nSTDERR:\n${events.stderr}
         ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
+        ...    observed_at=${issue_timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    **Event Retrieval Failed for Deployment `${DEPLOYMENT_NAME}`**\n\nFailed to retrieve events:\n\n${events.stderr}\n\n**Commands Used:** ${history}
     ELSE
@@ -724,13 +747,13 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
                                         ${new_reasons}=    Evaluate    $existing_reasons.union(set($item.get('reasons', [])))
                                         # Preserve event details for each resource
                                         ${existing_events}=    Evaluate    $existing_issue.get('event_details', [])
-                                        ${new_event}=    Evaluate    {'resource': "${item["kind"]}/${item["name"]}", 'reasons': $item.get('reasons', []), 'messages': $item.get('messages', []), 'count': $item.get('total_count', 1)}
+                                        ${new_event}=    Evaluate    {'resource': "${item["kind"]}/${item["name"]}", 'reasons': $item.get('reasons', []), 'messages': $item.get('messages', []), 'count': $item.get('total_count', 1), 'firstTimestamp': $item.get('firstTimestamp', ''), 'lastTimestamp': $item.get('lastTimestamp', '')}
                                         ${updated_events}=    Evaluate    $existing_events + [$new_event]
                                         ${updated_issue}=    Evaluate    {**$existing_issue, 'count': ${updated_count}, 'affected_objects': "${updated_objects}", 'consolidated_reasons': list($new_reasons), 'event_details': $updated_events}
                                         ${updated_dict}=    Evaluate    {**$consolidated_issues, "${issue_key}": $updated_issue}
                                         Set Test Variable    ${consolidated_issues}    ${updated_dict}
                                     ELSE
-                                        ${new_event}=    Evaluate    {'resource': "${item["kind"]}/${item["name"]}", 'reasons': $item.get('reasons', []), 'messages': $item.get('messages', []), 'count': $item.get('total_count', 1)}
+                                        ${new_event}=    Evaluate    {'resource': "${item["kind"]}/${item["name"]}", 'reasons': $item.get('reasons', []), 'messages': $item.get('messages', []), 'count': $item.get('total_count', 1), 'firstTimestamp': $item.get('firstTimestamp', ''), 'lastTimestamp': $item.get('lastTimestamp', '')}
                                         ${new_issue}=    Evaluate    {**$issue, 'count': 1, 'affected_objects': "${item["kind"]}/${item["name"]}, ", 'consolidated_reasons': $item.get('reasons', []), 'event_details': [$new_event]}
                                         ${updated_dict}=    Evaluate    {**$consolidated_issues, "${issue_key}": $new_issue}
                                         Set Test Variable    ${consolidated_issues}    ${updated_dict}
@@ -830,6 +853,20 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
                             END
                         END
                         
+                        # Extract the earliest warning event timestamp from event_details
+                        ${event_details_list}=    Evaluate    $issue.get('event_details', [])
+                        ${issue_timestamp}=    Set Variable    DateTime.Get Current Date
+                        IF    ${event_details_list}
+                            # Find the earliest firstTimestamp from all warning events
+                            ${timestamps}=    Evaluate    [event.get('firstTimestamp', '') for event in $event_details_list if event.get('firstTimestamp', '')]
+                            ${timestamps_length}=    Get Length    ${timestamps}
+                            IF    ${timestamps_length} > 0
+                                # Sort timestamps and get the earliest one
+                                ${sorted_timestamps}=    Evaluate    sorted($timestamps)
+                                ${issue_timestamp}=    Evaluate    $sorted_timestamps[0]
+                            END
+                        END
+                        
                         RW.Core.Add Issue
                         ...    severity=${adjusted_severity}
                         ...    expected=No warning events should be present for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
@@ -838,6 +875,7 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
                         ...    reproduce_hint=${events.cmd}
                         ...    details=${health_context}\n\n${details_prefix}${event_details_str}${issue["details"]}
                         ...    next_steps=${issue["next_steps"]}
+                        ...    observed_at=${issue_timestamp}
                     END
                     
                     # Add note about filtered stale events if applicable
@@ -908,6 +946,7 @@ Check Deployment Replica Status for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
     ...    render_in_commandlist=true
     
     IF    ${replica_status.returncode} != 0
+        ${issue_timestamp}=    DateTime.Get Current Date
         RW.Core.Add Issue
         ...    severity=1
         ...    expected=Deployment replica status should be retrievable for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
@@ -916,6 +955,7 @@ Check Deployment Replica Status for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
         ...    reproduce_hint=${replica_status.cmd}
         ...    details=Command failed with exit code ${replica_status.returncode}:\n\nSTDOUT:\n${replica_status.stdout}\n\nSTDERR:\n${replica_status.stderr}
         ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace
+        ...    observed_at=${issue_timestamp}
     ELSE
         TRY
             ${status_data}=    Evaluate    json.loads(r'''${replica_status.stdout}''')    json
@@ -937,6 +977,7 @@ Check Deployment Replica Status for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
             
             # Check for scaling issues (corrected logic for scale-to-zero)
             IF    ${ready_replicas} == 0 and ${desired_replicas} > 0
+                ${issue_timestamp}=    DateTime.Get Current Date
                 RW.Core.Add Issue
                 ...    severity=1
                 ...    expected=${desired_replicas} ready replicas for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
@@ -945,8 +986,10 @@ Check Deployment Replica Status for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
                 ...    reproduce_hint=${replica_status.cmd}
                 ...    details=Deployment is configured to run ${desired_replicas} replicas but has ${ready_replicas} ready replicas.\n\nStatus: Ready=${ready_replicas}, Available=${available_replicas}, Unavailable=${unavailable_replicas}
                 ...    next_steps=Check pod status and events for deployment issues\nInvestigate resource constraints or scheduling problems\nReview deployment configuration and health checks
+                ...    observed_at=${issue_timestamp}
             ELSE IF    ${ready_replicas} < ${desired_replicas} and ${desired_replicas} > 0
                 ${missing_replicas}=    Evaluate    ${desired_replicas} - ${ready_replicas}
+                ${issue_timestamp}=    DateTime.Get Current Date
                 RW.Core.Add Issue
                 ...    severity=2
                 ...    expected=${desired_replicas} ready replicas for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
@@ -955,6 +998,7 @@ Check Deployment Replica Status for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
                 ...    reproduce_hint=${replica_status.cmd}
                 ...    details=Deployment needs ${missing_replicas} more ready replicas to meet desired state of ${desired_replicas}.\n\nStatus: Ready=${ready_replicas}, Available=${available_replicas}, Unavailable=${unavailable_replicas}
                 ...    next_steps=Check pod status and events for scaling issues\nInvestigate resource constraints or scheduling problems\nReview deployment rollout status
+                ...    observed_at=${issue_timestamp}
             ELSE IF    ${desired_replicas} == 0
                 # Status already shown in consolidated report
                 Log    Deployment is scaled to 0 replicas
@@ -965,6 +1009,7 @@ Check Deployment Replica Status for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
             
         EXCEPT
             Log    Warning: Failed to parse replica status JSON
+            ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=3
             ...    expected=Replica status should be parseable for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
@@ -973,6 +1018,7 @@ Check Deployment Replica Status for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
             ...    reproduce_hint=${replica_status.cmd}
             ...    details=Command succeeded but JSON parsing failed. Raw output:\n${replica_status.stdout}
             ...    next_steps=Review deployment status output manually\nCheck for formatting issues in kubectl output
+            ...    observed_at=${issue_timestamp}
         END
         
         ${history}=    RW.CLI.Pop Shell History
@@ -991,6 +1037,7 @@ Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` in Namespace `${N
         ...    include_in_history=false
         
         IF    ${container_restarts.returncode} != 0
+            ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=3
             ...    expected=Container restart analysis should complete successfully for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
@@ -999,6 +1046,7 @@ Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` in Namespace `${N
             ...    reproduce_hint=${container_restarts.cmd}
             ...    details=Restart analysis failed with exit code ${container_restarts.returncode}:\n\nSTDOUT:\n${container_restarts.stdout}\n\nSTDERR:\n${container_restarts.stderr}
             ...    next_steps=Verify pod access and kubectl connectivity\nCheck if deployment exists and has running pods\nReview container restart analysis script
+            ...    observed_at=${issue_timestamp}
         ELSE
             TRY
                 # Try to parse as JSON first, but handle plain text responses gracefully
@@ -1010,6 +1058,7 @@ Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` in Namespace `${N
                 IF    ${json_match}
                     ${json_text}=    Evaluate    $json_match.group(0) if $json_match else '{}'
                     ${restart_data}=    Evaluate    json.loads(r'''${json_text}''')    json
+                    RW.Core.Add To Report    Hrithvika ${restart_data}
                     ${restart_issues}=    Evaluate    $restart_data.get('issues', [])
                     ${restart_summary}=    Evaluate    $restart_data.get('summary', {})
                     ${is_json}=    Set Variable    ${True}
@@ -1022,6 +1071,7 @@ Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` in Namespace `${N
                 END
                 
                 FOR    ${issue}    IN    @{restart_issues}
+                    ${issue_timestamp}=    RW.K8sLog.Extract Last Termination Timestamp    ${issue.get('details')}
                     RW.Core.Add Issue
                     ...    severity=${issue.get('severity', 3)}
                     ...    expected=Containers should run without frequent restarts for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
@@ -1030,6 +1080,7 @@ Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` in Namespace `${N
                     ...    reproduce_hint=Check container status and logs for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
                     ...    details=${issue.get('details', 'Container restart analysis detected potential issues')}
                     ...    next_steps=${issue.get('next_steps', 'Investigate container logs and health checks\nReview resource limits and application configuration')}
+                    ...    observed_at=${issue_timestamp}
                 END
                 
                 # Create consolidated restart analysis report
@@ -1070,27 +1121,28 @@ Identify Recent Configuration Changes for Deployment `${DEPLOYMENT_NAME}` in Nam
     
     # Parse output for specific patterns and create issues if needed
     ${output}=    Set Variable    ${config_analysis.stdout}
+
+    # Extract ReplicaSet information for issue creation
+    ${lines}=    Split String    ${output}    \n
+    ${current_rs}=    Set Variable    Unknown
+    ${change_time}=    Set Variable    Unknown
+    
+    FOR    ${line}    IN    @{lines}
+        IF    "Current ReplicaSet:" in $line
+            # Extract ReplicaSet name (everything between "Current ReplicaSet: " and " (created:")
+            ${rs_part}=    Evaluate    "${line}".split("Current ReplicaSet: ")[1] if len("${line}".split("Current ReplicaSet: ")) > 1 else "Unknown"
+            ${current_rs}=    Evaluate    "${rs_part}".split(" (created:")[0] if " (created:" in "${rs_part}" else "${rs_part}"
+            
+            # Extract timestamp (everything between "(created: " and ")")
+            IF    "(created: " in $line and ")" in $line
+                ${time_part}=    Evaluate    "${line}".split("(created: ")[1] if len("${line}".split("(created: ")) > 1 else "Unknown"
+                ${change_time}=    Evaluate    "${time_part}".split(")")[0] if ")" in "${time_part}" else "${time_part}"
+            END
+        END
+    END
     
     # Check for recent ReplicaSet changes
     IF    "Recent ReplicaSet change detected" in $output
-        # Extract ReplicaSet information for issue creation
-        ${lines}=    Split String    ${output}    \n
-        ${current_rs}=    Set Variable    Unknown
-        ${change_time}=    Set Variable    Unknown
-        
-        FOR    ${line}    IN    @{lines}
-            IF    "Current ReplicaSet:" in $line
-                # Extract ReplicaSet name (everything between "Current ReplicaSet: " and " (created:")
-                ${rs_part}=    Evaluate    "${line}".split("Current ReplicaSet: ")[1] if len("${line}".split("Current ReplicaSet: ")) > 1 else "Unknown"
-                ${current_rs}=    Evaluate    "${rs_part}".split(" (created:")[0] if " (created:" in "${rs_part}" else "${rs_part}"
-                
-                # Extract timestamp (everything between "(created: " and ")")
-                IF    "(created: " in $line and ")" in $line
-                    ${time_part}=    Evaluate    "${line}".split("(created: ")[1] if len("${line}".split("(created: ")) > 1 else "Unknown"
-                    ${change_time}=    Evaluate    "${time_part}".split(")")[0] if ")" in "${time_part}" else "${time_part}"
-                END
-            END
-        END
         
         # Check for container image changes
         IF    "Container Image Changes Detected" in $output
@@ -1117,6 +1169,7 @@ Identify Recent Configuration Changes for Deployment `${DEPLOYMENT_NAME}` in Nam
             ...    reproduce_hint=Check ReplicaSet history for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
             ...    details=Configuration Change Detected\n\nChange Type: Container Image Update\nTimestamp: ${change_time}\nCurrent ReplicaSet: ${current_rs}\n\nImage Changes:\n${image_details}\nThis change may be related to current deployment issues. Verify the image update was intentional and check for known issues with the new image version.
             ...    next_steps=Verify the image update was intentional\nCheck if the new image version has known issues\nReview deployment rollout status
+            ...    observed_at=${change_time}
         END
         
         # Check for environment variable changes
@@ -1148,6 +1201,7 @@ Identify Recent Configuration Changes for Deployment `${DEPLOYMENT_NAME}` in Nam
             ...    reproduce_hint=Check ReplicaSet history for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
             ...    details=Configuration Change Detected\n\nChange Type: Environment Variables Update\nTimestamp: ${change_time}\nCurrent ReplicaSet: ${current_rs}\n\nEnvironment Variable Changes:\n${env_details}\nThese environment variable changes may be related to current deployment issues. Review the changes to ensure they align with expected configuration.
             ...    next_steps=Review recent environment variable changes\nVerify changes align with expected configuration\nCheck application logs for configuration-related errors
+            ...    observed_at=${change_time}
         END
         
         # Check for resource requirement changes
@@ -1177,6 +1231,7 @@ Identify Recent Configuration Changes for Deployment `${DEPLOYMENT_NAME}` in Nam
             ...    reproduce_hint=Check ReplicaSet history for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
             ...    details=Configuration Change Detected\n\nChange Type: Resource Limits/Requests Update\nTimestamp: ${change_time}\nCurrent ReplicaSet: ${current_rs}\n\nResource Changes:\n${resource_details}\nThese resource limit changes may be related to current deployment issues. Monitor resource utilization and verify the limits are appropriate for the workload.
             ...    next_steps=Monitor resource utilization after changes\nVerify resource limits are appropriate for workload\nCheck for resource constraint issues
+            ...    observed_at=${change_time}
         END
     END
     
@@ -1190,6 +1245,7 @@ Identify Recent Configuration Changes for Deployment `${DEPLOYMENT_NAME}` in Nam
         ...    reproduce_hint=Check deployment generation vs observed generation for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
         ...    details=Recent kubectl apply operation detected. The deployment configuration has been updated but may still be processing.\n\nSee full analysis in report for generation gap details.
         ...    next_steps=Wait for controller to process changes\nCheck deployment status and conditions\nVerify no resource constraints are preventing updates
+        ...    observed_at=${change_time}
     END
     
     # Check for configuration drift
@@ -1202,4 +1258,5 @@ Identify Recent Configuration Changes for Deployment `${DEPLOYMENT_NAME}` in Nam
         ...    reproduce_hint=Check deployment generation vs observed generation for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
         ...    details=Configuration drift detected. The deployment has been modified but the controller hasn't processed all changes yet.\n\nSee full analysis in report for drift details.
         ...    next_steps=Wait for controller to process changes\nCheck deployment status and conditions\nVerify no resource constraints are preventing updates
+        ...    observed_at=${change_time}
     END

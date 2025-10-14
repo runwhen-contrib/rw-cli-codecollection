@@ -1,5 +1,6 @@
 import re, json, logging
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,7 @@ class StackTraceData:
     raw: str = field(default="", repr=False)
     parser_used_type: "BaseStackTraceParse" = None
     occurences: int = 1
+    observed_at: str = field(default="", repr=False)  # ISO 8601 timestamp when the stacktrace was observed
     # TODO: create a in-mem db of exception types
     # TODO: extract exception types and lookup in code
     # TODO: integration for generating log service URL
@@ -29,6 +31,7 @@ class StackTraceData:
                 and self.urls == other.urls
                 and self.parser_used_type == other.parser_used_type
                 and self.line_nums == other.line_nums
+                and self.observed_at == other.observed_at
             )
         return False
 
@@ -78,7 +81,8 @@ class StackTraceData:
         files_str: str = ", ".join(self.files if self.files else [""])
         line_nums_str: str = ", ".join([f"{k}: {v}" for k, v in self.line_nums.items()])
         error_messages_str: str = ", ".join(self.error_messages if self.error_messages else [""])
-        return f"StackTraceData: occurences: {self.occurences}, urls: {urls_str}, endpoints: {endpoints_str}, files: {files_str}, line_nums: {line_nums_str}, error_messages: {error_messages_str}\n\n{self.raw}"
+        observed_at_str: str = self.observed_at if self.observed_at else "Not set"
+        return f"StackTraceData: occurences: {self.occurences}, urls: {urls_str}, endpoints: {endpoints_str}, files: {files_str}, line_nums: {line_nums_str}, error_messages: {error_messages_str}, observed_at: {observed_at_str}\n\n{self.raw}"
 
 
 class BaseStackTraceParse:
@@ -117,6 +121,8 @@ class BaseStackTraceParse:
         urls: list[str] = BaseStackTraceParse.extract_urls(log, show_debug=show_debug)
         endpoints: list[str] = BaseStackTraceParse.extract_endpoints(log, show_debug=show_debug)
         error_messages: list[str] = BaseStackTraceParse.extract_sentences(log, show_debug=show_debug)
+        observed_at = BaseStackTraceParse.extract_timestamp(log, show_debug=show_debug)
+        
         st_data = StackTraceData(
             urls=urls,
             endpoints=endpoints,
@@ -124,6 +130,7 @@ class BaseStackTraceParse:
             line_nums=line_nums,
             error_messages=error_messages,
             raw=log,
+            observed_at=observed_at,
         )
         return st_data
 
@@ -202,6 +209,17 @@ class BaseStackTraceParse:
         # if we did not get any results with a fine grained match, try a more general match
         if not results:
             results = re.findall(r".*error.*", text, re.IGNORECASE)
+        deduplicated = []
+        for r in results:
+            if r not in deduplicated:
+                deduplicated.append(r)
+        results = deduplicated
+        return results
+
+    def extract_timestamp(text: str, show_debug: bool = False) -> str:
+        # format: RFC3339 (often RFC3339Nano) for K8s logs
+        regex = r"\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})\b"
+        results = re.findall(regex, text)
         deduplicated = []
         for r in results:
             if r not in deduplicated:
@@ -295,6 +313,8 @@ class PythonStackTraceParse(BaseStackTraceParse):
             urls: list[str] = BaseStackTraceParse.extract_urls(log, show_debug=show_debug)
             endpoints: list[str] = BaseStackTraceParse.extract_endpoints(log, show_debug=show_debug)
             error_messages: list[str] = PythonStackTraceParse.extract_sentences(log, show_debug=show_debug)
+            observed_at = PythonStackTraceParse.extract_timestamp(log, show_debug=show_debug)
+            
             st_data = StackTraceData(
                 urls=urls,
                 endpoints=endpoints,
@@ -302,6 +322,7 @@ class PythonStackTraceParse(BaseStackTraceParse):
                 line_nums=line_nums,
                 error_messages=error_messages,
                 raw=log,
+                observed_at=observed_at,
             )
             return st_data
         else:
@@ -349,6 +370,8 @@ class GoLangStackTraceParse(BaseStackTraceParse):
         urls: list[str] = BaseStackTraceParse.extract_urls(log, show_debug=show_debug)
         endpoints: list[str] = GoLangStackTraceParse.extract_endpoints(log, show_debug=show_debug)
         error_messages: list[str] = GoLangStackTraceParse.extract_sentences(log, show_debug=show_debug)
+        observed_at = GoLangStackTraceParse.extract_timestamp(log, show_debug=show_debug)
+        
         st_data = StackTraceData(
             urls=urls,
             endpoints=endpoints,
@@ -356,6 +379,7 @@ class GoLangStackTraceParse(BaseStackTraceParse):
             line_nums=line_nums,
             error_messages=error_messages,
             raw=log,
+            observed_at=observed_at,
         )
         return st_data
 

@@ -14,6 +14,7 @@ Library             RW.K8sLog
 Library             OperatingSystem
 Library             String
 Library             Collections
+Library             DateTime
 
 Suite Setup         Suite Initialization
 
@@ -55,6 +56,8 @@ Analyze Application Log Patterns for StatefulSet `${STATEFULSET_NAME}` in Namesp
             # Use the full issue details directly without summarization to preserve all log content
             ${issue_details_raw}=    Evaluate    $issue.get("details", "")
             ${issue_details_str}=    Convert To String    ${issue_details_raw}
+            # Use timestamp from log scan results if available, otherwise extract from details
+            ${issue_timestamp}=    Evaluate    $issue.get('observed_at', '')
             
             RW.Core.Add Issue
             ...    severity=${severity}
@@ -64,6 +67,7 @@ Analyze Application Log Patterns for StatefulSet `${STATEFULSET_NAME}` in Namesp
             ...    reproduce_hint=Check application logs for statefulset `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
             ...    details=${issue_details_str}
             ...    next_steps=${issue.get('next_steps', 'Review application logs and resolve underlying issues')}
+            ...    observed_at=${issue_timestamp}
         END
     END
 
@@ -72,7 +76,7 @@ Analyze Application Log Patterns for StatefulSet `${STATEFULSET_NAME}` in Namesp
     # Format scan results for better display
     ${formatted_results}=    RW.K8sLog.Format Scan Results For Display    scan_results=${scan_results}
     
-    RW.Core.Add Pre To Report    **Log Analysis Summary for StatefulSet `${STATEFULSET_NAME}`**\n**Health Score:** ${log_health_score}\n**Analysis Depth:** ${LOG_ANALYSIS_DEPTH}\n**Categories Analyzed:** ${LOG_PATTERN_CATEGORIES_STR}\n**Issues Found:** ${issues_count}\n\n${formatted_results}
+    RW.Core.Add Pre To Report    **Log Analysis Summary for StatefulSet `${STATEFULSET_NAME}`**\n**Health Score:** ${log_health_score}\n**Analysis Depth:** ${LOG_ANALYSIS_DEPTH}\n**Categories Analyzed:** ${LOG_PATTERN_CATEGORIES}\n**Issues Found:** ${issues_count}\n\n${formatted_results}
     
     RW.K8sLog.Cleanup Temp Files
 
@@ -115,6 +119,7 @@ Detect Log Anomalies for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMES
             ...    reproduce_hint=Use RW.K8sLog.Analyze Log Anomalies keyword to reproduce this analysis
             ...    details=${summarized_details}
             ...    next_steps=${next_steps_text}
+            ...    observed_at=${issue["observed_at"]}
         END
     END
     
@@ -147,6 +152,7 @@ Check Liveness Probe Configuration for StatefulSet `${STATEFULSET_NAME}`
     
     # Check for command failure and create generic issue if needed
     IF    ${liveness_probe_health.returncode} != 0
+        ${issue_timestamp}=    DateTime.Get Current Date
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=Liveness probe validation should complete for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
@@ -155,6 +161,7 @@ Check Liveness Probe Configuration for StatefulSet `${STATEFULSET_NAME}`
         ...    reproduce_hint=${liveness_probe_health.cmd}
         ...    details=Validation script failed with exit code ${liveness_probe_health.returncode}:\n\nSTDOUT:\n${liveness_probe_health.stdout}\n\nSTDERR:\n${liveness_probe_health.stderr}
         ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm StatefulSet '${STATEFULSET_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
+        ...    observed_at=${issue_timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Failed to validate liveness probe:\n\n${liveness_probe_health.stderr}
         RW.Core.Add Pre To Report    Commands Used: ${liveness_probe_health.cmd}
@@ -164,6 +171,7 @@ Check Liveness Probe Configuration for StatefulSet `${STATEFULSET_NAME}`
         ...    env=${env}
         ...    include_in_history=false
         IF    len($recommendations.stdout) > 0
+            ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=2
             ...    expected=Liveness probes should be configured and functional for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
@@ -172,6 +180,7 @@ Check Liveness Probe Configuration for StatefulSet `${STATEFULSET_NAME}`
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=Liveness Probe Configuration Issues with StatefulSet ${STATEFULSET_NAME}\n${liveness_probe_health.stdout}
             ...    next_steps=${recommendations.stdout}
+            ...    observed_at=${issue_timestamp}
         END
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Liveness probe testing results:\n\n${liveness_probe_health.stdout}
@@ -201,6 +210,7 @@ Check Readiness Probe Configuration for StatefulSet `${STATEFULSET_NAME}` in Nam
     
     # Check for command failure and create generic issue if needed
     IF    ${readiness_probe_health.returncode} != 0
+        ${issue_timestamp}=    DateTime.Get Current Date
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=Readiness probe validation should complete for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
@@ -209,6 +219,7 @@ Check Readiness Probe Configuration for StatefulSet `${STATEFULSET_NAME}` in Nam
         ...    reproduce_hint=${readiness_probe_health.cmd}
         ...    details=Validation script failed with exit code ${readiness_probe_health.returncode}:\n\nSTDOUT:\n${readiness_probe_health.stdout}\n\nSTDERR:\n${readiness_probe_health.stderr}
         ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm StatefulSet '${STATEFULSET_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
+        ...    observed_at=${issue_timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Failed to validate readiness probe:\n\n${readiness_probe_health.stderr}
         RW.Core.Add Pre To Report    Commands Used: ${readiness_probe_health.cmd}
@@ -218,6 +229,7 @@ Check Readiness Probe Configuration for StatefulSet `${STATEFULSET_NAME}` in Nam
         ...    env=${env}
         ...    include_in_history=false
         IF    len($recommendations.stdout) > 0
+            ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=2
             ...    expected=Readiness probes should be configured and functional for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
@@ -226,6 +238,7 @@ Check Readiness Probe Configuration for StatefulSet `${STATEFULSET_NAME}` in Nam
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=Readiness Probe Issues with StatefulSet ${STATEFULSET_NAME}\n${readiness_probe_health.stdout}
             ...    next_steps=${recommendations.stdout}
+            ...    observed_at=${issue_timestamp}
         END
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${readiness_probe_health.stdout}
@@ -244,6 +257,7 @@ Inspect StatefulSet Warning Events for `${STATEFULSET_NAME}` in Namespace `${NAM
     
     # Check for command failure and create generic issue if needed
     IF    ${events.returncode} != 0
+        ${issue_timestamp}=    DateTime.Get Current Date
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=StatefulSet warning events should be retrievable for `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
@@ -252,6 +266,7 @@ Inspect StatefulSet Warning Events for `${STATEFULSET_NAME}` in Namespace `${NAM
         ...    reproduce_hint=${events.cmd}
         ...    details=Command failed with exit code ${events.returncode}:\n\nSTDOUT:\n${events.stdout}\n\nSTDERR:\n${events.stderr}
         ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm StatefulSet '${STATEFULSET_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
+        ...    observed_at=${issue_timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Failed to retrieve events:\n\n${events.stderr}
         RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -263,6 +278,7 @@ Inspect StatefulSet Warning Events for `${STATEFULSET_NAME}` in Namespace `${NAM
         
         # Check for StatefulSet details command failure
         IF    ${k8s_statefulset_details.returncode} != 0
+            ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=2
             ...    expected=StatefulSet details should be retrievable for `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
@@ -271,6 +287,7 @@ Inspect StatefulSet Warning Events for `${STATEFULSET_NAME}` in Namespace `${NAM
             ...    reproduce_hint=${k8s_statefulset_details.cmd}
             ...    details=Command failed with exit code ${k8s_statefulset_details.returncode}:\n\nSTDOUT:\n${k8s_statefulset_details.stdout}\n\nSTDERR:\n${k8s_statefulset_details.stderr}
             ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm StatefulSet '${STATEFULSET_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
+            ...    observed_at=${issue_timestamp}
             ${history}=    RW.CLI.Pop Shell History
             RW.Core.Add Pre To Report    Failed to retrieve StatefulSet details:\n\n${k8s_statefulset_details.stderr}
             RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -286,6 +303,7 @@ Inspect StatefulSet Warning Events for `${STATEFULSET_NAME}` in Namespace `${NAM
                 ${object_list}=    Create List
                 # Create generic issue if we have events but can't parse them
                 IF    "Warning" in $events.stdout
+                    ${issue_timestamp}=   DateTime.Get Current Date
                     RW.Core.Add Issue
                     ...    severity=3
                     ...    expected=No warning events should be present for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
@@ -294,6 +312,7 @@ Inspect StatefulSet Warning Events for `${STATEFULSET_NAME}` in Namespace `${NAM
                     ...    reproduce_hint=${events.cmd}
                     ...    details=Warning events detected but JSON parsing failed. Raw output:\n${events.stdout}
                     ...    next_steps=Manually review events output and investigate warning conditions\n${related_resource_recommendations}
+                    ...    observed_at=${issue_timestamp}
                 END
             END
             
@@ -307,9 +326,10 @@ Inspect StatefulSet Warning Events for `${STATEFULSET_NAME}` in Namespace `${NAM
                 FOR    ${item}    IN    @{object_list}
                     ${message_string}=    Catenate    SEPARATOR;    @{item["messages"]}
                     ${messages}=    RW.K8sHelper.Sanitize Messages    ${message_string}
+                    ${event_timestamp}=    Set Variable    ${item["firstTimestamp"]}
                     ${issues}=    RW.CLI.Run Bash File
                     ...    bash_file=workload_issues.sh
-                    ...    cmd_override=./workload_issues.sh "${messages}" "StatefulSet" "${STATEFULSET_NAME}"
+                    ...    cmd_override=./workload_issues.sh "${messages}" "StatefulSet" "${STATEFULSET_NAME}" "${event_timestamp}"
                     ...    env=${env}
                     ...    include_in_history=False
                     
@@ -369,6 +389,7 @@ Inspect StatefulSet Warning Events for `${STATEFULSET_NAME}` in Namespace `${NAM
                     ...    reproduce_hint=${events.cmd}
                     ...    details=**Affected Pods:** ${pod_count}\n\n${consolidated_pod_details}
                     ...    next_steps=${sample_pod_issue["next_steps"]}\n${related_resource_recommendations}
+                    ...    observed_at=${sample_pod_issue["observed_at"]}
                 END
                 
                 # Create consolidated issues for PVCs
@@ -392,6 +413,7 @@ Inspect StatefulSet Warning Events for `${STATEFULSET_NAME}` in Namespace `${NAM
                     ...    reproduce_hint=${events.cmd}
                     ...    details=**Affected PVCs:** ${pvc_count}\n\n${consolidated_pvc_details}
                     ...    next_steps=${sample_pvc_issue["next_steps"]}\nCheck PV status and storage class configuration\n${related_resource_recommendations}
+                    ...    observed_at=${sample_pvc_issue["observed_at"]}
                 END
                 
                 # Create issues for StatefulSet-level problems
@@ -410,6 +432,7 @@ Inspect StatefulSet Warning Events for `${STATEFULSET_NAME}` in Namespace `${NAM
                         ...    reproduce_hint=${events.cmd}
                         ...    details=${issue["details"]}
                         ...    next_steps=${issue["next_steps"]}\n${related_resource_recommendations}
+                        ...    observed_at=${issue["observed_at"]}
                     END
                 END
             END
@@ -432,6 +455,7 @@ Fetch StatefulSet Workload Details For `${STATEFULSET_NAME}` in Namespace `${NAM
     
     # Check for command failure and create generic issue if needed
     IF    ${statefulset.returncode} != 0
+        ${issue_timestamp}=    DateTime.Get Current Date
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=StatefulSet manifest should be retrievable for `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
@@ -440,6 +464,7 @@ Fetch StatefulSet Workload Details For `${STATEFULSET_NAME}` in Namespace `${NAM
         ...    reproduce_hint=${statefulset.cmd}
         ...    details=Command failed with exit code ${statefulset.returncode}:\n\nSTDOUT:\n${statefulset.stdout}\n\nSTDERR:\n${statefulset.stderr}
         ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm StatefulSet '${STATEFULSET_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
+        ...    observed_at=${issue_timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Failed to retrieve StatefulSet manifest:\n\n${statefulset.stderr}
         RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -474,6 +499,7 @@ Inspect StatefulSet Replicas for `${STATEFULSET_NAME}` in namespace `${NAMESPACE
     
     # Check for command failure and create generic issue if needed
     IF    ${statefulset_replicas.returncode} != 0
+        ${issue_timestamp}=    DateTime.Get Current Date
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=StatefulSet replica status should be retrievable for `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
@@ -482,6 +508,7 @@ Inspect StatefulSet Replicas for `${STATEFULSET_NAME}` in namespace `${NAMESPACE
         ...    reproduce_hint=${statefulset_replicas.cmd}
         ...    details=Command failed with exit code ${statefulset_replicas.returncode}:\n\nSTDOUT:\n${statefulset_replicas.stdout}\n\nSTDERR:\n${statefulset_replicas.stderr}
         ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm StatefulSet '${STATEFULSET_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
+        ...    observed_at=${issue_timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Failed to retrieve StatefulSet replica status:\n\n${statefulset_replicas.stderr}
         RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -505,6 +532,7 @@ Inspect StatefulSet Replicas for `${STATEFULSET_NAME}` in namespace `${NAMESPACE
             ...    cmd_override=./workload_next_steps.sh "StatefulSet has no ready replicas" "StatefulSet" "${STATEFULSET_NAME}"
             ...    env=${env}
             ...    include_in_history=False
+            ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=1
             ...    expected=StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}` should have minimum availability / pod.
@@ -513,7 +541,9 @@ Inspect StatefulSet Replicas for `${STATEFULSET_NAME}` in namespace `${NAMESPACE
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=StatefulSet `${STATEFULSET_NAME}` has ${ready_replicas} ready pods and needs ${desired_replicas}
             ...    next_steps=${item_next_steps.stdout}
+            ...    observed_at=${issue_timestamp}
         ELSE IF    ${ready_replicas} < ${desired_replicas}
+            ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=3
             ...    expected=StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}` should have ${desired_replicas} pods.
@@ -522,7 +552,9 @@ Inspect StatefulSet Replicas for `${STATEFULSET_NAME}` in namespace `${NAMESPACE
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=StatefulSet `${STATEFULSET_NAME}` has ${ready_replicas}/${desired_replicas} ready pods. Current: ${current_replicas}, Updated: ${updated_replicas}
             ...    next_steps=Check pod status and investigate why replicas are not ready\nVerify persistent volume claims are bound\nCheck storage class configuration\nInvestigate ordered pod startup issues
+            ...    observed_at=${issue_timestamp}
         ELSE IF    ${updated_replicas} < ${current_replicas}
+            ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=3
             ...    expected=StatefulSet `${STATEFULSET_NAME}` should have all replicas updated to the latest revision
@@ -531,6 +563,7 @@ Inspect StatefulSet Replicas for `${STATEFULSET_NAME}` in namespace `${NAMESPACE
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=StatefulSet `${STATEFULSET_NAME}` rolling update is in progress: ${updated_replicas}/${current_replicas} pods updated
             ...    next_steps=Monitor rolling update progress\nCheck for pod startup issues\nVerify persistent volume availability
+            ...    observed_at=${issue_timestamp}
         END
     END
 
@@ -553,6 +586,7 @@ Check StatefulSet PersistentVolumeClaims for `${STATEFULSET_NAME}` in Namespace 
     
     # Check for command failure and create generic issue if needed
     IF    ${pvcs.returncode} != 0
+        ${issue_timestamp}=    DateTime.Get Current Date
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=PersistentVolumeClaim status should be retrievable for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
@@ -561,6 +595,7 @@ Check StatefulSet PersistentVolumeClaims for `${STATEFULSET_NAME}` in Namespace 
         ...    reproduce_hint=${pvcs.cmd}
         ...    details=Command failed with exit code ${pvcs.returncode}:\n\nSTDOUT:\n${pvcs.stdout}\n\nSTDERR:\n${pvcs.stderr}
         ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nCheck cluster connectivity and authentication\nVerify sufficient permissions to view PVCs
+        ...    observed_at=${issue_timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Failed to retrieve PVC status:\n\n${pvcs.stderr}
         RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -595,7 +630,8 @@ Check StatefulSet PersistentVolumeClaims for `${STATEFULSET_NAME}` in Namespace 
                 Append To List    ${unbound_details}    ${detail}
             END
             ${details_text}=    Catenate    SEPARATOR=\n    @{unbound_details}
-            
+            ${issue_timestamp}=    DateTime.Get Current Date
+
             RW.Core.Add Issue
             ...    severity=2
             ...    expected=All PersistentVolumeClaims for StatefulSet `${STATEFULSET_NAME}` should be bound in namespace `${NAMESPACE}`
@@ -604,6 +640,7 @@ Check StatefulSet PersistentVolumeClaims for `${STATEFULSET_NAME}` in Namespace 
             ...    reproduce_hint=${pvcs.cmd}
             ...    details=**Unbound PVCs:** ${len($pvc_issues)}/${total_pvcs}\n\n${details_text}
             ...    next_steps=Check storage class availability\nVerify persistent volume provisioner is working\nCheck node storage capacity\nInvestigate storage class permissions
+            ...    observed_at=${issue_timestamp}
         END
         
         RW.Core.Add Pre To Report    StatefulSet PVC Status: ${bound_pvcs}/${total_pvcs} bound
@@ -634,25 +671,28 @@ Identify Recent Configuration Changes for StatefulSet `${STATEFULSET_NAME}` in N
     
     # Parse output for specific patterns and create issues if needed
     ${output}=    Set Variable    ${config_analysis.stdout}
+    ${lines}=    Split String    ${output}    \n
+    ${change_time}=    Set Variable    Unknown
+
+    # Extract timestamp (everything between "(created: " and ",")
+    FOR    ${line}    IN    @{lines}
+        IF    "(created: " in $line
+            ${time_part}=    Evaluate    "${line}".split("(created: ")[1] if len("${line}".split("(created: ")) > 1 else "Unknown"
+            ${change_time}=    Evaluate    "${time_part}".split(",")[0] if "," in "${time_part}" else "${time_part}".split(")")[0] if ")" in "${time_part}" else "${time_part}"
+        END
+    END
     
     # Check for recent ControllerRevision changes
     IF    "Recent ControllerRevision change detected" in $output
         # Extract ControllerRevision information for issue creation
         ${lines}=    Split String    ${output}    \n
         ${current_revision}=    Set Variable    Unknown
-        ${change_time}=    Set Variable    Unknown
         
         FOR    ${line}    IN    @{lines}
             IF    "Current ControllerRevision:" in $line
                 # Extract ControllerRevision name (everything between "Current ControllerRevision: " and " (created:")
                 ${rev_part}=    Evaluate    "${line}".split("Current ControllerRevision: ")[1] if len("${line}".split("Current ControllerRevision: ")) > 1 else "Unknown"
                 ${current_revision}=    Evaluate    "${rev_part}".split(" (created:")[0] if " (created:" in "${rev_part}" else "${rev_part}"
-                
-                # Extract timestamp (everything between "(created: " and ",")
-                IF    "(created: " in $line
-                    ${time_part}=    Evaluate    "${line}".split("(created: ")[1] if len("${line}".split("(created: ")) > 1 else "Unknown"
-                    ${change_time}=    Evaluate    "${time_part}".split(",")[0] if "," in "${time_part}" else "${time_part}".split(")")[0] if ")" in "${time_part}" else "${time_part}"
-                END
             END
         END
         
@@ -683,6 +723,7 @@ Identify Recent Configuration Changes for StatefulSet `${STATEFULSET_NAME}` in N
             ...    reproduce_hint=Check ControllerRevision history for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
             ...    details=CRITICAL CONFIGURATION CHANGE DETECTED\n\nChange Type: Volume Claim Template Update\nTimestamp: ${change_time}\nCurrent Revision: ${current_revision}\n\nWARNING: This is a critical change for StatefulSets that can affect data persistence!\n\nVolume Template Changes:\n${volume_details}\nThis change requires immediate attention as it affects persistent storage for the StatefulSet.
             ...    next_steps=CRITICAL: Volume template changes require immediate attention\nVerify persistent volume compatibility\nCheck for data migration requirements\nEnsure backup procedures are in place\nMonitor pod startup and volume attachment\nValidate data integrity after changes
+            ...    observed_at=${change_time}
         END
         
         # Check for container image changes
@@ -710,6 +751,7 @@ Identify Recent Configuration Changes for StatefulSet `${STATEFULSET_NAME}` in N
             ...    reproduce_hint=Check ControllerRevision history for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
             ...    details=Configuration Change Detected\n\nChange Type: Container Image Update\nTimestamp: ${change_time}\nCurrent Revision: ${current_revision}\n\nImage Changes:\n${image_details}\nThis change may be related to current StatefulSet issues. Verify the image update was intentional and check for known issues with the new image version.
             ...    next_steps=Verify the image update was intentional\nCheck if the new image version has known issues\nReview StatefulSet rolling update status\nMonitor ordered pod updates (StatefulSets update sequentially)
+            ...    observed_at=${change_time}
         END
         
         # Check for environment variable changes
@@ -741,6 +783,7 @@ Identify Recent Configuration Changes for StatefulSet `${STATEFULSET_NAME}` in N
             ...    reproduce_hint=Check ControllerRevision history for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
             ...    details=Configuration Change Detected\n\nChange Type: Environment Variables Update\nTimestamp: ${change_time}\nCurrent Revision: ${current_revision}\n\nEnvironment Variable Changes:\n${env_details}\nThese environment variable changes may be related to current StatefulSet issues. Review the changes to ensure they align with expected configuration.
             ...    next_steps=Review recent environment variable changes\nVerify changes align with expected configuration\nCheck application logs for configuration-related errors\nMonitor ordered pod updates (StatefulSets update sequentially)
+            ...    observed_at=${change_time}
         END
         
         # Check for resource requirement changes
@@ -753,6 +796,7 @@ Identify Recent Configuration Changes for StatefulSet `${STATEFULSET_NAME}` in N
             ...    reproduce_hint=Check ControllerRevision history for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
             ...    details=**Configuration Change Detected**\n\n**Change Type:** Resource Limits/Requests Update\n**Timestamp:** ${change_time}\n**Current Revision:** ${current_revision}\n\nSee full analysis in report for detailed resource comparison.
             ...    next_steps=Monitor resource utilization after changes\nVerify resource limits are appropriate for workload\nCheck for resource constraint issues\nEnsure persistent volume performance is adequate\nMonitor ordered pod updates (StatefulSets update sequentially)
+            ...    observed_at=${change_time}
         END
     END
     
@@ -766,6 +810,7 @@ Identify Recent Configuration Changes for StatefulSet `${STATEFULSET_NAME}` in N
         ...    reproduce_hint=Check StatefulSet generation vs observed generation for `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
         ...    details=Recent kubectl apply operation detected. The StatefulSet configuration has been updated but may still be processing.\n\nSee full analysis in report for generation gap details.
         ...    next_steps=Wait for controller to process changes\nCheck StatefulSet status and conditions\nVerify no resource constraints are preventing updates\nMonitor ordered pod updates (StatefulSets update sequentially)
+        ...    observed_at=${change_time}
     END
     
     # Check for configuration drift
@@ -778,6 +823,7 @@ Identify Recent Configuration Changes for StatefulSet `${STATEFULSET_NAME}` in N
         ...    reproduce_hint=Check StatefulSet generation vs observed generation for `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
         ...    details=Configuration drift detected. The StatefulSet has been modified but the controller hasn't processed all changes yet.\n\nSee full analysis in report for drift details.
         ...    next_steps=Wait for controller to process changes\nCheck StatefulSet status and conditions\nVerify no resource constraints are preventing updates\nMonitor ordered pod updates (StatefulSets update sequentially)
+        ...    observed_at=${change_time}
     END
 
 
