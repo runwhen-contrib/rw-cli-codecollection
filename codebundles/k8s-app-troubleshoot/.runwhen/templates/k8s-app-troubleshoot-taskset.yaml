@@ -20,6 +20,7 @@ spec:
     ref: main
     {% endif %}
     pathToRobot: codebundles/k8s-app-troubleshoot/runbook.robot
+  lookbackWindow: {{lookback_window}}
   configProvided:
     - name: NAMESPACE
       value: {{match_resource.resource.metadata.namespace}}
@@ -31,8 +32,6 @@ spec:
       value: '10'
     - name: CREATE_ISSUES
       value: 'YES'
-    - name: LOGS_SINCE
-      value: 60m
     - name: EXCLUDE_PATTERN
       value: Placeholder
     - name: MAX_LOG_LINES

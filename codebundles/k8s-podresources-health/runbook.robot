@@ -232,12 +232,13 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=25
     ...    default=25
-   ${RESTART_AGE}=    RW.Core.Import User Variable    RESTART_AGE
+   ${LOOKBACK_WINDOW}=    RW.Core.Import User Variable    LOOKBACK_WINDOW
     ...    type=string
     ...    description=The age (in minutes) to consider when looking for container restarts.
     ...    pattern=^\d+$
     ...    example=10
     ...    default=10
+    ${RESTART_AGE}=    RW.Core.Normalize Lookback Window Str    ${LOOKBACK_WINDOW}    1
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}

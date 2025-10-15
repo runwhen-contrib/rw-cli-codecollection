@@ -21,13 +21,12 @@ spec:
     ref: main
     {% endif %}
     pathToRobot: codebundles/gcloud-node-preempt/runbook.robot
+  lookbackWindow: {{lookback_window}}
   intervalStrategy: intermezzo
   intervalSeconds: 300
   configProvided:
     - name: GCP_PROJECT_ID
       value: {{match_resource.resource.project_id}}
-    - name: AGE
-      value: '30'
   secretsProvided:
     - name: gcp_credentials_json
       workspaceKey: {{custom.gcp_ops_suite_sa}}

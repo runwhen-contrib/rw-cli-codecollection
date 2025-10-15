@@ -538,11 +538,12 @@ Suite Initialization
     ...    description=The Azure Subscription ID for the resource.  
     ...    pattern=\w*
     ...    default=""
-    ${TIME_PERIOD_MINUTES}=    RW.Core.Import User Variable    TIME_PERIOD_MINUTES
+    ${LOOKBACK_WINDOW}=    RW.Core.Import User Variable    LOOKBACK_WINDOW
     ...    type=string
     ...    description=The time period, in minutes, to look back for activites/events. 
     ...    pattern=\w*
     ...    default=10
+    ${TIME_PERIOD_MINUTES}=    RW.Core.Normalize Lookback Window Str    ${LOOKBACK_WINDOW}    1
     ${TIME_PERIOD_DAYS}=    RW.Core.Import User Variable    TIME_PERIOD_DAYS
     ...    type=string
     ...    description=The time period, in days, to look back for recommendations and notifications. 

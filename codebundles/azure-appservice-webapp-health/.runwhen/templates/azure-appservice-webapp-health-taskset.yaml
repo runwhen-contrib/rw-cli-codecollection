@@ -21,6 +21,7 @@ spec:
     ref: main
     {% endif %}
     pathToRobot: codebundles/azure-appservice-webapp-health/runbook.robot
+  lookbackWindow: {{lookback_window}}
   configProvided:
     - name: AZ_RESOURCE_GROUP
       value: {{resource_group.name}}
@@ -30,8 +31,6 @@ spec:
       value: "{{ subscription_id }}"
     - name: AZURE_SUBSCRIPTION_NAME
       value: "{{ subscription_name }}"
-    - name: TIME_PERIOD_MINUTES
-      value: "10"
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}
