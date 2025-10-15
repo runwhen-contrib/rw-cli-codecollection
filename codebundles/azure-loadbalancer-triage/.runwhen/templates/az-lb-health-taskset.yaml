@@ -21,7 +21,7 @@ spec:
     ref: main
     {% endif %}
     pathToRobot: codebundles/azure-loadbalancer-triage/runbook.robot
-  lookbackWindow: {{lookback_window}}
+  lookbackWindow: 24h
   configProvided:
     - name: AZ_LB_NAME
       value: {{match_resource.resource.name}}

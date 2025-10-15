@@ -20,7 +20,7 @@ spec:
     ref: main
     {% endif %}
     pathToRobot: codebundles/k8s-stacktrace-health/runbook.robot
-  lookbackWindow: {{lookback_window}}
+  lookbackWindow: 3h
   configProvided:
     - name: NAMESPACE
       value: {{match_resource.resource.metadata.namespace}}

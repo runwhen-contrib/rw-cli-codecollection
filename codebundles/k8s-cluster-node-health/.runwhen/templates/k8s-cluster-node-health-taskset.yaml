@@ -20,7 +20,7 @@ spec:
     ref: main
     {% endif %}
     pathToRobot: codebundles/k8s-cluster-node-health/runbook.robot
-  lookbackWindow: {{lookback_window}}
+  lookbackWindow: 10m
   configProvided:
     - name: CONTEXT
       value: "{{cluster.context}}"

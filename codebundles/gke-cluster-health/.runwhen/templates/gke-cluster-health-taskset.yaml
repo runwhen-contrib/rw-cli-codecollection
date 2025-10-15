@@ -21,7 +21,6 @@ spec:
     ref: main
     {% endif %}
     pathToRobot: codebundles/gke-cluster-health/runbook.robot
-  lookbackWindow: {{lookback_window}}
   configProvided:
     - name: GCP_PROJECT_ID
       value: {{match_resource.resource.project_id}}

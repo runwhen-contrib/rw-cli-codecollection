@@ -21,7 +21,7 @@ spec:
     ref: main
     {% endif %}
     pathToRobot: codebundles/azure-appservice-webapp-health/runbook.robot
-  lookbackWindow: {{lookback_window}}
+  lookbackWindow: 10m
   configProvided:
     - name: AZ_RESOURCE_GROUP
       value: {{resource_group.name}}

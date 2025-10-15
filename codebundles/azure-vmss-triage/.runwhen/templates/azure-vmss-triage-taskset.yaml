@@ -21,7 +21,7 @@ spec:
     ref: main
     {% endif %}
     pathToRobot: codebundles/azure-vmss-triage/runbook.robot
-  lookbackWindow: {{lookback_window}}
+  lookbackWindow: 60m
   configProvided:
     - name: AZ_RESOURCE_GROUP
       value: {{resource_group.name}}

@@ -21,7 +21,6 @@ spec:
     ref: main
     {% endif %}
     pathToRobot: codebundles/azure-kv-health/runbook.robot
-  lookbackWindow: {{lookback_window}}
   configProvided:
     - name: AZURE_RESOURCE_GROUP
       value: "{{resource_group.name}}"

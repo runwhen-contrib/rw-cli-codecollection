@@ -20,7 +20,7 @@ spec:
     ref: main
     {% endif %}
     pathToRobot: codebundles/k8s-deployment-healthcheck/runbook.robot
-  lookbackWindow: {{lookback_window}}
+  lookbackWindow: 10m
   configProvided:
     - name: NAMESPACE
       value: {{match_resource.resource.metadata.namespace}}

@@ -21,7 +21,6 @@ spec:
     ref: main
     {% endif %}
     pathToRobot: codebundles/azure-apim-health/runbook.robot
-  lookbackWindow: {{lookback_window}}
   configProvided:
     - name: AZ_RESOURCE_GROUP
       value: {{resource_group.name}}

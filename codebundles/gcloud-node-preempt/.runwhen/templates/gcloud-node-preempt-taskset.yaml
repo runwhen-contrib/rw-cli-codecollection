@@ -21,7 +21,7 @@ spec:
     ref: main
     {% endif %}
     pathToRobot: codebundles/gcloud-node-preempt/runbook.robot
-  lookbackWindow: {{lookback_window}}
+  lookbackWindow: 30m
   intervalStrategy: intermezzo
   intervalSeconds: 300
   configProvided:

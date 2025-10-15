@@ -21,7 +21,6 @@ spec:
     ref: main
     {% endif %}
     pathToRobot: codebundles/gh-actions-health/runbook.robot
-  lookbackWindow: {{lookback_window}}
   configProvided:
     - name: GITHUB_REPOS
       value: "{{match_resource.resource.name}}"
