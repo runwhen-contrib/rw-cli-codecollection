@@ -82,11 +82,12 @@ Suite Initialization
     ...    type=string
     ...    description=The Azure Virtual Machine Scale Set to triage.
     ...    pattern=\w*
-    ${TIME_PERIOD_MINUTES}=    RW.Core.Import User Variable    TIME_PERIOD_MINUTES
+    ${LOOKBACK_WINDOW}=    RW.Core.Import User Variable    LOOKBACK_WINDOW
     ...    type=string
     ...    description=The time period, in minutes, to look back for activites/events. 
     ...    pattern=\w*
     ...    default=60
+    ${TIME_PERIOD_MINUTES}=    RW.Core.Normalize Lookback Window Str    ${LOOKBACK_WINDOW}    1
     ${azure_credentials}=    RW.Core.Import Secret
     ...    azure_credentials
     ...    type=string

@@ -135,13 +135,13 @@ Suite Initialization
     ...    description=The name of the ingress object in Kubernetes.
     ...    pattern=\w*
     ...    example=frontend-external
-    ${TIME_SLICE}=    RW.Core.Import User Variable    TIME_SLICE
+    ${LOOKBACK_WINDOW}=    RW.Core.Import User Variable    LOOKBACK_WINDOW
     ...    type=string
     ...    description=The amount of time to perform aggregations over.
     ...    pattern=\w*
     ...    example=60m
     ...    default=60m
-    Set Suite Variable    ${TIME_SLICE}    ${TIME_SLICE}
+    ${TIME_SLICE}=    Set Variable    ${LOOKBACK_WINDOW}
     ${ERROR_CODES}=    RW.Core.Import User Variable    ERROR_CODES
     ...    type=string
     ...    description=Which http status codes to look for and classify as errors.
@@ -159,6 +159,7 @@ Suite Initialization
     Set Suite Variable    ${INGRESS_HOST}    ${INGRESS_HOST}
     Set Suite Variable    ${INGRESS_SERVICE}    ${INGRESS_SERVICE}
     Set Suite Variable    ${INGRESS_OBJECT_NAME}    ${INGRESS_OBJECT_NAME}
+    Set Suite Variable    ${TIME_SLICE}    ${TIME_SLICE}
     Set Suite Variable
     ...    ${env}
     ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}", "KUBECONFIG":"./${kubeconfig.key}","PATH":"$PATH:${OS_PATH}"}

@@ -340,12 +340,13 @@ Suite Initialization
     ...    type=string
     ...    description=Azure resource group.
     ...    pattern=\w*
-    ${LOOKBACK_PERIOD}=    RW.Core.Import User Variable    LOOKBACK_PERIOD
+    ${LOOKBACK_WINDOW}=    RW.Core.Import User Variable    LOOKBACK_WINDOW
     ...    type=string
-    ...    description=The lookback period for querying failed pipelines (e.g., 1d, 7d, 30d).
+    ...    description=The lookback window for querying failed pipelines (e.g., 1d, 7d, 30d).
     ...    pattern=\w*
     ...    default=7d
     ...    example=1d
+    ${LOOKBACK_PERIOD}=    Set Variable    ${LOOKBACK_WINDOW}
     ${THRESHOLD_MB}=    RW.Core.Import User Variable    THRESHOLD_MB
     ...    type=string
     ...    description=The threshold for data volume in MB.
