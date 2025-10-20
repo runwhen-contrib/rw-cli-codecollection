@@ -714,14 +714,16 @@ Increase CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
         ${new_cpu_limit_value}=    Set Variable    ${vpa_cpu_recommendation}
         RW.Core.Add Pre To Report    ----------\nVPA Upper Bound Recommendation for CPU: ${new_cpu_value}
     ELSE IF    $current_cpu_value != ""
-        ${new_cpu_value}=    Evaluate    "${current_cpu_value}".replace("m","")
-        ${new_cpu_value}=    Evaluate    int(${new_cpu_value}) * 2
-        ${new_cpu_value}=    Set Variable    ${new_cpu_value}m
+        # Parse CPU request: convert to millicores for calculation
+        # Kubernetes formats: "1" = 1000m, "0.5" = 500m, "100m" = 100m
+        ${cpu_in_millicores}=    Evaluate    int(float("${current_cpu_value}".replace("m","")) * 1000) if not "${current_cpu_value}".endswith("m") else int("${current_cpu_value}".replace("m",""))
+        ${new_cpu_millicores}=    Evaluate    int(${cpu_in_millicores} * 2)
+        ${new_cpu_value}=    Set Variable    ${new_cpu_millicores}m
         
         IF    $current_cpu_limit_value != ""
-            ${new_cpu_limit_value}=    Evaluate    "${current_cpu_limit_value}".replace("m","")
-            ${new_cpu_limit_value}=    Evaluate    int(${new_cpu_limit_value}) * 2
-            ${new_cpu_limit_value}=    Set Variable    ${new_cpu_limit_value}m
+            ${cpu_limit_in_millicores}=    Evaluate    int(float("${current_cpu_limit_value}".replace("m","")) * 1000) if not "${current_cpu_limit_value}".endswith("m") else int("${current_cpu_limit_value}".replace("m",""))
+            ${new_cpu_limit_millicores}=    Evaluate    int(${cpu_limit_in_millicores} * 2)
+            ${new_cpu_limit_value}=    Set Variable    ${new_cpu_limit_millicores}m
         END
         
         # Report message based on whether this is suggestion-only or will be applied
@@ -912,17 +914,16 @@ Increase Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
         ${new_memory_limit_value}=    Set Variable    ${vpa_memory_recommendation}
         RW.Core.Add Pre To Report    ----------\nVPA Upper Bound Recommendation for Memory: ${new_memory_value}
     ELSE IF    $current_memory_value != ""
-        # Handle different memory units (Mi, Gi, etc.)
-        ${new_memory_value}=    Evaluate    "${current_memory_value}".replace("Mi","").replace("Gi","").replace("M","").replace("G","")
-        ${memory_unit}=    Evaluate    "Mi" if "Mi" in "${current_memory_value}" else ("Gi" if "Gi" in "${current_memory_value}" else "Mi")
-        ${new_memory_value}=    Evaluate    int(float("${new_memory_value}")) * 2
-        ${new_memory_value}=    Set Variable    ${new_memory_value}${memory_unit}
+        # Parse memory request: detect unit BEFORE stripping, convert to Mi for calculation
+        # Kubernetes formats: Mi (mebibytes), Gi (gibibytes), M (megabytes), G (gigabytes), Ki, k, etc.
+        ${memory_in_mi}=    Evaluate    int(float("${current_memory_value}".replace("Gi","")) * 1024) if "Gi" in "${current_memory_value}" else (int(float("${current_memory_value}".replace("G","")) * 1000) if ("G" in "${current_memory_value}" and "Gi" not in "${current_memory_value}") else (int(float("${current_memory_value}".replace("Mi",""))) if "Mi" in "${current_memory_value}" else (int(float("${current_memory_value}".replace("M",""))) if "M" in "${current_memory_value}" else int(float("${current_memory_value}".replace("Ki","")) / 1024))))
+        ${new_memory_mi}=    Evaluate    int(${memory_in_mi} * 2)
+        ${new_memory_value}=    Set Variable    ${new_memory_mi}Mi
         
         IF    $current_memory_limit_value != ""
-            ${new_memory_limit_value}=    Evaluate    "${current_memory_limit_value}".replace("Mi","").replace("Gi","").replace("M","").replace("G","")
-            ${memory_limit_unit}=    Evaluate    "Mi" if "Mi" in "${current_memory_limit_value}" else ("Gi" if "Gi" in "${current_memory_limit_value}" else "Mi")
-            ${new_memory_limit_value}=    Evaluate    int(float("${new_memory_limit_value}")) * 2
-            ${new_memory_limit_value}=    Set Variable    ${new_memory_limit_value}${memory_limit_unit}
+            ${memory_limit_in_mi}=    Evaluate    int(float("${current_memory_limit_value}".replace("Gi","")) * 1024) if "Gi" in "${current_memory_limit_value}" else (int(float("${current_memory_limit_value}".replace("G","")) * 1000) if ("G" in "${current_memory_limit_value}" and "Gi" not in "${current_memory_limit_value}") else (int(float("${current_memory_limit_value}".replace("Mi",""))) if "Mi" in "${current_memory_limit_value}" else (int(float("${current_memory_limit_value}".replace("M",""))) if "M" in "${current_memory_limit_value}" else int(float("${current_memory_limit_value}".replace("Ki","")) / 1024))))
+            ${new_memory_limit_mi}=    Evaluate    int(${memory_limit_in_mi} * 2)
+            ${new_memory_limit_value}=    Set Variable    ${new_memory_limit_mi}Mi
         END
         
         # Report message based on whether this is suggestion-only or will be applied
@@ -1097,14 +1098,16 @@ Decrease CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
     END
 
     IF    $current_cpu_value != ""
-        ${new_cpu_value}=    Evaluate    "${current_cpu_value}".replace("m","")
-        ${new_cpu_value}=    Evaluate    max(10, int(${new_cpu_value}) / ${RESOURCE_SCALE_DOWN_FACTOR})
-        ${new_cpu_value}=    Set Variable    ${new_cpu_value}m
+        # Parse CPU request: convert to millicores for calculation
+        # Kubernetes formats: "1" = 1000m, "0.5" = 500m, "100m" = 100m
+        ${cpu_in_millicores}=    Evaluate    int(float("${current_cpu_value}".replace("m","")) * 1000) if not "${current_cpu_value}".endswith("m") else int("${current_cpu_value}".replace("m",""))
+        ${new_cpu_millicores}=    Evaluate    max(10, int(${cpu_in_millicores} / ${RESOURCE_SCALE_DOWN_FACTOR}))
+        ${new_cpu_value}=    Set Variable    ${new_cpu_millicores}m
         
         IF    $current_cpu_limit_value != ""
-            ${new_cpu_limit_value}=    Evaluate    "${current_cpu_limit_value}".replace("m","")
-            ${new_cpu_limit_value}=    Evaluate    max(10, int(${new_cpu_limit_value}) / ${RESOURCE_SCALE_DOWN_FACTOR})
-            ${new_cpu_limit_value}=    Set Variable    ${new_cpu_limit_value}m
+            ${cpu_limit_in_millicores}=    Evaluate    int(float("${current_cpu_limit_value}".replace("m","")) * 1000) if not "${current_cpu_limit_value}".endswith("m") else int("${current_cpu_limit_value}".replace("m",""))
+            ${new_cpu_limit_millicores}=    Evaluate    max(10, int(${cpu_limit_in_millicores} / ${RESOURCE_SCALE_DOWN_FACTOR}))
+            ${new_cpu_limit_value}=    Set Variable    ${new_cpu_limit_millicores}m
         END
         
         # Report message based on whether this is suggestion-only or will be applied
@@ -1282,17 +1285,16 @@ Decrease Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
     END
 
     IF    $current_memory_value != ""
-        # Handle different memory units (Mi, Gi, etc.)
-        ${new_memory_value}=    Evaluate    "${current_memory_value}".replace("Mi","").replace("Gi","").replace("M","").replace("G","")
-        ${memory_unit}=    Evaluate    "Mi" if "Mi" in "${current_memory_value}" else ("Gi" if "Gi" in "${current_memory_value}" else "Mi")
-        ${new_memory_value}=    Evaluate    max(16, int(float("${new_memory_value}") / ${RESOURCE_SCALE_DOWN_FACTOR}))
-        ${new_memory_value}=    Set Variable    ${new_memory_value}${memory_unit}
+        # Parse memory request: detect unit BEFORE stripping, convert to Mi for calculation
+        # Kubernetes formats: Mi (mebibytes), Gi (gibibytes), M (megabytes), G (gigabytes), Ki, k, etc.
+        ${memory_in_mi}=    Evaluate    int(float("${current_memory_value}".replace("Gi","")) * 1024) if "Gi" in "${current_memory_value}" else (int(float("${current_memory_value}".replace("G","")) * 1000) if ("G" in "${current_memory_value}" and "Gi" not in "${current_memory_value}") else (int(float("${current_memory_value}".replace("Mi",""))) if "Mi" in "${current_memory_value}" else (int(float("${current_memory_value}".replace("M",""))) if "M" in "${current_memory_value}" else int(float("${current_memory_value}".replace("Ki","")) / 1024))))
+        ${new_memory_mi}=    Evaluate    max(16, int(${memory_in_mi} / ${RESOURCE_SCALE_DOWN_FACTOR}))
+        ${new_memory_value}=    Set Variable    ${new_memory_mi}Mi
         
         IF    $current_memory_limit_value != ""
-            ${new_memory_limit_value}=    Evaluate    "${current_memory_limit_value}".replace("Mi","").replace("Gi","").replace("M","").replace("G","")
-            ${memory_limit_unit}=    Evaluate    "Mi" if "Mi" in "${current_memory_limit_value}" else ("Gi" if "Gi" in "${current_memory_limit_value}" else "Mi")
-            ${new_memory_limit_value}=    Evaluate    max(16, int(float("${new_memory_limit_value}") / ${RESOURCE_SCALE_DOWN_FACTOR}))
-            ${new_memory_limit_value}=    Set Variable    ${new_memory_limit_value}${memory_limit_unit}
+            ${memory_limit_in_mi}=    Evaluate    int(float("${current_memory_limit_value}".replace("Gi","")) * 1024) if "Gi" in "${current_memory_limit_value}" else (int(float("${current_memory_limit_value}".replace("G","")) * 1000) if ("G" in "${current_memory_limit_value}" and "Gi" not in "${current_memory_limit_value}") else (int(float("${current_memory_limit_value}".replace("Mi",""))) if "Mi" in "${current_memory_limit_value}" else (int(float("${current_memory_limit_value}".replace("M",""))) if "M" in "${current_memory_limit_value}" else int(float("${current_memory_limit_value}".replace("Ki","")) / 1024))))
+            ${new_memory_limit_mi}=    Evaluate    max(16, int(${memory_limit_in_mi} / ${RESOURCE_SCALE_DOWN_FACTOR}))
+            ${new_memory_limit_value}=    Set Variable    ${new_memory_limit_mi}Mi
         END
         
         # Report message based on whether this is suggestion-only or will be applied

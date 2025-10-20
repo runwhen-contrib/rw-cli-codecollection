@@ -34,6 +34,12 @@ The HPA scaling tasks allow you to scale HorizontalPodAutoscaler min/max replica
 The resource increase tasks intelligently scale up CPU and memory resources based on:
 - **VPA Recommendations**: If a VerticalPodAutoscaler exists with recommendations, uses the upper bound value
 - **Default Behavior**: If no VPA exists, doubles the current resource request/limit
+- **CPU Format Support**: Properly handles all Kubernetes CPU formats:
+  - Full cores: `1` (1000m), `0.5` (500m), `2` (2000m)
+  - Millicores: `100m`, `500m`, `1000m`
+- **Memory Format Support**: Properly handles all Kubernetes memory formats (converts to Mi for calculation):
+  - Binary units: `512Mi`, `1Gi`, `2Gi`, `1024Ki`
+  - Decimal units: `512M`, `1G` (megabytes, gigabytes)
 - **GitOps-Managed Deployments**: Only provides suggestions (does not apply changes) if the deployment has GitOps annotations (Flux, ArgoCD)
 - **HPA Considerations**: Does not apply changes if HorizontalPodAutoscaler exists (only provides suggestions) to avoid conflicts
 
@@ -41,6 +47,12 @@ The resource increase tasks intelligently scale up CPU and memory resources base
 The resource decrease tasks help optimize costs by reducing over-provisioned resources:
 - **Scale Down Factor**: Divides current CPU/memory requests and limits by `${RESOURCE_SCALE_DOWN_FACTOR}` (default: 2, meaning divide by 2)
 - **Safety Minimums**: Sets minimum thresholds (10m for CPU, 16Mi for memory) to prevent too-low values
+- **CPU Format Support**: Properly handles all Kubernetes CPU formats:
+  - Full cores: `1` (1000m), `0.5` (500m), `2` (2000m)
+  - Millicores: `100m`, `500m`, `1000m`
+- **Memory Format Support**: Properly handles all Kubernetes memory formats (converts to Mi for calculation):
+  - Binary units: `512Mi`, `1Gi`, `2Gi`, `1024Ki`
+  - Decimal units: `512M`, `1G` (megabytes, gigabytes)
 - **GitOps-Managed Deployments**: Only provides suggestions (does not apply changes) if the deployment has GitOps annotations (Flux, ArgoCD)
 - **HPA Considerations**: Does not apply changes if HorizontalPodAutoscaler exists (only provides suggestions) to avoid conflicts
 - **Use Cases**: Cost optimization, over-provisioned workloads, maintenance windows
