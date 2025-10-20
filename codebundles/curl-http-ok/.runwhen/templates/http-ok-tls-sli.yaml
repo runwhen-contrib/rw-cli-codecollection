@@ -28,7 +28,7 @@ spec:
   intervalSeconds: 30
   configProvided:
     - name: URLS
-      value: "{% for rule in match_resource.resource.spec.rules %}{% for path in rule.http.paths %}https://{{rule.host}}{% if path.path and path.path != "/" %}{{path.path}}{% endif %}{% if not loop.last %},{% endif %}{% endfor %}{% if not loop.last %},{% endif %}{% endfor %}"
+      value: "{% for rule in match_resource.resource.spec.rules %}{% for path in rule.http.paths %}{% if path.path and '(' in path.path %}{% set parts = path.path.split('(') %}{% set prefix = parts[0] %}{% if prefix and prefix != '/' %}https://{{rule.host}}{{prefix.rstrip('/')}}{% else %}{% if parts|length > 1 %}{% set inner = parts[1].split('|')[0].split(')')[0] %}{% if inner and inner != '/' %}https://{{rule.host}}/{{inner}}{% else %}https://{{rule.host}}/{% endif %}{% else %}https://{{rule.host}}/{% endif %}{% endif %}{% elif path.path and path.path != "/" %}https://{{rule.host}}{{path.path}}{% else %}https://{{rule.host}}/{% endif %}{% if not loop.last %},{% endif %}{% endfor %}{% if not loop.last %},{% endif %}{% endfor %}"
     - name: TARGET_LATENCY
       value: '1.2'
     - name: DESIRED_RESPONSE_CODE
