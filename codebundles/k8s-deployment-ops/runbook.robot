@@ -379,105 +379,103 @@ Scale Up HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by 
         ...    next_steps=Create an HPA for this deployment first\nOr use deployment scaling tasks instead\nVerify HPA scaleTargetRef matches deployment name exactly\nCheck namespace and context are correct
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Commands Used: ${history}
-        RETURN
-    END
-
-    RW.Core.Add Pre To Report    ----------\nFound HPA: ${hpa_name}
-
-    # Check if HPA is managed by GitOps
-    ${gitops_check}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r 'if (.metadata.labels // {} | to_entries | map(select(.key | test("flux|argocd|kustomize.toolkit.fluxcd.io"))) | length > 0) or (.metadata.annotations // {} | to_entries | map(select(.key | test("flux|argocd|gitops"))) | length > 0) then "true" else "false" end'
-    ...    env=${env}
-    ...    include_in_history=true
-    ...    timeout_seconds=180
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ${is_gitops_managed}=    Strip String    ${gitops_check.stdout}
-    RW.Core.Add Pre To Report    ----------\nGitOps Management Check:\n${is_gitops_managed}
-
-    # Get current HPA min and max replicas
-    ${current_min}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.minReplicas}'
-    ...    env=${env}
-    ...    include_in_history=true
-    ...    timeout_seconds=180
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ${min_replicas}=    Convert To Integer    ${current_min.stdout}
-
-    ${current_max}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.maxReplicas}'
-    ...    env=${env}
-    ...    include_in_history=true
-    ...    timeout_seconds=180
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ${max_replicas}=    Convert To Integer    ${current_max.stdout}
-
-    RW.Core.Add Pre To Report    ----------\nCurrent HPA Configuration:\nMin Replicas: ${min_replicas}\nMax Replicas: ${max_replicas}
-
-    # Calculate new values
-    ${new_min}=    Evaluate    int(${min_replicas} * ${HPA_SCALE_FACTOR})
-    ${new_max}=    Evaluate    int(${max_replicas} * ${HPA_SCALE_FACTOR})
-
-    # Apply upper limit if specified
-    IF    ${new_max} > ${HPA_MAX_REPLICAS}
-        ${new_max}=    Set Variable    ${HPA_MAX_REPLICAS}
-        RW.Core.Add Issue
-        ...    severity=4
-        ...    expected=HPA max replicas should scale to ${new_max}
-        ...    actual=HPA max replicas capped at ${HPA_MAX_REPLICAS}
-        ...    title=HPA Max Replicas Capped at ${HPA_MAX_REPLICAS}
-        ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=Scaled HPA max replicas capped at configured maximum: ${HPA_MAX_REPLICAS}
-        ...    next_steps=Review HPA_MAX_REPLICAS configuration if higher scaling is needed
-    END
-
-    RW.Core.Add Pre To Report    ----------\nScaling HPA:\nMin Replicas: ${min_replicas} → ${new_min}\nMax Replicas: ${max_replicas} → ${new_max}
-
-    # If GitOps managed, only suggest changes
-    IF    $is_gitops_managed == "true"
-        RW.Core.Add Issue
-        ...    severity=4
-        ...    expected=HPA `${hpa_name}` should be updated via GitOps
-        ...    actual=HPA `${hpa_name}` is managed by GitOps - changes should be made in Git repository
-        ...    title=Suggestion: Scale Up HPA `${hpa_name}` via GitOps
-        ...    reproduce_hint=View suggested patch in report output
-        ...    details=HPA ${hpa_name} is managed by GitOps (Flux/ArgoCD). To scale up, update the HPA manifest in your Git repository:\n\nSuggested change:\nminReplicas: ${min_replicas} → ${new_min}\nmaxReplicas: ${max_replicas} → ${new_max}\n\nOr apply this patch (for manual override, not recommended):\nkubectl patch hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} --patch '{"spec":{"minReplicas":${new_min},"maxReplicas":${new_max}}}'
-        ...    next_steps=Update HPA manifest in Git repository\nCommit and push changes to trigger GitOps sync\nMonitor GitOps controller for deployment updates\nIf urgent, consider manual override (will be reverted by GitOps)
-        ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Commands Used: ${history}
-        RETURN
-    END
-
-    # Update HPA
-    ${hpa_update}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} patch hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} --patch '{"spec":{"minReplicas":${new_min},"maxReplicas":${new_max}}}'
-    ...    env=${env}
-    ...    include_in_history=true
-    ...    timeout_seconds=180
-    ...    secret_file__kubeconfig=${kubeconfig}
-    RW.Core.Add Pre To Report    ----------\nHPA Update Result:\n${hpa_update.stdout}
-
-    IF    ($hpa_update.stderr) != ""
-        RW.Core.Add Issue
-        ...    severity=3
-        ...    expected=HPA `${hpa_name}` should scale up successfully
-        ...    actual=HPA `${hpa_name}` failed to scale up
-        ...    title=Failed to Scale Up HPA `${hpa_name}`
-        ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=Error scaling HPA: \n${hpa_update.stderr}
-        ...    next_steps=Review HPA configuration and permissions\nVerify HPA settings are valid
     ELSE
-        RW.Core.Add Issue
-        ...    severity=4
-        ...    expected=HPA `${hpa_name}` scaling operation completed
-        ...    actual=HPA `${hpa_name}` successfully scaled up by ${HPA_SCALE_FACTOR}x
-        ...    title=HPA `${hpa_name}` Scaled Up Successfully
-        ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=HPA ${hpa_name} for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE} was scaled up.\nPrevious: minReplicas=${min_replicas}, maxReplicas=${max_replicas}\nNew: minReplicas=${new_min}, maxReplicas=${new_max}
-        ...    next_steps=Monitor deployment metrics to ensure HPA scaling meets demand\nConsider adjusting HPA metrics thresholds if needed
-    END
+        RW.Core.Add Pre To Report    ----------\nFound HPA: ${hpa_name}
 
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
+        # Check if HPA is managed by GitOps
+        ${gitops_check}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r 'if (.metadata.labels // {} | to_entries | map(select(.key | test("flux|argocd|kustomize.toolkit.fluxcd.io"))) | length > 0) or (.metadata.annotations // {} | to_entries | map(select(.key | test("flux|argocd|gitops"))) | length > 0) then "true" else "false" end'
+        ...    env=${env}
+        ...    include_in_history=true
+        ...    timeout_seconds=180
+        ...    secret_file__kubeconfig=${kubeconfig}
+        ${is_gitops_managed}=    Strip String    ${gitops_check.stdout}
+        RW.Core.Add Pre To Report    ----------\nGitOps Management Check:\n${is_gitops_managed}
+
+        # Get current HPA min and max replicas
+        ${current_min}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.minReplicas}'
+        ...    env=${env}
+        ...    include_in_history=true
+        ...    timeout_seconds=180
+        ...    secret_file__kubeconfig=${kubeconfig}
+        ${min_replicas}=    Convert To Integer    ${current_min.stdout}
+
+        ${current_max}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.maxReplicas}'
+        ...    env=${env}
+        ...    include_in_history=true
+        ...    timeout_seconds=180
+        ...    secret_file__kubeconfig=${kubeconfig}
+        ${max_replicas}=    Convert To Integer    ${current_max.stdout}
+
+        RW.Core.Add Pre To Report    ----------\nCurrent HPA Configuration:\nMin Replicas: ${min_replicas}\nMax Replicas: ${max_replicas}
+
+        # Calculate new values
+        ${new_min}=    Evaluate    int(${min_replicas} * ${HPA_SCALE_FACTOR})
+        ${new_max}=    Evaluate    int(${max_replicas} * ${HPA_SCALE_FACTOR})
+
+        # Apply upper limit if specified
+        IF    ${new_max} > ${HPA_MAX_REPLICAS}
+            ${new_max}=    Set Variable    ${HPA_MAX_REPLICAS}
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    expected=HPA max replicas should scale to ${new_max}
+            ...    actual=HPA max replicas capped at ${HPA_MAX_REPLICAS}
+            ...    title=HPA Max Replicas Capped at ${HPA_MAX_REPLICAS}
+            ...    reproduce_hint=View Commands Used in Report Output
+            ...    details=Scaled HPA max replicas capped at configured maximum: ${HPA_MAX_REPLICAS}
+            ...    next_steps=Review HPA_MAX_REPLICAS configuration if higher scaling is needed
+        END
+
+        RW.Core.Add Pre To Report    ----------\nScaling HPA:\nMin Replicas: ${min_replicas} → ${new_min}\nMax Replicas: ${max_replicas} → ${new_max}
+
+        # If GitOps managed, only suggest changes
+        IF    $is_gitops_managed == "true"
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    expected=HPA `${hpa_name}` should be updated via GitOps
+            ...    actual=HPA `${hpa_name}` is managed by GitOps - changes should be made in Git repository
+            ...    title=Suggestion: Scale Up HPA `${hpa_name}` via GitOps
+            ...    reproduce_hint=View suggested patch in report output
+            ...    details=HPA ${hpa_name} is managed by GitOps (Flux/ArgoCD). To scale up, update the HPA manifest in your Git repository:\n\nSuggested change:\nminReplicas: ${min_replicas} → ${new_min}\nmaxReplicas: ${max_replicas} → ${new_max}\n\nOr apply this patch (for manual override, not recommended):\nkubectl patch hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} --patch '{"spec":{"minReplicas":${new_min},"maxReplicas":${new_max}}}'
+            ...    next_steps=Update HPA manifest in Git repository\nCommit and push changes to trigger GitOps sync\nMonitor GitOps controller for deployment updates\nIf urgent, consider manual override (will be reverted by GitOps)
+            ${history}=    RW.CLI.Pop Shell History
+            RW.Core.Add Pre To Report    Commands Used: ${history}
+        END
+
+        # Update HPA
+        ${hpa_update}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} patch hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} --patch '{"spec":{"minReplicas":${new_min},"maxReplicas":${new_max}}}'
+        ...    env=${env}
+        ...    include_in_history=true
+        ...    timeout_seconds=180
+        ...    secret_file__kubeconfig=${kubeconfig}
+        RW.Core.Add Pre To Report    ----------\nHPA Update Result:\n${hpa_update.stdout}
+
+        IF    ($hpa_update.stderr) != ""
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=HPA `${hpa_name}` should scale up successfully
+            ...    actual=HPA `${hpa_name}` failed to scale up
+            ...    title=Failed to Scale Up HPA `${hpa_name}`
+            ...    reproduce_hint=View Commands Used in Report Output
+            ...    details=Error scaling HPA: \n${hpa_update.stderr}
+            ...    next_steps=Review HPA configuration and permissions\nVerify HPA settings are valid
+        ELSE
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    expected=HPA `${hpa_name}` scaling operation completed
+            ...    actual=HPA `${hpa_name}` successfully scaled up by ${HPA_SCALE_FACTOR}x
+            ...    title=HPA `${hpa_name}` Scaled Up Successfully
+            ...    reproduce_hint=View Commands Used in Report Output
+            ...    details=HPA ${hpa_name} for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE} was scaled up.\nPrevious: minReplicas=${min_replicas}, maxReplicas=${max_replicas}\nNew: minReplicas=${new_min}, maxReplicas=${new_max}
+            ...    next_steps=Monitor deployment metrics to ensure HPA scaling meets demand\nConsider adjusting HPA metrics thresholds if needed
+            END
+
+            ${history}=    RW.CLI.Pop Shell History
+            RW.Core.Add Pre To Report    Commands Used: ${history}
+    END
 
 
 Scale Down HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` to Min ${HPA_MIN_REPLICAS}
@@ -510,92 +508,90 @@ Scale Down HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` t
         ...    next_steps=Create an HPA for this deployment first\nOr use deployment scaling tasks instead\nVerify HPA scaleTargetRef matches deployment name exactly\nCheck namespace and context are correct
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Commands Used: ${history}
-        RETURN
-    END
+    ELSE
+        RW.Core.Add Pre To Report    ----------\nFound HPA: ${hpa_name}
 
-    RW.Core.Add Pre To Report    ----------\nFound HPA: ${hpa_name}
+        # Check if HPA is managed by GitOps
+        ${gitops_check}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r 'if (.metadata.labels // {} | to_entries | map(select(.key | test("flux|argocd|kustomize.toolkit.fluxcd.io"))) | length > 0) or (.metadata.annotations // {} | to_entries | map(select(.key | test("flux|argocd|gitops"))) | length > 0) then "true" else "false" end'
+        ...    env=${env}
+        ...    include_in_history=true
+        ...    timeout_seconds=180
+        ...    secret_file__kubeconfig=${kubeconfig}
+        ${is_gitops_managed}=    Strip String    ${gitops_check.stdout}
+        RW.Core.Add Pre To Report    ----------\nGitOps Management Check:\n${is_gitops_managed}
 
-    # Check if HPA is managed by GitOps
-    ${gitops_check}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r 'if (.metadata.labels // {} | to_entries | map(select(.key | test("flux|argocd|kustomize.toolkit.fluxcd.io"))) | length > 0) or (.metadata.annotations // {} | to_entries | map(select(.key | test("flux|argocd|gitops"))) | length > 0) then "true" else "false" end'
-    ...    env=${env}
-    ...    include_in_history=true
-    ...    timeout_seconds=180
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ${is_gitops_managed}=    Strip String    ${gitops_check.stdout}
-    RW.Core.Add Pre To Report    ----------\nGitOps Management Check:\n${is_gitops_managed}
+        # Get current HPA min and max replicas
+        ${current_min}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.minReplicas}'
+        ...    env=${env}
+        ...    include_in_history=true
+        ...    timeout_seconds=180
+        ...    secret_file__kubeconfig=${kubeconfig}
+        ${min_replicas}=    Convert To Integer    ${current_min.stdout}
 
-    # Get current HPA min and max replicas
-    ${current_min}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.minReplicas}'
-    ...    env=${env}
-    ...    include_in_history=true
-    ...    timeout_seconds=180
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ${min_replicas}=    Convert To Integer    ${current_min.stdout}
+        ${current_max}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.maxReplicas}'
+        ...    env=${env}
+        ...    include_in_history=true
+        ...    timeout_seconds=180
+        ...    secret_file__kubeconfig=${kubeconfig}
+        ${max_replicas}=    Convert To Integer    ${current_max.stdout}
 
-    ${current_max}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.spec.maxReplicas}'
-    ...    env=${env}
-    ...    include_in_history=true
-    ...    timeout_seconds=180
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ${max_replicas}=    Convert To Integer    ${current_max.stdout}
+        RW.Core.Add Pre To Report    ----------\nCurrent HPA Configuration:\nMin Replicas: ${min_replicas}\nMax Replicas: ${max_replicas}
 
-    RW.Core.Add Pre To Report    ----------\nCurrent HPA Configuration:\nMin Replicas: ${min_replicas}\nMax Replicas: ${max_replicas}
+        # Set to minimum values
+        ${new_min}=    Set Variable    ${HPA_MIN_REPLICAS}
+        ${new_max}=    Set Variable    ${HPA_MIN_REPLICAS}
 
-    # Set to minimum values
-    ${new_min}=    Set Variable    ${HPA_MIN_REPLICAS}
-    ${new_max}=    Set Variable    ${HPA_MIN_REPLICAS}
+        RW.Core.Add Pre To Report    ----------\nScaling Down HPA to Minimum:\nMin Replicas: ${min_replicas} → ${new_min}\nMax Replicas: ${max_replicas} → ${new_max}
 
-    RW.Core.Add Pre To Report    ----------\nScaling Down HPA to Minimum:\nMin Replicas: ${min_replicas} → ${new_min}\nMax Replicas: ${max_replicas} → ${new_max}
+        # If GitOps managed, only suggest changes
+        IF    $is_gitops_managed == "true"
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    expected=HPA `${hpa_name}` should be updated via GitOps
+            ...    actual=HPA `${hpa_name}` is managed by GitOps - changes should be made in Git repository
+            ...    title=Suggestion: Scale Down HPA `${hpa_name}` via GitOps
+            ...    reproduce_hint=View suggested patch in report output
+            ...    details=HPA ${hpa_name} is managed by GitOps (Flux/ArgoCD). To scale down, update the HPA manifest in your Git repository:\n\nSuggested change:\nminReplicas: ${min_replicas} → ${new_min}\nmaxReplicas: ${max_replicas} → ${new_max}\n\nOr apply this patch (for manual override, not recommended):\nkubectl patch hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} --patch '{"spec":{"minReplicas":${new_min},"maxReplicas":${new_max}}}'
+            ...    next_steps=Update HPA manifest in Git repository\nCommit and push changes to trigger GitOps sync\nMonitor GitOps controller for deployment updates\nIf urgent, consider manual override (will be reverted by GitOps)
+            ${history}=    RW.CLI.Pop Shell History
+            RW.Core.Add Pre To Report    Commands Used: ${history}
+        ELSE
+            # Update HPA
+            ${hpa_update}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} patch hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} --patch '{"spec":{"minReplicas":${new_min},"maxReplicas":${new_max}}}'
+        ...    env=${env}
+        ...    include_in_history=true
+        ...    timeout_seconds=180
+        ...    secret_file__kubeconfig=${kubeconfig}
+        RW.Core.Add Pre To Report    ----------\nHPA Update Result:\n${hpa_update.stdout}
 
-    # If GitOps managed, only suggest changes
-    IF    $is_gitops_managed == "true"
-        RW.Core.Add Issue
-        ...    severity=4
-        ...    expected=HPA `${hpa_name}` should be updated via GitOps
-        ...    actual=HPA `${hpa_name}` is managed by GitOps - changes should be made in Git repository
-        ...    title=Suggestion: Scale Down HPA `${hpa_name}` via GitOps
-        ...    reproduce_hint=View suggested patch in report output
-        ...    details=HPA ${hpa_name} is managed by GitOps (Flux/ArgoCD). To scale down, update the HPA manifest in your Git repository:\n\nSuggested change:\nminReplicas: ${min_replicas} → ${new_min}\nmaxReplicas: ${max_replicas} → ${new_max}\n\nOr apply this patch (for manual override, not recommended):\nkubectl patch hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} --patch '{"spec":{"minReplicas":${new_min},"maxReplicas":${new_max}}}'
-        ...    next_steps=Update HPA manifest in Git repository\nCommit and push changes to trigger GitOps sync\nMonitor GitOps controller for deployment updates\nIf urgent, consider manual override (will be reverted by GitOps)
+        IF    ($hpa_update.stderr) != ""
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=HPA `${hpa_name}` should scale down successfully
+            ...    actual=HPA `${hpa_name}` failed to scale down
+            ...    title=Failed to Scale Down HPA `${hpa_name}`
+            ...    reproduce_hint=View Commands Used in Report Output
+            ...    details=Error scaling down HPA: \n${hpa_update.stderr}
+            ...    next_steps=Review HPA configuration and permissions\nVerify HPA settings are valid
+        ELSE
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    expected=HPA `${hpa_name}` scaling operation completed
+            ...    actual=HPA `${hpa_name}` successfully scaled down to minimum
+            ...    title=HPA `${hpa_name}` Scaled Down Successfully
+            ...    reproduce_hint=View Commands Used in Report Output
+            ...    details=HPA ${hpa_name} for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE} was scaled down to minimum.\nPrevious: minReplicas=${min_replicas}, maxReplicas=${max_replicas}\nNew: minReplicas=${new_min}, maxReplicas=${new_max}
+            ...    next_steps=HPA is now constrained to ${HPA_MIN_REPLICAS} replicas\nScale up HPA when ready to resume normal autoscaling operations
+            END
+        END
+
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Commands Used: ${history}
-        RETURN
     END
-
-    # Update HPA
-    ${hpa_update}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} patch hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} --patch '{"spec":{"minReplicas":${new_min},"maxReplicas":${new_max}}}'
-    ...    env=${env}
-    ...    include_in_history=true
-    ...    timeout_seconds=180
-    ...    secret_file__kubeconfig=${kubeconfig}
-    RW.Core.Add Pre To Report    ----------\nHPA Update Result:\n${hpa_update.stdout}
-
-    IF    ($hpa_update.stderr) != ""
-        RW.Core.Add Issue
-        ...    severity=3
-        ...    expected=HPA `${hpa_name}` should scale down successfully
-        ...    actual=HPA `${hpa_name}` failed to scale down
-        ...    title=Failed to Scale Down HPA `${hpa_name}`
-        ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=Error scaling down HPA: \n${hpa_update.stderr}
-        ...    next_steps=Review HPA configuration and permissions\nVerify HPA settings are valid
-    ELSE
-        RW.Core.Add Issue
-        ...    severity=4
-        ...    expected=HPA `${hpa_name}` scaling operation completed
-        ...    actual=HPA `${hpa_name}` successfully scaled down to minimum
-        ...    title=HPA `${hpa_name}` Scaled Down Successfully
-        ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=HPA ${hpa_name} for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE} was scaled down to minimum.\nPrevious: minReplicas=${min_replicas}, maxReplicas=${max_replicas}\nNew: minReplicas=${new_min}, maxReplicas=${new_max}
-        ...    next_steps=HPA is now constrained to ${HPA_MIN_REPLICAS} replicas\nScale up HPA when ready to resume normal autoscaling operations
-    END
-
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
 Increase CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
@@ -628,7 +624,6 @@ Increase CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
         ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access deployments in namespace `${NAMESPACE}`\nConfirm deployment name and namespace are correct
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Commands Used: ${history}
-        RETURN
     END
 
     # Check if deployment is managed by GitOps (Flux or ArgoCD)
@@ -828,7 +823,6 @@ Increase Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
         ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access deployments in namespace `${NAMESPACE}`\nConfirm deployment name and namespace are correct
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Commands Used: ${history}
-        RETURN
     END
 
     # Check if deployment is managed by GitOps (Flux or ArgoCD)
@@ -1027,7 +1021,6 @@ Decrease CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
         ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access deployments in namespace `${NAMESPACE}`\nConfirm deployment name and namespace are correct
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Commands Used: ${history}
-        RETURN
     END
 
     # Check if deployment is managed by GitOps (Flux or ArgoCD)
@@ -1135,7 +1128,6 @@ Decrease CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
         ...    next_steps=Cannot decrease resources - no current CPU requests found\nManually configure CPU resource requests for the deployment first
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Commands Used: ${history}
-        RETURN
     END
 
     IF    not $suggestion_only and $new_cpu_value != ""
@@ -1214,7 +1206,6 @@ Decrease Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
         ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access deployments in namespace `${NAMESPACE}`\nConfirm deployment name and namespace are correct
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Commands Used: ${history}
-        RETURN
     END
 
     # Check if deployment is managed by GitOps (Flux or ArgoCD)
@@ -1322,7 +1313,6 @@ Decrease Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
         ...    next_steps=Cannot decrease resources - no current memory requests found\nManually configure memory resource requests for the deployment first
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Commands Used: ${history}
-        RETURN
     END
 
     IF    not $suggestion_only and $new_memory_value != ""
