@@ -18,13 +18,15 @@ This codebundle provides a suite of operational tasks related to a deployment in
 - **Decrease Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`**
 
 ### HPA Scaling Tasks
-The new HPA scaling tasks allow you to scale HorizontalPodAutoscaler min/max replicas:
+The HPA scaling tasks allow you to scale HorizontalPodAutoscaler min/max replicas:
 - **Scale Up HPA**: Multiplies current min/max replicas by `${HPA_SCALE_FACTOR}` (default: 2x)
   - Caps max replicas at `${HPA_MAX_REPLICAS}` to prevent excessive scaling
   - Useful during traffic spikes or capacity planning
 - **Scale Down HPA**: Sets both min and max replicas to `${HPA_MIN_REPLICAS}` (default: 1)
   - Useful for reducing resource usage during maintenance or off-peak hours
   - Effectively constrains autoscaling to a minimal level
+
+**GitOps Integration**: Both HPA scaling tasks check for GitOps management (Flux/ArgoCD labels and annotations). If an HPA is managed by GitOps, the tasks will only provide suggestions and not apply changes directly, with instructions to update the HPA manifest in your Git repository.
 
 ### Resource Update Tasks
 

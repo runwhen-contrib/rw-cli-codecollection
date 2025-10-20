@@ -1203,3 +1203,285 @@ Identify Recent Configuration Changes for Deployment `${DEPLOYMENT_NAME}` in Nam
         ...    details=Configuration drift detected. The deployment has been modified but the controller hasn't processed all changes yet.\n\nSee full analysis in report for drift details.
         ...    next_steps=Wait for controller to process changes\nCheck deployment status and conditions\nVerify no resource constraints are preventing updates
     END
+
+
+Check HPA Health for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
+    [Documentation]    Checks if a HorizontalPodAutoscaler exists for the deployment and validates its configuration and current status.
+    [Tags]
+    ...    hpa
+    ...    autoscaling
+    ...    health
+    ...    deployment
+    ...    ${DEPLOYMENT_NAME}
+    ...    access:read-only
+
+    # Check if HPA exists for this deployment
+    ${hpa_check}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.spec.scaleTargetRef.name=="${DEPLOYMENT_NAME}" and (.spec.scaleTargetRef.kind=="Deployment" or .spec.scaleTargetRef.kind=="deployment")) | .metadata.name' | head -1
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ${hpa_name}=    Strip String    ${hpa_check.stdout}
+
+    IF    "${hpa_name}" == "" or $hpa_check.stderr != ""
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=Deployment `${DEPLOYMENT_NAME}` may have HPA configured for autoscaling
+        ...    actual=No HPA found for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+        ...    title=No HPA Found for Deployment `${DEPLOYMENT_NAME}`
+        ...    reproduce_hint=Check if HPA should be configured for deployment `${DEPLOYMENT_NAME}`
+        ...    details=No HorizontalPodAutoscaler was found targeting deployment ${DEPLOYMENT_NAME}. If autoscaling is needed, consider creating an HPA resource.\n\nCommand output: ${hpa_check.stdout}\nErrors: ${hpa_check.stderr}
+        ...    next_steps=Evaluate if autoscaling is needed for this deployment\nCreate HPA if autoscaling is required\nReview deployment scaling patterns and resource utilization\nVerify HPA scaleTargetRef matches deployment name exactly\nCheck namespace and context are correct
+        RETURN
+    END
+
+    RW.Core.Add Pre To Report    ----------\nFound HPA: ${hpa_name}
+
+    # Get HPA details
+    ${hpa_details}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} -o json
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+
+    # Parse HPA configuration
+    ${min_replicas}=    RW.CLI.Run Cli
+    ...    cmd=echo '${hpa_details.stdout}' | jq -r '.spec.minReplicas // 1'
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    
+    ${max_replicas}=    RW.CLI.Run Cli
+    ...    cmd=echo '${hpa_details.stdout}' | jq -r '.spec.maxReplicas // "N/A"'
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    
+    ${current_replicas}=    RW.CLI.Run Cli
+    ...    cmd=echo '${hpa_details.stdout}' | jq -r '.status.currentReplicas // 0'
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    
+    ${desired_replicas}=    RW.CLI.Run Cli
+    ...    cmd=echo '${hpa_details.stdout}' | jq -r '.status.desiredReplicas // 0'
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+
+    # Get metrics
+    ${metrics}=    RW.CLI.Run Cli
+    ...    cmd=echo '${hpa_details.stdout}' | jq -r '.spec.metrics // [] | map(.type) | join(", ")'
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+
+    # Get conditions
+    ${conditions}=    RW.CLI.Run Cli
+    ...    cmd=echo '${hpa_details.stdout}' | jq -r '.status.conditions // [] | map("\\(.type)=\\(.status) (\\(.reason // "N/A"))") | join(", ")'
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+
+    RW.Core.Add Pre To Report    ----------\nHPA Configuration:\nMin Replicas: ${min_replicas.stdout}\nMax Replicas: ${max_replicas.stdout}\nCurrent Replicas: ${current_replicas.stdout}\nDesired Replicas: ${desired_replicas.stdout}\nMetrics: ${metrics.stdout}\nConditions: ${conditions.stdout}
+
+    # Configuration Health Checks
+    
+    # Check if min replicas is 1 (potential availability risk)
+    ${min_is_one}=    Evaluate    int(${min_replicas.stdout}) == 1
+    IF    ${min_is_one}
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=HPA `${hpa_name}` should have minReplicas > 1 for high availability
+        ...    actual=HPA `${hpa_name}` has minReplicas set to 1
+        ...    title=HPA `${hpa_name}` May Have Availability Risk with minReplicas=1
+        ...    reproduce_hint=Check HPA configuration for ${hpa_name} in namespace ${NAMESPACE}
+        ...    details=HPA ${hpa_name} for deployment ${DEPLOYMENT_NAME} has minReplicas set to 1, which provides no redundancy. During scale-down periods, the deployment will have only a single replica, creating a single point of failure.\n\nCurrent: minReplicas=${min_replicas.stdout}\n\nConsider setting minReplicas to at least 2 for production workloads requiring high availability.
+        ...    next_steps=Evaluate availability requirements for this deployment\nConsider increasing minReplicas to 2 or more for redundancy\nReview PodDisruptionBudget settings\nAssess impact during maintenance windows
+    END
+
+    # Check if scaling range is too narrow (max - min < 2)
+    ${scaling_range}=    Evaluate    int(${max_replicas.stdout}) - int(${min_replicas.stdout})
+    ${narrow_range}=    Evaluate    ${scaling_range} < 2
+    IF    ${narrow_range} and int(${max_replicas.stdout}) > 0
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=HPA `${hpa_name}` should have adequate scaling range
+        ...    actual=HPA `${hpa_name}` has narrow scaling range (${scaling_range} replicas)
+        ...    title=HPA `${hpa_name}` Has Limited Scaling Range
+        ...    reproduce_hint=Check HPA configuration for ${hpa_name} in namespace ${NAMESPACE}
+        ...    details=HPA ${hpa_name} for deployment ${DEPLOYMENT_NAME} has a narrow scaling range.\n\nMin: ${min_replicas.stdout}\nMax: ${max_replicas.stdout}\nRange: ${scaling_range} replicas\n\nA narrow range limits the HPA's ability to respond to load changes effectively. Consider increasing maxReplicas to provide more scaling headroom.
+        ...    next_steps=Review application load patterns and scaling needs\nConsider increasing maxReplicas for better scaling flexibility\nEvaluate if HPA is appropriate for this workload\nReview metrics to understand scaling triggers
+    END
+
+    # Check if deployment has resource requests (required for CPU/memory-based HPA)
+    ${resource_requests}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.spec.template.spec.containers[0].resources.requests // {} | length'
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    
+    ${has_requests}=    Evaluate    int(${resource_requests.stdout}) > 0
+    ${uses_resource_metrics}=    Evaluate    "Resource" in "${metrics.stdout}"
+    IF    ${uses_resource_metrics} and not ${has_requests}
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=Deployment `${DEPLOYMENT_NAME}` should have resource requests configured for HPA
+        ...    actual=Deployment `${DEPLOYMENT_NAME}` has HPA with resource metrics but no resource requests
+        ...    title=HPA `${hpa_name}` Requires Resource Requests on Deployment
+        ...    reproduce_hint=Check deployment resource requests for ${DEPLOYMENT_NAME} in namespace ${NAMESPACE}
+        ...    details=HPA ${hpa_name} is configured to use resource-based metrics (${metrics.stdout}), but deployment ${DEPLOYMENT_NAME} does not have resource requests defined.\n\nResource-based HPA metrics (CPU/memory utilization percentages) require containers to have resource requests configured. Without them, the HPA cannot calculate utilization percentages.
+        ...    next_steps=Configure CPU and memory resource requests on deployment containers\nReview resource requirements and set appropriate requests\nConsider using absolute metrics instead of percentage-based if requests cannot be set\nVerify HPA metrics configuration matches deployment capabilities
+    END
+
+    # Check metric target values for potential misconfiguration
+    ${metric_targets}=    RW.CLI.Run Cli
+    ...    cmd=echo '${hpa_details.stdout}' | jq -r '.spec.metrics // [] | map(select(.type=="Resource")) | map("\\(.resource.name): \\(.resource.target.averageUtilization // .resource.target.averageValue // "N/A")%") | join(", ")'
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    
+    IF    "${metric_targets.stdout}" != "" and "${metric_targets.stdout}" != "null"
+        # Check for very aggressive CPU targets (< 50%)
+        ${has_aggressive_cpu}=    RW.CLI.Run Cli
+        ...    cmd=echo '${hpa_details.stdout}' | jq -r '.spec.metrics // [] | map(select(.type=="Resource" and .resource.name=="cpu" and (.resource.target.averageUtilization // 100) < 50)) | length'
+        ...    env=${env}
+        ...    secret_file__kubeconfig=${kubeconfig}
+        
+        ${aggressive_cpu}=    Evaluate    int(${has_aggressive_cpu.stdout}) > 0
+        IF    ${aggressive_cpu}
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    expected=HPA `${hpa_name}` should have reasonable CPU targets
+            ...    actual=HPA `${hpa_name}` has aggressive CPU target (< 50%)
+            ...    title=HPA `${hpa_name}` Has Aggressive CPU Scaling Target
+            ...    reproduce_hint=Check HPA metric targets for ${hpa_name} in namespace ${NAMESPACE}
+            ...    details=HPA ${hpa_name} has a CPU utilization target below 50%, which may cause premature scaling and resource over-provisioning.\n\nMetric Targets: ${metric_targets.stdout}\n\nTypical CPU targets are 70-80% for most workloads. Very low targets can lead to excessive pod counts and wasted resources.
+            ...    next_steps=Review application CPU usage patterns\nConsider raising CPU target to 70-80% range\nEvaluate if aggressive scaling is necessary for this workload\nMonitor cost implications of low utilization targets
+        END
+
+        # Check for very conservative CPU targets (> 95%)
+        ${has_conservative_cpu}=    RW.CLI.Run Cli
+        ...    cmd=echo '${hpa_details.stdout}' | jq -r '.spec.metrics // [] | map(select(.type=="Resource" and .resource.name=="cpu" and (.resource.target.averageUtilization // 0) > 95)) | length'
+        ...    env=${env}
+        ...    secret_file__kubeconfig=${kubeconfig}
+        
+        ${conservative_cpu}=    Evaluate    int(${has_conservative_cpu.stdout}) > 0
+        IF    ${conservative_cpu}
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    expected=HPA `${hpa_name}` should have reasonable CPU targets
+            ...    actual=HPA `${hpa_name}` has conservative CPU target (> 95%)
+            ...    title=HPA `${hpa_name}` Has Conservative CPU Scaling Target
+            ...    reproduce_hint=Check HPA metric targets for ${hpa_name} in namespace ${NAMESPACE}
+            ...    details=HPA ${hpa_name} has a CPU utilization target above 95%, which may not provide sufficient headroom before scaling occurs.\n\nMetric Targets: ${metric_targets.stdout}\n\nVery high targets can lead to performance degradation before autoscaling responds. Consider lowering to 70-80% for better responsiveness.
+            ...    next_steps=Review application performance during high CPU periods\nConsider lowering CPU target to 70-80% range\nMonitor response time during scale-up events\nEvaluate if conservative scaling is causing performance issues
+        END
+    END
+
+    # Check for scaling behavior configuration
+    ${has_behavior}=    RW.CLI.Run Cli
+    ...    cmd=echo '${hpa_details.stdout}' | jq -r 'if .spec.behavior then "true" else "false" end'
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    
+    IF    "${has_behavior.stdout}" == "false"
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=HPA `${hpa_name}` may benefit from behavior configuration
+        ...    actual=HPA `${hpa_name}` has no scaling behavior configured
+        ...    title=HPA `${hpa_name}` Missing Scaling Behavior Configuration
+        ...    reproduce_hint=Check HPA configuration for ${hpa_name} in namespace ${NAMESPACE}
+        ...    details=HPA ${hpa_name} does not have scaling behavior configured. Scaling behavior allows fine-tuning of scale-up/scale-down rates and stabilization windows.\n\nWithout behavior configuration, HPA uses default behaviors which may not be optimal for your workload. Consider configuring:\n- Scale-up policies (how quickly to add pods)\n- Scale-down policies (how quickly to remove pods)\n- Stabilization windows (prevent flapping)
+        ...    next_steps=Review HPA scaling behavior documentation\nConsider adding behavior configuration for scale-up/scale-down control\nMonitor scaling events for flapping or delayed responses\nTune stabilization windows based on application startup time
+    END
+
+    # Runtime Status Checks
+    
+    # Check if HPA is at max replicas (potential scaling limit)
+    ${at_max}=    Evaluate    int(${current_replicas.stdout}) >= int(${max_replicas.stdout})
+    IF    ${at_max} and int(${max_replicas.stdout}) > 0
+        RW.Core.Add Issue
+        ...    severity=3
+        ...    expected=HPA `${hpa_name}` should have scaling headroom
+        ...    actual=HPA `${hpa_name}` is at maximum replicas (${max_replicas.stdout})
+        ...    title=HPA `${hpa_name}` at Maximum Replicas - May Need Scaling Capacity
+        ...    reproduce_hint=Check HPA status for ${hpa_name} in namespace ${NAMESPACE}
+        ...    details=HPA ${hpa_name} for deployment ${DEPLOYMENT_NAME} is currently at its maximum replica count (${max_replicas.stdout}). This may indicate insufficient scaling capacity to handle current load.\n\nCurrent: ${current_replicas.stdout} replicas\nMax: ${max_replicas.stdout} replicas\n\nMetrics: ${metrics.stdout}
+        ...    next_steps=Review application metrics and load patterns\nConsider increasing HPA maxReplicas if more capacity is needed\nCheck if resource quotas are limiting scaling\nReview CPU/memory metrics to understand scaling triggers
+    END
+
+    # Check if HPA is at min replicas and trying to scale down (potential under-utilization)
+    ${at_min}=    Evaluate    int(${current_replicas.stdout}) <= int(${min_replicas.stdout})
+    ${has_min}=    Evaluate    int(${min_replicas.stdout}) > 1
+    IF    ${at_min} and ${has_min}
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=HPA `${hpa_name}` should scale appropriately with load
+        ...    actual=HPA `${hpa_name}` is at minimum replicas (${min_replicas.stdout})
+        ...    title=HPA `${hpa_name}` at Minimum Replicas - Potential Cost Optimization
+        ...    reproduce_hint=Check HPA status for ${hpa_name} in namespace ${NAMESPACE}
+        ...    details=HPA ${hpa_name} for deployment ${DEPLOYMENT_NAME} is at its minimum replica count (${min_replicas.stdout}). Consider reviewing if the minimum can be reduced during low-traffic periods for cost optimization.\n\nCurrent: ${current_replicas.stdout} replicas\nMin: ${min_replicas.stdout} replicas\n\nMetrics: ${metrics.stdout}
+        ...    next_steps=Review application load patterns\nConsider lowering minReplicas if consistently under-utilized\nImplement time-based scaling for predictable traffic patterns\nReview resource utilization metrics
+    END
+
+    # Check for missing metrics
+    IF    "${metrics.stdout}" == "" or "${metrics.stdout}" == "null"
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=HPA `${hpa_name}` should have metrics configured
+        ...    actual=HPA `${hpa_name}` has no metrics configured
+        ...    title=HPA `${hpa_name}` Missing Metrics Configuration
+        ...    reproduce_hint=Check HPA configuration for ${hpa_name} in namespace ${NAMESPACE}
+        ...    details=HPA ${hpa_name} for deployment ${DEPLOYMENT_NAME} does not have any metrics configured. Without metrics, the HPA cannot make scaling decisions.\n\nCurrent configuration:\nMin: ${min_replicas.stdout}\nMax: ${max_replicas.stdout}\nMetrics: None configured
+        ...    next_steps=Configure appropriate metrics for HPA (CPU, memory, or custom metrics)\nVerify metrics-server is running in the cluster\nReview HPA best practices for metric configuration
+    END
+
+    # Check for ScalingLimited condition
+    ${scaling_limited}=    RW.CLI.Run Cli
+    ...    cmd=echo '${hpa_details.stdout}' | jq -r '.status.conditions // [] | map(select(.type=="ScalingLimited" and .status=="True")) | length'
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    
+    ${is_scaling_limited}=    Evaluate    int(${scaling_limited.stdout}) > 0
+    IF    ${is_scaling_limited}
+        ${limited_reason}=    RW.CLI.Run Cli
+        ...    cmd=echo '${hpa_details.stdout}' | jq -r '.status.conditions // [] | map(select(.type=="ScalingLimited")) | .[0].reason // "Unknown"'
+        ...    env=${env}
+        ...    secret_file__kubeconfig=${kubeconfig}
+        
+        RW.Core.Add Issue
+        ...    severity=3
+        ...    expected=HPA `${hpa_name}` should be able to scale freely
+        ...    actual=HPA `${hpa_name}` scaling is limited (${limited_reason.stdout})
+        ...    title=HPA `${hpa_name}` Scaling Limited
+        ...    reproduce_hint=Check HPA conditions for ${hpa_name} in namespace ${NAMESPACE}
+        ...    details=HPA ${hpa_name} for deployment ${DEPLOYMENT_NAME} has scaling limitations.\n\nReason: ${limited_reason.stdout}\nCurrent: ${current_replicas.stdout} replicas\nMin: ${min_replicas.stdout}\nMax: ${max_replicas.stdout}\n\nThis may indicate the HPA has reached its configured limits or encountered constraints.
+        ...    next_steps=Review scaling limits (min/max replicas)\nCheck if resource quotas are constraining scaling\nVerify sufficient cluster capacity exists\nReview metric targets to ensure they're appropriate
+    END
+
+    # Check for AbleToScale=False condition
+    ${able_to_scale}=    RW.CLI.Run Cli
+    ...    cmd=echo '${hpa_details.stdout}' | jq -r '.status.conditions // [] | map(select(.type=="AbleToScale" and .status=="False")) | length'
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    
+    ${cannot_scale}=    Evaluate    int(${able_to_scale.stdout}) > 0
+    IF    ${cannot_scale}
+        ${unable_reason}=    RW.CLI.Run Cli
+        ...    cmd=echo '${hpa_details.stdout}' | jq -r '.status.conditions // [] | map(select(.type=="AbleToScale")) | .[0].message // "Unknown reason"'
+        ...    env=${env}
+        ...    secret_file__kubeconfig=${kubeconfig}
+        
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=HPA `${hpa_name}` should be able to scale
+        ...    actual=HPA `${hpa_name}` is unable to scale
+        ...    title=HPA `${hpa_name}` Cannot Scale
+        ...    reproduce_hint=Check HPA conditions for ${hpa_name} in namespace ${NAMESPACE}
+        ...    details=HPA ${hpa_name} for deployment ${DEPLOYMENT_NAME} is unable to perform scaling operations.\n\nReason: ${unable_reason.stdout}\n\nThis typically indicates a configuration issue or missing prerequisites like metrics-server.
+        ...    next_steps=Verify metrics-server is running and healthy\nCheck HPA configuration for errors\nReview deployment existence and health\nCheck RBAC permissions for HPA controller
+    END
+
+    # Add healthy status if no issues found
+    ${has_issues}=    Evaluate    ${at_max} or ${is_scaling_limited} or ${cannot_scale} or ("${metrics.stdout}" == "" or "${metrics.stdout}" == "null")
+    IF    not ${has_issues}
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=HPA `${hpa_name}` is healthy
+        ...    actual=HPA `${hpa_name}` is operating normally
+        ...    title=HPA `${hpa_name}` is Healthy
+        ...    reproduce_hint=Check HPA status for ${hpa_name} in namespace ${NAMESPACE}
+        ...    details=HPA ${hpa_name} for deployment ${DEPLOYMENT_NAME} is healthy and operating within normal parameters.\n\nConfiguration:\nMin: ${min_replicas.stdout}\nMax: ${max_replicas.stdout}\nCurrent: ${current_replicas.stdout}\nDesired: ${desired_replicas.stdout}\nMetrics: ${metrics.stdout}
+        ...    next_steps=Continue monitoring HPA metrics and scaling behavior\nReview application performance metrics\nAdjust HPA thresholds if needed based on observed patterns
+    END

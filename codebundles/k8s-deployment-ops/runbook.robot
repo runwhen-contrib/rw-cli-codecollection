@@ -361,28 +361,38 @@ Scale Up HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by 
 
     # Check if HPA exists for this deployment
     ${hpa_check}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.spec.scaleTargetRef.name=="${DEPLOYMENT_NAME}") | .metadata.name'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.spec.scaleTargetRef.name=="${DEPLOYMENT_NAME}" and (.spec.scaleTargetRef.kind=="Deployment" or .spec.scaleTargetRef.kind=="deployment")) | .metadata.name' | head -1
     ...    env=${env}
     ...    include_in_history=true
     ...    timeout_seconds=180
     ...    secret_file__kubeconfig=${kubeconfig}
     ${hpa_name}=    Strip String    ${hpa_check.stdout}
 
-    IF    "${hpa_name}" == ""
+    IF    "${hpa_name}" == "" or $hpa_check.stderr != ""
         RW.Core.Add Issue
         ...    severity=3
         ...    expected=HPA should exist for deployment `${DEPLOYMENT_NAME}`
         ...    actual=No HPA found for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
         ...    title=No HPA Found for Deployment `${DEPLOYMENT_NAME}`
         ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=Cannot scale HPA - no HorizontalPodAutoscaler exists for deployment ${DEPLOYMENT_NAME}
-        ...    next_steps=Create an HPA for this deployment first\nOr use deployment scaling tasks instead
+        ...    details=Cannot scale HPA - no HorizontalPodAutoscaler exists for deployment ${DEPLOYMENT_NAME}\n\nCommand output: ${hpa_check.stdout}\nErrors: ${hpa_check.stderr}
+        ...    next_steps=Create an HPA for this deployment first\nOr use deployment scaling tasks instead\nVerify HPA scaleTargetRef matches deployment name exactly\nCheck namespace and context are correct
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Commands Used: ${history}
         RETURN
     END
 
     RW.Core.Add Pre To Report    ----------\nFound HPA: ${hpa_name}
+
+    # Check if HPA is managed by GitOps
+    ${gitops_check}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r 'if (.metadata.labels // {} | to_entries | map(select(.key | test("flux|argocd|kustomize.toolkit.fluxcd.io"))) | length > 0) or (.metadata.annotations // {} | to_entries | map(select(.key | test("flux|argocd|gitops"))) | length > 0) then "true" else "false" end'
+    ...    env=${env}
+    ...    include_in_history=true
+    ...    timeout_seconds=180
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ${is_gitops_managed}=    Strip String    ${gitops_check.stdout}
+    RW.Core.Add Pre To Report    ----------\nGitOps Management Check:\n${is_gitops_managed}
 
     # Get current HPA min and max replicas
     ${current_min}=    RW.CLI.Run Cli
@@ -421,6 +431,21 @@ Scale Up HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by 
     END
 
     RW.Core.Add Pre To Report    ----------\nScaling HPA:\nMin Replicas: ${min_replicas} → ${new_min}\nMax Replicas: ${max_replicas} → ${new_max}
+
+    # If GitOps managed, only suggest changes
+    IF    $is_gitops_managed == "true"
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=HPA `${hpa_name}` should be updated via GitOps
+        ...    actual=HPA `${hpa_name}` is managed by GitOps - changes should be made in Git repository
+        ...    title=Suggestion: Scale Up HPA `${hpa_name}` via GitOps
+        ...    reproduce_hint=View suggested patch in report output
+        ...    details=HPA ${hpa_name} is managed by GitOps (Flux/ArgoCD). To scale up, update the HPA manifest in your Git repository:\n\nSuggested change:\nminReplicas: ${min_replicas} → ${new_min}\nmaxReplicas: ${max_replicas} → ${new_max}\n\nOr apply this patch (for manual override, not recommended):\nkubectl patch hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} --patch '{"spec":{"minReplicas":${new_min},"maxReplicas":${new_max}}}'
+        ...    next_steps=Update HPA manifest in Git repository\nCommit and push changes to trigger GitOps sync\nMonitor GitOps controller for deployment updates\nIf urgent, consider manual override (will be reverted by GitOps)
+        ${history}=    RW.CLI.Pop Shell History
+        RW.Core.Add Pre To Report    Commands Used: ${history}
+        RETURN
+    END
 
     # Update HPA
     ${hpa_update}=    RW.CLI.Run Cli
@@ -467,28 +492,38 @@ Scale Down HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` t
 
     # Check if HPA exists for this deployment
     ${hpa_check}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.spec.scaleTargetRef.name=="${DEPLOYMENT_NAME}") | .metadata.name'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.spec.scaleTargetRef.name=="${DEPLOYMENT_NAME}" and (.spec.scaleTargetRef.kind=="Deployment" or .spec.scaleTargetRef.kind=="deployment")) | .metadata.name' | head -1
     ...    env=${env}
     ...    include_in_history=true
     ...    timeout_seconds=180
     ...    secret_file__kubeconfig=${kubeconfig}
     ${hpa_name}=    Strip String    ${hpa_check.stdout}
 
-    IF    "${hpa_name}" == ""
+    IF    "${hpa_name}" == "" or $hpa_check.stderr != ""
         RW.Core.Add Issue
         ...    severity=3
         ...    expected=HPA should exist for deployment `${DEPLOYMENT_NAME}`
         ...    actual=No HPA found for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
         ...    title=No HPA Found for Deployment `${DEPLOYMENT_NAME}`
         ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=Cannot scale HPA - no HorizontalPodAutoscaler exists for deployment ${DEPLOYMENT_NAME}
-        ...    next_steps=Create an HPA for this deployment first\nOr use deployment scaling tasks instead
+        ...    details=Cannot scale HPA - no HorizontalPodAutoscaler exists for deployment ${DEPLOYMENT_NAME}\n\nCommand output: ${hpa_check.stdout}\nErrors: ${hpa_check.stderr}
+        ...    next_steps=Create an HPA for this deployment first\nOr use deployment scaling tasks instead\nVerify HPA scaleTargetRef matches deployment name exactly\nCheck namespace and context are correct
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Commands Used: ${history}
         RETURN
     END
 
     RW.Core.Add Pre To Report    ----------\nFound HPA: ${hpa_name}
+
+    # Check if HPA is managed by GitOps
+    ${gitops_check}=    RW.CLI.Run Cli
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r 'if (.metadata.labels // {} | to_entries | map(select(.key | test("flux|argocd|kustomize.toolkit.fluxcd.io"))) | length > 0) or (.metadata.annotations // {} | to_entries | map(select(.key | test("flux|argocd|gitops"))) | length > 0) then "true" else "false" end'
+    ...    env=${env}
+    ...    include_in_history=true
+    ...    timeout_seconds=180
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ${is_gitops_managed}=    Strip String    ${gitops_check.stdout}
+    RW.Core.Add Pre To Report    ----------\nGitOps Management Check:\n${is_gitops_managed}
 
     # Get current HPA min and max replicas
     ${current_min}=    RW.CLI.Run Cli
@@ -514,6 +549,21 @@ Scale Down HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` t
     ${new_max}=    Set Variable    ${HPA_MIN_REPLICAS}
 
     RW.Core.Add Pre To Report    ----------\nScaling Down HPA to Minimum:\nMin Replicas: ${min_replicas} → ${new_min}\nMax Replicas: ${max_replicas} → ${new_max}
+
+    # If GitOps managed, only suggest changes
+    IF    $is_gitops_managed == "true"
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=HPA `${hpa_name}` should be updated via GitOps
+        ...    actual=HPA `${hpa_name}` is managed by GitOps - changes should be made in Git repository
+        ...    title=Suggestion: Scale Down HPA `${hpa_name}` via GitOps
+        ...    reproduce_hint=View suggested patch in report output
+        ...    details=HPA ${hpa_name} is managed by GitOps (Flux/ArgoCD). To scale down, update the HPA manifest in your Git repository:\n\nSuggested change:\nminReplicas: ${min_replicas} → ${new_min}\nmaxReplicas: ${max_replicas} → ${new_max}\n\nOr apply this patch (for manual override, not recommended):\nkubectl patch hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} --patch '{"spec":{"minReplicas":${new_min},"maxReplicas":${new_max}}}'
+        ...    next_steps=Update HPA manifest in Git repository\nCommit and push changes to trigger GitOps sync\nMonitor GitOps controller for deployment updates\nIf urgent, consider manual override (will be reverted by GitOps)
+        ${history}=    RW.CLI.Pop Shell History
+        RW.Core.Add Pre To Report    Commands Used: ${history}
+        RETURN
+    END
 
     # Update HPA
     ${hpa_update}=    RW.CLI.Run Cli
@@ -594,7 +644,7 @@ Increase CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
 
     # Check if HPA exists for this deployment
     ${hpa_check}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.spec.scaleTargetRef.name=="${DEPLOYMENT_NAME}") | .metadata.name' || echo ""
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.spec.scaleTargetRef.name=="${DEPLOYMENT_NAME}" and (.spec.scaleTargetRef.kind=="Deployment" or .spec.scaleTargetRef.kind=="deployment")) | .metadata.name' | head -1 || echo ""
     ...    env=${env}
     ...    include_in_history=true
     ...    timeout_seconds=180
@@ -792,7 +842,7 @@ Increase Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
 
     # Check if HPA exists for this deployment
     ${hpa_check}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.spec.scaleTargetRef.name=="${DEPLOYMENT_NAME}") | .metadata.name' || echo ""
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.spec.scaleTargetRef.name=="${DEPLOYMENT_NAME}" and (.spec.scaleTargetRef.kind=="Deployment" or .spec.scaleTargetRef.kind=="deployment")) | .metadata.name' | head -1 || echo ""
     ...    env=${env}
     ...    include_in_history=true
     ...    timeout_seconds=180
@@ -991,7 +1041,7 @@ Decrease CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
 
     # Check if HPA exists for this deployment
     ${hpa_check}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.spec.scaleTargetRef.name=="${DEPLOYMENT_NAME}") | .metadata.name' || echo ""
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.spec.scaleTargetRef.name=="${DEPLOYMENT_NAME}" and (.spec.scaleTargetRef.kind=="Deployment" or .spec.scaleTargetRef.kind=="deployment")) | .metadata.name' | head -1 || echo ""
     ...    env=${env}
     ...    include_in_history=true
     ...    timeout_seconds=180
@@ -1176,7 +1226,7 @@ Decrease Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
 
     # Check if HPA exists for this deployment
     ${hpa_check}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.spec.scaleTargetRef.name=="${DEPLOYMENT_NAME}") | .metadata.name' || echo ""
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.spec.scaleTargetRef.name=="${DEPLOYMENT_NAME}" and (.spec.scaleTargetRef.kind=="Deployment" or .spec.scaleTargetRef.kind=="deployment")) | .metadata.name' | head -1 || echo ""
     ...    env=${env}
     ...    include_in_history=true
     ...    timeout_seconds=180
