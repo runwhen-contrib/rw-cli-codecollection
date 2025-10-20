@@ -54,6 +54,7 @@ namespace_info=$(az servicebus namespace show \
 endpoint=$(echo "$namespace_info" | jq -r '.serviceBusEndpoint')
 hostname="${endpoint#*://}"
 hostname="${hostname%/*}"
+hostname="${hostname%:*}"  # Remove port number (e.g., :443)
 echo "Service Bus endpoint hostname: $hostname"
 
 # Get namespace network settings
