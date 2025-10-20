@@ -442,10 +442,9 @@ Scale Up HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by 
             ...    next_steps=Update HPA manifest in Git repository\nCommit and push changes to trigger GitOps sync\nMonitor GitOps controller for deployment updates\nIf urgent, consider manual override (will be reverted by GitOps)
             ${history}=    RW.CLI.Pop Shell History
             RW.Core.Add Pre To Report    Commands Used: ${history}
-        END
-
-        # Update HPA
-        ${hpa_update}=    RW.CLI.Run Cli
+        ELSE
+            # Update HPA
+            ${hpa_update}=    RW.CLI.Run Cli
         ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} patch hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} --patch '{"spec":{"minReplicas":${new_min},"maxReplicas":${new_max}}}'
         ...    env=${env}
         ...    include_in_history=true
@@ -472,9 +471,10 @@ Scale Up HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by 
             ...    details=HPA ${hpa_name} for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE} was scaled up.\nPrevious: minReplicas=${min_replicas}, maxReplicas=${max_replicas}\nNew: minReplicas=${new_min}, maxReplicas=${new_max}
             ...    next_steps=Monitor deployment metrics to ensure HPA scaling meets demand\nConsider adjusting HPA metrics thresholds if needed
             END
+        END
 
-            ${history}=    RW.CLI.Pop Shell History
-            RW.Core.Add Pre To Report    Commands Used: ${history}
+        ${history}=    RW.CLI.Pop Shell History
+        RW.Core.Add Pre To Report    Commands Used: ${history}
     END
 
 
