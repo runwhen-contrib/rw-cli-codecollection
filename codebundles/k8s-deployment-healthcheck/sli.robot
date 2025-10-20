@@ -272,7 +272,7 @@ Get Critical Log Errors and Score for Deployment `${DEPLOYMENT_NAME}`
         ...    excluded_containers=${EXCLUDED_CONTAINERS}
         
         # Use only critical error patterns for fast SLI checks
-        @{critical_categories}=    Create List    GenericError    AppFailure    StackTrace
+        @{critical_categories}=    Create List    GenericError    AppFailure
         
         ${scan_results}=    RW.K8sLog.Scan Logs For Issues
         ...    log_dir=${log_dir}

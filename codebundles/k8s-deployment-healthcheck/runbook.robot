@@ -79,8 +79,8 @@ Suite Initialization
     ...    type=string
     ...    description=Comma-separated list of log pattern categories to scan for.
     ...    pattern=.*
-    ...    example=GenericError,AppFailure,StackTrace,Connection
-    ...    default=GenericError,AppFailure,StackTrace,Connection,Timeout,Auth,Exceptions,Resource,HealthyRecovery
+    ...    example=GenericError,AppFailure,Connection
+    ...    default=GenericError,AppFailure,Connection,Timeout,Auth,Exceptions,Resource,HealthyRecovery
     ${ANOMALY_THRESHOLD}=    RW.Core.Import User Variable    ANOMALY_THRESHOLD
     ...    type=string
     ...    description=The threshold for detecting event anomalies based on events per minute.
@@ -206,7 +206,7 @@ Suite Initialization
 *** Tasks ***
 
 Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
-    [Documentation]    Fetches and analyzes logs from the deployment pods for errors, stack traces, connection issues, and other patterns that indicate application health problems. Note: Warning messages about missing log files for excluded containers (like linkerd-proxy, istio-proxy) are expected and harmless.
+    [Documentation]    Fetches and analyzes logs from the deployment pods for errors, connection issues, and other patterns that indicate application health problems. Note: Warning messages about missing log files for excluded containers (like linkerd-proxy, istio-proxy) are expected and harmless.
     [Tags]
     ...    logs
     ...    application
@@ -214,7 +214,6 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
     ...    patterns
     ...    health
     ...    deployment
-    ...    stacktrace
     ...    access:read-only
     # Skip pod-related checks if deployment is scaled to 0
     IF    not ${SKIP_POD_CHECKS}
