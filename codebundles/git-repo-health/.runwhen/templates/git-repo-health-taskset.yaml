@@ -1,0 +1,50 @@
+apiVersion: runwhen.com/v1
+kind: Runbook
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  location: {{default_location}}
+  description: Comprehensive health monitoring and analysis for Git repositories across repositories and organizations.
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/git-repo-health/runbook.robot
+  configProvided:
+    - name: GITHUB_REPOS
+      value: "{{match_resource.resource.name}}"
+    - name: GITHUB_ORGS
+      value: "{% if match_resource.resource_type == 'github_organization' %}{{match_resource.resource.name}}{% endif %}"
+    - name: COMMIT_LOOKBACK_DAYS
+      value: "30"
+    - name: STALE_REPO_THRESHOLD_DAYS
+      value: "90"
+    - name: MIN_COMMITS_HEALTHY
+      value: "5"
+    - name: MAX_REPOS_TO_ANALYZE
+      value: "50"
+    - name: MAX_REPOS_PER_ORG
+      value: "20"
+    - name: MIN_REPO_HEALTH_SCORE
+      value: "0.7"
+    - name: MAX_STALE_REPOS_PERCENTAGE
+      value: "20"
+  secretsProvided:
+  {% if wb_version %}
+    - name: GITHUB_TOKEN
+      workspaceKey: GITHUB_TOKEN
+  {% else %}
+    - name: GITHUB_TOKEN
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}

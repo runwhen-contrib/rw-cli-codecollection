@@ -1,0 +1,57 @@
+apiVersion: runwhen.com/v1
+kind: ServiceLevelIndicator
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  displayUnitsLong: Health Score
+  displayUnitsShort: score
+  locations:
+    - {{default_location}}
+  description: Measures the overall health of Git repositories including commit activity, contributor diversity, and maintenance status.
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/git-repo-health/sli.robot
+  intervalStrategy: intermezzo
+  intervalSeconds: 300
+  configProvided:
+    - name: GITHUB_REPOS
+      value: "{{match_resource.resource.name}}"
+    - name: GITHUB_ORGS
+      value: "{% if match_resource.resource_type == 'github_organization' %}{{match_resource.resource.name}}{% endif %}"
+    - name: MIN_REPO_HEALTH_SCORE
+      value: "0.7"
+    - name: MIN_COMMIT_FREQUENCY_SCORE
+      value: "0.6"
+    - name: MIN_REPO_FRESHNESS_SCORE
+      value: "0.7"
+    - name: MIN_CONTRIBUTOR_DIVERSITY_SCORE
+      value: "0.5"
+    - name: MIN_COMMITS_HEALTHY
+      value: "5"
+    - name: SLI_LOOKBACK_DAYS
+      value: "1"
+    - name: MAX_REPOS_TO_ANALYZE
+      value: "50"
+    - name: MAX_REPOS_PER_ORG
+      value: "20"
+  secretsProvided:
+  {% if wb_version %}
+    - name: GITHUB_TOKEN
+      workspaceKey: GITHUB_TOKEN
+  {% else %}
+    - name: GITHUB_TOKEN
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}
