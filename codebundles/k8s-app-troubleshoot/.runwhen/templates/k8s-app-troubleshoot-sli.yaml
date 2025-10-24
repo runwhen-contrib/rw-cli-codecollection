@@ -29,8 +29,6 @@ spec:
   configProvided:
   - name: KUBERNETES_DISTRIBUTION_BINARY
     value: kubectl
-  - name: LOGS_SINCE
-    value: 60m
   - name: LABELS
     value: app={{match_resource.resource.metadata.labels.app}}
   - name: EXCLUDE_PATTERN

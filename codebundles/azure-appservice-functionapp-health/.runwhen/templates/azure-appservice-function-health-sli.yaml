@@ -31,8 +31,6 @@ spec:
       value: {{resource_group.name}}
     - name: FUNCTION_APP_NAME
       value: {{match_resource.resource.name}}
-    - name: TIME_PERIOD_MINUTES
-      value: "10"
     - name: AZURE_RESOURCE_SUBSCRIPTION_ID
       value: "{{ subscription_id }}"
     - name: AZURE_SUBSCRIPTION_NAME

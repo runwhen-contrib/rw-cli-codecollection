@@ -38,8 +38,6 @@ spec:
       value: {{match_resource.resource.metadata.name}}
     - name: WORKLOAD_TYPE
       value: {{match_resource.kind | lower}}
-    - name: LOG_AGE
-      value: "10m"
     - name: MAX_LOG_LINES
       value: "100"
     - name: MAX_LOG_BYTES
