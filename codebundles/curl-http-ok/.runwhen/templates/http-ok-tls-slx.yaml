@@ -22,4 +22,4 @@ spec:
   tags: 
     {% include "kubernetes-tags.yaml" ignore missing %}
     - name: access
-      value: read-write
+      value: read-only
