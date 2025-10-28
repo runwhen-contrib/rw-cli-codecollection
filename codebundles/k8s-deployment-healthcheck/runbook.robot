@@ -1058,7 +1058,6 @@ Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` in Namespace `${N
                 IF    ${json_match}
                     ${json_text}=    Evaluate    $json_match.group(0) if $json_match else '{}'
                     ${restart_data}=    Evaluate    json.loads(r'''${json_text}''')    json
-                    RW.Core.Add To Report    Hrithvika ${restart_data}
                     ${restart_issues}=    Evaluate    $restart_data.get('issues', [])
                     ${restart_summary}=    Evaluate    $restart_data.get('summary', {})
                     ${is_json}=    Set Variable    ${True}

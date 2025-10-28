@@ -76,7 +76,7 @@ Analyze Application Log Patterns for StatefulSet `${STATEFULSET_NAME}` in Namesp
     # Format scan results for better display
     ${formatted_results}=    RW.K8sLog.Format Scan Results For Display    scan_results=${scan_results}
     
-    RW.Core.Add Pre To Report    **Log Analysis Summary for StatefulSet `${STATEFULSET_NAME}`**\n**Health Score:** ${log_health_score}\n**Analysis Depth:** ${LOG_ANALYSIS_DEPTH}\n**Categories Analyzed:** ${LOG_PATTERN_CATEGORIES}\n**Issues Found:** ${issues_count}\n\n${formatted_results}
+    RW.Core.Add Pre To Report    **Log Analysis Summary for StatefulSet `${STATEFULSET_NAME}`**\n**Health Score:** ${log_health_score}\n**Analysis Depth:** ${LOG_ANALYSIS_DEPTH}\n**Categories Analyzed:** ${LOG_PATTERN_CATEGORIES_STR}\n**Issues Found:** ${issues_count}\n\n${formatted_results}
     
     RW.K8sLog.Cleanup Temp Files
 

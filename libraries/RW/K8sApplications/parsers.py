@@ -216,7 +216,7 @@ class BaseStackTraceParse:
         results = deduplicated
         return results
 
-    def extract_timestamp(text: str, show_debug: bool = False) -> str:
+    def extract_timestamp(text: str, show_debug: bool = False) -> list[str]:
         # format: RFC3339 (often RFC3339Nano) for K8s logs
         regex = r"\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})\b"
         results = re.findall(regex, text)
