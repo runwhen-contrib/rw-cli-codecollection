@@ -247,7 +247,8 @@ while read -r container; do
                 issue_details="{\"severity\":\"3\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\` in the last $CONTAINER_RESTART_AGE\",\"next_steps\":\"Unknown exit code for pod \`$pod_name\`. Escalate to the service or infrastructure owner for further investigation.\",\"details\":\"Unknown exit code for pod \`$pod_name\`: $exit_code_explanation. Total restart count: $restart_count (lifetime total). Most recent restart occurred within the last $CONTAINER_RESTART_AGE.\"}"
                 ;;
         esac
-
+        
+        issue_details="$(printf '%s' "$issue_details" | jq --arg ts "$terminated_finishedAt" '. + {observed_at: $ts}')"
         # Add issue detail to the list of recommendations
         recommendations+=("$issue_details")
       fi

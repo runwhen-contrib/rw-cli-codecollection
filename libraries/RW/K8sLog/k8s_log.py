@@ -13,6 +13,7 @@ from typing import Dict, List, Any, Optional, Tuple, Union
 from collections import defaultdict
 from difflib import SequenceMatcher
 from RW import platform
+from datetime import datetime, timezone
 
 
 class TimeoutError(Exception):
@@ -41,6 +42,40 @@ class K8sLog:
         self.ROBOT_LIBRARY_SCOPE = 'GLOBAL'
         self.temp_dir = None
         self.error_patterns = self._load_error_patterns()
+        self._timestamp_handler = None
+    
+    def _get_timestamp_handler(self):
+        """Lazy load the timestamp handler to avoid import issues."""
+        if self._timestamp_handler is None:
+            try:
+                from RW.LogAnalysis.java.timestamp_handler import TimestampHandler
+                self._timestamp_handler = TimestampHandler()
+            except ImportError as e:
+                logger.warning(f"Could not import TimestampHandler: {e}")
+                self._timestamp_handler = None
+        return self._timestamp_handler
+    
+    def _extract_timestamp_from_log_line(self, log_line: str) -> str:
+        """Extract timestamp from a log line, falling back to current time if none found."""
+        if not log_line or not log_line.strip():
+            return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+        
+        handler = self._get_timestamp_handler()
+        if handler is None:
+            # Fallback to current timestamp if handler is not available
+            return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+        
+        try:
+            timestamp_str, _, _ = handler.extract_timestamp_from_line(log_line)
+            if timestamp_str:
+                dt = handler.parse_timestamp_to_datetime(timestamp_str)
+                if dt:
+                    return dt.isoformat().replace('+00:00', 'Z')
+        except Exception as e:
+            logger.debug(f"Failed to extract timestamp from log line: {e}")
+        
+        # Fallback to current timestamp
+        return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
         
     def _load_error_patterns(self) -> Dict[str, Any]:
         """Load error patterns from the embedded patterns data."""
@@ -1031,11 +1066,15 @@ class K8sLog:
                                         break
                                 
                                 if not excluded:
+                                    # Extract timestamp from the matching log line
+                                    log_timestamp = self._extract_timestamp_from_log_line(line.strip())
+                                    
                                     matches.append({
                                         "line_number": line_num,
                                         "line": line.strip(),
                                         "pod": pod,
-                                        "container": container
+                                        "container": container,
+                                        "timestamp": log_timestamp
                                     })
                                     # Limit matches per pattern to prevent memory issues
                                     if len(matches) >= 100:
@@ -1052,6 +1091,10 @@ class K8sLog:
                                     pattern_config["name"], next_steps, sample_lines, workload_name, namespace
                                 )
                                 
+                                # Find the earliest timestamp from matches
+                                timestamps = [match.get("timestamp") for match in matches if match.get("timestamp")]
+                                earliest_timestamp = min(timestamps) if timestamps else datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+                                
                                 # Create issue for this pattern
                                 issue = {
                                     "category": category,
@@ -1060,7 +1103,8 @@ class K8sLog:
                                     "next_steps": context_aware_steps,
                                     "matches": matches,
                                     "total_occurrences": len(matches),
-                                    "sample_lines": sample_lines
+                                    "sample_lines": sample_lines,
+                                    "earliest_timestamp": earliest_timestamp
                                 }
                                 
                                 category_issues[category].append(issue)
@@ -1098,13 +1142,19 @@ class K8sLog:
                         "total_occurrences": 0,
                         "sample_lines": [],
                         "unique_next_steps": set(),
-                        "details_parts": []
+                        "details_parts": [],
+                        "earliest_timestamp": issue.get("earliest_timestamp", datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'))
                     }
                 
                 consolidated_data = consolidated_issues[content_key]
                 consolidated_data["total_occurrences"] += issue["total_occurrences"]
                 consolidated_data["sample_lines"].extend(issue["sample_lines"])
                 consolidated_data["unique_next_steps"].update(issue["next_steps"])
+                
+                # Track the earliest timestamp across all issues
+                issue_timestamp = issue.get("earliest_timestamp")
+                if issue_timestamp and issue_timestamp < consolidated_data["earliest_timestamp"]:
+                    consolidated_data["earliest_timestamp"] = issue_timestamp
                 
                 # Add details about where the issue was found
                 container_info = defaultdict(int)
@@ -1149,7 +1199,8 @@ class K8sLog:
                 "severity": issue_data["severity"], 
                 "severity_label": severity_label,
                 "occurrences": issue_data["total_occurrences"],
-                "category": issue_data["category"]
+                "category": issue_data["category"],
+                "observed_at": issue_data["earliest_timestamp"]
             })
 
         # Consolidate notes by category and create final results
@@ -1257,17 +1308,24 @@ class K8sLog:
 
                 if not log_content.strip():
                     continue
+                # logger.error(f"Hrithvika: {log_content}")
 
                 # Count occurrences of repeating log messages
                 log_lines = log_content.split('\n')
                 line_counts = defaultdict(int)
+                line_timestamps = defaultdict(str)
                 
                 for line in log_lines:
                     if line.strip():
                         # Clean the line for better grouping
+                        timestamp = self._extract_timestamp_from_log_line(line.strip())
                         cleaned_line = self._cleanup_log_line_for_grouping(line.strip())
                         if cleaned_line:
                             line_counts[cleaned_line] += 1
+                            if not line_timestamps[cleaned_line]:
+                                line_timestamps[cleaned_line] = timestamp
+                            elif timestamp and timestamp < line_timestamps[cleaned_line]:
+                                line_timestamps[cleaned_line] = timestamp
 
                 # Find lines that appear more than once
                 for cleaned_line, count in line_counts.items():
@@ -1314,7 +1372,8 @@ class K8sLog:
                             "details": f"**Repeated Message:** {cleaned_line}\n**Occurrences:** {count}\n**Container:** {container}",
                             "next_steps": next_steps_str,
                             "severity": severity,
-                            "occurrences": count
+                            "occurrences": count,
+                            "observed_at": line_timestamps[cleaned_line]
                         })
 
         # Generate summary
@@ -1616,6 +1675,72 @@ class K8sLog:
             return max(0.5, 1.0 - (total_weight * 0.1))  # Degraded health
         else:
             return max(0.8, 1.0 - (total_weight * 0.05))  # Minor issues
+
+    @keyword
+    def extract_last_termination_timestamp(self, log_data: str) -> str:
+        """Extract the last termination timestamp from container restart log data.
+        
+        Args:
+            log_data: String containing the log data with termination information
+            
+        Returns:
+            ISO timestamp string of the last termination, or empty string if not found
+        """
+        if not log_data or not log_data.strip():
+            return ""
+        
+        # Pattern to match "Last Termination: YYYY-MM-DDTHH:MM:SSZ" format
+        termination_pattern = r'Last Termination:\s*(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)'
+        
+        # Search for the pattern in the log data
+        match = re.search(termination_pattern, log_data)
+        
+        if match:
+            return match.group(1)
+        
+        # Look for any ISO timestamp in the details section
+        iso_timestamp_pattern = r'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)'
+        iso_matches = re.findall(iso_timestamp_pattern, log_data)
+        
+        if iso_matches:
+            # Return the last (most recent) timestamp found
+            return iso_matches[-1]
+        
+        return ""
+
+    @keyword
+    def get_first_false_condition_timestamp(self, pod_conditions: List[Dict[str, Any]]) -> str:
+        """Get the first lastTransitionTime for a condition where status is False.
+        
+        Args:
+            pod_conditions: List of pod condition dictionaries containing status and lastTransitionTime
+            
+        Returns:
+            ISO timestamp string of the first condition with status=False, or empty string if not found
+        """
+        if not pod_conditions or not isinstance(pod_conditions, list):
+            return ""
+        
+        # Sort conditions by lastTransitionTime to get the earliest one with status=False
+        false_conditions = []
+        
+        for condition in pod_conditions:
+            if not isinstance(condition, dict):
+                continue
+                
+            status = condition.get('status', '').lower()
+            last_transition_time = condition.get('lastTransitionTime', '')
+            
+            # Check if status is explicitly False (case-insensitive)
+            if status == 'false' and last_transition_time:
+                false_conditions.append({
+                    'lastTransitionTime': last_transition_time,
+                })
+        
+        if not false_conditions:
+            return ""
+        
+        return false_conditions[-1]['lastTransitionTime']
 
     @keyword
     def cleanup_temp_files(self):
