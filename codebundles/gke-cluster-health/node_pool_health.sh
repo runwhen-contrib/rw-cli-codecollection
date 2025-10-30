@@ -288,15 +288,15 @@ analyze_node_pool_health() {
     
     # Check for capacity issues - focus on real scheduling problems in multi-pool clusters
     if [[ "$MAX_NODES" != "null" && $MAX_NODES -gt 0 && $CURRENT_NODES -gt 0 ]]; then
-      # Calculate actual maximum capacity accounting for regional clusters
-      # For regional clusters, MAX_NODES is per-zone, so multiply by zone count
+      # Calculate actual maximum capacity accounting for multi-zone clusters
+      # For any cluster with multiple zones, MAX_NODES is per-zone, so multiply by zone count
       local ACTUAL_MAX_NODES
-      if [[ "$CLUSTER_TYPE" == "REGIONAL" && $CLUSTER_ZONES -gt 1 ]]; then
+      if [[ $CLUSTER_ZONES -gt 1 ]]; then
         ACTUAL_MAX_NODES=$((MAX_NODES * CLUSTER_ZONES))
         local capacity_desc="$MAX_NODES per zone × $CLUSTER_ZONES zones = $ACTUAL_MAX_NODES total"
       else
         ACTUAL_MAX_NODES=$MAX_NODES
-        local capacity_desc="$MAX_NODES total (zonal cluster)"
+        local capacity_desc="$MAX_NODES total (single-zone cluster)"
       fi
       
       # Debug: Log the values to understand any parsing issues
