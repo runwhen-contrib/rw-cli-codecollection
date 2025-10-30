@@ -14,7 +14,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check for Node Restarts in Cluster `${CONTEXT}` within Interval `${INTERVAL}`
+Check for Node Restarts in Cluster `${CONTEXT}` within Interval `${RW_LOOKBACK_WINDOW}`
     [Documentation]    Identify nodes that are starting and stopping within the time interval.
     [Tags]    cluster    preempt    spot    reboot    utilization    saturation    exhaustion    access:read-only
     ${node_restart_details}=    RW.CLI.Run Bash File
@@ -31,8 +31,8 @@ Check for Node Restarts in Cluster `${CONTEXT}` within Interval `${INTERVAL}`
        RW.Core.Add Issue
        ...    severity=4
        ...    expected=Nodes in Cluster Context `${CONTEXT}` are not starting/stopping frequently.
-       ...    actual=Nodes in Cluster Context `${CONTEXT}` are starting/stopping in the last ${INTERVAL}.
-       ...    title= Nodes in Cluster Context `${CONTEXT}` are starting/stopping in the last ${INTERVAL}.
+       ...    actual=Nodes in Cluster Context `${CONTEXT}` are starting/stopping in the last ${RW_LOOKBACK_WINDOW}.
+       ...    title= Nodes in Cluster Context `${CONTEXT}` are starting/stopping in the last ${RW_LOOKBACK_WINDOW}.
        ...    reproduce_hint=View Commands Used in Report Output
        ...    details=${node_restart_details.stdout}
        ...    next_steps=Escalate the issue to the service owner if this is behaviour unexpected.  
@@ -59,7 +59,7 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=default
     ...    example=my-main-cluster
-    ${INTERVAL}=    RW.Core.Import User Variable    INTERVAL
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Import User Variable    INTERVAL
     ...    type=string
     ...    description=The time interval in which to look back for node events. 
     ...    pattern=\w*
@@ -68,5 +68,5 @@ Suite Initialization
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
-    Set Suite Variable    ${INTERVAL}    ${INTERVAL}
-    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "CONTEXT":"${CONTEXT}", "INTERVAL":"${INTERVAL}"}
+    Set Suite Variable    ${RW_LOOKBACK_WINDOW}    ${RW_LOOKBACK_WINDOW}
+    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "CONTEXT":"${CONTEXT}", "RW_LOOKBACK_WINDOW":"${RW_LOOKBACK_WINDOW}"}
