@@ -48,29 +48,32 @@ def mem(v:str)->int:
 LIVE={"Running","Pending","Unknown"}
 def gather_pods():
     pod,node={},defaultdict(lambda:{"rc":0,"rm":0,"lc":0,"lm":0,"pods":[]})
+    pod_names = {}  # uid -> name mapping
     try:
         data=json.loads(run(["kubectl","get","pods","-A","-o","json"]))
     except subprocess.CalledProcessError as e:
         print(f"Warning: Failed to get pods - {e}")
-        return pod, node
+        return pod, node, pod_names
     
     for it in data["items"]:
         if it["status"].get("phase") not in LIVE or it["metadata"].get("deletionTimestamp"):
             continue
         uid=it["metadata"]["uid"]; nd=it["spec"].get("nodeName","UNSCHED")
+        name=it["metadata"]["name"]; namespace=it["metadata"]["namespace"]
+        pod_names[uid] = f"{namespace}/{name}"
         rc=rm=lc=lm=0
         for c in it["spec"]["containers"]:
             res=c.get("resources",{}); req=res.get("requests",{}); lim=res.get("limits",{})
             rc+=cpu(req.get("cpu","0"));          rm+=mem(req.get("memory","0"))
             lc+=cpu(lim.get("cpu",req.get("cpu","0"))); lm+=mem(lim.get("memory",req.get("memory","0")))
-        pod[uid]={"node":nd,"rc":rc,"rm":rm,"lc":lc,"lm":lm}
+        pod[uid]={"node":nd,"rc":rc,"rm":rm,"lc":lc,"lm":lm,"name":pod_names[uid]}
         n=node[nd]; n["rc"]+=rc; n["rm"]+=rm; n["lc"]+=lc; n["lm"]+=lm; n["pods"].append(uid)
     
     print(f"Gathered {len(pod)} pods across {len([n for n in node if n != 'UNSCHED'])} nodes")
     if "UNSCHED" in node and len(node["UNSCHED"]["pods"]) > 0:
         print(f"Warning: {len(node['UNSCHED']['pods'])} unscheduled pods found")
     
-    return pod,node
+    return pod,node,pod_names
 
 def allocatable():
     try:
@@ -144,7 +147,7 @@ def analyse(cl:str, loc:str):
     flag="--region" if re.fullmatch(r"[a-z0-9-]+[0-9]$",loc) else "--zone"
     retry(["gcloud","container","clusters","get-credentials",cl,flag,loc,"--quiet"])
 
-    pod,node=gather_pods(); alloc=allocatable(); usage=node_usage()
+    pod,node,pod_names=gather_pods(); alloc=allocatable(); usage=node_usage()
 
     meta=json.loads(run(["gcloud","container","clusters","describe",cl,flag,loc,
                          "--format=json(locations,locationType)"]))
@@ -209,7 +212,7 @@ def analyse(cl:str, loc:str):
     =============================================================================
     Cluster `{cl}`   Location `{loc}`   {ctype}
     -----------------------------------------------------------------------------
-    Largest pod : `{biggest['node']}`  {biggest['rc']}m / {biggest['rm']}MiB
+    Largest pod : `{biggest['name']}`  {biggest['rc']}m / {biggest['rm']}MiB
 
     Busiest node: `{busiest}`  (type {a_b['type']})
       Requests : {busy['rc']}m ({pr(busy['rc']/a_b['cpu']*100)})   {busy['rm']}MiB ({pr(busy['rm']/a_b['mem']*100)})
@@ -262,26 +265,75 @@ def analyse(cl:str, loc:str):
           if can_scale else
           f"\n{EMO['RES']}  Pool already at max ({cur_nodes}/{max_nodes}); a larger node is required.\n")
 
-    # ── sizing section (driven by *limits*, not head‑room) ──────────────
-    need_cpu = math.ceil(busy['lc'] / MAX_CPU_LIMIT_OVERCOMMIT)
-    need_mem = math.ceil(busy['lm'] / MAX_MEM_LIMIT_OVERCOMMIT)
-
+    # ── intelligent sizing section ──────────────────────────────────────
+    # Get current node specifications for comparison
+    current_node_cpu = a_b['cpu']  # Current node CPU in millicores
+    current_node_mem = a_b['mem']  # Current node memory in MiB
+    
+    # Calculate different sizing approaches
+    # 1. Based on current requests with headroom
+    req_based_cpu = math.ceil(busy['rc'] * 1.3)  # 30% headroom over current requests
+    req_based_mem = math.ceil(busy['rm'] * 1.3)  # 30% headroom over current memory
+    
+    # 2. Based on current usage with headroom  
+    usage_based_cpu = math.ceil(use_b['cpu'] * 2.0)  # 100% headroom over current usage
+    usage_based_mem = math.ceil(use_b['mem'] * 2.0)  # 100% headroom over current usage
+    
+    # 3. Based on limits with reasonable overcommit
+    limit_based_cpu = math.ceil(busy['lc'] / MAX_CPU_LIMIT_OVERCOMMIT)
+    limit_based_mem = math.ceil(busy['lm'] / MAX_MEM_LIMIT_OVERCOMMIT)
+    
+    # 4. Minimum based on largest single pod with headroom
+    pod_based_cpu = math.ceil(biggest['rc'] * 1.5)  # 50% headroom for largest pod
+    pod_based_mem = math.ceil(biggest['rm'] * 1.5)  # 50% headroom for largest pod
+    
+    # Choose the most appropriate sizing method
+    need_cpu = max(req_based_cpu, usage_based_cpu, limit_based_cpu, pod_based_cpu)
+    need_mem = max(req_based_mem, usage_based_mem, limit_based_mem, pod_based_mem)
+    
+    # Don't recommend smaller nodes than current unless there's a compelling reason
+    min_recommended_cpu = max(need_cpu, current_node_cpu // 2)  # At least half current CPU
+    min_recommended_mem = max(need_mem, current_node_mem // 2)  # At least half current memory
+    
+    # If current utilization is very low, allow smaller recommendations
+    cpu_utilization = (busy['rc'] / current_node_cpu) * 100
+    mem_utilization = (busy['rm'] / current_node_mem) * 100
+    
+    if cpu_utilization < 30 and mem_utilization < 30:
+        # Very low utilization - allow smaller nodes
+        min_recommended_cpu = need_cpu
+        min_recommended_mem = need_mem
+        sizing_reason = "Low utilization allows downsizing"
+    elif cpu_utilization > 70 or mem_utilization > 70:
+        # High utilization - recommend larger nodes
+        min_recommended_cpu = max(need_cpu, current_node_cpu)
+        min_recommended_mem = max(need_mem, current_node_mem)
+        sizing_reason = "High utilization requires maintaining or increasing capacity"
+    else:
+        # Moderate utilization - be conservative
+        sizing_reason = "Moderate utilization suggests maintaining similar capacity"
 
     cat=catalogue(region)
     mts=[{"name":n,"cpu":v["cpu"],"mem":v["mem"],"zones":v["zones"]} for n,v in cat.items()]
-    fits=[m for m in mts if zones.issubset(m["zones"]) and m["cpu"]*1000>=need_cpu and m["mem"]>=need_mem] \
-         or [m for m in mts if m["cpu"]*1000>=need_cpu and m["mem"]>=need_mem]
+    fits=[m for m in mts if zones.issubset(m["zones"]) and m["cpu"]*1000>=min_recommended_cpu and m["mem"]>=min_recommended_mem] \
+         or [m for m in mts if m["cpu"]*1000>=min_recommended_cpu and m["mem"]>=min_recommended_mem]
 
     try:
         fits.sort(key=lambda m:(m["cpu"],m["mem"])); best=fits[0]
         zones_n=len(zones); cap_cpu,cap_mem=best["cpu"]*1000,best["mem"]
-        total=max(math.ceil(need_cpu/cap_cpu), math.ceil(need_mem/cap_mem), 3)
+        total=max(math.ceil(min_recommended_cpu/cap_cpu), math.ceil(min_recommended_mem/cap_mem), 3)
         if ctype=="REGIONAL":
             per_zone=math.ceil(total/zones_n); min_n,max_n=per_zone,per_zone*3
         else:
             min_n,max_n=total,total*3
 
-        print(f"{EMO['NODE']}  *** RECOMMENDED NODE: {best['name']} "
+        print(f"\nSIZING ANALYSIS:")
+        print(f"Current node: {a_b['type']} ({current_node_cpu//1000} vCPU, {current_node_mem} MiB)")
+        print(f"CPU utilization: {cpu_utilization:.1f}% | Memory utilization: {mem_utilization:.1f}%")
+        print(f"Sizing reason: {sizing_reason}")
+        print(f"Required capacity: {min_recommended_cpu}m CPU, {min_recommended_mem} MiB memory")
+        
+        print(f"\n{EMO['NODE']}  *** RECOMMENDED NODE: {best['name']} "
               f"(vCPU {best['cpu']}, Mem {best['mem']}MiB) ***")
         print(f"Suggested autoscaler {min_n}-{max_n}"
               f" ({'per zone' if ctype=='REGIONAL' else 'total'})\n")
@@ -291,8 +343,17 @@ def analyse(cl:str, loc:str):
             print(f"{m['name']:<20} {m['cpu']:>4} {m['mem']:<8}{mark}")
         print()
 
+        # Provide better context in the issue
+        comparison = ""
+        if best['cpu'] > (current_node_cpu // 1000):
+            comparison = f"Upgrade from {current_node_cpu//1000} to {best['cpu']} vCPU"
+        elif best['cpu'] < (current_node_cpu // 1000):
+            comparison = f"Downsize from {current_node_cpu//1000} to {best['cpu']} vCPU"
+        else:
+            comparison = f"Maintain {best['cpu']} vCPU"
+
         note(cl,3,"Node‑pool sizing recommendation",
-             f"Use `{best['name']}` in `{cl}`; autoscaler {min_n}-{max_n}.",
+             f"Use `{best['name']}` in `{cl}` ({comparison}); autoscaler {min_n}-{max_n}. {sizing_reason}.",
              f"Cordon, drain and delete old nodes in `{cl}`; move workload to new pool.")
 
     except Exception as exc:
