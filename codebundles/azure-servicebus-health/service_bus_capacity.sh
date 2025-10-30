@@ -169,8 +169,9 @@ size_metrics=$(az monitor metrics list \
   --interval PT1H \
   --aggregation Average \
   -o json)
-current_size_percent=$(echo "$size_metrics" | jq '.value[0].timeseries[0].data | map(.average) | max // 0')
-current_size_gb=$(echo "scale=2; $current_size_percent * $max_namespace_size / 100" | bc)
+current_size_bytes=$(echo "$size_metrics" | jq '.value[0].timeseries[0].data | map(.average) | max // 0')
+current_size_gb=$(echo "scale=2; $current_size_bytes / 1024 / 1024 / 1024" | bc)
+current_size_percent=$(echo "scale=2; $current_size_gb * 100 / $max_namespace_size" | bc)
 
 echo "Current namespace size: $current_size_gb GB of $max_namespace_size GB (${current_size_percent}%)"
 
@@ -267,10 +268,48 @@ add_issue() {
 # Check namespace size
 size_percent=$(jq '.size.current_percent' <<< "$capacity_data")
 if (( $(echo "$size_percent > 80" | bc -l) )); then
+  current_gb=$(jq '.size.current_gb' <<< "$capacity_data")
+  max_gb=$(jq '.size.max_gb' <<< "$capacity_data")
+  queue_count=$(jq '.entities.queue_count' <<< "$capacity_data")
+  topic_count=$(jq '.entities.topic_count' <<< "$capacity_data")
+  subscription_count=$(jq '.entities.subscription_count' <<< "$capacity_data")
+  
   add_issue 3 \
     "Service Bus namespace $SB_NAMESPACE_NAME is approaching size limit (${size_percent}%)" \
     "Consider implementing message cleanup strategies or upgrading SKU/capacity" \
-    "Current size: $(jq '.size.current_gb' <<< "$capacity_data") GB of $(jq '.size.max_gb' <<< "$capacity_data") GB"
+    "NAMESPACE CAPACITY ANALYSIS:
+- Current Usage: ${current_gb} GB of ${max_gb} GB (${size_percent}%)
+- Namespace: $SB_NAMESPACE_NAME
+- SKU: $sku
+- Capacity Units: $capacity
+- Queue Count: $queue_count
+- Topic Count: $topic_count  
+- Subscription Count: $subscription_count
+
+CONTEXT: High namespace storage utilization indicates significant message accumulation across queues and topics. At 80%+ capacity, you're approaching the hard limit where new messages may be rejected. This typically occurs due to:
+1. Message backlog from slow or failed consumers
+2. Large message sizes consuming storage quickly
+3. Long message TTL values preventing automatic cleanup
+4. Dead letter queues accumulating failed messages
+5. Insufficient consumer throughput relative to producer rates
+
+INVESTIGATION STEPS:
+1. Identify largest queues/topics: Review individual entity sizes
+2. Check for message backlogs in active queues and subscriptions
+3. Review dead letter queues for accumulated failed messages
+4. Analyze message TTL settings across entities
+5. Monitor producer vs consumer rates to identify imbalances
+6. Review auto-delete policies on idle entities
+
+RECOMMENDATIONS:
+- Implement message cleanup strategies (shorter TTL, auto-delete policies)
+- Scale consumer applications to process backlogs faster
+- Consider upgrading to higher SKU tier or increasing capacity units
+- Implement monitoring and alerting for storage utilization
+- Review and optimize message sizes if possible
+- Clean up dead letter queues after investigation
+
+BUSINESS IMPACT: Reaching storage limits will cause message publishing failures, potentially disrupting critical business operations and causing data loss."
 fi
 
 # Check for throttling
