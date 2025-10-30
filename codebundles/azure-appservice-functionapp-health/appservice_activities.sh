@@ -3,14 +3,14 @@
 # ENV:
 # FUNCTION_APP_NAME
 # AZ_RESOURCE_GROUP
-# TIME_PERIOD_MINUTES (Optional, default is 60)
+# RW_LOOKBACK_WINDOW (Optional, default is 60)
 # AZURE_RESOURCE_SUBSCRIPTION_ID (Optional, defaults to current subscription)
 
 # Set the default time period to 120 minutes if not provided
-TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-120}"
+RW_LOOKBACK_WINDOW="${RW_LOOKBACK_WINDOW:-120}"
 
 # Calculate the start and end times
-start_time=$(date -u -d "$TIME_PERIOD_MINUTES minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
+start_time=$(date -u -d "$RW_LOOKBACK_WINDOW minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
 end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
 # Get or set subscription ID

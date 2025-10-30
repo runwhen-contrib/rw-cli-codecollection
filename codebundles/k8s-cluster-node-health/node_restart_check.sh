@@ -3,7 +3,7 @@
 context=$CONTEXT
 
 # Set the time interval (e.g., 24 hours)
-interval=$INTERVAL
+interval=$RW_LOOKBACK_WINDOW
 
 # Get the current date and time (ISO 8601 format)
 CURRENT_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")

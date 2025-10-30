@@ -5,7 +5,7 @@
 # Usage:
 #   export AZ_RESOURCE_GROUP="myResourceGroup"
 #   export APIM_NAME="myApimInstance"
-#   export TIME_PERIOD_MINUTES="60"  # Optional, defaults to 60
+#   export RW_LOOKBACK_WINDOW="60"  # Optional, defaults to 60
 #   # Optional: export AZURE_RESOURCE_SUBSCRIPTION_ID="your-subscription-id"
 #   ./check_apim_keyvault.sh
 #
@@ -37,14 +37,14 @@ az account set --subscription "$subscription" || {
 : "${AZ_RESOURCE_GROUP:?Must set AZ_RESOURCE_GROUP}"
 : "${APIM_NAME:?Must set APIM_NAME}"
 
-TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-60}"
+RW_LOOKBACK_WINDOW="${RW_LOOKBACK_WINDOW:-60}"
 OUTPUT_FILE="apim_keyvault_issues.json"
 issues_json='{"issues": []}'
 
 echo "[INFO] Checking APIM Key Vault Dependencies..."
 echo " APIM Name:     $APIM_NAME"
 echo " ResourceGroup: $AZ_RESOURCE_GROUP"
-echo " Time Period:   $TIME_PERIOD_MINUTES minutes"
+echo " Time Period:   $RW_LOOKBACK_WINDOW minutes"
 
 ###############################################################################
 # 2) Get APIM details and check for Key Vault references
@@ -182,7 +182,7 @@ for kv_name in "${unique_keyvaults[@]}"; do
                   --query "customerId" -o tsv 2>/dev/null); then
                 
                 # Query for Key Vault access failures
-                time_range="${TIME_PERIOD_MINUTES}m"
+                time_range="${RW_LOOKBACK_WINDOW}m"
                 KV_AUDIT_QUERY="AzureDiagnostics
 | where TimeGenerated >= ago($time_range)
 | where ResourceId == \"$kv_resource_id\"
