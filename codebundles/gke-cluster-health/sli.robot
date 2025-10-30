@@ -179,6 +179,32 @@ Quick Node Instance Group Health Check for GCP Project `${GCP_PROJECT_ID}`
     END
     RW.Core.Push Metric    ${gke_node_instance_score}    sub_name=node_instances
 
+Quick Node Instance Group Health Check for GCP Project `${GCP_PROJECT_ID}`
+    [Documentation]    Fast detection of critical node instance group health issues like quota exhaustion and provisioning failures
+    [Tags]    nodepool    instances    quota    gcloud    gke    gcp    access:read-only
+
+    ${instance_health_check}=    RW.CLI.Run Bash File
+    ...    bash_file=lightweight_node_instance_health.sh
+    ...    env=${env}
+    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    timeout_seconds=45
+
+    ${issues}=     RW.CLI.Run Cli
+    ...    cmd=cat lightweight_node_health_issues.json
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+
+    Set Global Variable     ${gke_node_instance_score}    1
+    IF    len(@{issue_list}) > 0
+        FOR    ${item}    IN    @{issue_list}
+            IF    ${item["severity"]} == 1 or ${item["severity"]} == 2
+                Set Global Variable    ${gke_node_instance_score}    0
+                Exit For Loop
+            ELSE IF    ${item["severity"]} > 2
+                Set Global Variable    ${gke_node_instance_score}    1
+            END
+        END
+    END
+
 Generate GKE Cluster Health Score
     ${gke_total_health_score}=      Evaluate  (${gke_sa_score} + ${gke_recommendations_score} + ${gke_cluster_health_score} +${gke_quota_score} + ${gke_node_instance_score}) / 5
     ${health_score}=      Convert to Number    ${gke_total_health_score}  2
