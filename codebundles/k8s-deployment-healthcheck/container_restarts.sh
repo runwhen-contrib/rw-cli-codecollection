@@ -27,53 +27,126 @@ function analyze_sigkill_cause() {
     local pod_name="$1"
     local container_name="$2"
     local terminated_time="$3"
-    
+
     # Get pod events around the termination time
     local events=$(${KUBERNETES_DISTRIBUTION_BINARY} get events --context=${CONTEXT} -n ${NAMESPACE} --field-selector involvedObject.name=${pod_name} -o json 2>/dev/null)
-    
+
     # Get container status details
     local pod_status=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod ${pod_name} --context=${CONTEXT} -n ${NAMESPACE} -o json 2>/dev/null)
     local terminated_reason=$(echo "$pod_status" | jq -r ".status.containerStatuses[] | select(.name==\"$container_name\") | .lastState.terminated.reason // \"N/A\"")
-    
-    # Check for explicit OOMKilled reason first
+
+    # STEP 1: Check for EXPLICIT OOMKilled reason (most reliable)
     if [[ "$terminated_reason" == "OOMKilled" ]]; then
         return 1  # Confirmed OOM
     fi
-    
-    # Look for OOM-related events
-    local oom_events=$(echo "$events" | jq -r '.items[] | select(.reason == "OOMKilling" or .reason == "Killing" and (.message | contains("Memory cgroup out of memory")) or (.message | contains("oom-kill")) or (.message | contains("Out of memory"))) | .message' 2>/dev/null)
-    
+
+    # STEP 2: Look for EXPLICIT OOM-related events (second most reliable)
+    local oom_events=$(echo "$events" | jq -r '.items[] | select(.reason == "OOMKilling" or (.reason == "Killing" and (.message | contains("Memory cgroup out of memory"))) or (.message | contains("oom-kill")) or (.message | contains("Out of memory")) or (.message | contains("memory limit exceeded"))) | .message' 2>/dev/null)
+
     if [[ -n "$oom_events" ]]; then
         return 1  # OOM confirmed via events
     fi
-    
-    # Look for liveness probe failure events
-    local probe_events=$(echo "$events" | jq -r '.items[] | select(.reason == "Unhealthy" and (.message | contains("Liveness probe failed")) or .reason == "Killing" and (.message | contains("liveness probe failed"))) | .message' 2>/dev/null)
-    
+
+    # STEP 3: Look for EXPLICIT liveness probe failure events (high confidence)
+    local probe_events=$(echo "$events" | jq -r '.items[] | select((.reason == "Unhealthy" and (.message | contains("Liveness probe failed"))) or (.reason == "Killing" and (.message | contains("liveness probe failed"))) or (.reason == "FailedMount" and (.message | contains("probe")))) | .message' 2>/dev/null)
+
     if [[ -n "$probe_events" ]]; then
         return 2  # Liveness probe failure confirmed
     fi
+
+    # STEP 4: Analyze resource usage patterns to infer cause
+    local memory_request=$(echo "$pod_status" | jq -r ".spec.containers[] | select(.name==\"$container_name\") | .resources.requests.memory // \"0\"")
+    local memory_limit=$(echo "$pod_status" | jq -r ".spec.containers[] | select(.name==\"$container_name\") | .resources.limits.memory // \"0\"")
     
-    # Look for other system-level termination events
-    local system_events=$(echo "$events" | jq -r '.items[] | select(.reason == "Killing" and ((.message | contains("preempt")) or (.message | contains("evict")) or (.message | contains("resource pressure")))) | .message' 2>/dev/null)
+    # Convert memory values to bytes for comparison
+    local request_bytes=0
+    local limit_bytes=0
     
+    if [[ "$memory_request" != "0" && "$memory_request" != "null" ]]; then
+        request_bytes=$(convert_memory_to_bytes "$memory_request")
+    fi
+    
+    if [[ "$memory_limit" != "0" && "$memory_limit" != "null" ]]; then
+        limit_bytes=$(convert_memory_to_bytes "$memory_limit")
+    fi
+
+    # STEP 5: Check for resource pressure or node-level issues
+    local node_events=$(${KUBERNETES_DISTRIBUTION_BINARY} get events --context=${CONTEXT} --all-namespaces --field-selector reason=NodeHasDiskPressure,reason=NodeHasMemoryPressure,reason=NodeHasPIDPressure -o json 2>/dev/null)
+    local pressure_events=$(echo "$node_events" | jq -r '.items[] | select(.lastTimestamp >= "'$(date -d '10 minutes ago' -Iseconds)'" or .firstTimestamp >= "'$(date -d '10 minutes ago' -Iseconds)'") | .message' 2>/dev/null)
+    
+    if [[ -n "$pressure_events" ]]; then
+        return 3  # Node resource pressure
+    fi
+
+    # STEP 6: Look for system-level termination events
+    local system_events=$(echo "$events" | jq -r '.items[] | select(.reason == "Killing" and ((.message | contains("preempt")) or (.message | contains("evict")) or (.message | contains("resource pressure")) or (.message | contains("node shutdown")))) | .message' 2>/dev/null)
+
     if [[ -n "$system_events" ]]; then
         return 3  # System-level termination
     fi
+
+    # STEP 7: Analyze the terminated reason more carefully
+    case "$terminated_reason" in
+        "Error")
+            # "Error" reason with exit 137 is often liveness probe failure, NOT OOM
+            # Check if there are any health-related events
+            local health_events=$(echo "$events" | jq -r '.items[] | select((.message | contains("health")) or (.message | contains("ready")) or (.message | contains("probe")) or (.message | contains("timeout"))) | .message' 2>/dev/null)
+            
+            if [[ -n "$health_events" ]]; then
+                return 2  # Likely probe-related
+            fi
+            
+            # Check for any "Killing" events without specific OOM indicators
+            local general_killing=$(echo "$events" | jq -r '.items[] | select(.reason == "Killing") | .message' 2>/dev/null)
+            
+            if [[ -n "$general_killing" ]]; then
+                # If killing events exist but no OOM evidence, likely probe failure
+                return 2  # Likely probe failure
+            fi
+            ;;
+        "Completed")
+            return 4  # Normal completion, not an error
+            ;;
+        *)
+            # Other reasons - analyze context
+            ;;
+    esac
+
+    # STEP 8: Final analysis - if we have high restart count but no clear OOM evidence, likely probe issues
+    local restart_count=$(echo "$pod_status" | jq -r ".status.containerStatuses[] | select(.name==\"$container_name\") | .restartCount // 0")
     
-    # Check for general "Killing" events that might indicate probe failures
-    local killing_events=$(echo "$events" | jq -r '.items[] | select(.reason == "Killing") | .message' 2>/dev/null)
+    if [[ $restart_count -gt 5 ]] && [[ "$terminated_reason" == "Error" ]]; then
+        # High restart count with "Error" reason but no OOM evidence suggests probe failures
+        return 2  # Likely probe failure pattern
+    fi
+
+    # If we can't determine the specific cause with confidence, return unknown
+    return 0  # Unknown cause - requires investigation
+}
+
+# Helper function to convert memory strings to bytes
+convert_memory_to_bytes() {
+    local memory_str="$1"
+    local bytes=0
     
-    # If we see killing events but no specific OOM indicators, it's likely probe-related
-    if [[ -n "$killing_events" ]]; then
-        # Check if the killing message mentions container health
-        if echo "$killing_events" | grep -q -i "container.*failed\|unhealthy\|probe"; then
-            return 2  # Likely probe failure
-        fi
+    if [[ "$memory_str" =~ ^([0-9]+)([KMGT]i?)$ ]]; then
+        local value="${BASH_REMATCH[1]}"
+        local unit="${BASH_REMATCH[2]}"
+        
+        case "$unit" in
+            "Ki") bytes=$((value * 1024)) ;;
+            "Mi") bytes=$((value * 1024 * 1024)) ;;
+            "Gi") bytes=$((value * 1024 * 1024 * 1024)) ;;
+            "Ti") bytes=$((value * 1024 * 1024 * 1024 * 1024)) ;;
+            "K") bytes=$((value * 1000)) ;;
+            "M") bytes=$((value * 1000 * 1000)) ;;
+            "G") bytes=$((value * 1000 * 1000 * 1000)) ;;
+            "T") bytes=$((value * 1000 * 1000 * 1000 * 1000)) ;;
+            *) bytes=$value ;;
+        esac
     fi
     
-    # If we can't determine the specific cause, return unknown
-    return 0
+    echo "$bytes"
 }
 
 # Tasks to perform when container exit code is "Error" or 1
