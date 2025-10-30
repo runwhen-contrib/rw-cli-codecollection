@@ -387,12 +387,13 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=70
     ...    default=70
-    ${FAILURE_LOOKBACK_DAYS}=    RW.Core.Import User Variable    FAILURE_LOOKBACK_DAYS
+    ${LOOKBACK_WINDOW}=    RW.Core.Import User Variable    LOOKBACK_WINDOW
     ...    type=string
     ...    description=Number of days to look back for workflow failures. Accepts partial numbers (e.g. 0.04 = 1h)
     ...    pattern=^\d+$
     ...    example=1
     ...    default=1
+    ${FAILURE_LOOKBACK_DAYS}=    RW.Core.Normalize Lookback Window Str    ${LOOKBACK_WINDOW}    1
     ${MAX_REPOS_TO_ANALYZE}=    RW.Core.Import User Variable    MAX_REPOS_TO_ANALYZE
     ...    type=string
     ...    description=Maximum number of repositories to analyze when GITHUB_REPOS is 'ALL' (0 for unlimited)

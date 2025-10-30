@@ -130,11 +130,12 @@ Suite Initialization
     ...    type=string
     ...    description=The Azure AKS cluster to triage.
     ...    pattern=\w*
-    ${TIME_PERIOD_MINUTES}=    RW.Core.Import User Variable    TIME_PERIOD_MINUTES
+    ${LOOKBACK_WINDOW}=    RW.Core.Import User Variable    LOOKBACK_WINDOW
     ...    type=string
     ...    description=The time period, in minutes, to look back for activites/events. 
     ...    pattern=\w*
     ...    default=60
+    ${TIME_PERIOD_MINUTES}=    RW.Core.Normalize Lookback Window Str    ${LOOKBACK_WINDOW}
     ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_RESOURCE_SUBSCRIPTION_ID
     ...    type=string
     ...    description=The Azure Subscription ID for the resource.  

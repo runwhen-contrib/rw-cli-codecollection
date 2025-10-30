@@ -59,12 +59,13 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=default
     ...    example=my-main-cluster
-    ${INTERVAL}=    RW.Core.Import User Variable    INTERVAL
+    ${LOOKBACK_WINDOW}=    RW.Core.Import User Variable    LOOKBACK_WINDOW
     ...    type=string
     ...    description=The time interval in which to look back for node events. 
     ...    pattern=\w*
     ...    default=10 minutes
     ...    example=4 hours, 5 minutes, etc. 
+    ${INTERVAL}=    RW.Core.Normalize Lookback Window Str    ${LOOKBACK_WINDOW}    2
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}

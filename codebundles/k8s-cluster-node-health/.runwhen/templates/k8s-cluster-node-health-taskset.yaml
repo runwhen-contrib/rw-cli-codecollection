@@ -20,13 +20,12 @@ spec:
     ref: main
     {% endif %}
     pathToRobot: codebundles/k8s-cluster-node-health/runbook.robot
+  lookbackWindow: 10m
   configProvided:
     - name: CONTEXT
       value: "{{cluster.context}}"
     - name: KUBERNETES_DISTRIBUTION_BINARY
       value: {{custom.kubernetes_distribution_binary}}
-    - name: INTERVAL
-      value: "10 minutes"
   secretsProvided:
   {% if wb_version %}
     {% include "kubernetes-auth.yaml" ignore missing %}

@@ -857,12 +857,13 @@ Suite Initialization
     ...    description=The name of the StatefulSet to triage.
     ...    pattern=\w*
     ...    example=mysql-primary
-    ${LOG_AGE}=    RW.Core.Import User Variable    LOG_AGE
+    ${LOOKBACK_WINDOW}=    RW.Core.Import User Variable    LOOKBACK_WINDOW
     ...    type=string
     ...    description=The age of logs to fetch from pods, used for log analysis tasks.
     ...    pattern=\w*
     ...    example=1h
     ...    default=3h
+    ${LOG_AGE}=    Set Variable    ${LOOKBACK_WINDOW}
     ${LOG_ANALYSIS_DEPTH}=    RW.Core.Import User Variable    LOG_ANALYSIS_DEPTH
     ...    type=string
     ...    description=The depth of log analysis to perform - basic, standard, or comprehensive.

@@ -21,9 +21,8 @@ spec:
     ref: main
     {% endif %}
     pathToRobot: codebundles/azure-loadbalancer-triage/runbook.robot
+  lookbackWindow: 24h
   configProvided:
-    - name: AZ_HISTORY_RANGE
-      value: '24'
     - name: AZ_LB_NAME
       value: {{match_resource.resource.name}}
     - name: AZ_LB_ID

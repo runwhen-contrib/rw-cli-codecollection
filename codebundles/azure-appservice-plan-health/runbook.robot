@@ -270,11 +270,12 @@ Suite Initialization
     ...    description=Azure subscription name.
     ...    pattern=\w*
     ...    default=""
-    ${AZURE_ACTIVITY_LOG_OFFSET}=    RW.Core.Import User Variable    AZURE_ACTIVITY_LOG_OFFSET
+    ${LOOKBACK_WINDOW}=    RW.Core.Import User Variable    LOOKBACK_WINDOW
     ...    type=string
     ...    description=Time offset for activity log collection (e.g., 24h, 7d) (default: 24h)
     ...    pattern=\w+
     ...    default=24h
+    ${AZURE_ACTIVITY_LOG_OFFSET}=    Set Variable    ${LOOKBACK_WINDOW}
     ${CPU_THRESHOLD}=    RW.Core.Import User Variable    CPU_THRESHOLD
     ...    type=string
     ...    description=CPU usage threshold percentage for high usage alerts (default: 80)
