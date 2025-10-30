@@ -127,14 +127,38 @@ def node_usage():
     return u
 
 def catalogue(region):
+    # Get machine types from GCP API
     mts=json.loads(run(["gcloud","compute","machine-types","list",
                         f"--filter=zone~{region}*",
                         "--format=json(name,guestCpus,memoryMb,zone)",
                         "--page-size","500","--limit","9999"]))
     cat=defaultdict(lambda:{"cpu":0,"mem":0,"zones":set()})
+    
+    # Filter to only include valid, current machine types suitable for GKE
+    valid_prefixes = [
+        "n2-standard-", "n2-highcpu-", "n2-highmem-",
+        "n1-standard-", "n1-highcpu-", "n1-highmem-",
+        "e2-standard-", "e2-highcpu-", "e2-highmem-",
+        "c2-standard-", "c2d-standard-",
+        "m1-", "m2-", "m3-",
+        "t2d-standard-", "t2a-standard-"
+    ]
+    
+    # Exclude deprecated, invalid, or problematic machine types
+    invalid_types = {
+        "g1-small", "f1-micro",  # Legacy types
+        "g2-standard-12",  # Invalid type that sometimes appears in API
+    }
+    
     for m in mts:
         n=m["name"]; z=Path(m["zone"]).name
-        cat[n]["cpu"]=m["guestCpus"]; cat[n]["mem"]=m["memoryMb"]; cat[n]["zones"].add(z)
+        
+        # Only include valid machine types
+        if (any(n.startswith(prefix) for prefix in valid_prefixes) and 
+            n not in invalid_types and
+            m["guestCpus"] >= 1 and m["memoryMb"] >= 1024):  # Minimum viable specs
+            cat[n]["cpu"]=m["guestCpus"]; cat[n]["mem"]=m["memoryMb"]; cat[n]["zones"].add(z)
+    
     return cat
 
 issues=[]
@@ -321,40 +345,83 @@ def analyse(cl:str, loc:str):
     try:
         fits.sort(key=lambda m:(m["cpu"],m["mem"])); best=fits[0]
         zones_n=len(zones); cap_cpu,cap_mem=best["cpu"]*1000,best["mem"]
-        total=max(math.ceil(min_recommended_cpu/cap_cpu), math.ceil(min_recommended_mem/cap_mem), 3)
-        if ctype=="REGIONAL":
-            per_zone=math.ceil(total/zones_n); min_n,max_n=per_zone,per_zone*3
+        
+        # Calculate minimum nodes needed based on resource requirements
+        min_nodes_cpu = math.ceil(min_recommended_cpu / cap_cpu)
+        min_nodes_mem = math.ceil(min_recommended_mem / cap_mem)
+        min_nodes_required = max(min_nodes_cpu, min_nodes_mem, 1)
+        
+        # Get current node pool information for realistic autoscaler sizing
+        current_nodes = cur_nodes
+        
+        # Calculate realistic autoscaler bounds based on current usage and headroom
+        if cpu_utilization < 30 and mem_utilization < 30:
+            # Low utilization - can scale down
+            suggested_min = max(min_nodes_required, math.ceil(current_nodes * 0.5))
+            suggested_max = max(suggested_min * 2, current_nodes)
+        elif cpu_utilization > 70 or mem_utilization > 70:
+            # High utilization - need more capacity
+            suggested_min = max(min_nodes_required, current_nodes)
+            suggested_max = max(suggested_min * 2, math.ceil(current_nodes * 1.5))
         else:
-            min_n,max_n=total,total*3
+            # Moderate utilization - maintain similar capacity
+            suggested_min = max(min_nodes_required, math.ceil(current_nodes * 0.8))
+            suggested_max = max(suggested_min, math.ceil(current_nodes * 1.2))
+        
+        # For regional clusters, distribute across zones
+        if ctype == "REGIONAL" and zones_n > 1:
+            min_per_zone = math.ceil(suggested_min / zones_n)
+            max_per_zone = math.ceil(suggested_max / zones_n)
+            autoscaler_desc = f"{min_per_zone}-{max_per_zone} per zone (total: {min_per_zone * zones_n}-{max_per_zone * zones_n})"
+            min_n, max_n = min_per_zone, max_per_zone
+        else:
+            autoscaler_desc = f"{suggested_min}-{suggested_max} total"
+            min_n, max_n = suggested_min, suggested_max
 
         print(f"\nSIZING ANALYSIS:")
         print(f"Current node: {a_b['type']} ({current_node_cpu//1000} vCPU, {current_node_mem} MiB)")
+        print(f"Current nodes: {current_nodes}")
         print(f"CPU utilization: {cpu_utilization:.1f}% | Memory utilization: {mem_utilization:.1f}%")
         print(f"Sizing reason: {sizing_reason}")
         print(f"Required capacity: {min_recommended_cpu}m CPU, {min_recommended_mem} MiB memory")
+        print(f"Minimum nodes needed: {min_nodes_required}")
         
-        print(f"\n{EMO['NODE']}  *** RECOMMENDED NODE: {best['name']} "
-              f"(vCPU {best['cpu']}, Mem {best['mem']}MiB) ***")
-        print(f"Suggested autoscaler {min_n}-{max_n}"
-              f" ({'per zone' if ctype=='REGIONAL' else 'total'})\n")
-        print("Other machine types that also fit (top 10):")
-        for m in fits[:10]:
-            mark="← recommended" if m is best else ""
-            print(f"{m['name']:<20} {m['cpu']:>4} {m['mem']:<8}{mark}")
-        print()
-
-        # Provide better context in the issue
-        comparison = ""
-        if best['cpu'] > (current_node_cpu // 1000):
-            comparison = f"Upgrade from {current_node_cpu//1000} to {best['cpu']} vCPU"
-        elif best['cpu'] < (current_node_cpu // 1000):
-            comparison = f"Downsize from {current_node_cpu//1000} to {best['cpu']} vCPU"
+        # Only recommend a different machine type if it makes sense
+        current_cpu_cores = current_node_cpu // 1000
+        recommended_cpu_cores = best['cpu']
+        
+        if (recommended_cpu_cores == current_cpu_cores and 
+            abs(best['mem'] - current_node_mem) < (current_node_mem * 0.2)):
+            # Very similar specs - don't recommend change
+            print(f"\n{EMO['OK']}  Current machine type `{a_b['type']}` is appropriate")
+            print(f"No machine type change recommended - current specs are suitable")
+            print(f"Consider adjusting autoscaler: {autoscaler_desc}")
+            
+            note(cl,4,"Node‑pool autoscaler adjustment",
+                 f"Current `{a_b['type']}` is suitable; consider autoscaler {autoscaler_desc}. {sizing_reason}.",
+                 f"Update autoscaler settings for node pool in `{cl}`")
         else:
-            comparison = f"Maintain {best['cpu']} vCPU"
+            print(f"\n{EMO['NODE']}  *** RECOMMENDED NODE: {best['name']} "
+                  f"(vCPU {best['cpu']}, Mem {best['mem']}MiB) ***")
+            print(f"Suggested autoscaler: {autoscaler_desc}")
+            print("\nOther machine types that also fit (top 5):")
+            for m in fits[:5]:
+                mark = "← recommended" if m is best else ""
+                print(f"{m['name']:<20} {m['cpu']:>4} vCPU {m['mem']:>6} MiB {mark}")
+            print()
 
-        note(cl,3,"Node‑pool sizing recommendation",
-             f"Use `{best['name']}` in `{cl}` ({comparison}); autoscaler {min_n}-{max_n}. {sizing_reason}.",
-             f"Cordon, drain and delete old nodes in `{cl}`; move workload to new pool.")
+            # Provide better context in the issue
+            comparison = ""
+            if best['cpu'] > current_cpu_cores:
+                comparison = f"Upgrade from {current_cpu_cores} to {best['cpu']} vCPU"
+            elif best['cpu'] < current_cpu_cores:
+                comparison = f"Optimize from {current_cpu_cores} to {best['cpu']} vCPU"
+            else:
+                comparison = f"Maintain {best['cpu']} vCPU with better memory ratio"
+
+            note(cl,3,"Node‑pool sizing recommendation",
+                 f"Use `{best['name']}` in `{cl}` ({comparison}); autoscaler {autoscaler_desc}. {sizing_reason}.",
+                 f"Create new node pool with `{best['name']}` and migrate workloads from current pool in `{cl}`")
 
     except Exception as exc:
         traceback.print_exc()

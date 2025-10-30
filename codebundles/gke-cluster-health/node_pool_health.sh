@@ -204,6 +204,19 @@ analyze_node_pool_health() {
   POOL_COUNT=$(echo "$NODE_POOLS_JSON" | jq length)
   log "  Found $POOL_COUNT node pools"
   
+  # Get cluster zone information for proper capacity calculations
+  CLUSTER_DETAILS="$(timeout_cmd 20 gcloud container clusters describe "$CLUSTER_NAME" \
+    "$LOC_FLAG"="$CLUSTER_LOC" --project="$PROJECT" \
+    --format="json(locationType,locations)" 2>/dev/null || echo '{}')"
+  
+  CLUSTER_TYPE="$(echo "$CLUSTER_DETAILS" | jq -r '.locationType // "ZONAL"')"
+  CLUSTER_ZONES=$(echo "$CLUSTER_DETAILS" | jq -r '.locations[]?' | wc -l)
+  
+  # Default to 1 zone if we can't determine
+  [[ "$CLUSTER_ZONES" =~ ^[0-9]+$ ]] && [[ $CLUSTER_ZONES -gt 0 ]] || CLUSTER_ZONES=1
+  
+  log "  Cluster Type: $CLUSTER_TYPE across $CLUSTER_ZONES zones"
+  
   # Process each node pool using in-memory data
   pool_num=0
   while read -r pool_data; do
@@ -275,20 +288,63 @@ analyze_node_pool_health() {
     
     # Check for capacity issues - focus on real scheduling problems in multi-pool clusters
     if [[ "$MAX_NODES" != "null" && $MAX_NODES -gt 0 && $CURRENT_NODES -gt 0 ]]; then
-      # Debug: Log the values to understand any parsing issues
-      log "      DEBUG: Pool $POOL_NAME - Current: $CURRENT_NODES, Max: $MAX_NODES, Autoscaling: $AUTOSCALING"
+      # Calculate actual maximum capacity accounting for regional clusters
+      # For regional clusters, MAX_NODES is per-zone, so multiply by zone count
+      local ACTUAL_MAX_NODES
+      if [[ "$CLUSTER_TYPE" == "REGIONAL" && $CLUSTER_ZONES -gt 1 ]]; then
+        ACTUAL_MAX_NODES=$((MAX_NODES * CLUSTER_ZONES))
+        local capacity_desc="$MAX_NODES per zone × $CLUSTER_ZONES zones = $ACTUAL_MAX_NODES total"
+      else
+        ACTUAL_MAX_NODES=$MAX_NODES
+        local capacity_desc="$MAX_NODES total (zonal cluster)"
+      fi
       
-      if [[ "$AUTOSCALING" == "true" && $CURRENT_NODES -eq $MAX_NODES ]]; then
+      # Debug: Log the values to understand any parsing issues
+      log "      DEBUG: Pool $POOL_NAME - Current: $CURRENT_NODES, Max per zone: $MAX_NODES, Actual max: $ACTUAL_MAX_NODES, Cluster: $CLUSTER_TYPE"
+      
+      if [[ $CURRENT_NODES -gt $ACTUAL_MAX_NODES ]]; then
+        # CRITICAL: Actually over capacity - this should rarely happen
+        local over_capacity_pct=$(( (CURRENT_NODES * 100) / ACTUAL_MAX_NODES ))
+        add_issue "Node pool \`$POOL_NAME\` exceeds maximum capacity in cluster \`$CLUSTER_NAME\`" \
+                  "CAPACITY EXCEEDED ANALYSIS:
+- Pool: $POOL_NAME
+- Cluster: $CLUSTER_NAME ($CLUSTER_TYPE)
+- Location: $CLUSTER_LOC
+- Machine Type: $MACHINE_TYPE
+- Current Running Nodes: $CURRENT_NODES
+- Configured Maximum: $capacity_desc
+- Over-capacity: $((CURRENT_NODES - ACTUAL_MAX_NODES)) nodes (${over_capacity_pct}% of max)
+- Min Nodes: $MIN_NODES per zone
+- Autoscaling: $AUTOSCALING
+
+CRITICAL ISSUE: This node pool is running MORE nodes than its configured maximum allows.
+
+ROOT CAUSE ANALYSIS:
+This situation is unusual and may indicate:
+1. Manual scaling operations that bypassed autoscaler limits
+2. Autoscaler configuration issues or bugs
+3. Recent changes to maximum node settings while nodes were running
+4. Temporary scaling during emergency situations
+
+BUSINESS IMPACT:
+- Unexpected infrastructure costs from over-provisioned resources
+- Risk of autoscaler conflicts and unpredictable behavior
+- Potential violation of capacity planning and budgets
+
+IMMEDIATE ACTION REQUIRED:
+Investigate why the pool exceeded its configured limits and adjust accordingly." 1 \
+                  "URGENT: Investigate over-capacity situation and adjust: gcloud container node-pools update $POOL_NAME --cluster=$CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --max-nodes=$((CURRENT_NODES / CLUSTER_ZONES + 1)) --project=$PROJECT\\nOR scale down if over-provisioned: gcloud container clusters resize $CLUSTER_NAME --node-pool=$POOL_NAME --num-nodes=$ACTUAL_MAX_NODES $LOC_FLAG=$CLUSTER_LOC --project=$PROJECT"
+      elif [[ "$AUTOSCALING" == "true" && $CURRENT_NODES -eq $ACTUAL_MAX_NODES ]]; then
         # Pool is at maximum capacity - this is the real issue in multi-pool clusters
         add_issue "Node pool \`$POOL_NAME\` at maximum capacity in cluster \`$CLUSTER_NAME\`" \
                   "MULTI-POOL CAPACITY ANALYSIS:
 - Pool: $POOL_NAME
-- Cluster: $CLUSTER_NAME
+- Cluster: $CLUSTER_NAME ($CLUSTER_TYPE)
 - Location: $CLUSTER_LOC
 - Machine Type: $MACHINE_TYPE
 - Current Nodes: $CURRENT_NODES
-- Maximum Nodes: $MAX_NODES
-- Min Nodes: $MIN_NODES
+- Configured Maximum: $capacity_desc
+- Min Nodes: $MIN_NODES per zone
 - Autoscaling: $AUTOSCALING
 - Utilization: 100%
 
@@ -308,20 +364,20 @@ RECOMMENDATIONS:
 - Review workload node selectors and resource requirements
 - Consider workload distribution across different node types
 - Monitor resource utilization trends for capacity planning" 2 \
-                  "Increase max nodes for this pool: gcloud container node-pools update $POOL_NAME --cluster=$CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --max-nodes=<NEW_MAX> --project=$PROJECT"
-      elif [[ "$AUTOSCALING" == "true" && $CURRENT_NODES -ge $(( MAX_NODES * 85 / 100 )) ]]; then
-        # Pool approaching maximum capacity (85%+ of max)
-        local capacity_pct=$(( (CURRENT_NODES * 100) / MAX_NODES ))
+                  "Increase max nodes for this pool: gcloud container node-pools update $POOL_NAME --cluster=$CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --max-nodes=$((MAX_NODES + 5)) --project=$PROJECT"
+      elif [[ "$AUTOSCALING" == "true" && $CURRENT_NODES -ge $(( ACTUAL_MAX_NODES * 85 / 100 )) ]]; then
+        # Pool approaching maximum capacity (85%+ of actual max)
+        local capacity_pct=$(( (CURRENT_NODES * 100) / ACTUAL_MAX_NODES ))
         add_issue "Node pool \`$POOL_NAME\` approaching maximum capacity in cluster \`$CLUSTER_NAME\`" \
                   "CAPACITY WARNING ANALYSIS:
 - Pool: $POOL_NAME
-- Cluster: $CLUSTER_NAME
+- Cluster: $CLUSTER_NAME ($CLUSTER_TYPE)
 - Location: $CLUSTER_LOC
 - Machine Type: $MACHINE_TYPE
 - Current Nodes: $CURRENT_NODES
-- Maximum Nodes: $MAX_NODES
+- Configured Maximum: $capacity_desc
 - Capacity Usage: ${capacity_pct}%
-- Min Nodes: $MIN_NODES
+- Min Nodes: $MIN_NODES per zone
 - Autoscaling: $AUTOSCALING
 
 ISSUE: Node pool is approaching its maximum capacity limit.
@@ -335,7 +391,7 @@ RECOMMENDATIONS:
 - Monitor scaling trends and usage patterns
 - Consider proactive capacity planning for this pool
 - Review if maximum capacity is appropriate for expected workload" 3 \
-                  "Monitor capacity trends and consider increasing max nodes: gcloud container node-pools update $POOL_NAME --cluster=$CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --max-nodes=<NEW_MAX> --project=$PROJECT"
+                  "Monitor capacity trends and consider increasing max nodes: gcloud container node-pools update $POOL_NAME --cluster=$CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --max-nodes=$((MAX_NODES + 2)) --project=$PROJECT"
       fi
     fi
     
