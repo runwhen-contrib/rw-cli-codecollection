@@ -119,6 +119,36 @@ Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOUR
         END
     END
 
+Analyze AKS Cluster Cost Optimization Opportunities for `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Analyzes 30-day utilization trends using Azure Monitor to identify underutilized node pools with cost savings opportunities. Provides Azure VM pricing-based estimates for potential monthly and annual savings with severity bands: Sev4 <$2k/month, Sev3 $2k-$10k/month, Sev2 >$10k/month.
+    [Tags]    aks    cost-optimization    underutilization    azure-monitor    pricing    access:read-only
+    ${cost_optimization}=    RW.CLI.Run Bash File
+    ...    bash_file=aks_cost_optimization.sh
+    ...    env=${env}
+    ...    timeout_seconds=300
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    RW.Core.Add Pre To Report    ${cost_optimization.stdout}
+
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat aks_cost_optimization_issues.json
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list}) > 0 
+        FOR    ${issue}    IN    @{issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    expected=AKS node pools should be efficiently utilized to minimize costs
+            ...    actual=AKS node pools show underutilization patterns with cost savings opportunities
+            ...    title=${issue["title"]}
+            ...    reproduce_hint=${cost_optimization.cmd}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["next_step"]}
+        END
+    END
+
 
 *** Keywords ***
 Suite Initialization
