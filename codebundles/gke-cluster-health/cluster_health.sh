@@ -64,8 +64,12 @@ process_cluster() {
     printf "%-60s %6s %6s\n" "NODE" "CPU%" "MEM%" >> "$REPORT_FILE"
     printf "%-60s %6s %6s\n" "----" "----" "----" >> "$REPORT_FILE"
 
-    declare -A NODEPOOL_OF CPU_ISSUES MEM_ISSUES
-    while read -r n p; do NODEPOOL_OF["$n"]="$p"; done < <(
+    declare -A NODEPOOL_OF CPU_ISSUES MEM_ISSUES NODEPOOL_TOTAL_NODES NODEPOOL_ALL_NODES
+    while read -r n p; do 
+      NODEPOOL_OF["$n"]="$p"
+      NODEPOOL_TOTAL_NODES["$p"]=$((${NODEPOOL_TOTAL_NODES["$p"]:-0} + 1))
+      NODEPOOL_ALL_NODES["$p"]+="$n;"
+    done < <(
       kubectl get nodes -o json |
       jq -r '.items[]|[.metadata.name, (.metadata.labels["cloud.google.com/gke-nodepool"]//"unknown")]|@tsv'
     )
@@ -84,8 +88,8 @@ process_cluster() {
     done <<< "$TOP_NODES"
     hr
 
-    report_pool_usage "CPU"   CPU_ISSUES
-    report_pool_usage "memory" MEM_ISSUES
+    report_pool_usage "CPU"   CPU_ISSUES NODEPOOL_TOTAL_NODES NODEPOOL_ALL_NODES
+    report_pool_usage "memory" MEM_ISSUES NODEPOOL_TOTAL_NODES NODEPOOL_ALL_NODES
   else
     log "kubectl‑top not available (metrics‑server?)"; hr
   fi
@@ -118,18 +122,122 @@ add_issue() {
 }
 
 report_pool_usage() {
-  local KIND="$1" ARR_NAME="$2"; declare -n ARR="$ARR_NAME"
+  local KIND="$1" ARR_NAME="$2" TOTAL_ARR_NAME="$3" ALL_NODES_ARR_NAME="$4"
+  declare -n ARR="$ARR_NAME" TOTAL_ARR="$TOTAL_ARR_NAME" ALL_NODES_ARR="$ALL_NODES_ARR_NAME"
+  
   for pool in "${!ARR[@]}"; do
-    local entries="${ARR[$pool]}" max=0
+    local entries="${ARR[$pool]}" max=0 min=100 sum=0 count=0
+    local affected_nodes=() all_pool_nodes
+    
+    # Parse affected nodes and calculate statistics
     for kv in ${entries//;/ }; do
-      pct="${kv##*=}"; pct="${pct%\%}"
-      [[ $pct =~ ^[0-9]+$ ]] && (( pct > max )) && max=$pct
+      [[ -z "$kv" ]] && continue
+      local node="${kv%%=*}" pct_str="${kv##*=}"
+      pct="${pct_str%\%}"
+      [[ $pct =~ ^[0-9]+$ ]] || continue
+      
+      affected_nodes+=("$node:$pct%")
+      (( pct > max )) && max=$pct
+      (( pct < min )) && min=$pct
+      sum=$((sum + pct))
+      count=$((count + 1))
     done
-    local sev=2; (( max >= 90 )) && sev=1
-    add_issue "High $KIND usage in \`$CLUSTER_NAME\`, node‑pool \`$pool\`" \
-              "Nodes ≥75% $KIND:\n${entries//;/\n}" \
-              "$sev" \
-              "Scale or optimise workloads on node‑pool \`$pool\`."
+    
+    # Get total nodes in pool and calculate percentages
+    local total_nodes=${TOTAL_ARR[$pool]:-0}
+    local affected_count=${#affected_nodes[@]}
+    local affected_percentage=0
+    [[ $total_nodes -gt 0 ]] && affected_percentage=$(( (affected_count * 100) / total_nodes ))
+    
+    # Calculate average usage of affected nodes
+    local avg_usage=0
+    [[ $count -gt 0 ]] && avg_usage=$((sum / count))
+    
+    # Determine severity based on both peak usage and percentage of pool affected
+    local sev=4
+    if (( max >= 90 )) || (( affected_percentage >= 75 )); then
+      sev=1  # Critical: Very high usage or most of pool affected
+    elif (( max >= 85 )) || (( affected_percentage >= 50 )); then
+      sev=2  # High: High usage or significant portion affected
+    elif (( max >= 80 )) || (( affected_percentage >= 25 )); then
+      sev=3  # Medium: Moderate usage or some nodes affected
+    fi
+    
+    # Build comprehensive issue details
+    local severity_desc
+    case $sev in
+      1) severity_desc="CRITICAL" ;;
+      2) severity_desc="HIGH" ;;
+      3) severity_desc="MEDIUM" ;;
+      4) severity_desc="LOW" ;;
+    esac
+    
+    # Get all nodes in pool for context
+    IFS=';' read -ra all_pool_nodes <<< "${ALL_NODES_ARR[$pool]}"
+    local healthy_nodes=()
+    for node in "${all_pool_nodes[@]}"; do
+      [[ -n "$node" ]] || continue
+      local is_affected=false
+      for affected in "${affected_nodes[@]}"; do
+        [[ "${affected%%:*}" == "$node" ]] && is_affected=true && break
+      done
+      [[ $is_affected == false ]] && healthy_nodes+=("$node")
+    done
+    
+    local title="High $KIND usage in \`$CLUSTER_NAME\`, node‑pool \`$pool\` ($severity_desc)"
+    
+    local details="NODE POOL $KIND USAGE ANALYSIS:
+- Node Pool: $pool
+- Cluster: $CLUSTER_NAME
+- Resource: $KIND
+- Severity: $severity_desc ($sev)
+
+IMPACT ASSESSMENT:
+- Total Nodes in Pool: $total_nodes
+- Affected Nodes (≥75%): $affected_count ($affected_percentage% of pool)
+- Healthy Nodes (<75%): ${#healthy_nodes[@]} ($(( 100 - affected_percentage ))% of pool)
+
+USAGE STATISTICS:
+- Peak Usage: $max%
+- Average Usage (affected nodes): $avg_usage%
+- Usage Range: $min% - $max%
+
+AFFECTED NODES:
+$(printf '%s\n' "${affected_nodes[@]}")
+
+HEALTHY NODES:
+$(printf '%s\n' "${healthy_nodes[@]}")
+
+ANALYSIS:
+$(if (( affected_percentage >= 75 )); then
+  echo "🔴 CRITICAL: Most of the node pool is experiencing high $KIND usage. This indicates systemic resource pressure."
+elif (( affected_percentage >= 50 )); then
+  echo "🟠 HIGH: Significant portion of the node pool has high $KIND usage. Resource constraints are affecting pool capacity."
+elif (( affected_percentage >= 25 )); then
+  echo "🟡 MEDIUM: Some nodes in the pool have high $KIND usage. Monitor for spreading resource pressure."
+else
+  echo "🟢 LOW: Only a few nodes affected. May be due to workload distribution or specific node issues."
+fi)
+
+BUSINESS IMPACT:
+$(if (( sev <= 2 )); then
+  echo "High risk of pod scheduling failures, performance degradation, and potential service disruptions."
+elif (( sev == 3 )); then
+  echo "Moderate risk of resource constraints affecting new workloads and performance."
+else
+  echo "Low immediate risk but should be monitored for trend analysis."
+fi)"
+
+    local next_steps="Scale or optimise workloads on node‑pool \`$pool\`"
+    if (( affected_percentage >= 50 )); then
+      next_steps="URGENT: Scale up node‑pool \`$pool\` or optimize high-usage workloads\\nAnalyze pod resource requests and limits\\nConsider node pool autoscaling configuration\\nReview workload distribution across nodes"
+    elif (( affected_percentage >= 25 )); then
+      next_steps="Scale node‑pool \`$pool\` or redistribute workloads\\nAnalyze resource usage patterns\\nOptimize pod resource allocation\\nMonitor for continued growth"
+    else
+      next_steps="Monitor node‑pool \`$pool\` resource trends\\nInvestigate specific high-usage nodes\\nOptimize workloads on affected nodes\\nConsider workload rebalancing"
+    fi
+    
+    add_issue "$title" "$details" "$sev" "$next_steps"
   done
 }
 
