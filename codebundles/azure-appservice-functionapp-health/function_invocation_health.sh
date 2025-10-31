@@ -12,7 +12,7 @@ source .env 2>/dev/null || true
 FUNCTION_APP_NAME=${FUNCTION_APP_NAME:-""}
 AZ_RESOURCE_GROUP=${AZ_RESOURCE_GROUP:-""}
 AZURE_RESOURCE_SUBSCRIPTION_ID=${AZURE_RESOURCE_SUBSCRIPTION_ID:-""}
-TIME_PERIOD_MINUTES=${TIME_PERIOD_MINUTES:-30}
+RW_LOOKBACK_WINDOW=${RW_LOOKBACK_WINDOW:-30}
 FUNCTION_ERROR_RATE_THRESHOLD=${FUNCTION_ERROR_RATE_THRESHOLD:-10}
 FUNCTION_MEMORY_THRESHOLD=${FUNCTION_MEMORY_THRESHOLD:-512}
 FUNCTION_DURATION_THRESHOLD=${FUNCTION_DURATION_THRESHOLD:-5000}
@@ -38,7 +38,7 @@ echo "=========================================="
 echo "Function App: $FUNCTION_APP_NAME"
 echo "Resource Group: $AZ_RESOURCE_GROUP"
 echo "Subscription: $AZURE_RESOURCE_SUBSCRIPTION_ID"
-echo "Time Period: Last $TIME_PERIOD_MINUTES minutes"
+echo "Time Period: Last $RW_LOOKBACK_WINDOW minutes"
 echo "Thresholds:"
 echo "  - Error Rate: ${FUNCTION_ERROR_RATE_THRESHOLD}%"
 echo "  - Memory Usage: ${FUNCTION_MEMORY_THRESHOLD}MB"
@@ -88,7 +88,7 @@ FUNCTIONS_WITH_SLOW_EXECUTION=()
 
 # Calculate time range for metrics
 END_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-START_TIME=$(date -u -d "$TIME_PERIOD_MINUTES minutes ago" +"%Y-%m-%dT%H:%M:%SZ")
+START_TIME=$(date -u -d "$RW_LOOKBACK_WINDOW minutes ago" +"%Y-%m-%dT%H:%M:%SZ")
 
 echo "⏰ Time range: $START_TIME to $END_TIME"
 echo ""
@@ -338,7 +338,7 @@ fi
 SUMMARY_DATA="Function App: $FUNCTION_APP_NAME
 Resource Group: $AZ_RESOURCE_GROUP
 Subscription: $SUBSCRIPTION_NAME
-Time Period: Last $TIME_PERIOD_MINUTES minutes
+Time Period: Last $RW_LOOKBACK_WINDOW minutes
 
 Overall Metrics:
 - Total Executions: $(format_display_value "$TOTAL_EXECUTIONS" "" "0")
@@ -413,13 +413,13 @@ echo "==============================================="
 # Create issues for functions with no executions (only if time period is reasonable)
 if [[ ${#FUNCTIONS_WITH_NO_EXECUTIONS[@]} -gt 0 ]]; then
     # Only create issue if time period is >= 30 minutes (short periods might be normal)
-    if [[ $TIME_PERIOD_MINUTES -ge 30 ]]; then
+    if [[ $RW_LOOKBACK_WINDOW -ge 30 ]]; then
         echo "⚠️  Functions with no executions: ${FUNCTIONS_WITH_NO_EXECUTIONS[*]}"
         
         no_exec_details="Function App: $FUNCTION_APP_NAME
 Resource Group: $AZ_RESOURCE_GROUP
 Subscription: $SUBSCRIPTION_NAME
-Time Period: Last $TIME_PERIOD_MINUTES minutes
+Time Period: Last $RW_LOOKBACK_WINDOW minutes
 
 Issue: Functions with no executions
 Affected Functions: ${FUNCTIONS_WITH_NO_EXECUTIONS[*]}
@@ -453,7 +453,7 @@ if [[ ${#FUNCTIONS_WITH_ERRORS[@]} -gt 0 ]]; then
     error_details="Function App: $FUNCTION_APP_NAME
 Resource Group: $AZ_RESOURCE_GROUP
 Subscription: $SUBSCRIPTION_NAME
-Time Period: Last $TIME_PERIOD_MINUTES minutes
+Time Period: Last $RW_LOOKBACK_WINDOW minutes
 
 Issue: Functions with high error rates
 Affected Functions: ${FUNCTIONS_WITH_ERRORS[*]}
@@ -500,7 +500,7 @@ if [[ ${#FUNCTIONS_WITH_THROTTLES[@]} -gt 0 ]]; then
     throttle_details="Function App: $FUNCTION_APP_NAME
 Resource Group: $AZ_RESOURCE_GROUP
 Subscription: $SUBSCRIPTION_NAME
-Time Period: Last $TIME_PERIOD_MINUTES minutes
+Time Period: Last $RW_LOOKBACK_WINDOW minutes
 
 Issue: Functions being throttled
 Affected Functions: ${FUNCTIONS_WITH_THROTTLES[*]}
@@ -540,7 +540,7 @@ if [[ ${#FUNCTIONS_WITH_HIGH_MEMORY[@]} -gt 0 ]]; then
     memory_details="Function App: $FUNCTION_APP_NAME
 Resource Group: $AZ_RESOURCE_GROUP
 Subscription: $SUBSCRIPTION_NAME
-Time Period: Last $TIME_PERIOD_MINUTES minutes
+Time Period: Last $RW_LOOKBACK_WINDOW minutes
 
 Issue: Functions with high memory usage
 Affected Functions: ${FUNCTIONS_WITH_HIGH_MEMORY[*]}
@@ -581,7 +581,7 @@ if [[ ${#FUNCTIONS_WITH_SLOW_EXECUTION[@]} -gt 0 ]]; then
     slow_details="Function App: $FUNCTION_APP_NAME
 Resource Group: $AZ_RESOURCE_GROUP
 Subscription: $SUBSCRIPTION_NAME
-Time Period: Last $TIME_PERIOD_MINUTES minutes
+Time Period: Last $RW_LOOKBACK_WINDOW minutes
 
 Issue: Functions with slow execution
 Affected Functions: ${FUNCTIONS_WITH_SLOW_EXECUTION[*]}
@@ -670,7 +670,7 @@ echo "==================="
 echo "Function App: $FUNCTION_APP_NAME"
 echo "Resource Group: $AZ_RESOURCE_GROUP"
 echo "Subscription: $SUBSCRIPTION_NAME"
-echo "Time Period: Last $TIME_PERIOD_MINUTES minutes"
+echo "Time Period: Last $RW_LOOKBACK_WINDOW minutes"
 echo "Total Functions: $(echo "$FUNCTIONS" | wc -w)"
 echo "Total Executions: $(format_display_value "$TOTAL_EXECUTIONS" "" "0")"
 echo "Total Errors: $(format_display_value "$TOTAL_ERRORS" "" "0")"
@@ -681,8 +681,8 @@ echo ""
 
 if [[ ${#ISSUES[@]} -eq 0 ]]; then
     echo "🎉 All functions are healthy!"
-    if [[ $TIME_PERIOD_MINUTES -lt 30 ]]; then
-        echo "ℹ️  Note: Short monitoring period ($TIME_PERIOD_MINUTES minutes) - consider using 30+ minutes for better insights"
+    if [[ $RW_LOOKBACK_WINDOW -lt 30 ]]; then
+        echo "ℹ️  Note: Short monitoring period ($RW_LOOKBACK_WINDOW minutes) - consider using 30+ minutes for better insights"
     fi
 else
     echo "⚠️  Issues detected:"

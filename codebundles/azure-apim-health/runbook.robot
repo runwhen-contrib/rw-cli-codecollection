@@ -505,7 +505,7 @@ Suite Initialization
     ...    type=string
     ...    description=The APIM Instance Name
     ...    pattern=\w*
-    ${RW_LOOKBACK_WINDOW}=    RW.Core.Import User Variable    TIME_PERIOD_MINUTES
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Import User Variable    RW_LOOKBACK_WINDOW
     ...    type=string
     ...    description=The time period, in minutes, to look back for activites/events. 
     ...    pattern=\w*

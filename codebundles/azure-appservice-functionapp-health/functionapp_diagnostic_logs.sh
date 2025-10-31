@@ -12,7 +12,7 @@ source .env 2>/dev/null || true
 FUNCTION_APP_NAME=${FUNCTION_APP_NAME:-""}
 AZ_RESOURCE_GROUP=${AZ_RESOURCE_GROUP:-""}
 AZURE_RESOURCE_SUBSCRIPTION_ID=${AZURE_RESOURCE_SUBSCRIPTION_ID:-""}
-TIME_PERIOD_MINUTES=${TIME_PERIOD_MINUTES:-60}
+RW_LOOKBACK_WINDOW=${RW_LOOKBACK_WINDOW:-60}
 
 # Validation
 if [[ -z "$FUNCTION_APP_NAME" ]]; then
@@ -35,7 +35,7 @@ echo "========================================"
 echo "Function App: $FUNCTION_APP_NAME"
 echo "Resource Group: $AZ_RESOURCE_GROUP"
 echo "Subscription: $AZURE_RESOURCE_SUBSCRIPTION_ID"
-echo "Time Period: Last $TIME_PERIOD_MINUTES minutes"
+echo "Time Period: Last $RW_LOOKBACK_WINDOW minutes"
 echo ""
 
 # Get the function app resource ID with timeout
@@ -50,7 +50,7 @@ SUBSCRIPTION_NAME="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
 
 # Calculate time range for logs
 END_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-START_TIME=$(date -u -d "$TIME_PERIOD_MINUTES minutes ago" +"%Y-%m-%dT%H:%M:%SZ")
+START_TIME=$(date -u -d "$RW_LOOKBACK_WINDOW minutes ago" +"%Y-%m-%dT%H:%M:%SZ")
 
 echo "⏰ Time range: $START_TIME to $END_TIME"
 echo "📋 Subscription: $SUBSCRIPTION_NAME"
@@ -255,7 +255,7 @@ echo "==================="
 echo "Function App: $FUNCTION_APP_NAME"
 echo "Resource Group: $AZ_RESOURCE_GROUP"
 echo "Subscription: $AZURE_RESOURCE_SUBSCRIPTION_ID"
-echo "Time Period: Last $TIME_PERIOD_MINUTES minutes"
+echo "Time Period: Last $RW_LOOKBACK_WINDOW minutes"
 echo "Diagnostic Settings: $(echo "$DIAGNOSTIC_SETTINGS" | jq length)"
 echo "Application Insights: $([ -n "$APP_INSIGHTS_ID" ] && echo "Configured" || echo "Not configured")"
 echo "Issues Found: ${#ISSUES[@]}"

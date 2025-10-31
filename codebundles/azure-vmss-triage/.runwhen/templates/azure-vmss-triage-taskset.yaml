@@ -26,7 +26,7 @@ spec:
       value: {{resource_group.name}}
     - name: VMSCALESET
       value: {{match_resource.resource.name}}
-    - name: TIME_PERIOD_MINUTES
+    - name: RW_LOOKBACK_WINDOW
       value: "60"
     - name: AZURE_RESOURCE_SUBSCRIPTION_ID
       value: "{{ subscription_id }}"
