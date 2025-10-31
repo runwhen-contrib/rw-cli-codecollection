@@ -115,16 +115,7 @@ def allocatable():
     
     return out
 
-def node_usage():
-    try: raw=run(["kubectl","top","nodes","--no-headers"])
-    except subprocess.CalledProcessError: return {}
-    u={}
-    for l in raw.strip().splitlines():
-        f=l.split(); n=f[0]
-        cpu_v=next((x for x in f[1:] if x.endswith("m")),None)
-        mem_v=next((x for x in f[1:] if x.endswith(("Ki","Mi","Gi"))),None)
-        if cpu_v and mem_v: u[n]={"cpu":cpu(cpu_v),"mem":mem(mem_v)}
-    return u
+# node_usage() removed - cluster_health.sh provides better utilization analysis
 
 def catalogue(region):
     # Get machine types from GCP API
@@ -171,7 +162,7 @@ def analyse(cl:str, loc:str):
     flag="--region" if re.fullmatch(r"[a-z0-9-]+[0-9]$",loc) else "--zone"
     retry(["gcloud","container","clusters","get-credentials",cl,flag,loc,"--quiet"])
 
-    pod,node,pod_names=gather_pods(); alloc=allocatable(); usage=node_usage()
+    pod,node,pod_names=gather_pods(); alloc=allocatable()
 
     meta=json.loads(run(["gcloud","container","clusters","describe",cl,flag,loc,
                          "--format=json(locations,locationType)"]))
@@ -190,20 +181,23 @@ def analyse(cl:str, loc:str):
         if missing_nodes:
             print(f"Nodes without scheduled pods: {missing_nodes}")
     
-    # Validate against expected node pools
+    # Validate against expected node pools - only warn if significant mismatch
     try:
         pools_info = json.loads(run(["gcloud","container","node-pools","list",
                                     "--cluster",cl,flag,loc,
                                     "--format=json(name,currentNodeCount,initialNodeCount)"]))
         expected_total_nodes = sum(p.get("currentNodeCount", p.get("initialNodeCount", 0)) for p in pools_info)
-        print(f"Expected nodes from node pools: {expected_total_nodes}, Found: {len(kubectl_nodes)}")
-        if expected_total_nodes != len(kubectl_nodes):
+        node_diff = abs(expected_total_nodes - len(kubectl_nodes))
+        
+        # Only report if difference is >2 nodes (small differences normal during autoscaling)
+        if node_diff > 2:
+            print(f"Warning: Expected {expected_total_nodes} nodes from node pools, found {len(kubectl_nodes)} nodes (difference: {node_diff})")
             note(cl,2,"Node count mismatch",
                  f"Expected {expected_total_nodes} nodes from node pools but found {len(kubectl_nodes)} nodes. "
-                 f"This may indicate nodes failed to join the cluster or are stuck in provisioning.",
+                 f"Difference of {node_diff} nodes may indicate nodes failed to join the cluster or are stuck in provisioning.",
                  f"Check GCP Console for node pool status and instance health in cluster `{cl}`.")
     except subprocess.CalledProcessError:
-        print("Warning: Could not verify node pool information")
+        pass  # Silently skip if we can't get node pool info
 
     valid=[n for n in node if n in alloc and alloc[n].get("ready", True)]
     unready_nodes = [n for n in alloc if not alloc[n].get("ready", True)]
@@ -219,7 +213,7 @@ def analyse(cl:str, loc:str):
              f"Check control plane for `{cl}`."); return
 
     busiest=max(valid,key=lambda n:(node[n]['rc'],node[n]['rm']))
-    a_b=alloc[busiest]; busy=node[busiest]; use_b=usage.get(busiest,{"cpu":0,"mem":0})
+    a_b=alloc[busiest]; busy=node[busiest]
     
     # Ensure we have pod data to analyze
     all_pods = list(pod.values())
@@ -240,7 +234,6 @@ def analyse(cl:str, loc:str):
 
     Busiest node: `{busiest}`  (type {a_b['type']})
       Requests : {busy['rc']}m ({pr(busy['rc']/a_b['cpu']*100)})   {busy['rm']}MiB ({pr(busy['rm']/a_b['mem']*100)})
-      Usage    : {use_b['cpu']}m ({pr(use_b['cpu']/a_b['cpu']*100)})   {use_b['mem']}MiB ({pr(use_b['mem']/a_b['mem']*100)})
       Limits   : {busy['lc']}m ({pr(busy['lc']/a_b['cpu']*100)})   {busy['lm']}MiB ({pr(busy['lm']/a_b['mem']*100)})
       Pods     : {len(busy['pods'])}
     """).rstrip())
@@ -270,12 +263,7 @@ def analyse(cl:str, loc:str):
               f">{MAX_MEM_LIMIT_OVERCOMMIT}× MEM): {', '.join(limit_over)}."),
              "Lower pod limits, split workload or scale the node‑pool.")
 
-    # can we just reschedule?
-    nodes_ok=sum(1 for n,a in alloc.items()
-                 if n in usage
-                 and a["cpu"]-usage[n]["cpu"]>=biggest["rc"]
-                 and a["mem"]-usage[n]["mem"]>=biggest["rm"])
-    resched_hint=nodes_ok>=MIN_HEADROOM_NODES
+    # Skip rescheduling hint calculation - cluster_health.sh handles capacity analysis
 
     # ── pool / autoscaler info ──────────────────────────────────────────
     pools=json.loads(run(["gcloud","container","node-pools","list",
@@ -392,14 +380,10 @@ def analyse(cl:str, loc:str):
         
         if (recommended_cpu_cores == current_cpu_cores and 
             abs(best['mem'] - current_node_mem) < (current_node_mem * 0.2)):
-            # Very similar specs - don't recommend change
+            # Very similar specs - don't recommend change or create issue
             print(f"\n{EMO['OK']}  Current machine type `{a_b['type']}` is appropriate")
             print(f"No machine type change recommended - current specs are suitable")
-            print(f"Consider adjusting autoscaler: {autoscaler_desc}")
-            
-            note(cl,4,"Node‑pool autoscaler adjustment",
-                 f"Current `{a_b['type']}` is suitable; consider autoscaler {autoscaler_desc}. {sizing_reason}.",
-                 f"Update autoscaler settings for node pool in `{cl}`")
+            # Don't create an issue when no action is needed
         else:
             print(f"\n{EMO['NODE']}  *** RECOMMENDED NODE: {best['name']} "
                   f"(vCPU {best['cpu']}, Mem {best['mem']}MiB) ***")
@@ -411,17 +395,24 @@ def analyse(cl:str, loc:str):
             print()
 
             # Provide better context in the issue
-            comparison = ""
-            if best['cpu'] > current_cpu_cores:
-                comparison = f"Upgrade from {current_cpu_cores} to {best['cpu']} vCPU"
-            elif best['cpu'] < current_cpu_cores:
-                comparison = f"Optimize from {current_cpu_cores} to {best['cpu']} vCPU"
-            else:
-                comparison = f"Maintain {best['cpu']} vCPU with better memory ratio"
+            # Only create issue if change is significant (>20% difference)
+            size_change_pct = abs(best['cpu'] - current_cpu_cores) / current_cpu_cores * 100 if current_cpu_cores > 0 else 100
+            
+            if size_change_pct > 20:
+                comparison = ""
+                if best['cpu'] > current_cpu_cores:
+                    comparison = f"Upgrade from {current_cpu_cores} to {best['cpu']} vCPU ({size_change_pct:.0f}% increase)"
+                elif best['cpu'] < current_cpu_cores:
+                    comparison = f"Optimize from {current_cpu_cores} to {best['cpu']} vCPU ({size_change_pct:.0f}% reduction)"
+                else:
+                    comparison = f"Maintain {best['cpu']} vCPU with better memory ratio"
 
-            note(cl,3,"Node‑pool sizing recommendation",
-                 f"Use `{best['name']}` in `{cl}` ({comparison}); autoscaler {autoscaler_desc}. {sizing_reason}.",
-                 f"Create new node pool with `{best['name']}` and migrate workloads from current pool in `{cl}`")
+                # Severity=4 (informational) since this is optimization, not a critical issue
+                note(cl,4,"Node‑pool sizing optimization opportunity",
+                     f"Consider `{best['name']}` in `{cl}` ({comparison}); autoscaler {autoscaler_desc}. {sizing_reason}.",
+                     f"Create new node pool with `{best['name']}` and migrate workloads from current pool in `{cl}`")
+            else:
+                print(f"Note: Recommended type very similar to current - no change needed")
 
     except Exception as exc:
         traceback.print_exc()

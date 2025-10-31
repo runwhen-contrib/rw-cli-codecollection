@@ -255,7 +255,10 @@ analyze_node_pool_health() {
             [.[] | select(.zone == $zone) | select(.name | contains($ig_hash)) | select(.status=="RUNNING")] | length')"
         fi
         
-        log "        IG: $IG_NAME (hash: $IG_HASH) - $instances_count running instances"
+        # Reduced verbosity: only log if there's a problem
+        if [[ $instances_count -eq 0 ]]; then
+          log "        WARNING: IG: $IG_NAME (hash: $IG_HASH) - 0 running instances"
+        fi
         CALCULATED_NODES=$((CALCULATED_NODES + instances_count))
       done <<< "$INSTANCE_GROUP_URLS"
     fi
@@ -267,10 +270,10 @@ analyze_node_pool_health() {
     
     if [[ $CALCULATED_NODES -gt 0 ]]; then
       CURRENT_NODES="$CALCULATED_NODES"
-      log "      Using calculated node count: $CALCULATED_NODES"
+      # Reduced verbosity - only log issues
     elif [[ "$API_NODES" != "null" && $API_NODES -gt 0 ]]; then
       CURRENT_NODES="$API_NODES"
-      log "      Using API node count: $API_NODES (calculation failed)"
+      # Using API fallback silently
     else
       CURRENT_NODES=0
       log "      WARNING: Both calculated and API node counts are 0 or unavailable"
@@ -299,8 +302,10 @@ analyze_node_pool_health() {
         local capacity_desc="$MAX_NODES total (single-zone cluster)"
       fi
       
-      # Debug: Log the values to understand any parsing issues
-      log "      DEBUG: Pool $POOL_NAME - Current: $CURRENT_NODES, Max per zone: $MAX_NODES, Actual max: $ACTUAL_MAX_NODES, Cluster: $CLUSTER_TYPE"
+      # Optional debug logging (enable with DEBUG=1 environment variable)
+      if [[ "${DEBUG:-0}" == "1" ]]; then
+        log "      DEBUG: Pool $POOL_NAME - Current: $CURRENT_NODES, Max per zone: $MAX_NODES, Actual max: $ACTUAL_MAX_NODES, Cluster: $CLUSTER_TYPE"
+      fi
       
       if [[ $CURRENT_NODES -gt $ACTUAL_MAX_NODES ]]; then
         # CRITICAL: Actually over capacity - this should rarely happen
@@ -365,33 +370,9 @@ RECOMMENDATIONS:
 - Consider workload distribution across different node types
 - Monitor resource utilization trends for capacity planning" 2 \
                   "Increase max nodes for this pool: gcloud container node-pools update $POOL_NAME --cluster=$CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --max-nodes=$((MAX_NODES + 5)) --project=$PROJECT"
-      elif [[ "$AUTOSCALING" == "true" && $CURRENT_NODES -ge $(( ACTUAL_MAX_NODES * 85 / 100 )) ]]; then
-        # Pool approaching maximum capacity (85%+ of actual max)
-        local capacity_pct=$(( (CURRENT_NODES * 100) / ACTUAL_MAX_NODES ))
-        add_issue "Node pool \`$POOL_NAME\` approaching maximum capacity in cluster \`$CLUSTER_NAME\`" \
-                  "CAPACITY WARNING ANALYSIS:
-- Pool: $POOL_NAME
-- Cluster: $CLUSTER_NAME ($CLUSTER_TYPE)
-- Location: $CLUSTER_LOC
-- Machine Type: $MACHINE_TYPE
-- Current Nodes: $CURRENT_NODES
-- Configured Maximum: $capacity_desc
-- Capacity Usage: ${capacity_pct}%
-- Min Nodes: $MIN_NODES per zone
-- Autoscaling: $AUTOSCALING
-
-ISSUE: Node pool is approaching its maximum capacity limit.
-
-BUSINESS IMPACT:
-- Limited headroom for scaling during demand spikes
-- Risk of reaching capacity limits soon for this machine type
-- Potential scheduling constraints for workloads requiring this node type
-
-RECOMMENDATIONS:
-- Monitor scaling trends and usage patterns
-- Consider proactive capacity planning for this pool
-- Review if maximum capacity is appropriate for expected workload" 3 \
-                  "Monitor capacity trends and consider increasing max nodes: gcloud container node-pools update $POOL_NAME --cluster=$CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --max-nodes=$((MAX_NODES + 2)) --project=$PROJECT"
+      # Note: Removed "approaching capacity" warning (was at 85% threshold)
+      # cluster_health.sh already handles resource pressure detection more effectively
+      # Only keep truly critical capacity issues (at max or over max)
       fi
     fi
     
