@@ -282,26 +282,22 @@ def analyse(cl:str, loc:str):
     current_node_cpu = a_b['cpu']  # Current node CPU in millicores
     current_node_mem = a_b['mem']  # Current node memory in MiB
     
-    # Calculate different sizing approaches
+    # Calculate sizing based on requests, limits, and largest pod
     # 1. Based on current requests with headroom
     req_based_cpu = math.ceil(busy['rc'] * 1.3)  # 30% headroom over current requests
     req_based_mem = math.ceil(busy['rm'] * 1.3)  # 30% headroom over current memory
     
-    # 2. Based on current usage with headroom  
-    usage_based_cpu = math.ceil(use_b['cpu'] * 2.0)  # 100% headroom over current usage
-    usage_based_mem = math.ceil(use_b['mem'] * 2.0)  # 100% headroom over current usage
-    
-    # 3. Based on limits with reasonable overcommit
+    # 2. Based on limits with reasonable overcommit
     limit_based_cpu = math.ceil(busy['lc'] / MAX_CPU_LIMIT_OVERCOMMIT)
     limit_based_mem = math.ceil(busy['lm'] / MAX_MEM_LIMIT_OVERCOMMIT)
     
-    # 4. Minimum based on largest single pod with headroom
+    # 3. Minimum based on largest single pod with headroom
     pod_based_cpu = math.ceil(biggest['rc'] * 1.5)  # 50% headroom for largest pod
     pod_based_mem = math.ceil(biggest['rm'] * 1.5)  # 50% headroom for largest pod
     
-    # Choose the most appropriate sizing method
-    need_cpu = max(req_based_cpu, usage_based_cpu, limit_based_cpu, pod_based_cpu)
-    need_mem = max(req_based_mem, usage_based_mem, limit_based_mem, pod_based_mem)
+    # Choose the most appropriate sizing method (removed usage-based since cluster_health.sh handles that)
+    need_cpu = max(req_based_cpu, limit_based_cpu, pod_based_cpu)
+    need_mem = max(req_based_mem, limit_based_mem, pod_based_mem)
     
     # Don't recommend smaller nodes than current unless there's a compelling reason
     min_recommended_cpu = max(need_cpu, current_node_cpu // 2)  # At least half current CPU
