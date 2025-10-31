@@ -181,23 +181,9 @@ def analyse(cl:str, loc:str):
         if missing_nodes:
             print(f"Nodes without scheduled pods: {missing_nodes}")
     
-    # Validate against expected node pools - only warn if significant mismatch
-    try:
-        pools_info = json.loads(run(["gcloud","container","node-pools","list",
-                                    "--cluster",cl,flag,loc,
-                                    "--format=json(name,currentNodeCount,initialNodeCount)"]))
-        expected_total_nodes = sum(p.get("currentNodeCount", p.get("initialNodeCount", 0)) for p in pools_info)
-        node_diff = abs(expected_total_nodes - len(kubectl_nodes))
-        
-        # Only report if difference is >2 nodes (small differences normal during autoscaling)
-        if node_diff > 2:
-            print(f"Warning: Expected {expected_total_nodes} nodes from node pools, found {len(kubectl_nodes)} nodes (difference: {node_diff})")
-            note(cl,2,"Node count mismatch",
-                 f"Expected {expected_total_nodes} nodes from node pools but found {len(kubectl_nodes)} nodes. "
-                 f"Difference of {node_diff} nodes may indicate nodes failed to join the cluster or are stuck in provisioning.",
-                 f"Check GCP Console for node pool status and instance health in cluster `{cl}`.")
-    except subprocess.CalledProcessError:
-        pass  # Silently skip if we can't get node pool info
+    # Note: Removed node count validation - GKE API reports counts inconsistently for multi-zone clusters
+    # (sometimes per-zone, sometimes total) causing false positive warnings.
+    # node_pool_health.sh does proper cross-validation with compute instances instead.
 
     valid=[n for n in node if n in alloc and alloc[n].get("ready", True)]
     unready_nodes = [n for n in alloc if not alloc[n].get("ready", True)]
@@ -279,25 +265,34 @@ def analyse(cl:str, loc:str):
 
     # ── intelligent sizing section ──────────────────────────────────────
     # Get current node specifications for comparison
-    current_node_cpu = a_b['cpu']  # Current node CPU in millicores
-    current_node_mem = a_b['mem']  # Current node memory in MiB
+    current_node_cpu = a_b['cpu']  # Current node allocatable CPU in millicores
+    current_node_mem = a_b['mem']  # Current node allocatable memory in MiB
     
-    # Calculate sizing based on requests, limits, and largest pod
-    # 1. Based on current requests with headroom
-    req_based_cpu = math.ceil(busy['rc'] * 1.3)  # 30% headroom over current requests
-    req_based_mem = math.ceil(busy['rm'] * 1.3)  # 30% headroom over current memory
+    # Get actual machine type specs from catalogue (not allocatable)
+    cat=catalogue(region)
+    current_machine_type = a_b['type']
+    current_machine_specs = cat.get(current_machine_type, {"cpu": current_node_cpu // 1000, "mem": current_node_mem})
+    actual_current_vcpu = current_machine_specs['cpu']  # Actual vCPU count from machine type
     
-    # 2. Based on limits with reasonable overcommit
-    limit_based_cpu = math.ceil(busy['lc'] / MAX_CPU_LIMIT_OVERCOMMIT)
-    limit_based_mem = math.ceil(busy['lm'] / MAX_MEM_LIMIT_OVERCOMMIT)
+    # Calculate sizing based on largest pod requirements (not busiest node's total workload)
+    # The goal is to ensure the machine type can handle individual pods, not to fit entire node workload on one machine
     
-    # 3. Minimum based on largest single pod with headroom
+    # Minimum based on largest single pod with headroom
     pod_based_cpu = math.ceil(biggest['rc'] * 1.5)  # 50% headroom for largest pod
     pod_based_mem = math.ceil(biggest['rm'] * 1.5)  # 50% headroom for largest pod
     
-    # Choose the most appropriate sizing method (removed usage-based since cluster_health.sh handles that)
-    need_cpu = max(req_based_cpu, limit_based_cpu, pod_based_cpu)
-    need_mem = max(req_based_mem, limit_based_mem, pod_based_mem)
+    # Also consider if current node type can handle typical workload density
+    # Use average pod size from busiest node as a proxy for typical density
+    avg_pod_cpu = busy['rc'] // max(len(busy['pods']), 1) if len(busy['pods']) > 0 else biggest['rc']
+    avg_pod_mem = busy['rm'] // max(len(busy['pods']), 1) if len(busy['pods']) > 0 else biggest['rm']
+    
+    # Node should comfortably fit 3-5 average pods (with headroom)
+    density_based_cpu = math.ceil(avg_pod_cpu * 4)  # 4 average pods
+    density_based_mem = math.ceil(avg_pod_mem * 4)
+    
+    # Choose the larger of: biggest pod requirement OR typical density requirement
+    need_cpu = max(pod_based_cpu, density_based_cpu)
+    need_mem = max(pod_based_mem, density_based_mem)
     
     # Don't recommend smaller nodes than current unless there's a compelling reason
     min_recommended_cpu = max(need_cpu, current_node_cpu // 2)  # At least half current CPU
@@ -321,7 +316,7 @@ def analyse(cl:str, loc:str):
         # Moderate utilization - be conservative
         sizing_reason = "Moderate utilization suggests maintaining similar capacity"
 
-    cat=catalogue(region)
+    # cat already loaded above, just use it
     mts=[{"name":n,"cpu":v["cpu"],"mem":v["mem"],"zones":v["zones"]} for n,v in cat.items()]
     fits=[m for m in mts if zones.issubset(m["zones"]) and m["cpu"]*1000>=min_recommended_cpu and m["mem"]>=min_recommended_mem] \
          or [m for m in mts if m["cpu"]*1000>=min_recommended_cpu and m["mem"]>=min_recommended_mem]
@@ -363,19 +358,19 @@ def analyse(cl:str, loc:str):
             min_n, max_n = suggested_min, suggested_max
 
         print(f"\nSIZING ANALYSIS:")
-        print(f"Current node: {a_b['type']} ({current_node_cpu//1000} vCPU, {current_node_mem} MiB)")
+        print(f"Current node: {a_b['type']} ({actual_current_vcpu} vCPU, allocatable: {current_node_cpu}m CPU / {current_node_mem} MiB RAM)")
         print(f"Current nodes: {current_nodes}")
-        print(f"CPU utilization: {cpu_utilization:.1f}% | Memory utilization: {mem_utilization:.1f}%")
+        print(f"Largest pod: {biggest['rc']}m CPU, {biggest['rm']} MiB RAM")
+        print(f"Average pod on busiest node: {avg_pod_cpu}m CPU, {avg_pod_mem} MiB RAM")
+        print(f"Busiest node utilization: {cpu_utilization:.1f}% CPU | {mem_utilization:.1f}% Memory")
         print(f"Sizing reason: {sizing_reason}")
-        print(f"Required capacity: {min_recommended_cpu}m CPU, {min_recommended_mem} MiB memory")
-        print(f"Minimum nodes needed: {min_nodes_required}")
+        print(f"Recommended node capacity: {min_recommended_cpu}m CPU, {min_recommended_mem} MiB memory")
         
         # Only recommend a different machine type if it makes sense
-        current_cpu_cores = current_node_cpu // 1000
         recommended_cpu_cores = best['cpu']
         
-        if (recommended_cpu_cores == current_cpu_cores and 
-            abs(best['mem'] - current_node_mem) < (current_node_mem * 0.2)):
+        if (recommended_cpu_cores == actual_current_vcpu and 
+            abs(best['mem'] - current_machine_specs['mem']) < (current_machine_specs['mem'] * 0.2)):
             # Very similar specs - don't recommend change or create issue
             print(f"\n{EMO['OK']}  Current machine type `{a_b['type']}` is appropriate")
             print(f"No machine type change recommended - current specs are suitable")
@@ -392,14 +387,14 @@ def analyse(cl:str, loc:str):
 
             # Provide better context in the issue
             # Only create issue if change is significant (>20% difference)
-            size_change_pct = abs(best['cpu'] - current_cpu_cores) / current_cpu_cores * 100 if current_cpu_cores > 0 else 100
+            size_change_pct = abs(best['cpu'] - actual_current_vcpu) / actual_current_vcpu * 100 if actual_current_vcpu > 0 else 100
             
             if size_change_pct > 20:
                 comparison = ""
-                if best['cpu'] > current_cpu_cores:
-                    comparison = f"Upgrade from {current_cpu_cores} to {best['cpu']} vCPU ({size_change_pct:.0f}% increase)"
-                elif best['cpu'] < current_cpu_cores:
-                    comparison = f"Optimize from {current_cpu_cores} to {best['cpu']} vCPU ({size_change_pct:.0f}% reduction)"
+                if best['cpu'] > actual_current_vcpu:
+                    comparison = f"Upgrade from {actual_current_vcpu} to {best['cpu']} vCPU ({size_change_pct:.0f}% increase)"
+                elif best['cpu'] < actual_current_vcpu:
+                    comparison = f"Optimize from {actual_current_vcpu} to {best['cpu']} vCPU ({size_change_pct:.0f}% reduction)"
                 else:
                     comparison = f"Maintain {best['cpu']} vCPU with better memory ratio"
 
