@@ -33,6 +33,7 @@ Retrieves and summarizes GCP Recommendations for GKE Clusters.
 Performs comprehensive health checking including:
 - Pod health and crash loop detection
 - Node utilization analysis  
+- **Cost optimization analysis** - identifies underutilized clusters with estimated MSRP cost savings
 - Resource availability assessment
 
 ### Check for Quota Related Autoscaling Issues
@@ -130,7 +131,7 @@ This ensures that critical events affecting instance groups are no longer missed
    |------|--------|-------------|
    | *Identify GKE Service Account Issues* | Missing IAM roles on cluster SAs. | `issues.json` → grouped RW Issues |
    | *Fetch GKE Recommendations* | Recommender‑API tips for clusters. | `recommendations_report.txt`, `recommendations_issues.json` |
-   | *Fetch GKE Cluster Health* | CrashLoopBackOff pods & node utilisation via `kubectl`. | `cluster_health_report.txt`, `cluster_health_issues.json` |
+   | *Fetch GKE Cluster Health* | CrashLoopBackOff pods, node utilisation, and cost optimization analysis via `kubectl`. Identifies underutilized clusters with MSRP cost savings estimates. | `cluster_health_report.txt`, `cluster_health_issues.json` |
    | *Check Quota Autoscaling Issues* | Regional quota blocking node‑pool scale‑out. | `region_quota_report.txt`, `region_quota_issues.json` |
    | *Validate GKE Node Sizes* | **`gke_node_size.py`** – decides "🔄 Reschedule" vs "🆕 Use node X"; groups overloaded nodes per cluster. | CLI stdout embedded in report, JSON issues in `node_size_issues.json` |
    | *Check Comprehensive Node Pool Health* | **`node_pool_health.sh`** – surfaces hard-to-find issues like region exhaustion, quota blocking, instance group failures, and Kubernetes node events. | `node_pool_health_report.txt`, `node_pool_health_issues.json` |

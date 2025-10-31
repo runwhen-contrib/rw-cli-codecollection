@@ -116,10 +116,44 @@ for topic_name in $(jq -r '.[].name' <<< "$topics"); do
   
   # Check if there are no subscriptions
   if [[ "$sub_count" -eq 0 ]]; then
-    add_issue 3 \
+    # Get topic configuration for context
+    topic_status=$(jq -r '.status' <<< "$topic_details")
+    topic_size_mb=$(jq -r '.maxSizeInMegabytes' <<< "$topic_details")
+    topic_current_size=$(jq -r '.sizeInBytes' <<< "$topic_details")
+    topic_message_count=$(jq -r '.countDetails.activeMessageCount // 0' <<< "$topic_details")
+    auto_delete_idle=$(jq -r '.autoDeleteOnIdle' <<< "$topic_details")
+    
+    add_issue 4 \
       "Topic '$topic_name' has no subscriptions" \
-      "Add subscriptions to the topic or consider removing the unused topic" \
-      "No subscriptions found for topic: $topic_name"
+      "Add subscriptions to the topic or consider removing the unused topic if it's no longer needed" \
+      "UNUSED TOPIC ANALYSIS:
+- Topic Name: $topic_name
+- Subscription Count: 0
+- Topic Status: $topic_status
+- Current Message Count: $topic_message_count
+- Current Size: $topic_current_size bytes
+- Max Size: $topic_size_mb MB
+- Auto Delete on Idle: $auto_delete_idle
+
+CONTEXT: Topics without subscriptions will accumulate published messages indefinitely since there are no consumers to process them. This can lead to:
+1. Unnecessary storage consumption
+2. Potential quota limit issues
+3. Confusion about system architecture
+4. Wasted resources and costs
+
+INVESTIGATION STEPS:
+1. Verify if this topic is intentionally unused or if subscriptions were accidentally deleted
+2. Check if there are plans to add subscriptions in the future
+3. Review application code to see if anything is publishing to this topic
+4. Consider if this topic is part of a development/testing setup that should be cleaned up
+
+RECOMMENDATIONS:
+- If topic is truly unused: Delete the topic to clean up resources
+- If temporarily unused: Consider setting appropriate auto-delete policies
+- If subscriptions are planned: Document the intended usage and timeline
+- If used for testing: Ensure proper lifecycle management
+
+BUSINESS IMPACT: Minimal immediate impact but indicates potential resource waste and architectural cleanup opportunities."
   fi
   
   # Check each subscription
@@ -134,22 +168,102 @@ for topic_name in $(jq -r '.[].name' <<< "$topics"); do
       --name "$sub_name" \
       -o json)
     
-    # Check dead letter count
+    # Check dead letter count with contextual severity
     dead_letter_count=$(jq -r '.countDetails.deadLetterMessageCount' <<< "$sub_details")
     if [[ "$dead_letter_count" -gt 0 ]]; then
-      add_issue 3 \
-        "Subscription '$sub_name' for topic '$topic_name' has $dead_letter_count dead-lettered messages" \
-        "Investigate dead-lettered messages to identify and fix processing issues" \
-        "Dead-lettered messages detected in subscription: $topic_name/$sub_name"
+      # Determine severity based on count
+      if [[ "$dead_letter_count" -gt 10000 ]]; then
+        severity=2
+        urgency="CRITICAL"
+      elif [[ "$dead_letter_count" -gt 1000 ]]; then
+        severity=3
+        urgency="HIGH"
+      elif [[ "$dead_letter_count" -gt 100 ]]; then
+        severity=3
+        urgency="MODERATE"
+      else
+        severity=4
+        urgency="LOW"
+      fi
+      
+      # Get additional context for LLM analysis
+      max_delivery_count=$(jq -r '.maxDeliveryCount' <<< "$sub_details")
+      status=$(jq -r '.status' <<< "$sub_details")
+      auto_delete_idle=$(jq -r '.autoDeleteOnIdle' <<< "$sub_details")
+      ttl=$(jq -r '.defaultMessageTimeToLive' <<< "$sub_details")
+      
+      add_issue $severity \
+        "Subscription '$sub_name' for topic '$topic_name' has $dead_letter_count dead-lettered messages ($urgency priority)" \
+        "Investigate dead-lettered messages using Azure portal or CLI. Check for processing errors, message format issues, or subscriber failures" \
+        "DEAD LETTER ANALYSIS:
+- Message Count: $dead_letter_count dead-lettered messages
+- Severity Level: $urgency ($severity)
+- Subscription: $sub_name
+- Topic: $topic_name
+- Subscription Status: $status
+- Max Delivery Count: $max_delivery_count
+- Auto Delete on Idle: $auto_delete_idle
+- Default Message TTL: $ttl
+
+CONTEXT: Dead-lettered messages indicate systematic processing failures. Messages are moved to the dead letter queue when they exceed the maximum delivery count ($max_delivery_count) or expire. This suggests either:
+1. Consumer application errors or crashes during message processing
+2. Message format/content issues that cause processing failures
+3. Infrastructure problems preventing message delivery
+4. Poison messages that consistently fail processing
+
+INVESTIGATION STEPS:
+1. Check dead letter queue properties and error descriptions
+2. Sample recent dead-lettered messages to identify patterns
+3. Review consumer application logs for processing errors
+4. Verify message format matches expected schema
+5. Check if max delivery count ($max_delivery_count) is appropriate for your use case
+
+BUSINESS IMPACT: Failed message processing may result in data loss, delayed operations, or incomplete business workflows."
     fi
     
     # Check for large active message count
     active_count=$(jq -r '.countDetails.activeMessageCount' <<< "$sub_details")
     if [[ "$active_count" -gt 1000 ]]; then
+      # Get additional context for backlog analysis
+      scheduled_count=$(jq -r '.countDetails.scheduledMessageCount // 0' <<< "$sub_details")
+      transfer_dead_letter_count=$(jq -r '.countDetails.transferDeadLetterMessageCount // 0' <<< "$sub_details")
+      transfer_count=$(jq -r '.countDetails.transferMessageCount // 0' <<< "$sub_details")
+      
       add_issue 3 \
         "Subscription '$sub_name' for topic '$topic_name' has $active_count active messages" \
         "Verify subscribers are processing messages at an adequate rate" \
-        "Large number of active messages in subscription: $topic_name/$sub_name"
+        "MESSAGE BACKLOG ANALYSIS:
+- Active Messages: $active_count (exceeds threshold of 1000)
+- Scheduled Messages: $scheduled_count
+- Transfer Messages: $transfer_count
+- Transfer Dead Letter Messages: $transfer_dead_letter_count
+- Subscription: $sub_name
+- Topic: $topic_name
+- Subscription Status: $status
+- Max Delivery Count: $max_delivery_count
+
+CONTEXT: Large active message counts indicate a processing backlog where messages are arriving faster than they can be consumed. This suggests:
+1. Consumer throughput is insufficient for current message volume
+2. Consumer applications may be down or experiencing performance issues
+3. Message processing logic may be too slow or resource-intensive
+4. Scaling issues with consumer infrastructure
+
+INVESTIGATION STEPS:
+1. Check consumer application health and availability
+2. Monitor consumer processing rates and performance metrics
+3. Verify consumer scaling configuration (auto-scaling, instance counts)
+4. Analyze message processing duration and identify bottlenecks
+5. Review consumer resource utilization (CPU, memory, network)
+6. Check for any consumer application errors or exceptions
+
+RECOMMENDATIONS:
+- Scale out consumer instances if processing is CPU/memory bound
+- Optimize message processing logic for better throughput
+- Implement consumer health monitoring and alerting
+- Consider message batching if supported by your application
+- Review subscription configuration (prefetch count, session handling)
+
+BUSINESS IMPACT: Message processing delays can lead to degraded user experience, delayed business operations, and potential SLA violations."
     fi
     
     # Check for disabled status

@@ -1368,7 +1368,8 @@ Check HPA Health for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     ...    secret_file__kubeconfig=${kubeconfig}
     
     ${has_requests}=    Evaluate    int(${resource_requests.stdout}) > 0
-    ${uses_resource_metrics}=    Evaluate    "Resource" in "${metrics.stdout}"
+    ${metrics_clean}=    Strip String    ${metrics.stdout}
+    ${uses_resource_metrics}=    Evaluate    "Resource" in """${metrics_clean}"""
     IF    ${uses_resource_metrics} and not ${has_requests}
         RW.Core.Add Issue
         ...    severity=2
@@ -1529,7 +1530,8 @@ Check HPA Health for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     END
 
     # Add healthy status if no issues found
-    ${has_issues}=    Evaluate    ${at_max} or ${is_scaling_limited} or ${cannot_scale} or ("${metrics.stdout}" == "" or "${metrics.stdout}" == "null")
+    ${metrics_empty}=    Evaluate    """${metrics_clean}""".strip() in ["", "null"]
+    ${has_issues}=    Evaluate    ${at_max} or ${is_scaling_limited} or ${cannot_scale} or ${metrics_empty}
     IF    not ${has_issues}
         RW.Core.Add Issue
         ...    severity=4

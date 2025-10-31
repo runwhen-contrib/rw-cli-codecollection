@@ -134,8 +134,8 @@ Fetch GKE Recommendations for GCP Project `${GCP_PROJECT_ID}`
     END
 
 Fetch GKE Cluster Health for GCP Project `${GCP_PROJECT_ID}`
-    [Documentation]    Using kubectl, fetch overall basic health of the cluster by checking unhealth pods and overutilized nodes. Useful when stackdriver is not available. Requires iam permissions to fetch cluster credentials with viewer rights. 
-    [Tags]    health    crashloopbackoff    gcloud    gke    gcp    access:read-only
+    [Documentation]    Using kubectl, fetch overall basic health of the cluster by checking unhealthy pods, overutilized nodes, and underutilized clusters with cost savings opportunities. Analyzes resource utilization and provides MSRP-based cost optimization recommendations. Useful when stackdriver is not available. Requires iam permissions to fetch cluster credentials with viewer rights. 
+    [Tags]    health    crashloopbackoff    cost-optimization    underutilization    gcloud    gke    gcp    access:read-only
 
     ${cluster_health}=    RW.CLI.Run Bash File
     ...    bash_file=cluster_health.sh

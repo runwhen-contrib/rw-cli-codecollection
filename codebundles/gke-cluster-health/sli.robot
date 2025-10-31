@@ -157,13 +157,13 @@ Quick Node Instance Group Health Check for GCP Project `${GCP_PROJECT_ID}`
     [Tags]    nodepool    instances    quota    gcloud    gke    gcp    access:read-only
 
     ${instance_health_check}=    RW.CLI.Run Bash File
-    ...    bash_file=lightweight_node_instance_health.sh
+    ...    bash_file=node_pool_health.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    timeout_seconds=45
 
     ${issues}=     RW.CLI.Run Cli
-    ...    cmd=cat lightweight_node_health_issues.json
+    ...    cmd=cat node_pool_health_issues.json
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
 
     Set Global Variable     ${gke_node_instance_score}    1
