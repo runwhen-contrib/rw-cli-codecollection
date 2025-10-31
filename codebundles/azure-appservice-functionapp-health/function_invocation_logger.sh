@@ -12,7 +12,7 @@ source .env 2>/dev/null || true
 FUNCTION_APP_NAME=${FUNCTION_APP_NAME:-""}
 AZ_RESOURCE_GROUP=${AZ_RESOURCE_GROUP:-""}
 AZURE_RESOURCE_SUBSCRIPTION_ID=${AZURE_RESOURCE_SUBSCRIPTION_ID:-""}
-TIME_PERIOD_MINUTES=${TIME_PERIOD_MINUTES:-30}
+RW_LOOKBACK_WINDOW=${RW_LOOKBACK_WINDOW:-30}
 
 # Validation
 if [[ -z "$FUNCTION_APP_NAME" ]]; then
@@ -34,7 +34,7 @@ echo "📊 Enhanced Function Invocation Logging"
 echo "======================================="
 echo "Function App: $FUNCTION_APP_NAME"
 echo "Resource Group: $AZ_RESOURCE_GROUP"
-echo "Time Period: Last $TIME_PERIOD_MINUTES minutes"
+echo "Time Period: Last $RW_LOOKBACK_WINDOW minutes"
 echo ""
 
 # Get the function app resource ID
@@ -49,7 +49,7 @@ SUBSCRIPTION_NAME="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
 
 # Calculate time range
 END_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-START_TIME=$(date -u -d "$TIME_PERIOD_MINUTES minutes ago" +"%Y-%m-%dT%H:%M:%SZ")
+START_TIME=$(date -u -d "$RW_LOOKBACK_WINDOW minutes ago" +"%Y-%m-%dT%H:%M:%SZ")
 
 # Get list of functions
 FUNCTIONS=$(az functionapp function list --name "$FUNCTION_APP_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "[].name" -o tsv 2>/dev/null)
@@ -58,7 +58,7 @@ if [[ -z "$FUNCTIONS" ]]; then
     echo "⚠️  No functions found in Function App $FUNCTION_APP_NAME"
     
     # Create issue_details format for no functions case
-    details="Function App: $FUNCTION_APP_NAME\nResource Group: $AZ_RESOURCE_GROUP\nSubscription: $SUBSCRIPTION_NAME\nTime Period: Last $TIME_PERIOD_MINUTES minutes\n\nIssue: No functions found for invocation logging\n\nSummary:\nTotal Functions: 0\nTotal Invocations: 0\nIdle Functions: 0\n\nPossible Causes:\n- Function app \`$FUNCTION_APP_NAME\` is empty or newly created\n- Functions not deployed to \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`\n- Function app \`$FUNCTION_APP_NAME\` is stopped or disabled\n- Deployment issues preventing function registration\n\nNext Steps:\n1. Check if \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\` is running\n2. Verify functions have been deployed to \`$FUNCTION_APP_NAME\`\n3. Review deployment logs for \`$FUNCTION_APP_NAME\`\n4. Check service endpoints and application configuration"
+    details="Function App: $FUNCTION_APP_NAME\nResource Group: $AZ_RESOURCE_GROUP\nSubscription: $SUBSCRIPTION_NAME\nTime Period: Last $RW_LOOKBACK_WINDOW minutes\n\nIssue: No functions found for invocation logging\n\nSummary:\nTotal Functions: 0\nTotal Invocations: 0\nIdle Functions: 0\n\nPossible Causes:\n- Function app \`$FUNCTION_APP_NAME\` is empty or newly created\n- Functions not deployed to \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`\n- Function app \`$FUNCTION_APP_NAME\` is stopped or disabled\n- Deployment issues preventing function registration\n\nNext Steps:\n1. Check if \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\` is running\n2. Verify functions have been deployed to \`$FUNCTION_APP_NAME\`\n3. Review deployment logs for \`$FUNCTION_APP_NAME\`\n4. Check service endpoints and application configuration"
     
     ESCAPED_DETAILS=$(echo "$details" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
     ESCAPED_FUNCTION_APP_NAME=$(echo "$FUNCTION_APP_NAME" | sed 's/"/\\"/g')
@@ -261,7 +261,7 @@ if [[ "$TOTAL_INVOCATIONS" -gt 0 ]]; then
     fi
     
     # Build details string
-    details="Function App: $FUNCTION_APP_NAME\nResource Group: $AZ_RESOURCE_GROUP\nSubscription: $SUBSCRIPTION_NAME\nTime Period: Last $TIME_PERIOD_MINUTES minutes\n\nIssue: Function invocation health analysis\n\nPer-Function Details:"
+    details="Function App: $FUNCTION_APP_NAME\nResource Group: $AZ_RESOURCE_GROUP\nSubscription: $SUBSCRIPTION_NAME\nTime Period: Last $RW_LOOKBACK_WINDOW minutes\n\nIssue: Function invocation health analysis\n\nPer-Function Details:"
     
     for func in $FUNCTIONS; do
         successes="${SUCCESS_COUNTS["$func"]:-0}"
@@ -329,13 +329,13 @@ if [[ "$TOTAL_INVOCATIONS" -gt 0 ]]; then
     ISSUES+=("{\"title\":\"$title\",\"severity\":$severity,\"next_step\":\"$next_step\",\"details\":\"$ESCAPED_DETAILS\"}")
 else
     # No invocations case
-    details="Function App: $FUNCTION_APP_NAME\nResource Group: $AZ_RESOURCE_GROUP\nSubscription: $SUBSCRIPTION_NAME\nTime Period: Last $TIME_PERIOD_MINUTES minutes\n\nIssue: No function invocations detected\n\nSummary:\nTotal Functions: $(echo "$FUNCTIONS" | wc -w)\nTotal Invocations: 0\nIdle Functions: $(echo "$FUNCTIONS" | wc -w)\n\nPossible Causes:\n- Functions in \`$FUNCTION_APP_NAME\` not triggered during monitoring period\n- Function app \`$FUNCTION_APP_NAME\` is stopped or disabled\n- No active triggers configured for functions in resource group \`$AZ_RESOURCE_GROUP\`\n- Network connectivity issues preventing triggers\n\nNext Steps:\n1. Check if \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\` is running\n2. Verify trigger configurations for all functions\n3. Check service endpoints and network connectivity\n4. Review Application Insights for \`$FUNCTION_APP_NAME\` to identify trigger issues"
+    details="Function App: $FUNCTION_APP_NAME\nResource Group: $AZ_RESOURCE_GROUP\nSubscription: $SUBSCRIPTION_NAME\nTime Period: Last $RW_LOOKBACK_WINDOW minutes\n\nIssue: No function invocations detected\n\nSummary:\nTotal Functions: $(echo "$FUNCTIONS" | wc -w)\nTotal Invocations: 0\nIdle Functions: $(echo "$FUNCTIONS" | wc -w)\n\nPossible Causes:\n- Functions in \`$FUNCTION_APP_NAME\` not triggered during monitoring period\n- Function app \`$FUNCTION_APP_NAME\` is stopped or disabled\n- No active triggers configured for functions in resource group \`$AZ_RESOURCE_GROUP\`\n- Network connectivity issues preventing triggers\n\nNext Steps:\n1. Check if \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\` is running\n2. Verify trigger configurations for all functions\n3. Check service endpoints and network connectivity\n4. Review Application Insights for \`$FUNCTION_APP_NAME\` to identify trigger issues"
     
     ESCAPED_DETAILS=$(echo "$details" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
     ESCAPED_FUNCTION_APP_NAME=$(echo "$FUNCTION_APP_NAME" | sed 's/"/\\"/g')
     ESCAPED_SUBSCRIPTION_NAME=$(echo "$SUBSCRIPTION_NAME" | sed 's/"/\\"/g')
     
-    ISSUES+=("{\"title\":\"Function App \`$ESCAPED_FUNCTION_APP_NAME\` in subscription \`$ESCAPED_SUBSCRIPTION_NAME\` has no invocations in the last $TIME_PERIOD_MINUTES minutes\",\"severity\":4,\"next_step\":\"Check if \`$ESCAPED_FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\` is running and verify trigger configurations for all functions\",\"details\":\"$ESCAPED_DETAILS\"}")
+    ISSUES+=("{\"title\":\"Function App \`$ESCAPED_FUNCTION_APP_NAME\` in subscription \`$ESCAPED_SUBSCRIPTION_NAME\` has no invocations in the last $RW_LOOKBACK_WINDOW minutes\",\"severity\":4,\"next_step\":\"Check if \`$ESCAPED_FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\` is running and verify trigger configurations for all functions\",\"details\":\"$ESCAPED_DETAILS\"}")
 fi
 
 # Create JSON output

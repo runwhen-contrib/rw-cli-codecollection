@@ -24,7 +24,7 @@ Check for Node Restarts in Cluster `${CONTEXT}`
     ${node_events}=    RW.CLI.Run CLI
     ...    cmd= grep "Total start/stop events" <<< "${node_restart_details.stdout}"| awk -F ":" '{print $2}'
     ${events}=    Convert To Number    ${node_events.stdout}
-    Log    ${events} total start/stop events for nodes within the last ${INTERVAL}
+    Log    ${events} total start/stop events for nodes within the last ${RW_LOOKBACK_WINDOW}
     ${event_score}=    Evaluate    1 if ${events} == 0 else 0
     Set Global Variable    ${event_score}
 
@@ -55,16 +55,12 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=default
     ...    example=my-main-cluster
-    ${INTERVAL}=    RW.Core.Import User Variable    INTERVAL
-    ...    type=string
-    ...    description=The time interval in which to look back for node events.
-    ...    pattern=\w*
-    ...    default=5 minutes
-    ...    example=4 hours, 5 minutes, etc.
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Import Platform Variable    RW_LOOKBACK_WINDOW
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Normalize Lookback Window    ${RW_LOOKBACK_WINDOW}     3
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
-    Set Suite Variable    ${INTERVAL}    ${INTERVAL}
+    Set Suite Variable    ${RW_LOOKBACK_WINDOW}    ${RW_LOOKBACK_WINDOW}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "CONTEXT":"${CONTEXT}", "INTERVAL":"${INTERVAL}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "CONTEXT":"${CONTEXT}", "RW_LOOKBACK_WINDOW":"${RW_LOOKBACK_WINDOW}"}

@@ -40,8 +40,6 @@ spec:
       value: "10m"
     - name: CONTAINER_RESTART_THRESHOLD
       value: "2"
-    - name: LOG_AGE
-      value: "10m"
     - name: EVENT_AGE
       value: "10m"
     - name: EVENT_THRESHOLD

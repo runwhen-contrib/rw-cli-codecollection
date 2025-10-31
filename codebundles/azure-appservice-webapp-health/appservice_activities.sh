@@ -8,15 +8,15 @@
 # APP_SERVICE_NAME
 # AZ_RESOURCE_GROUP
 # AZURE_RESOURCE_SUBSCRIPTION_ID (Optional, defaults to current subscription)
-# TIME_PERIOD_MINUTES (Optional, default is 60)
+# RW_LOOKBACK_WINDOW (Optional, default is 60)
 
 OUTPUT_FILE="app_service_activities_issues.json"
 
 # Set the default time period to 60 minutes if not provided
-TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-60}"
+RW_LOOKBACK_WINDOW="${RW_LOOKBACK_WINDOW:-60}"
 
-# Calculate the start time based on TIME_PERIOD_MINUTES
-start_time=$(date -u -d "$TIME_PERIOD_MINUTES minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
+# Calculate the start time based on RW_LOOKBACK_WINDOW
+start_time=$(date -u -d "$RW_LOOKBACK_WINDOW minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
 end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
 # Initialize the JSON object to store issues only - this ensures we always have valid output
@@ -58,7 +58,7 @@ echo "===== AZURE APP SERVICE ACTIVITY MONITORING ====="
 echo "App Service: $APP_SERVICE_NAME"
 echo "Resource Group: $AZ_RESOURCE_GROUP"
 echo "Subscription: $SUBSCRIPTION_NAME"
-echo "Time Period: $TIME_PERIOD_MINUTES minutes"
+echo "Time Period: $RW_LOOKBACK_WINDOW minutes"
 echo "Analysis Period: $start_time to $end_time"
 echo "===================================================="
 

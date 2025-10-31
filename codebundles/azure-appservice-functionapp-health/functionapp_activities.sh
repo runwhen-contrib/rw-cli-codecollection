@@ -3,14 +3,14 @@
 # ENV:
 # FUNCTION_APP_NAME
 # AZ_RESOURCE_GROUP
-# TIME_PERIOD_MINUTES (Optional, default is 120)
+# RW_LOOKBACK_WINDOW (Optional, default is 120)
 # AZURE_RESOURCE_SUBSCRIPTION_ID (Optional, defaults to current subscription)
 
 # Set the default time period to 120 minutes if not provided
-TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-120}"
+RW_LOOKBACK_WINDOW="${RW_LOOKBACK_WINDOW:-120}"
 
 # Calculate the start and end times
-start_time=$(date -u -d "$TIME_PERIOD_MINUTES minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
+start_time=$(date -u -d "$RW_LOOKBACK_WINDOW minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
 end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
 # Use subscription ID from environment variable
@@ -33,7 +33,7 @@ if [[ -z "$FUNCTION_APP_NAME" || -z "$AZ_RESOURCE_GROUP" ]]; then
   exit 1
 fi
 
-echo "Checking recent activities for Function App '$FUNCTION_APP_NAME' (last $TIME_PERIOD_MINUTES minutes)..."
+echo "Checking recent activities for Function App '$FUNCTION_APP_NAME' (last $RW_LOOKBACK_WINDOW minutes)..."
 
 # Retrieve the resource ID of the Function App
 resource_id=$(az functionapp show \
@@ -298,7 +298,7 @@ fi
 
 # If no critical operations found, create an informational issue
 if [[ $(echo "$start_operations" | jq length) -eq 0 && $(echo "$stop_operations" | jq length) -eq 0 && $(echo "$restart_operations" | jq length) -eq 0 && $(echo "$sync_operations" | jq length) -eq 0 ]]; then
-    echo "No critical operations found in the last $TIME_PERIOD_MINUTES minutes"
+    echo "No critical operations found in the last $RW_LOOKBACK_WINDOW minutes"
     
     # Check if there are any recent activities at all
     if [[ $(echo "$recent_activities" | jq length) -gt 0 ]]; then
@@ -309,7 +309,7 @@ if [[ $(echo "$start_operations" | jq length) -eq 0 && $(echo "$stop_operations"
         
         issues_json=$(echo "$issues_json" | jq \
             --arg title "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` - No Critical Operations" \
-            --arg nextStep "No start/stop/restart/sync operations found in the last $TIME_PERIOD_MINUTES minutes. Last operation was '$latest_operation_name' on $latest_timestamp. Current state: $function_app_state." \
+            --arg nextStep "No start/stop/restart/sync operations found in the last $RW_LOOKBACK_WINDOW minutes. Last operation was '$latest_operation_name' on $latest_timestamp. Current state: $function_app_state." \
             --arg severity "4" \
             --arg lastOp "$latest_operation_name" \
             --arg lastTimestamp "$latest_timestamp" \
@@ -332,7 +332,7 @@ if [[ $(echo "$start_operations" | jq length) -eq 0 && $(echo "$stop_operations"
     else
         issues_json=$(echo "$issues_json" | jq \
             --arg title "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` - No Recent Activity" \
-            --arg nextStep "No recent operations found for Function App '$FUNCTION_APP_NAME' in the last $TIME_PERIOD_MINUTES minutes. Current state: $function_app_state." \
+            --arg nextStep "No recent operations found for Function App '$FUNCTION_APP_NAME' in the last $RW_LOOKBACK_WINDOW minutes. Current state: $function_app_state." \
             --arg severity "4" \
             --arg currentState "$function_app_state" \
             --arg portalUrl "$portal_url" \

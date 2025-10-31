@@ -6,12 +6,12 @@ set -eo pipefail
 
 : "${APIM_NAME:?Environment variable APIM_NAME must be set}"
 : "${AZ_RESOURCE_GROUP:?Environment variable AZ_RESOURCE_GROUP must be set}"
-: "${TIME_PERIOD_MINUTES:?Environment variable TIME_PERIOD_MINUTES must be set}"
+: "${RW_LOOKBACK_WINDOW:?Environment variable RW_LOOKBACK_WINDOW must be set}"
 
 OUTPUT_FILE="apim_activity_log_issues.json"
 issues_json='{"issues": []}'
 
-echo "[INFO] Checking Activity Logs for APIM \`$APIM_NAME\` in RG \`$AZ_RESOURCE_GROUP\` (last $TIME_PERIOD_MINUTES minutes)..."
+echo "[INFO] Checking Activity Logs for APIM \`$APIM_NAME\` in RG \`$AZ_RESOURCE_GROUP\` (last $RW_LOOKBACK_WINDOW minutes)..."
 
 ###############################################################################
 # Set subscription context if provided
@@ -78,7 +78,7 @@ echo "[INFO] Azure Portal URL: $PORTAL_URL"
 # 3) Calculate time range for activity log query
 ###############################################################################
 end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-start_time=$(date -u -d "$TIME_PERIOD_MINUTES minutes ago" +"%Y-%m-%dT%H:%M:%SZ")
+start_time=$(date -u -d "$RW_LOOKBACK_WINDOW minutes ago" +"%Y-%m-%dT%H:%M:%SZ")
 
 echo "[INFO] Querying activity logs from $start_time to $end_time"
 

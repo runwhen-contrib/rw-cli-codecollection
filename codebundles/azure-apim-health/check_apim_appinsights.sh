@@ -5,7 +5,7 @@
 # Usage:
 #   export AZ_RESOURCE_GROUP="myResourceGroup"
 #   export APIM_NAME="myApimInstance"
-#   export TIME_PERIOD_MINUTES="60"  # Optional, defaults to 60
+#   export RW_LOOKBACK_WINDOW="60"  # Optional, defaults to 60
 #   # Optional: export AZURE_RESOURCE_SUBSCRIPTION_ID="your-subscription-id"
 #   ./check_apim_appinsights.sh
 #
@@ -37,14 +37,14 @@ az account set --subscription "$subscription" || {
 : "${AZ_RESOURCE_GROUP:?Must set AZ_RESOURCE_GROUP}"
 : "${APIM_NAME:?Must set APIM_NAME}"
 
-TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-60}"
+RW_LOOKBACK_WINDOW="${RW_LOOKBACK_WINDOW:-60}"
 OUTPUT_FILE="apim_appinsights_issues.json"
 issues_json='{"issues": []}'
 
 echo "[INFO] Checking APIM Application Insights Integration..."
 echo " APIM Name:     $APIM_NAME"
 echo " ResourceGroup: $AZ_RESOURCE_GROUP"
-echo " Time Period:   $TIME_PERIOD_MINUTES minutes"
+echo " Time Period:   $RW_LOOKBACK_WINDOW minutes"
 
 ###############################################################################
 # 2) Check if APIM has Application Insights configured
@@ -143,7 +143,7 @@ fi
 echo "[INFO] Analyzing Application Insights telemetry..."
 
 # Calculate time range
-start_time=$(date -u -d "$TIME_PERIOD_MINUTES minutes ago" +"%Y-%m-%dT%H:%M:%SZ")
+start_time=$(date -u -d "$RW_LOOKBACK_WINDOW minutes ago" +"%Y-%m-%dT%H:%M:%SZ")
 end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Query for exceptions related to APIM

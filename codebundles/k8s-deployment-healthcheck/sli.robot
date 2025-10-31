@@ -48,12 +48,8 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=1
     ...    default=1
-    ${LOG_AGE}=    RW.Core.Import User Variable    LOG_AGE
-    ...    type=string
-    ...    description=The time window to fetch logs for analysis.
-    ...    pattern=((\d+?)m|(\d+?)h)?
-    ...    example=10m
-    ...    default=10m
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Import Platform Variable    RW_LOOKBACK_WINDOW
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Normalize Lookback Window     ${RW_LOOKBACK_WINDOW}     2 
     ${MAX_LOG_LINES}=    RW.Core.Import User Variable    MAX_LOG_LINES
     ...    type=string
     ...    description=Maximum number of log lines to fetch per container to prevent API overload.
@@ -107,7 +103,7 @@ Suite Initialization
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTAINER_RESTART_AGE}    ${CONTAINER_RESTART_AGE}
     Set Suite Variable    ${CONTAINER_RESTART_THRESHOLD}    ${CONTAINER_RESTART_THRESHOLD}
-    Set Suite Variable    ${LOG_AGE}    ${LOG_AGE}
+    Set Suite Variable    ${RW_LOOKBACK_WINDOW}    ${RW_LOOKBACK_WINDOW}
     Set Suite Variable    ${MAX_LOG_LINES}    ${MAX_LOG_LINES}
     Set Suite Variable    ${MAX_LOG_BYTES}    ${MAX_LOG_BYTES}
     Set Suite Variable    ${EVENT_AGE}    ${EVENT_AGE}
@@ -266,7 +262,7 @@ Get Critical Log Errors and Score for Deployment `${DEPLOYMENT_NAME}`
         ...    namespace=${NAMESPACE}
         ...    context=${CONTEXT}
         ...    kubeconfig=${kubeconfig}
-        ...    log_age=${LOG_AGE}
+        ...    log_age=${RW_LOOKBACK_WINDOW}
         ...    max_log_lines=${MAX_LOG_LINES}
         ...    max_log_bytes=${MAX_LOG_BYTES}
         ...    excluded_containers=${EXCLUDED_CONTAINERS}
