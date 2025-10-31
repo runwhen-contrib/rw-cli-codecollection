@@ -245,6 +245,42 @@ Check Readiness Probe Configuration for StatefulSet `${STATEFULSET_NAME}` in Nam
         RW.Core.Add Pre To Report    Commands Used: ${readiness_probe_health.cmd}
     END
 
+Check for Container Restarts in StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
+    [Documentation]    Analyzes container restart patterns in the StatefulSet pods to identify the root cause of restarts, distinguishing between OOM kills, liveness probe failures, and other termination causes.
+    [Tags]    access:read-only  containers    restarts    errors    oom    probes    statefulset    ${STATEFULSET_NAME}
+    ${container_restarts}=    RW.CLI.Run Bash File
+    ...    bash_file=container_restarts.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
+    
+    # Check for command failure and create generic issue if needed
+    IF    ${container_restarts.returncode} != 0
+        ${history}=    RW.CLI.Pop Shell History
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    title=Container Restart Analysis Failed for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
+        ...    next_steps=Check StatefulSet Log for Issues with `${STATEFULSET_NAME}`\nInspect StatefulSet Warning Events for `${STATEFULSET_NAME}`
+        ...    details=Container restart analysis script failed with exit code ${container_restarts.returncode}:\n\nSTDOUT:\n${container_restarts.stdout}\n\nSTDERR:\n${container_restarts.stderr}
+        ...    observed_at=${issue_timestamp}
+    ELSE
+        # Parse and add issues from the script output
+        ${restart_issues}=    Evaluate    json.loads(r'''${container_restarts.stdout}''')    json
+        FOR    ${issue}    IN    @{restart_issues}
+            ${issue_timestamp}=    Get Current Date    result_format=%Y-%m-%dT%H:%M:%S.%fZ
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    title=${issue["title"]}
+            ...    next_steps=${issue["next_steps"]}
+            ...    details=${issue["details"]}
+            ...    observed_at=${issue_timestamp}
+        END
+        ${history}=    RW.CLI.Pop Shell History
+        RW.Core.Add Pre To Report    Container restart analysis results:\n\n${container_restarts.stdout}
+        RW.Core.Add Pre To Report    Commands Used: ${container_restarts.cmd}
+    END
+
 Inspect StatefulSet Warning Events for `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches warning events related to the StatefulSet workload in the namespace and triages any issues found in the events.
     [Tags]    access:read-only  events    workloads    errors    warnings    get    statefulset    ${STATEFULSET_NAME}

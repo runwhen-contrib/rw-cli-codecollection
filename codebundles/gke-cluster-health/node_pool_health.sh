@@ -204,6 +204,19 @@ analyze_node_pool_health() {
   POOL_COUNT=$(echo "$NODE_POOLS_JSON" | jq length)
   log "  Found $POOL_COUNT node pools"
   
+  # Get cluster zone information for proper capacity calculations
+  CLUSTER_DETAILS="$(timeout_cmd 20 gcloud container clusters describe "$CLUSTER_NAME" \
+    "$LOC_FLAG"="$CLUSTER_LOC" --project="$PROJECT" \
+    --format="json(locationType,locations)" 2>/dev/null || echo '{}')"
+  
+  CLUSTER_TYPE="$(echo "$CLUSTER_DETAILS" | jq -r '.locationType // "ZONAL"')"
+  CLUSTER_ZONES=$(echo "$CLUSTER_DETAILS" | jq -r '.locations[]?' | wc -l)
+  
+  # Default to 1 zone if we can't determine
+  [[ "$CLUSTER_ZONES" =~ ^[0-9]+$ ]] && [[ $CLUSTER_ZONES -gt 0 ]] || CLUSTER_ZONES=1
+  
+  log "  Cluster Type: $CLUSTER_TYPE across $CLUSTER_ZONES zones"
+  
   # Process each node pool using in-memory data
   pool_num=0
   while read -r pool_data; do
@@ -223,20 +236,47 @@ analyze_node_pool_health() {
       while IFS= read -r ig_url; do
         [[ -z "$ig_url" ]] && continue
         IG_ZONE="$(echo "$ig_url" | sed 's|.*/zones/||' | sed 's|/.*||')"
-        IG_HASH="$(echo "$ig_url" | sed 's|.*/instanceGroupManagers/||' | sed 's/.*-\([a-f0-9]\{8\}\)-grp$/\1/')"
+        IG_NAME="$(echo "$ig_url" | sed 's|.*/instanceGroupManagers/||' | sed 's|.*instanceGroups/||')"
         
-        local instances_count
-        instances_count="$(echo "$ALL_COMPUTE_INSTANCES" | jq --arg zone "$IG_ZONE" --arg ig_hash "$IG_HASH" '
-          [.[] | select(.zone == $zone) | select(.name | contains($ig_hash)) | select(.status=="RUNNING")] | length')"
+        # More robust hash extraction - handle different GKE naming patterns
+        IG_HASH=""
+        if [[ "$IG_NAME" =~ gke-.*-([a-f0-9]{8})-grp$ ]]; then
+          IG_HASH="${BASH_REMATCH[1]}"
+        elif [[ "$IG_NAME" =~ -([a-f0-9]{8})-grp$ ]]; then
+          IG_HASH="${BASH_REMATCH[1]}"
+        elif [[ "$IG_NAME" =~ -([a-f0-9]{6,10})-grp$ ]]; then
+          # Handle variable length hashes
+          IG_HASH="${BASH_REMATCH[1]}"
+        fi
+        
+        local instances_count=0
+        if [[ -n "$IG_HASH" ]]; then
+          instances_count="$(echo "$ALL_COMPUTE_INSTANCES" | jq --arg zone "$IG_ZONE" --arg ig_hash "$IG_HASH" '
+            [.[] | select(.zone == $zone) | select(.name | contains($ig_hash)) | select(.status=="RUNNING")] | length')"
+        fi
+        
+        # Reduced verbosity: only log if there's a problem
+        if [[ $instances_count -eq 0 ]]; then
+          log "        WARNING: IG: $IG_NAME (hash: $IG_HASH) - 0 running instances"
+        fi
         CALCULATED_NODES=$((CALCULATED_NODES + instances_count))
       done <<< "$INSTANCE_GROUP_URLS"
     fi
     
     # Use calculated nodes if available, otherwise fall back to API data
+    # But prefer API data if calculation seems wrong (calculated is 0 but API shows nodes)
+    local API_NODES
+    API_NODES="$(echo "$pool_data" | jq -r '.currentNodeCount // .initialNodeCount')"
+    
     if [[ $CALCULATED_NODES -gt 0 ]]; then
       CURRENT_NODES="$CALCULATED_NODES"
+      # Reduced verbosity - only log issues
+    elif [[ "$API_NODES" != "null" && $API_NODES -gt 0 ]]; then
+      CURRENT_NODES="$API_NODES"
+      # Using API fallback silently
     else
-      CURRENT_NODES="$(echo "$pool_data" | jq -r '.currentNodeCount // .initialNodeCount')"
+      CURRENT_NODES=0
+      log "      WARNING: Both calculated and API node counts are 0 or unavailable"
     fi
     
     log "    [$pool_num/$POOL_COUNT] Pool: $POOL_NAME ($MACHINE_TYPE)"
@@ -249,11 +289,91 @@ analyze_node_pool_health() {
                 "Check node pool status: gcloud container node-pools describe $POOL_NAME --cluster=$CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --project=$PROJECT"
     fi
     
-    # Check for capacity issues
-    if [[ "$AUTOSCALING" == "true" && "$CURRENT_NODES" == "$MAX_NODES" && "$MAX_NODES" != "null" && $MAX_NODES -gt 0 ]]; then
-      add_issue "Node pool \`$POOL_NAME\` at maximum capacity in cluster \`$CLUSTER_NAME\`" \
-                "Pool: $POOL_NAME | Cluster: $CLUSTER_NAME | Location: $CLUSTER_LOC | Machine Type: $MACHINE_TYPE | Current Nodes: $CURRENT_NODES | Maximum Nodes: $MAX_NODES | Min Nodes: $MIN_NODES | Autoscaling: $AUTOSCALING | Utilization: 100% | Risk: Cannot scale out during demand spikes" 2 \
-                "Increase max nodes: gcloud container node-pools update $POOL_NAME --cluster=$CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --max-nodes=<NEW_MAX> --project=$PROJECT"
+    # Check for capacity issues - focus on real scheduling problems in multi-pool clusters
+    if [[ "$MAX_NODES" != "null" && $MAX_NODES -gt 0 && $CURRENT_NODES -gt 0 ]]; then
+      # Calculate actual maximum capacity accounting for multi-zone clusters
+      # For any cluster with multiple zones, MAX_NODES is per-zone, so multiply by zone count
+      local ACTUAL_MAX_NODES
+      if [[ $CLUSTER_ZONES -gt 1 ]]; then
+        ACTUAL_MAX_NODES=$((MAX_NODES * CLUSTER_ZONES))
+        local capacity_desc="$MAX_NODES per zone × $CLUSTER_ZONES zones = $ACTUAL_MAX_NODES total"
+      else
+        ACTUAL_MAX_NODES=$MAX_NODES
+        local capacity_desc="$MAX_NODES total (single-zone cluster)"
+      fi
+      
+      # Optional debug logging (enable with DEBUG=1 environment variable)
+      if [[ "${DEBUG:-0}" == "1" ]]; then
+        log "      DEBUG: Pool $POOL_NAME - Current: $CURRENT_NODES, Max per zone: $MAX_NODES, Actual max: $ACTUAL_MAX_NODES, Cluster: $CLUSTER_TYPE"
+      fi
+      
+      if [[ $CURRENT_NODES -gt $ACTUAL_MAX_NODES ]]; then
+        # CRITICAL: Actually over capacity - this should rarely happen
+        local over_capacity_pct=$(( (CURRENT_NODES * 100) / ACTUAL_MAX_NODES ))
+        add_issue "Node pool \`$POOL_NAME\` exceeds maximum capacity in cluster \`$CLUSTER_NAME\`" \
+                  "CAPACITY EXCEEDED ANALYSIS:
+- Pool: $POOL_NAME
+- Cluster: $CLUSTER_NAME ($CLUSTER_TYPE)
+- Location: $CLUSTER_LOC
+- Machine Type: $MACHINE_TYPE
+- Current Running Nodes: $CURRENT_NODES
+- Configured Maximum: $capacity_desc
+- Over-capacity: $((CURRENT_NODES - ACTUAL_MAX_NODES)) nodes (${over_capacity_pct}% of max)
+- Min Nodes: $MIN_NODES per zone
+- Autoscaling: $AUTOSCALING
+
+CRITICAL ISSUE: This node pool is running MORE nodes than its configured maximum allows.
+
+ROOT CAUSE ANALYSIS:
+This situation is unusual and may indicate:
+1. Manual scaling operations that bypassed autoscaler limits
+2. Autoscaler configuration issues or bugs
+3. Recent changes to maximum node settings while nodes were running
+4. Temporary scaling during emergency situations
+
+BUSINESS IMPACT:
+- Unexpected infrastructure costs from over-provisioned resources
+- Risk of autoscaler conflicts and unpredictable behavior
+- Potential violation of capacity planning and budgets
+
+IMMEDIATE ACTION REQUIRED:
+Investigate why the pool exceeded its configured limits and adjust accordingly." 1 \
+                  "URGENT: Investigate over-capacity situation and adjust: gcloud container node-pools update $POOL_NAME --cluster=$CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --max-nodes=$((CURRENT_NODES / CLUSTER_ZONES + 1)) --project=$PROJECT\\nOR scale down if over-provisioned: gcloud container clusters resize $CLUSTER_NAME --node-pool=$POOL_NAME --num-nodes=$ACTUAL_MAX_NODES $LOC_FLAG=$CLUSTER_LOC --project=$PROJECT"
+      elif [[ "$AUTOSCALING" == "true" && $CURRENT_NODES -eq $ACTUAL_MAX_NODES ]]; then
+        # Pool is at maximum capacity - this is the real issue in multi-pool clusters
+        add_issue "Node pool \`$POOL_NAME\` at maximum capacity in cluster \`$CLUSTER_NAME\`" \
+                  "MULTI-POOL CAPACITY ANALYSIS:
+- Pool: $POOL_NAME
+- Cluster: $CLUSTER_NAME ($CLUSTER_TYPE)
+- Location: $CLUSTER_LOC
+- Machine Type: $MACHINE_TYPE
+- Current Nodes: $CURRENT_NODES
+- Configured Maximum: $capacity_desc
+- Min Nodes: $MIN_NODES per zone
+- Autoscaling: $AUTOSCALING
+- Utilization: 100%
+
+ISSUE: This node pool has reached its configured maximum capacity and cannot scale out.
+
+MULTI-POOL CLUSTER IMPACT:
+In clusters with multiple node pools (different machine types), when one pool reaches maximum capacity, it can cause scheduling failures for workloads that specifically require that node type, even if other pools have available capacity.
+
+BUSINESS IMPACT:
+- Pods requiring this specific machine type ($MACHINE_TYPE) cannot be scheduled
+- Risk of pod scheduling failures during traffic spikes
+- Potential service degradation for workloads tied to this node type
+- Limited ability to handle unexpected demand for this resource class
+
+RECOMMENDATIONS:
+- Increase maximum node count for this pool if sustained demand
+- Review workload node selectors and resource requirements
+- Consider workload distribution across different node types
+- Monitor resource utilization trends for capacity planning" 2 \
+                  "Increase max nodes for this pool: gcloud container node-pools update $POOL_NAME --cluster=$CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --max-nodes=$((MAX_NODES + 5)) --project=$PROJECT"
+      # Note: Removed "approaching capacity" warning (was at 85% threshold)
+      # cluster_health.sh already handles resource pressure detection more effectively
+      # Only keep truly critical capacity issues (at max or over max)
+      fi
     fi
     
     # Analyze instance groups for this pool using downloaded data
@@ -293,8 +413,16 @@ analyze_pool_instance_groups() {
     # Find instances in this instance group using downloaded data
     # GKE instances follow pattern: gke-{cluster}-{pool}-{hash}-{suffix}
     # Instance group names follow pattern: gke-{cluster}-{pool}-{hash}-grp
-    # Extract the hash from instance group name to match instances
-    IG_HASH="$(echo "$IG_NAME" | sed 's/.*-\([a-f0-9]\{8\}\)-grp$/\1/')"
+    # Extract the hash from instance group name to match instances - handle different patterns
+    IG_HASH=""
+    if [[ "$IG_NAME" =~ gke-.*-([a-f0-9]{8})-grp$ ]]; then
+      IG_HASH="${BASH_REMATCH[1]}"
+    elif [[ "$IG_NAME" =~ -([a-f0-9]{8})-grp$ ]]; then
+      IG_HASH="${BASH_REMATCH[1]}"
+    elif [[ "$IG_NAME" =~ -([a-f0-9]{6,10})-grp$ ]]; then
+      # Handle variable length hashes
+      IG_HASH="${BASH_REMATCH[1]}"
+    fi
     
     INSTANCES_IN_GROUP="$(echo "$ALL_COMPUTE_INSTANCES" | jq --arg zone "$IG_ZONE" --arg ig_hash "$IG_HASH" '
       [.[] | select(.zone == $zone) | select(.name | contains($ig_hash))]')"
