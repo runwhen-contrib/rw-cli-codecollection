@@ -123,29 +123,19 @@ function exit_code_success() {
 }
 
 # Function to find the resource owner of a pod
+# StatefulSets directly own their pods (no ReplicaSet intermediary)
 function find_resource_owner() {
     pod_name="$1"
     owner=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod $pod_name --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r '
     if .metadata.ownerReferences then
         .metadata.ownerReferences[0] as $owner |
-        if $owner.kind == "ReplicaSet" then
-            # If owned by ReplicaSet, find the Deployment that owns the ReplicaSet
-            ($owner.name | split("-")[:-1] | join("-")) as $deployment_name |
-            {
-                "kind": "StatefulSet",
-                "metadata": {
-                    "name": $deployment_name
-                }
+        # StatefulSets directly own their pods
+        {
+            "kind": $owner.kind,
+            "metadata": {
+                "name": $owner.name
             }
-        else
-            # Return the direct owner
-            {
-                "kind": $owner.kind,
-                "metadata": {
-                    "name": $owner.name
-                }
-            }
-        end
+        }
     else
         # No owner reference, return the pod itself
         {
