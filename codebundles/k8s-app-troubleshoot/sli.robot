@@ -19,7 +19,7 @@ Measure Application Exceptions in `${NAMESPACE}`
     [Documentation]    Examines recent logs for exceptions, providing a count of them.
     [Tags]    resource    application    workload    logs    state    exceptions    errors
     ${cmd}=    Set Variable
-    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
+    ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${RW_LOOKBACK_WINDOW} --container=${CONTAINER_NAME}
     IF    $EXCLUDE_PATTERN != ""
         ${cmd}=    Set Variable
         ...    ${cmd} | grep -Eiv "${EXCLUDE_PATTERN}" || true
@@ -67,13 +67,8 @@ Suite Initialization
     ...    type=string
     ...    description=The Kubernetes labels used to select the resource for logs.
     ...    pattern=\w*
-    ${LOGS_SINCE}=    RW.Core.Import User Variable
-    ...    LOGS_SINCE
-    ...    type=string
-    ...    description=How far back to fetch logs from containers in Kubernetes. Making this too recent and running the codebundle often could cause adverse performance.
-    ...    pattern=\w*
-    ...    example=15m
-    ...    default=15m
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Import Platform Variable    RW_LOOKBACK_WINDOW
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Normalize Lookback Window     ${RW_LOOKBACK_WINDOW}     2     
     ${EXCLUDE_PATTERN}=    RW.Core.Import User Variable
     ...    EXCLUDE_PATTERN
     ...    type=string
@@ -99,7 +94,7 @@ Suite Initialization
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${LABELS}    ${LABELS}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
-    Set Suite Variable    ${LOGS_SINCE}    ${LOGS_SINCE}
+    Set Suite Variable    ${RW_LOOKBACK_WINDOW}    ${RW_LOOKBACK_WINDOW}
     Set Suite Variable    ${EXCLUDE_PATTERN}    ${EXCLUDE_PATTERN}
     Set Suite Variable    ${CONTAINER_NAME}    ${CONTAINER_NAME}
     Set Suite Variable    ${MAX_LOG_LINES}    ${MAX_LOG_LINES}

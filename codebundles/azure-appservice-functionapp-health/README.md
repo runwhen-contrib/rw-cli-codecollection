@@ -29,7 +29,7 @@ export AZURE_RESOURCE_SUBSCRIPTION_ID
 
 The following variables can be customized to adjust thresholds for issue detection:
 
-- `TIME_PERIOD_MINUTES`: Time period to look back for activities/events (default: 10)
+- `RW_LOOKBACK_WINDOW`: Time period to look back for activities/events (default: 10)
 - `TIME_PERIOD_DAYS`: Time period to look back for recommendations (default: 7)
 - `CPU_THRESHOLD`: CPU % threshold for issues (default: 80)
 - `REQUESTS_THRESHOLD`: Requests/s threshold for issues (default: 1000)

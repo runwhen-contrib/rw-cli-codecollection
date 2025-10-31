@@ -13,16 +13,16 @@
 # ENV Variables:
 # - APP_SERVICE_NAME: Name of the Azure App Service
 # - AZ_RESOURCE_GROUP: Azure Resource Group name
-# - TIME_PERIOD_MINUTES: Time period to look back for activities (default: 60)
+# - RW_LOOKBACK_WINDOW: Time period to look back for activities (default: 60)
 # - AZURE_RESOURCE_SUBSCRIPTION_ID: Azure subscription ID (optional)
 
 OUTPUT_FILE="app_service_activities_enhanced.json"
 
 # Set the default time period to 60 minutes if not provided
-TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-60}"
+RW_LOOKBACK_WINDOW="${RW_LOOKBACK_WINDOW:-60}"
 
-# Calculate the start time based on TIME_PERIOD_MINUTES
-start_time=$(date -u -d "$TIME_PERIOD_MINUTES minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
+# Calculate the start time based on RW_LOOKBACK_WINDOW
+start_time=$(date -u -d "$RW_LOOKBACK_WINDOW minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
 end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
 # Initialize the JSON object to store issues
@@ -64,7 +64,7 @@ echo "===== ENHANCED AZURE APP SERVICE ACTIVITY MONITORING ====="
 echo "App Service: $APP_SERVICE_NAME"
 echo "Resource Group: $AZ_RESOURCE_GROUP"
 echo "Subscription: $SUBSCRIPTION_NAME"
-echo "Time Period: $TIME_PERIOD_MINUTES minutes"
+echo "Time Period: $RW_LOOKBACK_WINDOW minutes"
 echo "Analysis Period: $start_time to $end_time"
 echo "========================================================"
 
@@ -397,14 +397,14 @@ echo ""
 echo "===== SUMMARY ====="
 echo "Total issues found: $total_issues"
 echo "App Service state: $app_service_state"
-echo "Analysis period: $TIME_PERIOD_MINUTES minutes"
+echo "Analysis period: $RW_LOOKBACK_WINDOW minutes"
 echo "Output file: $OUTPUT_FILE"
 echo ""
 
 # Update summary with final counts
 issues_json=$(echo "$issues_json" | jq \
     --arg total_issues "$total_issues" \
-    --arg analysis_period "$TIME_PERIOD_MINUTES" \
+    --arg analysis_period "$RW_LOOKBACK_WINDOW" \
     '.summary.total_issues = ($total_issues | tonumber) |
      .summary.analysis_period_minutes = ($analysis_period | tonumber) |
      .summary.report_generated_at = "'"$(date -u '+%Y-%m-%dT%H:%M:%SZ')"'"')

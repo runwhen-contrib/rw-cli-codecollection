@@ -3,7 +3,7 @@
 # ENV VARIABLES:
 #   FUNCTION_APP_NAME     - Azure Function App name
 #   AZ_RESOURCE_GROUP     - Resource group for the Function App
-#   TIME_PERIOD_MINUTES   - (Optional) How many minutes to look back for metrics (default: 60)
+#   RW_LOOKBACK_WINDOW   - (Optional) How many minutes to look back for metrics (default: 60)
 #   AZURE_RESOURCE_SUBSCRIPTION_ID - (Optional) Subscription ID (defaults to current subscription)
 
 # USAGE:
@@ -24,8 +24,8 @@ subscription_name="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
 echo "Switching to subscription ID: $subscription"
 az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
 
-TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-60}"
-start_time=$(date -u -d "$TIME_PERIOD_MINUTES minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
+RW_LOOKBACK_WINDOW="${RW_LOOKBACK_WINDOW:-60}"
+start_time=$(date -u -d "$RW_LOOKBACK_WINDOW minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
 end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
 echo "Analyzing plan usage for Function App: $FUNCTION_APP_NAME"

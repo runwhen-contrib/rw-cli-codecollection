@@ -43,12 +43,8 @@ Suite Initialization
     ...    enum=[deployment,statefulset,daemonset]
     ...    example=deployment
     ...    default=deployment
-    ${LOG_AGE}=    RW.Core.Import User Variable    LOG_AGE
-    ...    type=string
-    ...    description=The time window to fetch logs for stacktrace analysis.
-    ...    pattern=((\d+?)m|(\d+?)h)?
-    ...    example=10m
-    ...    default=10m
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Import Platform Variable    RW_LOOKBACK_WINDOW
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Normalize Lookback Window     ${RW_LOOKBACK_WINDOW}    2 
     ${MAX_LOG_LINES}=    RW.Core.Import User Variable    MAX_LOG_LINES
     ...    type=string
     ...    description=Maximum number of log lines to fetch per container to prevent API overload.
@@ -75,7 +71,7 @@ Suite Initialization
     ...    default=kubectl
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
-    Set Suite Variable    ${LOG_AGE}    ${LOG_AGE}
+    Set Suite Variable    ${RW_LOOKBACK_WINDOW}    ${RW_LOOKBACK_WINDOW}
     Set Suite Variable    ${MAX_LOG_LINES}    ${MAX_LOG_LINES}
     Set Suite Variable    ${MAX_LOG_BYTES}    ${MAX_LOG_BYTES}
     Set Suite Variable    ${EXCLUDED_CONTAINER_NAMES}    ${EXCLUDED_CONTAINER_NAMES}
@@ -150,7 +146,7 @@ Get Stacktrace Health Score for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}`
         ...    namespace=${NAMESPACE}
         ...    context=${CONTEXT}
         ...    kubeconfig=${kubeconfig}
-        ...    log_age=${LOG_AGE}
+        ...    log_age=${RW_LOOKBACK_WINDOW}
         ...    max_log_lines=${MAX_LOG_LINES}
         ...    max_log_bytes=${MAX_LOG_BYTES}
         ...    excluded_containers=${EXCLUDED_CONTAINERS}

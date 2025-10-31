@@ -7,30 +7,30 @@
 # AZ_TENANT
 # APP_SERVICE_NAME
 # AZ_RESOURCE_GROUP
-# TIME_PERIOD_MINUTES (Optional, default is 60)
+# RW_LOOKBACK_WINDOW (Optional, default is 60)
 
 
 # Set the default time period to 60 minutes if not provided
-TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-60}"
+RW_LOOKBACK_WINDOW="${RW_LOOKBACK_WINDOW:-60}"
 
 # Get subscription name for issue reporting
 subscription_name="${AZURE_SUBSCRIPTION_NAME:-$(az account show --query "name" -o tsv 2>/dev/null || echo "Unknown")}"
 
-# Convert TIME_PERIOD_MINUTES into ISO 8601 duration format
-if (( TIME_PERIOD_MINUTES < 60 )); then
-    duration="PT${TIME_PERIOD_MINUTES}M"
-elif (( TIME_PERIOD_MINUTES < 1440 )); then
-    hours=$(( TIME_PERIOD_MINUTES / 60 ))
-    minutes=$(( TIME_PERIOD_MINUTES % 60 ))
+# Convert RW_LOOKBACK_WINDOW into ISO 8601 duration format
+if (( RW_LOOKBACK_WINDOW < 60 )); then
+    duration="PT${RW_LOOKBACK_WINDOW}M"
+elif (( RW_LOOKBACK_WINDOW < 1440 )); then
+    hours=$(( RW_LOOKBACK_WINDOW / 60 ))
+    minutes=$(( RW_LOOKBACK_WINDOW % 60 ))
     duration="PT${hours}H${minutes}M"
 else
-    days=$(( TIME_PERIOD_MINUTES / 1440 ))
-    hours=$(( (TIME_PERIOD_MINUTES % 1440) / 60 ))
-    minutes=$(( TIME_PERIOD_MINUTES % 60 ))
+    days=$(( RW_LOOKBACK_WINDOW / 1440 ))
+    hours=$(( (RW_LOOKBACK_WINDOW % 1440) / 60 ))
+    minutes=$(( RW_LOOKBACK_WINDOW % 60 ))
     duration="P${days}DT${hours}H${minutes}M"
 fi
 
-start_time=$(date -u -d "$TIME_PERIOD_MINUTES minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
+start_time=$(date -u -d "$RW_LOOKBACK_WINDOW minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
 end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
 tenant_id=$(az account show --query "tenantId" -o tsv)

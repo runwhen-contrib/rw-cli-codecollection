@@ -7,14 +7,14 @@
 # AZ_TENANT
 # AKS_CLUSTER
 # AZ_RESOURCE_GROUP
-# TIME_PERIOD_MINUTES (Optional, default is 60)
+# RW_LOOKBACK_WINDOW (Optional, default is 60)
 
 
 # Set the default time period to 60 minutes if not provided
-TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-60}"
+RW_LOOKBACK_WINDOW="${RW_LOOKBACK_WINDOW:-60}"
 
-# Calculate the start time based on TIME_PERIOD_MINUTES
-start_time=$(date -u -d "$TIME_PERIOD_MINUTES minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
+# Calculate the start time based on RW_LOOKBACK_WINDOW
+start_time=$(date -u -d "$RW_LOOKBACK_WINDOW minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
 end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
 

@@ -13,16 +13,16 @@
 # ENV Variables:
 # - FUNCTION_APP_NAME: Name of the Azure Function App
 # - AZ_RESOURCE_GROUP: Azure Resource Group name
-# - TIME_PERIOD_MINUTES: Time period to look back for activities (default: 60)
+# - RW_LOOKBACK_WINDOW: Time period to look back for activities (default: 60)
 # - AZURE_RESOURCE_SUBSCRIPTION_ID: Azure subscription ID (optional)
 
 OUTPUT_FILE="function_app_activities_enhanced.json"
 
 # Set the default time period to 120 minutes if not provided
-TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-120}"
+RW_LOOKBACK_WINDOW="${RW_LOOKBACK_WINDOW:-120}"
 
-# Calculate the start time based on TIME_PERIOD_MINUTES
-start_time=$(date -u -d "$TIME_PERIOD_MINUTES minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
+# Calculate the start time based on RW_LOOKBACK_WINDOW
+start_time=$(date -u -d "$RW_LOOKBACK_WINDOW minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
 end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
 # Initialize the JSON object to store issues
@@ -62,7 +62,7 @@ tenant_id=$(az account show --query "tenantId" -o tsv)
 echo "===== ENHANCED AZURE FUNCTION APP ACTIVITY MONITORING ====="
 echo "Function App: $FUNCTION_APP_NAME"
 echo "Resource Group: $AZ_RESOURCE_GROUP"
-echo "Time Period: $TIME_PERIOD_MINUTES minutes"
+echo "Time Period: $RW_LOOKBACK_WINDOW minutes"
 echo "Analysis Period: $start_time to $end_time"
 echo "========================================================"
 
@@ -353,14 +353,14 @@ echo ""
 echo "===== SUMMARY ====="
 echo "Total issues found: $total_issues"
 echo "Function App state: $function_app_state"
-echo "Analysis period: $TIME_PERIOD_MINUTES minutes"
+echo "Analysis period: $RW_LOOKBACK_WINDOW minutes"
 echo "Output file: $OUTPUT_FILE"
 echo ""
 
 # Update summary with final counts
 issues_json=$(echo "$issues_json" | jq \
     --arg total_issues "$total_issues" \
-    --arg analysis_period "$TIME_PERIOD_MINUTES" \
+    --arg analysis_period "$RW_LOOKBACK_WINDOW" \
     '.summary.total_issues = ($total_issues | tonumber) |
      .summary.analysis_period_minutes = ($analysis_period | tonumber) |
      .summary.report_generated_at = "'"$(date -u '+%Y-%m-%dT%H:%M:%SZ')"'"')

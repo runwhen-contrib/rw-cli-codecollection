@@ -12,7 +12,7 @@ source .env 2>/dev/null || true
 FUNCTION_APP_NAME=${FUNCTION_APP_NAME:-""}
 AZ_RESOURCE_GROUP=${AZ_RESOURCE_GROUP:-""}
 AZURE_RESOURCE_SUBSCRIPTION_ID=${AZURE_RESOURCE_SUBSCRIPTION_ID:-""}
-TIME_PERIOD_MINUTES=${TIME_PERIOD_MINUTES:-15}  # Reduced from 30 for faster queries
+RW_LOOKBACK_WINDOW=${RW_LOOKBACK_WINDOW:-15}  # Reduced from 30 for faster queries
 FUNCTION_ERROR_RATE_THRESHOLD=${FUNCTION_ERROR_RATE_THRESHOLD:-10}
 
 # Validation
@@ -35,7 +35,7 @@ echo "🔍 Fast Function App Failure Analysis"
 echo "====================================="
 echo "Function App: $FUNCTION_APP_NAME"
 echo "Resource Group: $AZ_RESOURCE_GROUP"
-echo "Time Period: Last $TIME_PERIOD_MINUTES minutes"
+echo "Time Period: Last $RW_LOOKBACK_WINDOW minutes"
 echo ""
 
 # Get the function app resource ID
@@ -50,7 +50,7 @@ SUBSCRIPTION_NAME="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
 
 # Calculate time range
 END_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-START_TIME=$(date -u -d "$TIME_PERIOD_MINUTES minutes ago" +"%Y-%m-%dT%H:%M:%SZ")
+START_TIME=$(date -u -d "$RW_LOOKBACK_WINDOW minutes ago" +"%Y-%m-%dT%H:%M:%SZ")
 
 # Get list of functions
 FUNCTIONS=$(az functionapp function list --name "$FUNCTION_APP_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "[].name" -o tsv 2>/dev/null)
@@ -59,7 +59,7 @@ if [[ -z "$FUNCTIONS" ]]; then
     echo "⚠️  No functions found in Function App $FUNCTION_APP_NAME" 
     
     # Create issue_details format for no functions case
-    details="Function App: $FUNCTION_APP_NAME\nResource Group: $AZ_RESOURCE_GROUP\nSubscription: $SUBSCRIPTION_NAME\nTime Period: Last $TIME_PERIOD_MINUTES minutes\n\nIssue: No functions found for analysis\n\nSummary:\nFunctions Analyzed: 0\nFunctions with Errors: 0\nFunctions with Health Score < 80: 0\n\nPossible Causes:\n- Function app \`$FUNCTION_APP_NAME\` is empty or newly created\n- Functions not deployed to \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`\n- Function app \`$FUNCTION_APP_NAME\` is stopped or disabled\n- Deployment issues preventing function registration\n\nNext Steps:\n1. Check if \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\` is running\n2. Verify functions have been deployed to \`$FUNCTION_APP_NAME\`\n3. Review deployment logs for \`$FUNCTION_APP_NAME\`\n4. Check service endpoints and application configuration"
+    details="Function App: $FUNCTION_APP_NAME\nResource Group: $AZ_RESOURCE_GROUP\nSubscription: $SUBSCRIPTION_NAME\nTime Period: Last $RW_LOOKBACK_WINDOW minutes\n\nIssue: No functions found for analysis\n\nSummary:\nFunctions Analyzed: 0\nFunctions with Errors: 0\nFunctions with Health Score < 80: 0\n\nPossible Causes:\n- Function app \`$FUNCTION_APP_NAME\` is empty or newly created\n- Functions not deployed to \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`\n- Function app \`$FUNCTION_APP_NAME\` is stopped or disabled\n- Deployment issues preventing function registration\n\nNext Steps:\n1. Check if \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\` is running\n2. Verify functions have been deployed to \`$FUNCTION_APP_NAME\`\n3. Review deployment logs for \`$FUNCTION_APP_NAME\`\n4. Check service endpoints and application configuration"
     
     ESCAPED_DETAILS=$(echo "$details" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
     ESCAPED_FUNCTION_APP_NAME=$(echo "$FUNCTION_APP_NAME" | sed 's/"/\\"/g')
@@ -214,7 +214,7 @@ if [[ "$error_functions" -gt 0 ]]; then
     fi
     
     # Build details string
-    details="Function App: $FUNCTION_APP_NAME\nResource Group: $AZ_RESOURCE_GROUP\nSubscription: $SUBSCRIPTION_NAME\nTime Period: Last $TIME_PERIOD_MINUTES minutes\n\nIssue: Function failure pattern analysis\n\nPer-Function Details:"
+    details="Function App: $FUNCTION_APP_NAME\nResource Group: $AZ_RESOURCE_GROUP\nSubscription: $SUBSCRIPTION_NAME\nTime Period: Last $RW_LOOKBACK_WINDOW minutes\n\nIssue: Function failure pattern analysis\n\nPer-Function Details:"
     
     for func in $FUNCTIONS; do
         executions=${FUNCTION_EXECUTIONS["$func"]:-0}
@@ -291,7 +291,7 @@ else
     # No errors case
     avg_health_score=$(echo "scale=1; $(for func in $FUNCTIONS; do echo "${FUNCTION_HEALTH_SCORES["$func"]:-100}"; done | awk '{sum+=$1} END {print sum/NR}')" | bc -l 2>/dev/null || echo "100.0")
     
-    details="Function App: $FUNCTION_APP_NAME\nResource Group: $AZ_RESOURCE_GROUP\nSubscription: $SUBSCRIPTION_NAME\nTime Period: Last $TIME_PERIOD_MINUTES minutes\n\nIssue: Function failure pattern analysis - no errors detected\n\nPer-Function Details:"
+    details="Function App: $FUNCTION_APP_NAME\nResource Group: $AZ_RESOURCE_GROUP\nSubscription: $SUBSCRIPTION_NAME\nTime Period: Last $RW_LOOKBACK_WINDOW minutes\n\nIssue: Function failure pattern analysis - no errors detected\n\nPer-Function Details:"
     
     for func in $FUNCTIONS; do
         executions=${FUNCTION_EXECUTIONS["$func"]:-0}

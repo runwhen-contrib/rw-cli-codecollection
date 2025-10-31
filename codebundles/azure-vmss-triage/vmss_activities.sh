@@ -7,14 +7,14 @@
 # AZ_TENANT
 # VMSCALESET
 # AZ_RESOURCE_GROUP
-# TIME_PERIOD_MINUTES (Optional, default is 60)
+# RW_LOOKBACK_WINDOW (Optional, default is 60)
 
 
 # Set the default time period to 60 minutes if not provided
-TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-60}"
+RW_LOOKBACK_WINDOW="${RW_LOOKBACK_WINDOW:-60}"
 
-# Calculate the start time based on TIME_PERIOD_MINUTES
-start_time=$(date -u -d "$TIME_PERIOD_MINUTES minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
+# Calculate the start time based on RW_LOOKBACK_WINDOW
+start_time=$(date -u -d "$RW_LOOKBACK_WINDOW minutes ago" '+%Y-%m-%dT%H:%M:%SZ')
 end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
 tenant_id=$(az account show --query "tenantId" -o tsv)
@@ -48,7 +48,7 @@ resource_id=$(az vmss show --name "$VMSCALESET" --resource-group "$AZ_RESOURCE_G
 event_log_url="https://portal.azure.com/#@$tenant_id/resource/subscriptions/$subscription_id/resourceGroups/$AZ_RESOURCE_GROUP/providers/Microsoft.Compute/virtualMachineScaleSets/$VMSCALESET/eventlogs"
 
 # Display recent activity logs within the time range in table format
-echo "Azure VM Scale Set $VMSCALESET activity logs (last $TIME_PERIOD_MINUTES minutes):"
+echo "Azure VM Scale Set $VMSCALESET activity logs (last $RW_LOOKBACK_WINDOW minutes):"
 az monitor activity-log list --resource-id "$resource_id" --start-time "$start_time" --end-time "$end_time" --output table
 
 

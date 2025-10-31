@@ -90,13 +90,68 @@ for queue_name in $(jq -r '.[].name' <<< "$queues"); do
     --name "$queue_name" \
     -o json)
   
-  # Check dead letter count
+  # Check dead letter count with contextual severity
   dead_letter_count=$(jq -r '.countDetails.deadLetterMessageCount' <<< "$queue_details")
   if [[ "$dead_letter_count" -gt 0 ]]; then
-    add_issue 3 \
-      "Queue '$queue_name' has $dead_letter_count dead-lettered messages" \
-      "Investigate dead-lettered messages to identify and fix processing issues" \
-      "Dead-lettered messages detected in queue: $queue_name"
+    # Determine severity based on count
+    if [[ "$dead_letter_count" -gt 10000 ]]; then
+      severity=2
+      urgency="CRITICAL"
+    elif [[ "$dead_letter_count" -gt 1000 ]]; then
+      severity=3
+      urgency="HIGH"
+    elif [[ "$dead_letter_count" -gt 100 ]]; then
+      severity=3
+      urgency="MODERATE"
+    else
+      severity=4
+      urgency="LOW"
+    fi
+    
+    # Get additional context for LLM analysis
+    max_delivery_count=$(jq -r '.maxDeliveryCount' <<< "$queue_details")
+    queue_status=$(jq -r '.status' <<< "$queue_details")
+    auto_delete_idle=$(jq -r '.autoDeleteOnIdle' <<< "$queue_details")
+    ttl=$(jq -r '.defaultMessageTimeToLive' <<< "$queue_details")
+    lock_duration=$(jq -r '.lockDuration' <<< "$queue_details")
+    
+    add_issue $severity \
+      "Queue '$queue_name' has $dead_letter_count dead-lettered messages ($urgency priority)" \
+      "Investigate dead-lettered messages using Azure portal or CLI. Check for processing errors, message format issues, or consumer failures" \
+      "QUEUE DEAD LETTER ANALYSIS:
+- Message Count: $dead_letter_count dead-lettered messages
+- Severity Level: $urgency ($severity)
+- Queue Name: $queue_name
+- Queue Status: $queue_status
+- Max Delivery Count: $max_delivery_count
+- Lock Duration: $lock_duration
+- Auto Delete on Idle: $auto_delete_idle
+- Default Message TTL: $ttl
+
+CONTEXT: Dead-lettered messages in queues indicate systematic processing failures. Messages are moved to the dead letter queue when they exceed the maximum delivery count ($max_delivery_count), expire, or encounter processing errors. This suggests:
+1. Consumer application errors or crashes during message processing
+2. Message format/content issues that cause processing failures
+3. Lock timeout issues where messages aren't processed within lock duration ($lock_duration)
+4. Infrastructure problems preventing message delivery
+5. Poison messages that consistently fail processing
+
+INVESTIGATION STEPS:
+1. Access dead letter queue via Azure portal or CLI: az servicebus queue show --name '$queue_name/\$DeadLetterQueue'
+2. Sample recent dead-lettered messages to identify error patterns
+3. Review DeadLetterReason and DeadLetterErrorDescription properties
+4. Check consumer application logs for processing errors and exceptions
+5. Verify message format matches expected schema
+6. Analyze lock duration vs processing time requirements
+7. Review max delivery count ($max_delivery_count) appropriateness
+
+RECOMMENDATIONS:
+- Implement dead letter message reprocessing logic if appropriate
+- Adjust lock duration if messages are timing out during processing
+- Review and optimize message processing logic
+- Consider implementing circuit breaker patterns for resilience
+- Set up monitoring for dead letter queue depth
+
+BUSINESS IMPACT: Failed message processing may result in data loss, delayed operations, incomplete business workflows, and potential compliance issues."
   fi
   
   # Check for large active message count

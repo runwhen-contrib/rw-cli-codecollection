@@ -4,7 +4,7 @@
 #   FUNCTION_APP_NAME   - Name of the Azure Function App
 #   AZ_RESOURCE_GROUP   - Resource group containing the Function App
 #   AZURE_RESOURCE_SUBSCRIPTION_ID - (Optional) Subscription ID (defaults to current subscription)
-#   TIME_PERIOD_MINUTES - (Optional) How many minutes of data to fetch (default 5)
+#   RW_LOOKBACK_WINDOW - (Optional) How many minutes of data to fetch (default 5)
 
 # Use subscription ID from environment variable
 subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
@@ -17,11 +17,11 @@ subscription_name="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
 echo "Switching to subscription ID: $subscription"
 az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
 
-TIME_PERIOD_MINUTES="${TIME_PERIOD_MINUTES:-5}"
+RW_LOOKBACK_WINDOW="${RW_LOOKBACK_WINDOW:-5}"
 
-# Determine the time range based on TIME_PERIOD_MINUTES
+# Determine the time range based on RW_LOOKBACK_WINDOW
 end_time=$(date -u '+%Y-%m-%dT%H:%MZ')
-start_time=$(date -u -d "$TIME_PERIOD_MINUTES minutes ago" '+%Y-%m-%dT%H:%MZ')
+start_time=$(date -u -d "$RW_LOOKBACK_WINDOW minutes ago" '+%Y-%m-%dT%H:%MZ')
 
 issues_json='{"issues": []}'
 metrics_data='{"metrics": []}'
@@ -160,7 +160,7 @@ if (( $(echo "$execution_count_total == 0" | bc -l) )); then
         --arg title "No Function Executions for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
         --arg nextStep "Verify that triggers are set up for Function App \`$FUNCTION_APP_NAME\` and that the function is invoked" \
         --arg severity "4" \
-        --arg details "No executions recorded for '$FUNCTION_APP_NAME' in subscription '$subscription_name' over the last $TIME_PERIOD_MINUTES minute(s)." \
+        --arg details "No executions recorded for '$FUNCTION_APP_NAME' in subscription '$subscription_name' over the last $RW_LOOKBACK_WINDOW minute(s)." \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
     )
 fi
@@ -182,7 +182,7 @@ if (( $(echo "$execution_units_total > 100" | bc -l) )); then
         --arg title "High Function Execution Units for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
         --arg nextStep "Review cost and scaling settings for \`$FUNCTION_APP_NAME\`" \
         --arg severity "3" \
-        --arg details "Execution units exceeded 100 in the last $TIME_PERIOD_MINUTES minute(s) for Function App '$FUNCTION_APP_NAME' in subscription '$subscription_name'." \
+        --arg details "Execution units exceeded 100 in the last $RW_LOOKBACK_WINDOW minute(s) for Function App '$FUNCTION_APP_NAME' in subscription '$subscription_name'." \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
     )
 fi

@@ -22,6 +22,92 @@ function check_command_exists() {
     fi
 }
 
+# Analyze the actual cause of SIGKILL (exit code 137) to distinguish between OOM and liveness probe failures
+function analyze_sigkill_cause() {
+    local pod_name="$1"
+    local container_name="$2"
+    local terminated_time="$3"
+    
+    # Get pod events around the termination time
+    local events=$(${KUBERNETES_DISTRIBUTION_BINARY} get events --context=${CONTEXT} -n ${NAMESPACE} --field-selector involvedObject.name=${pod_name} -o json 2>/dev/null)
+    
+    # Get container status details
+    local pod_status=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod ${pod_name} --context=${CONTEXT} -n ${NAMESPACE} -o json 2>/dev/null)
+    local terminated_reason=$(echo "$pod_status" | jq -r ".status.containerStatuses[] | select(.name==\"$container_name\") | .lastState.terminated.reason // \"N/A\"")
+    
+    # STEP 1: Check for EXPLICIT OOMKilled reason (most reliable)
+    if [[ "$terminated_reason" == "OOMKilled" ]]; then
+        return 1  # Confirmed OOM
+    fi
+    
+    # STEP 2: Look for EXPLICIT OOM-related events (second most reliable)
+    local oom_events=$(echo "$events" | jq -r '.items[] | select(.reason == "OOMKilling" or (.reason == "Killing" and (.message | contains("Memory cgroup out of memory"))) or (.message | contains("oom-kill")) or (.message | contains("Out of memory")) or (.message | contains("memory limit exceeded"))) | .message' 2>/dev/null)
+    
+    if [[ -n "$oom_events" ]]; then
+        return 1  # OOM confirmed via events
+    fi
+    
+    # STEP 3: Look for EXPLICIT liveness probe failure events (high confidence)
+    local probe_events=$(echo "$events" | jq -r '.items[] | select((.reason == "Unhealthy" and (.message | contains("Liveness probe failed"))) or (.reason == "Killing" and (.message | contains("liveness probe failed"))) or (.reason == "FailedMount" and (.message | contains("probe")))) | .message' 2>/dev/null)
+    
+    if [[ -n "$probe_events" ]]; then
+        return 2  # Liveness probe failure confirmed
+    fi
+    
+    # STEP 4: Check for resource pressure or node-level issues
+    local node_events=$(${KUBERNETES_DISTRIBUTION_BINARY} get events --context=${CONTEXT} --all-namespaces --field-selector reason=NodeHasDiskPressure,reason=NodeHasMemoryPressure,reason=NodeHasPIDPressure -o json 2>/dev/null)
+    local pressure_events=$(echo "$node_events" | jq -r '.items[] | select(.lastTimestamp >= "'$(date -d '10 minutes ago' -Iseconds)'" or .firstTimestamp >= "'$(date -d '10 minutes ago' -Iseconds)'") | .message' 2>/dev/null)
+    
+    if [[ -n "$pressure_events" ]]; then
+        return 3  # Node resource pressure
+    fi
+    
+    # STEP 5: Look for system-level termination events
+    local system_events=$(echo "$events" | jq -r '.items[] | select(.reason == "Killing" and ((.message | contains("preempt")) or (.message | contains("evict")) or (.message | contains("resource pressure")) or (.message | contains("node shutdown")))) | .message' 2>/dev/null)
+    
+    if [[ -n "$system_events" ]]; then
+        return 3  # System-level termination
+    fi
+    
+    # STEP 6: Analyze the terminated reason more carefully
+    case "$terminated_reason" in
+        "Error")
+            # "Error" reason with exit 137 is often liveness probe failure, NOT OOM
+            # Check if there are any health-related events
+            local health_events=$(echo "$events" | jq -r '.items[] | select((.message | contains("health")) or (.message | contains("ready")) or (.message | contains("probe")) or (.message | contains("timeout"))) | .message' 2>/dev/null)
+            
+            if [[ -n "$health_events" ]]; then
+                return 2  # Likely probe-related
+            fi
+            
+            # Check for any "Killing" events without specific OOM indicators
+            local general_killing=$(echo "$events" | jq -r '.items[] | select(.reason == "Killing") | .message' 2>/dev/null)
+            
+            if [[ -n "$general_killing" ]]; then
+                # If killing events exist but no OOM evidence, likely probe failure
+                return 2  # Likely probe failure
+            fi
+            ;;
+        "Completed")
+            return 4  # Normal completion, not an error
+            ;;
+        *)
+            # Other reasons - analyze context
+            ;;
+    esac
+    
+    # STEP 7: Final analysis - if we have high restart count but no clear OOM evidence, likely probe issues
+    local restart_count=$(echo "$pod_status" | jq -r ".status.containerStatuses[] | select(.name==\"$container_name\") | .restartCount // 0")
+    
+    if [[ $restart_count -gt 5 ]] && [[ "$terminated_reason" == "Error" ]]; then
+        # High restart count with "Error" reason but no OOM evidence suggests probe failures
+        return 2  # Likely probe failure pattern
+    fi
+    
+    # If we can't determine the specific cause with confidence, return unknown
+    return 0  # Unknown cause - requires investigation
+}
+
 # Tasks to perform when container exit code is "Error" or 1
 function exit_code_error() {
     logs=$(${KUBERNETES_DISTRIBUTION_BINARY} logs -p $1 -c $2 --tail=50 --context=${CONTEXT} -n ${NAMESPACE})
@@ -232,8 +318,28 @@ while read -r container; do
                     echo "Container terminated by SIGKILL related to node shutdown for pod \`$pod_name\`."
                     issue_details="{\"severity\":\"4\",\"title\":\"$owner_kind \`$owner_name\` in namespace \`${NAMESPACE}\` was evicted due to node shutdown in the last $CONTAINER_RESTART_AGE\",\"next_steps\":\"Inspect $owner_kind replicas for \`$owner_name\`\",\"details\":\"Container terminated by SIGKILL related to node shutdown. Total restart count: $restart_count (lifetime total). Most recent restart occurred within the last $CONTAINER_RESTART_AGE.\"}"
                 else
-                    echo "Container terminated by SIGKILL, possibly due to Out Of Memory, for pod \`$pod_name\`. Check if the container exceeded its memory limit. Consider increasing memory allocation or optimizing the application for better memory usage."
-                    issue_details="{\"severity\":\"2\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\` in the last $CONTAINER_RESTART_AGE\",\"next_steps\":\"Check $owner_kind Log for Issues with \`$owner_name\`\\nGet Pod Resource Utilization with Top in Namespace \`$NAMESPACE\`\\nShow Pods Without Resource Limit or Resource Requests Set in Namespace \`$NAMESPACE\`\\nIdentify Resource Constrained Pods In Namespace \`$NAMESPACE\`\",\"details\":\"Container terminated by SIGKILL, possibly due to Out Of Memory. Total restart count: $restart_count (lifetime total). Most recent restart occurred within the last $CONTAINER_RESTART_AGE. Check if the container exceeded its memory limit. Consider increasing memory allocation or optimizing the application for better memory usage.\"}"
+                    # Analyze the actual cause of SIGKILL (exit 137)
+                    analyze_sigkill_cause "$pod_name" "$name" "$terminated_finishedAt"
+                    sigkill_cause=$?
+                    
+                    case $sigkill_cause in
+                        1) # OOM Kill confirmed
+                            echo "Container terminated by SIGKILL due to Out Of Memory (OOM) for pod \`$pod_name\`. Container exceeded memory limits."
+                            issue_details="{\"severity\":\"2\",\"title\":\"$owner_kind \`$owner_name\` has container restarts due to OOM in namespace \`${NAMESPACE}\` in the last $CONTAINER_RESTART_AGE\",\"next_steps\":\"Check $owner_kind Log for Issues with \`$owner_name\`\\nGet Pod Resource Utilization with Top in Namespace \`$NAMESPACE\`\\nShow Pods Without Resource Limit or Resource Requests Set in Namespace \`$NAMESPACE\`\\nIdentify Resource Constrained Pods In Namespace \`$NAMESPACE\`\\nCheck Node Resource Utilization and Capacity\",\"details\":\"Container terminated by SIGKILL due to confirmed OOM kill. Pod: $pod_name, Container: $name. Total restart count: $restart_count (lifetime total). Most recent restart occurred within the last $CONTAINER_RESTART_AGE. Root cause: CONFIRMED OOM KILL - container exceeded memory limits.\"}"
+                            ;;
+                        2) # Liveness Probe Failure confirmed
+                            echo "Container terminated by SIGKILL due to liveness probe failure for pod \`$pod_name\`. Application failed health checks."
+                            issue_details="{\"severity\":\"2\",\"title\":\"$owner_kind \`$owner_name\` has container restarts due to liveness probe failures in namespace \`${NAMESPACE}\` in the last $CONTAINER_RESTART_AGE\",\"next_steps\":\"Check $owner_kind Log for Issues with \`$owner_name\`\\nCheck Liveliness Probe Configuration for $owner_kind \`$owner_name\`\\nGet Pod Resource Utilization with Top in Namespace \`$NAMESPACE\`\\nReview Application Health Check Endpoints\",\"details\":\"Container terminated by SIGKILL due to liveness probe failure. Pod: $pod_name, Container: $name. Total restart count: $restart_count (lifetime total). Most recent restart occurred within the last $CONTAINER_RESTART_AGE. Root cause: LIVENESS PROBE FAILURE - application was unresponsive to health checks, NOT an OOM issue.\"}"
+                            ;;
+                        3) # Other SIGKILL cause (preemption, etc.)
+                            echo "Container terminated by SIGKILL due to system-level termination for pod \`$pod_name\` (preemption, eviction, or resource pressure)."
+                            issue_details="{\"severity\":\"3\",\"title\":\"$owner_kind \`$owner_name\` has container restarts due to system termination in namespace \`${NAMESPACE}\` in the last $CONTAINER_RESTART_AGE\",\"next_steps\":\"Check $owner_kind Log for Issues with \`$owner_name\`\\nInspect $owner_kind Warning Events for \`$owner_name\`\\nCheck Node Resource Utilization and Capacity\\nReview Pod Priority Classes and Resource Requests\",\"details\":\"Container terminated by SIGKILL due to system-level events. Pod: $pod_name, Container: $name. Total restart count: $restart_count (lifetime total). Most recent restart occurred within the last $CONTAINER_RESTART_AGE. Root cause: SYSTEM-LEVEL TERMINATION - pod preemption, node resource pressure, or cluster scheduling decisions.\"}"
+                            ;;
+                        *) # Unknown/unclear cause
+                            echo "Container terminated by SIGKILL for pod \`$pod_name\` - cause unclear. Requires investigation to determine if OOM, probe failure, or other issue."
+                            issue_details="{\"severity\":\"2\",\"title\":\"$owner_kind \`$owner_name\` has container restarts due to unclear SIGKILL cause in namespace \`${NAMESPACE}\` in the last $CONTAINER_RESTART_AGE\",\"next_steps\":\"Check $owner_kind Log for Issues with \`$owner_name\`\\nInspect $owner_kind Warning Events for \`$owner_name\`\\nGet Pod Resource Utilization with Top in Namespace \`$NAMESPACE\`\\nCheck Liveliness Probe Configuration for $owner_kind \`$owner_name\`\",\"details\":\"Container terminated by SIGKILL with unclear cause. Pod: $pod_name, Container: $name. Total restart count: $restart_count (lifetime total). Most recent restart occurred within the last $CONTAINER_RESTART_AGE. Root cause: REQUIRES INVESTIGATION - could be OOM, liveness probe failure, or other system-level termination.\"}"
+                            ;;
+                    esac
                 fi
                 ;;
             "Graceful Termination SIGTERM")
@@ -247,7 +353,8 @@ while read -r container; do
                 issue_details="{\"severity\":\"3\",\"title\":\"$owner_kind \`$owner_name\` has container restarts in namespace \`${NAMESPACE}\` in the last $CONTAINER_RESTART_AGE\",\"next_steps\":\"Unknown exit code for pod \`$pod_name\`. Escalate to the service or infrastructure owner for further investigation.\",\"details\":\"Unknown exit code for pod \`$pod_name\`: $exit_code_explanation. Total restart count: $restart_count (lifetime total). Most recent restart occurred within the last $CONTAINER_RESTART_AGE.\"}"
                 ;;
         esac
-
+        
+        issue_details="$(printf '%s' "$issue_details" | jq --arg ts "$terminated_finishedAt" '. + {observed_at: $ts}')"
         # Add issue detail to the list of recommendations
         recommendations+=("$issue_details")
       fi
