@@ -54,23 +54,13 @@ function analyze_sigkill_cause() {
         return 2  # Liveness probe failure confirmed
     fi
 
-    # STEP 4: Analyze resource usage patterns to infer cause
-    local memory_request=$(echo "$pod_status" | jq -r ".spec.containers[] | select(.name==\"$container_name\") | .resources.requests.memory // \"0\"")
-    local memory_limit=$(echo "$pod_status" | jq -r ".spec.containers[] | select(.name==\"$container_name\") | .resources.limits.memory // \"0\"")
-    
-    # Convert memory values to bytes for comparison
-    local request_bytes=0
-    local limit_bytes=0
-    
-    if [[ "$memory_request" != "0" && "$memory_request" != "null" ]]; then
-        request_bytes=$(convert_memory_to_bytes "$memory_request")
-    fi
-    
-    if [[ "$memory_limit" != "0" && "$memory_limit" != "null" ]]; then
-        limit_bytes=$(convert_memory_to_bytes "$memory_limit")
-    fi
+    # NOTE: STEP 4 removed - cannot infer OOM from current pod's resource config
+    # We're looking at the restarted (current) pod, not the crashed one.
+    # We don't have historical metrics from the terminated container,
+    # so we can't determine actual memory usage at crash time.
+    # Steps 1-3 above catch explicit OOM evidence; anything else is speculation.
 
-    # STEP 5: Check for resource pressure or node-level issues
+    # STEP 4: Check for resource pressure or node-level issues
     local node_events=$(${KUBERNETES_DISTRIBUTION_BINARY} get events --context=${CONTEXT} --all-namespaces --field-selector reason=NodeHasDiskPressure,reason=NodeHasMemoryPressure,reason=NodeHasPIDPressure -o json 2>/dev/null)
     local pressure_events=$(echo "$node_events" | jq -r '.items[] | select(.lastTimestamp >= "'$(date -d '10 minutes ago' -Iseconds)'" or .firstTimestamp >= "'$(date -d '10 minutes ago' -Iseconds)'") | .message' 2>/dev/null)
     
@@ -122,31 +112,6 @@ function analyze_sigkill_cause() {
 
     # If we can't determine the specific cause with confidence, return unknown
     return 0  # Unknown cause - requires investigation
-}
-
-# Helper function to convert memory strings to bytes
-convert_memory_to_bytes() {
-    local memory_str="$1"
-    local bytes=0
-    
-    if [[ "$memory_str" =~ ^([0-9]+)([KMGT]i?)$ ]]; then
-        local value="${BASH_REMATCH[1]}"
-        local unit="${BASH_REMATCH[2]}"
-        
-        case "$unit" in
-            "Ki") bytes=$((value * 1024)) ;;
-            "Mi") bytes=$((value * 1024 * 1024)) ;;
-            "Gi") bytes=$((value * 1024 * 1024 * 1024)) ;;
-            "Ti") bytes=$((value * 1024 * 1024 * 1024 * 1024)) ;;
-            "K") bytes=$((value * 1000)) ;;
-            "M") bytes=$((value * 1000 * 1000)) ;;
-            "G") bytes=$((value * 1000 * 1000 * 1000)) ;;
-            "T") bytes=$((value * 1000 * 1000 * 1000 * 1000)) ;;
-            *) bytes=$value ;;
-        esac
-    fi
-    
-    echo "$bytes"
 }
 
 # Tasks to perform when container exit code is "Error" or 1
