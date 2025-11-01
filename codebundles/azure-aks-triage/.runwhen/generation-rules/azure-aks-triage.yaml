@@ -20,4 +20,3 @@ spec:
             - type: sli
             - type: runbook
               templateName: azure-aks-triage-taskset.yaml
-            - type: workflow

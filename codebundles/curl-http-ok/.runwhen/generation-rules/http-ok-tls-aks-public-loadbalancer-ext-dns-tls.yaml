@@ -29,5 +29,3 @@ spec:
             - type: sli
             - type: runbook
               templateName: http-ok-tls-aks-public-loadbalancer-ext-dns-tls-taskset.yaml
-            - type: workflow
-              templateName: http-ok-tls-aks-public-loadbalancer-ext-dns-tls-workflow.yaml

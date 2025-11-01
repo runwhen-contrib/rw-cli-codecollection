@@ -36,9 +36,7 @@ spec:
     - name: VERIFY_SSL
       value: 'false'
   secretsProvided: []
-  alerts:
-    warning:
-      operator: <
-      threshold: '1'
-      for: '10m'
-
+  alertConfig:
+    tasks:
+      persona: eager-edgar
+      sessionTTL: 10m

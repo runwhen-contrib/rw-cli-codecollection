@@ -55,3 +55,7 @@ spec:
     - name: GITHUB_TOKEN
       workspaceKey: AUTH DETAILS NOT FOUND
   {% endif %} 
+  alertConfig:
+    tasks:
+      persona: eager-edgar
+      sessionTTL: 10m

@@ -22,4 +22,3 @@ spec:
             - type: sli
             - type: runbook
               templateName: k8s-cluster-node-health-taskset.yaml
-            - type: workflow
