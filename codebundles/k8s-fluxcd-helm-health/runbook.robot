@@ -66,7 +66,7 @@ Fetch FluxCD HelmRelease Error Messages in Namespace `${NAMESPACE}`
     [Documentation]    List helmreleases and display the status conditions message for any helmreleases that are not in a Ready state. 
     [Tags]        FluxCD     Helmrelease    Errors     Unhealthy    Message    ${NAMESPACE}
     ${helmrelease_errors}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} -o=jsonpath="{range .items[?(@.status.conditions[].status=='False')]}{'-----\\nName: '}{@.metadata.name}{'\\n'}{@.status.conditions[*].message}{'\\n'}{end}" --context ${CONTEXT} || true
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} -o=jsonpath="{range .items[*]}[?(@.status.conditions[?(@.type=='Ready')].status=='False')]{'-----\\nName: '}{@.metadata.name}--{@.status.conditions[0].lastTransitionTime}{'\\n'}{@.status.conditions[*].message}{'\\n'}{end}" --context ${CONTEXT} || true
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true

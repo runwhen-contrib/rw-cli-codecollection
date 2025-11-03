@@ -20,7 +20,8 @@ if [[ -z "$APP_SERVICE_NAME" || -z "$AZ_RESOURCE_GROUP" ]]; then
         --arg details "APP_SERVICE_NAME and AZ_RESOURCE_GROUP must be set for log analysis" \
         --arg nextSteps "Set required environment variables and retry log analysis" \
         --arg severity "1" \
-        '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber)}]')
+        --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+        '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber), "observed_at": $observed_at}]')
     echo "$issues_json" | jq '.' > "$OUTPUT_FILE"
     exit 0
 fi
@@ -36,7 +37,8 @@ else
         --arg details "Could not verify App Service '$APP_SERVICE_NAME' in resource group '$AZ_RESOURCE_GROUP' within 3 seconds" \
         --arg nextSteps "Verify App Service name and check permissions for \`$APP_SERVICE_NAME\` in RG \`$AZ_RESOURCE_GROUP\`" \
         --arg severity "3" \
-        '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber)}]')
+        --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+        '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber), "observed_at": $observed_at}]')
     echo "$issues_json" | jq '.' > "$OUTPUT_FILE"
     exit 0
 fi
@@ -60,13 +62,15 @@ if APP_INSIGHTS_KEY=$(timeout 3s az webapp config appsettings list --name "$APP_
                     
                     # Get first error message for summary
                     first_error=$(echo "$RECENT_ERRORS" | jq -r '.[0][1]' 2>/dev/null | head -c 200)
-                    
+                    error_timestamp=$(first_error | jq -r '.timestamp')
+
                     issues_json=$(echo "$issues_json" | jq \
                         --arg title "Recent Application Errors in \`$APP_SERVICE_NAME\`" \
                         --arg details "Found $error_count recent errors via Application Insights. First error: $first_error" \
                         --arg nextSteps "Review and fix application errors in \`$APP_SERVICE_NAME\` in RG \`$AZ_RESOURCE_GROUP\`" \
                         --arg severity "3" \
-                        '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber)}]')
+                        --arg observed_at "$error_timestamp" \
+                        '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber), "observed_at": $observed_at}]')
                 else
                     echo "✓ No recent errors found in Application Insights"
                 fi
@@ -83,7 +87,8 @@ if APP_INSIGHTS_KEY=$(timeout 3s az webapp config appsettings list --name "$APP_
             --arg details "Application Insights is not configured for this App Service. Consider enabling it for better monitoring and error tracking" \
             --arg nextSteps "Enable Application Insights for \`$APP_SERVICE_NAME\` in RG \`$AZ_RESOURCE_GROUP\` to improve monitoring capabilities" \
             --arg severity "4" \
-            '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber)}]')
+            --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+            '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber), "observed_at": $observed_at}]')
     fi
 else
     echo "ℹ Could not check Application Insights configuration within timeout"
@@ -108,13 +113,15 @@ if APP_SERVICE_RESOURCE_ID=$(timeout 3s az webapp show --name "$APP_SERVICE_NAME
                         
                         # Get first error for summary
                         first_log_error=$(echo "$LOG_ANALYTICS_RESULTS" | jq -r '.[0][2]' 2>/dev/null | head -c 200)
+                        log_error_timestamp=$(first_log_error | jq -r '.TimeGenerated')
                         
                         issues_json=$(echo "$issues_json" | jq \
                             --arg title "Recent Log Errors in \`$APP_SERVICE_NAME\`" \
                             --arg details "Found $log_error_count recent error entries in diagnostic logs. First error: $first_log_error" \
                             --arg nextSteps "Review diagnostic logs and fix errors in \`$APP_SERVICE_NAME\` in RG \`$AZ_RESOURCE_GROUP\`" \
                             --arg severity "3" \
-                            '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber)}]')
+                            --arg observed_at "$log_error_timestamp" \
+                            '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber), "observed_at": $observed_at}]')
                     else
                         echo "✓ No recent errors in diagnostic logs"
                     fi
@@ -134,7 +141,8 @@ if APP_SERVICE_RESOURCE_ID=$(timeout 3s az webapp show --name "$APP_SERVICE_NAME
             --arg details "Diagnostic settings are not configured or could not be verified for this App Service" \
             --arg nextSteps "Configure diagnostic settings for \`$APP_SERVICE_NAME\` in RG \`$AZ_RESOURCE_GROUP\` to enable log collection" \
             --arg severity "4" \
-            '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber)}]')
+            --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+            '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber), "observed_at": $observed_at}]')
     fi
 else
     echo "ℹ Could not get App Service resource ID within timeout"

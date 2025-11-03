@@ -49,7 +49,8 @@ if ! az account set --subscription "$subscription_id"; then
         --arg details "Could not switch to subscription $subscription_id. Check subscription access" \
         --arg nextStep "Verify subscription access and authentication for \`$SUBSCRIPTION_NAME\`" \
         --arg severity "1" \
-        '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber)}]')
+        --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+        '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber), "observed_at": $observed_at}]')
     echo "$issues_json" > "$OUTPUT_FILE"
     echo "Subscription error. Results saved to $OUTPUT_FILE"
     exit 1
@@ -76,7 +77,8 @@ if ! resource_id=$(az webapp show --name "$APP_SERVICE_NAME" --resource-group "$
         --arg details "Could not find App Service $APP_SERVICE_NAME in resource group $AZ_RESOURCE_GROUP. Service may not exist or access may be restricted" \
         --arg nextStep "Verify App Service name and resource group exist, then check access permissions" \
         --arg severity "1" \
-        '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber)}]')
+        --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+        '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber), "observed_at": $observed_at}]')
     echo "$issues_json" > "$OUTPUT_FILE"
     echo "App Service not found. Results saved to $OUTPUT_FILE"
     exit 0
@@ -90,7 +92,8 @@ if [[ -z "$resource_id" ]]; then
         --arg details "App Service query returned empty resource ID. Service may not exist" \
         --arg nextStep "Verify App Service exists and is properly configured in the resource group" \
         --arg severity "1" \
-        '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber)}]')
+        --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+        '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber), "observed_at": $observed_at}]')
     echo "$issues_json" > "$OUTPUT_FILE"
     echo "Empty resource ID. Results saved to $OUTPUT_FILE"
     exit 0
@@ -141,7 +144,8 @@ if [[ "$app_service_state" != "Running" ]]; then
         --arg nextStep "Start the App Service immediately to restore service availability and check activity logs to identify who stopped the service" \
         --arg severity "1" \
         --arg details "App Service state: $app_service_state. Service is unavailable to users. This may be impacting production traffic." \
-        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]')
+        --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details, "observed_at": $observed_at}]')
     
     echo "Service is stopped - analyzing recent activities to identify who made this change..."
 fi
@@ -304,6 +308,7 @@ for operation in "${critical_operations[@]}"; do
                     --arg operation "$operation" \
                     --arg impact "$impact" \
                     --arg timestamp "$timestamp" \
+                    --arg observed_at "$timestamp" \
                     --argjson logs "$processed_critical" \
                     '.issues += [{
                         "title": $title, 
@@ -313,6 +318,7 @@ for operation in "${critical_operations[@]}"; do
                         "operation": $operation,
                         "impact": $impact,
                         "timestamp": $timestamp,
+                        "observed_at": $observed_at,
                         "details": $logs
                     }]'
                 )
@@ -371,12 +377,14 @@ for level in "${!log_levels[@]}"; do
                     --arg nextStep "Review the $level-level activity events to identify potential system issues or configuration problems" \
                     --arg severity "${log_levels[$level]}" \
                     --arg count "$activity_count" \
+                    --arg observed_at "${processed_details[0].eventTimestamp}" \
                     --argjson logs "$processed_details" \
                     '.issues += [{
                         "title": $title, 
                         "next_step": $nextStep, 
                         "severity": ($severity | tonumber), 
                         "activity_count": ($count | tonumber),
+                        "observed_at": $observed_at,
                         "details": $logs
                     }]'
                 )

@@ -14,6 +14,7 @@ Library             RW.K8sLog
 Library             OperatingSystem
 Library             String
 Library             Collections
+Library             DateTime
 
 Suite Setup         Suite Initialization
 
@@ -55,6 +56,7 @@ Analyze Application Log Patterns for DaemonSet `${DAEMONSET_NAME}` in Namespace 
             # Use the full issue details directly without summarization to preserve all log content
             ${issue_details_raw}=    Evaluate    $issue.get("details", "")
             ${issue_details_str}=    Convert To String    ${issue_details_raw}
+            ${issue_timestamp}=    Evaluate    $issue.get('observed_at', '')
             
             RW.Core.Add Issue
             ...    severity=${severity}
@@ -64,6 +66,7 @@ Analyze Application Log Patterns for DaemonSet `${DAEMONSET_NAME}` in Namespace 
             ...    reproduce_hint=Check application logs for daemonset `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
             ...    details=${issue_details_str}
             ...    next_steps=${issue.get('next_steps', 'Review application logs and resolve underlying issues')}
+            ...    observed_at=${issue_timestamp}
         END
     END
 
@@ -106,7 +109,8 @@ Detect Log Anomalies for DaemonSet `${DAEMONSET_NAME}` in Namespace `${NAMESPACE
         FOR    ${issue}    IN    @{anomaly_issues}
             ${summarized_details}=    RW.K8sLog.Summarize Log Issues    issue_details=${issue["details"]}
             ${next_steps_text}=    Catenate    SEPARATOR=\n    @{issue["next_steps"]}
-            
+            ${issue_timestamp}=    Evaluate    $issue.get('observed_at', '')
+
             RW.Core.Add Issue
             ...    severity=${issue["severity"]}
             ...    expected=No log anomalies should be present in DaemonSet `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
@@ -115,6 +119,7 @@ Detect Log Anomalies for DaemonSet `${DAEMONSET_NAME}` in Namespace `${NAMESPACE
             ...    reproduce_hint=Use RW.K8sLog.Analyze Log Anomalies keyword to reproduce this analysis
             ...    details=${summarized_details}
             ...    next_steps=${next_steps_text}
+            ...    observed_at=${issue_timestamp}
         END
     END
     
@@ -137,7 +142,7 @@ Identify Recent Configuration Changes for DaemonSet `${DAEMONSET_NAME}` in Names
     
     # Run configuration change analysis using bash script (matches other task patterns)
     ${config_analysis}=    RW.CLI.Run Cli
-    ...    cmd=bash track_daemonset_config_changes.sh "${DAEMONSET_NAME}" "${NAMESPACE}" "${CONTEXT}" "24h"
+    ...    cmd=bash track_daemonset_config_changes.sh "${DAEMONSET_NAME}" "${NAMESPACE}" "${CONTEXT}" "2100h"
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     
@@ -146,27 +151,27 @@ Identify Recent Configuration Changes for DaemonSet `${DAEMONSET_NAME}` in Names
     
     # Parse output for specific patterns and create issues if needed
     ${output}=    Set Variable    ${config_analysis.stdout}
+    ${lines}=    Split String    ${output}    \n
+    ${current_revision}=    Set Variable    Unknown
+    ${change_time}=    Set Variable    Unknown
+    
+    FOR    ${line}    IN    @{lines}
+        IF    "Current ControllerRevision:" in $line
+            # Extract ControllerRevision name (everything between "Current ControllerRevision: " and " (created:")
+            ${rev_part}=    Evaluate    "${line}".split("Current ControllerRevision: ")[1] if len("${line}".split("Current ControllerRevision: ")) > 1 else "Unknown"
+            ${current_revision}=    Evaluate    "${rev_part}".split(" (created:")[0] if " (created:" in "${rev_part}" else "${rev_part}"
+            
+            # Extract timestamp (everything between "(created: " and ",")
+            IF    "(created: " in $line
+                ${time_part}=    Evaluate    "${line}".split("(created: ")[1] if len("${line}".split("(created: ")) > 1 else "Unknown"
+                ${change_time}=    Evaluate    "${time_part}".split(",")[0] if "," in "${time_part}" else "${time_part}".split(")")[0] if ")" in "${time_part}" else "${time_part}"
+            END
+        END
+    END
     
     # Check for recent ControllerRevision changes
     IF    "Recent ControllerRevision change detected" in $output
         # Extract ControllerRevision information for issue creation
-        ${lines}=    Split String    ${output}    \n
-        ${current_revision}=    Set Variable    Unknown
-        ${change_time}=    Set Variable    Unknown
-        
-        FOR    ${line}    IN    @{lines}
-            IF    "Current ControllerRevision:" in $line
-                # Extract ControllerRevision name (everything between "Current ControllerRevision: " and " (created:")
-                ${rev_part}=    Evaluate    "${line}".split("Current ControllerRevision: ")[1] if len("${line}".split("Current ControllerRevision: ")) > 1 else "Unknown"
-                ${current_revision}=    Evaluate    "${rev_part}".split(" (created:")[0] if " (created:" in "${rev_part}" else "${rev_part}"
-                
-                # Extract timestamp (everything between "(created: " and ",")
-                IF    "(created: " in $line
-                    ${time_part}=    Evaluate    "${line}".split("(created: ")[1] if len("${line}".split("(created: ")) > 1 else "Unknown"
-                    ${change_time}=    Evaluate    "${time_part}".split(",")[0] if "," in "${time_part}" else "${time_part}".split(")")[0] if ")" in "${time_part}" else "${time_part}"
-                END
-            END
-        END
         
         # Check for container image changes
         IF    "Container Image Changes Detected" in $output
@@ -193,6 +198,7 @@ Identify Recent Configuration Changes for DaemonSet `${DAEMONSET_NAME}` in Names
             ...    reproduce_hint=Check ControllerRevision history for DaemonSet `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
             ...    details=Configuration Change Detected\n\nChange Type: Container Image Update\nTimestamp: ${change_time}\nCurrent Revision: ${current_revision}\n\nImage Changes:\n${image_details}\nThis change may be related to current DaemonSet issues. Verify the image update was intentional and check for known issues with the new image version.
             ...    next_steps=Verify the image update was intentional\nCheck if the new image version has known issues\nReview DaemonSet rolling update status\nMonitor pod updates across all nodes
+            ...    observed_at=${change_time}
         END
         
         # Check for environment variable changes
@@ -224,6 +230,7 @@ Identify Recent Configuration Changes for DaemonSet `${DAEMONSET_NAME}` in Names
             ...    reproduce_hint=Check ControllerRevision history for DaemonSet `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
             ...    details=Configuration Change Detected\n\nChange Type: Environment Variables Update\nTimestamp: ${change_time}\nCurrent Revision: ${current_revision}\n\nEnvironment Variable Changes:\n${env_details}\nThese environment variable changes may be related to current DaemonSet issues. Review the changes to ensure they align with expected configuration.
             ...    next_steps=Review recent environment variable changes\nVerify changes align with expected configuration\nCheck application logs for configuration-related errors\nMonitor pod updates across all nodes
+            ...    observed_at=${change_time}
         END
         
         # Check for resource requirement changes
@@ -253,6 +260,7 @@ Identify Recent Configuration Changes for DaemonSet `${DAEMONSET_NAME}` in Names
             ...    reproduce_hint=Check ControllerRevision history for DaemonSet `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
             ...    details=Configuration Change Detected\n\nChange Type: Resource Limits/Requests Update\nTimestamp: ${change_time}\nCurrent Revision: ${current_revision}\n\nResource Changes:\n${resource_details}\nThese resource limit changes may be related to current DaemonSet issues. Monitor resource utilization and verify the limits are appropriate for the workload running on all nodes.
             ...    next_steps=Monitor resource utilization after changes\nVerify resource limits are appropriate for workload\nCheck for resource constraint issues on nodes\nEnsure node capacity can handle new resource requirements\nMonitor pod updates across all nodes
+            ...    observed_at=${change_time}
         END
         
         # Check for node scheduling changes (DaemonSet-specific)
@@ -265,6 +273,7 @@ Identify Recent Configuration Changes for DaemonSet `${DAEMONSET_NAME}` in Names
             ...    reproduce_hint=Check ControllerRevision history for DaemonSet `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
             ...    details=Configuration Change Detected\n\nChange Type: Node Scheduling Update (nodeSelector/tolerations)\nTimestamp: ${change_time}\nCurrent Revision: ${current_revision}\n\nNode scheduling changes can affect which nodes the DaemonSet pods run on. This is critical for DaemonSets as they need to run on specific or all nodes.\n\nSee full analysis in report for scheduling details.
             ...    next_steps=Verify node scheduling changes are intentional\nCheck if pods are running on expected nodes\nValidate toleration changes don't exclude required nodes\nMonitor pod distribution across cluster nodes
+            ...    observed_at=${change_time}
         END
         
         # Check for host networking or security context changes (DaemonSet-specific)
@@ -277,6 +286,7 @@ Identify Recent Configuration Changes for DaemonSet `${DAEMONSET_NAME}` in Names
             ...    reproduce_hint=Check ControllerRevision history for DaemonSet `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
             ...    details=CRITICAL CONFIGURATION CHANGE DETECTED\n\nChange Type: Host Access Configuration (hostNetwork/securityContext)\nTimestamp: ${change_time}\nCurrent Revision: ${current_revision}\n\nWARNING: Changes to host networking or security context can have significant security and networking implications!\n\nSee full analysis in report for host access details.
             ...    next_steps=CRITICAL: Verify host access changes are authorized\nReview security implications of changes\nCheck network connectivity after hostNetwork changes\nValidate security context changes don't compromise security\nMonitor pod startup and host resource access
+            ...    observed_at=${change_time}
         END
     END
     
@@ -290,6 +300,7 @@ Identify Recent Configuration Changes for DaemonSet `${DAEMONSET_NAME}` in Names
         ...    reproduce_hint=Check DaemonSet generation vs observed generation for `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
         ...    details=Recent kubectl apply operation detected. The DaemonSet configuration has been updated but may still be processing.\n\nSee full analysis in report for generation gap details.
         ...    next_steps=Wait for controller to process changes\nCheck DaemonSet status and conditions\nVerify no resource constraints are preventing updates\nMonitor pod updates across all nodes
+        ...    observed_at=${change_time}
     END
     
     # Check for configuration drift
@@ -302,6 +313,8 @@ Identify Recent Configuration Changes for DaemonSet `${DAEMONSET_NAME}` in Names
         ...    reproduce_hint=Check DaemonSet generation vs observed generation for `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
         ...    details=Configuration drift detected. The DaemonSet has been modified but the controller hasn't processed all changes yet.\n\nSee full analysis in report for drift details.
         ...    next_steps=Wait for controller to process changes\nCheck DaemonSet status and conditions\nVerify no resource constraints are preventing updates\nMonitor pod updates across all nodes
+        ...    observed_at=${change_time}
+    END
 
 Check Liveness Probe Configuration for DaemonSet `${DAEMONSET_NAME}`
     [Documentation]    Validates if a Liveness probe has possible misconfigurations
@@ -323,6 +336,7 @@ Check Liveness Probe Configuration for DaemonSet `${DAEMONSET_NAME}`
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ${issue_timestamp}=    DateTime.Get Current Date
     
     # Check for command failure and create generic issue if needed
     IF    ${liveness_probe_health.returncode} != 0
@@ -334,6 +348,7 @@ Check Liveness Probe Configuration for DaemonSet `${DAEMONSET_NAME}`
         ...    reproduce_hint=${liveness_probe_health.cmd}
         ...    details=Validation script failed with exit code ${liveness_probe_health.returncode}:\n\nSTDOUT:\n${liveness_probe_health.stdout}\n\nSTDERR:\n${liveness_probe_health.stderr}
         ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm DaemonSet '${DAEMONSET_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
+        ...    observed_at=${issue_timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Failed to validate liveness probe:\n\n${liveness_probe_health.stderr}
         RW.Core.Add Pre To Report    Commands Used: ${liveness_probe_health.cmd}
@@ -351,6 +366,7 @@ Check Liveness Probe Configuration for DaemonSet `${DAEMONSET_NAME}`
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=Liveness Probe Configuration Issues with DaemonSet ${DAEMONSET_NAME}\n${liveness_probe_health.stdout}
             ...    next_steps=${recommendations.stdout}
+            ...    observed_at=${issue_timestamp}
         END
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Liveness probe testing results:\n\n${liveness_probe_health.stdout}
@@ -377,6 +393,7 @@ Check Readiness Probe Configuration for DaemonSet `${DAEMONSET_NAME}` in Namespa
     ...    include_in_history=False
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
+    ${issue_timestamp}=    DateTime.Get Current Date
     
     # Check for command failure and create generic issue if needed
     IF    ${readiness_probe_health.returncode} != 0
@@ -388,6 +405,7 @@ Check Readiness Probe Configuration for DaemonSet `${DAEMONSET_NAME}` in Namespa
         ...    reproduce_hint=${readiness_probe_health.cmd}
         ...    details=Validation script failed with exit code ${readiness_probe_health.returncode}:\n\nSTDOUT:\n${readiness_probe_health.stdout}\n\nSTDERR:\n${readiness_probe_health.stderr}
         ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm DaemonSet '${DAEMONSET_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
+        ...    observed_at=${issue_timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Failed to validate readiness probe:\n\n${readiness_probe_health.stderr}
         RW.Core.Add Pre To Report    Commands Used: ${readiness_probe_health.cmd}
@@ -405,6 +423,7 @@ Check Readiness Probe Configuration for DaemonSet `${DAEMONSET_NAME}` in Namespa
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=Readiness Probe Issues with DaemonSet ${DAEMONSET_NAME}\n${readiness_probe_health.stdout}
             ...    next_steps=${recommendations.stdout}
+            ...    observed_at=${issue_timestamp}
         END
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${readiness_probe_health.stdout}
@@ -420,7 +439,8 @@ Inspect DaemonSet Warning Events for `${DAEMONSET_NAME}` in Namespace `${NAMESPA
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
-    
+    ${issue_timestamp}=    DateTime.Get Current Date
+
     # Check for command failure and create generic issue if needed
     IF    ${events.returncode} != 0
         RW.Core.Add Issue
@@ -431,6 +451,7 @@ Inspect DaemonSet Warning Events for `${DAEMONSET_NAME}` in Namespace `${NAMESPA
         ...    reproduce_hint=${events.cmd}
         ...    details=Command failed with exit code ${events.returncode}:\n\nSTDOUT:\n${events.stdout}\n\nSTDERR:\n${events.stderr}
         ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm DaemonSet '${DAEMONSET_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
+        ...    observed_at=${issue_timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Failed to retrieve events:\n\n${events.stderr}
         RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -450,6 +471,7 @@ Inspect DaemonSet Warning Events for `${DAEMONSET_NAME}` in Namespace `${NAMESPA
             ...    reproduce_hint=${k8s_daemonset_details.cmd}
             ...    details=Command failed with exit code ${k8s_daemonset_details.returncode}:\n\nSTDOUT:\n${k8s_daemonset_details.stdout}\n\nSTDERR:\n${k8s_daemonset_details.stderr}
             ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm DaemonSet '${DAEMONSET_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
+            ...    observed_at=${issue_timestamp}
             ${history}=    RW.CLI.Pop Shell History
             RW.Core.Add Pre To Report    Failed to retrieve DaemonSet details:\n\n${k8s_daemonset_details.stderr}
             RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -473,6 +495,7 @@ Inspect DaemonSet Warning Events for `${DAEMONSET_NAME}` in Namespace `${NAMESPA
                     ...    reproduce_hint=${events.cmd}
                     ...    details=Warning events detected but JSON parsing failed. Raw output:\n${events.stdout}
                     ...    next_steps=Manually review events output and investigate warning conditions\n${related_resource_recommendations}
+                    ...    observed_at=${issue_timestamp}
                 END
             END
             
@@ -485,9 +508,10 @@ Inspect DaemonSet Warning Events for `${DAEMONSET_NAME}` in Namespace `${NAMESPA
                 FOR    ${item}    IN    @{object_list}
                     ${message_string}=    Catenate    SEPARATOR;    @{item["messages"]}
                     ${messages}=    RW.K8sHelper.Sanitize Messages    ${message_string}
+                    ${event_timestamp}=    Set Variable    ${item["firstTimestamp"]}
                     ${issues}=    RW.CLI.Run Bash File
                     ...    bash_file=workload_issues.sh
-                    ...    cmd_override=./workload_issues.sh "${messages}" "DaemonSet" "${DAEMONSET_NAME}"
+                    ...    cmd_override=./workload_issues.sh "${messages}" "DaemonSet" "${DAEMONSET_NAME}" "${event_timestamp}"
                     ...    env=${env}
                     ...    include_in_history=False
                     
@@ -545,6 +569,7 @@ Inspect DaemonSet Warning Events for `${DAEMONSET_NAME}` in Namespace `${NAMESPA
                     ...    reproduce_hint=${events.cmd}
                     ...    details=**Affected Pods:** ${pod_count}\n\n${consolidated_pod_details}
                     ...    next_steps=${sample_pod_issue["next_steps"]}\n${related_resource_recommendations}
+                    ...    observed_at=${sample_pod_issue["observed_at"]}
                 END
                 
                 # Create issues for DaemonSet-level problems
@@ -563,6 +588,7 @@ Inspect DaemonSet Warning Events for `${DAEMONSET_NAME}` in Namespace `${NAMESPA
                         ...    reproduce_hint=${events.cmd}
                         ...    details=${issue["details"]}
                         ...    next_steps=${issue["next_steps"]}\n${related_resource_recommendations}
+                        ...    observed_at=${issue["observed_at"]}
                     END
                 END
             END
@@ -582,7 +608,7 @@ Fetch DaemonSet Workload Details For `${DAEMONSET_NAME}` in Namespace `${NAMESPA
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
-    
+    ${issue_timestamp}=    DateTime.Get Current Date
     # Check for command failure and create generic issue if needed
     IF    ${daemonset.returncode} != 0
         RW.Core.Add Issue
@@ -593,6 +619,7 @@ Fetch DaemonSet Workload Details For `${DAEMONSET_NAME}` in Namespace `${NAMESPA
         ...    reproduce_hint=${daemonset.cmd}
         ...    details=Command failed with exit code ${daemonset.returncode}:\n\nSTDOUT:\n${daemonset.stdout}\n\nSTDERR:\n${daemonset.stderr}
         ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm DaemonSet '${DAEMONSET_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
+        ...    observed_at=${issue_timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Failed to retrieve DaemonSet manifest:\n\n${daemonset.stderr}
         RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -621,7 +648,7 @@ Inspect DaemonSet Status for `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
     ...    env=${env}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
-    
+    ${issue_timestamp}=    DateTime.Get Current Date
     # Check for command failure and create generic issue if needed
     IF    ${daemonset_status.returncode} != 0
         RW.Core.Add Issue
@@ -632,6 +659,7 @@ Inspect DaemonSet Status for `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
         ...    reproduce_hint=${daemonset_status.cmd}
         ...    details=Command failed with exit code ${daemonset_status.returncode}:\n\nSTDOUT:\n${daemonset_status.stdout}\n\nSTDERR:\n${daemonset_status.stderr}
         ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm DaemonSet '${DAEMONSET_NAME}' exists in the namespace\nCheck cluster connectivity and authentication
+        ...    observed_at=${issue_timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Failed to retrieve DaemonSet status:\n\n${daemonset_status.stderr}
         RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -664,6 +692,7 @@ Inspect DaemonSet Status for `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=DaemonSet `${DAEMONSET_NAME}` has ${number_ready} ready pods and needs ${desired_scheduled} scheduled across nodes
             ...    next_steps=${item_next_steps.stdout}
+            ...    observed_at=${issue_timestamp}
         ELSE IF    ${number_ready} < ${desired_scheduled}
             RW.Core.Add Issue
             ...    severity=3
@@ -673,6 +702,7 @@ Inspect DaemonSet Status for `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=DaemonSet `${DAEMONSET_NAME}` has ${number_ready}/${desired_scheduled} ready pods. Scheduled: ${current_scheduled}, Unavailable: ${number_unavailable}
             ...    next_steps=Check node status and conditions\nVerify DaemonSet tolerations and node selectors\nInvestigate pod events and container restarts\nCheck node resource availability
+            ...    observed_at=${issue_timestamp}
         ELSE IF    ${number_unavailable} > 0
             RW.Core.Add Issue
             ...    severity=3
@@ -682,6 +712,7 @@ Inspect DaemonSet Status for `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=DaemonSet `${DAEMONSET_NAME}` has ${number_unavailable} unavailable pods out of ${desired_scheduled} desired
             ...    next_steps=Check pod status and events\nInvestigate node conditions and taints\nReview DaemonSet tolerations and node selectors
+            ...    observed_at=${issue_timestamp}
         ELSE IF    ${number_misscheduled} > 0
             RW.Core.Add Issue
             ...    severity=3
@@ -691,6 +722,7 @@ Inspect DaemonSet Status for `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=DaemonSet `${DAEMONSET_NAME}` has ${number_misscheduled} pods running on nodes where they shouldn't
             ...    next_steps=Review DaemonSet node selectors and tolerations\nCheck node labels and taints\nInvestigate pod placement policies
+            ...    observed_at=${issue_timestamp}
         END
         
         ${history}=    RW.CLI.Pop Shell History
@@ -714,7 +746,7 @@ Check Node Affinity and Tolerations for DaemonSet `${DAEMONSET_NAME}` in Namespa
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
-    
+    ${issue_timestamp}=    DateTime.Get Current Date
     # Check for command failure and create generic issue if needed
     IF    ${node_constraints.returncode} != 0
         RW.Core.Add Issue
@@ -725,6 +757,7 @@ Check Node Affinity and Tolerations for DaemonSet `${DAEMONSET_NAME}` in Namespa
         ...    reproduce_hint=${node_constraints.cmd}
         ...    details=Command failed with exit code ${node_constraints.returncode}:\n\nSTDOUT:\n${node_constraints.stdout}\n\nSTDERR:\n${node_constraints.stderr}
         ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nCheck cluster connectivity and authentication\nVerify sufficient permissions to view DaemonSets
+        ...    observed_at=${issue_timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Failed to retrieve node constraints:\n\n${node_constraints.stderr}
         RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -757,6 +790,7 @@ Check Node Affinity and Tolerations for DaemonSet `${DAEMONSET_NAME}` in Namespa
             ...    reproduce_hint=${node_constraints.cmd}
             ...    details=DaemonSet ${DAEMONSET_NAME} has no tolerations, which may prevent it from running on tainted nodes
             ...    next_steps=Review cluster node taints\nAdd appropriate tolerations to DaemonSet if needed\nVerify desired node scheduling behavior
+            ...    observed_at=${issue_timestamp}
         END
         
         IF    $affinity and len($affinity) > 0

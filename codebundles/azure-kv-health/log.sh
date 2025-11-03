@@ -43,11 +43,13 @@ if ! keyvaults=$(az keyvault list -g "$AZURE_RESOURCE_GROUP" --subscription "$AZ
         --arg details "$err_msg" \
         --arg severity "4" \
         --arg nextStep "Check if the resource group exists and you have the right CLI permissions." \
+        --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
         '.issues += [{
            "title": $title,
            "details": $details,
            "next_step": $nextStep,
-           "severity": ($severity | tonumber)
+           "severity": ($severity | tonumber),
+           "observed_at": $observed_at
         }]')
     echo "$issues_json" > "$OUTPUT_FILE"
     exit 1
@@ -74,13 +76,15 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
             --arg details "No diagnostic settings send logs to Log Analytics. $err_msg" \
             --arg severity "4" \
             --arg nextStep "Configure a diagnostic setting to forward Key Vault \`$name\` logs to Log Analytics in Resource Group \`$AZURE_RESOURCE_GROUP\`" \
+            --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
             --arg resource_url "$resource_url" \
             '.issues += [{
                "title": $title,
                "details": $details,
                "next_step": $nextStep,
                "severity": ($severity | tonumber),
-               "resource_url": $resource_url
+               "resource_url": $resource_url,
+               "observed_at": $observed_at
              }]')
         continue
     fi
@@ -100,12 +104,14 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
                 --arg severity "1" \
                 --arg nextStep "Configure at least one setting to send logs to Log Analytics for Key Vault \`$name\` in Resource Group \`$AZURE_RESOURCE_GROUP\`" \
                 --arg resource_url "$resource_url" \
+                --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
                 '.issues += [{
                    "title": $title,
                    "details": $details,
                    "next_step": $nextStep,
                    "severity": ($severity | tonumber),
-                   "resource_url": $resource_url
+                   "resource_url": $resource_url,
+                   "observed_at": $observed_at
                  }]')
             continue
         fi
@@ -123,12 +129,14 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
                 --arg severity "1" \
                 --arg nextStep "Check if you have Reader or higher role on the workspace resource. Also verify it is a valid workspace ID." \
                 --arg resource_url "$resource_url" \
+                --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
                 '.issues += [{
                    "title": $title,
                    "details": $details,
                    "next_step": $nextStep,
                    "severity": ($severity | tonumber),
-                   "resource_url": $resource_url
+                   "resource_url": $resource_url,
+                   "observed_at": $observed_at
                  }]')
             continue
         fi
@@ -148,12 +156,14 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
                 --arg severity "1" \
                 --arg nextStep "Verify query syntax, aggregator, or ensure the workspace has logs." \
                 --arg resource_url "$resource_url" \
+                --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
                 '.issues += [{
                    "title": $title,
                    "details": $details,
                    "next_step": $nextStep,
                    "severity": ($severity | tonumber),
-                   "resource_url": $resource_url
+                   "resource_url": $resource_url,
+                   "observed_at": $observed_at
                  }]')
             continue
         fi
@@ -190,7 +200,7 @@ for row in $(echo "${keyvaults}" | jq -c '.[]'); do
                         userAgent: .[0].userAgent_s,
                         resultDescription: .[0].ResultDescription,
                         count: length
-                    })
+                    }) | sort_by(.timestamp)
                 ')
                 nextStep=$(cat <<EOF
 Verify identity permissions in access policies and RBAC in resource group \`$AZURE_RESOURCE_GROUP\`
@@ -207,12 +217,14 @@ EOF
                     --arg severity "3" \
                     --arg nextStep "$nextStep" \
                     --arg resource_url "$resource_url" \
+                    --arg observed_at "$(echo "$details_json" | jq -r '.[0].timestamp')" \
                     '.issues += [{
                     "title": $title,
                     "details": $details,
                     "next_step": $nextStep,
                     "severity": ($severity | tonumber),
-                    "resource_url": $resource_url
+                    "resource_url": $resource_url,
+                    "observed_at": $observed_at
                     }]')
             fi
 
@@ -228,8 +240,9 @@ EOF
                         clientIP: .[0].CallerIPAddress,
                         resultDescription: .[0].ResultDescription,
                         vaultName: .[0].eventGridEventProperties_data_VaultName_s,
-                        count: length
-                    })
+                        count: length,
+                        timestamp: .[0].TimeGenerated
+                    }) | sort_by(.timestamp)
                 ')
 
                 issues_json=$(echo "$issues_json" | jq \
@@ -238,12 +251,14 @@ EOF
                     --arg severity "3" \
                     --arg nextStep "Review Key vault client retry logic.\n Split workloads across multiple key vaults if needed." \
                     --arg resource_url "$resource_url" \
+                    --arg observed_at "$(echo "$details_json" | jq -r '.[0].timestamp')" \
                     '.issues += [{
                     "title": $title,
                     "details": $details,
                     "next_step": $nextStep,
                     "severity": ($severity | tonumber),
-                    "resource_url": $resource_url
+                    "resource_url": $resource_url,
+                    "observed_at": $observed_at
                     }]')
             fi
 
@@ -262,8 +277,9 @@ EOF
                         resourceGroup: .resource_resourceGroupName_s,
                         subscriptionId: .resource_subscriptionId_g,
                         lastAccess: (.secretProperties_attributes_updated_d // .keyProperties_attributes_updated_d),
-                        operations: (.keyProperties_operations_s // "N/A")
-                    })
+                        operations: (.keyProperties_operations_s // "N/A"),
+                        timestamp: .TimeGenerated
+                    }) | sort_by(.timestamp)
                 ')
                 
                 issues_json=$(echo "$issues_json" | jq \
@@ -272,12 +288,14 @@ EOF
                     --arg severity "3" \
                     --arg nextStep "1. Review and rotate expired secrets/keys. 2. Check last access time to determine usage. 3. Verify if keys/secrets are still enabled. 4. Consider implementing automatic rotation. 5. Review operations history to understand usage patterns. 6. Check if associated resources still need these credentials." \
                     --arg resource_url "$resource_url" \
+                    --arg observed_at "$(echo "$details_json" | jq -r '.[0].timestamp')" \
                     '.issues += [{
                        "title": $title,
                        "details": $details,
                        "next_step": $nextStep,
                        "severity": ($severity | tonumber),
-                       "resource_url": $resource_url
+                       "resource_url": $resource_url,
+                       "observed_at": $observed_at
                      }]')
             fi
         fi
