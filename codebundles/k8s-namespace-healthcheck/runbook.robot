@@ -619,6 +619,12 @@ Suite Initialization
     ...    pattern=((\d+?)m)?
     ...    example=4h
     ...    default=4h
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Import User Variable    RW_LOOKBACK_WINDOW
+    ...    type=string
+    ...    description=The time window (in (h) hours or (m) minutes) to look back for time-sensitive issues like failed pods, pending pods, workload status conditions, and event anomalies. Resources with issues older than this window will be ignored.
+    ...    pattern=\w*
+    ...    example=1h
+    ...    default=1h
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
@@ -626,6 +632,7 @@ Suite Initialization
     Set Suite Variable    ${EVENT_AGE}    ${EVENT_AGE}
     Set Suite Variable    ${ANOMALY_THRESHOLD}    ${ANOMALY_THRESHOLD}
     Set Suite Variable    ${CONTAINER_RESTART_AGE}    ${CONTAINER_RESTART_AGE}
+    Set Suite Variable    ${RW_LOOKBACK_WINDOW}    ${RW_LOOKBACK_WINDOW}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "CONTAINER_RESTART_AGE": "${CONTAINER_RESTART_AGE}", "EVENT_AGE": "${EVENT_AGE}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "CONTAINER_RESTART_AGE": "${CONTAINER_RESTART_AGE}", "EVENT_AGE": "${EVENT_AGE}", "RW_LOOKBACK_WINDOW": "${RW_LOOKBACK_WINDOW}"}
