@@ -35,8 +35,12 @@ ISSUES_TMP="$TEMP_DIR/aks_cost_optimization_issues_$$.json"
 echo -n "[" > "$ISSUES_TMP"
 first_issue=true
 
-# Cleanup function
+# Cleanup function - ensure valid JSON is always created
 cleanup() {
+    # If script exits with error, ensure we have a valid empty JSON file
+    if [[ ! -f "$ISSUES_FILE" ]] || [[ ! -s "$ISSUES_FILE" ]]; then
+        echo '[]' > "$ISSUES_FILE"
+    fi
     rm -f "$ISSUES_TMP" 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -166,7 +170,8 @@ CLUSTER_DETAILS=$(az aks show --name "$AKS_CLUSTER" --resource-group "$AZ_RESOUR
 if [[ -z "$CLUSTER_DETAILS" || "$CLUSTER_DETAILS" == "null" ]]; then
     log "❌ Failed to retrieve cluster details"
     echo '[]' > "$ISSUES_FILE"
-    exit 1
+    progress "Analysis completed with errors - no cluster details available"
+    exit 0  # Exit successfully with empty results rather than failing
 fi
 
 CLUSTER_ID=$(echo "$CLUSTER_DETAILS" | jq -r '.id')
@@ -183,11 +188,13 @@ NODE_POOLS=$(echo "$CLUSTER_DETAILS" | jq -r '.agentPoolProfiles[]')
 if [[ -z "$NODE_POOLS" || "$NODE_POOLS" == "null" ]]; then
     log "❌ No node pools found"
     echo '[]' > "$ISSUES_FILE"
-    exit 1
+    progress "Analysis completed - no node pools to analyze"
+    exit 0  # Exit successfully with empty results
 fi
 
 # Process each node pool
-echo "$CLUSTER_DETAILS" | jq -c '.agentPoolProfiles[]' | while read -r pool_data; do
+# Use process substitution to avoid subshell issues with pipe
+while read -r pool_data; do
     POOL_NAME=$(echo "$pool_data" | jq -r '.name')
     VM_SIZE=$(echo "$pool_data" | jq -r '.vmSize')
     NODE_COUNT=$(echo "$pool_data" | jq -r '.count')
@@ -270,9 +277,10 @@ echo "$CLUSTER_DETAILS" | jq -c '.agentPoolProfiles[]' | while read -r pool_data
     MEMORY_VALUES=$(echo "$MEMORY_METRICS" | jq -r '.value[0].timeseries[0].data[]?.average // empty' | grep -v '^$' || echo "")
     
     if [[ -n "$CPU_VALUES" ]]; then
-        # Calculate statistics from CPU values
-        CPU_STATS=$(echo "$CPU_VALUES" | awk '
-        BEGIN { sum=0; count=0; max=0; values[1] }
+        # Calculate statistics from CPU values using portable approach
+        # Sort values and calculate statistics without using asort (not available in all awk versions)
+        CPU_STATS=$(echo "$CPU_VALUES" | sort -n | awk '
+        BEGIN { sum=0; count=0; max=0 }
         { 
             values[++count] = $1
             sum += $1
@@ -281,8 +289,7 @@ echo "$CLUSTER_DETAILS" | jq -c '.agentPoolProfiles[]' | while read -r pool_data
         END {
             if (count > 0) {
                 avg = sum/count
-                # Sort for percentile calculation
-                asort(values)
+                # Calculate 95th percentile from sorted values
                 p95_idx = int(count * 0.95)
                 if (p95_idx < 1) p95_idx = 1
                 p95 = values[p95_idx]
@@ -417,7 +424,7 @@ RISK ASSESSMENT:
     fi
     
     hr
-done
+done < <(echo "$CLUSTER_DETAILS" | jq -c '.agentPoolProfiles[]')
 
 # Finalize issues JSON
 echo "]" >> "$ISSUES_TMP"

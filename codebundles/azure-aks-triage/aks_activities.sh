@@ -40,10 +40,18 @@ tenant_id=$(az account show --query "tenantId" -o tsv)
 
 
 echo "Azure AKS $AKS_CLUSTER activity logs (recent):"
-# Get the activity logs of the vm scaled set
-resource_id=$(az aks show --name $AKS_CLUSTER --resource-group $AZ_RESOURCE_GROUP --subscription $subscription --query "id")
+# Get the activity logs of the AKS cluster
+resource_id=$(az aks show --name $AKS_CLUSTER --resource-group $AZ_RESOURCE_GROUP --subscription $subscription --query "id" -o tsv)
 
-az monitor activity-log list --resource-id $resource_id --start-time "$start_time" --end-time "$end_time" --resource-group $AZ_RESOURCE_GROUP --output table
+if [[ -z "$resource_id" || "$resource_id" == "null" ]]; then
+    echo "❌ Failed to get AKS cluster resource ID"
+    # Create empty issues file and exit gracefully
+    echo '{"issues": []}' > "aks_activities_issues.json"
+    exit 0
+fi
+
+echo "AKS Cluster Resource ID: $resource_id"
+az monitor activity-log list --resource-id "$resource_id" --start-time "$start_time" --end-time "$end_time" --output table
 
 # Generate the event log URL
 event_log_url="https://portal.azure.com/#@$tenant_id/resource/subscriptions/$subscription/resourceGroups/$AZ_RESOURCE_GROUP/providers/Microsoft.ContainerService/managedClusters/$AKS_CLUSTER/eventlogs"
@@ -59,8 +67,8 @@ declare -A log_levels=( ["Critical"]="1" ["Error"]="2" ["Warning"]="4" )
 
 # Check for each log level in activity logs and add structured issues to issues_json
 for level in "${!log_levels[@]}"; do
-    # Use a refined query to gather detailed log entries within the time range
-    details=$(az monitor activity-log list --resource-id $resource_id --start-time "$start_time" --end-time "$end_time" --resource-group $AZ_RESOURCE_GROUP --query "[?level=='$level']" -o json | jq -c "[.[] | {
+    # Use a refined query to gather detailed log entries within the time range for the AKS cluster
+    details=$(az monitor activity-log list --resource-id "$resource_id" --start-time "$start_time" --end-time "$end_time" --query "[?level=='$level']" -o json | jq -c "[.[] | {
         eventTimestamp,
         caller,
         level,
@@ -83,8 +91,8 @@ for level in "${!log_levels[@]}"; do
     if [[ $(echo "$details" | jq length) -gt 0 ]]; then
         # Build the issue entry and add it to the issues array in issues_json
         issues_json=$(echo "$issues_json" | jq \
-            --arg title "$level level issues detected for VM Scale Set \`$AKS_CLUSTER\` in Azure Resource Group \`$AZ_RESOURCE_GROUP\`" \
-            --arg nextStep "Check the $level-level activity logs for Azure resource \`$AKS_CLUSTER\` in resource group \`$AZ_RESOURCE_GROUP\`. [Activity log URL]($event_log_url)" \
+            --arg title "$level level issues detected for AKS Cluster \`$AKS_CLUSTER\` in Azure Resource Group \`$AZ_RESOURCE_GROUP\`" \
+            --arg nextStep "Check the $level-level activity logs for AKS cluster \`$AKS_CLUSTER\` in resource group \`$AZ_RESOURCE_GROUP\`. [Activity log URL]($event_log_url)" \
             --arg severity "${log_levels[$level]}" \
             --argjson logs "$details" \
             '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $logs}]'
@@ -93,4 +101,16 @@ for level in "${!log_levels[@]}"; do
 done
 
 # Save the structured JSON data to issues.json
+# Ensure the JSON is always valid, even if empty
+if [[ -z "$issues_json" ]]; then
+    issues_json='{"issues": []}'
+fi
+
 echo "$issues_json" > "aks_activities_issues.json"
+
+# Also ensure the file exists and is valid JSON
+if [[ ! -f "aks_activities_issues.json" ]] || ! jq empty "aks_activities_issues.json" 2>/dev/null; then
+    echo '{"issues": []}' > "aks_activities_issues.json"
+fi
+
+echo "Issues file created: aks_activities_issues.json"
