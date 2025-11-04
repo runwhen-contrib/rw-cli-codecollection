@@ -131,13 +131,36 @@ Inspect Warning Events in Namespace `${NAMESPACE}`
                     # Adjust severity based on current workload health for deployments
                     ${adjusted_severity}=    Set Variable    ${issue["severity"]}
                     IF    "${owner_kind}" == "Deployment" and '''${workload_health}''' != '''**Current Status:** Unable to retrieve'''
-                        # Check if deployment is healthy (has ready replicas and is available)
-                        ${has_zero_ready}=    Evaluate    __import__('re').search(r'\b0/\d+\s+ready replicas', '''${workload_health}''') is not None    modules=re
-                        ${is_healthy}=    Evaluate    "ready replicas" in '''${workload_health}''' and "True" in '''${workload_health}''' and not ${has_zero_ready}
+                        # Extract replica counts for scheduling failure analysis
+                        ${ready_replicas_match}=    Evaluate    __import__('re').search(r'(\d+)/(\d+)\s+ready replicas', '''${workload_health}''')    modules=re
+                        ${ready_count}=    Set Variable    0
+                        ${desired_count}=    Set Variable    0
+                        IF    ${ready_replicas_match} is not None
+                            ${ready_count}=    Evaluate    int($ready_replicas_match.group(1))
+                            ${desired_count}=    Evaluate    int($ready_replicas_match.group(2))
+                        END
                         
-                        # Lower severity for probe failures when deployment is healthy
+                        # Check if deployment is healthy (has ready replicas and is available)
+                        ${has_zero_ready}=    Evaluate    ${ready_count} == 0
+                        ${has_expected_replicas}=    Evaluate    ${ready_count} == ${desired_count}
+                        ${is_available}=    Evaluate    "Available: True" in '''${workload_health}'''
+                        ${is_healthy}=    Evaluate    ${has_expected_replicas} and ${is_available}
+                        
+                        # Detect scheduling failures vs other issues
+                        ${is_scheduling_issue}=    Evaluate    "nodes are available" in '''${issue["title"]}'''.lower() or "insufficient" in '''${issue["title"]}'''.lower() or "scheduling" in '''${issue["title"]}'''.lower()
                         ${is_probe_issue}=    Evaluate    "probe failures" in '''${issue["title"]}'''.lower()
-                        IF    ${is_healthy} and ${is_probe_issue}
+                        
+                        # Adjust severity for scheduling failures based on replica health
+                        IF    ${is_scheduling_issue}
+                            IF    ${has_expected_replicas}
+                                ${adjusted_severity}=    Set Variable    4
+                                Log    Lowering severity to 4 for scheduling issues when deployment ${owner_name} has expected replicas (${ready_count}/${desired_count})
+                            ELSE
+                                ${adjusted_severity}=    Set Variable    3
+                                Log    Setting severity to 3 for scheduling issues when deployment ${owner_name} has fewer than expected replicas (${ready_count}/${desired_count})
+                            END
+                        # Lower severity for probe failures when deployment is healthy
+                        ELSE IF    ${is_probe_issue} and ${is_healthy}
                             ${adjusted_severity}=    Set Variable    4
                             Log    Lowering severity to 4 for probe failures in healthy deployment ${owner_name}
                         END
