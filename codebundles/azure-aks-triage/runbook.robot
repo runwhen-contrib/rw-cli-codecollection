@@ -104,7 +104,7 @@ Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOUR
 
     RW.Core.Add Pre To Report    ${activites.stdout}
 
-    ${issues}=    RW.CLI.Run Cli    cmd=cat aks_activities_issues.json
+    ${issues}=    RW.CLI.Run Cli    cmd=cat ${OUTPUT DIR}/aks_activities_issues.json
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
