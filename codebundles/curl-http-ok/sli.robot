@@ -26,18 +26,25 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=1.2
     ...    example=1.2
-    ${DESIRED_RESPONSE_CODE}=    RW.Core.Import User Variable    DESIRED_RESPONSE_CODE
+    ${ACCEPTABLE_RESPONSE_CODES}=    RW.Core.Import User Variable    ACCEPTABLE_RESPONSE_CODES
     ...    type=string
-    ...    description=The response code that indicates success.
+    ...    description=Comma-separated list of HTTP response codes that indicate success and connectivity (e.g., 200,201,202,204,301,302,307,401,403).
     ...    pattern=\w*
-    ...    default=200
-    ...    example=200
+    ...    default=200,201,202,204,301,302,307,401,403
+    ...    example=200,201,202,204,301,302,307,401,403
     ${VERIFY_SSL}=    RW.Core.Import User Variable    VERIFY_SSL
     ...    type=string
     ...    description=Whether to verify SSL certificates. Set to 'false' to ignore SSL certificate errors.
     ...    pattern=\w*
     ...    default=false
     ...    example=true
+    
+    # Set suite variables for use in keywords
+    Set Suite Variable    ${URLS}    ${URLS}
+    Set Suite Variable    ${TARGET_LATENCY}    ${TARGET_LATENCY}
+    Set Suite Variable    ${ACCEPTABLE_RESPONSE_CODES}    ${ACCEPTABLE_RESPONSE_CODES}
+    Set Suite Variable    ${VERIFY_SSL}    ${VERIFY_SSL}
+
 *** Tasks ***
 Validate HTTP URL Availability and Timeliness
     [Documentation]    Use cURL to validate single or multiple http responses
@@ -95,8 +102,9 @@ Test Single URL
             # Check for connection failures (HTTP 000 status code)
             ${connection_success}=    Evaluate    1 if "${status_code}" != "000" else 0
             
-            # Check if HTTP status code matches desired response code
-            ${http_ok}=    Evaluate    1 if "${status_code}" == "${DESIRED_RESPONSE_CODE}" else 0
+            # Check if HTTP status code is in acceptable response codes list
+            ${acceptable_codes_list}=    Evaluate    [code.strip() for code in "${ACCEPTABLE_RESPONSE_CODES}".split(',')]
+            ${http_ok}=    Evaluate    1 if "${status_code}" in ${acceptable_codes_list} else 0
             
             # Check if latency is within target
             ${latency_within_target}=    Evaluate    1 if ${latency} <= ${TARGET_LATENCY} else 0

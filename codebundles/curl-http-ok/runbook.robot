@@ -81,20 +81,25 @@ Check Single HTTP URL
             ...    reproduce_hint=Run: ${curl_rsp.cmd}
             ...    details=${test_url} returned HTTP status code 000, indicating a connection failure.\n\nCurl Response: ${curl_rsp.stdout}\nCurl Exit Code: ${curl_rsp.returncode}\nCurl Stderr: ${curl_rsp.stderr}\n\nThis typically means:\n- The server is unreachable\n- DNS resolution failed\n- Connection was refused\n- SSL/TLS handshake failed\n- Network timeout occurred\n\nThis is different from HTTP error codes (4xx, 5xx) as it indicates the HTTP request never completed successfully.
             ...    next_steps=Check ${owner_kind.stdout} `${owner_name.stdout}` Status and Readiness\nVerify Service Endpoints and Load Balancer Configuration\nCheck Network Policies and Ingress Rules\nInspect Pod Health and Resource Availability
-        ELSE IF    "${json['http_code']}" != "${DESIRED_RESPONSE_CODE}"
-            RW.Core.Add Issue
-            ...    severity=4
-            ...    title=HTTP response code does not match desired response code ${DESIRED_RESPONSE_CODE} for ${owner_kind.stdout} `${owner_name.stdout}` at ${test_url}
-            ...    expected=HTTP response code should be ${DESIRED_RESPONSE_CODE}
-            ...    actual=Received HTTP response code ${json['http_code']}
-            ...    reproduce_hint=Run: ${curl_rsp.cmd}
-            ...    details=${test_url} responded with HTTP status code ${json['http_code']} instead of expected ${DESIRED_RESPONSE_CODE}.\n\nDetailed Timing Information:\n- DNS Lookup Time: ${json.get('time_namelookup', 'N/A')}s\n- Connection Time: ${json.get('time_connect', 'N/A')}s\n- SSL Handshake Time: ${json.get('time_appconnect', 'N/A')}s\n- Time to First Byte: ${json.get('time_starttransfer', 'N/A')}s\n- Total Time: ${json.get('time_total', 'N/A')}s\n- Remote IP: ${json.get('remote_ip', 'N/A')}:${json.get('remote_port', 'N/A')}\n- Local IP: ${json.get('local_ip', 'N/A')}:${json.get('local_port', 'N/A')}\n- Download Size: ${json.get('size_download', 'N/A')} bytes\n- Download Speed: ${json.get('speed_download', 'N/A')} bytes/sec\n\nCurl Response: ${curl_rsp.stdout}\n\nHTTP Status Code Meanings:\n- 1xx: Informational responses\n- 2xx: Success responses\n- 3xx: Redirection messages\n- 4xx: Client error responses (check URL, authentication, permissions)\n- 5xx: Server error responses (check server health, resources)\n\nCheck related ingress objects, services, and pods.
-            ...    next_steps=Check ${owner_kind.stdout} Log for Issues with `${owner_name.stdout}`\n Troubleshoot Warning Events in Namespace `${owner_namespace.stdout}`\nQuery Traces for HTTP Errors in Namespace `${owner_namespace.stdout}`
+        ELSE
+            # Check if HTTP status code is in acceptable response codes list
+            ${acceptable_codes_list}=    Evaluate    [code.strip() for code in "${ACCEPTABLE_RESPONSE_CODES}".split(',')]
+            ${http_code_acceptable}=    Evaluate    "${json['http_code']}" in ${acceptable_codes_list}
+            IF    not ${http_code_acceptable}
+                RW.Core.Add Issue
+                ...    severity=4
+                ...    title=HTTP response code does not match acceptable response codes ${ACCEPTABLE_RESPONSE_CODES} for ${owner_kind.stdout} `${owner_name.stdout}` at ${test_url}
+                ...    expected=HTTP response code should be one of: ${ACCEPTABLE_RESPONSE_CODES}
+                ...    actual=Received HTTP response code ${json['http_code']}
+                ...    reproduce_hint=Run: ${curl_rsp.cmd}
+                ...    details=${test_url} responded with HTTP status code ${json['http_code']} instead of acceptable codes ${ACCEPTABLE_RESPONSE_CODES}.\n\nDetailed Timing Information:\n- DNS Lookup Time: ${json.get('time_namelookup', 'N/A')}s\n- Connection Time: ${json.get('time_connect', 'N/A')}s\n- SSL Handshake Time: ${json.get('time_appconnect', 'N/A')}s\n- Time to First Byte: ${json.get('time_starttransfer', 'N/A')}s\n- Total Time: ${json.get('time_total', 'N/A')}s\n- Remote IP: ${json.get('remote_ip', 'N/A')}:${json.get('remote_port', 'N/A')}\n- Local IP: ${json.get('local_ip', 'N/A')}:${json.get('local_port', 'N/A')}\n- Download Size: ${json.get('size_download', 'N/A')} bytes\n- Download Speed: ${json.get('speed_download', 'N/A')} bytes/sec\n\nCurl Response: ${curl_rsp.stdout}\n\nHTTP Status Code Meanings:\n- 1xx: Informational responses\n- 2xx: Success responses\n- 3xx: Redirection messages\n- 4xx: Client error responses (check URL, authentication, permissions)\n- 5xx: Server error responses (check server health, resources)\n\nCheck related ingress objects, services, and pods.
+                ...    next_steps=Check ${owner_kind.stdout} Log for Issues with `${owner_name.stdout}`\n Troubleshoot Warning Events in Namespace `${owner_namespace.stdout}`\nQuery Traces for HTTP Errors in Namespace `${owner_namespace.stdout}`
+            END
         END
         
-        # Check latency only if connection was successful and no other issues found
+        # Check latency only if connection was successful and HTTP code is acceptable
         ${latency}=    Set Variable    ${json['time_total']}
-        IF    "${json['http_code']}" != "000" and ${latency} > ${TARGET_LATENCY}
+        IF    "${json['http_code']}" != "000" and ${http_code_acceptable} and ${latency} > ${TARGET_LATENCY}
             RW.Core.Add Issue
             ...    severity=4
             ...    title=HTTP latency exceeded target latency for ${owner_kind.stdout} `${owner_name.stdout}` at ${test_url}
@@ -150,12 +155,12 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=1.2
     ...    example=1.2
-    ${DESIRED_RESPONSE_CODE}=    RW.Core.Import User Variable    DESIRED_RESPONSE_CODE
+    ${ACCEPTABLE_RESPONSE_CODES}=    RW.Core.Import User Variable    ACCEPTABLE_RESPONSE_CODES
     ...    type=string
-    ...    description=The response code that indicates success.
+    ...    description=Comma-separated list of HTTP response codes that indicate success and connectivity (e.g., 200,201,202,204,301,302,307,401,403).
     ...    pattern=\w*
-    ...    default=200
-    ...    example=200
+    ...    default=200,201,202,204,301,302,307,401,403
+    ...    example=200,201,202,204,301,302,307,401,403
     ${OWNER_DETAILS}=    RW.Core.Import User Variable    OWNER_DETAILS
     ...    type=string
     ...    description=Json list of owner details
@@ -168,7 +173,7 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=false
     ...    example=true
-    Set Suite Variable    ${DESIRED_RESPONSE_CODE}    ${DESIRED_RESPONSE_CODE}
+    Set Suite Variable    ${ACCEPTABLE_RESPONSE_CODES}    ${ACCEPTABLE_RESPONSE_CODES}
     Set Suite Variable    ${URLS}    ${URLS}
     Set Suite Variable    ${TARGET_LATENCY}    ${TARGET_LATENCY}
     Set Suite Variable    ${OWNER_DETAILS}    ${OWNER_DETAILS}
