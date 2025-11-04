@@ -184,7 +184,7 @@ Inspect Container Restarts In Namespace `${NAMESPACE}`
                 ...    expected=Containers should not be restarting in namespace `${NAMESPACE}`
                 ...    actual=We found containers with restarts in namespace `${NAMESPACE}`
                 ...    title=${item["title"]}
-                ...    reproduce_hint=${container_restart_details.cmd}
+                ...    reproduce_hint=${container_restart_analysis.cmd}
                 ...    details=${item["details"]}
                 ...    next_steps=${item["next_steps"]}
                 ...    observed_at=${item["observed_at"]}
