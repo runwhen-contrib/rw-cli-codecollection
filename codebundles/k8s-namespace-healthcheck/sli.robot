@@ -28,24 +28,12 @@ Suite Initialization
     ...    description=Which Kubernetes context to operate within.
     ...    pattern=\w*
     ...    example=my-main-cluster
-    ${EVENT_AGE}=    RW.Core.Import User Variable    EVENT_AGE
-    ...    type=string
-    ...    description=The time window in minutes as to when the event was last seen.
-    ...    pattern=((\d+?)m)?
-    ...    example=5m
-    ...    default=5m
     ${EVENT_THRESHOLD}=    RW.Core.Import User Variable    EVENT_THRESHOLD
     ...    type=string
     ...    description=The maximum total events to be still considered healthy. 
     ...    pattern=^\d+$
-    ...    example=2
-    ...    default=2
-    ${CONTAINER_RESTART_AGE}=    RW.Core.Import User Variable    CONTAINER_RESTART_AGE
-    ...    type=string
-    ...    description=The time window in minutes as search for container restarts.
-    ...    pattern=((\d+?)m)?
-    ...    example=5m
-    ...    default=5m
+    ...    example=4
+    ...    default=4
     ${CONTAINER_RESTART_THRESHOLD}=    RW.Core.Import User Variable    CONTAINER_RESTART_THRESHOLD
     ...    type=string
     ...    description=The maximum total container restarts to be still considered healthy. 
@@ -62,9 +50,7 @@ Suite Initialization
     ${RW_LOOKBACK_WINDOW}=    RW.Core.Normalize Lookback Window     ${RW_LOOKBACK_WINDOW}     2
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
-    Set Suite Variable    ${EVENT_AGE}    ${EVENT_AGE}
     Set Suite Variable    ${EVENT_THRESHOLD}    ${EVENT_THRESHOLD}
-    Set Suite Variable    ${CONTAINER_RESTART_AGE}    ${CONTAINER_RESTART_AGE}
     Set Suite Variable    ${CONTAINER_RESTART_THRESHOLD}    ${CONTAINER_RESTART_THRESHOLD}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
@@ -72,20 +58,20 @@ Suite Initialization
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "RW_LOOKBACK_WINDOW": "${RW_LOOKBACK_WINDOW}"}
 
 *** Tasks ***
-Get Error Event Count within ${EVENT_AGE} and calculate Score
-    [Documentation]    Captures error events and counts them within a configurable timeframe.
+Get Error Event Count within ${RW_LOOKBACK_WINDOW} and calculate Score
+    [Documentation]    Captures error events and counts them within the RW_LOOKBACK_WINDOW timeframe, consistent with runbook analysis.
     [Tags]     Event    Count    Warning
     ${error_events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ${EVENT_AGE}=    RW.CLI.String To Datetime    ${EVENT_AGE}
+    ${RW_LOOKBACK_WINDOW_DATETIME}=    RW.CLI.String To Datetime    ${RW_LOOKBACK_WINDOW}
     ${error_event_count}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${error_events}
-    ...    extract_path_to_var__recent_error_events=items[].{name:metadata.name, eventlts:lastTimestamp, message:message}|[?eventlts >= `${EVENT_AGE}`]
+    ...    extract_path_to_var__recent_error_events=items[].{name:metadata.name, eventlts:lastTimestamp, message:message}|[?eventlts >= `${RW_LOOKBACK_WINDOW_DATETIME}`]
     ...    from_var_with_path__recent_error_events__to__event_count=length(@)
     ...    assign_stdout_from_var=event_count
-    Log    ${error_event_count.stdout} total events found with event type Warning up to age ${EVENT_AGE}
+    Log    ${error_event_count.stdout} total events found with event type Warning up to age ${RW_LOOKBACK_WINDOW}
     
     ${event_count}=    Convert To Integer    ${error_event_count.stdout}
     ${threshold}=    Convert To Integer    ${EVENT_THRESHOLD}
@@ -104,14 +90,14 @@ Get Container Restarts and Score in Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=300
-    ${CONTAINER_RESTART_AGE}=    RW.CLI.String To Datetime    ${CONTAINER_RESTART_AGE}
+    ${RW_LOOKBACK_WINDOW_DATETIME}=    RW.CLI.String To Datetime    ${RW_LOOKBACK_WINDOW}
     ${container_restarts_sum}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${pods}
-    ...    extract_path_to_var__pod_restart_stats=items[].{name:metadata.name, containerRestarts:status.containerStatuses[].{restartCount:restartCount, terminated_at:lastState.terminated.finishedAt}|[?restartCount > `0` && terminated_at >= `${CONTAINER_RESTART_AGE}`]}
+    ...    extract_path_to_var__pod_restart_stats=items[].{name:metadata.name, containerRestarts:status.containerStatuses[].{restartCount:restartCount, terminated_at:lastState.terminated.finishedAt}|[?restartCount > `0` && terminated_at >= `${RW_LOOKBACK_WINDOW_DATETIME}`]}
     ...    from_var_with_path__pod_restart_stats__to__pods_with_recent_restarts=[].{name: name, restartSum:sum(containerRestarts[].restartCount || [`0`])}|[?restartSum > `0`]
     ...    from_var_with_path__pods_with_recent_restarts__to__restart_sum=sum([].restartSum)
     ...    assign_stdout_from_var=restart_sum
-    Log    ${container_restarts_sum.stdout} total container restarts found in the last ${CONTAINER_RESTART_AGE}
+    Log    ${container_restarts_sum.stdout} total container restarts found in the last ${RW_LOOKBACK_WINDOW}
     
     ${restart_count}=    Convert To Integer    ${container_restarts_sum.stdout}
     ${threshold}=    Convert To Integer    ${CONTAINER_RESTART_THRESHOLD}
