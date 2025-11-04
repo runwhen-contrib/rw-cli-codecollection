@@ -41,7 +41,7 @@ tenant_id=$(az account show --query "tenantId" -o tsv)
 
 echo "Azure AKS $AKS_CLUSTER activity logs (recent):"
 # Get the activity logs of the vm scaled set
-resource_id=$(az aks show --name $AKS_CLUSTER --resource-group $AZ_RESOURCE_GROUP --subscription $subscription --query "id")
+resource_id=$(az aks show --name $AKS_CLUSTER --resource-group $AZ_RESOURCE_GROUP --subscription $subscription --query "id" -o tsv)
 
 az monitor activity-log list --resource-id $resource_id --start-time "$start_time" --end-time "$end_time" --resource-group $AZ_RESOURCE_GROUP --output table
 
