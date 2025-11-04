@@ -23,7 +23,8 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 - `SERVICE_ERROR_PATTERN`: The error pattern used when extracting and summarizing error logs from services.
 - `SERVICE_EXCLUDE_PATTERN`: What patterns used to exclude results when checking service logs in a namespace. Useful to reduce noise.
 - `ANOMALY_THRESHOLD`: What non-warning event count constitutes an anomaly for raising issues.
-- `RW_LOOKBACK_WINDOW`: The time window (in (h) hours or (m) minutes) to look back for time-sensitive issues like failed pods, pending pods, workload status conditions, and event anomalies. Resources with issues older than this window will be ignored. Default value is `1h`.
+- `RW_LOOKBACK_WINDOW`: The time window (in (h) hours or (m) minutes) to look back for time-sensitive issues like failed pods, pending pods, workload status conditions, event anomalies, container restart analysis, and warning events. Resources with issues older than this window will be ignored. Default value is `1h`.
+- `CONTAINER_RESTART_THRESHOLD`: The maximum total container restarts to be still considered healthy. Only containers exceeding this threshold will trigger detailed restart analysis. Default value is `3`.
 
 ## Requirements
 - A kubeconfig with appropriate RBAC permissions to perform the desired command.

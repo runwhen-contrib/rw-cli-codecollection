@@ -21,7 +21,7 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 Inspect Warning Events in Namespace `${NAMESPACE}`
-    [Documentation]    Queries all warning events in a given namespace within the user specified age,
+    [Documentation]    Queries all warning events in a given namespace within the RW_LOOKBACK_WINDOW timeframe,
     ...    fetches the list of involved pod names, groups the events, collects event message details
     ...    and searches for a useful next step based on these details.
     [Tags]    access:read-only    namespace    trace    error    pods    events    logs    grep    ${NAMESPACE}
@@ -162,21 +162,15 @@ Inspect Warning Events in Namespace `${NAMESPACE}`
 
 
 Inspect Container Restarts In Namespace `${NAMESPACE}`
-    [Documentation]    Fetches pods that have container restarts and provides a report of the restart issues.
+    [Documentation]    Fetches pods that have container restarts and provides a detailed analysis of restart causes including proper OOM vs liveness probe failure detection.
     [Tags]     access:read-only    namespace    containers    status    restarts    ${namespace}
-    ${container_restart_details}=    RW.CLI.Run Cli
-    ...    cmd=TIME_PERIOD="${CONTAINER_RESTART_AGE}"; TIME_PERIOD_UNIT=$(echo $TIME_PERIOD | awk '{print substr($0,length($0),1)}'); TIME_PERIOD_VALUE=$(echo $TIME_PERIOD | awk '{print substr($0,1,length($0)-1)}'); if [[ $TIME_PERIOD_UNIT == "m" ]]; then DATE_CMD_ARG="$TIME_PERIOD_VALUE minutes ago"; elif [[ $TIME_PERIOD_UNIT == "h" ]]; then DATE_CMD_ARG="$TIME_PERIOD_VALUE hours ago"; else echo "Unsupported time period unit. Use 'm' for minutes or 'h' for hours."; exit 1; fi; THRESHOLD_TIME=$(date -u --date="$DATE_CMD_ARG" +"%Y-%m-%dT%H:%M:%SZ"); $KUBERNETES_DISTRIBUTION_BINARY get pods --context=$CONTEXT -n $NAMESPACE -o json | jq -r --argjson exit_code_explanations '{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}' --arg threshold_time "$THRESHOLD_TIME" '.items[] | select(.status.containerStatuses != null) | select(any(.status.containerStatuses[]; .restartCount > 0 and (.lastState.terminated.finishedAt // "1970-01-01T00:00:00Z") > $threshold_time)) | "---\\npod_name: \\(.metadata.name)\\n" + (.status.containerStatuses[] | "containers: \\(.name)\\nrestart_count: \\(.restartCount)\\nmessage: \\(.state.waiting.message // "N/A")\\nterminated_reason: \\(.lastState.terminated.reason // "N/A")\\nterminated_finishedAt: \\(.lastState.terminated.finishedAt // "N/A")\\nterminated_exitCode: \\(.lastState.terminated.exitCode // "N/A")\\nexit_code_explanation: \\($exit_code_explanations[.lastState.terminated.exitCode | tostring] // "Unknown exit code")") + "\\n---\\n"'
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ...    timeout_seconds=300
-    ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
     ${container_restart_analysis}=    RW.CLI.Run Bash File
     ...    bash_file=container_restarts.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=300
-    ...    include_in_history=False
+    ...    show_in_rwl_cheatsheet=true
+    ...    render_in_commandlist=true
     ${recommendations}=    RW.CLI.Run Cli
     ...    cmd=cat container_restart_issues.json
     ...    env=${env}
@@ -198,12 +192,12 @@ Inspect Container Restarts In Namespace `${NAMESPACE}`
         END
     END
     ${history}=    RW.CLI.Pop Shell History
-    IF    """${container_restart_details.stdout}""" == ""
-        ${container_restart_details}=    Set Variable    No container restarts found
+    IF    """${container_restart_analysis.stdout}""" == ""
+        ${container_restart_summary}=    Set Variable    No container restarts found
     ELSE
-        ${container_restart_details}=    Set Variable    ${container_restart_details.stdout}
+        ${container_restart_summary}=    Set Variable    ${container_restart_analysis.stdout}
     END
-    RW.Core.Add Pre To Report    **Summary of Container Restarts in Namespace: ${NAMESPACE}**\n\n${container_restart_analysis.stdout}
+    RW.Core.Add Pre To Report    **Summary of Container Restarts in Namespace: ${NAMESPACE}**\n\n${container_restart_summary}
     RW.Core.Add Pre To Report    **Commands Used:**\n${history}
 
 
@@ -416,7 +410,7 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
     [Documentation]    Fetches non warning events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
     [Tags]     access:read-only    namespace    events    info    state    anomolies    count    occurences    ${namespace}
     ${recent_events_by_object}=    RW.CLI.Run Cli
-    ...    cmd=TIME_PERIOD="${RW_LOOKBACK_WINDOW}"; if [[ \$TIME_PERIOD =~ ^([0-9]+)h\$ ]]; then SECONDS_AGO=\$((\$\{BASH_REMATCH[1]\} * 3600)); elif [[ \$TIME_PERIOD =~ ^([0-9]+)m\$ ]]; then SECONDS_AGO=\$((\$\{BASH_REMATCH[1]\} * 60)); else SECONDS_AGO=3600; fi; THRESHOLD_TIME=\$(date -u -d "@\$((\$(date +%s) - \$SECONDS_AGO))" +"%Y-%m-%dT%H:%M:%SZ"); ${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json > events.json && cat events.json | jq -r --arg threshold_time "\$THRESHOLD_TIME" '[.items[] | select(.involvedObject.name != null and .involvedObject.name != "" and .involvedObject.name != "Unknown" and .involvedObject.kind != null and .involvedObject.kind != "") | select((.lastTimestamp // "1970-01-01T00:00:00Z") > \$threshold_time) | {namespace: .involvedObject.namespace, kind: .involvedObject.kind, name: ((if .involvedObject and .involvedObject.kind == "Pod" then (.involvedObject.name | split("-")[:-1] | join("-")) else .involvedObject.name end) // ""), count: .count, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, reason: .reason, message: .message}] | group_by(.namespace, .kind, .name) | .[] | {(.[0].namespace + "/" + .[0].kind + "/" + .[0].name): {events: .}}' | jq -r --argjson threshold "${ANOMALY_THRESHOLD}" 'to_entries[] | {object: .key, oldest_timestamp: ([.value.events[] | .firstTimestamp] | min), most_recent_timestamp: ([.value.events[] | .lastTimestamp] | max), events_per_minute: (reduce .value.events[] as \$event (0; . + \$event.count) / (((([.value.events[] | .lastTimestamp | fromdateiso8601] | max) - ([.value.events[] | .firstTimestamp | fromdateiso8601] | min)) / 60) | if . < 1 then 1 else . end)), total_events: (reduce .value.events[] as \$event (0; . + \$event.count)), summary_messages: [.value.events[] | .message] | unique | join("; ")} | select(.events_per_minute > \$threshold)' | jq -s '.'
+    ...    cmd=TIME_PERIOD="${RW_LOOKBACK_WINDOW}"; if [[ \$TIME_PERIOD =~ ^([0-9]+)h\$ ]]; then SECONDS_AGO=\$((\$\{BASH_REMATCH[1]\} * 3600)); elif [[ \$TIME_PERIOD =~ ^([0-9]+)m\$ ]]; then SECONDS_AGO=\$((\$\{BASH_REMATCH[1]\} * 60)); else SECONDS_AGO=3600; fi; THRESHOLD_TIME=\$(date -u -d "@\$((\$(date +%s) - \$SECONDS_AGO))" +"%Y-%m-%dT%H:%M:%SZ"); ${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json > events.json && cat events.json | jq -r --arg threshold_time "\$THRESHOLD_TIME" '[.items[] | select(.involvedObject.name != null and .involvedObject.name != "" and .involvedObject.name != "Unknown" and .involvedObject.kind != null and .involvedObject.kind != "") | select((.lastTimestamp // "1970-01-01T00:00:00Z") > \$threshold_time) | {namespace: .involvedObject.namespace, kind: .involvedObject.kind, name: ((if .involvedObject and .involvedObject.kind == "Pod" then (.involvedObject.name | split("-")[:-1] | join("-")) else .involvedObject.name end) // ""), count: .count, firstTimestamp: (.firstTimestamp // "1970-01-01T00:00:00Z"), lastTimestamp: (.lastTimestamp // "1970-01-01T00:00:00Z"), reason: .reason, message: .message}] | group_by(.namespace, .kind, .name) | .[] | {(.[0].namespace + "/" + .[0].kind + "/" + .[0].name): {events: .}}' | jq -r --argjson threshold "${ANOMALY_THRESHOLD}" 'to_entries[] | {object: .key, oldest_timestamp: ([.value.events[] | .firstTimestamp] | min), most_recent_timestamp: ([.value.events[] | .lastTimestamp] | max), events_per_minute: (reduce .value.events[] as \$event (0; . + \$event.count) / (((([.value.events[] | .lastTimestamp | fromdateiso8601] | max) - ([.value.events[] | .firstTimestamp | fromdateiso8601] | min)) / 60) | if . < 1 then 1 else . end)), total_events: (reduce .value.events[] as \$event (0; . + \$event.count)), summary_messages: [.value.events[] | .message] | unique | join("; ")} | select(.events_per_minute > \$threshold)' | jq -s '.'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
@@ -439,7 +433,7 @@ Check Event Anomalies in Namespace `${NAMESPACE}`
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=False
             ${messages}=    RW.K8sHelper.Sanitize Messages    ${item["summary_messages"]}
-            ${event_timestamp}=    Set Variable    ${item["firstTimestamp"]}
+            ${event_timestamp}=    Set Variable    ${item["oldest_timestamp"]}
             ${item_owner_output}=    RW.CLI.Run Cli
             ...    cmd=echo "${item_owner.stdout}" | sed 's/ *$//' | tr -d '\n'
             ...    env=${env}
@@ -625,6 +619,12 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=1h
     ...    default=1h
+    ${CONTAINER_RESTART_THRESHOLD}=    RW.Core.Import User Variable    CONTAINER_RESTART_THRESHOLD
+    ...    type=string
+    ...    description=The maximum total container restarts to be still considered healthy.
+    ...    pattern=^\d+$
+    ...    example=2
+    ...    default=3
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
@@ -633,6 +633,7 @@ Suite Initialization
     Set Suite Variable    ${ANOMALY_THRESHOLD}    ${ANOMALY_THRESHOLD}
     Set Suite Variable    ${CONTAINER_RESTART_AGE}    ${CONTAINER_RESTART_AGE}
     Set Suite Variable    ${RW_LOOKBACK_WINDOW}    ${RW_LOOKBACK_WINDOW}
+    Set Suite Variable    ${CONTAINER_RESTART_THRESHOLD}    ${CONTAINER_RESTART_THRESHOLD}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "CONTAINER_RESTART_AGE": "${CONTAINER_RESTART_AGE}", "EVENT_AGE": "${EVENT_AGE}", "RW_LOOKBACK_WINDOW": "${RW_LOOKBACK_WINDOW}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "CONTAINER_RESTART_AGE": "${CONTAINER_RESTART_AGE}", "EVENT_AGE": "${EVENT_AGE}", "RW_LOOKBACK_WINDOW": "${RW_LOOKBACK_WINDOW}", "CONTAINER_RESTART_THRESHOLD": "${CONTAINER_RESTART_THRESHOLD}"}

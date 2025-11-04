@@ -50,8 +50,8 @@ if [[ -z "$NAMESPACE" ]]; then
     exit 1
 fi
 
-# Parse EVENT_AGE - default to 5 if not set (aligned with SLI frequency)
-EVENT_AGE_MINUTES=$(parse_event_age "${EVENT_AGE:-5}")
+# Parse RW_LOOKBACK_WINDOW - default to 30m if not set (aligned with other runbook tasks)
+EVENT_AGE_MINUTES=$(parse_event_age "${RW_LOOKBACK_WINDOW:-30m}")
 
 # Create temporary directory under current working directory
 TEMP_DIR="./temp_warning_events_$$_$(date +%s)"
