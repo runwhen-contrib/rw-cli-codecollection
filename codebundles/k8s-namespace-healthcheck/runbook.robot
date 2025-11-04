@@ -70,7 +70,7 @@ Inspect Warning Events in Namespace `${NAMESPACE}`
                 ${workload_health}=    Set Variable    **Current Status:** Unable to retrieve
                 IF    "${owner_kind}" == "Deployment"
                     ${health_check}=    RW.CLI.Run Cli
-                    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${owner_name} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '{desired_replicas: .spec.replicas, ready_replicas: (.status.readyReplicas // 0), available_replicas: (.status.availableReplicas // 0), conditions: [.status.conditions[]? | select(.type == "Available") | {status: .status, reason: .reason}]}'
+                    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${owner_name} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '{desired_replicas: .spec.replicas, ready_replicas: (.status.readyReplicas // 0), available_replicas: (.status.availableReplicas // 0), updated_replicas: (.status.updatedReplicas // 0), replicas: (.status.replicas // 0), conditions: [.status.conditions[]? | select(.type == "Available" or .type == "Progressing") | {type: .type, status: .status, reason: .reason, message: .message}]}'
                     ...    env=${env}
                     ...    secret_file__kubeconfig=${kubeconfig}
                     ...    include_in_history=false
@@ -81,13 +81,34 @@ Inspect Warning Events in Namespace `${NAMESPACE}`
                             ${desired}=    Evaluate    $health_data.get('desired_replicas', 0)
                             ${ready}=    Evaluate    $health_data.get('ready_replicas', 0)
                             ${available}=    Evaluate    $health_data.get('available_replicas', 0)
+                            ${updated}=    Evaluate    $health_data.get('updated_replicas', 0)
+                            ${total_replicas}=    Evaluate    $health_data.get('replicas', 0)
                             ${conditions}=    Evaluate    $health_data.get('conditions', [])
                             
-                            ${workload_health}=    Set Variable    **Current Deployment Status:** ${ready}/${desired} ready replicas, ${available} available
+                            # Check if deployment is actively scaling
+                            ${is_scaling_up}=    Evaluate    ${total_replicas} > ${ready} and ${total_replicas} <= ${desired}
+                            ${is_progressing}=    Set Variable    False
+                            ${progressing_reason}=    Set Variable    
+                            
+                            ${workload_health}=    Set Variable    **Current Deployment Status:** ${ready}/${desired} ready replicas, ${available} available, ${total_replicas} total
                             FOR    ${condition}    IN    @{conditions}
+                                ${cond_type}=    Evaluate    $condition.get('type', 'Unknown')
                                 ${cond_status}=    Evaluate    $condition.get('status', 'Unknown')
                                 ${cond_reason}=    Evaluate    $condition.get('reason', '')
-                                ${workload_health}=    Catenate    ${workload_health}    \n**Available:** ${cond_status} (${cond_reason})
+                                ${cond_message}=    Evaluate    $condition.get('message', '')
+                                
+                                IF    "${cond_type}" == "Progressing" and "${cond_status}" == "True"
+                                    ${is_progressing}=    Set Variable    True
+                                    ${progressing_reason}=    Set Variable    ${cond_reason}
+                                    ${workload_health}=    Catenate    ${workload_health}    \n**Progressing:** ${cond_status} (${cond_reason})
+                                ELSE IF    "${cond_type}" == "Available"
+                                    ${workload_health}=    Catenate    ${workload_health}    \n**Available:** ${cond_status} (${cond_reason})
+                                END
+                            END
+                            
+                            # Add scaling context
+                            IF    ${is_scaling_up} and ${is_progressing}
+                                ${workload_health}=    Catenate    ${workload_health}    \n**Scaling Status:** Actively scaling up (${progressing_reason})
                             END
                         EXCEPT
                             Log    Warning: Failed to parse deployment health status for ${owner_name}
@@ -143,8 +164,10 @@ Inspect Warning Events in Namespace `${NAMESPACE}`
                         # Check if deployment is healthy (has ready replicas and is available)
                         ${has_zero_ready}=    Evaluate    ${ready_count} == 0
                         ${has_expected_replicas}=    Evaluate    ${ready_count} == ${desired_count}
-                        ${is_available}=    Evaluate    "Available: True" in '''${workload_health}'''
+                        ${is_available}=    Evaluate    "**Available:** True" in '''${workload_health}'''
+                        ${is_actively_scaling}=    Evaluate    "Actively scaling" in '''${workload_health}'''
                         ${is_healthy}=    Evaluate    ${has_expected_replicas} and ${is_available}
+                        ${is_scaling_healthy}=    Evaluate    ${is_actively_scaling} and ${is_available} and ${ready_count} > 0
                         
                         # Detect scheduling failures vs other issues
                         ${is_scheduling_issue}=    Evaluate    "nodes are available" in '''${issue["title"]}'''.lower() or "insufficient" in '''${issue["title"]}'''.lower() or "scheduling" in '''${issue["title"]}'''.lower()
@@ -155,14 +178,17 @@ Inspect Warning Events in Namespace `${NAMESPACE}`
                             IF    ${has_expected_replicas}
                                 ${adjusted_severity}=    Set Variable    4
                                 Log    Lowering severity to 4 for scheduling issues when deployment ${owner_name} has expected replicas (${ready_count}/${desired_count})
+                            ELSE IF    ${is_scaling_healthy}
+                                ${adjusted_severity}=    Set Variable    4
+                                Log    Lowering severity to 4 for scheduling issues during active scaling of deployment ${owner_name} (${ready_count}/${desired_count}, scaling in progress)
                             ELSE
                                 ${adjusted_severity}=    Set Variable    3
                                 Log    Setting severity to 3 for scheduling issues when deployment ${owner_name} has fewer than expected replicas (${ready_count}/${desired_count})
                             END
-                        # Lower severity for probe failures when deployment is healthy
-                        ELSE IF    ${is_probe_issue} and ${is_healthy}
+                        # Lower severity for probe failures when deployment is healthy or scaling
+                        ELSE IF    ${is_probe_issue} and (${is_healthy} or ${is_scaling_healthy})
                             ${adjusted_severity}=    Set Variable    4
-                            Log    Lowering severity to 4 for probe failures in healthy deployment ${owner_name}
+                            Log    Lowering severity to 4 for probe failures in healthy/scaling deployment ${owner_name}
                         END
                     END
                     

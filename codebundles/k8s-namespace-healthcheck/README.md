@@ -1,5 +1,5 @@
 # Kubernetes Namespace Triage
-This codebundle is used for searching in a namespace for possible issues to triage; covering things such as scraping logs, checking for anomalies in events, looking for pod restarts, etc. These tasks can be performed with just native kubernetes objects and do not require additional logging / tracing tools be setup by the user. Problems identified during triage will result in raised issues with intelligent severity adjustment - for example, scheduling failures are treated as lower severity (4) when the deployment has the expected number of replicas, but higher severity (3) when replicas are below the desired count.
+This codebundle is used for searching in a namespace for possible issues to triage; covering things such as scraping logs, checking for anomalies in events, looking for pod restarts, etc. These tasks can be performed with just native kubernetes objects and do not require additional logging / tracing tools be setup by the user. Problems identified during triage will result in raised issues with intelligent severity adjustment - for example, scheduling failures are treated as lower severity (4) when the deployment has the expected number of replicas or is actively scaling (HPA operations), but higher severity (3) when replicas are below the desired count and not scaling.
 
 ## Tasks
 
