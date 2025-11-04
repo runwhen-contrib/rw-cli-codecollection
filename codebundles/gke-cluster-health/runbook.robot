@@ -99,6 +99,8 @@ Identify GKE Service Account Issues in GCP Project `${GCP_PROJECT_ID}`
             ...    reproduce_hint=${sa_check.cmd}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["next_steps"]}
+            ...    summary=${issue["summary"]}
+            ...    observations=${issue["observations"]}
         END
     END
 
@@ -160,6 +162,8 @@ Fetch GKE Cluster Health for GCP Project `${GCP_PROJECT_ID}`
             ...    reproduce_hint=${cluster_health.cmd}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["suggested"]}
+            ...    summary=${issue["summary"]}
+            ...    observations=${issue["observations"]}
         END
     END
 
@@ -190,6 +194,8 @@ Check for Quota Related GKE Autoscaling Issues in GCP Project `${GCP_PROJECT_ID}
             ...    reproduce_hint=${quota_check.cmd}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["suggested"]}
+            ...    summary=${issue["summary"]}
+            ...    observations=${issue["observations"]}
         END
     END
 
@@ -217,6 +223,8 @@ Validate GKE Node Sizes for GCP Project `${GCP_PROJECT_ID}`
             ...    reproduce_hint=${node_rec.cmd}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["next_steps"]}
+            ...    summary=${issue["summary"]}
+            ...    observations=${issue["observations"]}
         END
     END
     RW.Core.Add Pre To Report    Node‑size Recommendation Output:\n${node_rec.stdout}
@@ -249,6 +257,8 @@ Fetch GKE Cluster Operations for GCP Project `${GCP_PROJECT_ID}`
             ...    reproduce_hint=${ops_list.cmd}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["next_steps"]}
+            ...    summary=${issue["summary"]}
+            ...    observations=${issue["observations"]}
         END
     END
     RW.Core.Add Pre To Report    Operations:\n${ops_list.stdout}

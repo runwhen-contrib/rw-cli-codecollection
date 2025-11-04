@@ -15,6 +15,7 @@ from __future__ import annotations
 import json, math, os, re, subprocess, sys, textwrap, time, traceback
 from collections import defaultdict
 from pathlib import Path
+from typing import List, Dict
 
 # ── tunables ────────────────────────────────────────────────────────────
 MAX_CPU_LIMIT_OVERCOMMIT = float(os.getenv("MAX_CPU_LIMIT_OVERCOMMIT", "3.0"))  # 300 %
@@ -153,9 +154,11 @@ def catalogue(region):
     return cat
 
 issues=[]
-def note(cl,sev,ttl,det,nxt):
+def note(cl,sev,ttl,det,nxt, summary: str = None, observations: List[Dict[str, str]] = None):
     issues.append({"severity":sev,"title":f"{ttl} in cluster `{cl}`",
-                   "details":det,"next_steps":nxt})
+                   "details":det,"next_steps":nxt, 
+                   "summary": summary,
+                   "observations": observations})
 
 # ── per‑cluster analysis ────────────────────────────────────────────────
 def analyse(cl:str, loc:str):
@@ -189,14 +192,55 @@ def analyse(cl:str, loc:str):
     unready_nodes = [n for n in alloc if not alloc[n].get("ready", True)]
     
     if unready_nodes:
-        note(cl,2,"Unready nodes detected",
-             f"{len(unready_nodes)} nodes are not ready: {', '.join(unready_nodes)}. "
+        num_unready_nodes = len(unready_nodes)
+        unready_node_names = ", ".join([f"`{node_nm}`" for node_nm in unready_nodes])
+        
+        summary = textwrap.dedent(f"""
+            {num_unready_nodes} nodes ({unready_node_names}) in the `{cl}` GKE 
+            cluster were detected as unready, reducing overall cluster capacity. The 
+            issue indicated that the cluster was at or near capacity and might require 
+            additional or healthy nodes. Recommended actions included investigating 
+            node health and readiness, checking control plane and node communication, 
+            and validating component health checks.""").strip()
+        
+        observations = [
+            {
+                "observation": f"{num_unready_nodes} nodes, {unready_node_names}, in cluster `{cl}` were reported as unready, reducing cluster capacity.",
+                "category": "infrastructure"
+            },
+            {
+                "observation": f"The `{cl}` currently lacks sufficient available node capacity compared to expected operational levels.",
+                "category": "performance"
+            }
+        ]
+
+        note(cl=cl,sev=2,ttl="Unready nodes detected",
+             det=f"{num_unready_nodes} nodes are not ready: {', '.join(unready_nodes)}. "
              f"This reduces available cluster capacity.",
-             f"Investigate node health and readiness issues in cluster `{cl}`.")
+             nxt=f"Investigate node health and readiness issues in cluster `{cl}`.",
+             summary = summary, observations = observations)
     
     if not valid:
-        note(cl,2,"Analysis failed","No schedulable nodes found.",
-             f"Check control plane for `{cl}`."); return
+        summary = textwrap.dedent(f"""
+            The analysis for cluster `{cl}` failed due to the absence of schedulable nodes. 
+            Recommended actions include checking the control plane, reviewing node taints and 
+            labels, assessing resource quota utilization, and investigating recent node 
+            provisioning failures in `{cl}`""").strip()
+        
+        observations = [
+            {
+                "observation": f"No schedulable nodes found in cluster `{cl}`.",
+                "category": "infrastructure"
+            },
+            {
+                "observation": f"The control plane in `{cl}` is not functioning correctly, preventing the scheduling of pods.",
+                "category": "configuration"
+            }
+        ]
+
+        note(cl=cl,sev=2,ttl="Analysis failed",det="No schedulable nodes found.",
+             nxt="No schedulable nodes found.",
+             summary = summary, observations = observations); return
 
     busiest=max(valid,key=lambda n:(node[n]['rc'],node[n]['rm']))
     a_b=alloc[busiest]; busy=node[busiest]
@@ -204,9 +248,27 @@ def analyse(cl:str, loc:str):
     # Ensure we have pod data to analyze
     all_pods = list(pod.values())
     if not all_pods:
-        note(cl,3,"No pods found",
-             f"No pods found in cluster `{cl}`. Cannot perform sizing analysis.",
-             f"Deploy workloads to cluster `{cl}` for meaningful analysis.")
+        summary = textwrap.dedent(f"""
+                Cluster {cl} was found with no running pods, preventing sizing analysis. 
+                The issue indicated that GKE nodes were at capacity or unavailable. Recommended 
+                actions included deploying workloads, verifying node health, inspecting control 
+                plane events, and validating network and IAM configurations.""").strip()
+            
+        observations = [
+            {
+                "observation": f"Cluster `{cl}` had no active pods detected, preventing resource sizing analysis.",
+                "category": "operational"
+            },
+            {
+                "observation": f"IAM or network misconfigurations may have affected resource provisioning in `{cl}`.",
+                "category": "configuration"
+            }
+        ]
+
+        note(cl=cl,sev=3,ttl="No pods found",
+             det=f"No pods found in cluster `{cl}`. Cannot perform sizing analysis.",
+             nxt=f"Deploy workloads to cluster `{cl}` for meaningful analysis.",
+             summary = summary, observations = observations)
         return
     
     biggest=max(all_pods, key=lambda p:(p["rc"],p["rm"]))
@@ -231,9 +293,35 @@ def analyse(cl:str, loc:str):
         if d['rc']>a['cpu'] or d['rm']>a['mem']:
             overloaded.append(n)
     if overloaded:
-        note(cl,2,"Node overloaded",
-             f"{len(overloaded)} nodes exceed requests allocatable: {', '.join(overloaded)}.",
-             f"Reschedule pods or scale the pool in cluster `{cl}`.")
+        overloaded_node_names = ", ".join([f"`{node_nm}`" for node_nm in overloaded])
+
+        summary = textwrap.dedent(f"""
+            The `{cl}` experienced capacity issues where {overloaded_node_names} exceeded 
+            their allocatable resource limits, leading to an overloaded state. This indicated 
+            that the cluster had insufficient available node capacity to handle current workloads 
+            effectively. Investigations focused on optimizing workload distribution, reviewing 
+            recent deployment impacts, and validating resource quotas and limits to prevent 
+            future overutilization.""").strip()
+        
+        observations = [
+            {
+                "observation": f"{overloaded_node_names} in `{cl}` exceeded their allocatable resource requests.",
+                "category": "performance"
+            },
+            {
+                "observation": f"Recent deployment activity may have contributed to increased resource pressure on {overloaded_node_names}.",
+                "category": "configuration"
+            },
+            {
+                "observation": f"Resource quotas and limits in `{cl}` may not align with current workload demands.",
+                "category": "configuration"
+            }
+        ]
+
+        note(cl=cl,sev=2,ttl="Node overloaded",
+             det=f"{len(overloaded)} nodes exceed requests allocatable: {', '.join(overloaded)}.",
+             nxt=f"Reschedule pods or scale the pool in cluster `{cl}`.",
+             summary = summary, observations = observations)
 
     # ── limits over‑commit table ────────────────────────────────────────
     limit_over=[]
@@ -243,11 +331,39 @@ def analyse(cl:str, loc:str):
             d["lm"]/a["mem"]>MAX_MEM_LIMIT_OVERCOMMIT):
             limit_over.append(n)
     if limit_over:
-        note(cl,2,"Node limits over‑committed",
-             (f"{len(limit_over)} nodes beyond limit thresholds "
+        num_limit_over = len(limit_over)
+        limit_over_nodes_str = ", ".join([f'`{node_nm}`' for node_nm in limit_over])
+
+        summary = textwrap.dedent(f"""
+            {num_limit_over} nodes in cluster `{cl}` are over-committed, exceeding CPU and 
+            memory thresholds, which has resulted in the cluster reaching capacity and 
+            lacking available nodes. The expected state is for the GKE cluster to have 
+            available nodes, but currently, additional resources or adjustments are needed. 
+            Recommended actions include lowering pod limits, splitting workloads, or 
+            scaling the node pool; no comments were provided and no resolving task is noted.
+        """).strip()
+
+        observations = [
+            {
+                "category": "infrastructure",
+                "observation": textwrap.dedent(f"""
+                    Nodes {limit_over_nodes_str} in cluster `{cl}` have exceeded 
+                    CPU (> {MAX_CPU_LIMIT_OVERCOMMIT}) or memory (> {MAX_MEM_LIMIT_OVERCOMMIT}) limit thresholds.""").strip()
+            },
+            {
+                "category": "operational",
+                "observation": textwrap.dedent(f"""
+                    Actual state shows GKE clusters in `{cl}` are at capacity or require new nodes, 
+                    differing from the expected state of available node capacity.""").strip()
+            }
+        ]
+
+        note(cl=cl,sev=2,ttl="Node limits over-committed",
+             det=(f"{num_limit_over} nodes beyond limit thresholds "
               f"(>{MAX_CPU_LIMIT_OVERCOMMIT}× CPU or "
               f">{MAX_MEM_LIMIT_OVERCOMMIT}× MEM): {', '.join(limit_over)}."),
-             "Lower pod limits, split workload or scale the node‑pool.")
+             nxt="Lower pod limits, split workload or scale the node-pool.",
+             summary = summary, observations = observations)
 
     # Skip rescheduling hint calculation - cluster_health.sh handles capacity analysis
 
@@ -398,10 +514,34 @@ def analyse(cl:str, loc:str):
                 else:
                     comparison = f"Maintain {best['cpu']} vCPU with better memory ratio"
 
+                summary = textwrap.dedent(f"""Moderate utilization was observed in cluster `{cl}`, 
+                    indicating an opportunity to optimize node-pool sizing by transitioning to `{best['name']}` 
+                    nodes (optimize from {actual_current_vcpu} to {best['cpu']} vCPU, 
+                    {size_change_pct:.0f}% reduction). The GKE cluster is currently at or near capacity, 
+                    requiring additional node capacity.""").strip()
+
+                observations = [
+                    {
+                        "observation": f"`{cl}` showed {cpu_utilization:.1f}% CPU | {mem_utilization:.1f}% Memory utilization indicating node capacity is at or near capacity.",
+                        "category": "infrastructure"
+                    },
+                    {
+                        "observation": f"The node pool in `{cl}` uses {actual_current_vcpu} vCPU nodes and an optimization to {best['cpu']} vCPU nodes (`{best['name']}`) was identified.",
+                        "category": "configuration"
+                    },
+                    {
+                        "observation": f"Autoscaler in `{cl}` is configured for {min_n}-{max_n} nodes per zone, totaling {min_n * zones_n}-{max_n * zones_n} nodes.",
+                        "category": "configuration"
+                    }
+                ]
+
                 # Severity=4 (informational) since this is optimization, not a critical issue
-                note(cl,4,"Node‑pool sizing optimization opportunity",
-                     f"Consider `{best['name']}` in `{cl}` ({comparison}); autoscaler {autoscaler_desc}. {sizing_reason}.",
-                     f"Create new node pool with `{best['name']}` and migrate workloads from current pool in `{cl}`")
+                note(cl=cl, sev=4, ttl="Node‑pool sizing optimization opportunity",
+                     det=f"Consider `{best['name']}` in `{cl}` ({comparison}); autoscaler {autoscaler_desc}. {sizing_reason}.",
+                     nxt=f"Create new node pool with `{best['name']}` and migrate workloads from current pool in `{cl}`",
+                     summary=summary,
+                     observations=observations
+                     )
             else:
                 print(f"Note: Recommended type very similar to current - no change needed")
 

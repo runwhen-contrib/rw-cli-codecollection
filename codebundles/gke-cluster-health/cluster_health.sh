@@ -51,10 +51,47 @@ process_cluster() {
     echo "$NODE_STATUSES" | awk '{printf "%-60s %s\n",$1,$2}' >> "$REPORT_FILE"; hr
 
     NOT_READY="$(echo "$NODE_STATUSES" | awk '$2!="Ready"')"
-    [[ -n "$NOT_READY" ]] && \
-      add_issue "Node(s) Not Ready in \`$CLUSTER_NAME\`" \
-                "The following nodes are not Ready:\n$NOT_READY" 2 \
-                "kubectl describe node <name> && kubectl get events --field-selector involvedObject.name=<name>"
+
+    local not_ready_nodes="$(awk '{print $1}' <<<"$NOT_READY" | paste -sd ', ' -)"
+
+    if [[ -n "$NOT_READY" ]]; then
+      local severity=2
+      local title="Node(s) Not Ready in \`$CLUSTER_NAME\`"
+      local details="The following nodes are not Ready:\n$NOT_READY"
+      local next_steps="kubectl describe node <name> && kubectl get events --field-selector involvedObject.name=<name>"
+
+      local summary="Nodes $not_ready_nodes in \`$CLUSTER_NAME\` are in a Not Ready state, \
+indicating capacity or pod functionality issues within the GKE cluster. The expected \
+condition is that all nodes are available and no pods are in CrashLoopBackOff. \
+Recommended next steps include inspecting node details and events using kubectl, \
+reviewing system logs, verifying control plane connectivity, and checking resource \
+utilization for the affected location. The issue was resolved by fetching GKE Cluster Health for GCP Project \`$PROJECT\`."
+      
+      local observations=$(jq -nc \
+        --arg cluster "$CLUSTER_NAME" \
+        --arg not_ready "$not_ready_nodes" \
+        '[
+          {
+            "observation": ("Nodes `" + $not_ready + "` in cluster `" + $cluster + "` were observed in a Not Ready state."),
+            "category": "infrastructure"
+          },
+          {
+            "observation": ("The GKE cluster in `" + $cluster + "` showed capacity or pod functionality issues."),
+            "category": "infrastructure"
+          },
+          {
+            "observation": ("The clusters actual state deviated from the expected condition of having all nodes available and no pods in CrashLoopBackOff."),
+            "category": "operational"
+          },
+          {
+            "observation": ("Node-level diagnostics were intended to be reproduced via ./cluster_health.sh."),
+            "category": "operational"
+          }
+        ]'
+         )
+
+      add_issue "$title" "$details" "$severity" "$next_steps" "$summary" "$observations" "$use_llm_for_next_steps"
+    fi
   fi
 
   # ── 2) CPU / memory by node‑pool ─────────────────────────────────────
@@ -108,20 +145,57 @@ process_cluster() {
     done <<< "$CRASHLOOP"
 
     local SUGG_NS; SUGG_NS="$(printf "%s\n" "${!NSMAP[@]}" | sort | paste -sd ',')"
-    add_issue "CrashLoopBackOff pods in \`$CLUSTER_NAME\`" \
-              "Crashing pods:\n$CRASHLOOP" \
-              "$([[ $ANY_CRITICAL == true ]] && echo 1 || echo 4)" \
-              "Inspect pods and namespace health: \`$SUGG_NS\`"
+
+    # get "pod/namespace" combinations
+    CRASHLOOP_COMBINED="$(echo "$CRASHLOOP" | awk '{print $2 "/" $1}' | paste -sd ',')"
+
+    local title="CrashLoopBackOff pods in \`$CLUSTER_NAME\`"
+    local details="Crashing pods:\n$CRASHLOOP"
+    local severity=$([[ $ANY_CRITICAL == true ]] && echo 1 || echo 4)
+    
+    local next_steps="Inspect pods and namespace health: \`$SUGG_NS\`"
+    next_steps+=$'\nVerify container image integrity and pull status in `'"$CLUSTER_NAME"$'`'
+    next_steps+=$'\nExamine recent kubelet and scheduler logs in `'"$CLUSTER_NAME"$'`'
+    next_steps+=$'\nAssess network policies and DNS configuration in `'"$CLUSTER_NAME"$'`'
+
+    local use_llm_for_next_steps=0 # Statically set to 0 (false)
+
+    local summary="In \`$CLUSTER_NAME\`, several pods are in a CrashLoopBackOff state, \
+including $CRASHLOOP_COMBINED. This indicates potential capacity or pod functionality \
+issues within the GKE cluster. Recommended actions include checking the health of these \
+namespaces, verifying container image integrity and pull status, reviewing kubelet and \
+scheduler logs, and assessing network policies and DNS configuration."
+
+    local observations=$(jq -nc \
+      --arg crashloop_combined "$CRASHLOOP_COMBINED" \
+      '[
+        {
+          "observation": ("Pods `" + $crashloop_combined + "` are in CrashLoopBackOff state."),
+          "category": "infrastructure"
+        },
+        {
+          "observation": ("The clusters actual state shows pod functionality or capacity issues contrary to the expected healthy condition."),
+          "category": "operational"
+        },
+        {
+          "observation": ("The issue can be reproduced or validated using the script ./cluster_health.sh."),
+          "category": "operational"
+        }
+      ]
+      '
+    )
+
+    add_issue "$title" "$details" "$severity" "$next_steps" "$summary" "$observations" "$use_llm_for_next_steps"
   fi
 }
 
 add_issue() {
-  local TITLE="$1" DETAILS="$2" SEV="$3" NEXT="$4"
+  local TITLE="$1" DETAILS="$2" SEV="$3" NEXT="$4" SUMMARY="${5:-}" OBSERVATIONS="${6:-[]}"
   log "🔸  $TITLE (severity=$SEV)"; [[ -n "$DETAILS" ]] && log "$DETAILS"
   log "Next‑steps: $NEXT"; hr
   $first_issue || echo "," >> "$ISSUES_TMP"; first_issue=false
-  jq -n --arg t "$TITLE" --arg d "$DETAILS" --arg n "$NEXT" --argjson s "$SEV" \
-        '{title:$t,details:$d,severity:$s,suggested:$n}' >> "$ISSUES_TMP"
+  jq -n --arg t "$TITLE" --arg d "$DETAILS" --arg n "$NEXT" --argjson s "$SEV" --arg summary "$SUMMARY" --argjson observations "$OBSERVATIONS" \
+        '{title:$t,details:$d,severity:$s,suggested:$n,summary:$summary,observations:$observations}' >> "$ISSUES_TMP"
 }
 
 # GCP Machine Type Pricing (MSRP per hour in USD - 2024 estimates)
@@ -244,8 +318,9 @@ check_underutilization() {
           severity=4  # Medium savings potential
         fi
         
-        add_issue "Possible Cost Savings: Node pool \`$pool\` underutilized in cluster \`$CLUSTER_NAME\`" \
-                  "UNDERUTILIZATION COST ANALYSIS:
+        local title="Possible Cost Savings: Node pool \`$pool\` underutilized in cluster \`$CLUSTER_NAME\`"
+        local details="\
+UNDERUTILIZATION COST ANALYSIS:
 - Node Pool: $pool
 - Cluster: $CLUSTER_NAME
 - Machine Type: $machine_type
@@ -272,8 +347,48 @@ RECOMMENDATIONS:
 1. Review workload resource requests and limits
 2. Consider reducing node pool size or switching to smaller machine types
 3. Implement cluster autoscaling and right-sizing policies
-4. Set up utilization monitoring and alerts" $severity \
-                  "Review workload resource usage: kubectl top pods -A\\nConsider scaling down node pool: gcloud container clusters resize $CLUSTER_NAME --node-pool=$pool --num-nodes=$((total_nodes - removable_nodes))\\nAnalyze pod resource requests: kubectl describe nodes | grep -A5 'Allocated resources'\\nEnable cluster autoscaling: gcloud container node-pools update $pool --cluster=$CLUSTER_NAME --enable-autoscaling --min-nodes=1 --max-nodes=$total_nodes"
+4. Set up utilization monitoring and alerts"
+        local next_steps="\
+Review workload resource usage: kubectl top pods -A
+Consider scaling down node pool: gcloud container clusters resize $CLUSTER_NAME --node-pool=$pool --num-nodes=$((total_nodes - removable_nodes))
+Analyze pod resource requests: kubectl describe nodes | grep -A5 'Allocated resources'
+Enable cluster autoscaling: gcloud container node-pools update $pool --cluster=$CLUSTER_NAME --enable-autoscaling --min-nodes=1 --max-nodes=$total_nodes"
+
+        printf -v summary_content "Node pool \`%s\` in cluster \`%s\` is significantly underutilized, with average CPU at %s%% and memory at %s%%, leading to estimated unnecessary costs of \$$%s per month. It is recommended to review workload resource usage, consider scaling down the node pool, analyze pod resource requests, and enable cluster autoscaling to improve resource allocation and reduce costs. No user comments were provided." \
+          "$pool" "$CLUSTER_NAME" "$avg_cpu" "$avg_mem" "$total_monthly_savings"
+        local summary="$summary_content"
+
+        local observations=$(jq -nc \
+          --arg pool "$pool" \
+          --arg cluster "$CLUSTER_NAME" \
+          --arg project "$PROJECT" \
+          --arg total_nodes "$total_nodes" \
+          --arg avg_cpu "$avg_cpu" \
+          --arg avg_mem "$avg_mem" \
+          --arg monthly_savings_per_node "$monthly_savings_per_node" \
+          --arg total_monthly_savings "$total_monthly_savings" \
+          --arg removable_nodes "$removable_nodes" \
+          '[
+            {
+              "category": "infrastructure",
+              "observation": ("Node pool `" + $pool + "` in cluster `" + $cluster + "` is running " + $total_nodes + " nodes with average CPU utilization at " + $avg_cpu + "% and memory utilization at " + $avg_mem + "%.")
+            },
+            {
+              "category": "infrastructure",
+              "observation": ("Estimated monthly cost per node in `" + $pool + "` is $" + $monthly_savings_per_node + ", with a total potential monthly savings of $" + $total_monthly_savings + " if " + $removable_nodes + " nodes are removed.")
+            },
+            {
+              "category": "operational",
+              "observation": ("GKE clusters in `" + $project + "` have capacity or pod functionality issues, deviating from the expected state of available capacity and no pods in crashloopbackoff.")
+            },
+            {
+              "category": "configuration",
+              "observation": ("Workload scheduling patterns and affinity rules affecting pod placement on `" + $pool + "` in `" + $cluster + "` are highlighted for investigation.")
+            }
+          ]'
+        )
+
+        add_issue "$title" "$details" "$severity" "$next_steps" "$summary" "$observations"
       fi
     fi
   done
@@ -341,7 +456,6 @@ report_pool_usage() {
       done
       [[ $is_affected == false ]] && healthy_nodes+=("$node")
     done
-    
     local title="High $KIND usage in \`$CLUSTER_NAME\`, node‑pool \`$pool\` ($severity_desc)"
     
     local details="NODE POOL $KIND USAGE ANALYSIS:
@@ -388,14 +502,55 @@ fi)"
 
     local next_steps="Scale or optimise workloads on node‑pool \`$pool\`"
     if (( affected_percentage >= 50 )); then
-      next_steps="URGENT: Scale up node‑pool \`$pool\` or optimize high-usage workloads\\nAnalyze pod resource requests and limits\\nConsider node pool autoscaling configuration\\nReview workload distribution across nodes"
+      next_steps="URGENT: Scale up node‑pool \`$pool\` or optimize high-usage workloads\nAnalyze pod resource requests and limits\nConsider node pool autoscaling configuration\nReview workload distribution across nodes"
     elif (( affected_percentage >= 25 )); then
-      next_steps="Scale node‑pool \`$pool\` or redistribute workloads\\nAnalyze resource usage patterns\\nOptimize pod resource allocation\\nMonitor for continued growth"
+      next_steps="Scale node‑pool \`$pool\` or redistribute workloads\nAnalyze resource usage patterns\nOptimize pod resource allocation\nMonitor for continued growth"
     else
-      next_steps="Monitor node‑pool \`$pool\` resource trends\\nInvestigate specific high-usage nodes\\nOptimize workloads on affected nodes\\nConsider workload rebalancing"
+      next_steps="Monitor node‑pool \`$pool\` resource trends\nInvestigate specific high-usage nodes\nOptimize workloads on affected nodes\nConsider workload rebalancing"
     fi
+
+    printf -v summary_content "High %s usage was detected in \`%s\` on node-pool \`%s\`, with some nodes reaching %s CPU utilization. This exceeds the expected threshold for available capacity and may impact pod functionality. Actions needed include scaling or optimizing workloads, investigating pod resource consumption, reviewing recent changes, and analyzing historical %s usage trends in \`%s\`." \
+      "$KIND" "$CLUSTER_NAME" "$pool" "${affected_percentage}%" "$KIND" "$CLUSTER_NAME"
+    local summary="$summary_content"
+
+    local observations_json=$(cat <<'EOF_JSON'
+[
+  {
+    "category": "infrastructure",
+    "observation": "Nodes in node-pool `{{.pool}}` within `{{.cluster}}` are reporting memory usage >= 75%."
+  },
+  {
+    "category": "operational",
+    "observation": "Pods within `{{.cluster}}` may be experiencing capacity or functionality issues, deviating from the expected healthy state."
+  },
+  {
+    "category": "configuration",
+    "observation": "Recent changes to deployments within `{{.cluster}}` are noted as relevant to the current state."
+  }
+]
+EOF_JSON
+)
+
+    local observations=$(jq -nc \
+      --arg pool "$pool" \
+      --arg cluster "$CLUSTER_NAME" \
+      '[
+        {
+          "category": "infrastructure",
+          "observation": ("Nodes in node-pool `" + $pool + "` within `" + $cluster + "` are reporting memory usage >= 75%.")
+        },
+        {
+          "category": "operational",
+          "observation": ("Pods within `" + $cluster + "` may be experiencing capacity or functionality issues, deviating from the expected healthy state.")
+        },
+        {
+          "category": "configuration",
+          "observation": ("Recent changes to deployments within `" + $cluster + "` are noted as relevant to the current state.")
+        }
+      ]'
+    )
     
-    add_issue "$title" "$details" "$sev" "$next_steps"
+    add_issue "$title" "$details" "$sev" "$next_steps" "$summary" "$observations"
   done
 }
 
