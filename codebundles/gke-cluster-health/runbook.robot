@@ -290,5 +290,7 @@ Check Node Pool Health for GCP Project `${GCP_PROJECT_ID}`
             ...    reproduce_hint=${node_pool_health.cmd}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["next_steps"]}
+            ...    summary=${issue["summary"]}
+            ...    observations=${issue["observations"]}
         END
     END

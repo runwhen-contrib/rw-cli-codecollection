@@ -41,6 +41,7 @@ Verify Istio Sidecar Injection for Cluster `${CONTEXT}`
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
     IF    len(@{issues}) > 0
         FOR    ${issue}    IN    @{issues}
+
             RW.Core.Add Issue
             ...    severity=${issue['severity']}
             ...    expected=${issue['expected']}
@@ -49,6 +50,8 @@ Verify Istio Sidecar Injection for Cluster `${CONTEXT}`
             ...    reproduce_hint=${results.cmd}
             ...    next_steps=${issue['next_steps']}
             ...    details=${issue['details']}
+            ...    summary=${issue['summary']}
+            ...    observations=${issue['observations']}
         END
     END
 
@@ -90,6 +93,8 @@ Check Istio Sidecar Resource Usage for Cluster `${CONTEXT}`
             ...    reproduce_hint=${reproduce_cmd}
             ...    next_steps=${issue['next_steps']}
             ...    details=${issue['details']}
+            ...    summary=${issue['summary']}
+            ...    observations=${issue['observations']}
         END
     END
     ${usage_report}=    RW.CLI.Run Cli
@@ -130,6 +135,8 @@ Validate Istio Installation in Cluster `${CONTEXT}`
             ...    reproduce_hint=${reproduce_cmd}
             ...    next_steps=${issue['next_steps']}
             ...    details=${issue['details']}
+            ...    summary=${issue['summary']}
+            ...    observations=${issue['observations']}
         END
     END
     ${installation_report}=    RW.CLI.Run Cli
@@ -251,6 +258,8 @@ Verify Istio SSL Certificates in Cluster `${CONTEXT}`
             ...    reproduce_hint=${reproduce_cmd}
             ...    next_steps=${issue['next_steps']}
             ...    details=${issue['details']}
+            ...    summary=${issue['summary']}
+            ...    observations=${issue['observations']}
         END
     END
     ${mtls_report}=    RW.CLI.Run Cli
