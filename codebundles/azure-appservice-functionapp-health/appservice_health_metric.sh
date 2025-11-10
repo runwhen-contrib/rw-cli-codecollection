@@ -176,15 +176,110 @@ if (( $(echo "$errors_total > 0" | bc -l) )); then
     )
 fi
 
-# Optionally, if you want to warn about high execution units (representing cost/usage):
-if (( $(echo "$execution_units_total > 100" | bc -l) )); then
+# Advanced execution units analysis with baseline comparison and anomaly detection
+echo "🔍 Analyzing execution units with baseline comparison..."
+
+# Get configuration values with defaults
+COST_THRESHOLD=${EXECUTION_UNITS_COST_THRESHOLD:-10000000}
+ANOMALY_MULTIPLIER=${EXECUTION_UNITS_ANOMALY_MULTIPLIER:-5}
+LOOKBACK_DAYS=${BASELINE_LOOKBACK_DAYS:-7}
+
+# Calculate baseline from historical data (same time period, N days ago)
+echo "📊 Calculating baseline from last $LOOKBACK_DAYS days..."
+
+# Calculate historical time range (same duration, N days ago)
+# Convert formatted timestamps back to epoch, subtract days, then format again
+end_epoch=$(date -d "$end_time" +%s 2>/dev/null || echo "")
+start_epoch=$(date -d "$start_time" +%s 2>/dev/null || echo "")
+
+if [[ -n "$end_epoch" && -n "$start_epoch" ]]; then
+    baseline_end_epoch=$((end_epoch - LOOKBACK_DAYS * 86400))
+    baseline_start_epoch=$((start_epoch - LOOKBACK_DAYS * 86400))
+    baseline_end_time=$(date -u -d "@$baseline_end_epoch" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo "")
+    baseline_start_time=$(date -u -d "@$baseline_start_epoch" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo "")
+else
+    baseline_end_time=""
+    baseline_start_time=""
+fi
+
+baseline_execution_units=0
+baseline_available=false
+
+# Only attempt baseline calculation if we have valid dates
+if [[ -n "$baseline_start_time" && -n "$baseline_end_time" ]]; then
+    echo "Baseline period: $baseline_start_time to $baseline_end_time"
+    
+    # Get historical execution units for baseline
+    baseline_metric_data=$(az monitor metrics list \
+        --resource "$resource_id" \
+        --metric "FunctionExecutionUnits" \
+        --start-time "$baseline_start_time" \
+        --end-time "$baseline_end_time" \
+        --interval PT5M \
+        --output json 2>/dev/null || echo '{"value":[]}')
+    
+    # Calculate baseline total
+    if [[ -n "$baseline_metric_data" ]] && [[ "$(echo "$baseline_metric_data" | jq '.value | length')" != "0" ]]; then
+        mapfile -t baseline_points < <(echo "$baseline_metric_data" | jq -c '.value[].timeseries[].data[]')
+        baseline_sum=0
+        baseline_count=0
+        
+        for point in "${baseline_points[@]}"; do
+            val=$(echo "$point" | jq -r '.total // "0"')
+            if [[ "$val" != "null" && "$val" != "0" ]]; then
+                baseline_sum=$(echo "$baseline_sum + $val" | bc -l 2>/dev/null || echo "$baseline_sum")
+                baseline_count=$((baseline_count + 1))
+            fi
+        done
+        
+        if [[ $baseline_count -gt 0 ]]; then
+            baseline_execution_units=$baseline_sum
+            baseline_available=true
+            echo "✅ Baseline calculated: $baseline_execution_units execution units ($baseline_count data points)"
+        else
+            echo "⚠️ No baseline data available - using fallback thresholds"
+        fi
+    else
+        echo "⚠️ No historical data available for baseline calculation"
+    fi
+else
+    echo "⚠️ Could not calculate baseline time range"
+fi
+
+# Cost threshold check (always performed)
+if (( $(echo "$execution_units_total > $COST_THRESHOLD" | bc -l) )); then
+    # Calculate intervals per hour dynamically based on RW_LOOKBACK_WINDOW
+    intervals_per_hour=$(echo "scale=0; 60 / $RW_LOOKBACK_WINDOW" | bc -l 2>/dev/null || echo "6")
+    monthly_cost_estimate=$(echo "scale=2; $execution_units_total * 0.000016 * 30 * 24 * $intervals_per_hour" | bc -l 2>/dev/null || echo "unknown")
+    
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "High Function Execution Units for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
-        --arg nextStep "Review cost and scaling settings for \`$FUNCTION_APP_NAME\`" \
-        --arg severity "3" \
-        --arg details "Execution units exceeded 100 in the last $RW_LOOKBACK_WINDOW minute(s) for Function App '$FUNCTION_APP_NAME' in subscription '$subscription_name'." \
+        --arg title "High Function Execution Units Cost Alert for \`$FUNCTION_APP_NAME\`" \
+        --arg nextStep "Review cost and scaling settings for \`$FUNCTION_APP_NAME\`. Consider optimizing function memory allocation, execution time, or implementing scaling policies." \
+        --arg severity "4" \
+        --arg details "COST ALERT: Execution units ($execution_units_total) exceeded cost threshold ($COST_THRESHOLD) in the last $RW_LOOKBACK_WINDOW minute(s) for Function App '$FUNCTION_APP_NAME'. Estimated monthly cost impact: ~\$$monthly_cost_estimate. Current usage represents significant compute costs that should be reviewed." \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
     )
+fi
+
+# Anomaly detection (only if baseline is available)
+if [[ "$baseline_available" == "true" ]]; then
+    anomaly_threshold=$(echo "$baseline_execution_units * $ANOMALY_MULTIPLIER" | bc -l 2>/dev/null || echo "0")
+    
+    if (( $(echo "$execution_units_total > $anomaly_threshold" | bc -l) )); then
+        multiplier_actual=$(echo "scale=1; $execution_units_total / $baseline_execution_units" | bc -l 2>/dev/null || echo "unknown")
+        
+        issues_json=$(echo "$issues_json" | jq \
+            --arg title "Execution Units Anomaly Detected for \`$FUNCTION_APP_NAME\`" \
+            --arg nextStep "Investigate unusual activity: check for traffic spikes, function performance issues, memory leaks, or deployment changes. Review Application Insights for \`$FUNCTION_APP_NAME\`." \
+            --arg severity "3" \
+            --arg details "ANOMALY ALERT: Current execution units ($execution_units_total) are ${multiplier_actual}x higher than baseline ($baseline_execution_units) for Function App '$FUNCTION_APP_NAME'. This represents unusual activity compared to the same time period $LOOKBACK_DAYS days ago. Potential causes: traffic spike, performance regression, memory leaks, or inefficient code changes." \
+            '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
+        )
+    else
+        echo "✅ Execution units within normal range (${execution_units_total} vs baseline ${baseline_execution_units})"
+    fi
+else
+    echo "ℹ️ Anomaly detection skipped - no baseline available (new app or insufficient historical data)"
 fi
 
 ###############################################

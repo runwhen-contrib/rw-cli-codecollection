@@ -41,6 +41,19 @@ The following variables can be customized to adjust thresholds for issue detecti
 - `FUNCTION_MEMORY_THRESHOLD`: Function memory usage threshold in MB (default: 512)
 - `FUNCTION_DURATION_THRESHOLD`: Function execution duration threshold in ms (default: 5000)
 
+### Advanced Execution Units Monitoring
+
+The codebundle includes intelligent execution units monitoring with baseline comparison and anomaly detection:
+
+- `EXECUTION_UNITS_COST_THRESHOLD`: Static threshold for cost alerts - represents ~$500/month at default (default: 10000000)
+- `EXECUTION_UNITS_ANOMALY_MULTIPLIER`: Multiplier for anomaly detection - alerts when execution units are X times higher than baseline (default: 5)
+- `BASELINE_LOOKBACK_DAYS`: Number of days to look back for baseline calculation (default: 7)
+
+**How it works:**
+1. **Cost Alert**: Always triggers when execution units exceed the static threshold (helps with budget management)
+2. **Anomaly Alert**: Compares current usage to the same time period N days ago and alerts if usage is significantly higher than normal
+3. **Baseline Calculation**: Uses historical Azure Monitor data to establish normal usage patterns for your specific Function App
+
 ## Features
 
 - **Resource Health Check**: Monitors Azure resource health status

@@ -111,7 +111,7 @@ else
                     echo "$error_logs" | jq -r '.[] | "      \(.Category): \(.count_) errors"'
                     
                     # Create issue for error logs
-                    error_details=$(echo "$error_logs" | jq -r '.[] | "- \(.Category): \(.count_) errors" | join("\n")')
+                    error_details=$(echo "$error_logs" | jq -r '[.[] | "- \(.Category): \(.count_) errors"] | join("\n")')
                     ISSUES+=("{\"title\":\"Function App \`$FUNCTION_APP_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has error logs in Log Analytics\",\"severity\":2,\"next_step\":\"Review error logs in Log Analytics workspace\",\"details\":\"Error logs found in Log Analytics workspace: $workspace_id for Function App '$FUNCTION_APP_NAME' in subscription '$SUBSCRIPTION_NAME'\\n\\n$error_details\"}")
                 fi
             else
@@ -144,13 +144,19 @@ if [[ -n "$APP_INSIGHTS_ID" && "$APP_INSIGHTS_ID" != "None" ]]; then
     
     # First, verify that Application Insights is actually accessible and working
     echo "🔍 Verifying Application Insights accessibility..."
-    test_query="requests | where timestamp > ago(1h) | limit 1"
+    # Use comprehensive telemetry check that works for all function types (HTTP, timer, queue, etc.)
+    test_query="union traces, requests, dependencies, exceptions, customEvents | where timestamp > ago(24h) | limit 1"
     test_result=$(timeout 30 az monitor app-insights query --app "$app_insights_name" --analytics-query "$test_query" -o json 2>/dev/null || echo "ERROR")
     
-    if [[ "$test_result" == "ERROR" || "$test_result" == "[]" || "$test_result" == "" ]]; then
-        echo "⚠️  Application Insights found but not accessible or not collecting data"
-        echo "   This could indicate Application Insights is not properly configured or not receiving data"
-        ISSUES+=("{\"title\":\"Function App \`$FUNCTION_APP_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has Application Insights but it's not accessible\",\"severity\":3,\"next_step\":\"Verify Application Insights configuration and data collection for \`$FUNCTION_APP_NAME\` in \`$AZ_RESOURCE_GROUP\` in subscription \`$SUBSCRIPTION_NAME\`\",\"details\":\"Application Insights resource found: $app_insights_name for Function App '$FUNCTION_APP_NAME' in subscription '$SUBSCRIPTION_NAME', but queries are not returning data. This may indicate the service is not properly configured or not receiving telemetry data.\"}")
+    if [[ "$test_result" == "ERROR" ]]; then
+        echo "❌ Application Insights query failed - connectivity or permission issue"
+        echo "   This indicates a real problem with Application Insights access"
+        ISSUES+=("{\"title\":\"Function App \`$FUNCTION_APP_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has Application Insights connectivity issues\",\"severity\":3,\"next_step\":\"Verify Application Insights permissions and network connectivity for \`$FUNCTION_APP_NAME\` in \`$AZ_RESOURCE_GROUP\` in subscription \`$SUBSCRIPTION_NAME\`\",\"details\":\"Application Insights resource found: $app_insights_name for Function App '$FUNCTION_APP_NAME' in subscription '$SUBSCRIPTION_NAME', but queries are failing. This indicates connectivity issues, permission problems, or the Application Insights resource may not exist.\"}")
+    elif [[ "$test_result" == "[]" || "$test_result" == "" ]]; then
+        echo "ℹ️  Application Insights accessible but no recent telemetry data (last 24h)"
+        echo "   This is normal for infrequently executed functions (timer, queue-triggered, etc.)"
+        # Only create informational issue, not a high-priority alert
+        ISSUES+=("{\"title\":\"Function App \`$FUNCTION_APP_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has no recent telemetry in Application Insights\",\"severity\":4,\"next_step\":\"Verify if this is expected for \`$FUNCTION_APP_NAME\` based on its trigger type and execution schedule. For timer-triggered or infrequent functions, this may be normal.\",\"details\":\"Application Insights is accessible for Function App '$FUNCTION_APP_NAME' in subscription '$SUBSCRIPTION_NAME', but no telemetry data found in the last 24 hours. This may be normal for timer-triggered, queue-triggered, or other infrequently executed functions.\"}")
     else
         # Application Insights is working, now check for actual issues
         echo "✅ Application Insights is accessible and collecting data"
@@ -173,7 +179,7 @@ if [[ -n "$APP_INSIGHTS_ID" && "$APP_INSIGHTS_ID" != "None" ]]; then
                     echo "$exceptions" | jq -r '.[] | "  - \(.type): \(.severityLevel) (\(.count_) occurrences)"' 2>/dev/null || echo "  - Unable to parse exception details"
                     
                     # Create issue for exceptions
-                    exception_details=$(echo "$exceptions" | jq -r '.[] | "- \(.type): \(.severityLevel) (\(.count_) occurrences)" | join("\n")' 2>/dev/null || echo "Unable to parse exception details")
+                    exception_details=$(echo "$exceptions" | jq -r '[.[] | "- \(.type): \(.severityLevel) (\(.count_) occurrences)"] | join("\n")' 2>/dev/null || echo "Unable to parse exception details")
                     ISSUES+=("{\"title\":\"Function App \`$FUNCTION_APP_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has exceptions in Application Insights\",\"severity\":2,\"next_step\":\"Review exceptions in Application Insights\",\"details\":\"Exceptions found in Application Insights: $app_insights_name for Function App '$FUNCTION_APP_NAME' in subscription '$SUBSCRIPTION_NAME'\\n\\n$exception_details\"}")
                 else
                     echo "✅ No recent exceptions found in Application Insights"
@@ -204,7 +210,7 @@ if [[ -n "$APP_INSIGHTS_ID" && "$APP_INSIGHTS_ID" != "None" ]]; then
                     echo "$failed_requests" | jq -r '.[] | "  - \(.name): HTTP \(.resultCode) (\(.count_) failures)"' 2>/dev/null || echo "  - Unable to parse failed request details"
                     
                     # Create issue for failed requests
-                    failed_details=$(echo "$failed_requests" | jq -r '.[] | "- \(.name): HTTP \(.resultCode) (\(.count_) failures)" | join("\n")' 2>/dev/null || echo "Unable to parse failed request details")
+                    failed_details=$(echo "$failed_requests" | jq -r '[.[] | "- \(.name): HTTP \(.resultCode) (\(.count_) failures)"] | join("\n")' 2>/dev/null || echo "Unable to parse failed request details")
                     ISSUES+=("{\"title\":\"Function App \`$FUNCTION_APP_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has failed requests in Application Insights\",\"severity\":2,\"next_step\":\"Review failed requests in Application Insights\",\"details\":\"Failed requests found in Application Insights: $app_insights_name for Function App '$FUNCTION_APP_NAME' in subscription '$SUBSCRIPTION_NAME'\\n\\n$failed_details\"}")
                 else
                     echo "✅ No recent failed requests found in Application Insights"
