@@ -17,12 +17,13 @@ add_issue() {
     local actual="$4"
     local details="$5"
     local next_steps="$6"
+    local observed_at="${7:-$(date '+%Y-%m-%d %H:%M:%S')}"
     
     # Escape quotes and newlines for JSON
     details=$(echo "$details" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
     next_steps=$(echo "$next_steps" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
     
-    local issue="{\"title\":\"$title\",\"severity\":$severity,\"expected\":\"$expected\",\"actual\":\"$actual\",\"details\":\"$details\",\"next_steps\":\"$next_steps\"}"
+    local issue="{\"title\":\"$title\",\"severity\":$severity,\"expected\":\"$expected\",\"actual\":\"$actual\",\"details\":\"$details\",\"next_steps\":\"$next_steps\",\"observed_at\":\"$observed_at\"}"
     jq ". += [${issue}]" "$ISSUES_FILE" > temp.json && mv temp.json "$ISSUES_FILE"
 }
 

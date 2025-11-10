@@ -11,6 +11,7 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
 Library             Collections
+Library             DateTime
 Suite Setup         Suite Initialization
 
 
@@ -37,6 +38,7 @@ Check Azure App Service Plan Resource Health in resource group `${AZURE_RESOURCE
             ${pretty_health}=    Evaluate    pprint.pformat(${health})    modules=pprint
             ${plan_name}=    Set Variable    ${health['resourceName']}
             ${health_status}=    Set Variable    ${health['properties']['availabilityState']}
+            ${issue_timestamp}=    Set Variable    ${health['properties']['occuredTime']}
             IF    "${health_status}" != "Available"
                 RW.Core.Add Issue
                 ...    severity=3
@@ -46,9 +48,11 @@ Check Azure App Service Plan Resource Health in resource group `${AZURE_RESOURCE
                 ...    reproduce_hint=${output.cmd}
                 ...    details={"health": ${pretty_health}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    next_steps=Investigate the health status of the Azure App Service Plan in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    observed_at=${issue_timestamp}
             END
         END
     ELSE
+        ${issue_timestamp}=    Datetime.Get Current Date
         RW.Core.Add Issue
         ...    severity=4
         ...    expected=Azure App Service Plan health should be enabled in resource group `${AZURE_RESOURCE_GROUP}`
@@ -57,6 +61,7 @@ Check Azure App Service Plan Resource Health in resource group `${AZURE_RESOURCE
         ...    reproduce_hint=${output.cmd}
         ...    details={"health_list": ${health_list}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
         ...    next_steps=Enable App Service Plan `${plan_name}` health provider Microsoft.ResourceHealth in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+        ...    observed_at=${issue_timestamp}
     END
 
 
@@ -94,6 +99,7 @@ Check App Service Plan Capacity and Recommendations in resource group `${AZURE_R
             ...    details={"plan": ${plan}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=Scale up the App Service Plan `${plan['name']}` in resource group `${plan['resourceGroup']}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`.\nOptimize the application code in App service plan `${plan['name']}` in resource group `${plan['resourceGroup']}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${script_output.cmd}
+            ...    observed_at=${plan['timestamp']}
         END
     ELSE
         RW.Core.Add Pre To Report    No high usage detected in any App Service Plans in resource group `${AZURE_RESOURCE_GROUP}`
@@ -130,6 +136,7 @@ Check App Service Plan Capacity and Recommendations in resource group `${AZURE_R
             ...    details={"plan": ${plan}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=${joined_recommendations}
             ...    reproduce_hint=${script_output.cmd}
+            ...    observed_at=${plan['timestamp']}
         END
     ELSE
         RW.Core.Add Pre To Report    No scaling recommendations found for App Service Plans in resource group `${AZURE_RESOURCE_GROUP}`
@@ -204,6 +211,7 @@ Check App Service Plan Changes in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    details={"changes": ${change}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    reproduce_hint=${audit_cmd.cmd}
                 ...    next_steps=Check App Service Plan `${asp_name}` logs for security implications in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    observed_at=${timestamp}
             END
         END
     ELSE
@@ -240,6 +248,7 @@ Check App Service Plan Changes in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    details={"details": ${enhanced_details}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    reproduce_hint=${audit_cmd.cmd}
                 ...    next_steps=Check errors logs in App Service Plan `${asp_name}` in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`.
+                ...    observed_at=${timestamp}
             END
         END
     ELSE

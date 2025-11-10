@@ -48,6 +48,7 @@ Check Network Configuration for ACR `${ACR_NAME}` In Resource Group `${AZ_RESOUR
             ...    reproduce_hint=${issue.get("reproduce_hint", "")}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["next_steps"]}
+            ...    observed_at=${issue.get("observed_at")}
         END
     END
 
@@ -72,6 +73,7 @@ Check DNS & TLS Reachability for Registry `${ACR_NAME}`
             ...    reproduce_hint=${issue.get("reproduce_hint", "")}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["next_steps"]}
+            ...    observed_at=${issue.get("observed_at")}
         END
     END
 
@@ -105,6 +107,7 @@ Check ACR Login & Authentication for Registry `${ACR_NAME}`
             ...    reproduce_hint=${issue.get("reproduce_hint", "")}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["next_steps"]}
+            ...    observed_at=${issue.get("observed_at")}
         END
     END
 
@@ -138,6 +141,7 @@ Check ACR SKU and Usage Metrics for Registry `${ACR_NAME}`
             ...    reproduce_hint=${issue.get("reproduce_hint", "")}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["next_steps"]}
+            ...    observed_at=${issue.get("observed_at")}
         END
     END
 
@@ -173,6 +177,7 @@ Check ACR Storage Utilization for Registry `${ACR_NAME}`
             ...    reproduce_hint=${issue.get("reproduce_hint", "")}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["next_steps"]}
+            ...    observed_at=${issue.get("observed_at")}
         END
     END
 
@@ -208,6 +213,7 @@ Analyze ACR Pull/Push Success Ratio for Registry `${ACR_NAME}`
             ...    reproduce_hint=${issue.get("reproduce_hint", "")}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["next_steps"]}
+            ...    observed_at=${issue.get("observed_at")}
         END
     END
 
@@ -233,6 +239,7 @@ Check ACR Repository Event Failures for Registry `${ACR_NAME}`
             ...    reproduce_hint=${issue.get("reproduce_hint", "")}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["next_steps"]}
+            ...    observed_at=${issue.get("observed_at")}
         END
     END
 
@@ -276,6 +283,7 @@ Check ACR Security Configuration and RBAC for Registry `${ACR_NAME}`
         ...    reproduce_hint=${issue["reproduce_hint"]}
         ...    details=${issue["details"]}
         ...    next_steps=${issue["next_steps"]}
+        ...    observed_at=${issue.get("observed_at")}
     END
 
 

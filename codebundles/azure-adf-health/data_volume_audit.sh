@@ -389,6 +389,7 @@ EOF
         data_written=$(safe_jq "$activity" '.Output_dataWritten_d' "0")
         is_heavy_read=$(safe_jq "$activity" '.isHeavyRead' "0")
         is_heavy_write=$(safe_jq "$activity" '.isHeavyWrite' "0")
+        observed_at=$(safe_jq "$activity" '.TimeGenerated' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')")
 
         if [[ "$is_heavy_read" -eq 1 ]] || [[ "$is_heavy_write" -eq 1 ]]; then
             audit_json=$(echo "$audit_json" | jq \
@@ -401,6 +402,7 @@ EOF
                 --arg actual "ADF pipeline \`$pipeline_name\` has large data operations in resource group \`$resource_group\`" \
                 --arg resource_url "$df_url" \
                 --arg run_id "$run_id" \
+                --arg observed_at "$observed_at" \
                 --arg reproduce_hint "az monitor log-analytics query --workspace \"$workspace_guid\" --analytics-query '$kql_query' --subscription \"$subscription_id\" --output json" \
                 '.data_volume_alerts += [{
                     "title": $title,
@@ -412,7 +414,8 @@ EOF
                     "resource_url": $resource_url,
                     "expected": $expected,
                     "reproduce_hint": $reproduce_hint,
-                    "run_id": $run_id
+                    "run_id": $run_id,
+                    "observed_at": $observed_at
                 }]')
         fi
     done < <(echo "$volume_data" | jq -c '.[]' 2>/dev/null || echo "")

@@ -8,6 +8,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             DateTime
 
 Suite Setup         Suite Initialization
 
@@ -30,6 +31,7 @@ Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resou
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${timestamp}=    DateTime.Get Current Date
     IF    len(@{issue_list}) > 0 
         IF    "${issue_list["properties"]["title"]}" != "Available"
             RW.Core.Add Issue
@@ -40,6 +42,7 @@ Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resou
             ...    reproduce_hint=${resource_health.cmd}
             ...    details=${issue_list}
             ...    next_steps=Please escalate to the Azure service owner or check back later.
+            ...    observed_at=${issue_list["properties"]["occuredTime"]}
         END
     ELSE
         RW.Core.Add Issue
@@ -50,6 +53,7 @@ Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resou
         ...    reproduce_hint=${resource_health.cmd}
         ...    details=${issue_list}
         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
+        ...    observed_at=${timestamp}
     END
 
 
@@ -70,6 +74,7 @@ Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${timestamp}=    DateTime.Get Current Date
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
             RW.Core.Add Issue    
@@ -80,6 +85,7 @@ Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${
             ...    actual=AKS Cluster `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has configuration issues
             ...    reproduce_hint=${config.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${timestamp}
         END
     END
 Check Network Configuration of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
@@ -104,7 +110,11 @@ Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOUR
 
     RW.Core.Add Pre To Report    ${activites.stdout}
 
-    ${issues}=    RW.CLI.Run Cli    cmd=cat aks_activities_issues.json
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat aks_activities_issues.json
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
@@ -116,6 +126,7 @@ Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOUR
             ...    actual=AKS Cluster `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` has Warning/Error/Critical activities
             ...    reproduce_hint=${activites.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${item["observed_at"]}
         END
     END
 

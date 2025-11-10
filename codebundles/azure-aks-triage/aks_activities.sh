@@ -90,12 +90,14 @@ for level in "${!log_levels[@]}"; do
 
     if [[ $(echo "$details" | jq length) -gt 0 ]]; then
         # Build the issue entry and add it to the issues array in issues_json
+        observed_at=$(echo "$details" | jq -r '.[0].eventTimestamp // ""')
         issues_json=$(echo "$issues_json" | jq \
             --arg title "$level level issues detected for AKS Cluster \`$AKS_CLUSTER\` in Azure Resource Group \`$AZ_RESOURCE_GROUP\`" \
             --arg nextStep "Check the $level-level activity logs for AKS cluster \`$AKS_CLUSTER\` in resource group \`$AZ_RESOURCE_GROUP\`. [Activity log URL]($event_log_url)" \
             --arg severity "${log_levels[$level]}" \
+            --arg observed_at "$observed_at" \
             --argjson logs "$details" \
-            '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $logs}]'
+            '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $logs, "observed_at": $observed_at}]'
         )
     fi
 done

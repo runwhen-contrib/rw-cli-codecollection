@@ -153,15 +153,17 @@ echo "Analyzing logs for potential issues..."
 
 issues="[]"
 add_issue() {
-  local sev="$1" title="$2" next="$3" details="$4"
+  local sev="$1" title="$2" next="$3" details="$4" observed_at="${5:-$(date '+%Y-%m-%d %H:%M:%S')}"
   issues=$(jq --arg s "$sev" --arg t "$title" \
               --arg n "$next" --arg d "$details" \
-              '. += [{severity:($s|tonumber),title:$t,next_step:$n,details:$d}]' \
+              --arg o "$observed_at" \
+              '. += [{severity:($s|tonumber),title:$t,next_step:$n,details:$d,observed_at:$o}]' \
               <<<"$issues")
 }
 
 # Check for error logs
 error_count=$(jq '.errorLogs | length' <<< "$logs_data")
+observed_at=$(jq -r '.errorLogs[0].TimeGenerated' <<< "$logs_data")
 if [[ "$error_count" -gt 0 ]]; then
   # Get the most recent errors (up to 5)
   recent_errors=$(jq '.errorLogs[0:5]' <<< "$logs_data")
@@ -169,12 +171,13 @@ if [[ "$error_count" -gt 0 ]]; then
   add_issue 1 \
     "Service Bus namespace $SB_NAMESPACE_NAME has $error_count errors in logs" \
     "Investigate the error logs in Log Analytics and address the root causes" \
-    "Recent errors: $(echo "$recent_errors" | jq -c)"
+    "Recent errors: $(echo "$recent_errors" | jq -c)" \
+    "$observed_at"
 fi
 
 # Check for failed operations
 failed_ops_count=$(jq '.operationLogs[] | select(.status_s == "Failed") | length' <<< "$logs_data" 2>/dev/null || echo "0")
-
+observed_at=$(jq -r '.operationLogs[0].TimeGenerated' <<< "$logs_data")
 if [[ "$failed_ops_count" -gt 0 ]]; then
   # Get the most recent failed operations (up to 5)
   recent_failed_ops=$(jq '.operationLogs[] | select(.status_s == "Failed") | .[0:5]' <<< "$logs_data")
@@ -182,7 +185,8 @@ if [[ "$failed_ops_count" -gt 0 ]]; then
   add_issue 3 \
     "Service Bus namespace $SB_NAMESPACE_NAME has $failed_ops_count failed operations" \
     "Review the failed operations and investigate the root causes" \
-    "Failed operations detected"
+    "Failed operations detected" \
+    "$observed_at"
 fi
 
 # Check if Log Analytics isn't set up properly

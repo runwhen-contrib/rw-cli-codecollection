@@ -168,7 +168,7 @@ AzureDiagnostics
 | where Category == "ApplicationGatewayAccessLog"
 | where ResourceId == "${AGW_RESOURCE_ID}"
 | where toint(httpStatus_d) >= 400 and toint(httpStatus_d) < 600
-| summarize CountOfMatches = count()
+| summarize CountOfMatches = count(), LastSeen = max(TimeGenerated)
 EOF
 )
 
@@ -212,15 +212,18 @@ echo "Count of HTTP errors (4xx/5xx) in last $TIME_RANGE: $count_of_matches"
 # 6) Compare with threshold
 # -----------------------------------------------------------------------------
 if (( $(echo "$count_of_matches > $WARNINGS_THRESHOLD" | bc -l) )); then
+  observed_at=$(echo "$query_output" | jq -r '.tables[0].rows[0][1] // "Unknown"' 2>/dev/null || echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)")
   issues_json=$(echo "$issues_json" | jq \
     --arg title "High HTTP Error Rate Detected in Application Gateway" \
     --arg details "Found $count_of_matches HTTP error responses (4xx/5xx status codes) in $TIME_RANGE for Application Gateway $APP_GATEWAY_NAME." \
     --arg severity "2" \
     --arg nextStep "Investigate the cause of HTTP errors for Application Gateway \`$APP_GATEWAY_NAME\` in Resource Group \`$AZ_RESOURCE_GROUP\`. Check backend health, SSL certificates, and routing rules." \
+    --arg observed_at "$observed_at" \
     '.issues += [{
        "title": $title,
        "details": $details,
        "next_step": $nextStep,
+       "observed_at": $observed_at,
        "severity": ($severity | tonumber)
      }]')
 else

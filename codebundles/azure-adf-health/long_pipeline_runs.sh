@@ -404,6 +404,7 @@ EOF
             --arg resource_url "$df_url" \
             --arg reproduce_hint "az monitor log-analytics query --workspace \"$workspace_guid\" --analytics-query '$kql_query' --subscription \"$subscription_id\" --output json" \
             --arg run_id "$run_id" \
+            --arg observed_at "$start_time" \
             '.long_running_pipelines += [{
                 "title": $title,
                 "details": $details,
@@ -416,7 +417,8 @@ EOF
                 "status": $status,
                 "resource_url": $resource_url,
                 "reproduce_hint": $reproduce_hint,
-                "run_id": $run_id
+                "run_id": $run_id,
+                "observed_at": $observed_at
             }]')
     done < <(echo "$long_running_pipelines" | jq -c '.[]' 2>/dev/null || echo "")
 done < <(echo "$datafactories" | jq -c '.[]' 2>/dev/null || echo "")

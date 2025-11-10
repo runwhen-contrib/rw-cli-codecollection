@@ -38,7 +38,7 @@ echo "Resource Group: $AZ_RESOURCE_GROUP"
 echo "Time Range: $start_time to $end_time"
 
 # Get Function App details
-function_app_info=$(az functionapp show --name "$FUNCTION_APP_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "{resourceId: id, state: state, kind: kind, defaultHostName: defaultHostName}" -o json 2>/dev/null)
+function_app_info=$(az functionapp show --name "$FUNCTION_APP_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "{resourceId: id, state: state, kind: kind, defaultHostName: defaultHostName, timestamp: lastModifiedTimeUtc}" -o json 2>/dev/null)
 
 if [[ -z "$function_app_info" ]]; then
     echo "Error: Function App '$FUNCTION_APP_NAME' not found in resource group '$AZ_RESOURCE_GROUP'."
@@ -48,6 +48,7 @@ fi
 resource_id=$(echo "$function_app_info" | jq -r '.resourceId')
 function_app_state=$(echo "$function_app_info" | jq -r '.state')
 function_app_kind=$(echo "$function_app_info" | jq -r '.kind')
+timestamp=$(echo "$function_app_info" | jq -r '.timestamp')
 
 echo "Function App State: $function_app_state"
 echo "Function App Kind: $function_app_kind"
@@ -61,6 +62,12 @@ add_issue() {
     local next_step="$2"
     local severity="$3"
     local details="$4"
+    local observed_at="$5"
+    
+    # Set default observed_at if not provided
+    if [[ -z "$observed_at" ]]; then
+        observed_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+    fi
     
     # Build portal URLs for easy access
     portal_url="https://portal.azure.com/#@/resource${resource_id}/overview"
@@ -75,7 +82,8 @@ add_issue() {
         --arg nextStep "$next_step" \
         --arg severity "$severity" \
         --arg details "$detailed_info" \
-        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
+        --arg observed_at "$observed_at" \
+        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details, "observed_at": $observed_at}]'
     )
 }
 
@@ -96,35 +104,47 @@ if [[ $(echo "$advisor_recommendations" | jq length) -gt 0 ]]; then
     reliability_recs=$(echo "$advisor_recommendations" | jq '[.[] | select(.category == "HighAvailability")]')
     
     if [[ $(echo "$performance_recs" | jq length) -gt 0 ]]; then
+        # Get the most recent timestamp from performance recommendations
+        timestamp=$(echo "$performance_recs" | jq -r '[.[] | .lastUpdated] | max')
         perf_summary=$(echo "$performance_recs" | jq -r '.[] | "\(.shortDescription.problem) - \(.shortDescription.solution)"' | head -3)
         add_issue "Performance Recommendations for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
                   "Review Azure Advisor performance recommendations for Function App \`$FUNCTION_APP_NAME\`. These recommendations can help optimize application performance and user experience." \
                   "4" \
-                  "$perf_summary"
+                  "$perf_summary" \
+                  "$timestamp"
     fi
     
     if [[ $(echo "$cost_recs" | jq length) -gt 0 ]]; then
+        # Get the most recent timestamp from cost recommendations
+        timestamp=$(echo "$cost_recs" | jq -r '[.[] | .lastUpdated] | max')
         cost_summary=$(echo "$cost_recs" | jq -r '.[] | "\(.shortDescription.problem) - \(.shortDescription.solution)"' | head -3)
         add_issue "Cost Optimization Recommendations for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
                   "Review Azure Advisor cost recommendations for Function App \`$FUNCTION_APP_NAME\`. These recommendations can help reduce operational costs." \
                   "4" \
-                  "$cost_summary"
+                  "$cost_summary" \
+                  "$timestamp"
     fi
     
     if [[ $(echo "$security_recs" | jq length) -gt 0 ]]; then
+        # Get the most recent timestamp from security recommendations
+        timestamp=$(echo "$security_recs" | jq -r '[.[] | .lastUpdated] | max')
         security_summary=$(echo "$security_recs" | jq -r '.[] | "\(.shortDescription.problem) - \(.shortDescription.solution)"' | head -3)
         add_issue "Security Recommendations for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
                   "Review Azure Advisor security recommendations for Function App \`$FUNCTION_APP_NAME\`. These recommendations help improve security posture." \
                   "4" \
-                  "$security_summary"
+                  "$security_summary" \
+                  "$timestamp"
     fi
     
     if [[ $(echo "$reliability_recs" | jq length) -gt 0 ]]; then
+        # Get the most recent timestamp from reliability recommendations
+        timestamp=$(echo "$reliability_recs" | jq -r '[.[] | .lastUpdated] | max')
         reliability_summary=$(echo "$reliability_recs" | jq -r '.[] | "\(.shortDescription.problem) - \(.shortDescription.solution)"' | head -3)
         add_issue "Reliability Recommendations for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
                   "Review Azure Advisor reliability recommendations for Function App \`$FUNCTION_APP_NAME\`. These recommendations help improve application reliability." \
                   "4" \
-                  "$reliability_summary"
+                  "$reliability_summary" \
+                  "$timestamp"
     fi
 else
     echo "No Azure Advisor recommendations found"
@@ -148,6 +168,7 @@ if [[ $(echo "$service_health" | jq length) -gt 0 ]]; then
         event_status=$(echo "$event" | jq -r '.properties.status')
         event_level=$(echo "$event" | jq -r '.properties.level')
         event_summary=$(echo "$event" | jq -r '.properties.summary')
+        observed_at=$(echo "$event" | jq -r '.properties.lastUpdateTime')
         
         severity="4"
         if [[ "$event_level" == "Critical" ]]; then
@@ -159,7 +180,8 @@ if [[ $(echo "$service_health" | jq length) -gt 0 ]]; then
         add_issue "Service Health Alert: $event_title" \
                   "Azure Service Health has reported an issue that may affect Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`. Status: $event_status. Review the service health dashboard for more details." \
                   "$severity" \
-                  "$event_summary"
+                  "$event_summary" \
+                  "$observed_at"
     done < <(echo "$service_health" | jq -c '.[]')
 else
     echo "No Service Health notifications found"
@@ -241,7 +263,8 @@ if [[ "$function_app_state" != "Running" ]]; then
     add_issue "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` is Stopped - Potential Cost Savings" \
               "Function App \`$FUNCTION_APP_NAME\` is currently stopped. If this is intentional and long-term, consider deleting unused resources to reduce costs." \
               "4" \
-              "Stopped Function Apps may still incur costs for associated resources like storage accounts and hosting plans."
+              "Stopped Function Apps may still incur costs for associated resources like storage accounts and hosting plans." \
+              "$timestamp"
 fi
 
 # Portal URLs are now included in each issue's details via the add_issue function

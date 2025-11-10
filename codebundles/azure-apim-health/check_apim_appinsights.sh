@@ -150,7 +150,7 @@ end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 EXCEPTIONS_QUERY="exceptions
 | where timestamp >= datetime('$start_time') and timestamp <= datetime('$end_time')
 | where cloud_RoleName has \"$APIM_NAME\" or operation_Name has \"apim\" or operation_Name has \"gateway\"
-| summarize ExceptionCount = count() by type, outerMessage
+| summarize ExceptionCount = count(), LastSeen = max(timestamp) by type, outerMessage
 | order by ExceptionCount desc"
 
 echo "[INFO] Querying Application Insights for exceptions..."
@@ -168,6 +168,7 @@ if exceptions_output=$(az monitor app-insights query \
             exc_type=$(echo "$exceptions_output" | jq -r ".tables[0].rows[$i][0] // \"Unknown\"")
             exc_message=$(echo "$exceptions_output" | jq -r ".tables[0].rows[$i][1] // \"No message\"")
             exc_count=$(echo "$exceptions_output" | jq -r ".tables[0].rows[$i][2] // 0")
+            exc_observed_at=$(echo "$exceptions_output" | jq -r ".tables[0].rows[$i][3] // \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"")
             
             if [[ "$exc_count" -gt 5 ]]; then  # Threshold for reporting
                 issues_json=$(echo "$issues_json" | jq \
@@ -175,11 +176,13 @@ if exceptions_output=$(az monitor app-insights query \
                     --arg d "Exception: $exc_type, Message: $exc_message, Count: $exc_count" \
                     --arg s "2" \
                     --arg n "Investigate $exc_type exceptions in APIM. Check application logs and policies." \
+                    --arg observed_at "$exc_observed_at" \
                     '.issues += [{
                        "title": $t,
                        "details": $d,
                        "next_steps": $n,
-                       "severity": ($s | tonumber)
+                       "severity": ($s | tonumber),
+                       "observed_at": $observed_at
                     }]')
             fi
         done
@@ -195,7 +198,7 @@ FAILED_REQUESTS_QUERY="requests
 | where timestamp >= datetime('$start_time') and timestamp <= datetime('$end_time')
 | where cloud_RoleName has \"$APIM_NAME\" or operation_Name has \"apim\" or operation_Name has \"gateway\"
 | where success == false
-| summarize FailedCount = count() by resultCode, name
+| summarize FailedCount = count(), LastSeen = max(timestamp) by resultCode, name
 | order by FailedCount desc"
 
 echo "[INFO] Querying Application Insights for failed requests..."
@@ -208,6 +211,7 @@ if failed_requests_output=$(az monitor app-insights query \
     if [[ "$failed_request_types" -gt 0 ]]; then
         echo "[INFO] Found $failed_request_types failed request types"
         
+        observed_at=$(echo "$failed_requests_output" | jq -r ".tables[0].rows[0][3] // \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"")
         # Process failed requests
         total_failures=0
         for (( i=0; i<failed_request_types; i++ )); do
@@ -224,11 +228,13 @@ if failed_requests_output=$(az monitor app-insights query \
                 --arg d "Total failed requests: $total_failures. Details: $failure_details" \
                 --arg s "2" \
                 --arg n "Investigate failed request patterns in APIM. Check API policies and backend connectivity." \
+                --arg observed_at "$observed_at" \
                 '.issues += [{
                    "title": $t,
                    "details": $d,
                    "next_steps": $n,
-                   "severity": ($s | tonumber)
+                   "severity": ($s | tonumber),
+                   "observed_at": $observed_at
                 }]')
         fi
     fi
@@ -242,7 +248,7 @@ fi
 PERFORMANCE_QUERY="requests
 | where timestamp >= datetime('$start_time') and timestamp <= datetime('$end_time')
 | where cloud_RoleName has \"$APIM_NAME\" or operation_Name has \"apim\" or operation_Name has \"gateway\"
-| summarize AvgDuration = avg(duration), MaxDuration = max(duration), RequestCount = count()
+| summarize AvgDuration = avg(duration), MaxDuration = max(duration), RequestCount = count(), LastSeen = max(timestamp)
 | where AvgDuration > 1000 or MaxDuration > 5000"  # 1 second average or 5 second max
 
 echo "[INFO] Querying Application Insights for performance issues..."
@@ -256,17 +262,20 @@ if performance_output=$(az monitor app-insights query \
         avg_duration=$(echo "$performance_output" | jq -r '.tables[0].rows[0][0] // 0')
         max_duration=$(echo "$performance_output" | jq -r '.tables[0].rows[0][1] // 0')
         request_count=$(echo "$performance_output" | jq -r '.tables[0].rows[0][2] // 0')
+        observed_at=$(echo "$performance_output" | jq -r ".tables[0].rows[0][3] // \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"")
         
         issues_json=$(echo "$issues_json" | jq \
             --arg t "Performance Issues Detected in Application Insights" \
             --arg d "Average duration: ${avg_duration}ms, Max duration: ${max_duration}ms, Request count: $request_count" \
             --arg s "3" \
             --arg n "Investigate APIM performance issues. Check policies, backend response times, and network latency." \
+            --arg observed_at "$observed_at" \
             '.issues += [{
                "title": $t,
                "details": $d,
                "next_steps": $n,
-               "severity": ($s | tonumber)
+               "severity": ($s | tonumber),
+               "observed_at": $observed_at
             }]')
     fi
 else

@@ -8,7 +8,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
-
+Library             DateTime
 Suite Setup         Suite Initialization
 
 
@@ -39,6 +39,7 @@ Gather APIM Resource Information for APIM `${APIM_NAME}` in Resource Group `${AZ
             ...    reproduce_hint=${apim_config.cmd}
             ...    details=${item["details"]}
             ...    next_steps=${item["next_steps"]}
+            ...    observed_at=${item["observed_at"]}
         END
     END
 
@@ -54,6 +55,7 @@ Check for Resource Health Issues Affecting APIM `${APIM_NAME}` in Resource Group
     ...    show_in_rwl_cheatsheet=true
 
     RW.Core.Add Pre To Report    ${resource_health.stdout}
+    ${timestamp}=    DateTime.Get Current Date
 
     IF    "${resource_health.stderr}" != ''
         RW.Core.Add Issue
@@ -64,6 +66,7 @@ Check for Resource Health Issues Affecting APIM `${APIM_NAME}` in Resource Group
         ...    actual=stderr encountered
         ...    reproduce_hint=${resource_health.cmd}
         ...    details=${resource_health.stderr}
+        ...    observed_at=${timestamp}
     END
 
     # 4) Read the JSON output from apim_resource_health.json
@@ -80,6 +83,7 @@ Check for Resource Health Issues Affecting APIM `${APIM_NAME}` in Resource Group
         ${status_title}=    Set Variable    ${issue_list["properties"]["title"]}
         # Check if the category is "Not Applicable" to suppress issue for ondemand/serverless deployments
         ${category}=    Set Variable    ${issue_list["properties"]["category"]}
+        ${observed_at}=    Set Variable    ${issue_list["properties"]["occuredTime"]}
 
         IF    "${status_title}" != "Available" and "${category}" != "Not Applicable"
             RW.Core.Add Issue
@@ -90,6 +94,7 @@ Check for Resource Health Issues Affecting APIM `${APIM_NAME}` in Resource Group
             ...    reproduce_hint=${resource_health.cmd}
             ...    details=${issue_list}
             ...    next_steps=Consult Azure Resource Health documentation or escalate to service owner.
+            ...    observed_at=${observed_at}
         END
     ELSE
         RW.Core.Add Issue
@@ -100,6 +105,7 @@ Check for Resource Health Issues Affecting APIM `${APIM_NAME}` in Resource Group
         ...    reproduce_hint=${resource_health.cmd}
         ...    details=${issue_list}
         ...    next_steps=Enable Resource Health or check provider registration for Microsoft.ResourceHealth
+        ...    observed_at=${timestamp}
     END
 
 Fetch Key Metrics for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
@@ -113,6 +119,7 @@ Fetch Key Metrics for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP
     ...    include_in_history=false
 
     RW.Core.Add Pre To Report    ${apim_metrics.stdout}
+    ${timestamp}=    DateTime.Get Current Date
 
     IF    "${apim_metrics.stderr}" != ''
         RW.Core.Add Issue
@@ -123,6 +130,7 @@ Fetch Key Metrics for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP
         ...    actual=Stderr encountered
         ...    reproduce_hint=${apim_metrics.cmd}
         ...    details=${apim_metrics.stderr}
+        ...    observed_at=${timestamp}
     END
 
     ${metrics_output}=    RW.CLI.Run Cli
@@ -144,6 +152,7 @@ Fetch Key Metrics for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP
             ...    actual=Potential problem flagged in metrics
             ...    reproduce_hint=${apim_metrics.cmd}
             ...    details=${issue["details"]}
+            ...    observed_at=${timestamp}
         END
     END
 
@@ -164,6 +173,7 @@ Check Logs for Errors with APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_
     ...    include_in_history=false
 
     RW.Core.Add Pre To Report    ${diag_run.stdout}
+    ${timestamp}=    DateTime.Get Current Date
 
     IF    "${diag_run.stderr}" != ''
         RW.Core.Add Issue
@@ -174,6 +184,7 @@ Check Logs for Errors with APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_
         ...    actual=stderr encountered
         ...    reproduce_hint=${diag_run.cmd}
         ...    details=${diag_run.stderr}
+        ...    observed_at=${timestamp}
     END
 
     # Parse the JSON file for issues
@@ -188,6 +199,7 @@ Check Logs for Errors with APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_
 
     IF    len(@{apim_log_issues}) > 0
         FOR    ${item}    IN    @{apim_log_issues}
+            ${item_observed_at}=    Get Variable Value    ${item["observed_at"]}    ${timestamp}
             RW.Core.Add Issue
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
@@ -196,6 +208,7 @@ Check Logs for Errors with APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_
             ...    actual=Some errors/warnings found above threshold
             ...    reproduce_hint=${diag_run.cmd}
             ...    details=${item["details"]}
+            ...    observed_at=${item_observed_at}
         END
     END
 
@@ -216,6 +229,7 @@ Check Activity Logs for APIM Management Operations `${APIM_NAME}` in Resource Gr
     ...    include_in_history=false
 
     RW.Core.Add Pre To Report    ${activity_run.stdout}
+    ${timestamp}=    DateTime.Get Current Date
 
     IF    "${activity_run.stderr}" != ''
         RW.Core.Add Issue
@@ -226,6 +240,7 @@ Check Activity Logs for APIM Management Operations `${APIM_NAME}` in Resource Gr
         ...    actual=stderr encountered
         ...    reproduce_hint=${activity_run.cmd}
         ...    details=${activity_run.stderr}
+        ...    observed_at=${timestamp}
     END
 
     # Parse the JSON file for issues
@@ -240,6 +255,7 @@ Check Activity Logs for APIM Management Operations `${APIM_NAME}` in Resource Gr
 
     IF    len(@{activity_issues}) > 0
         FOR    ${item}    IN    @{activity_issues}
+            ${item_observed_at}=    Get Variable Value    ${item["observed_at"]}    ${timestamp}
             RW.Core.Add Issue
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
@@ -248,6 +264,7 @@ Check Activity Logs for APIM Management Operations `${APIM_NAME}` in Resource Gr
             ...    actual=Administrative issues detected in activity logs
             ...    reproduce_hint=${activity_run.cmd}
             ...    details=${item["details"]}
+            ...    observed_at=${item_observed_at}
         END
     END
 
@@ -268,6 +285,7 @@ Check Application Insights Integration for APIM `${APIM_NAME}` in Resource Group
     ...    include_in_history=false
 
     RW.Core.Add Pre To Report    ${appinsights_run.stdout}
+    ${timestamp}=    DateTime.Get Current Date
 
     IF    "${appinsights_run.stderr}" != ''
         RW.Core.Add Issue
@@ -278,6 +296,7 @@ Check Application Insights Integration for APIM `${APIM_NAME}` in Resource Group
         ...    actual=stderr encountered
         ...    reproduce_hint=${appinsights_run.cmd}
         ...    details=${appinsights_run.stderr}
+        ...    observed_at=${timestamp}
     END
 
     ${appinsights_json}=    RW.CLI.Run Cli
@@ -291,6 +310,7 @@ Check Application Insights Integration for APIM `${APIM_NAME}` in Resource Group
 
     IF    len(@{appinsights_issues}) > 0
         FOR    ${item}    IN    @{appinsights_issues}
+            ${item_observed_at}=    Get Variable Value    ${item["observed_at"]}    ${timestamp}
             RW.Core.Add Issue
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
@@ -299,6 +319,7 @@ Check Application Insights Integration for APIM `${APIM_NAME}` in Resource Group
             ...    actual=Application Insights issues detected
             ...    reproduce_hint=${appinsights_run.cmd}
             ...    details=${item["details"]}
+            ...    observed_at=${item_observed_at}
         END
     END
 
@@ -313,6 +334,7 @@ Check Key Vault Dependencies for APIM `${APIM_NAME}` in Resource Group `${AZ_RES
     ...    include_in_history=false
 
     RW.Core.Add Pre To Report    ${keyvault_run.stdout}
+    ${timestamp}=    DateTime.Get Current Date
 
     IF    "${keyvault_run.stderr}" != ''
         RW.Core.Add Issue
@@ -323,6 +345,7 @@ Check Key Vault Dependencies for APIM `${APIM_NAME}` in Resource Group `${AZ_RES
         ...    actual=stderr encountered
         ...    reproduce_hint=${keyvault_run.cmd}
         ...    details=${keyvault_run.stderr}
+        ...    observed_at=${timestamp}
     END
 
     ${keyvault_json}=    RW.CLI.Run Cli
@@ -336,6 +359,7 @@ Check Key Vault Dependencies for APIM `${APIM_NAME}` in Resource Group `${AZ_RES
 
     IF    len(@{keyvault_issues}) > 0
         FOR    ${item}    IN    @{keyvault_issues}
+            ${item_observed_at}=    Get Variable Value    ${item["observed_at"]}    ${timestamp}
             RW.Core.Add Issue
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
@@ -344,6 +368,7 @@ Check Key Vault Dependencies for APIM `${APIM_NAME}` in Resource Group `${AZ_RES
             ...    actual=Key Vault access issues detected
             ...    reproduce_hint=${keyvault_run.cmd}
             ...    details=${item["details"]}
+            ...    observed_at=${item_observed_at}
         END
     END
 
@@ -359,6 +384,7 @@ Verify APIM Policy Configurations for `${APIM_NAME}` in Resource Group `${AZ_RES
 
     # Include script stdout in the test report
     RW.Core.Add Pre To Report    ${policy_check.stdout}
+    ${timestamp}=    DateTime.Get Current Date
 
     # If there's any stderr, raise an immediate issue
     IF    "${policy_check.stderr}" != ''
@@ -370,6 +396,7 @@ Verify APIM Policy Configurations for `${APIM_NAME}` in Resource Group `${AZ_RES
         ...    actual=stderr encountered
         ...    reproduce_hint=${policy_check.cmd}
         ...    details=${policy_check.stderr}
+        ...    observed_at=${timestamp}
     END
 
     # Read the final JSON file (apim_policy_issues.json)
@@ -392,6 +419,7 @@ Verify APIM Policy Configurations for `${APIM_NAME}` in Resource Group `${AZ_RES
             ...    actual=Policy issues detected that may affect functionality
             ...    reproduce_hint=${policy_check.cmd}
             ...    details=${issue["details"]}
+            ...    observed_at=${timestamp}
         END
     END
 
@@ -412,6 +440,7 @@ Check APIM SSL Certificates for `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_
     ...    include_in_history=false
 
     RW.Core.Add Pre To Report    ${cert_check.stdout}
+    ${timestamp}=    DateTime.Get Current Date
 
     IF    "${cert_check.stderr}" != ''
         RW.Core.Add Issue
@@ -422,6 +451,7 @@ Check APIM SSL Certificates for `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_
         ...    actual=Errors encountered
         ...    reproduce_hint=${cert_check.cmd}
         ...    details=${cert_check.stderr}
+        ...    observed_at=${timestamp}
     END
 
     ${cert_issues_cmd}=    RW.CLI.Run Cli
@@ -443,6 +473,7 @@ Check APIM SSL Certificates for `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_
             ...    actual=Certificate mismatch or near/over expiry
             ...    reproduce_hint=${cert_check.cmd}
             ...    details=${item["details"]}
+            ...    observed_at=${timestamp}
         END
     END
 
@@ -457,6 +488,7 @@ Inspect Dependencies and Related Resources for APIM `${APIM_NAME}` in Resource G
     ...    include_in_history=false
 
     RW.Core.Add Pre To Report    ${deps_run.stdout}
+    ${timestamp}=    DateTime.Get Current Date
 
     IF    "${deps_run.stderr}" != ''
         RW.Core.Add Issue
@@ -467,6 +499,7 @@ Inspect Dependencies and Related Resources for APIM `${APIM_NAME}` in Resource G
         ...    actual=stderr encountered
         ...    reproduce_hint=${deps_run.cmd}
         ...    details=${deps_run.stderr}
+        ...    observed_at=${timestamp}
     END
 
     ${deps_json_cmd}=    RW.CLI.Run Cli
@@ -492,6 +525,7 @@ Inspect Dependencies and Related Resources for APIM `${APIM_NAME}` in Resource G
             ...    actual=Some dependencies are unhealthy or unreachable
             ...    reproduce_hint=${deps_run.cmd}
             ...    details=${item["details"]}
+            ...    observed_at=${timestamp}
         END
     END
 

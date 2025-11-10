@@ -189,7 +189,7 @@ for kv_name in "${unique_keyvaults[@]}"; do
 | where Category == \"AuditEvent\"
 | where ResultType != \"Success\"
 | where OperationName in (\"SecretGet\", \"CertificateGet\", \"KeyGet\")
-| summarize FailureCount = count() by OperationName, ResultType, CallerIpAddress
+| summarize FailureCount = count(), LastSeen = max(TimeGenerated) by OperationName, ResultType, CallerIPAddress
 | order by FailureCount desc"
                 
                 if kv_audit_output=$(az monitor log-analytics query \
@@ -201,6 +201,7 @@ for kv_name in "${unique_keyvaults[@]}"; do
                     if [[ "$failure_count" -gt 0 ]]; then
                         echo "[INFO] Found $failure_count failure types in Key Vault audit logs"
                         
+                        observed_at=$(echo "$kv_audit_output" | jq -r ".tables[0].rows[0][4] // \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"")
                         total_failures=0
                         for (( i=0; i<failure_count; i++ )); do
                             operation=$(echo "$kv_audit_output" | jq -r ".tables[0].rows[$i][0] // \"Unknown\"")
@@ -217,11 +218,13 @@ for kv_name in "${unique_keyvaults[@]}"; do
                                 --arg d "Key Vault: $kv_name, Total failures: $total_failures, Details: $failure_details" \
                                 --arg s "3" \
                                 --arg n "Investigate Key Vault access failures. Check APIM managed identity permissions and network connectivity." \
+                                --arg observed_at "$observed_at" \
                                 '.issues += [{
                                    "title": $t,
                                    "details": $d,
                                    "next_steps": $n,
-                                   "severity": ($s | tonumber)
+                                   "severity": ($s | tonumber),
+                                   "observed_at": $observed_at
                                 }]')
                         fi
                     fi
